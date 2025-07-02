@@ -161,6 +161,26 @@ closed protocol Central {
         handle server_end:Connection;
     });
 
+    /// Synchronize to a periodic advertising train. Reports will be delivered via the
+    /// `PeriodicAdvertisingSync` protocol.
+    @available(added=NEXT)
+    strict SyncToPeriodicAdvertising(resource table {
+        /// Identifier of the peer transmitting the periodic advertisement, as indicated via
+        /// `Peer.periodic_advertising_interval`.
+        /// Required.
+        1: peer_id bt.PeerId;
+        /// The Advertising SID of the advertisement used to synchronize. This is found in a
+        /// standard scan result (`Peer.advertising_sid`).
+        /// Required.
+        2: advertising_sid uint8;
+        /// Upon successful synchronization, the `PeriodicAdvertisingSync.OnEstablished` event will
+        /// be sent. See `PeriodicAdvertisingSync` for failure epitaphs.
+        /// Required.
+        3: sync server_end:PeriodicAdvertisingSync;
+        4: config PeriodicAdvertisingSyncConfiguration;
+    });
+
+
     /// Create a new Connected Iosochronous Group (CIG) with the specified parameters. This
     /// operation is only valid when operating in the Central role for a connection.
     ///

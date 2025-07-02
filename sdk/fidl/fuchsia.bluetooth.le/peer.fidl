@@ -90,10 +90,23 @@ type Peer = table {
     9: advertising_sid uint8;
 
     /// Interval of the periodic advertising.
+    /// The presence of this field indicates that a periodic advertising train
+    /// is associated with this advertisement.
     ///
     /// Range: 0x0006 to 0xFFFF
+    /// Time: N × 1.25 ms
     @available(added=25)
     10: periodic_advertising_interval uint16;
+};
+
+@available(added=NEXT)
+type PeriodicAdvertisingSyncTransferError = flexible enum : uint32 {
+    FAILED = 0;
+    /// The `PeriodicAdvertisingSyncId` does not correspond to an active `PeriodicAdvertisingSync`.
+    INVALID_SYNC_ID = 1;
+    TRANSFER_ALREADY_PENDING = 2;
+    NOT_SUPPORTED_LOCAL = 3;
+    NOT_SUPPORTED_REMOTE = 4;
 };
 
 /// Protocol that represents the connection to a peer. This can be used to interact with GATT
@@ -155,4 +168,27 @@ closed protocol Connection {
         /// The PSM of the remote side to connect to.
         3: psm Psm;
     });
+
+    /// Send synchronization information for a periodic advertising train identified by `sync_id` to
+    /// the connected peer.
+    @available(added=NEXT)
+    strict TransferPeriodicAdvertisingSync(table {
+        /// Required.
+        1: sync_id PeriodicAdvertisingSyncId;
+        /// Application specific data to send with the sync.
+        /// Optional.
+        /// Default: 0
+        2: service_data uint16;
+    }) -> () error PeriodicAdvertisingSyncTransferError;
+
+    /// Accept the next Periodic Advertising Sync Transfer from the peer. A response will be sent
+    /// when the host is ready to accept the transfer. Only one request can be pending at a time.
+    @available(added=NEXT)
+    strict AcceptPeriodicAdvertisingSyncTransfer(resource table {
+        /// When the sync is established, the `PeriodicAdvertisingSync.OnEstablished` event will be
+        /// sent containing the service data received with the transfer. Closing the client end will
+        /// cancel the transfer.
+        1: sync server_end:PeriodicAdvertisingSync;
+        2: config PeriodicAdvertisingSyncConfiguration;
+    }) -> () error PeriodicAdvertisingSyncTransferError;
 };

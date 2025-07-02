@@ -253,6 +253,50 @@
         "strictness": "flexible"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfo.encryption",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfo.max_sdu_size",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfo.phy",
+        "ordinal": "3",
+        "type": "fuchsia.bluetooth.le/PhysicalLayer"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfo.streams_count",
+        "ordinal": "1",
+        "type": "uint8"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfo"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfoReport.info",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfo"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfoReport.timestamp",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfoReport"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.Connect",
         "strictness": "strict",
@@ -363,6 +407,14 @@
         "strictness": "strict",
         "ordinal": "6879792045015185312",
         "direction": "one_way"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Central.SyncToPeriodicAdvertising",
+        "strictness": "strict",
+        "ordinal": "2141143943042090425",
+        "direction": "one_way",
+        "request": "fuchsia.bluetooth.le/CentralSyncToPeriodicAdvertisingRequest"
     },
     {
         "kind": "protocol",
@@ -601,6 +653,35 @@
     {
         "kind": "struct",
         "name": "fuchsia.bluetooth.le/CentralStartScanResponse"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CentralSyncToPeriodicAdvertisingRequest.advertising_sid",
+        "ordinal": "2",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CentralSyncToPeriodicAdvertisingRequest.config",
+        "ordinal": "4",
+        "type": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncConfiguration"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CentralSyncToPeriodicAdvertisingRequest.peer_id",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/PeerId"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CentralSyncToPeriodicAdvertisingRequest.sync",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.bluetooth.le/PeriodicAdvertisingSync"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/CentralSyncToPeriodicAdvertisingRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -957,6 +1038,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Connection.AcceptPeriodicAdvertisingSyncTransfer",
+        "strictness": "strict",
+        "ordinal": "4907289341329047083",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/ConnectionAcceptPeriodicAdvertisingSyncTransferRequest",
+        "response": "fuchsia.bluetooth.le/Connection_AcceptPeriodicAdvertisingSyncTransfer_Response",
+        "error": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Connection.ConnectL2cap",
         "strictness": "strict",
         "ordinal": "1311975855931440361",
@@ -980,6 +1071,16 @@
         "ordinal": "3055426333748022379",
         "direction": "one_way",
         "request": "fuchsia.bluetooth.le/ConnectionRequestGattClientRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Connection.TransferPeriodicAdvertisingSync",
+        "strictness": "strict",
+        "ordinal": "1231630093263168025",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/ConnectionTransferPeriodicAdvertisingSyncRequest",
+        "response": "fuchsia.bluetooth.le/Connection_TransferPeriodicAdvertisingSync_Response",
+        "error": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError"
     },
     {
         "kind": "protocol",
@@ -1008,6 +1109,23 @@
     {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/ConnectionAcceptCisRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionAcceptPeriodicAdvertisingSyncTransferRequest.config",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncConfiguration"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionAcceptPeriodicAdvertisingSyncTransferRequest.sync",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.bluetooth.le/PeriodicAdvertisingSync"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/ConnectionAcceptPeriodicAdvertisingSyncTransferRequest",
         "resourceness": "resource"
     },
     {
@@ -1059,6 +1177,22 @@
         "kind": "struct",
         "name": "fuchsia.bluetooth.le/ConnectionRequestGattClientRequest",
         "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionTransferPeriodicAdvertisingSyncRequest.service_data",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionTransferPeriodicAdvertisingSyncRequest.sync_id",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncId"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/ConnectionTransferPeriodicAdvertisingSyncRequest"
     },
     {
         "kind": "enum/member",
@@ -1332,6 +1466,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.bluetooth.le/MAX_SUBEVENTS",
+        "type": "uint8",
+        "value": "128"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.bluetooth.le/MAX_URI_LENGTH",
         "type": "uint16",
         "value": "278"
@@ -1431,6 +1571,240 @@
     {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/Peer"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingReport.data",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.le/ScanData"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingReport.event_counter",
+        "ordinal": "3",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingReport.rssi",
+        "ordinal": "1",
+        "type": "int8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingReport.subevent",
+        "ordinal": "4",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingReport.timestamp",
+        "ordinal": "5",
+        "type": "int64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingReport"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync.Cancel",
+        "strictness": "flexible",
+        "ordinal": "964188149686164882",
+        "direction": "one_way"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync.OnError",
+        "strictness": "flexible",
+        "ordinal": "126190293214481994",
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnErrorRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync.OnEstablished",
+        "strictness": "flexible",
+        "ordinal": "5358210945963528156",
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync.SyncToSubevents",
+        "strictness": "flexible",
+        "ordinal": "7294808485976178925",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncSyncToSubeventsRequest",
+        "response": "fuchsia.bluetooth.le/PeriodicAdvertisingSync_SyncToSubevents_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync.WatchAdvertisingReport",
+        "strictness": "flexible",
+        "ordinal": "3361392857685938999",
+        "direction": "two_way",
+        "response": "fuchsia.bluetooth.le/PeriodicAdvertisingSync_WatchAdvertisingReport_Response"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncConfiguration.filter_duplicates",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncConfiguration"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncError.INITIAL_SYNCHRONIZATION_FAILED",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncError.NOT_SUPPORTED_LOCAL",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncError.NOT_SUPPORTED_REMOTE",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncError.SYNCHRONIZATION_LOST",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncError",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncId.value",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnErrorRequest.error",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncError"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnErrorRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest.advertising_sid",
+        "ordinal": "5",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest.id",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncId"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest.peer_id",
+        "ordinal": "3",
+        "type": "fuchsia.bluetooth/PeerId"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest.periodic_advertising_interval",
+        "ordinal": "7",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest.phy",
+        "ordinal": "6",
+        "type": "fuchsia.bluetooth.le/PhysicalLayer"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest.service_data",
+        "ordinal": "4",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest.subevents_count",
+        "ordinal": "2",
+        "type": "uint8"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncOnEstablishedRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncSyncToSubeventsRequest.subevents",
+        "ordinal": "1",
+        "type": "vector<uint8>:128"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncSyncToSubeventsRequest"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError.FAILED",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError.INVALID_SYNC_ID",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError.NOT_SUPPORTED_LOCAL",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError.NOT_SUPPORTED_REMOTE",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError.TRANSFER_ALREADY_PENDING",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSyncTransferError",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync_WatchAdvertisingReport_Response.reports",
+        "ordinal": "1",
+        "type": "vector<fuchsia.bluetooth.le/SyncReport>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/PeriodicAdvertisingSync_WatchAdvertisingReport_Response"
     },
     {
         "kind": "protocol/member",
@@ -1562,6 +1936,27 @@
         "kind": "struct",
         "name": "fuchsia.bluetooth.le/PeripheralStartAdvertisingRequest",
         "resourceness": "resource"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PhysicalLayer.LE_1M",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PhysicalLayer.LE_2M",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/PhysicalLayer.LE_CODED",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth.le/PhysicalLayer",
+        "strictness": "flexible",
+        "type": "uint8"
     },
     {
         "kind": "protocol/member",
@@ -1786,6 +2181,23 @@
     {
         "kind": "struct",
         "name": "fuchsia.bluetooth.le/ServiceDataEntry"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth.le/SyncReport.broadcast_isochronous_group_info_report",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.le/BroadcastIsochronousGroupInfoReport"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth.le/SyncReport.periodic_advertising_report",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/PeriodicAdvertisingReport"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.bluetooth.le/SyncReport",
+        "strictness": "flexible"
     },
     {
         "kind": "library",

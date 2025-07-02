@@ -19,7 +19,9 @@ fidl("fuchsia.bluetooth.le") {
     "l2cap.fidl",
     "overview.fidl",
     "peer.fidl",
+    "periodic.fidl",
     "peripheral.fidl",
+    "phy.fidl",
     "types_deprecated.fidl",
   ]
 
