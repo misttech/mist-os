@@ -89,14 +89,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
  private:
   const std::string_view kScheduleProfileRole = "fuchsia.devices.usb.drivers.dwc3.interrupt";
 
-  void DciIntfSetSpeed(fuchsia_hardware_usb_descriptor::wire::UsbSpeed speed)
-      __TA_REQUIRES(dci_lock_);
-  void DciIntfSetConnected(bool connected) __TA_REQUIRES(dci_lock_);
-  zx::result<size_t> DciIntfControl(const fuchsia_hardware_usb_descriptor::wire::UsbSetup* setup,
-                                    const uint8_t* write_buffer, size_t write_size,
-                                    uint8_t* read_buffer, size_t read_size)
-      __TA_REQUIRES(dci_lock_);
-
   static inline const uint32_t kEp0BufferSize = UINT16_MAX + 1;
 
   // physical endpoint numbers.  We use 0 and 1 for EP0, and let the device-mode
@@ -311,8 +303,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   void Ep0Start() __TA_EXCLUDES(lock_);
   void Ep0QueueSetupLocked() __TA_REQUIRES(ep0_.lock) __TA_EXCLUDES(lock_);
   void Ep0StartEndpoints() __TA_REQUIRES(ep0_.lock) __TA_EXCLUDES(lock_);
-  zx::result<size_t> HandleEp0Setup(const fuchsia_hardware_usb_descriptor::wire::UsbSetup& setup,
-                                    void* buffer, size_t length) __TA_REQUIRES(ep0_.lock)
+  void HandleEp0Setup(size_t length, Ep0::State next_state) __TA_REQUIRES(ep0_.lock)
       __TA_EXCLUDES(lock_);
   void HandleEp0TransferCompleteEvent(uint8_t ep_num) __TA_EXCLUDES(lock_, ep0_.lock);
   void HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage)
@@ -349,11 +340,11 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
                  const zx_packet_interrupt_t* interrupt);
 
   std::mutex lock_;
-  std::mutex dci_lock_;
 
   fdf::PDev pdev_;
 
-  fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface> dci_intf_ __TA_GUARDED(dci_lock_);
+  fidl::WireClient<fuchsia_hardware_usb_dci::UsbDciInterface>
+      dci_intf_;  // Must be accessed on irq_dispatcher_
 
   std::optional<ddk::MmioBuffer> mmio_;
 

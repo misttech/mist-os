@@ -532,11 +532,17 @@ void Dwc3::ResetConfiguration() {
     UserEpReset(uep);
   }
 
-  {
-    std::lock_guard<std::mutex> lock(dci_lock_);
-    if (dci_intf_.is_valid()) {
-      DciIntfSetConnected(true);
-    }
+  if (dci_intf_.is_valid()) {
+    fidl::Arena arena;
+    dci_intf_.buffer(arena)->SetConnected(true).Then(
+        [](fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::SetConnected>&
+               result) {
+          if (!result.ok()) {
+            FDF_LOG(ERROR, "(framework) SetConnected(): %s", result.status_string());
+          } else if (result->is_error()) {
+            FDF_LOG(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
+          }
+        });
   }
 }
 
@@ -552,11 +558,17 @@ void Dwc3::HandleResetEvent() {
 
   Ep0Start();
 
-  {
-    std::lock_guard<std::mutex> lock(dci_lock_);
-    if (dci_intf_.is_valid()) {
-      DciIntfSetConnected(false);
-    }
+  if (dci_intf_.is_valid()) {
+    fidl::Arena arena;
+    dci_intf_.buffer(arena)->SetConnected(false).Then(
+        [](fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::SetConnected>&
+               result) {
+          if (!result.ok()) {
+            FDF_LOG(ERROR, "(framework) SetConnected(): %s", result.status_string());
+          } else if (result->is_error()) {
+            FDF_LOG(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
+          }
+        });
   }
 }
 
@@ -606,22 +618,33 @@ void Dwc3::HandleConnectionDoneEvent() {
     ep0_.cur_speed = new_speed;
   }
 
-  {
-    std::lock_guard<std::mutex> lock(dci_lock_);
-    if (dci_intf_.is_valid()) {
-      DciIntfSetSpeed(new_speed);
-    }
+  if (dci_intf_.is_valid()) {
+    fidl::Arena arena;
+    dci_intf_.buffer(arena)->SetSpeed(new_speed).Then(
+        [](fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::SetSpeed>& result) {
+          if (!result.ok()) {
+            FDF_LOG(ERROR, "(framework) SetSpeed(): %s", result.status_string());
+          } else if (result->is_error()) {
+            FDF_LOG(ERROR, "SetSpeed(): %s", zx_status_get_string(result->error_value()));
+          }
+        });
   }
 }
 
 void Dwc3::HandleDisconnectedEvent() {
   FDF_LOG(INFO, "Dwc3::HandleDisconnectedEvent");
 
-  {
-    std::lock_guard<std::mutex> lock(dci_lock_);
-    if (dci_intf_.is_valid()) {
-      DciIntfSetConnected(false);
-    }
+  if (dci_intf_.is_valid()) {
+    fidl::Arena arena;
+    dci_intf_.buffer(arena)->SetConnected(false).Then(
+        [](fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::SetConnected>&
+               result) {
+          if (!result.ok()) {
+            FDF_LOG(ERROR, "(framework) SetConnected(): %s", result.status_string());
+          } else if (result->is_error()) {
+            FDF_LOG(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
+          }
+        });
   }
 
   ResetEndpoints();
@@ -652,16 +675,17 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
     return;
   }
 
-  std::lock_guard<std::mutex> lock(dci_lock_);
-
-  if (dci_intf_.is_valid()) {
-    FDF_LOG(ERROR, "%s: DCI Interface already set", __func__);
-    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
-    return;
-  }
-
-  dci_intf_.Bind(std::move(request.interface()));
-  completer.Reply(zx::ok());
+  async::PostTask(
+      irq_dispatcher_.async_dispatcher(), [this, interface = std::move(request.interface()),
+                                           completer = completer.ToAsync()]() mutable {
+        if (dci_intf_.is_valid()) {
+          FDF_LOG(ERROR, "%s: DCI Interface already set", __func__);
+          completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+          return;
+        }
+        dci_intf_.Bind(std::move(interface), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        completer.Reply(zx::ok());
+      });
 }
 
 void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
@@ -812,68 +836,6 @@ void Dwc3::CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& comple
 
   uep->server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
   completer.Reply(zx::ok());
-}
-
-void Dwc3::DciIntfSetSpeed(fdescriptor::wire::UsbSpeed speed) {
-  ZX_ASSERT(dci_intf_.is_valid());
-
-  fidl::Arena arena;
-  auto result = dci_intf_.buffer(arena)->SetSpeed(speed);
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "(framework) SetSpeed(): %s", result.status_string());
-  } else if (result->is_error()) {
-    FDF_LOG(ERROR, "SetSpeed(): %s", zx_status_get_string(result->error_value()));
-  }
-}
-
-void Dwc3::DciIntfSetConnected(bool connected) {
-  ZX_ASSERT(dci_intf_.is_valid());
-
-  fidl::Arena arena;
-  auto result = dci_intf_.buffer(arena)->SetConnected(connected);
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "(framework) SetConnected(): %s", result.status_string());
-  } else if (result->is_error()) {
-    FDF_LOG(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
-  }
-}
-
-zx::result<size_t> Dwc3::DciIntfControl(const fdescriptor::wire::UsbSetup* setup,
-                                        const uint8_t* write_buffer, size_t write_size,
-                                        uint8_t* read_buffer, size_t read_size) {
-  ZX_ASSERT(dci_intf_.is_valid());
-
-  auto fwrite =
-      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(write_buffer), write_size);
-
-  fidl::Arena arena;
-  auto result = dci_intf_.buffer(arena)->Control(*setup, fwrite);
-
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "(framework) Control(): %s", result.status_string());
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Control(): %s", zx_status_get_string(result->error_value()));
-    return result->take_error();
-  }
-
-  // A lightweight byte-span is used to make it easier to process the read data.
-  cpp20::span<uint8_t> read_data{result.value()->read.get()};
-
-  // Don't blow out caller's buffer.
-  if (read_data.size_bytes() > read_size) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  size_t read_actual{0};
-
-  if (!read_data.empty()) {
-    std::memcpy(read_buffer, read_data.data(), read_data.size_bytes());
-    read_actual = read_data.size_bytes();
-  }
-
-  return zx::ok(read_actual);
 }
 
 void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
