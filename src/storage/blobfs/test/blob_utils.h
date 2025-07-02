@@ -5,11 +5,14 @@
 #ifndef SRC_STORAGE_BLOBFS_TEST_BLOB_UTILS_H_
 #define SRC_STORAGE_BLOBFS_TEST_BLOB_UTILS_H_
 
+#include <fidl/fuchsia.fxfs/cpp/markers.h>
 #include <lib/fdio/io.h>
+#include <lib/fidl/cpp/wire/channel.h>
 
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 
 #include <fbl/unique_fd.h>
@@ -80,6 +83,10 @@ void VerifyContents(int fd, const uint8_t* data, size_t data_size);
 // Asserts (via ASSERT_* in gtest) that the write and read succeeded.
 // TODO(jfsulliv): Return a status, or change the name to indicate that this will assert on failure.
 void MakeBlob(const BlobInfo& info, fbl::unique_fd* fd);
+
+// Uses the provided BlobCreator client to write the blob as is without compression.
+void CreateUncompressedBlob(std::span<uint8_t> data,
+                            fidl::WireSyncClient<fuchsia_fxfs::BlobCreator>& creator);
 
 // Returns the name of |format| for use in parameterized tests.
 std::string GetBlobLayoutFormatNameForTests(BlobLayoutFormat format);

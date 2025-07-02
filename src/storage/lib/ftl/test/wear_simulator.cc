@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.fxfs/cpp/markers.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/owned-vmo-mapper.h>
@@ -18,6 +20,7 @@
 #include <memory>
 #include <set>
 
+#include <fbl/array.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
@@ -64,6 +67,7 @@ struct MountedSystem {
 
   fidl::ClientEnd<fuchsia_io::Directory> blobfs_export_root;
   fs_management::NamespaceBinding blobfs_binding;
+  fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> blob_creator;
 
   fidl::ClientEnd<fuchsia_io::Directory> minfs_export_root;
   fs_management::NamespaceBinding minfs_binding;
@@ -113,7 +117,7 @@ void InitMinfs(const char* root_path, const SystemConfig& config, std::vector<si
   constexpr size_t kMaxWriteSize = kMaxWritePages * kPageSize;
   char path_buf[255];
   auto write_buf = std::make_unique<char[]>(kMaxWriteSize);
-  memset(write_buf.get(), 0xAB, kMaxWriteSize);
+  memset(write_buf.get(), 0xAA, kMaxWriteSize);
 
   // Create"cold" data"
   sprintf(path_buf, "%s/cold/", root_path);
@@ -194,6 +198,7 @@ void WearSimulator::Init() {
   fidl::Arena arena;
   fs_management::MountedVolume* blobfs;
   fs_management::NamespaceBinding blobfs_bind;
+  fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> blob_creator;
   {
     auto res = ramnand.fvm_partition()->fvm().fs().CreateVolume(
         "blobfs",
@@ -209,6 +214,11 @@ void WearSimulator::Init() {
     ASSERT_TRUE(res.is_ok()) << "Failed to create blobfs: " << res.error_value();
     blobfs = res.value();
 
+    auto svc = component::OpenDirectoryAt(blobfs->ExportRoot(), "svc");
+    ASSERT_TRUE(svc.is_ok());
+    auto creator = component::ConnectAt<fuchsia_fxfs::BlobCreator>(*svc);
+    ASSERT_TRUE(creator.is_ok());
+    blob_creator = fidl::WireSyncClient<fuchsia_fxfs::BlobCreator>(std::move(*creator));
     auto binding = fs_management::NamespaceBinding::Create("/blob/", blobfs->DataRoot().value());
     ASSERT_TRUE(binding.is_ok()) << binding.status_string();
     blobfs_bind = std::move(binding.value());
@@ -239,6 +249,7 @@ void WearSimulator::Init() {
       .ramnand = std::move(ramnand),
       .blobfs_export_root = blobfs->Release(),
       .blobfs_binding = std::move(blobfs_bind),
+      .blob_creator = std::move(blob_creator),
       .minfs_export_root = minfs->Release(),
       .minfs_binding = std::move(minfs_bind),
   });
@@ -306,7 +317,6 @@ void WearSimulator::FillBlobfs(size_t space) {
   constexpr size_t kMaxBlobSize = 96ul * 1024 * 1024;
   ASSERT_TRUE(mount_) << "Wear simulator not initialized";
 
-  // Random data in blob to avoid compression. Get actual sizing.
   for (; space > 0;) {
     size_t max_pages = std::min(space, kMaxBlobSize) / kPageSize;
     size_t size;
@@ -315,11 +325,16 @@ void WearSimulator::FillBlobfs(size_t space) {
     } else {
       size = ((rand() % (max_pages - 1)) + 1) * kPageSize;
     }
-    std::unique_ptr<blobfs::BlobInfo> info =
-        blobfs::GenerateRandomBlob(mount_->blobfs_binding.path(), size);
-    fbl::unique_fd fd;
-    ASSERT_NO_FATAL_FAILURE(blobfs::MakeBlob(*info, &fd));
-    ASSERT_EQ(close(fd.release()), 0);
+    auto blob = fbl::MakeArray<uint8_t>(size);
+    memset(blob.get(), 0x55, blob.size());
+    // Random 64 bit value at the start, avoid duplicate blobs.
+    *reinterpret_cast<uint32_t*>(blob.get()) = rand();
+    *reinterpret_cast<uint32_t*>(&blob[4]) = rand();
+
+    // Don't compress the delivery blob, this way the blob will fill asmich space as needed for the
+    // test, but can be well compressed for image import/export.
+    ASSERT_NO_FATAL_FAILURE(blobfs::CreateUncompressedBlob(
+        std::span<uint8_t>(blob.begin(), blob.end()), mount_->blob_creator));
     space -= size;
   }
 }
@@ -403,6 +418,7 @@ void WearSimulator::Reboot() {
   fidl::Arena arena;
   fs_management::MountedVolume* blobfs;
   fs_management::NamespaceBinding blobfs_bind;
+  fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> blob_creator;
   {
     auto res = ramnand.fvm_partition()->fvm().fs().OpenVolume(
         "blobfs", fuchsia_fs_startup::wire::MountOptions::Builder(arena)
@@ -412,6 +428,11 @@ void WearSimulator::Reboot() {
     ASSERT_TRUE(res.is_ok()) << "Failed to create blobfs: " << res.error_value();
     blobfs = res.value();
 
+    auto svc = component::OpenDirectoryAt(blobfs->ExportRoot(), "svc");
+    ASSERT_TRUE(svc.is_ok());
+    auto creator = component::ConnectAt<fuchsia_fxfs::BlobCreator>(*svc);
+    ASSERT_TRUE(creator.is_ok());
+    blob_creator = fidl::WireSyncClient<fuchsia_fxfs::BlobCreator>(std::move(*creator));
     auto binding = fs_management::NamespaceBinding::Create("/blob/", blobfs->DataRoot().value());
     ASSERT_TRUE(binding.is_ok()) << binding.status_string();
     blobfs_bind = std::move(binding.value());
@@ -435,6 +456,7 @@ void WearSimulator::Reboot() {
       .ramnand = std::move(ramnand),
       .blobfs_export_root = blobfs->Release(),
       .blobfs_binding = std::move(blobfs_bind),
+      .blob_creator = std::move(blob_creator),
       .minfs_export_root = minfs->Release(),
       .minfs_binding = std::move(minfs_bind),
   });

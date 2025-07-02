@@ -5,8 +5,12 @@
 #include "src/storage/blobfs/test/blob_utils.h"
 
 #include <fcntl.h>
+#include <fidl/fuchsia.fxfs/cpp/markers.h>
+#include <fidl/fuchsia.fxfs/cpp/wire_messaging.h>
 #include <lib/fdio/io.h>
+#include <lib/fidl/cpp/wire/array.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -17,6 +21,7 @@
 #include <filesystem>
 #include <limits>
 #include <memory>
+#include <span>
 
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
@@ -28,6 +33,7 @@
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/blob_layout.h"
+#include "src/storage/blobfs/delivery_blob.h"
 
 namespace blobfs {
 namespace {
@@ -147,6 +153,48 @@ std::string GetBlobLayoutFormatNameForTests(BlobLayoutFormat format) {
       return "PaddedMerkleTreeAtStartLayout";
     case BlobLayoutFormat::kCompactMerkleTreeAtEnd:
       return "CompactMerkleTreeAtEndLayout";
+  }
+}
+
+void CreateUncompressedBlob(std::span<uint8_t> data,
+                            fidl::WireSyncClient<fuchsia_fxfs::BlobCreator>& creator) {
+  zx::result<fbl::Array<uint8_t>> delivery_blob = GenerateDeliveryBlobType1(data, false);
+  ASSERT_TRUE(delivery_blob.is_ok())
+      << "Failed to create delivery blob: " << delivery_blob.status_string();
+
+  zx::result<Digest> merkle_root = CalculateDeliveryBlobDigest(*delivery_blob);
+  ASSERT_TRUE(merkle_root.is_ok())
+      << "Failed to generate blob Merkle root: " << merkle_root.status_string();
+
+  fidl::WireSyncClient<fuchsia_fxfs::BlobWriter> writer;
+  {
+    fidl::Array<uint8_t, 32> hash;
+    merkle_root->CopyTo(hash.data_);
+    auto result = creator->Create(hash, false);
+    ASSERT_TRUE(result.ok()) << "Fidl error: " << result.status_string();
+    ASSERT_TRUE(result->is_ok()) << "Blob creator: " << result.status_string();
+    writer = fidl::WireSyncClient<fuchsia_fxfs::BlobWriter>{std::move((*result)->writer)};
+  }
+
+  zx::vmo vmo;
+  {
+    auto result = writer->GetVmo(delivery_blob->size());
+    ASSERT_TRUE(result.ok()) << "Fidl error: " << result.status_string();
+    ASSERT_TRUE(result->is_ok()) << "BlobWriter::GetVmo: " << result.status_string();
+    vmo = std::move((*result)->vmo);
+  }
+
+  size_t vmo_size;
+  ASSERT_EQ(vmo.get_size(&vmo_size), ZX_OK);
+
+  uint64_t bytes_written = 0;
+  while (bytes_written < delivery_blob->size()) {
+    uint64_t bytes_to_write = std::min(vmo_size, delivery_blob->size() - bytes_written);
+    ASSERT_EQ(vmo.write(delivery_blob->data() + bytes_written, 0, bytes_to_write), ZX_OK);
+    auto result = writer->BytesReady(bytes_to_write);
+    ASSERT_TRUE(result.ok()) << "Fidl error: " << result.status_string();
+    ASSERT_TRUE(result->is_ok()) << "BlobWriter::BytesReady: " << result.status_string();
+    bytes_written += bytes_to_write;
   }
 }
 
