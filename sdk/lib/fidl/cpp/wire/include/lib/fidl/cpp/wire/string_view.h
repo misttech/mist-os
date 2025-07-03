@@ -18,14 +18,15 @@
 namespace fidl {
 
 // A FIDL string that borrows its contents.
+//
+// StringView instances can be passed by value, as copying is cheap.
 class StringView final : private VectorView<const char> {
  public:
   constexpr StringView() noexcept = default;
 
-  constexpr explicit StringView(VectorView<char>&& vector_view)
-      : VectorView(std::move(vector_view)) {}
-  constexpr explicit StringView(VectorView<const char>&& vector_view)
-      : VectorView(std::move(vector_view)) {}
+  constexpr explicit StringView(const VectorView<char>& vector_view) : VectorView(vector_view) {}
+  constexpr explicit StringView(const VectorView<const char>& vector_view)
+      : VectorView(vector_view) {}
 
   // Allocates a string using an arena.
   StringView(AnyArena& allocator, std::string_view from) : VectorView(allocator, from.size()) {

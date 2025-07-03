@@ -25,6 +25,8 @@ namespace fidl {
 // vector and other methods like fidl::Arena, std::array, or std::vector must be
 // used to construct it.
 //
+// VectorView instances can be passed by value, as copying is cheap.
+//
 // VectorView's layout and data format must match fidl_vector_t as it will be
 // reinterpret_casted into/from fidl_vector_t during encoding and decoding.
 //
@@ -86,13 +88,20 @@ class VectorView {
   VectorView(AnyArena& arena, const std::vector<std::remove_cv_t<T>>& vector)
       : VectorView(arena, cpp20::span(vector)) {}
 
-  template <typename U>
-  constexpr VectorView(VectorView<U>&& other) {
-    static_assert(
-        std::is_same<T, U>::value || std::is_same<T, std::add_const_t<U>>::value,
-        "VectorView<T> can only be move-constructed from VectorView<T> or VectorView<const T>");
+  constexpr VectorView(const VectorView&) = default;
+  constexpr VectorView& operator=(const VectorView&) = default;
+
+  template <typename _ = std::enable_if<!std::is_same_v<T, std::remove_cv_t<T>>>>
+  // NOLINTNEXTLINE(google-explicit-constructor) Intentionally implicit
+  constexpr VectorView(const VectorView<std::remove_cv_t<T>>& other) noexcept
+      : size_(other.size_), data_(other.data_) {}
+
+  template <typename _ = std::enable_if<!std::is_same_v<T, std::remove_cv_t<T>>>>
+  // NOLINTNEXTLINE(google-explicit-constructor) Intentionally implicit
+  constexpr VectorView& operator=(const VectorView<std::remove_cv_t<T>>& other) noexcept {
     size_ = other.size_;
     data_ = other.data_;
+    return *this;
   }
 
   // Constructs a fidl::VectorView by unsafely borrowing other sequences.
@@ -121,15 +130,6 @@ class VectorView {
   }
   static VectorView<T> constexpr FromExternal(T* data, size_t size) {
     return VectorView<T>(data, size);
-  }
-
-  template <typename U>
-  constexpr VectorView& operator=(VectorView<U>&& other) {
-    static_assert(std::is_same<T, U>::value || std::is_same<T, std::add_const_t<U>>::value,
-                  "VectorView<T> can only be assigned from VectorView<T> or VectorView<const T>");
-    size_ = other.size_;
-    data_ = other.data_;
-    return *this;
   }
 
   constexpr cpp20::span<T> get() const { return {data(), size()}; }
