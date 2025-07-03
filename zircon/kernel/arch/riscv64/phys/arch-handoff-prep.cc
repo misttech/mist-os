@@ -38,12 +38,6 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
               *reinterpret_cast<const zbi_dcfg_riscv_generic_timer_driver_t*>(payload.data());
           SaveForMexec(header, payload);
           break;
-        case ZBI_KERNEL_DRIVER_ARM_GIC_V2:
-          ZX_ASSERT(payload.size() >= sizeof(zbi_dcfg_arm_gic_v2_driver_t));
-          arch_handoff.gic_driver =
-              *reinterpret_cast<const zbi_dcfg_arm_gic_v2_driver_t*>(payload.data());
-          SaveForMexec(header, payload);
-          break;
       }
       break;
     }

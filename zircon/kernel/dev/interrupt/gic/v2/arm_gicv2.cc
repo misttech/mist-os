@@ -20,6 +20,9 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <arch/arm64.h>
+#include <arch/arm64/hypervisor/gic/gicv2.h>
+#include <arch/arm64/periphmap.h>
 #include <arch/ops.h>
 #include <arch/regs.h>
 #include <dev/interrupt.h>
@@ -36,27 +39,14 @@
 #include <lk/init.h>
 #include <pdev/interrupt.h>
 
+#include "arm_gicv2m_pcie.h"
+
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE 0
 
-#if defined(__aarch64__)
-#include <arch/arm64.h>
-#include <arch/arm64/hypervisor/gic/gicv2.h>
-#include <arch/arm64/periphmap.h>
-
-#include "arm_gicv2m_pcie.h"
 #define IFRAME_PC(frame) ((frame)->elr)
 #define get_vaddr_from_paddr(paddr) reinterpret_cast<zx_vaddr_t>((periph_paddr_to_vaddr(paddr)))
-#elif defined(__riscv)
-#include <arch/riscv64.h>
-#include <vm/physmap.h>
-#define IFRAME_PC(frame) ((frame)->regs.pc)
-inline zx_vaddr_t get_vaddr_from_paddr(paddr_t paddr) {
-  physmap_preserve_gaps_for_mmio();
-  return reinterpret_cast<zx_vaddr_t>(paddr_to_physmap(paddr));
-}
-#endif
 
 // Values read from the config.
 vaddr_t arm_gicv2_gic_base = 0;
@@ -364,19 +354,10 @@ void gic_init_percpu() {
       system_topology::Graph::GetSystemTopology().ProcessorByLogicalId(logical_num, &node);
   if (status == ZX_OK) {
     cpu_num_t gic_id;
-#if defined(__aarch64__)
     DEBUG_ASSERT(node->entity.discriminant == ZBI_TOPOLOGY_ENTITY_PROCESSOR &&
                  node->entity.processor.architecture_info.discriminant ==
                      ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
     gic_id = node->entity.processor.architecture_info.arm64.gic_id;
-#elif defined(__riscv)
-    DEBUG_ASSERT(node->entity.discriminant == ZBI_TOPOLOGY_ENTITY_PROCESSOR &&
-                 node->entity.processor.architecture_info.discriminant ==
-                     ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-    gic_id = static_cast<cpu_num_t>(node->entity.processor.architecture_info.riscv64.hart_id);
-#else
-#error define for new architecture
-#endif
     mask_translator.SetGicIdForLogicalId(logical_num, gic_id);
   } else {
     printf("arm_gicv2: unable to get logical processor %u in topology, status: %d\n", logical_num,
@@ -535,17 +516,13 @@ void ArmGicInitEarly(const zbi_dcfg_arm_gic_v2_driver_t& config) {
   status = gic_register_sgi_handler(MP_IPI_HALT + ipi_base, &arm_ipi_halt_handler);
   DEBUG_ASSERT(status == ZX_OK);
 
-#if defined(__aarch64__)
   gicv2_hw_interface_register();
-#endif
 }
 
 void ArmGicInitLate(const zbi_dcfg_arm_gic_v2_driver_t& config) {
   ASSERT(mmio_phys);
 
-#if defined(__aarch64__)
   arm_gicv2_pcie_init(use_msi);
-#endif
 
   // Place the physical address of the GICv2 registers on the MMIO deny list.
   // Users will not be able to create MMIO resources which permit mapping of the
