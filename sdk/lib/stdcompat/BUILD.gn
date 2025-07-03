@@ -9,6 +9,7 @@ group("tests") {
   deps = [ "test:tests" ]
 }
 
+# LINT.IfChange
 zx_library("stdcompat") {
   sdk = "source"
   sdk_publishable = "partner"
@@ -57,3 +58,6 @@ zx_library("stdcompat") {
   # implicit link inputs from default configs.
   configs = []
 }
+
+# LINT.ThenChange(BUILD.bazel)
+

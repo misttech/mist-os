@@ -16,6 +16,7 @@ filegroup(
     visibility = [
         "//build/bazel/bazel_idk/tests:__subpackages__",
         "//sdk/lib/magma_common:__pkg__",
+        "//sdk/lib/stdcompat:__pkg__",
     ],
 )
 
