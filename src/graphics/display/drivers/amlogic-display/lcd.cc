@@ -149,7 +149,7 @@ zx::result<uint32_t> GetMipiDsiDisplayId(
 
 // static
 zx::result<std::unique_ptr<Lcd>> Lcd::Create(
-    fdf::Namespace& incoming, uint32_t panel_type, const PanelConfig* panel_config,
+    fdf::Namespace& incoming, display::PanelType panel_type, const PanelConfig* panel_config,
     designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
   ZX_DEBUG_ASSERT(designware_dsi_host_controller != nullptr);
@@ -174,7 +174,7 @@ zx::result<std::unique_ptr<Lcd>> Lcd::Create(
   return zx::ok(std::move(lcd));
 }
 
-Lcd::Lcd(uint32_t panel_type, const PanelConfig* panel_config,
+Lcd::Lcd(display::PanelType panel_type, const PanelConfig* panel_config,
          designware_dsi::DsiHostController* designware_dsi_host_controller,
          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio, bool enabled)
     : panel_type_(panel_type),
@@ -334,7 +334,7 @@ zx::result<> Lcd::Disable() {
     fdf::info("LCD is already off, no work to do");
     return zx::ok();
   }
-  fdf::info("Powering off the LCD [type={}]", panel_type_);
+  fdf::info("Powering off the LCD [type={}]", static_cast<uint32_t>(panel_type_));
   zx::result<> power_off_result = PerformDisplayInitCommandSequence(panel_config_.dsi_off);
   if (!power_off_result.is_ok()) {
     fdf::error("Failed to decode and execute panel off sequence: {}", power_off_result);
@@ -350,7 +350,7 @@ zx::result<> Lcd::Enable() {
     return zx::ok();
   }
 
-  fdf::info("Powering on the LCD [type={}]", panel_type_);
+  fdf::info("Powering on the LCD [type={}]", static_cast<uint32_t>(panel_type_));
   zx::result<> power_on_result = PerformDisplayInitCommandSequence(panel_config_.dsi_on);
   if (!power_on_result.is_ok()) {
     fdf::error("Failed to decode and execute panel init sequence: {}", power_on_result);

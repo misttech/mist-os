@@ -126,27 +126,20 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "embeddable",
                     "embeddable_userdebug",
                     "embeddable_eng",
-                    "component_manager",
                     "bootstrap_realm_development_access",
                 ]
             }
             (FeatureSetLevel::Embeddable, BuildType::UserDebug) => {
-                vec![
-                    "embeddable",
-                    "embeddable_userdebug",
-                    "component_manager",
-                    "bootstrap_realm_development_access",
-                ]
+                vec!["embeddable", "embeddable_userdebug", "bootstrap_realm_development_access"]
             }
             (FeatureSetLevel::Embeddable, BuildType::User) => {
-                vec!["embeddable", "component_manager"]
+                vec!["embeddable"]
             }
             (FeatureSetLevel::Bootstrap, _) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
                     "embeddable_eng",
-                    "component_manager",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "bootstrap_eng",
@@ -158,7 +151,6 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "embeddable",
                     "embeddable_userdebug",
                     "embeddable_eng",
-                    "component_manager",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "bootstrap_eng",
@@ -173,7 +165,6 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
-                    "component_manager",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "core_realm",
@@ -184,19 +175,12 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                 ]
             }
             (FeatureSetLevel::Utility, BuildType::User) => {
-                vec![
-                    "embeddable",
-                    "component_manager",
-                    "bootstrap",
-                    "core_realm",
-                    "core_realm_user_and_userdebug",
-                ]
+                vec!["embeddable", "bootstrap", "core_realm", "core_realm_user_and_userdebug"]
             }
             (FeatureSetLevel::Standard, BuildType::Eng) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
-                    "component_manager_with_tracing",
                     "embeddable_eng",
                     "bootstrap",
                     "bootstrap_userdebug",
@@ -217,7 +201,6 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
-                    "component_manager",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "core_realm",
@@ -233,7 +216,6 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             (FeatureSetLevel::Standard, BuildType::User) => {
                 vec![
                     "embeddable",
-                    "component_manager",
                     "bootstrap",
                     "core_realm",
                     "core_realm_user_and_userdebug",
@@ -431,7 +413,7 @@ fn configure_subsystems(
 
     storage::StorageSubsystemConfig::define_configuration(
         &context_base.for_subsystem("storage"),
-        &platform.storage,
+        &(&platform.storage, &platform.recovery, &platform.development_support),
         builder,
     )
     .context("Configuring the 'storage' subsystem")?;

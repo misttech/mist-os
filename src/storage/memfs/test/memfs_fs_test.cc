@@ -2,13 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/loop.h>
 #include <lib/fdio/namespace.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <zircon/assert.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
+
+#include <memory>
+#include <string>
+#include <utility>
 
 #include "src/storage/fs_test/fs_test.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
+#include "src/storage/lib/fs_management/cpp/options.h"
 #include "src/storage/memfs/memfs.h"
-#include "src/storage/memfs/vnode_dir.h"
+#include "src/storage/memfs/vnode_dir.h"  // IWYU pragma: keep
 
 namespace {
 

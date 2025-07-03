@@ -9,17 +9,19 @@ use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
 use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
-    PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,
-    PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue,
-    ThreadGroup, ThreadGroupKey, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
-    ZombieProcess,
+    NormalPriority, PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
+    PtraceState, PtraceStatus, RealtimePriority, SchedulerState, SchedulingPolicy,
+    SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, ThreadGroupKey,
+    ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter, ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
 use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
-use starnix_sync::{Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease};
+use starnix_sync::{
+    FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease,
+};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
 };
@@ -392,8 +394,8 @@ pub struct TaskMutableState {
     /// The exit status that this task exited with.
     exit_status: Option<ExitStatus>,
 
-    /// Desired scheduler policy for the task.
-    pub scheduler_policy: SchedulerPolicy,
+    /// Desired scheduler state for the task.
+    pub scheduler_state: SchedulerState,
 
     /// The UTS namespace assigned to this thread.
     ///
@@ -1152,7 +1154,7 @@ impl Task {
         signal_mask: SigSet,
         kernel_signals: VecDeque<KernelSignal>,
         vfork_event: Option<Arc<zx::Event>>,
-        scheduler_policy: SchedulerPolicy,
+        scheduler_state: SchedulerState,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
         seccomp_filter_state: SeccompState,
@@ -1183,7 +1185,7 @@ impl Task {
                     signals: SignalState::with_mask(signal_mask),
                     kernel_signals,
                     exit_status: None,
-                    scheduler_policy,
+                    scheduler_state,
                     uts_ns,
                     no_new_privs,
                     oom_score_adj: Default::default(),
@@ -1219,8 +1221,16 @@ impl Task {
 
     state_accessor!(Task, mutable_state);
 
-    pub fn add_file(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        self.files.add_with_flags(self, file, flags)
+    pub fn add_file<L>(
+        &self,
+        locked: &mut Locked<L>,
+        file: FileHandle,
+        flags: FdFlags,
+    ) -> Result<FdNumber, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.files.add_with_flags(locked.cast_locked::<FileOpsCore>(), self, file, flags)
     }
 
     pub fn creds(&self) -> Credentials {
@@ -1253,36 +1263,62 @@ impl Task {
         *fs = fs.fork();
     }
 
-    /// Overwrite the existing scheduler policy with a new one and update the task's thread's role.
-    pub fn set_scheduler_policy(&self, policy: SchedulerPolicy) -> Result<(), Errno> {
-        self.update_sched_policy_then_role(|sched_policy| *sched_policy = policy)
+    /// Modify the given elements of the scheduler state with new values and update the
+    /// task's thread's role.
+    pub(crate) fn set_scheduler_policy_priority_and_reset_on_fork(
+        &self,
+        policy: SchedulingPolicy,
+        priority: RealtimePriority,
+        reset_on_fork: bool,
+    ) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|scheduler_state| {
+            scheduler_state.policy = policy;
+            scheduler_state.realtime_priority = priority;
+            scheduler_state.reset_on_fork = reset_on_fork;
+        })
     }
 
-    /// Update the nice value of the scheduler policy and update the task's thread's role.
-    pub fn update_scheduler_nice(&self, raw_priority: u8) -> Result<(), Errno> {
-        self.update_sched_policy_then_role(|sched_policy| sched_policy.set_raw_nice(raw_priority))
+    /// Modify the scheduler state's priority and update the task's thread's role.
+    pub(crate) fn set_scheduler_priority(&self, priority: RealtimePriority) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|scheduler_state| {
+            scheduler_state.realtime_priority = priority
+        })
     }
 
-    /// Update the task's thread's role based on its current scheduler policy without making any
-    /// changes to the policy.
+    /// Modify the scheduler state's nice and update the task's thread's role.
+    pub(crate) fn set_scheduler_nice(&self, nice: NormalPriority) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|scheduler_state| {
+            scheduler_state.normal_priority = nice
+        })
+    }
+
+    /// Overwrite the existing scheduler state with a new one and update the task's thread's role.
+    pub fn set_scheduler_state(&self, scheduler_state: SchedulerState) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|task_scheduler_state| {
+            *task_scheduler_state = scheduler_state
+        })
+    }
+
+    /// Update the task's thread's role based on its current scheduler state without making any
+    /// changes to the state.
     ///
     /// This should be called on tasks that have newly created threads, e.g. after cloning.
-    pub fn sync_scheduler_policy_to_role(&self) -> Result<(), Errno> {
-        self.update_sched_policy_then_role(|_| {})
+    pub fn sync_scheduler_state_to_role(&self) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|_| {})
     }
 
-    fn update_sched_policy_then_role(
+    fn update_scheduler_state_then_role(
         &self,
-        updater: impl FnOnce(&mut SchedulerPolicy),
+        updater: impl FnOnce(&mut SchedulerState),
     ) -> Result<(), Errno> {
         profile_duration!("UpdateTaskThreadRole");
-        let new_scheduler_policy = {
+        let new_scheduler_state = {
             // Hold the task state lock as briefly as possible, it's not needed to update the role.
             let mut state = self.write();
-            updater(&mut state.scheduler_policy);
-            state.scheduler_policy
+            updater(&mut state.scheduler_state);
+            state.scheduler_state
         };
-        self.thread_group().kernel.scheduler.set_thread_role(self, new_scheduler_policy)?;
+        self.thread_group().kernel.scheduler.set_thread_role(self, new_scheduler_state)?;
         Ok(())
     }
 
@@ -1483,10 +1519,9 @@ impl Task {
 }
 
 impl Releasable for Task {
-    type Context<'a: 'b, 'b> =
-        (ThreadState, &'a mut Locked<TaskRelease>, RwLockWriteGuard<'a, PidTable>);
+    type Context<'a> = (ThreadState, &'a mut Locked<TaskRelease>, RwLockWriteGuard<'a, PidTable>);
 
-    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(mut self, context: Self::Context<'a>) {
         let (thread_state, locked, mut pids) = context;
 
         *self.proc_pid_directory_cache.get_mut() = None;
@@ -1628,10 +1663,10 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_tid_allocation() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         assert_eq!(current_task.get_tid(), 1);
-        let another_current = create_task(&mut locked, &kernel, "another-task");
+        let another_current = create_task(locked, &kernel, "another-task");
         let another_tid = another_current.get_tid();
         assert!(another_tid >= 2);
 
@@ -1642,9 +1677,9 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clone_pid_and_parent_pid() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let thread = current_task.clone_task_for_test(
-            &mut locked,
+            locked,
             (CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64,
             Some(SIGCHLD),
         );
@@ -1652,7 +1687,7 @@ mod test {
         assert_ne!(current_task.get_tid(), thread.get_tid());
         assert_eq!(current_task.thread_group().leader, thread.thread_group().leader);
 
-        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        let child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
         assert_ne!(current_task.get_pid(), child_task.get_pid());
         assert_ne!(current_task.get_tid(), child_task.get_tid());
         assert_eq!(current_task.get_pid(), child_task.thread_group().read().get_ppid());
@@ -1670,19 +1705,19 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clone_rlimit() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let prev_fsize = current_task.thread_group().get_rlimit(Resource::FSIZE);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let prev_fsize = current_task.thread_group().get_rlimit(locked, Resource::FSIZE);
         assert_ne!(prev_fsize, 10);
         current_task
             .thread_group()
             .limits
-            .lock()
+            .lock(locked)
             .set(Resource::FSIZE, rlimit { rlim_cur: 10, rlim_max: 100 });
-        let current_fsize = current_task.thread_group().get_rlimit(Resource::FSIZE);
+        let current_fsize = current_task.thread_group().get_rlimit(locked, Resource::FSIZE);
         assert_eq!(current_fsize, 10);
 
-        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let child_fsize = child_task.thread_group().get_rlimit(Resource::FSIZE);
+        let child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+        let child_fsize = child_task.thread_group().get_rlimit(locked, Resource::FSIZE);
         assert_eq!(child_fsize, 10)
     }
 }

@@ -7,6 +7,7 @@
 
 #include <lib/zx/clock.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "generated-source.h"
 

@@ -152,7 +152,7 @@ group("bazel_action_allowlist") {
     "//examples/drivers/template:bazel_package.bazel_build",
     "//examples/drivers/transport/driver/v2:child_bazel_package.bazel_build",
     "//examples/drivers/transport/driver/v2:parent_bazel_package.bazel_build",
-    "//sdk:bazel_built_fuchsia_idk",
+    "//sdk:final_fuchsia_idk.exported",
     "//sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build",
     "//src:bazel_tests.bazel_build",
     "//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo-bazel-package.bazel_build",
@@ -350,6 +350,12 @@ generated_file("gn_build_variables_for_bazel") {
       type = "array_of_strings"
       location = declaration
     },
+    {
+      name = "warn_on_sdk_changes"
+      value = warn_on_sdk_changes
+      type = "bool"
+      location = declaration
+    },
   ]
 
   # LINT.ThenChange(//build/sdk/config.gni)
@@ -374,4 +380,18 @@ generated_file("gn_build_variables_for_bazel") {
   ]
 
   # LINT.ThenChange(//build/config/fuchsia/platform_version.gni)
+
+  # LINT.IfChange
+  declaration = "//build/testing/config.gni"
+  import(declaration)
+  contents += [
+    {
+      name = "update_goldens"
+      value = update_goldens
+      type = "bool"
+      location = declaration
+    },
+  ]
+
+  # LINT.ThenChange(//build/testing/config.gni)
 }

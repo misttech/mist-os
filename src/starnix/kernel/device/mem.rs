@@ -4,7 +4,6 @@
 
 use crate::device::kobject::DeviceMetadata;
 use crate::device::{simple_device_ops, DeviceMode};
-use crate::fs::sysfs::DeviceDirectory;
 use crate::mm::{
     create_anonymous_mapping_memory, DesiredAddress, MappingName, MappingOptions,
     MemoryAccessorExt, ProtectionFlags,
@@ -19,7 +18,7 @@ use crate::vfs::{
     FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
 };
 use starnix_logging::{log_info, track_stub, Level};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -36,8 +35,16 @@ use zx::{
 #[derive(Default)]
 pub struct DevNull;
 
-pub fn new_null_file(current_task: &CurrentTask, flags: OpenFlags) -> FileHandle {
+pub fn new_null_file<L>(
+    locked: &mut Locked<L>,
+    current_task: &CurrentTask,
+    flags: OpenFlags,
+) -> FileHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     Anon::new_file_extended(
+        locked,
         current_task,
         Box::new(DevNull),
         flags,
@@ -261,7 +268,9 @@ pub fn open_kmsg(
     _node: &FsNode,
     flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    Syslog::validate_access(current_task, SyslogAccess::DevKmsg)?;
+    if flags.can_read() {
+        Syslog::validate_access(current_task, SyslogAccess::DevKmsgRead)?;
+    }
     let subscription = if flags.can_read() {
         Some(Mutex::new(Syslog::snapshot_then_subscribe(&current_task)?))
     } else {
@@ -439,7 +448,7 @@ impl<'a> starnix_logging::ToValue for LogOutputTag<'a> {
 
 pub fn mem_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask)
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
@@ -451,7 +460,6 @@ where
         "null".into(),
         DeviceMetadata::new("null".into(), DeviceType::NULL, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevNull>,
     );
     registry.register_device(
@@ -460,7 +468,6 @@ where
         "zero".into(),
         DeviceMetadata::new("zero".into(), DeviceType::ZERO, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevZero>,
     );
     registry.register_device(
@@ -469,7 +476,6 @@ where
         "full".into(),
         DeviceMetadata::new("full".into(), DeviceType::FULL, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevFull>,
     );
     registry.register_device(
@@ -478,7 +484,6 @@ where
         "random".into(),
         DeviceMetadata::new("random".into(), DeviceType::RANDOM, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.register_device(
@@ -487,7 +492,6 @@ where
         "urandom".into(),
         DeviceMetadata::new("urandom".into(), DeviceType::URANDOM, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.register_device(
@@ -496,7 +500,6 @@ where
         "kmsg".into(),
         DeviceMetadata::new("kmsg".into(), DeviceType::KMSG, DeviceMode::Char),
         mem_class,
-        DeviceDirectory::new,
         open_kmsg,
     );
 }

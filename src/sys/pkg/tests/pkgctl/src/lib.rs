@@ -463,6 +463,9 @@ impl MockPackageCacheService {
                 PackageCacheRequest::SetUpgradableUrls { .. } => {
                     panic!("should only support Get requests, received SetUpgradableUrls")
                 }
+                PackageCacheRequest::WriteBlobs { .. } => {
+                    panic!("should only support Get requests, received WriteBlobs")
+                }
                 PackageCacheRequest::_UnknownMethod { .. } => {
                     panic!("should only support Get requests, received UnknownMethod")
                 }

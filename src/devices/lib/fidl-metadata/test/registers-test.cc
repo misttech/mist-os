@@ -12,62 +12,48 @@ template <typename T>
 static void check_encodes(
     const cpp20::span<const fidl_metadata::registers::Register<T>> register_entries) {
   // Encode.
-  auto result = fidl_metadata::registers::RegistersMetadataToFidl(register_entries);
-  ASSERT_OK(result.status_value());
-  std::vector<uint8_t>& data = result.value();
-
-  // Decode.
-  fit::result decoded =
-      fidl::InplaceUnpersist<fuchsia_hardware_registers::wire::Metadata>(cpp20::span(data));
-  ASSERT_TRUE(decoded.is_ok(), "%s", decoded.error_value().FormatDescription().c_str());
-
-  auto metadata = *decoded.value();
+  zx::result metadata_result = fidl_metadata::registers::RegistersMetadataToFidl(register_entries);
+  ASSERT_OK(metadata_result.status_value());
+  const auto& metadata = metadata_result.value();
 
   // Check everything looks sensible.
-  ASSERT_TRUE(metadata.has_registers());
-  auto registers = metadata.registers();
-  ASSERT_EQ(registers.count(), register_entries.size());
+  ASSERT_TRUE(metadata.registers().has_value());
+  const auto& registers = metadata.registers().value();
+  ASSERT_EQ(registers.size(), register_entries.size());
 
   for (size_t i = 0; i < register_entries.size(); i++) {
-    ASSERT_TRUE(registers[i].has_name());
-    ASSERT_EQ(registers[i].name().get(), register_entries[i].name);
+    const auto& reg = registers[i];
+    ASSERT_EQ(reg.name(), register_entries[i].name);
 
-    ASSERT_TRUE(registers[i].has_mmio_id());
-    ASSERT_EQ(registers[i].mmio_id(), register_entries[i].mmio_id);
+    ASSERT_EQ(reg.mmio_id(), register_entries[i].mmio_id);
 
-    ASSERT_TRUE(registers[i].has_masks());
-    ASSERT_EQ(registers[i].masks().count(), register_entries[i].masks.size());
+    ASSERT_TRUE(reg.masks().has_value());
+    ASSERT_EQ(reg.masks().value().size(), register_entries[i].masks.size());
     for (size_t j = 0; j < register_entries[i].masks.size(); j++) {
-      ASSERT_TRUE(registers[i].masks()[j].has_mask());
+      const auto& mask_entry = reg.masks().value()[j];
+      ASSERT_TRUE(mask_entry.mask().has_value());
+      const auto& mask = mask_entry.mask().value();
       if constexpr (std::is_same_v<T, uint8_t>) {
-        ASSERT_EQ(registers[i].masks()[j].mask().Which(),
-                  fuchsia_hardware_registers::wire::Mask::Tag::kR8);
-        ASSERT_EQ(registers[i].masks()[j].mask().r8(), register_entries[i].masks[j].value);
+        ASSERT_EQ(mask.Which(), fuchsia_hardware_registers::Mask::Tag::kR8);
+        ASSERT_EQ(mask.r8().value(), register_entries[i].masks[j].value);
       } else if constexpr (std::is_same_v<T, uint16_t>) {
-        ASSERT_EQ(registers[i].masks()[j].mask().Which(),
-                  fuchsia_hardware_registers::wire::Mask::Tag::kR16);
-        ASSERT_EQ(registers[i].masks()[j].mask().r16(), register_entries[i].masks[j].value);
+        ASSERT_EQ(mask.Which(), fuchsia_hardware_registers::Mask::Tag::kR16);
+        ASSERT_EQ(mask.r16().value(), register_entries[i].masks[j].value);
       } else if constexpr (std::is_same_v<T, uint32_t>) {
-        ASSERT_EQ(registers[i].masks()[j].mask().Which(),
-                  fuchsia_hardware_registers::wire::Mask::Tag::kR32);
-        ASSERT_EQ(registers[i].masks()[j].mask().r32(), register_entries[i].masks[j].value);
+        ASSERT_EQ(mask.Which(), fuchsia_hardware_registers::Mask::Tag::kR32);
+        ASSERT_EQ(mask.r32().value(), register_entries[i].masks[j].value);
       } else if constexpr (std::is_same_v<T, uint64_t>) {
-        ASSERT_EQ(registers[i].masks()[j].mask().Which(),
-                  fuchsia_hardware_registers::wire::Mask::Tag::kR64);
-        ASSERT_EQ(registers[i].masks()[j].mask().r64(), register_entries[i].masks[j].value);
+        ASSERT_EQ(mask.Which(), fuchsia_hardware_registers::Mask::Tag::kR64);
+        ASSERT_EQ(mask.r64().value(), register_entries[i].masks[j].value);
       } else {
         ASSERT_TRUE(false);
       }
 
-      ASSERT_TRUE(registers[i].masks()[j].has_mmio_offset());
-      ASSERT_EQ(registers[i].masks()[j].mmio_offset(), register_entries[i].masks[j].mmio_offset);
+      ASSERT_EQ(mask_entry.mmio_offset(), register_entries[i].masks[j].mmio_offset);
 
-      ASSERT_TRUE(registers[i].masks()[j].has_count());
-      ASSERT_EQ(registers[i].masks()[j].count(), register_entries[i].masks[j].count);
+      ASSERT_EQ(mask_entry.count(), register_entries[i].masks[j].count);
 
-      ASSERT_TRUE(registers[i].masks()[j].has_overlap_check_on());
-      ASSERT_EQ(registers[i].masks()[j].overlap_check_on(),
-                register_entries[i].masks[j].overlap_check_on);
+      ASSERT_EQ(mask_entry.overlap_check_on(), register_entries[i].masks[j].overlap_check_on);
     }
   }
 }

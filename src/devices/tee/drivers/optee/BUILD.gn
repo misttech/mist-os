@@ -24,10 +24,17 @@ source_set("tee_smc") {
 source_set("optee_lib") {
   sources = [
     "optee-client.cc",
+    "optee-client.h",
     "optee-controller.cc",
+    "optee-controller.h",
     "optee-message.cc",
+    "optee-message.h",
+    "optee-smc.h",
     "optee-util.cc",
+    "optee-util.h",
     "shared-memory.cc",
+    "shared-memory.h",
+    "tee-smc.h",
   ]
 
   public_deps = [

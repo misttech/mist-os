@@ -33,11 +33,10 @@ MINIMAL_PLATFORM_BASE = {
     "power": {
         "enable_non_hermetic_testing": True,
     },
-    "storage": {
-        "storage_host_enabled": True,
-    },
 }
 
 MINIMAL_PRODUCT_BASE = {
-    "build_info": DEFAULT_PRODUCT_BUILD_INFO,
+    "build_info": DEFAULT_PRODUCT_BUILD_INFO | {
+        "name": "minimal",
+    },
 }

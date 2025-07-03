@@ -24,7 +24,7 @@ use crate::crash_info::CrashRecords;
 use crate::memory::reporter::MemoryReporter;
 use crate::vdso_vmo::get_next_vdso_vmo;
 use ::routing::policy::ScopedPolicyChecker;
-use chrono::{NaiveDateTime, TimeZone as _, Utc};
+use chrono::DateTime;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner::{
     ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
@@ -516,8 +516,7 @@ impl ElfRunner {
                 let utc_time_ns = utc_timestamp.into_nanos();
                 let seconds = (utc_time_ns / 1_000_000_000) as i64;
                 let nanos = (utc_time_ns % 1_000_000_000) as u32;
-                let dt = Utc
-                    .from_utc_datetime(&NaiveDateTime::from_timestamp_opt(seconds, nanos).unwrap());
+                let dt = DateTime::from_timestamp(seconds, nanos).unwrap();
 
                 // If any of the above values are unavailable (unlikely), then this
                 // does not happen.

@@ -61,11 +61,13 @@ class MoblyDriverLibTest(unittest.TestCase):
         self, mock_popen: Any, *unused_args: Any
     ) -> None:
         """Test case to ensure exception raised on test failure"""
-        self.mock_process.wait.return_value = 1
+        expected_return_code = 42
+        self.mock_process.wait.return_value = expected_return_code
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
-        with self.assertRaises(mobly_driver.MoblyTestFailureException):
+        with self.assertRaises(mobly_driver.MoblyTestFailureException) as cm:
             mobly_driver.run(self.mock_driver, "/py/path", "/test/path")
+        self.assertEqual(cm.exception.return_code, expected_return_code)
 
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")

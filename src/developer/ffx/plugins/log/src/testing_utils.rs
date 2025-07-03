@@ -97,7 +97,7 @@ pub fn test_log_with_tag(timestamp: i64) -> LogsData {
 }
 
 pub fn naive_utc_nanos(utc_time: &str) -> i64 {
-    parse_utc_time(utc_time).unwrap().time.naive_utc().timestamp_nanos_opt().unwrap()
+    parse_utc_time(utc_time).unwrap().time.naive_utc().and_utc().timestamp_nanos_opt().unwrap()
 }
 
 impl Default for TestEnvironmentConfig {

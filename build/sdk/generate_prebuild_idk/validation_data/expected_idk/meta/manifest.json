@@ -38,6 +38,16 @@
       "type": "fidl_library"
     },
     {
+      "meta": "packages/fake-build-info/meta.json",
+      "stable": true,
+      "type": "package"
+    },
+    {
+      "meta": "packages/intl_property_manager/meta.json",
+      "stable": true,
+      "type": "package"
+    },
+    {
       "meta": "pkg/async/meta.json",
       "stable": true,
       "type": "cc_source_library"

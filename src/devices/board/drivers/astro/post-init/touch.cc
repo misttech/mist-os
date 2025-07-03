@@ -176,59 +176,74 @@ zx::result<> AddFocaltechTouch(
 }
 
 zx::result<> PostInit::InitTouch() {
-  /* Two variants of display are supported, one with BOE display panel and
-        ft3x27 touch controller, the other with INX panel and Goodix touch
-        controller.  This GPIO input is used to identify each.
-        Logic 0 for BOE/ft3x27 combination
-        Logic 1 for Innolux/Goodix combination
-  */
+  switch (panel_type_) {
+    case display::PanelType::kInnoluxP070acbFitipowerJd9364:
+      // Innolux P070ACB panel on Astro uses Goodix touch controller chip.
+      return InitGoodixTouch();
+    case display::PanelType::kBoeTv070wsmFitipowerJd9364Astro:
+      // BOE TV070WSM panel on Astro uses Focaltech FT3x27 touch controller
+      // chip.
+      return InitFocaltechTouch();
+    default:
+      break;
+  }
+  FDF_LOG(ERROR, "Invalid panel type for Astro: %" PRIu32, static_cast<uint32_t>(panel_type_));
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
 
-  if (display_id_) {
-    // The Goodix touch driver expects the interrupt line to be pulled up and the reset line to be
-    // pulled down.
-    if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kUp);
-        result.is_error()) {
-      return result;
-    }
-    if (auto result = SetPull(incoming(), "touch-reset", fuchsia_hardware_pin::Pull::kDown);
-        result.is_error()) {
-      return result;
-    }
+zx::result<> PostInit::InitGoodixTouch() {
+  // The Goodix touch driver expects the interrupt line to be pulled up and the reset line to be
+  // pulled down.
+  // TODO(https://fxbug.dev/428033669): Move the GPIO initialization
+  // logic to the touch driver.
+  if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kUp);
+      result.is_error()) {
+    return result;
+  }
+  if (auto result = SetPull(incoming(), "touch-reset", fuchsia_hardware_pin::Pull::kDown);
+      result.is_error()) {
+    return result;
+  }
 
-    const std::vector<fuchsia_driver_framework::ParentSpec2> goodix_parents{
-        {{kGoodixI2cRules, kGoodixI2cProperties}},
-        {{kInterruptRules, kInterruptProperties}},
-        {{kResetRules, kResetProperties}},
-    };
+  const std::vector<fuchsia_driver_framework::ParentSpec2> goodix_parents{
+      {{kGoodixI2cRules, kGoodixI2cProperties}},
+      {{kInterruptRules, kInterruptProperties}},
+      {{kResetRules, kResetProperties}},
+  };
 
-    const fuchsia_driver_framework::CompositeNodeSpec goodix_node_spec{{
-        .name = "gt92xx_touch",
-        .parents2 = goodix_parents,
-    }};
+  const fuchsia_driver_framework::CompositeNodeSpec goodix_node_spec{{
+      .name = "gt92xx_touch",
+      .parents2 = goodix_parents,
+  }};
 
-    if (auto result = composite_manager_->AddSpec(goodix_node_spec); result.is_error()) {
-      if (result.error_value().is_framework_error()) {
-        FDF_LOG(ERROR, "Call to AddSpec failed: %s",
-                result.error_value().framework_error().FormatDescription().c_str());
-        return zx::error(result.error_value().framework_error().status());
-      }
-      if (result.error_value().is_domain_error()) {
-        FDF_LOG(ERROR, "AddSpec failed");
-        return zx::error(ZX_ERR_INTERNAL);
-      }
+  if (auto result = composite_manager_->AddSpec(goodix_node_spec); result.is_error()) {
+    if (result.error_value().is_framework_error()) {
+      FDF_LOG(ERROR, "Call to AddSpec failed: %s",
+              result.error_value().framework_error().FormatDescription().c_str());
+      return zx::error(result.error_value().framework_error().status());
     }
-  } else {
-    // The Focaltech touch driver expects the interrupt line to be driven by the touch controller.
-    if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kNone);
-        result.is_error()) {
-      return result;
+    if (result.error_value().is_domain_error()) {
+      FDF_LOG(ERROR, "AddSpec failed");
+      return zx::error(ZX_ERR_INTERNAL);
     }
+  }
 
-    auto status = AddFocaltechTouch(pbus_);
-    if (!status.is_ok()) {
-      FDF_LOG(ERROR, "ft3x27: DdkAddCompositeNodeSpec failed: %s", status.status_string());
-      return status;
-    }
+  return zx::ok();
+}
+
+zx::result<> PostInit::InitFocaltechTouch() {
+  // The Focaltech touch driver expects the interrupt line to be driven by the touch controller.
+  // TODO(https://fxbug.dev/428033669): Move the GPIO initialization
+  // logic to the touch driver.
+  if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kNone);
+      result.is_error()) {
+    return result;
+  }
+
+  auto status = AddFocaltechTouch(pbus_);
+  if (!status.is_ok()) {
+    FDF_LOG(ERROR, "ft3x27: DdkAddCompositeNodeSpec failed: %s", status.status_string());
+    return status;
   }
 
   return zx::ok();

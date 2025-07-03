@@ -14,22 +14,27 @@ use crate::vfs::{FsNode, FsStr};
 use crate::TODO_DENY;
 use selinux::{
     Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, InitialSid,
-    KernelClass, NullessByteStr,
+    KernelClass, NullessByteStr, SystemPermission,
 };
+use starnix_sync::{LockBefore, Locked, ThreadGroupLimits};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::auth::CAP_DAC_OVERRIDE;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
+use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::{errno, error, rlimit};
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
-pub(in crate::security) fn update_state_on_exec(
+pub(in crate::security) fn update_state_on_exec<L>(
+    locked: &mut Locked<L>,
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
     elf_security_state: &ResolvedElfState,
-) {
+) where
+    L: LockBefore<ThreadGroupLimits>,
+{
     let (new_sid, old_sid) = {
         let mut task_attrs = task_consistent_attrs(current_task);
         let previous_sid = task_attrs.current_sid;
@@ -56,7 +61,7 @@ pub(in crate::security) fn update_state_on_exec(
     //    permitted to inherit the parent task's signal state.
     // 4. TODO(https://fxbug.dev/331815418): Wake the parent task if waiting on `current_task`.
     close_inaccessible_file_descriptors(security_server, current_task, new_sid);
-    maybe_reset_rlimits(security_server, current_task, old_sid, new_sid);
+    maybe_reset_rlimits(locked, security_server, current_task, old_sid, new_sid);
 }
 
 /// "Closes" file descriptors that `current_task` does not have permission to access by remapping
@@ -116,12 +121,15 @@ fn close_inaccessible_file_descriptors(
 
 /// Checks the `rlimitinh` permission for the current task. If the permission is denied, resets
 /// the current task's resource limits.
-fn maybe_reset_rlimits(
+fn maybe_reset_rlimits<L>(
+    locked: &mut Locked<L>,
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
     old_sid: SecurityId,
     new_sid: SecurityId,
-) {
+) where
+    L: LockBefore<ThreadGroupLimits>,
+{
     let audit_context = current_task.into();
     let permission_check = security_server.as_permission_check();
     if check_permission(
@@ -143,8 +151,8 @@ fn maybe_reset_rlimits(
     // and the initial task's soft limit.
     let weak_init = current_task.kernel().pids.read().get_task(1);
     let init_task = weak_init.upgrade().expect("get the initial task");
-    let init_rlimits = { init_task.thread_group().limits.lock().clone() };
-    let mut current_rlimits = current_task.thread_group().limits.lock();
+    let init_rlimits = { init_task.thread_group().limits.lock(locked).clone() };
+    let mut current_rlimits = current_task.thread_group().limits.lock(locked);
     (Resource::ALL).iter().for_each(|resource| {
         let current = current_rlimits.get(*resource);
         let init = init_rlimits.get(*resource);
@@ -434,6 +442,35 @@ pub(in crate::security) fn check_signal_access(
             audit_context,
         ),
     }
+}
+
+pub(in crate::security) fn check_syslog(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    action: SyslogAction,
+) -> Result<(), Errno> {
+    let sid = current_task.security_state.lock().current_sid;
+    let required_permission = match action {
+        SyslogAction::ReadAll | SyslogAction::SizeBuffer => SystemPermission::SyslogRead,
+        SyslogAction::ConsoleOff | SyslogAction::ConsoleOn | SyslogAction::ConsoleLevel => {
+            SystemPermission::SyslogConsole
+        }
+        SyslogAction::Close
+        | SyslogAction::Open
+        | SyslogAction::Read
+        | SyslogAction::ReadClear
+        | SyslogAction::Clear
+        | SyslogAction::SizeUnread => SystemPermission::SyslogMod,
+    };
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/425873800", "Enforce syslog permissions."),
+        current_task.kernel(),
+        permission_check,
+        sid,
+        InitialSid::Kernel.into(),
+        required_permission,
+        current_task.into(),
+    )
 }
 
 /// Returns the serialized Security Context associated with the specified task.
@@ -1064,7 +1101,7 @@ mod tests {
     #[fuchsia::test]
     async fn security_state_is_updated_on_exec() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |_locked, current_task, security_server| {
+            |locked, current_task, security_server| {
                 let initial_state = {
                     let state = &mut current_task.security_state.lock();
 
@@ -1086,7 +1123,11 @@ mod tests {
                     .expect("invalid security context");
                 assert_ne!(elf_sid, initial_state.current_sid);
 
-                update_state_on_exec(&current_task, &ResolvedElfState { sid: Some(elf_sid) });
+                update_state_on_exec(
+                    locked,
+                    &current_task,
+                    &ResolvedElfState { sid: Some(elf_sid) },
+                );
                 assert_eq!(
                     *current_task.security_state.lock(),
                     TaskAttrs {
@@ -1108,20 +1149,20 @@ mod tests {
     // for processes, so resource limits should be reset when the SID changes during exec.
     async fn handle_rlimitinh_on_exec() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |mut locked, current_task, security_server| {
+            |locked, current_task, security_server| {
                 // In this testing context, `current_task` is the initial task.
                 // Set its rlimits to some known values.
                 assert_eq!(current_task.tid, 1);
                 {
-                    let mut initial_limits = current_task.thread_group().limits.lock();
+                    let mut initial_limits = current_task.thread_group().limits.lock(locked);
                     (Resource::ALL).iter().for_each(|resource| {
                         initial_limits.set(*resource, rlimit { rlim_cur: 10, rlim_max: 20 });
                     })
                 }
                 // Clone the initial task, then set the child task's rlimits to some new values.
-                let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+                let child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
                 {
-                    let mut child_limits = child_task.thread_group().limits.lock();
+                    let mut child_limits = child_task.thread_group().limits.lock(locked);
                     (Resource::ALL).iter().for_each(|resource| {
                         child_limits.set(*resource, rlimit { rlim_cur: 30, rlim_max: 40 });
                     })
@@ -1129,9 +1170,10 @@ mod tests {
 
                 // Clone the child task. Before exec, the grandchild task's rlimits should be equal
                 // to its parent's.
-                let grandchild_task = child_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-                let parent_limits = { child_task.thread_group().limits.lock().clone() };
-                let pre_exec_limits = { grandchild_task.thread_group().limits.lock().clone() };
+                let grandchild_task = child_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+                let parent_limits = { child_task.thread_group().limits.lock(locked).clone() };
+                let pre_exec_limits =
+                    { grandchild_task.thread_group().limits.lock(locked).clone() };
                 {
                     (Resource::ALL).iter().for_each(|resource| {
                         let parent = parent_limits.get(*resource);
@@ -1147,9 +1189,14 @@ mod tests {
                     .security_context_to_sid(b"u:object_r:test_valid_t:s0".into())
                     .expect("invalid security context");
                 assert_ne!(old_sid, new_sid);
-                update_state_on_exec(&grandchild_task, &ResolvedElfState { sid: Some(new_sid) });
+                update_state_on_exec(
+                    locked,
+                    &grandchild_task,
+                    &ResolvedElfState { sid: Some(new_sid) },
+                );
 
-                let post_exec_limits = { grandchild_task.thread_group().limits.lock().clone() };
+                let post_exec_limits =
+                    { grandchild_task.thread_group().limits.lock(locked).clone() };
                 {
                     (Resource::ALL).iter().for_each(|resource| {
                         let pre_exec = pre_exec_limits.get(*resource);
@@ -1163,12 +1210,16 @@ mod tests {
                 }
 
                 // rlimits are not reset when the task SID does not change.
-                let same_domain_task =
-                    child_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-                update_state_on_exec(&same_domain_task, &ResolvedElfState { sid: Some(old_sid) });
-                let same_domain_limits = { same_domain_task.thread_group().limits.lock().clone() };
+                let same_domain_task = child_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+                update_state_on_exec(
+                    locked,
+                    &same_domain_task,
+                    &ResolvedElfState { sid: Some(old_sid) },
+                );
+                let same_domain_limits =
+                    { same_domain_task.thread_group().limits.lock(locked).clone() };
                 {
-                    let parent_limits = { child_task.thread_group().limits.lock().clone() };
+                    let parent_limits = { child_task.thread_group().limits.lock(locked).clone() };
                     (Resource::ALL).iter().for_each(|resource| {
                         let parent = parent_limits.get(*resource);
                         let same_domain = same_domain_limits.get(*resource);

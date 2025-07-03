@@ -6,6 +6,7 @@ use crate::maps::{Map, MapKey, MapValueRef, RingBuffer, RingBufferWakeupPolicy};
 use ebpf::{BpfValue, EbpfHelperImpl, EbpfProgramContext};
 use inspect_stubs::track_stub;
 use linux_uapi::{
+    bpf_func_id_BPF_FUNC_get_current_pid_tgid, bpf_func_id_BPF_FUNC_get_current_uid_gid,
     bpf_func_id_BPF_FUNC_get_smp_processor_id, bpf_func_id_BPF_FUNC_get_socket_cookie,
     bpf_func_id_BPF_FUNC_get_socket_uid, bpf_func_id_BPF_FUNC_ktime_get_boot_ns,
     bpf_func_id_BPF_FUNC_ktime_get_coarse_ns, bpf_func_id_BPF_FUNC_ktime_get_ns,
@@ -15,7 +16,7 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_ringbuf_discard, bpf_func_id_BPF_FUNC_ringbuf_reserve,
     bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_sk_fullsock,
     bpf_func_id_BPF_FUNC_sk_storage_get, bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
-    bpf_func_id_BPF_FUNC_trace_printk, uid_t,
+    bpf_func_id_BPF_FUNC_trace_printk, gid_t, pid_t, uid_t,
 };
 use std::slice;
 
@@ -273,6 +274,52 @@ where
     ]
 }
 
+pub trait CurrentTaskContext {
+    fn get_uid_gid(&self) -> (uid_t, gid_t);
+    fn get_tid_tgid(&self) -> (pid_t, pid_t);
+}
+
+fn bpf_get_current_uid_gid<C: EbpfProgramContext>(
+    context: &mut C::RunContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue
+where
+    for<'b> C::RunContext<'b>: CurrentTaskContext,
+{
+    let (uid, gid) = context.get_uid_gid();
+    (uid as u64 + (gid as u64) << 32).into()
+}
+
+fn bpf_get_current_pid_tgid<C: EbpfProgramContext>(
+    context: &mut C::RunContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue
+where
+    for<'b> C::RunContext<'b>: CurrentTaskContext,
+{
+    let (pid, tgid) = context.get_tid_tgid();
+    (pid as u64 + (tgid as u64) << 32).into()
+}
+
+/// Returns helper implementations that depend on `CurrentTask`.
+pub fn get_current_task_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
+where
+    for<'a> C::RunContext<'a>: CurrentTaskContext,
+{
+    vec![
+        (bpf_func_id_BPF_FUNC_get_current_uid_gid, EbpfHelperImpl(bpf_get_current_uid_gid)),
+        (bpf_func_id_BPF_FUNC_get_current_pid_tgid, EbpfHelperImpl(bpf_get_current_pid_tgid)),
+    ]
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LoadBytesBase {
     MacHeader,
@@ -383,7 +430,7 @@ fn bpf_sk_fullsock<C: EbpfProgramContext>(
     0.into()
 }
 
-// Helpers that are supplied to socket filter programs in addition to the common helpers.
+/// Returns helpers that are supplied to socket filter programs in addition to the common helpers.
 pub fn get_socket_filter_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
 where
     for<'a> C::RunContext<'a>: SocketFilterContext,
@@ -394,5 +441,42 @@ where
         (bpf_func_id_BPF_FUNC_skb_load_bytes_relative, EbpfHelperImpl(bpf_skb_load_bytes_relative)),
         (bpf_func_id_BPF_FUNC_sk_storage_get, EbpfHelperImpl(bpf_sk_storage_get)),
         (bpf_func_id_BPF_FUNC_sk_fullsock, EbpfHelperImpl(bpf_sk_fullsock)),
+    ]
+}
+
+pub trait SocketContext {
+    type BpfSock<'a>;
+
+    fn get_socket_cookie(&self, sock: &Self::BpfSock<'_>) -> u64;
+}
+
+// `bpf_get_socket_cookie()` for `CGROUP_SOCK` programs. Note that unlike
+// the default `bpf_get_socket_cookie()` this one takes bpf_sock as the first argument
+fn bpf_get_socket_cookie_sock<'a, C: EbpfProgramContext>(
+    context: &mut C::RunContext<'a>,
+    bpf_sock: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue
+where
+    for<'b> C::RunContext<'b>: SocketContext,
+{
+    // SAFETY: Verifier checks that the argument points at the `BpfSock`.
+    let bpf_sock: &<C::RunContext<'a> as SocketContext>::BpfSock<'a> =
+        unsafe { &*bpf_sock.as_ptr() };
+
+    context.get_socket_cookie(bpf_sock).into()
+}
+
+/// Returns helpers for programs of type `BPF_PROG_TYPE_CGROUP_SOCK`.
+pub fn get_cgroup_sock_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
+where
+    for<'b> C::RunContext<'b>: SocketContext,
+{
+    vec![
+        (bpf_func_id_BPF_FUNC_get_socket_cookie, EbpfHelperImpl(bpf_get_socket_cookie_sock)),
+        (bpf_func_id_BPF_FUNC_sk_storage_get, EbpfHelperImpl(bpf_sk_storage_get)),
     ]
 }

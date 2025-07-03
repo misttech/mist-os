@@ -72,7 +72,9 @@ async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<Utc
 /// Creates a UTC kernel clock with a backstop time configured by /boot.
 pub async fn create_utc_clock(bootfs: &Option<BootfsSvc>) -> Result<UtcClock, Error> {
     let backstop = read_utc_backstop("/boot/config/build_info/minimum_utc_stamp", &bootfs).await?;
-    let clock = UtcClock::create(ClockOpts::empty(), Some(backstop))
+    // Allows the UTC clock to be converted to a memory-mapped clock.
+    let clock_opts = ClockOpts::MAPPABLE;
+    let clock = UtcClock::create(clock_opts, Some(backstop))
         .map_err(|s| anyhow!("failed to create UTC clock: {}", s))?;
     Ok(clock)
 }

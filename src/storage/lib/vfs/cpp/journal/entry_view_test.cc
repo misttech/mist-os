@@ -2,11 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "entry_view.h"
+#include "src/storage/lib/vfs/cpp/journal/entry_view.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <storage/buffer/block_buffer.h>
+#include <storage/buffer/block_buffer_view.h>
+#include <storage/operation/operation.h>
+
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
 namespace {
@@ -250,7 +260,7 @@ TEST_F(EntryViewEscapedTest, EscapedBlocksCanBeDecoded) {
   EXPECT_TRUE(header.EscapedBlock(0));
   EXPECT_EQ(kTarget, header.TargetBlock(0));
   EXPECT_EQ(kJournalEntryMagic, ptr[0]) << "Payload prefix should have been reset, but it was not";
-  EXPECT_EQ(0xDEADBEEF, ptr[1]) << "Remainter of payload should have remained untouched";
+  EXPECT_EQ(0xDEADBEEF, ptr[1]) << "Remainder of payload should have remained untouched";
 }
 
 TEST_F(EntryViewEscapedTest, ShouldDetectIncorrectEscapedBlockPrefix) {

@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 use rutabaga_gfx::*;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_logging::log_error;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -26,7 +25,7 @@ fn create_gpu_device(
 
 pub fn gpu_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
@@ -40,7 +39,6 @@ where
             current_task,
             "virtio-gpu".into(),
             registry.objects.starnix_class(),
-            DeviceDirectory::new,
             create_gpu_device,
         )
         .expect("can register virtio-gpu");

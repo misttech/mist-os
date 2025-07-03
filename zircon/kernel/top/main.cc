@@ -28,7 +28,9 @@
 #include <platform.h>
 #include <string.h>
 #include <zircon/compiler.h>
+#include <zircon/tls.h>
 
+#include <arch/current_thread.h>
 #include <dev/init.h>
 #include <kernel/cpu.h>
 #include <kernel/init.h>
@@ -72,6 +74,23 @@ void lk_main(PhysHandoff* handoff) {
 
   // After HandoffFromPhys(), gPhysHandoff should now be set.
   ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
+
+  // Care is taken to do this top-level in lk_main() and after
+  // HandoffFromPhys(). This needs to be top-level as the updating of the
+  // stack guard needs to happen in a function that does not return (e.g.,
+  // lk_main()) since on return the invalidated guard would be compared
+  // against the new one. Further, HandoffFromPhys() will initialize enough of
+  // the kernel to give choose_stack_guard() access to supported means of
+  // hardware randomness.
+  //
+  // TODO(https://fxbug.dev/398677049): This should be done in physboot when it
+  // has access to a source of randomness (as it will for KASLR support) at the
+  // time it sets up the compiler ABI.
+  {
+    uint64_t* stack_guard = reinterpret_cast<uint64_t*>(arch_get_current_compiler_thread_pointer() +
+                                                        ZX_TLS_STACK_GUARD_OFFSET);
+    *stack_guard = choose_stack_guard();
+  }
 
   // Initialize debug tracing (if enabled) as early as possible. This allows
   // debug tracing to be used before the debug log comes up, and before global

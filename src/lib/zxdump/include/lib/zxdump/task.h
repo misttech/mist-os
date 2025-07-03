@@ -7,7 +7,6 @@
 
 #include <lib/elfldltl/constants.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/version.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/debug.h>
 
@@ -499,7 +498,7 @@ class Process : public Task {
   // the enum definition above for details.  In all modes it can return an
   // empty buffer if the memory was elided from the dump.  The success return
   // value is a move-only type; see <zxdump/buffer.h> for full details.
-  template <typename T = std::byte, class View = cpp20::span<const T>>
+  template <typename T = std::byte, class View = std::span<const T>>
   fit::result<Error, Buffer<T, View>> read_memory(
       uint64_t vaddr, size_t count, ReadMemorySize size_mode = ReadMemorySize::kExact) {
     static_assert(!std::is_reference_v<T>,
@@ -561,13 +560,11 @@ class Process : public Task {
   // The same thing is provided in u8string, u16string, u32string, and wstring
   // variants.
 
-#if __cpp_lib_char8_t
   fit::result<Error, std::u8string> read_memory_u8string(uint64_t vaddr,
                                                          size_t limit = kReadMemoryStringLimit /
                                                                         sizeof(char8_t)) {
     return read_memory_basic_string<char8_t>(vaddr, limit);
   }
-#endif
 
   fit::result<Error, std::u16string> read_memory_u16string(uint64_t vaddr,
                                                            size_t limit = kReadMemoryStringLimit /

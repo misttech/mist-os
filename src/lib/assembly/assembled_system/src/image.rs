@@ -9,7 +9,7 @@ use fuchsia_pkg::PackageManifest;
 use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use utf8_path::path_relative_from;
 
 /// An item in the AssembledSystem.
@@ -282,11 +282,6 @@ pub struct BlobfsContents {
     /// Maximum total size of all the blobs stored in this image.
     pub maximum_contents_size: Option<u64>,
 }
-
-/// Contains unique set of blobs.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(transparent)]
-pub struct PackageSetBlobInfo(pub BTreeSet<PackageBlob>);
 
 impl BlobfsContents {
     /// Add base package info into BlobfsContents

@@ -188,7 +188,10 @@ template("run_fuchsia_bazel_sdk_tests") {
     action(_cpu_target_name) {
       testonly = true
       script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
-      inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
+      inputs = [
+        "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel",
+        "//build/bazel_sdk/tests/MODULE.bazel",
+      ]
       outputs = [
         "$target_gen_dir/$target_name.stamp",
         "$target_out_dir/$target_name.bazel_events_logs.json",

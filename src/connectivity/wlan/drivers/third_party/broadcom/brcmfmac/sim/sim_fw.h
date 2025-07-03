@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "fidl/fuchsia.wlan.common/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-frame.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-sta-ifc.h"
@@ -142,7 +143,7 @@ class SimFirmware {
   struct AssocOpts {
     common::MacAddr bssid;
     fuchsia_wlan_ieee80211::Ssid ssid;
-    bss_type_t bss_type;
+    fuchsia_wlan_common::wire::BssType bss_type;
   };
 
   // During a reassociation attempt, this is where reassoc params are stored.

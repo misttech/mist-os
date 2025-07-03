@@ -5,12 +5,16 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_JOURNAL_REPLAY_H_
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_REPLAY_H_
 
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
+#include <cstdint>
+#include <vector>
+
 #include <storage/buffer/vmo_buffer.h>
+#include <storage/buffer/vmoid_registry.h>
 #include <storage/operation/operation.h>
 
-#include "lib/zx/result.h"
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 

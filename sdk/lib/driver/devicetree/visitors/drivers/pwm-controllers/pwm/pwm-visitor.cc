@@ -184,16 +184,16 @@ zx::result<> PwmVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     }
 
     if (controller->second.pwm_channels.channels()) {
-      fit::result encoded_metadata = fidl::Persist(controller->second.pwm_channels);
-      if (encoded_metadata.is_error()) {
-        FDF_LOG(ERROR, "Failed to encode pwm channels metadata: %s",
-                encoded_metadata.error_value().FormatDescription().c_str());
-        return zx::error(encoded_metadata.error_value().status());
+      fit::result persisted_metadata = fidl::Persist(controller->second.pwm_channels);
+      if (persisted_metadata.is_error()) {
+        FDF_LOG(ERROR, "Failed to persist pwm channels metadata: %s",
+                persisted_metadata.error_value().FormatDescription().c_str());
+        return zx::error(persisted_metadata.error_value().status());
       }
 
       fuchsia_hardware_platform_bus::Metadata channels_metadata = {{
-          .id = std::to_string(DEVICE_METADATA_PWM_CHANNELS),
-          .data = encoded_metadata.value(),
+          .id = fuchsia_hardware_pwm::PwmChannelsMetadata::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
       }};
 
       node.AddMetadata(std::move(channels_metadata));

@@ -58,6 +58,7 @@ test("ftl-wear-simulator-test") {
     "//src/storage/fvm:fvm-component",
     "//src/storage/minfs/bin:minfs-test-component",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
   ]
 }
 

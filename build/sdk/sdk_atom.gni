@@ -14,9 +14,10 @@ _types_supporting_unstable_atoms = [
   "cc_source_library",
   "fidl_library",
 
-  # LINT.ThenChange(//build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/generate_prebuild_idk.py)
+  # LINT.ThenChange(//build/bazel/bazel_idk/defs.bzl:unstable_atom_types, //build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/idk_generator.py)
 ]
 _types_not_requiring_compatibility = [
+  # LINT.IfChange(non_compatibility_types)
   "bind_library",
   "companion_host_tool",
   "dart_library",
@@ -27,6 +28,8 @@ _types_not_requiring_compatibility = [
   "host_tool",
   "package",
   "version_history",
+
+  # LINT.ThenChange(//build/bazel/bazel_idk/defs.bzl:non_compatibility_types)
 ]
 
 # Atoms of type "data" specify the real type in `value.type`. These are the
@@ -53,11 +56,6 @@ _cross_compiled_atom_types = [
 #   $target_gen_dir/$target_name.sdk
 #     An IDK build manifest describing what files pertain to the atom and which
 #     other atoms are required by this atom.
-#
-#   $target_gen_dir/$target_name.meta.json
-#     A metadata file describing the atom.
-#     This file is included in the final SDK and used to e.g. drive the
-#     inclusion of the atom in a different build system.
 #
 # Parameters
 #
@@ -93,11 +91,6 @@ _cross_compiled_atom_types = [
 #     List of scopes describing the contents of this element.
 #     See the "File scopes" section for how to describe files.
 #
-#   file_list
-#     Path to a file containing file mappings.
-#     Each line in the file should contain a "dest=source" mapping, similarly to
-#     file scopes.
-#
 #   api (optional)
 #     Path to the file representing the API canonically exposed by this atom.
 #     This file is used to ensure modifications to the API are explicitly
@@ -125,13 +118,11 @@ _cross_compiled_atom_types = [
 # This scope describes a metadata file to be added to the SDK element. Its
 # supported attributes are:
 #
-#   source (optional)
-#     Path to the metadata file.
-#
 #   value (optional)
 #     Scope representing the metadata contents.
 #
-#     NOTE: Exactly one of `source` or `value` must be set.
+#     This must be set for atom types not explicitly handled by
+#     generate_prebuild_idk.py.
 #
 #   dest (required)
 #     The path of the metadata file (usually `meta.json`) in the final IDK,
@@ -174,11 +165,11 @@ template("sdk_atom") {
          "Must specify the atom destination in the IDK")
 
   # Though the metadata files have a `type` key, the `meta.type` argument is not
-  # used for this. Verify the `meta.type` argument and underlying metadata are
+  # used for this when `meta.value` is specified. In this case, verify the
+  # `meta.type` argument and type specified in `meta.value` are
   # consistent when possible.  The values of `type` must match if and only if
   # the argument's value is not "data". For "data" atoms, an underlying type is
-  # specified in the metadata. Atoms that use a `meta.source` file cannot be
-  # verified.
+  # specified in the metadata.
   if (defined(meta.value)) {
     value = meta.value
     assert(defined(value.type) && value.type != "",
@@ -198,6 +189,10 @@ template("sdk_atom") {
   } else {
     assert(type != "data", "'data' atoms must use `meta.value`.")
   }
+
+  # Nested variables will not cause unused variable errors so explicitly assert
+  # that this obsolete value is not set.
+  assert(!defined(meta.source), "`meta.source` is obsolete.")
 
   assert(defined(invoker.category), "Must define an SDK category")
   category = invoker.category
@@ -337,7 +332,7 @@ template("sdk_atom") {
 
   assert(
       defined(invoker.api) || !is_stable || is_type_not_requiring_compatibility,
-      "All atoms with types ('${type}') and categories ('${category}') requiring compatibility must specify an `api` file unless explicitly unstable.")
+      "All atoms with types ('${type}') requiring compatibility must specify an `api` file unless explicitly unstable.")
   not_needed([
                "is_type_not_requiring_compatibility",
                "target_label",
@@ -382,25 +377,13 @@ template("sdk_atom") {
     ]
   }
 
-  meta_target_name = "${target_name}_meta"
-
-  # The generated file containing the metadata for the atom that will be
-  # included in the final IDK as its `meta.json` at `meta.dest`.
-  meta_file_for_idk = "$target_gen_dir/$target_name.meta.json"
-
   _idk_atom_prebuild_info = {
     atom_id = invoker.id
     atom_label = get_label_info(":${target_name}", "label_no_toolchain")
     atom_type = type
     atom_meta = {
-      forward_variables_from(meta,
-                             "*",
-                             [
-                               "source",
-                               "source_prebuild_info",
-                             ])
+      forward_variables_from(meta, "*", [ "source_prebuild_info" ])
     }
-    atom_meta_json_file = rebase_path(meta_file_for_idk, root_build_dir)
     if (defined(meta.source_prebuild_info)) {
       prebuild_info = meta.source_prebuild_info
     }
@@ -423,68 +406,6 @@ template("sdk_atom") {
       atom_label += "-${current_cpu}"
     }
   }
-
-  assert(defined(meta.source) != defined(meta.value),
-         "Exactly one of `meta.source` and `meta.value` must be set.")
-  if (defined(meta.value)) {
-    meta_generated_file_target = "${target_name}_meta_generated_file"
-    generated_file(meta_generated_file_target) {
-      forward_variables_from(invoker, _default_forward_from_invoker)
-      outputs = [ meta_file_for_idk ]
-      contents = meta.value
-      output_conversion = "json"
-      deps = gn_deps
-    }
-    target_providing_meta_file_for_idk = [ ":$meta_generated_file_target" ]
-  } else {
-    meta_copy_target_name = "${target_name}_meta_copy"
-    assert(defined(meta.source), "Meta scope needs a source or value")
-    if (!defined(meta.source_prebuild_info)) {
-      print(get_label_info(":$target_name", "label_no_toolchain") +
-            ": No meta.source_prebuild_info argument!")
-    }
-
-    # Copy the file to a canonical location for access by other rules.
-    # TODO(https://fxbug.dev/42131074): instead, make sure that all atoms generate their metadata
-    # file in the right location.
-    copy(meta_copy_target_name) {
-      forward_variables_from(invoker, _default_forward_from_invoker)
-
-      sources = [ meta.source ]
-
-      outputs = [ meta_file_for_idk ]
-
-      deps = gn_deps
-    }
-
-    target_providing_meta_file_for_idk = [ ":$meta_copy_target_name" ]
-  }
-
-  # Verify that the metadata complies with the specified schema.
-  validate_json(meta_target_name) {
-    forward_variables_from(invoker, _default_forward_from_invoker)
-    data = meta_file_for_idk
-    schema = "//build/sdk/meta/${type}.json"
-    use_valico = true
-    sources = [
-      # This file is imported by all schemas.
-      "//build/sdk/meta/common.json",
-    ]
-
-    # Add any schema referenced by the main schema for the type.
-    if (type == "ffx_tool") {
-      sources += [ "//build/sdk/meta/host_tool.json" ]
-    }
-
-    public_deps = target_providing_meta_file_for_idk
-  }
-
-  # Add the metadata file to the set of files to include in SDKs.
-  file_args += [
-    "--file",
-    meta.dest,
-    rebase_path(meta_file_for_idk, root_build_dir),
-  ]
 
   assert(defined(invoker.api) == defined(invoker.api_contents),
          "Must set only one of 'api' and 'api_contents' together")
@@ -538,7 +459,7 @@ template("sdk_atom") {
 
   # Generates an IDK build manifest representing this atom.
   # This manifest is only used at build time to generate the IDK. The actual
-  # manifest for this atom in the IDK is `meta_file_for_idk`.
+  # manifest for this atom in the IDK is generated from prebuild info.
   python_action(target_name) {
     forward_variables_from(invoker, _default_forward_from_invoker)
 
@@ -548,7 +469,7 @@ template("sdk_atom") {
 
     binary_label = "//build/sdk:create_atom_manifest"
 
-    public_deps = gn_deps + [ ":$meta_target_name" ]
+    public_deps = gn_deps
     if (_verify_api) {
       public_deps += [ ":$verify_api_target_name" ]
     }
@@ -578,7 +499,7 @@ template("sdk_atom") {
            ] + rebase_path(dep_manifests, root_build_dir) + file_args
 
     # Record the actual stability state for all atoms. This may not match the
-    # presence of "stable" in `meta_file_for_idk`.
+    # presence of "stable" in the meta.json file.
     if (is_stable) {
       args += [ "--stable" ]
     }
@@ -587,14 +508,6 @@ template("sdk_atom") {
       args += [
         "--area",
         invoker.sdk_area,
-      ]
-    }
-
-    if (defined(invoker.file_list)) {
-      inputs += [ invoker.file_list ]
-      args += [
-        "--file-list",
-        rebase_path(invoker.file_list, root_build_dir),
       ]
     }
 

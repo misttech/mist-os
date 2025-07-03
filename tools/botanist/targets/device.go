@@ -302,14 +302,16 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 		}
 		for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
 			logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)
+			bootCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+			defer cancel()
 			// ffx target bootloader boot doesn't work for Sorrel.
 			if t.opts.Netboot && os.Getenv("FUCHSIA_DEVICE_TYPE") != "Sorrel" {
-				if err = t.ffx.BootloaderBoot(ctx, target, pbPath, tcpFlash); err == nil {
+				if err = t.ffx.BootloaderBoot(bootCtx, target, pbPath, tcpFlash); err == nil {
 					// If successful, early exit.
 					break
 				}
 			} else {
-				if err = t.flash(ctx, pbPath, target, tcpFlash); err == nil {
+				if err = t.flash(bootCtx, pbPath, target, tcpFlash); err == nil {
 					// If successful, early exit.
 					break
 				}
@@ -389,7 +391,16 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	}
 
 	if serialSocketPath != "" {
-		return <-bootedLogChan
+		connectionTimeout := t.connectionTimeout
+		if connectionTimeout == 0 {
+			connectionTimeout = 5 * time.Minute
+		}
+		select {
+		case err := <-bootedLogChan:
+			return err
+		case <-time.After(connectionTimeout):
+			return fmt.Errorf("timed out after %v waiting for device to boot", connectionTimeout)
+		}
 	}
 
 	return nil

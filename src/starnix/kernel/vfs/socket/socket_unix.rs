@@ -27,7 +27,7 @@ use ebpf_api::{
     SocketFilterContext, SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
@@ -178,7 +178,7 @@ impl UnixSocket {
         open_flags: OpenFlags,
     ) -> Result<(FileHandle, FileHandle), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let credentials = current_task.as_ucred();
         let left = Socket::new(
@@ -202,17 +202,23 @@ impl UnixSocket {
         downcast_socket_to_unix(&right).lock().state = UnixSocketState::Connected(left.clone());
         downcast_socket_to_unix(&right).lock().credentials = Some(credentials);
         let left = SocketFile::from_socket(
+            locked,
             current_task,
             left,
             open_flags,
             /* kernel_private= */ false,
         )?;
         let right = SocketFile::from_socket(
+            locked,
             current_task,
             right,
             open_flags,
             /* kernel_private= */ false,
         )?;
+        let left_socket = SocketFile::get_from_file(&left)?;
+        let right_socket = SocketFile::get_from_file(&right)?;
+
+        security::socket_socketpair(current_task, left_socket, right_socket)?;
         Ok((left, right))
     }
 
@@ -697,7 +703,12 @@ impl SocketOps for UnixSocket {
     /// which changes how read() behaves on that socket. Second, close
     /// transitions the internal state of this socket to Closed, which breaks
     /// the reference cycle that exists in the connected state.
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, socket: &Socket) {
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        socket: &Socket,
+    ) {
         let (maybe_peer, has_unread) = {
             let mut inner = self.lock();
             let maybe_peer = inner.peer().map(Arc::clone);
@@ -1143,9 +1154,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_socket_send_capacity() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let socket = Socket::new(
-            &mut locked,
+            locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Stream,
@@ -1154,11 +1165,11 @@ mod tests {
         )
         .expect("Failed to create socket.");
         socket
-            .bind(&mut locked, &current_task, SocketAddress::Unix(b"\0".into()))
+            .bind(locked, &current_task, SocketAddress::Unix(b"\0".into()))
             .expect("Failed to bind socket.");
-        socket.listen(&mut locked, &current_task, 10).expect("Failed to listen.");
+        socket.listen(locked, &current_task, 10).expect("Failed to listen.");
         let connecting_socket = Socket::new(
-            &mut locked,
+            locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Stream,
@@ -1169,27 +1180,27 @@ mod tests {
         connecting_socket
             .ops
             .connect(
-                &mut locked.cast_locked(),
+                locked.cast_locked(),
                 &connecting_socket,
                 &current_task,
                 SocketPeer::Handle(socket.clone()),
             )
             .expect("Failed to connect socket.");
-        assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(&mut locked, &current_task));
-        let server_socket = socket.accept(&mut locked).unwrap();
+        assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(locked, &current_task));
+        let server_socket = socket.accept(locked).unwrap();
 
         let opt_size = std::mem::size_of::<socklen_t>();
         let user_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), opt_size as u64);
+            map_memory(locked, &current_task, UserAddress::default(), opt_size as u64);
         let send_capacity: socklen_t = 4 * 4096;
         current_task.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
         let user_buffer = UserBuffer { address: user_address, length: opt_size };
         server_socket
-            .setsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
+            .setsockopt(locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
             .unwrap();
 
         let opt_bytes =
-            server_socket.getsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
+            server_socket.getsockopt(locked, &current_task, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
         let retrieved_capacity = socklen_t::from_ne_bytes(opt_bytes.try_into().unwrap());
         // Setting SO_SNDBUF actually sets it to double the size
         assert_eq!(2 * send_capacity, retrieved_capacity);

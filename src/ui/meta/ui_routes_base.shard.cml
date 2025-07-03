@@ -141,6 +141,11 @@
             from: "#vulkan_loader",
             to: "#ui",
         },
+        {
+            service: [ "fuchsia.vulkan.loader.TrustedService" ],
+            from: "#vulkan_loader",
+            to: "#ui",
+        },
 
         // Routes from optional shards.
         // All of these routes should be marked `source_availability: "unknown"`

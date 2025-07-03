@@ -25,6 +25,23 @@ class Memory {
     return ReadBytes(addr, sizeof(res), &res);
   }
 
+  [[nodiscard]] Error ReadString(uint64_t addr, char* str, size_t max_length) {
+    char ch;
+    size_t i = 0;
+    do {
+      if (i >= max_length) {
+        str[i - 1] = '\0';
+        break;
+      }
+      if (auto err = Read(addr + i, ch); err.has_err()) {
+        return err;
+      }
+      str[i] = ch;
+      i++;
+    } while (ch != '\0');
+    return Success();
+  }
+
   // Read an object and advance the addr by the read size. Do not advance if failed.
   template <class Type>
   [[nodiscard]] Error ReadAndAdvance(uint64_t& addr, Type& res) {

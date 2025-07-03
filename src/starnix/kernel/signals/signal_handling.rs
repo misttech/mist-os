@@ -13,7 +13,7 @@ use crate::task::{
 };
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_info, log_trace, log_warn};
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{LockBefore, Locked, ThreadGroupLimits, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::{Errno, EINTR, ERESTART_RESTARTBLOCK};
@@ -39,36 +39,67 @@ enum SignalPriority {
 
 // `send_signal*()` calls below may fail only for real-time signals (with EAGAIN). They are
 // expected to succeed for all other signals.
-pub fn send_signal_first(task: &Task, task_state: TaskWriteGuard<'_>, siginfo: SignalInfo) {
-    send_signal_prio(task, task_state, siginfo.into(), SignalPriority::First, true)
+pub fn send_signal_first<L>(
+    locked: &mut Locked<L>,
+    task: &Task,
+    task_state: TaskWriteGuard<'_>,
+    siginfo: SignalInfo,
+) where
+    L: LockBefore<ThreadGroupLimits>,
+{
+    send_signal_prio(locked, task, task_state, siginfo.into(), SignalPriority::First, true)
         .expect("send_signal(SignalPriority::First) is not expected to fail")
 }
 
 // Sends `signal` to `task`. The signal must be a standard (i.e. not real-time) signal.
-pub fn send_standard_signal(task: &Task, siginfo: SignalInfo) {
+pub fn send_standard_signal<L>(locked: &mut Locked<L>, task: &Task, siginfo: SignalInfo)
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     debug_assert!(!siginfo.signal.is_real_time());
     let state = task.write();
-    send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
+    send_signal_prio(locked, task, state, siginfo.into(), SignalPriority::Last, false)
         .expect("send_signal(SignalPriority::Last) is not expected to fail for standard signals.")
 }
 
-pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
+pub fn send_signal<L>(locked: &mut Locked<L>, task: &Task, siginfo: SignalInfo) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     let state = task.write();
-    send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
+    send_signal_prio(locked, task, state, siginfo.into(), SignalPriority::Last, false)
 }
 
-pub fn send_freeze_signal(task: &Task, waiter: Waiter) -> Result<(), Errno> {
+pub fn send_freeze_signal<L>(
+    locked: &mut Locked<L>,
+    task: &Task,
+    waiter: Waiter,
+) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     let state = task.write();
-    send_signal_prio(task, state, KernelSignalInfo::Freeze(waiter), SignalPriority::First, true)
+    send_signal_prio(
+        locked,
+        task,
+        state,
+        KernelSignalInfo::Freeze(waiter),
+        SignalPriority::First,
+        true,
+    )
 }
 
-fn send_signal_prio(
+fn send_signal_prio<L>(
+    locked: &mut Locked<L>,
     task: &Task,
     mut task_state: TaskWriteGuard<'_>,
     kernel_siginfo: KernelSignalInfo,
     prio: SignalPriority,
     force_wake: bool,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     let (siginfo, signal, is_masked, was_masked, is_real_time, sigaction, action) =
         match kernel_siginfo {
             KernelSignalInfo::User(ref user_siginfo) => {
@@ -92,7 +123,7 @@ fn send_signal_prio(
 
     if is_real_time && prio != SignalPriority::First {
         if task_state.pending_signal_count()
-            >= task.thread_group().get_rlimit(Resource::SIGPENDING) as usize
+            >= task.thread_group().get_rlimit(locked, Resource::SIGPENDING) as usize
         {
             return error!(EAGAIN);
         }

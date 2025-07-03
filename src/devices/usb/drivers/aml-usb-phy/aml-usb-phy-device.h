@@ -19,14 +19,15 @@ namespace aml_usb_phy {
 class AmlUsbPhy;
 
 class AmlUsbPhyDevice : public fdf::DriverBase {
- private:
+ public:
   class ChildNode {
    public:
     explicit ChildNode(AmlUsbPhyDevice* parent, std::string_view name, uint32_t property_did)
         : parent_(parent), name_(name), property_did_(property_did) {}
 
-    ChildNode& operator--();
-    ChildNode& operator++();
+    zx::result<> Publish();
+    zx::result<> UnPublish();
+    std::string_view name() const { return name_; }
 
    private:
     AmlUsbPhyDevice* parent_;
@@ -34,12 +35,12 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
     const uint32_t property_did_;
 
     std::mutex lock_;
-    fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_ __TA_GUARDED(lock_);
+    fidl::WireSyncClient<fuchsia_driver_framework::NodeController> child_controller_
+        __TA_GUARDED(lock_);
     compat::SyncInitializedDeviceServer compat_server_ __TA_GUARDED(lock_);
     std::atomic_uint32_t count_ __TA_GUARDED(lock_) = 0;
   };
 
- public:
   static constexpr std::string_view kDeviceName = "aml_usb_phy";
 
   AmlUsbPhyDevice(fdf::DriverStartArgs start_args,
@@ -47,6 +48,9 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
       : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
   zx::result<> Start() override;
   void Stop() override;
+
+  // Unbind from parent node when a fatal failure occurs.
+  void UnbindOnFailure();
 
   ChildNode xhci_{this, "xhci", PDEV_DID_USB_XHCI_COMPOSITE};
   ChildNode dwc2_{this, "dwc2", PDEV_DID_USB_DWC2};

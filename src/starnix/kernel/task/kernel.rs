@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::attachments::EbpfAttachments;
+use crate::bpf::EbpfState;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
@@ -15,9 +15,9 @@ use crate::task::limits::SystemLimits;
 use crate::task::memory_attribution::MemoryAttributionManager;
 use crate::task::net::NetstackDevices;
 use crate::task::{
-    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
-    HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads, PidTable,
-    SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, DelayedReleaser,
+    HrTimerManager, HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads,
+    PidTable, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
@@ -26,7 +26,7 @@ use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
 };
-use crate::vfs::{DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts};
+use crate::vfs::{FileHandle, FileOps, FsNode, FsString, Mounts};
 use bstr::BString;
 use expando::Expando;
 use fidl::endpoints::{
@@ -53,6 +53,7 @@ use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -145,6 +146,9 @@ impl EncryptionKeyId {
 /// The structure of this object will likely need to evolve as we implement more namespacing and
 /// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
 pub struct Kernel {
+    /// Weak reference to self. Allows to not have to pass &Arc<Kernel> in apis.
+    pub weak_self: Weak<Kernel>,
+
     /// The kernel threads running on behalf of this kernel.
     pub kthreads: KernelThreads,
 
@@ -292,7 +296,7 @@ pub struct Kernel {
 
     /// Vector of functions to be run when procfs is constructed. This is to allow
     /// modules to expose directories into /proc/device-tree.
-    pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
+    pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)>,
 
     /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
     shutting_down: AtomicBool,
@@ -310,8 +314,8 @@ pub struct Kernel {
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 
-    /// Keeps track of attached eBPF programs.
-    pub ebpf_attachments: EbpfAttachments,
+    /// eBPF state: loaded programs, eBPF maps, etc.
+    pub ebpf_state: Arc<EbpfState>,
 
     /// Cgroups of the kernel.
     pub cgroups: KernelCgroups,
@@ -336,9 +340,9 @@ impl InterfacesHandlerImpl {
 }
 
 impl InterfacesHandler for InterfacesHandlerImpl {
-    fn handle_new_link(&mut self, name: &str) {
+    fn handle_new_link(&mut self, name: &str, interface_id: NonZeroU64) {
         if let Some(kernel) = self.kernel() {
-            kernel.netstack_devices.add_device(&kernel, name.into());
+            kernel.netstack_devices.add_device(&kernel, name.into(), interface_id);
         }
     }
 
@@ -346,6 +350,19 @@ impl InterfacesHandler for InterfacesHandlerImpl {
         if let Some(kernel) = self.kernel() {
             kernel.netstack_devices.remove_device(&kernel, name.into());
         }
+    }
+
+    fn handle_idle_event(&mut self) {
+        let Some(kernel) = self.kernel() else {
+            log_error!("kernel went away while netlink is initializing");
+            return;
+        };
+        let (initialized, wq) = &kernel.netstack_devices.initialized_and_wq;
+        if initialized.swap(true, Ordering::SeqCst) {
+            log_error!("netlink initial devices should only be reported once");
+            return;
+        }
+        wq.notify_all()
     }
 }
 
@@ -358,7 +375,7 @@ impl Kernel {
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         security_state: security::KernelState,
-        procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
+        procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)>,
         time_adjustment_proxy: Option<AdjustSynchronousProxy>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
@@ -372,6 +389,7 @@ impl Kernel {
         let iptables = OrderedRwLock::new(IpTables::new(features.netstack_mark));
 
         let this = Arc::new_cyclic(|kernel| Kernel {
+            weak_self: kernel.clone(),
             kthreads: KernelThreads::new(kernel.clone()),
             features,
             pids: RwLock::new(PidTable::new()),
@@ -405,7 +423,7 @@ impl Kernel {
             next_file_object_id: Default::default(),
             system_limits: SystemLimits::default(),
             ptrace_scope: AtomicU8::new(0),
-            restrict_dmesg: AtomicBool::new(true),
+            restrict_dmesg: AtomicBool::new(false),
             disable_unprivileged_bpf: AtomicU8::new(0), // Enable unprivileged BPF by default.
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
@@ -420,10 +438,15 @@ impl Kernel {
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
-            ebpf_attachments: Default::default(),
+            ebpf_state: Default::default(),
             cgroups: Default::default(),
             time_adjustment_proxy,
         });
+
+        // Initialize the device registry before registering any devices.
+        //
+        // We will create sysfs recursively within this function.
+        this.device_registry.objects.init(&mut this.kthreads.unlocked_for_async(), &this);
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
         // because the inspect node that owns this reference is owned by the kernel.
@@ -642,12 +665,10 @@ impl Kernel {
     ///
     /// This function follows the lazy initialization pattern, where the first
     /// call will instantiate the Netlink implementation.
-    pub(crate) fn network_netlink<'a>(
-        self: &'a Arc<Self>,
-    ) -> &'a Netlink<NetlinkSenderReceiverProvider> {
+    pub fn network_netlink(&self) -> &Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) = Netlink::new(
-                InterfacesHandlerImpl(Arc::downgrade(self)),
+                InterfacesHandlerImpl(self.weak_self.clone()),
                 netlink::FeatureFlags {
                     assume_ifb0_existence: self.features.rtnetlink_assume_ifb0_existence,
                 },
@@ -724,8 +745,8 @@ impl Kernel {
                 let set_properties = |node: &fuchsia_inspect::Node| {
                     node.record_string("command", task.command().to_str().unwrap_or("{err}"));
 
-                    let sched_policy = task.read().scheduler_policy;
-                    if !sched_policy.is_default() {
+                    let scheduler_state = task.read().scheduler_state;
+                    if !scheduler_state.is_default() {
                         node.record_child("sched", |node| {
                             node.record_string(
                                 "role_name",
@@ -734,7 +755,7 @@ impl Kernel {
                                     .map(|n| Cow::Borrowed(n))
                                     .unwrap_or_else(|e| Cow::Owned(e.to_string())),
                             );
-                            node.record_string("policy", format!("{sched_policy:?}"));
+                            node.record_string("state", format!("{scheduler_state:?}"));
                         });
                     }
                 };

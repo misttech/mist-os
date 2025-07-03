@@ -10,6 +10,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
@@ -311,9 +312,12 @@ class Gt6853Test : public zxtest::Test {
     loop_.RunUntilIdle();
   }
 
-  zx_status_t Init(uint32_t panel_type_id = 1) {
-    panel_type_id_ = panel_type_id;
+  // Must be called before `Init()`.
+  void SetDisplayPanelType(display::PanelType display_panel_type) {
+    display_panel_type_ = display_panel_type;
+  }
 
+  zx_status_t Init() {
     InitParent();
 
     config_vmo = &config_vmo_;
@@ -396,7 +400,10 @@ class Gt6853Test : public zxtest::Test {
 
   zx::interrupt gpio_interrupt_;
   MockDevice* device_ = nullptr;
-  uint32_t panel_type_id_ = 0;
+
+  // Display panel type.
+  display::PanelType display_panel_type_ = display::PanelType::kKdKd070d82FitipowerJd9364;
+
   zx::vmo config_vmo_;
   zx::vmo firmware_vmo_;
 
@@ -452,8 +459,8 @@ class Gt6853Test : public zxtest::Test {
                                  "gpio-int");
 
     fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, nullptr, nullptr, "pdev");
-    fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &panel_type_id_,
-                              sizeof(panel_type_id_));
+    fake_parent_->SetMetadata(DEVICE_METADATA_DISPLAY_PANEL_TYPE, &display_panel_type_,
+                              sizeof(display_panel_type_));
   }
 
   std::shared_ptr<sync_completion_t> i2c_read_completion_ = std::make_shared<sync_completion_t>();
@@ -617,7 +624,8 @@ TEST_F(Gt6853Test, ConfigDownloadPanelType9365) {
 
   i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 0);
 
-  ASSERT_OK(Init(4));  // kPanelTypeKdFiti9365
+  SetDisplayPanelType(display::PanelType::kKdKd070d82FitipowerJd9365);
+  ASSERT_OK(Init());
 
   auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
   EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number zero");

@@ -19,7 +19,9 @@ instead, and this .bzl will be removed.
 
 load(
     "//fuchsia/private:fuchsia_api_level.bzl",
+    _FUCHSIA_API_LEVEL_TARGET = "FUCHSIA_API_LEVEL_TARGET",
     _FuchsiaAPILevelInfo = "FuchsiaAPILevelInfo",
+    _REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET = "REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET",
     _fuchsia_api_level = "fuchsia_api_level",
     _get_fuchsia_api_level = "get_fuchsia_api_level",
 )
@@ -30,6 +32,11 @@ load(
     _fuchsia_debug_symbols = "fuchsia_debug_symbols",
     _strip_resources = "strip_resources",
     _transform_collected_debug_symbols_infos = "transform_collected_debug_symbols_infos",
+)
+load(
+    "//fuchsia/private:fuchsia_toolchains.bzl",
+    _FUCHSIA_TOOLCHAIN_DEFINITION = "FUCHSIA_TOOLCHAIN_DEFINITION",
+    _get_fuchsia_sdk_toolchain = "get_fuchsia_sdk_toolchain",
 )
 load("//fuchsia/private:fuchsia_transition.bzl", _fuchsia_transition = "fuchsia_transition")
 load(
@@ -58,11 +65,6 @@ load(
     _FuchsiaProductConfigInfo = "FuchsiaProductConfigInfo",
     _FuchsiaVirtualDeviceInfo = "FuchsiaVirtualDeviceInfo",
 )
-load(
-    "//fuchsia/private:fuchsia_toolchains.bzl",
-    _FUCHSIA_TOOLCHAIN_DEFINITION = "FUCHSIA_TOOLCHAIN_DEFINITION",
-    _get_fuchsia_sdk_toolchain = "get_fuchsia_sdk_toolchain",
-)
 
 # assembly/providers.bzl
 FuchsiaBoardConfigInfo = _FuchsiaBoardConfigInfo
@@ -82,6 +84,8 @@ transform_collected_debug_symbols_infos = _transform_collected_debug_symbols_inf
 FuchsiaAPILevelInfo = _FuchsiaAPILevelInfo
 fuchsia_api_level = _fuchsia_api_level
 get_fuchsia_api_level = _get_fuchsia_api_level
+FUCHSIA_API_LEVEL_TARGET = _FUCHSIA_API_LEVEL_TARGET
+REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET = _REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET
 
 # fuchsia_transition.bzl
 fuchsia_transition = _fuchsia_transition

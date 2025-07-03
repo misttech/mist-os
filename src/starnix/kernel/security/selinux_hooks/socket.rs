@@ -7,7 +7,7 @@ use super::fs_node::compute_new_fs_node_sid;
 use super::{
     check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
 };
-use crate::security::selinux_hooks::superblock;
+use crate::security::selinux_hooks::{superblock, FsNodeLabel};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
     socket_fs, NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketFile, SocketPeer,
@@ -182,23 +182,25 @@ where
         return Ok(());
     }
 
-    let sockfs = socket_fs(current_task.kernel());
+    let sockfs = socket_fs(locked, current_task.kernel());
     // Ensure sockfs gets labeled, in case it was mounted after the SELinux policy has been loaded.
     superblock::file_system_resolve_security(locked, security_server, &current_task, &sockfs)
         .expect("resolve fs security");
     let effective_sid = task_effective_sid(current_task);
     let new_socket_class = compute_socket_security_class(domain, socket_type, protocol);
-    let new_socket_sid = compute_new_fs_node_sid(
-        security_server,
-        current_task,
-        &sockfs,
-        None,
-        new_socket_class.into(),
-        "".into(),
-    )?
-    .map(|(sid, _)| sid)
-    // TODO: https://fxbug.dev/364569053 - default to socket-related initial SIDs.
-    .unwrap_or_else(|| InitialSid::Unlabeled.into());
+    let new_socket_sid = if let Some(fs_label) = sockfs.security_state.state.label() {
+        compute_new_fs_node_sid(
+            security_server,
+            current_task,
+            fs_label,
+            None,
+            new_socket_class.into(),
+            "".into(),
+        )?
+    } else {
+        // TODO: https://fxbug.dev/364569053 - default to socket-related initial SIDs.
+        InitialSid::Unlabeled.into()
+    };
 
     has_socket_permission_for_sid(
         &security_server.as_permission_check(),
@@ -208,6 +210,24 @@ where
         CommonFsNodePermission::Create.for_class(new_socket_class),
         current_task.into(),
     )
+}
+
+/// Sets the peer security context for each socket in the pair.
+pub(in crate::security) fn socket_socketpair(
+    left: DowncastedFile<'_, SocketFile>,
+    right: DowncastedFile<'_, SocketFile>,
+) -> Result<(), Errno> {
+    let left_label = left.file().node().security_state.lock().label.clone();
+    let FsNodeLabel::SecurityId { sid: left_sid } = left_label else {
+        panic!("SecurityId not set for socketpair")
+    };
+    let right_label = right.file().node().security_state.lock().label.clone();
+    let FsNodeLabel::SecurityId { sid: right_sid } = right_label else {
+        panic!("SecurityId not set for socketpair")
+    };
+    *left.socket().security.state.peer_sid.lock() = Some(right_sid);
+    *right.socket().security.state.peer_sid.lock() = Some(left_sid);
+    Ok(())
 }
 
 /// Computes and sets the security class for `socket`.
@@ -301,6 +321,33 @@ pub(in crate::security) fn check_socket_listen_access(
         CommonSocketPermission::Listen.for_class(socket_class),
         current_task.into(),
     )
+}
+
+/// Checks that `current_task` has permission to accept a connection on `listening_socket`, and
+/// sets the security state for `accepted_socket` to match the context of `listening_socket`.
+pub(in crate::security) fn socket_accept(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    listening_socket: DowncastedFile<'_, SocketFile>,
+    accepted_socket: DowncastedFile<'_, SocketFile>,
+) -> Result<(), Errno> {
+    let current_sid = task_effective_sid(current_task);
+    let listening_security_state = listening_socket.file().node().security_state.lock().clone();
+    let FsNodeClass::Socket(socket_class) = listening_security_state.class else {
+        panic!("socket_accept called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_accept checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &listening_socket.file().node(),
+        CommonSocketPermission::Accept.for_class(socket_class),
+        current_task.into(),
+    )?;
+    *accepted_socket.file().node().security_state.lock() = listening_security_state;
+    Ok(())
 }
 
 /// Checks that `current_task` has permission to get socket options on `socket`.

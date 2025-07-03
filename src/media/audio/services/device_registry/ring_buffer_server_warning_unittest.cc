@@ -69,11 +69,12 @@ class RingBufferServerWarningTest : public AudioDeviceRegistryServerTestBase,
 
 class RingBufferServerCompositeWarningTest : public RingBufferServerWarningTest {
  protected:
+  static inline const std::string kClassName = "RingBufferServerCompositeWarningTest";
   std::shared_ptr<Device> EnableDriverAndAddDevice(
       const std::shared_ptr<FakeComposite>& fake_driver) {
-    auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                 fad::DeviceType::kComposite,
-                                 fad::DriverClient::WithComposite(fake_driver->Enable()));
+    auto device = Device::Create(
+        adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+        fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName);
     adr_service()->AddDevice(device);
 
     RunLoopUntilIdle();

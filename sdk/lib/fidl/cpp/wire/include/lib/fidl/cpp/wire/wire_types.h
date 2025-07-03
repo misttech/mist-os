@@ -15,10 +15,20 @@
 #include <lib/fidl/cpp/wire/wire_coding_traits.h>
 #include <lib/fidl/cpp/wire_format_metadata.h>
 #include <lib/fit/inline_any.h>
+#include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/fidl.h>
 #include <zircon/types.h>
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #ifdef __Fuchsia__
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>

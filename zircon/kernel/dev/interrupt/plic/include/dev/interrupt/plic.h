@@ -7,10 +7,10 @@
 #ifndef ZIRCON_KERNEL_DEV_INTERRUPT_PLIC_INCLUDE_DEV_INTERRUPT_PLIC_H_
 #define ZIRCON_KERNEL_DEV_INTERRUPT_PLIC_INCLUDE_DEV_INTERRUPT_PLIC_H_
 
-#include <lib/zbi-format/driver-config.h>
+#include <phys/handoff.h>
 
 // Early and late initialization routines for the driver.
-void PLICInitEarly(const zbi_dcfg_riscv_plic_driver_t& config);
+void PLICInitEarly(const RiscvPlicDriverConfig& config);
 void PLICInitLate();
 
-#endif
+#endif  // ZIRCON_KERNEL_DEV_INTERRUPT_PLIC_INCLUDE_DEV_INTERRUPT_PLIC_H_

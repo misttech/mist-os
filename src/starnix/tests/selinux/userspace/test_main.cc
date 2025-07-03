@@ -32,6 +32,10 @@ void LoadPolicy(const std::string& name) {
   auto result = WriteExistingFile("/sys/fs/selinux/load", binary_policy.value());
   ASSERT_TRUE(result.is_ok()) << "Load of policy from " << policy_path
                               << " failed: " << strerror(result.error_value());
+
+  // Ensure that the binary policy is reported by the kernel as having been loaded.
+  auto loaded_policy = ReadFile("/sys/fs/selinux/policy");
+  ASSERT_TRUE(loaded_policy.is_ok());
 }
 
 // Perform one-time initialization of the test system.

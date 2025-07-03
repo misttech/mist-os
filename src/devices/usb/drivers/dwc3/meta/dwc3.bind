@@ -4,6 +4,7 @@
 
 composite dwc3;
 
+using fuchsia.clock;
 using fuchsia.designware.platform;
 using fuchsia.devicetree;
 using fuchsia.interconnect;
@@ -46,4 +47,28 @@ optional node "interconnect-usb-ipa" {
 optional node "interconnect-ddr-usb" {
   fuchsia.hardware.interconnect.PathService == fuchsia.hardware.interconnect.PathService.ZirconTransport;
   fuchsia.interconnect.PATH_NAME == "ddr-usb";
+}
+
+optional node "core-clk" {
+  fuchsia.clock.FUNCTION == "fuchsia.clock.FUNCTION.core-clk";
+}
+
+optional node "iface-clk" {
+  fuchsia.clock.FUNCTION == "fuchsia.clock.FUNCTION.iface-clk";
+}
+
+optional node "bus-aggr-clk" {
+  fuchsia.clock.FUNCTION == "fuchsia.clock.FUNCTION.bus-aggr-clk";
+}
+
+optional node "xo" {
+  fuchsia.clock.FUNCTION == "fuchsia.clock.FUNCTION.xo";
+}
+
+optional node "sleep-clk" {
+  fuchsia.clock.FUNCTION == "fuchsia.clock.FUNCTION.sleep-clk";
+}
+
+optional node "utmi-clk" {
+  fuchsia.clock.FUNCTION == "fuchsia.clock.FUNCTION.utmi-clk";
 }

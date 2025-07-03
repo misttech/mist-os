@@ -14,17 +14,51 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error, off_t};
 use std::collections::VecDeque;
 
+unsafe extern "C" {
+    // Declare a symbol that doesn't exist. If the compiler cannot prove that this is never used,
+    // this will create a compilation error showing an issue with the usage of the traits in this
+    // file.
+    fn undefined_symbol_to_prevent_compilation();
+}
+
 pub trait SequenceFileSource: Send + Sync + 'static {
     type Cursor: Default + Send;
     fn next(
         &self,
+        _cursor: Self::Cursor,
+        _sink: &mut DynamicFileBuf,
+    ) -> Result<Option<Self::Cursor>, Errno> {
+        // SAFETY: This cannot compile and ensure this method is never reached
+        unsafe {
+            undefined_symbol_to_prevent_compilation();
+        }
+        panic!("Either next or next_locked must be implemented");
+    }
+    fn next_locked(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
         cursor: Self::Cursor,
         sink: &mut DynamicFileBuf,
-    ) -> Result<Option<Self::Cursor>, Errno>;
+    ) -> Result<Option<Self::Cursor>, Errno> {
+        self.next(cursor, sink)
+    }
 }
 
 pub trait DynamicFileSource: Send + Sync + 'static {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno>;
+    fn generate(&self, _sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        // SAFETY: This cannot compile and ensure this method is never reached
+        unsafe {
+            undefined_symbol_to_prevent_compilation();
+        }
+        panic!("Either generate or generate_locked must be implemented");
+    }
+    fn generate_locked(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        sink: &mut DynamicFileBuf,
+    ) -> Result<(), Errno> {
+        self.generate(sink)
+    }
 }
 
 impl<T> SequenceFileSource for T
@@ -32,8 +66,13 @@ where
     T: DynamicFileSource,
 {
     type Cursor = ();
-    fn next(&self, _cursor: (), sink: &mut DynamicFileBuf) -> Result<Option<()>, Errno> {
-        self.generate(sink).map(|_| None)
+    fn next_locked(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        _cursor: (),
+        sink: &mut DynamicFileBuf,
+    ) -> Result<Option<()>, Errno> {
+        self.generate_locked(locked, sink).map(|_| None)
     }
 }
 
@@ -136,8 +175,13 @@ impl<Source: SequenceFileSource + Clone> DynamicFile<Source> {
 }
 
 impl<Source: SequenceFileSource> DynamicFile<Source> {
-    fn read_internal(&self, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-        self.state.lock().read(offset, data)
+    fn read_internal(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        self.state.lock().read(locked, offset, data)
     }
 }
 
@@ -150,13 +194,13 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn read(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        self.read_internal(offset, data)
+        self.read_internal(locked, offset, data)
     }
 
     fn write(
@@ -172,7 +216,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn seek(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -184,7 +228,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
         // seeking to the start of the file).
         if new_offset > 0 {
             let mut dummy_buf = VecOutputBuffer::new(0);
-            self.read_internal(new_offset as usize, &mut dummy_buf)?;
+            self.read_internal(locked, new_offset as usize, &mut dummy_buf)?;
         }
 
         Ok(new_offset)
@@ -231,7 +275,12 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
         self.byte_offset = 0;
     }
 
-    fn read(&mut self, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+    fn read(
+        &mut self,
+        locked: &mut Locked<FileOpsCore>,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
         if offset != self.byte_offset {
             self.reset();
         }
@@ -245,7 +294,7 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
                 break;
             };
             let mut buf = std::mem::take(&mut self.buf);
-            self.cursor = self.source.next(cursor, &mut buf).map_err(|e| {
+            self.cursor = self.source.next_locked(locked, cursor, &mut buf).map_err(|e| {
                 // Reset everything on failure
                 self.reset();
                 e
@@ -401,16 +450,20 @@ mod tests {
 
     fn create_test_file<T: SequenceFileSource>(
         source: T,
-    ) -> (AutoReleasableTask, FileHandle, Locked<Unlocked>) {
+    ) -> (AutoReleasableTask, FileHandle, &'static mut Locked<Unlocked>) {
         let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let file =
-            anon_test_file(&current_task, Box::new(DynamicFile::new(source)), OpenFlags::RDONLY);
+        let file = anon_test_file(
+            locked,
+            &current_task,
+            Box::new(DynamicFile::new(source)),
+            OpenFlags::RDONLY,
+        );
         (current_task, file, locked)
     }
 
     #[::fuchsia::test]
     async fn test_sequence() -> Result<(), Errno> {
-        let (current_task, file, mut locked) = create_test_file(TestSequenceFileSource {});
+        let (current_task, file, locked) = create_test_file(TestSequenceFileSource {});
 
         let read_at = |locked: &mut Locked<Unlocked>,
                        offset: usize,
@@ -421,11 +474,11 @@ mod tests {
             Ok(buffer.data().to_vec())
         };
 
-        assert_eq!(read_at(&mut locked, 0, 2)?, &[0, 1]);
-        assert_eq!(read_at(&mut locked, 2, 2)?, &[2, 3]);
-        assert_eq!(read_at(&mut locked, 4, 4)?, &[4, 5, 6, 7]);
-        assert_eq!(read_at(&mut locked, 0, 2)?, &[0, 1]);
-        assert_eq!(read_at(&mut locked, 4, 2)?, &[4, 5]);
+        assert_eq!(read_at(locked, 0, 2)?, &[0, 1]);
+        assert_eq!(read_at(locked, 2, 2)?, &[2, 3]);
+        assert_eq!(read_at(locked, 4, 4)?, &[4, 5, 6, 7]);
+        assert_eq!(read_at(locked, 0, 2)?, &[0, 1]);
+        assert_eq!(read_at(locked, 4, 2)?, &[4, 5]);
         Ok(())
     }
 
@@ -448,7 +501,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read() -> Result<(), Errno> {
         let counter = Arc::new(Counter { value: Mutex::new(0) });
-        let (current_task, file, mut locked) = create_test_file(TestFileSource { counter });
+        let (current_task, file, locked) = create_test_file(TestFileSource { counter });
         let read_at = |locked: &mut Locked<Unlocked>,
                        offset: usize,
                        length: usize|
@@ -459,16 +512,16 @@ mod tests {
         };
 
         // Verify that we can read all data to the end.
-        assert_eq!(read_at(&mut locked, 0, 20)?, (0..10).collect::<Vec<u8>>());
+        assert_eq!(read_at(locked, 0, 20)?, (0..10).collect::<Vec<u8>>());
 
         // Read from the beginning. Content should be refreshed.
-        assert_eq!(read_at(&mut locked, 0, 2)?, [1, 2]);
+        assert_eq!(read_at(locked, 0, 2)?, [1, 2]);
 
         // Continue reading. Content should not be updated.
-        assert_eq!(read_at(&mut locked, 2, 2)?, [3, 4]);
+        assert_eq!(read_at(locked, 2, 2)?, [3, 4]);
 
         // Try reading from a new position. Content should be updated.
-        assert_eq!(read_at(&mut locked, 5, 2)?, [7, 8]);
+        assert_eq!(read_at(locked, 5, 2)?, [7, 8]);
 
         Ok(())
     }
@@ -476,7 +529,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_and_seek() -> Result<(), Errno> {
         let counter = Arc::new(Counter { value: Mutex::new(0) });
-        let (current_task, file, mut locked) =
+        let (current_task, file, locked) =
             create_test_file(TestFileSource { counter: counter.clone() });
         let read = |locked: &mut Locked<Unlocked>, length: usize| -> Result<Vec<u8>, Errno> {
             let mut buffer = VecOutputBuffer::new(length);
@@ -485,18 +538,18 @@ mod tests {
         };
 
         // Call `read()` to read the content all the way to the end. Content should not update
-        assert_eq!(read(&mut locked, 1)?, [0]);
-        assert_eq!(read(&mut locked, 2)?, [1, 2]);
-        assert_eq!(read(&mut locked, 20)?, (3..10).collect::<Vec<u8>>());
+        assert_eq!(read(locked, 1)?, [0]);
+        assert_eq!(read(locked, 2)?, [1, 2]);
+        assert_eq!(read(locked, 20)?, (3..10).collect::<Vec<u8>>());
 
         // Seek to the start of the file. Content should be updated on the following read.
-        file.seek(&mut locked, &current_task, SeekTarget::Set(0))?;
+        file.seek(locked, &current_task, SeekTarget::Set(0))?;
         assert_eq!(*counter.value.lock(), 1);
-        assert_eq!(read(&mut locked, 2)?, [1, 2]);
+        assert_eq!(read(locked, 2)?, [1, 2]);
         assert_eq!(*counter.value.lock(), 2);
 
         // Seeking to `pos > 0` should update the content.
-        file.seek(&mut locked, &current_task, SeekTarget::Set(1))?;
+        file.seek(locked, &current_task, SeekTarget::Set(1))?;
         assert_eq!(*counter.value.lock(), 3);
 
         Ok(())

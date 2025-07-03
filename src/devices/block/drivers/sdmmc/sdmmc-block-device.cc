@@ -301,9 +301,9 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
       fdf_power::ApplyPowerConfiguration(*parent_->driver_incoming(), element_configs);
 
   if (config_result.is_error()) {
-    zx::result<> error = fdf_power::ErrorToZxError(config_result.error_value());
-    FDF_LOGL(INFO, logger(), "Failed to apply power config: %s", error.status_string());
-    return error;
+    FDF_LOGL(INFO, logger(), "Failed to apply power config: %s",
+             fdf_power::ErrorToString(config_result.error_value()));
+    return fdf_power::ErrorToZxError(config_result.error_value());
   }
 
   std::vector<fdf_power::ElementDesc> elements = std::move(config_result.value());
@@ -334,22 +334,33 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   zx::result connect_to_cpu_element_manager =
       parent_->driver_incoming()->Connect<fuchsia_power_system::CpuElementManager>();
   if (connect_to_cpu_element_manager.is_error()) {
-    // TODO (https://fxbug.dev/372507953) Return an error instead of just logging
-    FDF_LOGL(INFO, logger(), "Registration skipped, CpuElementManager unavailable: %s",
+    FDF_LOGL(ERROR, logger(), "CpuElementManager unavailable: %s",
              zx_status_get_string(connect_to_cpu_element_manager.error_value()));
-  } else {
-    fidl::SyncClient<fuchsia_power_system::CpuElementManager> cpu_element_manager(
-        std::move(connect_to_cpu_element_manager.value()));
-    zx::event clone;
-    ZX_ASSERT(hardware_power_element_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &clone) ==
-              ZX_OK);
-    fidl::Result<fuchsia_power_system::CpuElementManager::AddExecutionStateDependency> result =
-        cpu_element_manager->AddExecutionStateDependency(
-            {{.dependency_token = std::move(clone), .power_level = 1}});
-    if (result.is_error()) {
-      // TODO (https://fxbug.dev/372507953) Return an error instead of just logging
-      FDF_LOGL(ERROR, logger(), "CpuElementManager token registration failed: %s",
-               result.error_value().FormatDescription().c_str());
+    return connect_to_cpu_element_manager.take_error();
+  }
+
+  fidl::SyncClient<fuchsia_power_system::CpuElementManager> cpu_element_manager(
+      std::move(connect_to_cpu_element_manager.value()));
+  zx::event clone;
+  ZX_ASSERT(hardware_power_element_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &clone) ==
+            ZX_OK);
+  fidl::Result<fuchsia_power_system::CpuElementManager::AddExecutionStateDependency> result =
+      cpu_element_manager->AddExecutionStateDependency(
+          {{.dependency_token = std::move(clone), .power_level = 1}});
+  if (result.is_error()) {
+    FDF_LOGL(ERROR, logger(), "CpuElementManager token registration failed: %s",
+             result.error_value().FormatDescription().c_str());
+    if (result.error_value().is_framework_error()) {
+      return zx::error(result.error_value().framework_error().status());
+    }
+
+    switch (result.error_value().domain_error()) {
+      case fuchsia_power_system::AddExecutionStateDependencyError::kInvalidArgs:
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      case fuchsia_power_system::AddExecutionStateDependencyError::kBadState:
+        return zx::error(ZX_ERR_BAD_STATE);
+      default:
+        return zx::error(ZX_ERR_INTERNAL);
     }
   }
 
@@ -363,7 +374,8 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   }
   hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
 
-  // Start continuous monitoring of the required level and adjusting of the hardware's power level.
+  // Start continuous monitoring of the required level and adjusting of the hardware's power
+  // level.
   WatchHardwareRequiredLevel();
 
   return zx::success();
@@ -411,6 +423,25 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
         }
 
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
+
+        // TODO(424264756): Remove this case when we're able to get a lease at the time the PE is
+        // created.
+        if (hardware_power_lease_control_client_end_.is_valid()) {
+          // Power Framework will immediately call SetLevel(OFF) followed by SetLevel(BOOT). These
+          // calls can be ignored while we still have a lease on the BOOT level.
+
+          if (required_level == kPowerLevelOn) {
+            // If we're rising above the boot power level, it must because an
+            // external lease raised our power level. This means we can drop
+            // our self-lease and allow the external entity to drive our power
+            // state.
+            hardware_power_lease_control_client_end_.reset();
+          }
+          UpdatePowerLevel(hardware_power_current_level_client_, required_level);
+          delay_before_next_watch = false;
+          return;
+        }
+
         switch (required_level) {
           case kPowerLevelOn:
           case kPowerLevelBoot: {
@@ -424,14 +455,6 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
               FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s",
                        duration.to_usecs(), zx_status_get_string(status));
               return;
-            }
-
-            // If we're rising above the boot power level, it must because an
-            // external lease raised our power level. This means we can drop
-            // our self-lease and allow the external entity to drive our power
-            // state.
-            if (kPowerLevelOn && hardware_power_lease_control_client_end_.is_valid()) {
-              hardware_power_lease_control_client_end_.reset();
             }
 
             // Communicate to Power Broker that the hardware power level has been raised.
@@ -1189,7 +1212,28 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
   }
 
   if (vccq_off_with_controller_off_) {
-    // TODO(388815124): Re-initialize the device.
+    // The device was turned off and is now back in the pre-idle state. Change the bus settings to
+    // match the device state so they stay in sync.
+    if (zx_status_t status = sdmmc_->SetBusWidth(SDMMC_BUS_WIDTH_ONE); status != ZX_OK) {
+      return status;
+    }
+    if (zx_status_t status = sdmmc_->SetTiming(SDMMC_TIMING_LEGACY); status != ZX_OK) {
+      return status;
+    }
+    if (zx_status_t status = sdmmc_->SetBusFreq(kInitializationFrequencyHz); status != ZX_OK) {
+      return status;
+    }
+
+    // Probe the device again now that power has been restored.
+    sdmmc_->ClearRca();
+    if (zx_status_t status = sdmmc_->SdmmcGoIdle(); status != ZX_OK) {
+      return status;
+    }
+
+    ZX_DEBUG_ASSERT(!is_sd_);
+    if (zx_status_t status = ProbeMmcLocked(); status != ZX_OK) {
+      return status;
+    }
   } else {
     if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
       FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));

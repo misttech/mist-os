@@ -128,7 +128,7 @@ impl FileOps for SyncFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -206,13 +206,14 @@ impl FileOps for SyncFile {
                 let name = merge_data.name.map(|x| x as u8);
                 // TODO: https://fxbug.dev/407611229 - Verify whether "sync_file" should be private.
                 let file = Anon::new_private_file(
+                    locked,
                     current_task,
                     Box::new(SyncFile::new(name, fence)),
                     OpenFlags::RDWR,
                     "sync_file",
                 );
 
-                let fd = current_task.add_file(file, FdFlags::empty())?;
+                let fd = current_task.add_file(locked, file, FdFlags::empty())?;
                 merge_data.fence = fd.raw();
 
                 current_task.write_object(user_ref, &merge_data)?;

@@ -68,7 +68,8 @@ bool MoonflowerPartitioner::SupportsPartition(const PartitionSpec& spec) const {
       PartitionSpec(paver::Partition::kBootloaderB, "recovery_zbi"),
       PartitionSpec(paver::Partition::kZirconA),
       PartitionSpec(paver::Partition::kZirconB),
-      PartitionSpec(paver::Partition::kFuchsiaVolumeManager)};
+      PartitionSpec(paver::Partition::kFuchsiaVolumeManager),
+      PartitionSpec(paver::Partition::kFuchsiaVolumeManager, kOpaqueVolumeContentType)};
   return std::any_of(std::cbegin(supported_specs), std::cend(supported_specs),
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }

@@ -4,6 +4,8 @@
   FIDL toolchain
 * [Style Guide][style]
 * [Designing APIs][designing-apis]
+* [ABI and API compatibility guide][abi-api-compat] &mdash; details the possible
+  transitions for each FIDL type, taking into account ABI and API compatibility
 * [Maxing Out Pagination][pagination] &mdash; help on determining how much data
    can fit into a single message
 * [Comparing new C++ and high-level C++ language bindings][c-family]
@@ -14,6 +16,7 @@
 [cli]: /docs/development/languages/fidl/guides/cli.md
 [style]: /docs/development/languages/fidl/guides/style.md
 [designing-apis]: /docs/development/languages/fidl/guides/api-design.md
+[abi-api-compat]: /docs/development/languages/fidl/guides/compatibility/README.md
 [pagination]: /docs/development/languages/fidl/guides/max-out-pagination.md
 [c-family]: /docs/development/languages/fidl/guides/c-family-comparison.md
 [generated-code]: /docs/development/languages/fidl/guides/generated-code.md

@@ -61,7 +61,11 @@ bootstrap_user_platform_aib_names = [
   "fshost_fvm_minfs",
   "fshost_fvm_minfs_migration",
   "fshost_non_eng",
+  "fshost_non_recovery",
+  "fshost_non_storage_host",
   "fshost_storage",
+  "fshost_storage_host_fxfs",
+  "fshost_recovery",
   "paver_legacy",
 
   # SWD (Software Delivery)
@@ -148,7 +152,6 @@ bootstrap_eng_platform_aib_names = [
 
   # Storage
   "fshost_eng",
-  "fshost_storage_host_fxfs",
   "fshost_storage_host_gpt_fvm_minfs",
   "fshost_storage_host_fvm_minfs",
   "partitioning_tools",
@@ -357,6 +360,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "cobalt_userdebug_config",
                          "mdns_fuchsia_device_wired_service",
                          "nanohub_support",
+                         "fastrpc_support",
                          "omaha_client_empty_eager_config",
                          "radar_proxy_with_injector",
                          "sl4f",
@@ -408,6 +412,7 @@ eng_only_platform_aib_names =
       # This isn't in all eng builds, but is in some,
       # and not in any non-eng builds.
       "component_manager_with_tracing",
+      "component_manager_with_tracing_and_heapdump",
 
       # The minimal additions for eng build-type assemblies
       "standard_eng",
@@ -459,6 +464,9 @@ eng_only_platform_aib_names =
       # Forensics
       "feedback_upload_config",
       "cobalt_default_config",
+
+      # Memory profiling
+      "heapdump_global_collector",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names
@@ -497,6 +505,7 @@ experimental_aib_names = [
 
   "hvdcp_opti_support",
   "nanohub_support",
+  "fastrpc_support",
   "paravirtualization_support_bootstrap",
   "power_framework_broker",
   "power_framework_sag",

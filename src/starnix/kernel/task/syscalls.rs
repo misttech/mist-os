@@ -8,9 +8,9 @@ use crate::security;
 use crate::signals::syscalls::RUsagePtr;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
-    ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
-    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, SyslogAccess, Task,
-    ThreadGroup, PR_SET_PTRACER_ANY,
+    ptrace_traceme, CurrentTask, ExitStatus, NormalPriority, PtraceAllowedPtracers,
+    PtraceAttachType, PtraceOptions, SchedulingPolicy, SeccompAction, SeccompStateValue,
+    SyslogAccess, Task, ThreadGroup, PR_SET_PTRACER_ANY,
 };
 use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
@@ -49,11 +49,11 @@ use starnix_uapi::{
     PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG,
     PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA,
     PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
-    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW,
-    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL,
-    SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER,
-    SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2,
-    _LINUX_CAPABILITY_VERSION_3,
+    SCHED_RESET_ON_FORK, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+    SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
+    SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT,
+    SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1,
+    _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 use static_assertions::const_assert;
 use std::cmp;
@@ -218,7 +218,7 @@ pub fn sys_execveat(
     // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
     const PAGE_LIMIT: usize = 32;
     let page_limit_size: usize = PAGE_LIMIT * *PAGE_SIZE as usize;
-    let rlimit = current_task.thread_group().get_rlimit(Resource::STACK);
+    let rlimit = current_task.thread_group().get_rlimit(locked, Resource::STACK);
     let stack_limit = rlimit / 4;
     let argv_env_limit = cmp::max(page_limit_size, stack_limit as usize);
 
@@ -757,31 +757,58 @@ pub fn sys_sched_getscheduler(
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
     security::check_getsched_access(current_task, target_task.as_ref())?;
-    let current_policy = target_task.read().scheduler_policy;
-    Ok(current_policy.raw_policy())
+    let current_scheduler_state = target_task.read().scheduler_state;
+    Ok(current_scheduler_state.policy_for_sched_getscheduler())
 }
 
 pub fn sys_sched_setscheduler(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     policy: u32,
     param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
+    // Parse & validate the arguments.
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
     }
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
-    let param = current_task.read_object(param)?;
-    let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
-    if !current_task.is_euid_friendly_with(&target_task) {
+
+    let reset_on_fork = policy & SCHED_RESET_ON_FORK != 0;
+
+    let policy = SchedulingPolicy::try_from(policy & !SCHED_RESET_ON_FORK)?;
+    let realtime_priority =
+        policy.realtime_priority_from(current_task.read_object(param)?.sched_priority)?;
+
+    // TODO: https://fxbug.dev/425143440 - we probably want to improve the locking here.
+    let current_state = target_task.read().scheduler_state;
+
+    // Check capabilities and permissions, if required, for the operation.
+    let euid_friendly = current_task.is_euid_friendly_with(&target_task);
+    let strengthening = current_state.realtime_priority < realtime_priority;
+    let rlimited = strengthening
+        && realtime_priority
+            .exceeds(target_task.thread_group().get_rlimit(locked, Resource::RTPRIO));
+    let clearing_reset_on_fork = current_state.reset_on_fork && !reset_on_fork;
+    let caught_in_idle_trap = current_state.policy == SchedulingPolicy::Idle
+        && policy != SchedulingPolicy::Idle
+        && current_state
+            .normal_priority
+            .exceeds(target_task.thread_group().get_rlimit(locked, Resource::NICE));
+    if !euid_friendly || rlimited || clearing_reset_on_fork || caught_in_idle_trap {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
+
     security::check_setsched_access(current_task, &target_task)?;
-    target_task.set_scheduler_policy(policy)?;
+
+    // Apply the new scheduler configuration to the task.
+    target_task.set_scheduler_policy_priority_and_reset_on_fork(
+        policy,
+        realtime_priority,
+        reset_on_fork,
+    )?;
 
     Ok(())
 }
@@ -903,35 +930,45 @@ pub fn sys_sched_getparam(
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let param_value = target_task.read().scheduler_policy.raw_params();
+    let param_value = target_task.read().scheduler_state.get_sched_param();
     current_task.write_object(param, &param_value)?;
     Ok(())
 }
 
 pub fn sys_sched_setparam(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
+    // Parse & validate the arguments.
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
     }
-
-    let new_params: sched_param = current_task.read_object(param.into())?;
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let current_policy = target_task.read().scheduler_policy;
 
-    let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
+    // TODO: https://fxbug.dev/425143440 - we probably want to improve the locking here.
+    let current_state = target_task.read().scheduler_state;
 
-    let policy =
-        SchedulerPolicy::from_sched_params(current_policy.raw_policy(), new_params, rlimit)?;
-    if !current_task.is_euid_friendly_with(&target_task) {
+    let realtime_priority = current_state
+        .policy
+        .realtime_priority_from(current_task.read_object(param)?.sched_priority)?;
+
+    // Check capabilities and permissions, if required, for the operation.
+    let euid_friendly = current_task.is_euid_friendly_with(&target_task);
+    let strengthening = current_state.realtime_priority < realtime_priority;
+    let rlimited = strengthening
+        && realtime_priority
+            .exceeds(target_task.thread_group().get_rlimit(locked, Resource::RTPRIO));
+    if !euid_friendly || rlimited {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
+
     security::check_setsched_access(current_task, &target_task)?;
-    target_task.set_scheduler_policy(policy)?;
+
+    // Apply the new scheduler configuration to the task.
+    target_task.set_scheduler_priority(realtime_priority)?;
 
     Ok(())
 }
@@ -1244,7 +1281,7 @@ pub fn sys_ptrace(
         PTRACE_TRACEME => ptrace_traceme(current_task),
         PTRACE_ATTACH => ptrace_attach(locked, current_task, pid, PtraceAttachType::Attach, data),
         PTRACE_SEIZE => ptrace_attach(locked, current_task, pid, PtraceAttachType::Seize, data),
-        _ => ptrace_dispatch(current_task, request, pid, addr, data),
+        _ => ptrace_dispatch(locked, current_task, request, pid, addr, data),
     }
 }
 
@@ -1322,7 +1359,7 @@ pub fn sys_prlimit64(
 }
 
 pub fn do_prlimit64<T>(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
@@ -1386,7 +1423,7 @@ where
                 }
                 Some(new_limit)
             };
-            ThreadGroup::adjust_rlimits(current_task, &target_task, resource, new_limit)?
+            ThreadGroup::adjust_rlimits(locked, current_task, &target_task, resource, new_limit)?
         }
     };
     if !old_limit_ref.is_null() {
@@ -1534,7 +1571,7 @@ pub fn sys_capset(
 }
 
 pub fn sys_seccomp(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     operation: u32,
     flags: u32,
@@ -1577,7 +1614,7 @@ pub fn sys_seccomp(
                 security::check_task_capable(current_task, CAP_SYS_ADMIN)
                     .map_err(|_| errno!(EACCES))?;
             }
-            current_task.add_seccomp_filter(code, flags)
+            current_task.add_seccomp_filter(locked, code, flags)
         }
         SECCOMP_GET_ACTION_AVAIL => {
             if flags != 0 || args.is_null() {
@@ -1646,8 +1683,9 @@ pub fn sys_setsid(
     Ok(current_task.get_pid())
 }
 
-// Note the asymmetry with sys_setpriority: this returns what Starnix calls a "raw" priority, which
-// ranges from 1 (weakest) to 40 (strongest).
+// Note the asymmetry with sys_setpriority: this returns "kernel nice" which ranges
+// from 1 (weakest) to 40 (strongest). (It is part of Linux history that this syscall
+// deals with niceness but has "priority" in its name.)
 pub fn sys_getpriority(
     _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
@@ -1656,47 +1694,58 @@ pub fn sys_getpriority(
 ) -> Result<u8, Errno> {
     match which {
         PRIO_PROCESS => {}
+        // TODO: https://fxbug.dev/287121196 - support PRIO_PGRP and PRIO_USER?
         _ => return error!(EINVAL),
     }
     track_stub!(TODO("https://fxbug.dev/322893809"), "getpriority permissions");
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     let state = target_task.read();
-    Ok(state.scheduler_policy.raw_priority())
+    Ok(state.scheduler_state.normal_priority.raw_priority())
 }
 
-// Note the asymmetry with sys_getpriority: the `priority` parameter is what Starnix calls a
-// "user space" priority, which ranges from -20 (strongest) to 19 (weakest) (other values can be
-// passed and are clamped to that range and interpretation).
+// Note the asymmetry with sys_getpriority: this call's `priority` parameter is a
+// "user nice" which ranges from -20 (strongest) to 19 (weakest) (other values can be
+// passed and are clamped to that range and interpretation). (It is part of Linux
+// history that this syscall deals with niceness but has "priority" in its name.)
 pub fn sys_setpriority(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     who: i32,
     priority: i32,
 ) -> Result<(), Errno> {
+    // Parse & validate the arguments.
     match which {
         PRIO_PROCESS => {}
+        // TODO: https://fxbug.dev/287121196 - support PRIO_PGRP and PRIO_USER?
         _ => return error!(EINVAL),
     }
 
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
-    const MIN_RAW_PRIORITY: i32 = 1;
-    const MID_RAW_PRIORITY: i32 = 20;
-    const MAX_RAW_PRIORITY: i32 = 40;
-    let new_raw_priority =
-        (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
-    let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
-    let allowed_so_far_as_rlimit_is_concerned = !strengthening
-        || new_raw_priority as u64 <= target_task.thread_group().get_rlimit(Resource::NICE);
-    if !(current_task.is_euid_friendly_with(&target_task) && allowed_so_far_as_rlimit_is_concerned)
-    {
+
+    let normal_priority = NormalPriority::from_setpriority_syscall(priority);
+
+    // TODO: https://fxbug.dev/425143440 - we probably want to improve the locking here.
+    let current_state = target_task.read().scheduler_state;
+
+    // Check capabilities and permissions, if required, for the operation.
+    let euid_friendly = current_task.is_euid_friendly_with(&target_task);
+    let strengthening = current_state.normal_priority < normal_priority;
+    let rlimited = strengthening
+        && normal_priority.exceeds(target_task.thread_group().get_rlimit(locked, Resource::NICE));
+    if !euid_friendly {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
+    } else if rlimited {
+        security::check_task_capable(current_task, CAP_SYS_NICE).map_err(|_| errno!(EACCES))?;
     }
+
     security::check_setsched_access(current_task, &target_task)?;
 
-    target_task.update_scheduler_nice(new_raw_priority)?;
+    // Apply the new scheduler configuration to the task.
+    target_task.set_scheduler_nice(normal_priority)?;
+
     Ok(())
 }
 
@@ -2033,15 +2082,14 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_prctl_set_vma_anon_name() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let name_addr = (mapped_address + 128u64).unwrap();
         let name = "test-name\0";
         current_task.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
         sys_prctl(
-            &mut locked,
+            locked,
             &mut current_task,
             PR_SET_VMA,
             PR_SET_VMA_ANON_NAME as u64,
@@ -2061,7 +2109,7 @@ mod tests {
                 .to_string(),
         );
 
-        sys_munmap(&mut locked, &current_task, mapped_address, *PAGE_SIZE as usize)
+        sys_munmap(locked, &current_task, mapped_address, *PAGE_SIZE as usize)
             .expect("failed to unmap memory");
         assert_eq!(
             error!(EFAULT),
@@ -2071,19 +2119,18 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name_special_chars() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         for c in 1..255 {
             let vma_name = CString::new([c]).unwrap();
             current_task.write_memory(name_addr, vma_name.as_bytes_with_nul()).unwrap();
 
             let result = sys_prctl(
-                &mut locked,
+                locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -2109,12 +2156,11 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name_long() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let name_too_long = CString::new(vec![b'a'; 256]).unwrap();
 
@@ -2122,7 +2168,7 @@ mod tests {
 
         assert_eq!(
             sys_prctl(
-                &mut locked,
+                locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -2139,7 +2185,7 @@ mod tests {
 
         assert_eq!(
             sys_prctl(
-                &mut locked,
+                locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -2153,11 +2199,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name_misaligned() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
+        let name_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let name = CString::new("name").unwrap();
         current_task.write_memory(name_addr, name.as_bytes_with_nul()).unwrap();
@@ -2165,7 +2210,7 @@ mod tests {
         // Passing a misaligned pointer to the start of the named region fails.
         assert_eq!(
             sys_prctl(
-                &mut locked,
+                locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -2179,7 +2224,7 @@ mod tests {
         // Passing an unaligned length does work, however.
         assert_eq!(
             sys_prctl(
-                &mut locked,
+                locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -2193,120 +2238,92 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_prctl_get_set_dumpable() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
-        sys_prctl(&mut locked, &mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0)
+        sys_prctl(locked, &mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0)
             .expect("failed to get dumpable");
 
-        sys_prctl(&mut locked, &mut current_task, PR_SET_DUMPABLE, 1, 0, 0, 0)
+        sys_prctl(locked, &mut current_task, PR_SET_DUMPABLE, 1, 0, 0, 0)
             .expect("failed to set dumpable");
-        sys_prctl(&mut locked, &mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0)
+        sys_prctl(locked, &mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0)
             .expect("failed to get dumpable");
 
         // SUID_DUMP_ROOT not supported.
-        sys_prctl(&mut locked, &mut current_task, PR_SET_DUMPABLE, 2, 0, 0, 0)
+        sys_prctl(locked, &mut current_task, PR_SET_DUMPABLE, 2, 0, 0, 0)
             .expect("failed to set dumpable");
-        sys_prctl(&mut locked, &mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0)
+        sys_prctl(locked, &mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0)
             .expect("failed to get dumpable");
     }
 
     #[::fuchsia::test]
     async fn test_sys_getsid() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         assert_eq!(
             current_task.get_tid(),
-            sys_getsid(&mut locked, &current_task, 0).expect("failed to get sid")
+            sys_getsid(locked, &current_task, 0).expect("failed to get sid")
         );
 
-        let second_current = create_task(&mut locked, &kernel, "second task");
+        let second_current = create_task(locked, &kernel, "second task");
 
         assert_eq!(
             second_current.get_tid(),
-            sys_getsid(&mut locked, &current_task, second_current.get_tid())
-                .expect("failed to get sid")
+            sys_getsid(locked, &current_task, second_current.get_tid()).expect("failed to get sid")
         );
     }
 
     #[::fuchsia::test]
     async fn test_get_affinity_size() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let pid = current_task.get_pid();
+        assert_eq!(sys_sched_getaffinity(locked, &current_task, pid, 16, mapped_address), Ok(16));
         assert_eq!(
-            sys_sched_getaffinity(&mut locked, &current_task, pid, 16, mapped_address),
-            Ok(16)
-        );
-        assert_eq!(
-            sys_sched_getaffinity(&mut locked, &current_task, pid, 1024, mapped_address),
+            sys_sched_getaffinity(locked, &current_task, pid, 1024, mapped_address),
             Ok(std::mem::size_of::<CpuSet>())
         );
         assert_eq!(
-            sys_sched_getaffinity(&mut locked, &current_task, pid, 1, mapped_address),
+            sys_sched_getaffinity(locked, &current_task, pid, 1, mapped_address),
             error!(EINVAL)
         );
         assert_eq!(
-            sys_sched_getaffinity(&mut locked, &current_task, pid, 9, mapped_address),
+            sys_sched_getaffinity(locked, &current_task, pid, 9, mapped_address),
             error!(EINVAL)
         );
     }
 
     #[::fuchsia::test]
     async fn test_set_affinity_size() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
         let pid = current_task.get_pid();
         assert_eq!(
-            sys_sched_setaffinity(
-                &mut locked,
-                &current_task,
-                pid,
-                *PAGE_SIZE as u32,
-                mapped_address
-            ),
+            sys_sched_setaffinity(locked, &current_task, pid, *PAGE_SIZE as u32, mapped_address),
             Ok(())
         );
         assert_eq!(
-            sys_sched_setaffinity(&mut locked, &current_task, pid, 1, mapped_address),
+            sys_sched_setaffinity(locked, &current_task, pid, 1, mapped_address),
             error!(EINVAL)
         );
     }
 
     #[::fuchsia::test]
     async fn test_task_name() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let name = "my-task-name\0";
         current_task.write_memory(mapped_address, name.as_bytes()).expect("failed to write name");
 
-        let result = sys_prctl(
-            &mut locked,
-            &mut current_task,
-            PR_SET_NAME,
-            mapped_address.ptr() as u64,
-            0,
-            0,
-            0,
-        )
-        .unwrap();
+        let result =
+            sys_prctl(locked, &mut current_task, PR_SET_NAME, mapped_address.ptr() as u64, 0, 0, 0)
+                .unwrap();
         assert_eq!(SUCCESS, result);
 
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        let result = sys_prctl(
-            &mut locked,
-            &mut current_task,
-            PR_GET_NAME,
-            mapped_address.ptr() as u64,
-            0,
-            0,
-            0,
-        )
-        .unwrap();
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let result =
+            sys_prctl(locked, &mut current_task, PR_GET_NAME, mapped_address.ptr() as u64, 0, 0, 0)
+                .unwrap();
         assert_eq!(SUCCESS, result);
 
         let name_length = name.len();
@@ -2317,55 +2334,51 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_sched_get_priority_min_max() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let non_rt_min =
-            sys_sched_get_priority_min(&mut locked, &current_task, SCHED_NORMAL).unwrap();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let non_rt_min = sys_sched_get_priority_min(locked, &current_task, SCHED_NORMAL).unwrap();
         assert_eq!(non_rt_min, 0);
-        let non_rt_max =
-            sys_sched_get_priority_max(&mut locked, &current_task, SCHED_NORMAL).unwrap();
+        let non_rt_max = sys_sched_get_priority_max(locked, &current_task, SCHED_NORMAL).unwrap();
         assert_eq!(non_rt_max, 0);
 
-        let rt_min = sys_sched_get_priority_min(&mut locked, &current_task, SCHED_FIFO).unwrap();
+        let rt_min = sys_sched_get_priority_min(locked, &current_task, SCHED_FIFO).unwrap();
         assert_eq!(rt_min, 1);
-        let rt_max = sys_sched_get_priority_max(&mut locked, &current_task, SCHED_FIFO).unwrap();
+        let rt_max = sys_sched_get_priority_max(locked, &current_task, SCHED_FIFO).unwrap();
         assert_eq!(rt_max, 99);
 
         let min_bad_policy_error =
-            sys_sched_get_priority_min(&mut locked, &current_task, std::u32::MAX).unwrap_err();
+            sys_sched_get_priority_min(locked, &current_task, std::u32::MAX).unwrap_err();
         assert_eq!(min_bad_policy_error, errno!(EINVAL));
 
         let max_bad_policy_error =
-            sys_sched_get_priority_max(&mut locked, &current_task, std::u32::MAX).unwrap_err();
+            sys_sched_get_priority_max(locked, &current_task, std::u32::MAX).unwrap_err();
         assert_eq!(max_bad_policy_error, errno!(EINVAL));
     }
 
     #[::fuchsia::test]
     async fn test_sched_setscheduler() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         current_task
             .thread_group()
             .limits
-            .lock()
+            .lock(locked)
             .set(Resource::RTPRIO, rlimit { rlim_cur: 255, rlim_max: 255 });
 
-        let scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
+        let scheduler = sys_sched_getscheduler(locked, &current_task, 0).unwrap();
         assert_eq!(scheduler, SCHED_NORMAL, "tasks should have normal scheduler by default");
 
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let requested_params = sched_param { sched_priority: 15 };
         current_task.write_object(mapped_address.into(), &requested_params).unwrap();
 
-        sys_sched_setscheduler(&mut locked, &current_task, 0, SCHED_FIFO, mapped_address.into())
+        sys_sched_setscheduler(locked, &current_task, 0, SCHED_FIFO, mapped_address.into())
             .unwrap();
 
-        let new_scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
+        let new_scheduler = sys_sched_getscheduler(locked, &current_task, 0).unwrap();
         assert_eq!(new_scheduler, SCHED_FIFO, "task should have been assigned fifo scheduler");
 
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address.into())
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        sys_sched_getparam(locked, &current_task, 0, mapped_address.into())
             .expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
@@ -2374,10 +2387,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_sched_getparam() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address.into())
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let mapped_address = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        sys_sched_getparam(locked, &current_task, 0, mapped_address.into())
             .expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
@@ -2386,10 +2398,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_setuid() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         // Test for root.
         current_task.set_creds(Credentials::root());
-        sys_setuid(&mut locked, &current_task, 42).expect("setuid");
+        sys_setuid(locked, &current_task, 42).expect("setuid");
         let mut creds = current_task.creds();
         assert_eq!(creds.euid, 42);
         assert_eq!(creds.uid, 42);
@@ -2400,10 +2412,10 @@ mod tests {
         current_task.set_creds(creds);
 
         // Test for non root, which task now is.
-        assert_eq!(sys_setuid(&mut locked, &current_task, 0), error!(EPERM));
-        assert_eq!(sys_setuid(&mut locked, &current_task, 43), error!(EPERM));
+        assert_eq!(sys_setuid(locked, &current_task, 0), error!(EPERM));
+        assert_eq!(sys_setuid(locked, &current_task, 43), error!(EPERM));
 
-        sys_setuid(&mut locked, &current_task, 42).expect("setuid");
+        sys_setuid(locked, &current_task, 42).expect("setuid");
         let creds = current_task.creds();
         assert_eq!(creds.euid, 42);
         assert_eq!(creds.uid, 42);
@@ -2416,7 +2428,7 @@ mod tests {
         creds.saved_uid = 43;
         current_task.set_creds(creds);
 
-        sys_setuid(&mut locked, &current_task, 41).expect("setuid");
+        sys_setuid(locked, &current_task, 41).expect("setuid");
         let creds = current_task.creds();
         assert_eq!(creds.euid, 41);
         assert_eq!(creds.uid, 41);
@@ -2428,7 +2440,7 @@ mod tests {
         creds.saved_uid = 43;
         current_task.set_creds(creds);
 
-        sys_setuid(&mut locked, &current_task, 43).expect("setuid");
+        sys_setuid(locked, &current_task, 43).expect("setuid");
         let creds = current_task.creds();
         assert_eq!(creds.euid, 43);
         assert_eq!(creds.uid, 41);
@@ -2437,9 +2449,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_c_string_vector() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let arg_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let arg_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let arg = b"test-arg\0";
         current_task.write_memory(arg_addr, arg).expect("failed to write test arg");
         let arg_usercstr = UserCString::new(&current_task, arg_addr);
@@ -2447,7 +2459,7 @@ mod tests {
 
         let argv_addr = UserCStringPtr::new(
             &current_task,
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE),
+            map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE),
         );
         current_task
             .write_multi_arch_ptr(argv_addr.addr(), arg_usercstr)

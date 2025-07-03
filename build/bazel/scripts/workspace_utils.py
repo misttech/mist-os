@@ -482,7 +482,6 @@ def record_fuchsia_workspace(
     gn_output_dir: Path,
     git_bin_path: Path,
     log: T.Optional[T.Callable[[str], None]] = None,
-    enable_bzlmod: bool = False,
 ) -> None:
     """Record generated entries for the Fuchsia workspace and helper files.
 
@@ -502,7 +501,6 @@ def record_fuchsia_workspace(
         git_bin_path: Path to the host git binary to use during the build.
         log: Optional logging callback. If not None, must take a single
             string as argument.
-        enable_bzlmod: Optional flag. Set to True to enable Bzlmod.
     """
 
     host_os = get_host_platform()
@@ -570,49 +568,10 @@ def record_fuchsia_workspace(
         content = expand_template_file(generated, template_name, **kwargs)
         generated.record_file_content(dst_path, content, executable=executable)
 
-    # Generate workspace/module files.
-    if enable_bzlmod:
-        generated.record_symlink(
-            "workspace/WORKSPACE.bzlmod",
-            fuchsia_dir / "build" / "bazel" / "toplevel.WORKSPACE.bzlmod",
-        )
-
-        generated.record_symlink(
-            "workspace/MODULE.bazel",
-            fuchsia_dir / "build" / "bazel" / "toplevel.MODULE.bazel",
-        )
-    else:
-        # Generate two distinct Bazel workspace definition files.
-        #
-        # - WORKSPACE.no_sdk.bazel + no_sdk.bazelrc:
-        #
-        #   Omits any repository definition related to the IDK and the SDK.
-        #   I.e. there is no @fuchsia_in_tree_idk or @fuchsia_sdk repository
-        #   in this workspace. This allows building Bazel targets immediately
-        #   after `fx gen`, as long as they do not reference labels pointing
-        #   to @fuchsia_sdk or @fuchsia_in_tree_idk. This is used to implement
-        #   `fx bazel-no-sdk` and the `no_sdk = true` attribute in the GN
-        #   bazel_action() template.
-        #
-        # - WORKSPACE.fuchsia.bazel + fuchsia.bazelrc:
-        #
-        #   Contains the full set of repository definitions, which currently
-        #   require the IDK to be built with Ninja before being able to use the
-        #   workspace, even for simpler queries. Used to implement `fx bazel`
-        #   and the GN bazel_action() without `no_sdk = true`.
-        #
-        # The WORKSPACE.bazel and .bazelrc files are simple symlinks to either
-        # one of these set of files, and will be adjusted before invoking Bazel
-        # by `fx bazel`, `fx bazel-no-sdk` and `bazel_action.py`.
-        #
-
-        # This file contains all definitions, with a special marker line.
-        # workspace/WORKSPACE.fuchsia.bazel is a symlink to it, then its
-        # content is processed and cut to generate workspace/WORKSPACE.no_sdk.bazel.
-        generated.record_symlink(
-            "workspace/WORKSPACE.bazel",
-            fuchsia_dir / "build" / "bazel" / "toplevel.WORKSPACE.bazel",
-        )
+    generated.record_symlink(
+        "workspace/MODULE.bazel",
+        fuchsia_dir / "build" / "bazel" / "toplevel.MODULE.bazel",
+    )
 
     generated.record_symlink(
         "workspace/BUILD.bazel",
@@ -671,11 +630,6 @@ def record_fuchsia_workspace(
         workspace_log_file=f"{logs_dir_from_workspace}/workspace_events.log",
         execution_log_file=f"{logs_dir_from_workspace}/exec_log.pb.zstd",
     )
-
-    if enable_bzlmod:
-        bazelrc_content = bazelrc_content.replace(
-            "--enable_bzlmod=false", "--enable_bzlmod=true"
-        )
 
     generated.record_file_content("workspace/.bazelrc", bazelrc_content)
 
@@ -740,15 +694,6 @@ def record_fuchsia_workspace(
     )
     # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
 
-    generated.record_symlink(
-        # LINT.IfChange
-        "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
-        # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
-        # LINT.IfChange
-        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
-        # LINT.ThenChange(//build/regenerator.py)
-    )
-
     # Used when merging the IDK sub-build directories. For other use cases,
     # prefer a symlink with a narrower scope.
     generated.record_symlink(
@@ -756,6 +701,15 @@ def record_fuchsia_workspace(
         "workspace/fuchsia_build_generated/ninja_root_build_dir",
         # LINT.ThenChange(//build/bazel/bazel_sdk/BUILD.bazel)
         gn_output_dir,
+    )
+
+    generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
+        # LINT.ThenChange(//build/bazel/bazel_sdk/BUILD.bazel, //build/bazel/toplevel.MODULE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
+        # LINT.ThenChange(//build/regenerator.py)
     )
 
     generated.record_symlink(
@@ -769,7 +723,7 @@ def record_fuchsia_workspace(
 
     # The following symlinks are used only by bazel_action.py when processing
     # the list of Bazel source inputs, the actual repository setup in
-    # WORKSPACE.bazel reuses the two symlinks above instead.
+    # MODULE.bazel reuses the two symlinks above instead.
     generated.record_symlink(
         # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_sdk.hash",
@@ -814,7 +768,6 @@ def generate_fuchsia_workspace(
     fuchsia_dir: Path,
     build_dir: Path,
     log: T.Optional[T.Callable[[str], None]] = None,
-    enable_bzlmod: bool = False,
 ) -> set[Path]:
     """Generate the Fuchsia Bazel workspace and associated files.
 
@@ -823,7 +776,6 @@ def generate_fuchsia_workspace(
         build_dir: Path to the GN/Ninja output directory.
         log: Optional logging callback. If not None, must take a single
             string as argument.
-        enable_bzlmod: Optional flag. Set to True to enable Bzlmod.
 
     Returns:
        A set of input file paths that were read by this function.
@@ -858,7 +810,6 @@ def generate_fuchsia_workspace(
         gn_output_dir=build_dir,
         git_bin_path=Path(git_bin_path),
         log=log,
-        enable_bzlmod=True,
     )
 
     # Remove the old workspace's content, which is just a set

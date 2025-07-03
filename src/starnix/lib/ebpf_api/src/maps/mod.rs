@@ -38,15 +38,8 @@ use linux_uapi::{
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 use zx::{AsHandleRef, HandleBased};
-
-/// Counter for map identifiers.
-static MAP_IDS: AtomicU32 = AtomicU32::new(1);
-fn new_map_id() -> u32 {
-    MAP_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-}
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum MapError {
@@ -93,7 +86,6 @@ trait MapImpl: Send + Sync + Debug {
 /// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
 #[derive(Debug)]
 pub struct Map {
-    pub id: u32,
     pub schema: MapSchema,
     pub flags: u32,
 
@@ -122,6 +114,13 @@ impl MapReference for PinnedMap {
     fn as_bpf_value(&self) -> BpfValue {
         BpfValue::from(self.deref() as *const Map)
     }
+
+    fn get_data_ptr(&self) -> Option<BpfValue> {
+        assert!(self.0.schema.map_type == bpf_map_type_BPF_MAP_TYPE_ARRAY);
+
+        let key = [0u8; 4];
+        self.0.lookup(&key).map(|v| BpfValue::from(v.ptr().raw_ptr()))
+    }
 }
 
 // Avoid allocation for eBPF keys smaller than 16 bytes.
@@ -144,7 +143,7 @@ const SHARED_MAP_RIGHTS: zx::Rights = BASE_MAP_RIGHTS.union(zx::Rights::TRANSFER
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<PinnedMap, MapError> {
         let map_impl = create_map_impl(&schema, None)?;
-        Ok(PinnedMap(Arc::pin(Self { id: new_map_id(), schema, flags, map_impl })))
+        Ok(PinnedMap(Arc::pin(Self { schema, flags, map_impl })))
     }
 
     pub fn new_shared(shared: febpf::Map) -> Result<PinnedMap, MapError> {
@@ -166,7 +165,7 @@ impl Map {
         };
 
         let map_impl = create_map_impl(&schema, Some(vmo))?;
-        Ok(PinnedMap(Arc::pin(Self { id: new_map_id(), schema, flags: 0, map_impl })))
+        Ok(PinnedMap(Arc::pin(Self { schema, flags: 0, map_impl })))
     }
 
     pub fn share(&self) -> Result<febpf::Map, MapError> {

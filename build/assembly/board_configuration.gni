@@ -203,6 +203,7 @@ template("board_configuration") {
                              "tee_trusted_app_guids",
                            ])
     name = board_name
+    arch = target_cpu
 
     if (defined(invoker.hardware_info)) {
       hardware_info = invoker.hardware_info
@@ -227,6 +228,14 @@ template("board_configuration") {
               get_label_info(invoker.devicetree, "target_out_dir") + "/" +
                   get_label_info(invoker.devicetree, "name") + ".dtb",
               root_build_dir)
+    }
+    release_info = {
+      info = {
+        name = board_name
+        repository = "intermediate_repository"
+        version = "intermediate_version"
+      }
+      bib_sets = []
     }
   }
 
@@ -327,6 +336,7 @@ template("board_configuration") {
           label =
               get_label_info(":${labels.main_target}", "label_with_toolchain")
           name = board_name
+          cipd_name = board_name
           outdir = rebase_path(files.board_config_dir, root_build_dir)
         },
       ]

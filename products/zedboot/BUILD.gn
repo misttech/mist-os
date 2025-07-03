@@ -43,32 +43,12 @@ product_assembly_configuration("zedboot") {
   }
 }
 
-product_assembly_configuration("zedboot_with_fvm") {
-  platform = {
-    forward_variables_from(zedboot_platform_base, "*")
-    storage = {
-      filesystems = {
-        image_name = "zedboot"
-        image_mode = "no_image"
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
-            }
-          }
-        }
-      }
-    }
-  }
-  product = {
-  }
-}
-
 product_assembly_configuration("zedboot_with_minfs") {
   platform = {
     forward_variables_from(zedboot_platform_base, "*")
     storage = {
+      # TODO(https://fxbug.dev/423673855): Remove to enable
+      storage_host_enabled = false
       filesystems = {
         image_name = "zedboot"
         image_mode = "no_image"
@@ -81,21 +61,6 @@ product_assembly_configuration("zedboot_with_minfs") {
             }
           }
         }
-      }
-    }
-  }
-  product = {
-  }
-}
-
-product_assembly_configuration("zedboot_with_storage_host") {
-  platform = {
-    forward_variables_from(zedboot_platform_base, "*")
-    storage = {
-      storage_host_enabled = true
-      filesystems = {
-        image_name = "zedboot"
-        image_mode = "no_image"
       }
     }
   }

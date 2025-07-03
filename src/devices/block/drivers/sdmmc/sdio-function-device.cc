@@ -21,39 +21,6 @@
 
 namespace {
 
-std::pair<zx::error<zx_status_t>, const char*> MapPowerError(fdf_power::Error error) {
-  switch (error) {
-    case fdf_power::Error::INVALID_ARGS:
-      return {zx::error(ZX_ERR_INVALID_ARGS), "Invalid power configuration"};
-    case fdf_power::Error::IO:
-      return {zx::error(ZX_ERR_IO), "IO error"};
-    case fdf_power::Error::DEPENDENCY_NOT_FOUND:
-      return {zx::error(ZX_ERR_NOT_FOUND), "Could not get dependency tokens"};
-    case fdf_power::Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND:
-      return {zx::error(ZX_ERR_NOT_FOUND), "No token service capability available"};
-    case fdf_power::Error::READ_INSTANCES:
-      return {zx::error(ZX_ERR_IO), "Failed to list service instances"};
-    case fdf_power::Error::NO_TOKEN_SERVICE_INSTANCES:
-      return {zx::error(ZX_ERR_NOT_FOUND), "No token service instances available"};
-    case fdf_power::Error::TOKEN_REQUEST:
-      return {zx::error(ZX_ERR_IO), "Failed to get token"};
-    case fdf_power::Error::ACTIVITY_GOVERNOR_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "No SAG token capability available"};
-    case fdf_power::Error::ACTIVITY_GOVERNOR_REQUEST:
-      return {zx::error(ZX_ERR_IO), "SAG request failed"};
-    case fdf_power::Error::TOPOLOGY_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "Topology service unavailable"};
-    case fdf_power::Error::CONFIGURATION_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "Failed to get power configuration"};
-    case fdf_power::Error::CPU_ELEMENT_MANAGER_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "No CpuElementManager capability available"};
-    case fdf_power::Error::CPU_ELEMENT_MANAGER_REQUEST:
-      return {zx::error(ZX_ERR_IO), "CpuElementManager request failed"};
-    default:
-      return {zx::error(ZX_ERR_INTERNAL), "(unknown)"};
-  }
-}
-
 std::pair<zx::error<zx_status_t>, const char*> MapLeaseError(
     fuchsia_power_broker::LeaseError error) {
   switch (error) {
@@ -168,25 +135,28 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
       fdf::MakeOffer2<fuchsia_hardware_sdio::DriverService>(arena, sdio_function_name_));
 
   if (sdio_parent_->parent()->config().enable_suspend()) {
-    if (zx::result<> result = ConfigurePowerManagement(); result.is_error()) {
-      return result.status_value();
-    }
+    // TODO(b/425459741) Treat errors as fatal again once all products are
+    // wired proerly.
+    if (zx::result<> result = ConfigurePowerManagement(); !result.is_error()) {
+      fuchsia_hardware_power::PowerTokenService::InstanceHandler handler({
+          .token_provider = power_token_provider_bindings_.CreateHandler(
+              this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+      });
+      result = sdio_parent_->parent()
+                   ->driver_outgoing()
+                   ->AddService<fuchsia_hardware_power::PowerTokenService>(std::move(handler),
+                                                                           sdio_function_name_);
+      if (result.is_error()) {
+        FDF_LOGL(ERROR, logger(), "Failed to add power token service: %s", result.status_string());
+        return result.status_value();
+      }
 
-    fuchsia_hardware_power::PowerTokenService::InstanceHandler handler({
-        .token_provider = power_token_provider_bindings_.CreateHandler(
-            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
-    });
-    zx::result result = sdio_parent_->parent()
-                            ->driver_outgoing()
-                            ->AddService<fuchsia_hardware_power::PowerTokenService>(
-                                std::move(handler), sdio_function_name_);
-    if (result.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to add power token service: %s", result.status_string());
-      return result.status_value();
+      offers.push_back(
+          fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>(arena, sdio_function_name_));
+    } else {
+      FDF_LOGL(ERROR, logger(), "Power configuration failed, power management disabled: %s",
+               result.status_string());
     }
-
-    offers.push_back(
-        fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>(arena, sdio_function_name_));
   }
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
@@ -673,9 +643,9 @@ zx::result<> SdioFunctionDevice::ConfigurePowerManagement() {
       fdf_power::ApplyPowerConfiguration(*sdio_parent_->parent()->driver_incoming(), configs, true);
 
   if (add_result.is_error()) {
-    std::pair error = MapPowerError(add_result.error_value());
-    FDF_LOGL(ERROR, logger(), "Failed to add power element: %s", error.second);
-    return error.first;
+    FDF_LOGL(ERROR, logger(), "Failed to add power element: %s",
+             fdf_power::ErrorToString(add_result.error_value()));
+    return fdf_power::ErrorToZxError(add_result.error_value());
   }
 
   if (add_result.value().size() != 1) {

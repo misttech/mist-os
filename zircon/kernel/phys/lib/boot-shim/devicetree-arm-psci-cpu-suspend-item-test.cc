@@ -125,7 +125,7 @@ void CheckIdleStates(zbitl::Image<std::span<std::byte>>& zbi,
       continue;
     }
     present = true;
-    ASSERT_GE(header->length, sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t) * states.size());
+    ASSERT_EQ(header->length, sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t) * states.size());
     auto* psci_states = reinterpret_cast<zbi_dcfg_arm_psci_cpu_suspend_state_t*>(payload.data());
     // Simple lookup based on the psci parameter.
     for (const auto& state : states) {

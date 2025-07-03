@@ -19,23 +19,23 @@ var tcpAdvancedV6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseN
 	{2, 25}:  Fail,
 	{3, 17}:  Flaky, // TODO(https://fxbug.dev/42056374): Fix the flake.
 	{4, 17}:  Flaky,
-	{5, 17}:  Fail,
-	{5, 18}:  Fail,
-	{5, 19}:  Fail,
-	{5, 20}:  Fail,
-	{5, 21}:  Fail,
-	{5, 22}:  Fail,
-	{5, 23}:  Fail,
+	{5, 17}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{5, 18}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{5, 19}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{5, 20}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{5, 21}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{5, 22}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{5, 23}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
 	{6, 17}:  Pass,
-	{7, 17}:  Fail,
-	{7, 18}:  Fail,
-	{8, 17}:  Fail,
-	{8, 18}:  Fail,
-	{8, 19}:  Fail,
+	{7, 17}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{7, 18}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 17}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 18}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 19}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
 	{8, 20}:  Pass,
-	{8, 21}:  Fail,
-	{8, 22}:  Fail,
-	{8, 23}:  Fail,
+	{8, 21}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 22}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 23}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
 	{9, 1}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
 	{9, 2}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
 	{10, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.

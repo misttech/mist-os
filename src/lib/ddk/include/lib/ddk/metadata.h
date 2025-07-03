@@ -24,18 +24,10 @@ static_assert(DEVICE_METADATA_PARTITION_MAP == ZBI_TYPE_DRV_PARTITION_MAP, "");
 // maximum size of DEVICE_METADATA_PARTITION_MAP data
 #define METADATA_PARTITION_MAP_MAX 4096
 
-// Initial USB mode
-// type: usb_mode_t
-#define DEVICE_METADATA_USB_MODE 0x4D425355  // USBM
-
 // Platform board private data (for board driver)
 // type: ???
 #define DEVICE_METADATA_BOARD_PRIVATE 0x524F426D  // mBOR
 static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
-
-// Interrupt controller type (for sysinfo driver)
-// type: uint8_t
-#define DEVICE_METADATA_INTERRUPT_CONTROLLER_TYPE 0x43544E49  // INTC
 
 // Button Metadata
 // type: fuchsia.buttons.Metadata
@@ -47,34 +39,16 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // list of buttons_gpio_config_t
 #define DEVICE_METADATA_BUTTONS_GPIOS 0x474E5442  // BTNG
 
-// type: fuchsia_hardware_thermal_ThermalDeviceInfo
-#define DEVICE_METADATA_THERMAL_CONFIG 0x54485243  // THRC
-
-// type: FIDL fuchsia.hardware.pwm/PwmChannelsMetadata
-#define DEVICE_METADATA_PWM_CHANNELS 0x004D5750  // PWM\0
-
 // type: vendor specific Wifi configuration
 #define DEVICE_METADATA_WIFI_CONFIG 0x49464957  // WIFI
 
-// type: display_panel_t (defined in //src/graphics/display/lib/
+// type: display::PanelType (defined in //src/graphics/display/lib/
 // device-protocol-display/include/lib/device-protocol/display-panel.h)
-#define DEVICE_METADATA_DISPLAY_PANEL_CONFIG 0x43505344  // DSPC
+#define DEVICE_METADATA_DISPLAY_PANEL_TYPE 0x43505344  // DSPC
 
 // Maximum screen brightness in nits. Used by the backlight driver.
 // type: double
 #define DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS 0x4C4B4342  // BCKL
-
-// type: FIDL fuchsia.hardware.registers/Metadata
-#define DEVICE_METADATA_REGISTERS 0x53474552  // REGS
-
-// type: FIDL fuchsia.hardware.vreg/Metadata
-#define DEVICE_METADATA_VREG 0x47455256  // VREG
-
-// type: FIDL fuchsia.hardware.tee/TeeMetadata
-#define DEVICE_METADATA_TEE_THREAD_CONFIG 0x43454554  // TEEC
-
-// Type: FIDL fuchsia.hardware.trippoint/TripDeviceMetadata
-#define DEVICE_METADATA_TRIP 0x50495254  // TRIP
 
 // Metadata types that have least significant byte set to lowercase 'd'
 // signify private driver data.

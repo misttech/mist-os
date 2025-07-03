@@ -11,6 +11,7 @@
 # noticeable regressions in `gn gen` time or ninja build time, we can improve
 # bazel2gn to be able to generate the correct import statements instead.
 
+import("//build/cpp/sdk_source_set.gni")
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")

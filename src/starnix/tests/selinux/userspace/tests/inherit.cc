@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <sys/time.h>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
@@ -171,6 +172,66 @@ TEST(InheritTest, FdUseAllowed) {
     std::string expect_null_inode = std::to_string(int(false));
     char* args[] = {basename(path_for_exec.data()), allow_use_fd_str.data(),
                     expect_null_inode.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
+// When the `siginh` permission is denied, the parent's ITIMER_REAL is reset during `exec`.
+TEST(InheritTest, SiginhDeniedItimerRealReset) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    struct itimerval parent_val;
+    parent_val.it_value.tv_sec = 1000000;
+    parent_val.it_value.tv_usec = 0;
+    parent_val.it_interval.tv_sec = 0;
+    parent_val.it_interval.tv_usec = 0;
+
+    ASSERT_THAT(setitimer(ITIMER_REAL, &parent_val, nullptr), SyscallSucceeds());
+
+    std::string path_for_exec = "data/bin/is_itimer_real_reset_bin";
+    std::string expect_itimer_real_reset = std::to_string(int(true));
+    char* args[] = {basename(path_for_exec.data()), expect_itimer_real_reset.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
+// When the `siginh` permission is allowed, the parent's ITIMER_REAL is preserved across `exec`.
+TEST(InheritTest, SiginhAllowedItimerRealInherited) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_allow_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    struct itimerval parent_val;
+    parent_val.it_value.tv_sec = 1000000;
+    parent_val.it_value.tv_usec = 0;
+    parent_val.it_interval.tv_sec = 0;
+    parent_val.it_interval.tv_usec = 0;
+
+    ASSERT_THAT(setitimer(ITIMER_REAL, &parent_val, nullptr), SyscallSucceeds());
+
+    std::string path_for_exec = "data/bin/is_itimer_real_reset_bin";
+    std::string expect_itimer_real_reset = std::to_string(int(false));
+    char* args[] = {basename(path_for_exec.data()), expect_itimer_real_reset.data(), NULL};
 
     auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
     ASSERT_TRUE(set_exec_context.is_ok());

@@ -48,10 +48,6 @@ class Driver {
 
   // Creates a buffer that owns the provided handle. Can be called on any thread.
   virtual std::unique_ptr<Buffer> MsdImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }
-  // TODO(b/417848695) - remove when unused
-  std::unique_ptr<Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) {
-    return MsdImportBuffer(std::move(vmo), client_id);
-  }
 
   // Creates a semaphore that owns the provided handle. Can be called on any thread.
   virtual magma_status_t MsdImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,

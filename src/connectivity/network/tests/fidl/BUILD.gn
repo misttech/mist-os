@@ -33,6 +33,9 @@ non_sharded_tests = [
     err_logs = true
     log_less = true
   },
+  {
+    label = "settings"
+  },
 ]
 
 if (target_cpu != "riscv64") {

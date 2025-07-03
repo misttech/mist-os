@@ -40,6 +40,8 @@ ffx_plugin("ffx_doctor") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
+    "//third_party/rust_crates:nix",
+    "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:termion",
     "//third_party/rust_crates:zip",
@@ -60,6 +62,7 @@ ffx_plugin("ffx_doctor") {
 
   sources = [
     "src/doctor_ledger.rs",
+    "src/gcheck.rs",
     "src/ledger_view.rs",
     "src/lib.rs",
     "src/single_target_diagnostics.rs",

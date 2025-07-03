@@ -21,8 +21,6 @@
 
 namespace {
 
-constexpr uint32_t kInitializationFrequencyHz = 400'000;
-
 constexpr zx::duration kVoltageStabilizationTime = zx::msec(5);
 constexpr zx::duration kDataStabilizationTime = zx::msec(1);
 

@@ -202,7 +202,7 @@ async fn handle_adb(
 pub struct FunctionFs;
 impl FunctionFs {
     pub fn new_fs(
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -232,7 +232,13 @@ impl FunctionFs {
             0
         };
 
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
+        let fs = FileSystem::new(
+            locked,
+            current_task.kernel(),
+            CacheMode::Uncached,
+            FunctionFs,
+            options,
+        )?;
 
         let creds = FsCred { uid, gid };
         let info = FsNodeInfo::new(mode!(IFDIR, 0o777), creds);
@@ -325,10 +331,14 @@ fn connect_to_device(
         .map_err(|_| errno!(EINVAL))?;
 
     loop {
-        let fadb::UsbAdbImpl_Event::OnStatusChanged { status } = adb_proxy
-            .wait_for_event(zx::MonotonicInstant::INFINITE)
-            .expect("failed to wait for event");
-
+        let fadb::UsbAdbImpl_Event::OnStatusChanged { status } =
+            match adb_proxy.wait_for_event(zx::MonotonicInstant::INFINITE) {
+                Ok(event) => event,
+                Err(e) => {
+                    log_error!(e:?; "adb proxy failed to wait for event");
+                    return error!(EINVAL);
+                }
+            };
         // Don't decrement the counter here, since the first adb read call will decrement the
         // counter for this message, keeping the container alive until the read call can be made.
 

@@ -14,6 +14,11 @@ assert(current_toolchain == default_toolchain,
 # For boards with arm64 architecture, we always use the arm64 board.
 board_name = target_cpu
 
+group("products") {
+  testonly = true
+  deps = [ ":microfuchsia_eng.${board_name}_product_config" ]
+}
+
 group("microfuchsia") {
   testonly = true
   if (target_cpu == "x64" || target_cpu == "arm64") {
@@ -35,6 +40,8 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
         "//products/microfuchsia:product_bundle_eng.${board_name}"
     bazel_product_image_target =
         "//products/microfuchsia:microfuchsia_eng.${board_name}"
+    bazel_product_config_target = "//products/microfuchsia:assembly_config_eng"
+    bazel_product_config_name = "microfuchsia_eng"
     bazel_recovery_image_target = "//products/zedboot:${board_name}"
     bazel_inputs_from_gn = [
       "//build/images/flash:esp.bazel_input",

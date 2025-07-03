@@ -11,20 +11,15 @@ use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::TryStreamExt;
 use once_cell::sync::OnceCell;
 use starnix_core::device::kobject::Device;
-use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::task::CurrentTask;
+use starnix_core::fs::sysfs::build_device_directory;
+use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
-use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
-use starnix_core::vfs::{
-    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr,
-};
+use starnix_core::vfs::FsNodeOps;
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
-use starnix_uapi::auth::FsCred;
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
-use starnix_uapi::open_flags::OpenFlags;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -32,84 +27,25 @@ use zx::MonotonicInstant;
 
 const TEMPERATURE_DRIVER_DIR: &str = "/dev/class/trippoint";
 
-struct ThermalZoneDirectory {
-    base_dir: DeviceDirectory,
-    device_type: String,
+fn build_thermal_zone_directory(
+    device: &Device,
     proxy: Arc<OnceCell<ftemperature::DeviceSynchronousProxy>>,
-}
-
-impl ThermalZoneDirectory {
-    fn new(
-        device: Device,
-        proxy: Arc<OnceCell<ftemperature::DeviceSynchronousProxy>>,
-        device_type: String,
-    ) -> Self {
-        let base_dir = DeviceDirectory::new(device);
-        Self { device_type, proxy, base_dir }
-    }
-}
-
-impl FsNodeOps for ThermalZoneDirectory {
-    fs_node_impl_dir_readonly!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        let mut entries = self.base_dir.create_file_ops_entries();
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"temp".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"type".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"policy".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"available_policies".into(),
-            inode: None,
-        });
-        Ok(VecDirectory::new_file(entries))
-    }
-
-    fn lookup(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        node: &FsNode,
-        current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        match &**name {
-            b"temp" => Ok(node.fs().create_node_and_allocate_node_id(
-                TemperatureFile::new_node(self.proxy.clone()),
-                FsNodeInfo::new(mode!(IFREG, 0o664), FsCred::root()),
-            )),
-            b"type" => Ok(node.fs().create_node_and_allocate_node_id(
-                BytesFile::new_node(format!("{}\n", self.device_type).into_bytes()),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            )),
-            b"policy" => Ok(node.fs().create_node_and_allocate_node_id(
-                BytesFile::new_node(format!("{}\n", "step_wise").into_bytes()),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            )),
-            b"available_policies" => Ok(node.fs().create_node_and_allocate_node_id(
-                BytesFile::new_node(format!("{}\n", "step_wise").into_bytes()),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            )),
-            _ => self.base_dir.lookup(locked, node, current_task, name),
-        }
-    }
+    device_type: String,
+    dir: &SimpleDirectoryMutator,
+) {
+    build_device_directory(device, dir);
+    dir.entry("temp", TemperatureFile::new_node(proxy), mode!(IFREG, 0o664));
+    dir.entry(
+        "type",
+        BytesFile::new_node(format!("{}\n", device_type).into_bytes()),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry("policy", BytesFile::new_node(b"step_wise\n".to_vec()), mode!(IFREG, 0o444));
+    dir.entry(
+        "available_policies",
+        BytesFile::new_node(b"step_wise\n".to_vec()),
+        mode!(IFREG, 0o444),
+    );
 }
 
 struct TemperatureFile {
@@ -139,12 +75,7 @@ impl BytesFileOps for TemperatureFile {
     }
 }
 
-pub fn thermal_device_init(
-    locked: &mut Locked<Unlocked>,
-    system_task: &CurrentTask,
-    devices: Vec<String>,
-) {
-    let kernel = system_task.kernel();
+pub fn thermal_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel, devices: Vec<String>) {
     let registry = &kernel.device_registry;
     let virtual_thermal_class = registry.objects.virtual_thermal_class();
 
@@ -158,10 +89,9 @@ pub fn thermal_device_init(
 
         registry.add_numberless_device(
             locked,
-            system_task,
             thermal_zone.clone().as_str().into(),
             virtual_thermal_class.clone(),
-            move |dev| ThermalZoneDirectory::new(dev, proxy.clone(), sensor_name.clone().into()),
+            |device, dir| build_thermal_zone_directory(device, proxy, sensor_name, dir),
         );
 
         sensor_proxies.insert(sensor_name_clone, proxy_clone);

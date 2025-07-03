@@ -14,7 +14,7 @@
 
 namespace zxdump {
 
-fit::result<std::string> PipedCommand::StartArgv(cpp20::span<const char*> argv) {
+fit::result<std::string> PipedCommand::StartArgv(std::span<const char*> argv) {
   ZX_DEBUG_ASSERT(!process_);
 
   std::vector<fdio_spawn_action_t> actions = spawn_actions_;

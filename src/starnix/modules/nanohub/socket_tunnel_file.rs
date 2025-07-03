@@ -13,8 +13,9 @@ use starnix_core::device::DeviceOps;
 use starnix_core::fs::fuchsia::new_remote_file_ops;
 use starnix_core::fs_node_impl_not_dir;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -113,17 +114,15 @@ impl FsNodeOps for SocketTunnelSysfsFile {
 }
 
 /// Create and register a device node backed by a SocketTunnelFile
-pub fn register_socket_tunnel_device<F, N, L>(
+pub fn register_socket_tunnel_device<L>(
     locked: &mut Locked<L>,
     current_task: &CurrentTask,
     socket_label: &FsStr,
     dev_node_name: &FsStr,
     dev_class_name: &FsStr,
-    create_device_sysfs_ops: F,
+    build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
 ) where
-    F: Fn(Device) -> N + Send + Sync + 'static,
-    N: FsNodeOps,
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
@@ -132,12 +131,12 @@ pub fn register_socket_tunnel_device<F, N, L>(
         registry.objects.get_or_create_class(dev_class_name, registry.objects.virtual_bus());
 
     registry
-        .register_dyn_device(
+        .register_dyn_device_with_dir(
             locked,
             current_task,
             dev_node_name.into(),
             device_class,
-            create_device_sysfs_ops,
+            build_directory,
             SocketTunnelFile::new(socket_label.to_owned()),
         )
         .expect("Can register socket tunnel file");

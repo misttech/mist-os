@@ -132,7 +132,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                            SetLayerColorConfigCompleter::Sync& _completer) override;
   void SetLayerImage2(SetLayerImage2RequestView request,
                       SetLayerImage2Completer::Sync& _completer) override;
-  void CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& _completer) override;
+  void CheckConfig(CheckConfigCompleter::Sync& _completer) override;
   void DiscardConfig(DiscardConfigCompleter::Sync& _completer) override;
   void ApplyConfig3(ApplyConfig3RequestView request,
                     ApplyConfig3Completer::Sync& _completer) override;
@@ -166,6 +166,11 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
  private:
   display::ConfigCheckResult CheckConfigImpl();
   void ApplyConfigImpl();
+
+  // CheckConfig() implementation for a single display configuration.
+  //
+  // `display_config`'s draft configuration must have a non-empty layer list.
+  display::ConfigCheckResult CheckConfigForDisplay(const DisplayConfig& display_config);
 
   // Cleans up states of all current Images.
   // Returns true if any current layer has been modified.

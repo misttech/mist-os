@@ -17,8 +17,6 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.factory.wlan/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/fidl.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>

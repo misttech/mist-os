@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::collections::hash_map::Entry;
-use alloc::collections::HashMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt::Debug;
@@ -11,6 +9,7 @@ use core::fmt::Debug;
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip};
+use netstack3_hashmap::hash_map::{Entry, HashMap};
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
 use crate::{

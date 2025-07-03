@@ -4,24 +4,36 @@
 
 // This file contains tests for the InspectTree class as well as the associated inspect data.
 
+#include <lib/fpromise/promise.h>
 #include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/reader.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/inspect/testing/cpp/inspect.h>
-#include <lib/zx/result.h>
+#include <zircon/assert.h>
 
 #include <optional>
+#include <utility>
 #include <vector>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
 #include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
-
-using namespace ::testing;
-using namespace inspect::testing;
 
 namespace fs_inspect {
 
 namespace {
+
+using inspect::testing::ChildrenMatch;
+using inspect::testing::IntIs;
+using inspect::testing::NameMatches;
+using inspect::testing::NodeMatches;
+using inspect::testing::PropertyList;
+using inspect::testing::StringIs;
+using inspect::testing::UintIs;
+using testing::IsSupersetOf;
 
 // Helper functions to create validators that can be used to validate an inspect::Hierarchy against
 // the expected node name, properties, and values.
@@ -113,7 +125,7 @@ class FakeInspectTree {
   }
 
  private:
-  inspect::Inspector inspector_ = {};
+  inspect::Inspector inspector_;
 
   // Structured data to be exposed in the inspect hierarchy.
   fs_inspect::InfoData info_data_ = {};
@@ -121,7 +133,7 @@ class FakeInspectTree {
   fs_inspect::FvmData fvm_data_ = {};
 
   // Last snapshot taken of the inspect tree.
-  inspect::Hierarchy snapshot_ = {};
+  inspect::Hierarchy snapshot_;
 
   // `fs_inspect_nodes_` should be last as it owns callbacks that reference other data in this
   // object.

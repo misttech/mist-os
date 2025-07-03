@@ -43,12 +43,6 @@ fn split_range(range: &Range<usize>, mid: usize) -> (Range<usize>, Range<usize>)
     let base = range.start;
     (base..base + mid, base + mid..base + l)
 }
-
-// TODO(jfsulliv): Eventually we will want zero-copy buffers which are provided by filesystem
-// clients (e.g. via zx::stream) and which we either splice pages into or out of from a transfer
-// buffer, or which we directly connect to the block device, or which we read and write to in some
-// different way (involving changes to the block interface).
-
 /// Buffer is a read-write buffer that can be used for I/O with the block device. They are created
 /// by a BufferAllocator, and automatically deallocate themselves when they go out of scope.
 ///
@@ -187,8 +181,6 @@ impl<'a> BufferRef<'a> {
     }
 
     /// Returns the range in the underlying BufferSource that this BufferRef covers.
-    /// TODO(jfsulliv): Currently unused in host code. Remove when there is a real Device impl.
-    #[allow(dead_code)]
     pub fn range(&self) -> Range<usize> {
         self.start..self.end
     }
@@ -294,8 +286,6 @@ impl<'a> MutableBufferRef<'a> {
     }
 
     /// Returns the range in the underlying BufferSource that this MutableBufferRef covers.
-    /// TODO(jfsulliv): Currently unused in host code. Remove when there is a real Device impl.
-    #[allow(dead_code)]
     pub fn range(&self) -> Range<usize> {
         self.range.clone()
     }

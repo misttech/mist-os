@@ -27,6 +27,7 @@
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
+#include <phys/uart-console.h>
 
 #include "log.h"
 

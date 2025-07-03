@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
+#include <fidl/fuchsia.hardware.thermal/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -84,127 +84,20 @@ const std::vector<fpbus::Irq> thermal_irqs_ddr{
     }},
 };
 
-constexpr fuchsia_hardware_thermal::wire::ThermalTemperatureInfo TripPoint(float temp_c,
-                                                                           uint16_t cpu_opp_big,
-                                                                           uint16_t cpu_opp_little,
-                                                                           uint16_t gpu_opp) {
+fuchsia_hardware_thermal::ThermalTemperatureInfo TripPoint(float temp_c, uint16_t cpu_opp_big,
+                                                           uint16_t cpu_opp_little,
+                                                           uint16_t gpu_opp) {
   constexpr float kHysteresis = 2.0f;
 
-  return {
+  return {{
       .up_temp_celsius = temp_c + kHysteresis,
       .down_temp_celsius = temp_c - kHysteresis,
       .fan_level = 0,
       .big_cluster_dvfs_opp = cpu_opp_big,
       .little_cluster_dvfs_opp = cpu_opp_little,
       .gpu_clk_freq_source = gpu_opp,
-  };
+  }};
 }
-
-/*
- * PASSIVE COOLING - For Sherlock, we have DVFS support added
- *
- * Below is the operating point information for Small cluster
- * Operating point 0  - Freq 0.1000 GHz Voltage 0.7310 V
- * Operating point 1  - Freq 0.2500 GHz Voltage 0.7310 V
- * Operating point 2  - Freq 0.5000 GHz Voltage 0.7310 V
- * Operating point 3  - Freq 0.6670 GHz Voltage 0.7310 V
- * Operating point 4  - Freq 1.0000 GHz Voltage 0.7310 V
- * Operating point 5  - Freq 1.2000 GHz Voltage 0.7310 V
- * Operating point 6  - Freq 1.3980 GHz Voltage 0.7610 V
- * Operating point 7  - Freq 1.5120 GHz Voltage 0.7910 V
- * Operating point 8  - Freq 1.6080 GHz Voltage 0.8310 V
- * Operating point 9  - Freq 1.7040 GHz Voltage 0.8610 V
- * Operating point 10 - Freq 1.8960 GHz Voltage 0.9810 V
- *
- * Below is the operating point information for Big cluster
- * Operating point 0  - Freq 0.1000 GHz Voltage 0.7510 V
- * Operating point 1  - Freq 0.2500 GHz Voltage 0.7510 V
- * Operating point 2  - Freq 0.5000 GHz Voltage 0.7510 V
- * Operating point 3  - Freq 0.6670 GHz Voltage 0.7510 V
- * Operating point 4  - Freq 1.0000 GHz Voltage 0.7710 V
- * Operating point 5  - Freq 1.2000 GHz Voltage 0.7710 V
- * Operating point 6  - Freq 1.3980 GHz Voltage 0.7910 V
- * Operating point 7  - Freq 1.5120 GHz Voltage 0.8210 V
- * Operating point 8  - Freq 1.6080 GHz Voltage 0.8610 V
- * Operating point 9  - Freq 1.7040 GHz Voltage 0.8910 V
- * Operating point 10 - Freq 1.9080 GHz Voltage 1.0220 V
- *
- * GPU_CLK_FREQUENCY_SOURCE -
- * 0 - 285.7 MHz
- * 1 - 400 MHz
- * 2 - 500 MHz
- * 3 - 666 MHz
- * 4 - 800 MHz
- */
-
-// NOTE: This is a very trivial policy, no data backing it up
-// As we do more testing this policy can evolve.
-fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config_pll =
-    {
-        .active_cooling = false,
-        .passive_cooling = true,
-        .gpu_throttling = true,
-        .num_trip_points = 4,
-        .big_little = true,
-        .critical_temp_celsius = 101.0f,
-        .trip_point_info =
-            {
-                TripPoint(82.5f, 9, 10, 4), TripPoint(85.0f, 8, 9, 4), TripPoint(87.5f, 6, 6, 4),
-                TripPoint(90.0f, 4, 4, 4),
-                TripPoint(-273.15f, 0, 0, 0),  // 0 Kelvin is impossible, marks end of TripPoints
-            },
-        .opps =
-            {
-                fuchsia_hardware_thermal::wire::OperatingPoint{
-                    .opp =
-                        {
-                            fuchsia_hardware_thermal::wire::OperatingPointEntry{
-                                .freq_hz = 100'000'000, .volt_uv = 751'000},
-                            {.freq_hz = 250'000'000, .volt_uv = 751'000},
-                            {.freq_hz = 500'000'000, .volt_uv = 751'000},
-                            {.freq_hz = 667'000'000, .volt_uv = 751'000},
-                            {.freq_hz = 1'000'000'000, .volt_uv = 771'000},
-                            {.freq_hz = 1'200'000'000, .volt_uv = 771'000},
-                            {.freq_hz = 1'398'000'000, .volt_uv = 791'000},
-                            {.freq_hz = 1'512'000'000, .volt_uv = 821'000},
-                            {.freq_hz = 1'608'000'000, .volt_uv = 861'000},
-                            {.freq_hz = 1'704'000'000, .volt_uv = 891'000},
-                            {.freq_hz = 1'908'000'000, .volt_uv = 1'022'000},
-                        },
-                    .latency = 0,
-                    .count = 11,
-                },
-                fuchsia_hardware_thermal::wire::OperatingPoint{
-                    .opp =
-                        {
-                            fuchsia_hardware_thermal::wire::OperatingPointEntry{
-                                .freq_hz = 100'000'000, .volt_uv = 731'000},
-                            {.freq_hz = 250'000'000, .volt_uv = 731'000},
-                            {.freq_hz = 500'000'000, .volt_uv = 731'000},
-                            {.freq_hz = 667'000'000, .volt_uv = 731'000},
-                            {.freq_hz = 1'000'000'000, .volt_uv = 731'000},
-                            {.freq_hz = 1'200'000'000, .volt_uv = 731'000},
-                            {.freq_hz = 1'398'000'000, .volt_uv = 761'000},
-                            {.freq_hz = 1'512'000'000, .volt_uv = 791'000},
-                            {.freq_hz = 1'608'000'000, .volt_uv = 831'000},
-                            {.freq_hz = 1'704'000'000, .volt_uv = 861'000},
-                            {.freq_hz = 1'896'000'000, .volt_uv = 1'011'000},
-                        },
-                    .latency = 0,
-                    .count = 11,
-                },
-            },
-};
-
-fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config_ddr = {
-    .active_cooling = false,
-    .passive_cooling = false,
-    .gpu_throttling = false,
-    .num_trip_points = 0,
-    .big_little = false,
-    .critical_temp_celsius = 110.0,
-    .trip_point_info = {TripPoint(-273.15f, 0, 0, 0)},  // Unused
-    .opps = {}};
 
 // clang-format on
 aml_thermal_info_t aml_thermal_info = {
@@ -235,30 +128,6 @@ aml_thermal_info_t aml_thermal_info = {
     .cluster_id_map = {},
 };
 
-const std::vector<fpbus::Metadata> thermal_metadata_pll{
-    {{
-        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&thermal_config_pll),
-            reinterpret_cast<const uint8_t*>(&thermal_config_pll) + sizeof(thermal_config_pll)),
-    }},
-    {{
-        .id = std::to_string(DEVICE_METADATA_PRIVATE),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&aml_thermal_info),
-            reinterpret_cast<const uint8_t*>(&aml_thermal_info) + sizeof(aml_thermal_info)),
-    }},
-};
-
-const std::vector<fpbus::Metadata> thermal_metadata_ddr{
-    {{
-        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&thermal_config_ddr),
-            reinterpret_cast<const uint8_t*>(&thermal_config_ddr) + sizeof(thermal_config_ddr)),
-    }},
-};
-
 const std::map<uint32_t, std::string> kPwmIdMap = {
     {T931_PWM_A, bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER},
     {T931_PWM_AO_D, bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_LITTLE_CLUSTER},
@@ -271,29 +140,249 @@ const std::map<uint32_t, std::string> kClockFunctionMap = {
     {g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16, bind_fuchsia_clock::FUNCTION_SYS_CPUB_DIV16},
 };
 
-const fpbus::Node thermal_dev_pll = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-thermal-pll";
-  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
-  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL;
-  dev.mmio() = thermal_mmios_pll;
-  dev.irq() = thermal_irqs_pll;
-  dev.metadata() = thermal_metadata_pll;
-  return dev;
-}();
+zx::result<> CreateThermalPllNode(
+    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  /*
+   * PASSIVE COOLING - For Sherlock, we have DVFS support added
+   *
+   * Below is the operating point information for Small cluster
+   * Operating point 0  - Freq 0.1000 GHz Voltage 0.7310 V
+   * Operating point 1  - Freq 0.2500 GHz Voltage 0.7310 V
+   * Operating point 2  - Freq 0.5000 GHz Voltage 0.7310 V
+   * Operating point 3  - Freq 0.6670 GHz Voltage 0.7310 V
+   * Operating point 4  - Freq 1.0000 GHz Voltage 0.7310 V
+   * Operating point 5  - Freq 1.2000 GHz Voltage 0.7310 V
+   * Operating point 6  - Freq 1.3980 GHz Voltage 0.7610 V
+   * Operating point 7  - Freq 1.5120 GHz Voltage 0.7910 V
+   * Operating point 8  - Freq 1.6080 GHz Voltage 0.8310 V
+   * Operating point 9  - Freq 1.7040 GHz Voltage 0.8610 V
+   * Operating point 10 - Freq 1.8960 GHz Voltage 0.9810 V
+   *
+   * Below is the operating point information for Big cluster
+   * Operating point 0  - Freq 0.1000 GHz Voltage 0.7510 V
+   * Operating point 1  - Freq 0.2500 GHz Voltage 0.7510 V
+   * Operating point 2  - Freq 0.5000 GHz Voltage 0.7510 V
+   * Operating point 3  - Freq 0.6670 GHz Voltage 0.7510 V
+   * Operating point 4  - Freq 1.0000 GHz Voltage 0.7710 V
+   * Operating point 5  - Freq 1.2000 GHz Voltage 0.7710 V
+   * Operating point 6  - Freq 1.3980 GHz Voltage 0.7910 V
+   * Operating point 7  - Freq 1.5120 GHz Voltage 0.8210 V
+   * Operating point 8  - Freq 1.6080 GHz Voltage 0.8610 V
+   * Operating point 9  - Freq 1.7040 GHz Voltage 0.8910 V
+   * Operating point 10 - Freq 1.9080 GHz Voltage 1.0220 V
+   *
+   * GPU_CLK_FREQUENCY_SOURCE -
+   * 0 - 285.7 MHz
+   * 1 - 400 MHz
+   * 2 - 500 MHz
+   * 3 - 666 MHz
+   * 4 - 800 MHz
+   */
 
-const fpbus::Node thermal_dev_ddr = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-thermal-ddr";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_T931;
-  dev.did() = PDEV_DID_AMLOGIC_THERMAL_DDR;
-  dev.mmio() = thermal_mmios_ddr;
-  dev.irq() = thermal_irqs_ddr;
-  dev.metadata() = thermal_metadata_ddr;
-  return dev;
-}();
+  // NOTE: This is a very trivial policy, no data backing it up
+  // As we do more testing this policy can evolve.
+  fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config{
+      {
+          .active_cooling = false,
+          .passive_cooling = true,
+          .gpu_throttling = true,
+          .num_trip_points = 4,
+          .big_little = true,
+          .critical_temp_celsius = 101.0f,
+          .trip_point_info =
+              {
+                  TripPoint(82.5f, 9, 10, 4), TripPoint(85.0f, 8, 9, 4), TripPoint(87.5f, 6, 6, 4),
+                  TripPoint(90.0f, 4, 4, 4),
+                  TripPoint(-273.15f, 0, 0, 0),  // 0 Kelvin is impossible, marks end of TripPoints
+              },
+          .opps =
+              {
+                  fuchsia_hardware_thermal::OperatingPoint{{
+                      .opp =
+                          {
+                              fuchsia_hardware_thermal::OperatingPointEntry{
+                                  {.freq_hz = 100'000'000, .volt_uv = 751'000}},
+                              {{.freq_hz = 250'000'000, .volt_uv = 751'000}},
+                              {{.freq_hz = 500'000'000, .volt_uv = 751'000}},
+                              {{.freq_hz = 667'000'000, .volt_uv = 751'000}},
+                              {{.freq_hz = 1'000'000'000, .volt_uv = 771'000}},
+                              {{.freq_hz = 1'200'000'000, .volt_uv = 771'000}},
+                              {{.freq_hz = 1'398'000'000, .volt_uv = 791'000}},
+                              {{.freq_hz = 1'512'000'000, .volt_uv = 821'000}},
+                              {{.freq_hz = 1'608'000'000, .volt_uv = 861'000}},
+                              {{.freq_hz = 1'704'000'000, .volt_uv = 891'000}},
+                              {{.freq_hz = 1'908'000'000, .volt_uv = 1'022'000}},
+                          },
+                      .latency = 0,
+                      .count = 11,
+                  }},
+                  fuchsia_hardware_thermal::OperatingPoint{
+                      {
+                          .opp =
+                              {
+                                  fuchsia_hardware_thermal::OperatingPointEntry{
+                                      {.freq_hz = 100'000'000, .volt_uv = 731'000}},
+                                  {{.freq_hz = 250'000'000, .volt_uv = 731'000}},
+                                  {{.freq_hz = 500'000'000, .volt_uv = 731'000}},
+                                  {{.freq_hz = 667'000'000, .volt_uv = 731'000}},
+                                  {{.freq_hz = 1'000'000'000, .volt_uv = 731'000}},
+                                  {{.freq_hz = 1'200'000'000, .volt_uv = 731'000}},
+                                  {{.freq_hz = 1'398'000'000, .volt_uv = 761'000}},
+                                  {{.freq_hz = 1'512'000'000, .volt_uv = 791'000}},
+                                  {{.freq_hz = 1'608'000'000, .volt_uv = 831'000}},
+                                  {{.freq_hz = 1'704'000'000, .volt_uv = 861'000}},
+                                  {{.freq_hz = 1'896'000'000, .volt_uv = 1'011'000}},
+                              },
+                          .latency = 0,
+                          .count = 11,
+                      }},
+              },
+      }};
+
+  fit::result persisted_metadata = fidl::Persist(thermal_config);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist thermal config: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return zx::error(persisted_metadata.error_value().status());
+  }
+
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = fuchsia_hardware_thermal::ThermalDeviceInfo::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
+      }},
+      {{
+          .id = std::to_string(DEVICE_METADATA_PRIVATE),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&aml_thermal_info),
+              reinterpret_cast<const uint8_t*>(&aml_thermal_info) + sizeof(aml_thermal_info)),
+      }},
+  };
+
+  const fpbus::Node node{{
+      .name = "aml-thermal-pll",
+      .vid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC,
+      .pid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931,
+      .did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL,
+      .mmio = thermal_mmios_pll,
+      .irq = thermal_irqs_pll,
+      .metadata = std::move(metadata),
+  }};
+
+  // The PLL sensor is controlled by a legacy thermal device, which performs DVFS.
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('SHER');
+
+  std::vector<fdf::ParentSpec2> parents;
+  parents.reserve(kClockFunctionMap.size() + kPwmIdMap.size() + 1);
+  parents.push_back(fuchsia_driver_framework::ParentSpec2{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
+                                       bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+          },
+      .properties =
+          {
+              fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+          },
+  }});
+
+  for (auto& [pwm_id, function] : kPwmIdMap) {
+    auto rules = std::vector{
+        fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
+                                 bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, pwm_id),
+    };
+    auto properties = std::vector{
+        fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
+                           bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION, function),
+    };
+    parents.push_back(fdf::ParentSpec2{{rules, properties}});
+  }
+
+  for (auto& [clock_id, function] : kClockFunctionMap) {
+    auto rules = std::vector{
+        fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
+                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, clock_id),
+    };
+    auto properties = std::vector{
+        fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
+                           bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, function),
+    };
+    parents.push_back(fdf::ParentSpec2{{rules, properties}});
+  }
+
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, node),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml_thermal_pll", .parents2 = parents}}));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add node: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<> CreateThermalDdrNode(
+    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config{
+      {.active_cooling = false,
+       .passive_cooling = false,
+       .gpu_throttling = false,
+       .num_trip_points = 0,
+       .big_little = false,
+       .critical_temp_celsius = 110.0,
+       .trip_point_info = {TripPoint(-273.15f, 0, 0, 0)},  // Unused
+       .opps = {}}};
+
+  fit::result persisted_metadata = fidl::Persist(thermal_config);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist thermal config: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return zx::error(persisted_metadata.error_value().status());
+  }
+
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = fuchsia_hardware_thermal::ThermalDeviceInfo::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
+      }},
+  };
+
+  fpbus::Node node{{
+      .name = "aml-thermal-ddr",
+      .vid = PDEV_VID_AMLOGIC,
+      .pid = PDEV_PID_AMLOGIC_T931,
+      .did = PDEV_DID_AMLOGIC_THERMAL_DDR,
+      .mmio = thermal_mmios_ddr,
+      .irq = thermal_irqs_ddr,
+      .metadata = std::move(metadata),
+  }};
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('SHER');
+
+  // The DDR sensor is controlled by a non-legacy thermal device, which only reads temperature.
+  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, node));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add node: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+
+  return zx::ok();
+}
 
 }  // namespace
 
@@ -310,79 +399,14 @@ zx_status_t Sherlock::ThermalInit() {
 
   gpio_init_steps_.push_back(GpioOutput(T931_GPIOE(2), false));
 
-  // The PLL sensor is controlled by a legacy thermal device, which performs DVFS.
-  fidl::Arena<> fidl_arena;
-  fdf::Arena arena('SHER');
-  {
-    std::vector<fdf::ParentSpec2> parents;
-    parents.reserve(kClockFunctionMap.size() + kPwmIdMap.size() + 1);
-    parents.push_back(fuchsia_driver_framework::ParentSpec2{{
-        .bind_rules =
-            {
-                fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
-                                         bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            },
-        .properties =
-            {
-                fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            },
-    }});
-
-    for (auto& [pwm_id, function] : kPwmIdMap) {
-      auto rules = std::vector{
-          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                                   bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, pwm_id),
-      };
-      auto properties = std::vector{
-          fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION, function),
-      };
-      parents.push_back(fdf::ParentSpec2{{rules, properties}});
-    }
-
-    for (auto& [clock_id, function] : kClockFunctionMap) {
-      auto rules = std::vector{
-          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                   bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, clock_id),
-      };
-      auto properties = std::vector{
-          fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                             bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, function),
-      };
-      parents.push_back(fdf::ParentSpec2{{rules, properties}});
-    }
-
-    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
-        fidl::ToWire(fidl_arena, thermal_dev_pll),
-        fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                     {.name = "aml_thermal_pll", .parents2 = parents}}));
-    if (!result.ok()) {
-      zxlogf(ERROR, "AddCompositeNodeSpec SherlockThermal(thermal_dev_pll) request failed: %s",
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "AddCompositeNodeSpec SherlockThermal(thermal_dev_pll) failed: %s",
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
+  if (zx::result result = CreateThermalPllNode(pbus_); result.is_error()) {
+    zxlogf(ERROR, "Failed to create thermal pll platform node: %s", result.status_string());
+    return result.status_value();
   }
 
-  // The DDR sensor is controlled by a non-legacy thermal device, which only reads temperature.
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermal_dev_ddr));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd SherlockThermal(thermal_dev_ddr) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd SherlockThermal(thermal_dev_ddr) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  if (zx::result result = CreateThermalDdrNode(pbus_); result.is_error()) {
+    zxlogf(ERROR, "Failed to create thermal ddr platform node: %s", result.status_string());
+    return result.status_value();
   }
 
   return ZX_OK;

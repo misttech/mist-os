@@ -22,7 +22,7 @@
 #include <ktl/type_traits.h>
 #include <ktl/utility.h>
 #include <phys/stdio.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 
 #include <ktl/enforce.h>
 
@@ -42,34 +42,6 @@ void AddressSpace::AllocateRootPageTables() {
     ZX_ASSERT_MSG(upper_root, "failed to allocate upper root page table");
     upper_root_paddr_ = *upper_root;
   }
-}
-
-fit::result<AddressSpace::MapError> AddressSpace::Map(uint64_t vaddr, uint64_t size, uint64_t paddr,
-                                                      AddressSpace::MapSettings settings) {
-  ZX_ASSERT_MSG(vaddr < kLowerVirtualAddressRangeEnd || vaddr >= kUpperVirtualAddressRangeStart,
-                "virtual address %#" PRIx64 " must be < %#" PRIx64 " or >= %#" PRIx64, vaddr,
-                kLowerVirtualAddressRangeEnd, kUpperVirtualAddressRangeStart);
-
-  bool upper = vaddr >= kUpperVirtualAddressRangeStart;
-
-  // Fix-up settings per documented behavior.
-  if constexpr (!kExecuteOnlyAllowed) {
-    settings.access.readable |= !settings.access.writable && settings.access.executable;
-  }
-
-  settings.global = upper;
-
-  if constexpr (kDualSpaces) {
-    if (upper) {
-      return UpperPaging::Map(upper_root_paddr_, paddr_to_io_, permanent_allocator(), state_, vaddr,
-                              size, paddr, settings);
-    }
-  }
-
-  // See allocator descriptions for the appropriate use-cases.
-  auto lower_allocator = upper ? permanent_allocator() : temporary_allocator();
-  return LowerPaging::Map(lower_root_paddr_, paddr_to_io_, lower_allocator, state_, vaddr, size,
-                          paddr, settings);
 }
 
 void AddressSpace::IdentityMapRam() {
@@ -118,11 +90,10 @@ void AddressSpace::IdentityMapRam() {
 }
 
 void AddressSpace::IdentityMapUart() {
-  GetUartDriver().Visit([this]<typename KernelDriver>(const KernelDriver& driver) {
-    if (ktl::optional<memalloc::Range> range = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
-      auto result = IdentityMap(range->addr, range->size, MmioMapSettings());
-      ZX_ASSERT_MSG(result.is_ok(), "Failed to map in UART range: [%#" PRIx64 ", %#" PRIx64 ")",
-                    range->addr, range->size);
-    }
-  });
+  if (const ktl::optional uart_range = GetUartDriver().maybe_mmio_range()) {
+    const auto [start, size] = uart_range->AlignedTo(ZX_PAGE_SIZE);
+    auto result = IdentityMap(start, size, MmioMapSettings());
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to map in UART range: [%#" PRIx64 ", %#" PRIx64 ")",
+                  start, size);
+  }
 }

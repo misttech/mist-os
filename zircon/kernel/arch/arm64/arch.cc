@@ -367,15 +367,12 @@ void arch_early_init() {
   arm64_cpu_early_init();
 }
 
-void arch_prevm_init() { arm64_boot_mmu_unwire(); }
+void arch_prevm_init() {}
 
 void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   arch_mp_init_percpu();
 
   dprintf(INFO, "ARM boot EL%lu\n", arm64_get_boot_el());
-  auto [total_boot_mem, used_boot_mem] = arm64_boot_map_used_memory();
-  dprintf(INFO, "ARM used %#zx bytes out of %#zx bytes for boot page tables\n", used_boot_mem,
-          total_boot_mem);
 
   arm64_feature_debug(true);
 
@@ -405,7 +402,7 @@ void arch_late_init_percpu(void) {
   }
 }
 
-void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) {
+void ArchIdlePowerThread::EnterIdleState() {
   // section K14.2.3 of the ARM ARM (DDI 0487K.a) says:
   //
   // ```

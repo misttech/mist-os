@@ -32,11 +32,10 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use argh::FromArgs;
-use askama::Template;
 
 use self::config::{Config, ResourceBindings};
 use self::ir::Schema;
-use self::templates::Context;
+use self::templates::render_schema;
 
 /// Generate Rust bindings from FIDL IR
 #[derive(FromArgs)]
@@ -70,9 +69,7 @@ fn main() {
         emit_debug_impls: true,
         resource_bindings: ResourceBindings::default(),
     };
-    let context = Context::new(schema, config);
-
-    let result = context.render().expect("failed to emit FIDL bindings");
+    let result = render_schema(&schema, &config).expect("failed to emit FIDL bindings");
 
     // Manually trim trailing whitespace; rustfmt ICEs on some long lines with trailing whitespace.
     let out = File::create(&args.output_filename).expect("failed to create output file");

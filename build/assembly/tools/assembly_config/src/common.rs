@@ -14,7 +14,7 @@ pub fn get_release_version(
     version: &Option<String>,
     version_file: &Option<Utf8PathBuf>,
 ) -> Result<String> {
-    _get_string_or_file_content(
+    get_string_or_file_content(
         version,
         version_file,
         "unversioned",
@@ -29,7 +29,7 @@ pub fn get_release_repository(
     repo: &Option<String>,
     repo_file: &Option<Utf8PathBuf>,
 ) -> Result<String> {
-    _get_string_or_file_content(
+    get_string_or_file_content(
         repo,
         repo_file,
         "unknown",
@@ -37,7 +37,7 @@ pub fn get_release_repository(
     )
 }
 
-fn _get_string_or_file_content(
+fn get_string_or_file_content(
     field: &Option<String>,
     field_file: &Option<Utf8PathBuf>,
     undefined_message: &str,
@@ -69,7 +69,7 @@ mod tests {
     fn test_default() {
         let version: Option<String> = None;
         let version_file: Option<Utf8PathBuf> = None;
-        let version = _get_string_or_file_content(
+        let version = get_string_or_file_content(
             &version,
             &version_file,
             "unversioned",
@@ -83,7 +83,7 @@ mod tests {
     fn test_version_string() {
         let version: Option<String> = Some("version_string".to_string());
         let version_file: Option<Utf8PathBuf> = None;
-        let version = _get_string_or_file_content(
+        let version = get_string_or_file_content(
             &version,
             &version_file,
             "unversioned",
@@ -97,7 +97,7 @@ mod tests {
     fn test_empty_version_string() {
         let version: Option<String> = Some("".to_string());
         let version_file: Option<Utf8PathBuf> = None;
-        let version = _get_string_or_file_content(
+        let version = get_string_or_file_content(
             &version,
             &version_file,
             "unversioned",
@@ -115,7 +115,7 @@ mod tests {
         let version: Option<String> = None;
         let version_file: Option<Utf8PathBuf> =
             Some(Utf8Path::from_path(file.path()).unwrap().into());
-        let version = _get_string_or_file_content(
+        let version = get_string_or_file_content(
             &version,
             &version_file,
             "unversioned",
@@ -133,7 +133,7 @@ mod tests {
         let version: Option<String> = None;
         let version_file: Option<Utf8PathBuf> =
             Some(Utf8Path::from_path(file.path()).unwrap().into());
-        let version = _get_string_or_file_content(
+        let version = get_string_or_file_content(
             &version,
             &version_file,
             "unversioned",
@@ -151,7 +151,7 @@ mod tests {
         let version: Option<String> = Some("version_string".to_string());
         let version_file: Option<Utf8PathBuf> =
             Some(Utf8Path::from_path(file.path()).unwrap().into());
-        assert!(_get_string_or_file_content(
+        assert!(get_string_or_file_content(
             &version,
             &version_file,
             "unversioned",
@@ -164,7 +164,7 @@ mod tests {
     fn test_version_file_missing() {
         let version: Option<String> = None;
         let version_file: Option<Utf8PathBuf> = Some(Utf8PathBuf::new());
-        assert!(_get_string_or_file_content(
+        assert!(get_string_or_file_content(
             &version,
             &version_file,
             "unversioned",

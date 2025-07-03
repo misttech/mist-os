@@ -2,33 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::KObjectHandle;
-use crate::fs::sysfs::{
-    sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
-    VulnerabilitiesClassDirectory,
-};
-use crate::task::CurrentTask;
-use crate::vfs::pseudo::simple_directory::{SimpleDirectory, SimpleDirectoryMutator};
+use crate::fs::sysfs::{build_cpu_class_directory, build_kernel_directory, build_power_directory};
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::pseudo::simple_file::BytesFile;
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
-    CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-    FsNodeInfo, FsStr, PathBuilder, SymlinkNode,
+    CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
 use ebpf_api::BPF_PROG_TYPE_FUSE;
 use starnix_logging::bug_ref;
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
-use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::{statfs, SYSFS_MAGIC};
-
-pub const SYSFS_DEVICES: &str = "devices";
-pub const SYSFS_BUS: &str = "bus";
-pub const SYSFS_CLASS: &str = "class";
-pub const SYSFS_BLOCK: &str = "block";
-pub const SYSFS_DEV: &str = "dev";
 
 struct SysFs;
 impl FileSystemOps for SysFs {
@@ -46,31 +34,38 @@ impl FileSystemOps for SysFs {
 }
 
 impl SysFs {
-    fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
-        let kernel = current_task.kernel();
-        let registry = &kernel.device_registry;
-
-        let fs = FileSystem::new_with_node_cache(
+    fn new_fs<L>(
+        locked: &mut Locked<L>,
+        kernel: &Kernel,
+        options: FileSystemOptions,
+    ) -> FileSystemHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let fs = FileSystem::new(
+            locked,
             kernel,
             CacheMode::Cached(CacheConfig::default()),
             SysFs,
             options,
-            registry.objects.node_cache.clone(),
         )
         .expect("sysfs constructed with valid options");
 
-        let root = SimpleDirectory::new();
-        fs.create_root(fs.allocate_ino(), root.clone());
-        let dir = SimpleDirectoryMutator::new(fs.clone(), root);
+        fn empty_dir(_: &SimpleDirectoryMutator) {}
 
-        let dir_mode = mode!(IFDIR, 0o755);
-        dir.subdir("fs", 0o755, |dir| {
-            dir.subdir("selinux", 0o755, |_| ());
-            dir.subdir("bpf", 0o755, |_| ());
-            dir.subdir("cgroup", 0o755, |_| ());
-            dir.subdir("fuse", 0o755, |dir| {
-                dir.subdir("connections", 0o755, |_| ());
-                dir.subdir("features", 0o755, |dir| {
+        let registry = &kernel.device_registry;
+        let root = &registry.objects.root;
+        fs.create_root(fs.allocate_ino(), root.clone());
+        let dir = SimpleDirectoryMutator::new(fs.clone(), root.clone());
+
+        let dir_mode = 0o755;
+        dir.subdir("fs", dir_mode, |dir| {
+            dir.subdir("selinux", dir_mode, empty_dir);
+            dir.subdir("bpf", dir_mode, empty_dir);
+            dir.subdir("cgroup", dir_mode, empty_dir);
+            dir.subdir("fuse", dir_mode, |dir| {
+                dir.subdir("connections", dir_mode, empty_dir);
+                dir.subdir("features", dir_mode, |dir| {
                     dir.entry(
                         "fuse_bpf",
                         BytesFile::new_node(b"supported\n".to_vec()),
@@ -83,21 +78,28 @@ impl SysFs {
                     mode!(IFREG, 0o444),
                 );
             });
-            dir.subdir("pstore", 0o755, |_| ());
+            dir.subdir("pstore", dir_mode, empty_dir);
         });
 
-        dir.entry(SYSFS_DEVICES, registry.objects.devices.ops(), dir_mode);
-        dir.entry(SYSFS_BUS, registry.objects.bus.ops(), dir_mode);
-        dir.entry(SYSFS_BLOCK, registry.objects.block.ops(), dir_mode);
-        dir.entry(SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
-        dir.entry(SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
+        dir.subdir("devices", dir_mode, empty_dir);
+        dir.subdir("bus", dir_mode, empty_dir);
+        dir.subdir("block", dir_mode, empty_dir);
+        dir.subdir("class", dir_mode, empty_dir);
+        dir.subdir("dev", dir_mode, |dir| {
+            dir.subdir("char", dir_mode, empty_dir);
+            dir.subdir("block", dir_mode, empty_dir);
+        });
 
-        sysfs_kernel_directory(current_task, &dir);
-        sysfs_power_directory(current_task, &dir);
+        dir.subdir("kernel", 0o755, |dir| {
+            build_kernel_directory(kernel, dir);
+        });
+        dir.subdir("power", 0o755, |dir| {
+            build_power_directory(kernel, dir);
+        });
 
-        dir.subdir("module", 0o755, |dir| {
-            dir.subdir("dm_verity", 0o755, |dir| {
-                dir.subdir("parameters", 0o755, |dir| {
+        dir.subdir("module", dir_mode, |dir| {
+            dir.subdir("dm_verity", dir_mode, |dir| {
+                dir.subdir("parameters", dir_mode, |dir| {
                     dir.entry(
                         "prefetch_cluster",
                         StubEmptyFile::new_node(
@@ -110,14 +112,12 @@ impl SysFs {
             });
         });
 
-        // TODO(https://fxbug.dev/42072346): Temporary fix of flakeness in tcp_socket_test.
-        // Remove after registry.rs refactor is in place.
-        registry
-            .objects
-            .devices
-            .get_or_create_child("system".into(), KObjectDirectory::new)
-            .get_or_create_child("cpu".into(), CpuClassDirectory::new)
-            .get_or_create_child("vulnerabilities".into(), VulnerabilitiesClassDirectory::new);
+        // TODO(https://fxbug.dev/425942145): Correctly implement system filesystem in sysfs
+        dir.subdir("devices", dir_mode, |dir| {
+            dir.subdir("system", dir_mode, |dir| {
+                dir.subdir("cpu", dir_mode, build_cpu_class_directory);
+            });
+        });
 
         fs
     }
@@ -126,57 +126,20 @@ impl SysFs {
 struct SysFsHandle(FileSystemHandle);
 
 pub fn sys_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
-    options: FileSystemOptions,
+    _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    Ok(current_task
-        .kernel()
+    Ok(get_sysfs(locked, current_task.kernel()))
+}
+
+pub fn get_sysfs<L>(locked: &mut Locked<L>, kernel: &Kernel) -> FileSystemHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
+    kernel
         .expando
-        .get_or_init(|| SysFsHandle(SysFs::new_fs(current_task, options)))
+        .get_or_init(|| SysFsHandle(SysFs::new_fs(locked, kernel, FileSystemOptions::default())))
         .0
-        .clone())
-}
-
-/// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from
-/// a subsystem.
-pub fn sysfs_create_link(
-    from: KObjectHandle,
-    to: KObjectHandle,
-    owner: FsCred,
-) -> (SymlinkNode, FsNodeInfo) {
-    let mut path = PathBuilder::new();
-    path.prepend_element(to.path().as_ref());
-    // Escape one more level from its subsystem to the root of sysfs.
-    path.prepend_element("..".into());
-
-    let path_to_root = from.path_to_root();
-    if !path_to_root.is_empty() {
-        path.prepend_element(path_to_root.as_ref());
-    }
-
-    // Build a symlink with the relative path.
-    SymlinkNode::new(path.build_relative().as_ref(), owner)
-}
-
-/// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from
-/// the bus devices directory.
-pub fn sysfs_create_bus_link(
-    from: KObjectHandle,
-    to: KObjectHandle,
-    owner: FsCred,
-) -> (SymlinkNode, FsNodeInfo) {
-    let mut path = PathBuilder::new();
-    path.prepend_element(to.path().as_ref());
-    // Escape two more levels from its subsystem to the root of sysfs.
-    path.prepend_element("..".into());
-    path.prepend_element("..".into());
-
-    let path_to_root = from.path_to_root();
-    if !path_to_root.is_empty() {
-        path.prepend_element(path_to_root.as_ref());
-    }
-
-    // Build a symlink with the relative path.
-    SymlinkNode::new(path.build_relative().as_ref(), owner)
+        .clone()
 }

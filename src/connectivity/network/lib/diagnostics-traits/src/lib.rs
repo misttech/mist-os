@@ -6,8 +6,7 @@
 //! host and Fuchsia targets can implement Inspect support.
 
 #![no_std]
-
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia;

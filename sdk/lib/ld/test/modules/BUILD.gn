@@ -13,10 +13,10 @@ import("//sdk/lib/ld/testing/test_elf_object.gni")
 
 # Musl's dlclose does not unload the module, which prevents being able to reuse
 # the same test module in multiple dlopen tests that do not expect the module
-# or its deps to already be loaded. Therefore tests must use uniquely named test
-# files. `per_test_modules` and `per_test_executables` includes targets that
-# will have copies generated with each suffix in `per_test_suffices`.
-# `per_test_suffices` include test names in //sdk/lib/dl/test/* test files.
+# or its deps to already be loaded. Therefore tests must use uniquely named
+# test files. `per_test_modules` and `per_test_executables` includes targets
+# that will have copies generated with each suffix in `per_test_suffices`.
+# `per_test_suffices` include test names in //sdk/lib/c/dlfcn/dl/test/* files.
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
@@ -24,6 +24,8 @@ per_test_modules = [
   ":precedence-in-dep-resolution",
   ":soname-filename-loaded-dep",
   ":soname-filename-dep",
+  ":one-weak-symbol",
+  ":all-weak-symbols",
 ]
 
 per_test_executables = [
@@ -49,6 +51,8 @@ per_test_suffices = [
   "Basic",
   "Relative",
   "Symbolic",
+  "OneWeakSymbol",
+  "AllWeakSymbols",
   "BasicDep",
   "IndirectDeps",
   "ManyDeps",
@@ -92,7 +96,7 @@ per_test_suffices = [
   "ModuleNameOwnership",
 ]
 
-# This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
+# This reaches all the runtime deps of //sdk/lib/c/dlfcn/dl/test:dl-unittests.
 # Packaging is handled by "dl-test-data" and related targets below.
 group("dl-test-data.deps") {
   visibility = [ ":*" ]
@@ -121,8 +125,9 @@ group("dl-test-data.deps") {
     foreach(test, per_test_modules + per_test_executables) {
       # Note this isn't the .test-data subtarget, it's just the main target.
       # The .test-data subtarget places the module and its runtime deps into a
-      # sandbox directory in the package.  But the //sdk/lib/dl tests will use
-      # dlopen to get them directly from the normal place in the package /lib.
+      # sandbox directory in the package.  But the //sdk/lib/c/dlfcn/dl/test
+      # tests will use dlopen to get them directly from the normal place in the
+      # package /lib.
       #
       # See dl-test-data below for the host test data case.
       deps += [ "$test.$suffix.module" ]
@@ -131,9 +136,9 @@ group("dl-test-data.deps") {
 }
 
 # These are the shared_library() targets to be included as startup modules for
-# //sdk/lib/dl/test:dl-unittests.
+# //sdk/lib/c/dlfcn/dl/test:dl-unittests.
 group("dl-unittest.deps") {
-  visibility = [ "//sdk/lib/dl/test:*" ]
+  visibility = [ "//sdk/lib/c/*" ]
   testonly = true
   deps = [
     ":has-foo-v1.StartupModulesDep",
@@ -230,7 +235,7 @@ template("distribution_manifest_host_test_data") {
 # The test("dl-unittests") target has deps on this to get its test data.
 # It must also use the config("dl-test-data.config") below.
 group("dl-test-data") {
-  visibility = [ "//sdk/lib/dl/test:*" ]
+  visibility = [ "//sdk/lib/c/*" ]
   testonly = true
   if (is_fuchsia) {
     # The modules and their deps just go in their usual /lib places.
@@ -264,7 +269,7 @@ distribution_manifest_host_test_data("dl-test-data.host-test-data") {
 # The executable with this in configs (via public_configs) will be linked such
 # that its dlopen will find unadorned names in $host_test_data_dir at runtime.
 config("dl-test-data.config") {
-  visibility = [ "//sdk/lib/dl/test:*" ]
+  visibility = [ "//sdk/lib/c/*" ]
   ldflags = [ "-Wl,--enable-new-dtags,-rpath,\$ORIGIN/" +
               rebase_path(dl_test_data_dir, host_out_dir) ]
 }
@@ -921,7 +926,6 @@ test_shared_library("tls-desc-dep") {
   visibility = [
     ":*",
     "//sdk/lib/c/*",
-    "//sdk/lib/dl/test/*",
   ]
 
   public = [ "tls-dep.h" ]
@@ -1478,9 +1482,19 @@ foreach(test, [ "" ] + per_test_suffices) {
     sources = [ "foo-v1.cc" ]
   }
 
+  test_shared_library("ld-dep-foo-v1-weak$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo-v1-weak.cc" ]
+  }
+
   test_shared_library("ld-dep-foo-v2$suffix") {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo-v2.cc" ]
+  }
+
+  test_shared_library("ld-dep-foo-v2-weak$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo-v2-weak.cc" ]
   }
 
   test_shared_library("has-foo-v1$suffix") {
@@ -1520,6 +1534,30 @@ foreach(test, [ "" ] + per_test_suffices) {
     deps = [
       ":ld-dep-foo-v1$suffix",
       ":ld-dep-foo-v2$suffix",
+    ]
+  }
+
+  # one-weak-symbol:
+  #  - foo-v1 -> [[gnu::weak]] foo() returns 2
+  #  - foo-v2 -> foo() returns 7
+  test_loadable_module("one-weak-symbol$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo.cc" ]
+    deps = [
+      ":ld-dep-foo-v1-weak$suffix",
+      ":ld-dep-foo-v2$suffix",
+    ]
+  }
+
+  # all-weak-symbols:
+  #  - foo-v1 -> [[gnu::weak]] foo() returns 2
+  #  - foo-v2 -> [[gnu::weak]] foo() returns 7
+  test_loadable_module("all-weak-symbols$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo.cc" ]
+    deps = [
+      ":ld-dep-foo-v1-weak$suffix",
+      ":ld-dep-foo-v2-weak$suffix",
     ]
   }
 
@@ -2164,4 +2202,21 @@ test_executable("ldsvc-config") {
 config("ldsvc-config.libprefix") {
   visibility = [ ":*" ]
   ldflags = [ "-Wl,-dynamic-linker=test-libprefix/ld.so.1" ]
+}
+
+source_set("startup-symbols") {
+  visibility = [
+    ":*",
+    "//sdk/lib/c/*",
+  ]
+  public = [ "startup-symbols.h" ]
+  public_configs = [ ":headers.config" ]
+}
+
+# This lets test code outside this directory that's reusing these test modules
+# use plain `#include "foo.h"` like the test code here does for the local test
+# headers.
+config("headers.config") {
+  visibility = [ ":*" ]
+  include_dirs = [ "." ]
 }

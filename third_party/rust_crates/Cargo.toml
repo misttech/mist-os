@@ -30,6 +30,7 @@ ahash = "0.8.11"
 ansi_term = "0.12.0"
 anyhow = "1.0.97"
 arbitrary = { version = "1.0.3", features = ["derive"] }
+arc-swap = "1.7.1"
 argh = "0.1.12"
 arrayref = "0.3.9"
 arrayvec = "0.7.4"
@@ -74,7 +75,7 @@ chacha20 = "0.9.1"
 # https://github.com/rust-lang/cargo/issues/4463. Until there's an escape
 # hatch, all we can do is document and shed a silent tear while we wait for the
 # ecosystem to migrate away from time 0.1.
-chrono = { version = "0.4.34", default-features = false }
+chrono = { version = "0.4.41", default-features = false }
 chrono-english = "0.1.7"
 ciborium = { version = "0.2.2", features = ["std"] }
 cipher = "0.4.4"
@@ -108,6 +109,7 @@ event-listener = "5.3.1"
 fancy-regex = "0.8"
 fatfs = "0.3.6"
 flate2 = { version = "1.1.1", default-features = false, features = ["rust_backend"] }
+flyweights = { version = "0.1.5", features = ["json_schema", "serde"] }
 foreign-types = "0.3.1"
 foreign-types-shared = "0.1.0"
 fragile = "=1.0.0"
@@ -276,7 +278,6 @@ euclid = { version = "0.22.1", features = [ "serde" ] }
 flagset = "0.4.6"
 getopts = "0.2"
 hyper-rustls = { version = "0.24.2", default-features = false }
-lipsum = "0.6.0"
 openat = "0.1.21"
 openssl = { version = "0.10.71", features = ["unstable_boringssl"] }
 pkcs1 = "0.7.5"
@@ -397,6 +398,7 @@ winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
 windows-core = { path = "empty/windows-core" }
+windows-link-0_1_2 = { package = "windows-link", path = "empty/windows-link-0.1.2" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }

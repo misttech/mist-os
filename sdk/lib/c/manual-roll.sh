@@ -18,6 +18,13 @@ else
   readonly DRY_RUN=false
 fi
 
+if [ $# -gt 0 ] && [ "$1" = --commit ]; then
+  shift
+  readonly COMMIT=true
+else
+  readonly COMMIT=false
+fi
+
 if [ $# -eq 0 ]; then
   readonly REFSPEC=origin/main
 elif [ $# -eq 1 ]; then
@@ -59,7 +66,7 @@ for dir in "${!REPOS[@]}"; do
   fi
   if [ "${NEW_REV["$project"]}" != "${OLD_REV["$project"]}" ]; then
     REV_DIFF["$dir"]="$(git -C "$dir" rev-parse --verify --short "${OLD_REV["$project"]}")..$(git -C "$dir" rev-parse --verify --short ${NEW_REV["$project"]})"
-    LOG["$dir"]="$(git -C "$dir" log --reverse --pretty=oneline \
+    LOG["$dir"]="$(git -C "$dir" log --pretty=oneline \
       --abbrev-commit "${REV_DIFF["$dir"]}")"
     SUMMARY+=("$project" "${REV_DIFF["$dir"]}")
   fi
@@ -81,16 +88,26 @@ else
   )
 fi
 
-if [ ${#SUMMARY[*]} -gt 0 ]; then
-  echo '
-```commitlog'
+commitlog() {
   echo "[libc] Roll ${SUMMARY[*]}"
-fi
-for dir in "${!LOG[@]}"; do
-  echo "
+  for dir in "${!LOG[@]}"; do
+    echo "
 //$dir ${URL["$dir"]}/+log/${REV_DIFF["$dir"]}"
-  echo "${LOG["$dir"]}"
-done
-echo '
-Cq-Include-Trybots: luci.turquoise.global.try:run-postsubmit-tryjobs
-```'
+    echo "${LOG["$dir"]}"
+  done
+  echo '
+Cq-Include-Trybots: luci.turquoise.global.try:run-postsubmit-tryjobs'
+}
+
+if [ ${#SUMMARY[*]} -eq 0 ]; then
+  echo 'Nothing to do!'
+  exit
+fi
+
+if $COMMIT && ! $DRY_RUN; then
+  (LOG="$(commitlog)"
+   set -x
+   git commit -a -m"$LOG"
+   jiri update -local-manifest-project=fuchsia
+  )
+fi

@@ -282,13 +282,16 @@ fit::result<Error> GetTokensFromSag(ElementDependencyMap& dependencies, TokenMap
 
 }  // namespace
 
-zx::error<int> ErrorToZxError(Error e) {
+zx::error<zx_status_t> ErrorToZxError(Error e) {
   switch (e) {
     case Error::INVALID_ARGS:
       return zx::error(ZX_ERR_INVALID_ARGS);
     case Error::TOKEN_REQUEST:
     case Error::IO:
     case Error::TOPOLOGY_UNAVAILABLE:
+    case Error::CONFIGURATION_UNAVAILABLE:
+    case Error::CPU_ELEMENT_MANAGER_UNAVAILABLE:
+    case Error::CPU_ELEMENT_MANAGER_REQUEST:
       return zx::error(ZX_ERR_IO);
     case Error::DEPENDENCY_NOT_FOUND:
       return zx::error(ZX_ERR_NOT_FOUND);
@@ -299,9 +302,40 @@ zx::error<int> ErrorToZxError(Error e) {
     case Error::READ_INSTANCES:
     case Error::ACTIVITY_GOVERNOR_REQUEST:
       return zx::error(ZX_ERR_IO_REFUSED);
-    default:
-      return zx::error(ZX_ERR_INTERNAL);
   }
+  return zx::error(ZX_ERR_INTERNAL);
+}
+
+const char* ErrorToString(Error e) {
+  switch (e) {
+    case Error::INVALID_ARGS:
+      return "INVALID_ARGS";
+    case Error::IO:
+      return "IO";
+    case Error::DEPENDENCY_NOT_FOUND:
+      return "DEPENDENCY_NOT_FOUND";
+    case Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND:
+      return "TOKEN_SERVICE_CAPABILITY_NOT_FOUND";
+    case Error::READ_INSTANCES:
+      return "READ_INSTANCES";
+    case Error::NO_TOKEN_SERVICE_INSTANCES:
+      return "NO_TOKEN_SERVICE_INSTANCES";
+    case Error::TOKEN_REQUEST:
+      return "TOKEN_REQUEST";
+    case Error::ACTIVITY_GOVERNOR_UNAVAILABLE:
+      return "ACTIVITY_GOVERNOR_UNAVAILABLE";
+    case Error::ACTIVITY_GOVERNOR_REQUEST:
+      return "ACTIVITY_GOVERNOR_REQUEST";
+    case Error::TOPOLOGY_UNAVAILABLE:
+      return "TOPOLOGY_UNAVAILABLE";
+    case Error::CONFIGURATION_UNAVAILABLE:
+      return "CONFIGURATION_UNAVAILABLE";
+    case Error::CPU_ELEMENT_MANAGER_UNAVAILABLE:
+      return "CPU_ELEMENT_MANAGER_UNAVAILABLE";
+    case Error::CPU_ELEMENT_MANAGER_REQUEST:
+      return "CPU_ELEMENT_MANAGER_REQUEST";
+  }
+  return "(unknown)";
 }
 
 void ElementRunner::RunPowerElement() {

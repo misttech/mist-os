@@ -74,6 +74,20 @@ zx::result<zx::interrupt> FakePDev::GetInterruptById(uint32_t index) {
   return zx::ok(std::move(irq));
 }
 
+zx::result<zx::bti> FakePDev::GetBtiById(uint32_t index) {
+  auto itr = config_.btis.find(index);
+  if (itr == config_.btis.end()) {
+    if (!config_.use_fake_bti) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+
+    return fake_bti::CreateFakeBti();
+  }
+  zx::bti bti;
+  itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti);
+  return zx::ok(std::move(bti));
+}
+
 void FakePDev::GetInterruptById(GetInterruptByIdRequestView request,
                                 GetInterruptByIdCompleter::Sync& completer) {
   zx::result irq = GetInterruptById(request->index);
@@ -100,28 +114,27 @@ void FakePDev::GetInterruptByName(GetInterruptByNameRequestView request,
 }
 
 void FakePDev::GetBtiById(GetBtiByIdRequestView request, GetBtiByIdCompleter::Sync& completer) {
-  zx::bti bti;
-  auto itr = config_.btis.find(request->index);
-  if (itr == config_.btis.end()) {
-    if (!config_.use_fake_bti) {
-      completer.ReplyError(ZX_ERR_NOT_FOUND);
-      return;
-    }
-    zx::result result = fake_bti::CreateFakeBti();
-    if (result.is_error()) {
-      completer.ReplyError(result.status_value());
-      return;
-    }
-    bti = std::move(result.value());
-  } else {
-    itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti);
+  zx::result bti = GetBtiById(request->index);
+  if (bti.is_error()) {
+    completer.ReplyError(bti.status_value());
+    return;
   }
-  completer.ReplySuccess(std::move(bti));
+  completer.ReplySuccess(std::move(bti.value()));
 }
 
 void FakePDev::GetBtiByName(GetBtiByNameRequestView request,
                             GetBtiByNameCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  auto index = config_.bti_names.find(request->name.get());
+  if (index == config_.bti_names.end()) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+  zx::result bti = GetBtiById(index->second);
+  if (bti.is_error()) {
+    completer.ReplyError(bti.status_value());
+    return;
+  }
+  completer.ReplySuccess(std::move(bti.value()));
 }
 
 void FakePDev::GetSmcById(GetSmcByIdRequestView request, GetSmcByIdCompleter::Sync& completer) {

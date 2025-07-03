@@ -37,11 +37,11 @@ mod tests;
 pub const NUM_FRAGMENTATION_HISTOGRAM_SLOTS: usize = 12;
 #[derive(Default, Debug)]
 pub struct FragmentationStats {
-    /// Histogram of extent size in bytes. Buckets are fixed as 0, <=4kB, <=8kB, ... <=2MiB, >2MiB.
+    /// Histogram of extent size in bytes. Buckets are fixed as <=4kB, <=8kB, ... <=2MiB, >2MiB.
     pub extent_size: [u64; NUM_FRAGMENTATION_HISTOGRAM_SLOTS],
-    /// Histogram of extents per file. Buckets are fixed as 0, <=1, <=2, ... <=512, >512.
+    /// Histogram of extents per file. Buckets are fixed as <=1, <=2, ... <=512, >512.
     pub extent_count: [u64; NUM_FRAGMENTATION_HISTOGRAM_SLOTS],
-    /// Histogram of free space in bytes. Buckets are fixed as 0, <=4kB, <=8kB, ... <=2MiB, >2MiB.
+    /// Histogram of free space in bytes. Buckets are fixed as <=4kB, <=8kB, ... <=2MiB, >2MiB.
     pub free_space: [u64; NUM_FRAGMENTATION_HISTOGRAM_SLOTS],
 }
 
@@ -53,7 +53,7 @@ impl FragmentationStats {
     /// Returns the histogram bucket for extent_count.
     pub fn get_histogram_bucket_for_count(count: u64) -> usize {
         let log_count = (64 - count.leading_zeros()) as usize;
-        return log_count.clamp(0, NUM_FRAGMENTATION_HISTOGRAM_SLOTS - 1);
+        return log_count.clamp(1, NUM_FRAGMENTATION_HISTOGRAM_SLOTS) - 1;
     }
 }
 

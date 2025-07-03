@@ -24,12 +24,15 @@ namespace {
 // All the PanelConfig pointers are non-null in the returned array.
 const std::vector<const PanelConfig*> kPanelConfigsForTesting = [] {
   std::vector<const PanelConfig*> panel_configs;
-  const uint32_t kPanelIds[] = {
-      PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO, PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364,
-      PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364,    PANEL_BOE_TV101WXM_FITIPOWER_JD9364,
-      PANEL_KD_KD070D82_FITIPOWER_JD9364,        PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON,
+  const display::PanelType kPanelIds[] = {
+      display::PanelType::kBoeTv070wsmFitipowerJd9364Astro,
+      display::PanelType::kInnoluxP070acbFitipowerJd9364,
+      display::PanelType::kInnoluxP101dezFitipowerJd9364,
+      display::PanelType::kBoeTv101wxmFitipowerJd9364,
+      display::PanelType::kKdKd070d82FitipowerJd9364,
+      display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson,
   };
-  for (const uint32_t panel : kPanelIds) {
+  for (const display::PanelType panel : kPanelIds) {
     const PanelConfig* panel_config = GetPanelConfig(panel);
     ZX_ASSERT(panel_config != nullptr);
     panel_configs.push_back(panel_config);
@@ -75,7 +78,8 @@ class PllTimingHdmiPllClockRatioCalculatedCorrectly : public ::testing::Test {
 };
 
 TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364Astro) {
-  const PanelConfig* panel_config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  const PanelConfig* panel_config =
+      GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9364Astro);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
@@ -86,7 +90,8 @@ TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364
 }
 
 TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd9364) {
-  const PanelConfig* panel_config = GetPanelConfig(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  const PanelConfig* panel_config =
+      GetPanelConfig(display::PanelType::kInnoluxP070acbFitipowerJd9364);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
@@ -97,7 +102,8 @@ TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd9
 }
 
 TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd9364) {
-  const PanelConfig* panel_config = GetPanelConfig(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  const PanelConfig* panel_config =
+      GetPanelConfig(display::PanelType::kInnoluxP101dezFitipowerJd9364);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
@@ -108,7 +114,7 @@ TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd9
 }
 
 TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv101wxmFitipowerJd9364) {
-  const PanelConfig* panel_config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  const PanelConfig* panel_config = GetPanelConfig(display::PanelType::kBoeTv101wxmFitipowerJd9364);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,

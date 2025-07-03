@@ -31,6 +31,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync,
 };
 
+pub mod random_op;
 pub mod static_tree;
 
 /// The three steps the target-side of a blackout test needs to implement.
@@ -109,15 +110,15 @@ async fn handle_controller<T: Test + 'static>(
 ) -> Result<()> {
     match request {
         ControllerRequest::Setup { responder, device_label, device_path, seed } => {
-            let res = test.setup(device_label, device_path, seed).await.map_err(|e| {
-                log::error!("{:?}", e);
+            let res = test.setup(device_label, device_path, seed).await.map_err(|err| {
+                log::error!(err:?; "Setup failed");
                 zx::Status::INTERNAL.into_raw()
             });
             responder.send(res)?;
         }
         ControllerRequest::Test { responder, device_label, device_path, seed, duration } => {
-            let test_fut = test.test(device_label, device_path, seed).map_err(|e| {
-                log::error!("{:?}", e);
+            let test_fut = test.test(device_label, device_path, seed).map_err(|err| {
+                log::error!(err:?; "Test failed");
                 zx::Status::INTERNAL.into_raw()
             });
             if duration != 0 {

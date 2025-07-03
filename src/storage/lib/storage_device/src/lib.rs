@@ -2,6 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! `storage_device` provides a higher-level portable API ([`Device`]) for interacting with block
+//! devices.  This library also provides the [`Buffer`] type which is a contiguous, splittable
+//! transfer buffer allocated out of a shared pool which can be used for I/O.
+//!
+//! The two main implementations are
+//!   - [`block_device::BlockDevice`], which is backed by a [`block_client::Device`] and used on
+//!     Fuchsia devices, and
+//!   - [`file_backed_device::FileBackedDevice`], which is backed by a regular file and is portable.
+
 use crate::buffer::{BufferFuture, BufferRef, MutableBufferRef};
 use anyhow::{bail, Error};
 use async_trait::async_trait;
@@ -29,13 +38,13 @@ pub mod fake_device;
 pub trait Device: Send + Sync {
     /// Allocates a transfer buffer of at least |size| bytes for doing I/O with the device.
     /// The actual size of the buffer will be rounded up to a block-aligned size.
+    /// Blocks until enough capacity is available in the buffer.
     fn allocate_buffer(&self, size: usize) -> BufferFuture<'_>;
 
     /// Returns the block size of the device. Buffers are aligned to block-aligned chunks.
     fn block_size(&self) -> u32;
 
     /// Returns the number of blocks of the device.
-    // TODO(jfsulliv): Should this be async and go query the underlying device?
     fn block_count(&self) -> u64;
 
     /// Returns the size in bytes of the device.

@@ -7,7 +7,7 @@ use starnix_logging::{log_debug, log_error, log_warn};
 
 use anyhow::{bail, format_err, Context as _, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_wlan_wlanix as fidl_wlanix;
+use fidl_fuchsia_wlan_wlanix::{self as fidl_wlanix, Nl80211Message, Nl80211MessageArray};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use netlink::messaging::Sender;
@@ -70,6 +70,11 @@ fn fidl_message_to_netlink(
     let mut netlink_message = NetlinkMessage::new(header, payload);
     netlink_message.finalize();
     Ok(netlink_message)
+}
+
+fn deserialize(vmo: zx::Vmo) -> Result<Vec<Nl80211Message>, anyhow::Error> {
+    let value = vmo.read_to_vec(0, vmo.get_content_size()?)?;
+    Ok(fidl::unpersist::<Nl80211MessageArray>(&value)?.messages)
 }
 
 #[async_trait]
@@ -168,37 +173,35 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
             payload: Some(payload),
             ..Default::default()
         };
-        let response = match self
-            .nl80211_proxy
-            .message(fidl_wlanix::Nl80211MessageRequest {
-                message: Some(message),
-                ..Default::default()
-            })
-            .await
-        {
-            Err(e) => {
-                log_error!(tag = NETLINK_LOG_TAG; "Failed to send nl80211 message: {}", e,);
+        let vmo = match self.nl80211_proxy.message_v2(&message).await {
+            Ok(Ok(value)) => value,
+            Ok(Err(errno)) => {
+                log_error!(tag = NETLINK_LOG_TAG; "Failed to read nl80211 message: {}", errno);
                 return;
             }
-            Ok(Err(e)) => {
-                log_error!(tag = NETLINK_LOG_TAG; "Nl80211 message returned an error: {}", e,);
+            Err(fidl_error) => {
+                log_error!(tag = NETLINK_LOG_TAG; "Failed to read nl80211 message due to FIDL error: {:?}", fidl_error);
                 return;
             }
-            Ok(Ok(response)) => response,
+        };
+        let responses = match deserialize(vmo) {
+            Ok(value) => value,
+            Err(error) => {
+                log_error!(tag = NETLINK_LOG_TAG; "Failed to read nl80211 message from VMO: {:?}", error);
+                return;
+            }
         };
 
-        if let Some(responses) = response.responses {
-            // It's not valid to send multiple messages with the same sequence
-            // number unless the multipart flag is set.
-            if responses.len() > 1 {
-                netlink_header.flags |= netlink_packet_core::NLM_F_MULTIPART;
-            }
-            for resp_message in responses {
-                match fidl_message_to_netlink(netlink_header, resp_message) {
-                    Ok(resp) => sender.send(resp, None),
-                    Err(e) => {
-                        log_error!(tag = NETLINK_LOG_TAG; "Failed to send response message: {}", e)
-                    }
+        // It's not valid to send multiple messages with the same sequence
+        // number unless the multipart flag is set.
+        if responses.len() > 1 {
+            netlink_header.flags |= netlink_packet_core::NLM_F_MULTIPART;
+        }
+        for resp_message in responses {
+            match fidl_message_to_netlink(netlink_header, resp_message) {
+                Ok(resp) => sender.send(resp, None),
+                Err(e) => {
+                    log_error!(tag = NETLINK_LOG_TAG; "Failed to send response message: {}", e)
                 }
             }
         }

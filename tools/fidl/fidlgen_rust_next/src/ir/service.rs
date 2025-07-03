@@ -4,8 +4,7 @@
 
 use serde::Deserialize;
 
-use super::{Attributes, CompIdent, Ident, Type};
-use crate::de::Index;
+use super::{Attributes, CompIdent, Decl, DeclType, Ident, Type};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Service {
@@ -15,11 +14,17 @@ pub struct Service {
     pub members: Vec<ServiceMember>,
 }
 
-impl Index for Service {
-    type Key = CompIdent;
+impl Decl for Service {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Service
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
     }
 }
 

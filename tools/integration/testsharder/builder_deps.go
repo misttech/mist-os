@@ -10,19 +10,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
-	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
+func testBotPlatform(cpu string) (string, error) {
+	// The test bot platform should use the same OS as the host where testsharder is run
+	// so just get the current host platform and replace the cpu.
+	platform, err := hostplatform.Name()
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(platform, "-")
+	return fmt.Sprintf("%s-%s", parts[0], cpu), nil
+}
+
 // AddShardDeps adds tools from the build that are required to run on the shard.
-func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools build.Tools, params *proto.Params) error {
+func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools build.Tools) error {
 	// First get the build metadata from the args.json to add to the shard and to help
 	// determine what deps need to be added to the shard.
 	// TODO(ihuh): Dedupe this with fint so only fint needs to know how to generate
@@ -60,7 +69,10 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 		if len(s.Summary.Tests) > 0 {
 			continue
 		}
-		platform := hostplatform.MakeName(runtime.GOOS, s.HostCPU(params.UseTcg))
+		platform, err := testBotPlatform(s.HostCPU())
+		if err != nil {
+			return err
+		}
 		toolDeps := []string{"botanist", "bootserver_new", "ssh"}
 		for _, variant := range buildMetadata.Variants {
 			// Builders running with the coverage variants produce profiles that need to
@@ -79,7 +91,7 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 			// The zbi tool is used to embed the ssh key into the zbi.
 			toolDeps = append(toolDeps, "fvm", "zbi")
 		}
-		if s.HostCPU(params.UseTcg) == "x64" {
+		if s.HostCPU() == "x64" {
 			// Relevant for automatic symbolization of things running on
 			// host. Only the x64 variation is available in the checkout and
 			// we have nothing that runs on an arm host that needs

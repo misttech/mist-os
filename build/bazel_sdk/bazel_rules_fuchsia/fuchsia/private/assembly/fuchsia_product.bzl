@@ -62,6 +62,7 @@ def _fuchsia_product_assembly_impl(ctx):
             "--output",
             platform_aibs_file.path,
         ],
+        mnemonic = "Assembly",
         progress_message = "Gathering AIBs for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
@@ -75,10 +76,12 @@ def _fuchsia_product_assembly_impl(ctx):
     build_id_dirs += product_config.build_id_dirs
     build_id_dirs += board_config.build_id_dirs
 
+    inputs_also_needed_by_create_system = []
+    inputs_also_needed_by_create_system += ctx.files.product_config
+    inputs_also_needed_by_create_system += ctx.files.board_config
+    inputs_also_needed_by_create_system += platform_artifacts.files
+
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
-    ffx_inputs += ctx.files.product_config
-    ffx_inputs += ctx.files.board_config
-    ffx_inputs += platform_artifacts.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
     ffx_invocation = get_ffx_assembly_args(fuchsia_toolchain) + [
@@ -103,7 +106,7 @@ def _fuchsia_product_assembly_impl(ctx):
     for (pattern_string, overrides_label) in overrides_maps.items():
         if _match_assembly_pattern_string(ctx.label, pattern_string):
             overrides_info = overrides_label[FuchsiaAssemblyDeveloperOverridesInfo]
-            ffx_inputs += overrides_info.inputs
+            inputs_also_needed_by_create_system += overrides_info.inputs
             ffx_invocation.extend([
                 "--developer-overrides",
                 overrides_info.manifest.path,
@@ -118,7 +121,7 @@ def _fuchsia_product_assembly_impl(ctx):
     ]
 
     ctx.actions.run_shell(
-        inputs = ffx_inputs,
+        inputs = ffx_inputs + inputs_also_needed_by_create_system,
         outputs = [
             out_dir,
             # Isolate dirs contain useful debug files like logs, so include it
@@ -126,6 +129,7 @@ def _fuchsia_product_assembly_impl(ctx):
             ffx_isolate_dir,
         ],
         command = "\n".join(shell_src),
+        mnemonic = "Assembly",
         progress_message = "Product Assembly for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
@@ -144,17 +148,18 @@ def _fuchsia_product_assembly_impl(ctx):
             "--base-package-manifest-list",
             base_package_list.path,
         ],
+        mnemonic = "Assembly",
         progress_message = "Creating package manifests list for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
-    deps = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list, platform_aibs_file] + ffx_inputs
+    outputs = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list, platform_aibs_file]
 
     return [
-        DefaultInfo(files = depset(deps)),
+        DefaultInfo(files = depset(outputs + inputs_also_needed_by_create_system)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
-            all_files = depset(deps),
+            all_files = depset(outputs + inputs_also_needed_by_create_system),
         ),
         FuchsiaProductAssemblyInfo(
             product_assembly_out = out_dir,
@@ -211,7 +216,10 @@ _fuchsia_product_assembly = rule(
 def _fuchsia_product_create_system_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
-    gen_dir = ctx.actions.declare_directory(ctx.label.name + "_gen")
+    gen_dir_path = "{basedir}/{label_name}_gen".format(
+        basedir = out_dir.dirname,
+        label_name = ctx.label.name,
+    )
 
     # Assembly create-system
     product_assembly_out = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].product_assembly_out
@@ -219,7 +227,6 @@ def _fuchsia_product_create_system_impl(ctx):
     build_id_dirs = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].build_id_dirs
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
-    ffx_inputs += ctx.files.product_assembly
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
     shell_src = _CREATE_SYSTEM_RUNNER_SH_TEMPLATE.format(
@@ -229,33 +236,35 @@ def _fuchsia_product_create_system_impl(ctx):
     shell_env = {
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
-        "GENDIR": gen_dir.path,
+        "GENDIR": gen_dir_path,
         "PRODUCT_ASSEMBLY_OUTDIR": product_assembly_out.path,
     }
 
     ctx.actions.run_shell(
-        inputs = ffx_inputs,
+        inputs = ffx_inputs + ctx.files.product_assembly,
         outputs = [
             out_dir,
-            gen_dir,
             # Isolate dirs contain useful debug files like logs, so include it
             # in outputs.
             ffx_isolate_dir,
         ],
         command = shell_src,
         env = shell_env,
+        mnemonic = "Assembly",
         progress_message = "Assembly Create-system for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
+    inputs_needed_by_downstream_actions = []
+    inputs_needed_by_downstream_actions += ctx.files.product_assembly
+    outputs = [out_dir, ffx_isolate_dir]
     return [
-        DefaultInfo(files = depset([out_dir, gen_dir, ffx_isolate_dir] + ffx_inputs)),
+        DefaultInfo(files = depset(outputs + inputs_needed_by_downstream_actions)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
-            all_files = depset([out_dir, gen_dir, ffx_isolate_dir] + ffx_inputs),
+            all_files = depset(outputs + inputs_needed_by_downstream_actions),
         ),
         FuchsiaProductImageInfo(
             images_out = out_dir,
-            images_intermediates = gen_dir,
             platform_aibs = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].platform_aibs,
             product_assembly_out = product_assembly_out,
             build_type = build_type,

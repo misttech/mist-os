@@ -337,7 +337,14 @@ void PageQueues::SynchronizeWithAging() {
   while (true) {
     // Wait for any in progress aging to complete. This is not an Autounsignal event and so waiting
     // on it without the lock is not manipulating its state.
-    no_pending_aging_signal_.Wait();
+    constexpr int kWarnTimeoutSeconds = 10;
+    zx_status_t status =
+        no_pending_aging_signal_.Wait(Deadline::after_mono(ZX_SEC(kWarnTimeoutSeconds)));
+    if (status == ZX_ERR_TIMED_OUT) {
+      printf("[pq]: WARNING Waited %d seconds so far for aging to complete\n", kWarnTimeoutSeconds);
+      // Only warn once, wait now with an infinite timeout.
+      no_pending_aging_signal_.Wait();
+    }
 
     // The MruThread may not have woken up yet to clear the pending signal, so we must check
     // ourselves.
@@ -758,6 +765,11 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
   const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
                            pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
 
+  // Calculate a worst case iterations for processing any given isolate list.
+  ActiveInactiveCounts active_inactive = GetActiveInactiveCounts();
+  const uint64_t max_isolate_iterations =
+      active_inactive.active + active_inactive.inactive + kNumReclaim;
+
   // In order to safely resume iteration where we left off between lock drops we need to make use of
   // the isolate_cursor_, which requires holding the isolate_cursor_lock_.
   Guard<Mutex> isolate_cursor_guard{&isolate_cursor_lock_};
@@ -772,7 +784,14 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
     // Count work done separately to all iterations so we can periodically drop the lock and process
     // the deferred_list.
     uint64_t work_done = 0;
+    // Separately count iterations for debug purposes.
+    uint64_t loop_iterations = 0;
     while (current) {
+      if (loop_iterations++ == max_isolate_iterations) {
+        KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max isolate loop iterations %" PRIu64 "",
+                    __FUNCTION__, max_isolate_iterations);
+      }
+
       vm_page_t* page = current;
       current = list_next_type(list, &current->queue_node, vm_page_t, queue_node);
       PageQueue page_queue =
@@ -889,6 +908,9 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
 
       for (uint iterations = 0; !list_is_empty(list) && iterations < kMaxQueueWork; iterations++) {
         vm_page_t* page = list_remove_head_type(list, vm_page_t, queue_node);
+        // As we are processing the LRU queues we should never see the page of the isolate cursor,
+        // as that is from a different list, and hence we do not need to call AdvanceIsolateCursorIf
+        DEBUG_ASSERT(page != isolate_cursor_.page);
         PageQueue page_queue = static_cast<PageQueue>(
             page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
         DEBUG_ASSERT(page_queue >= PageQueueReclaimBase);
@@ -1029,11 +1051,13 @@ void PageQueues::MoveToWired(vm_page_t* page) {
   MaybeCheckActiveRatioAging(1);
 }
 
-void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
+void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset,
+                              bool skip_reclaim) {
   {
     Guard<SpinLock, IrqSave> guard{&list_lock_};
-    SetQueueBacklinkLockedList(page, object, page_offset,
-                               anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous);
+    SetQueueBacklinkLockedList(
+        page, object, page_offset,
+        anonymous_is_reclaimable_ && !skip_reclaim ? mru_gen_to_queue() : PageQueueAnonymous);
 #if DEBUG_ASSERT_IMPLEMENTED
     if (debug_compressor_) {
       debug_compressor_->Add(page, object, page_offset);
@@ -1056,11 +1080,11 @@ void PageQueues::MoveToHighPriority(vm_page_t* page) {
   MaybeCheckActiveRatioAging(1);
 }
 
-void PageQueues::MoveToAnonymous(vm_page_t* page) {
+void PageQueues::MoveToAnonymous(vm_page_t* page, bool skip_reclaim) {
   {
     Guard<SpinLock, IrqSave> guard{&list_lock_};
-    MoveToQueueLockedList(page,
-                          anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous);
+    MoveToQueueLockedList(
+        page, anonymous_is_reclaimable_ && !skip_reclaim ? mru_gen_to_queue() : PageQueueAnonymous);
 #if DEBUG_ASSERT_IMPLEMENTED
     if (debug_compressor_) {
       debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
@@ -1421,11 +1445,19 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekIsolate(size_t lowest_que
   // Ignore any requests to evict from the active queues as this is never allowed.
   lowest_queue = ktl::max(lowest_queue, kNumActiveQueues);
 
+  // TODO(adanis): Restructure this loop such that there is no question about its termination, but
+  // for now be paranoid.
+  constexpr uint kMaxIterations = kNumReclaim * 2;
+  uint loop_iterations = 0;
+
   while (true) {
     // Peek the Isolate queue in case anything is ready for us.
     ktl::optional<VmoBacklink> result = ProcessIsolateList(0);
     if (result) {
       return result;
+    }
+    if (loop_iterations++ > kMaxIterations) {
+      KERNEL_OOPS("[pq]: %s iterated more than %u times", __FUNCTION__, kMaxIterations);
     }
 
     SynchronizeWithAging();

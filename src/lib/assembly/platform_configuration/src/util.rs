@@ -6,6 +6,7 @@ use crate::common::{ConfigurationBuilder, ConfigurationContext};
 use anyhow::Context;
 use assembly_config_schema::BuildType;
 use assembly_constants::FileEntry;
+use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
 use fuchsia_url::AbsolutePackageUrl::{Pinned, Unpinned};
 use handlebars::Handlebars;
@@ -56,6 +57,24 @@ pub(crate) fn add_platform_declared_product_provided_component(
     // Add the core shard to the product.
     builder.core_shard(&cml_path);
     Ok(())
+}
+
+pub fn render_bootfs_cml_template(
+    product_component_url: &str,
+    template_contents: &str,
+) -> anyhow::Result<String> {
+    // Gather the data to render the cml template.
+    let url = BootUrl::parse(product_component_url)
+        .with_context(|| format!("Parsing bootfs component_url: {product_component_url}"))?;
+
+    // Only COMPONENT_URL makes sense for bootfs
+    let data =
+        BTreeMap::from([("COMPONENT_URL", product_component_url), ("PACKAGE_PATH", url.path())]);
+
+    let handlebars = Handlebars::new();
+    handlebars.render_template(template_contents, &data).with_context(|| {
+        format!("Rendering a bootfs package cml shard template for: {product_component_url}")
+    })
 }
 
 fn render_cml_template(
@@ -125,6 +144,53 @@ mod tests {
                         "from": "parent",
                         "to": "#something",
                         "subdir": "my-package",
+                    },
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn test_render_boot_cml_template() {
+        let cml_template = json!({
+            "children": [
+                {
+                    "name": "something",
+                    "url": "{{COMPONENT_URL}}",
+                },
+            ],
+            "offer": [
+                {
+                    "directory": "config-data",
+                    "from": "parent",
+                    "to": "#something",
+                    "subdir": "{{PACKAGE_PATH}}",
+                },
+            ],
+        });
+
+        let cml = render_bootfs_cml_template(
+            "fuchsia-boot:///my-package/path#meta/my-component.cm",
+            &cml_template.to_string(),
+        )
+        .unwrap();
+        let cml: serde_json::Value = serde_json::from_str(&cml).unwrap();
+
+        assert_eq!(
+            cml,
+            json!({
+                 "children": [
+                    {
+                        "name": "something",
+                        "url": "fuchsia-boot:///my-package/path#meta/my-component.cm",
+                    },
+                ],
+                "offer": [
+                    {
+                        "directory": "config-data",
+                        "from": "parent",
+                        "to": "#something",
+                        "subdir": "/my-package/path",
                     },
                 ],
             })

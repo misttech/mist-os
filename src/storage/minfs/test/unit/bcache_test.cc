@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <storage/buffer/vmo_buffer.h>
 
+#include "gtest/gtest.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/minfs.h"
@@ -129,6 +130,57 @@ TEST(BcacheTest, WriteblkThenReadblk) {
   memset(source_buffer.get(), 'b', kMinfsBlockSize);
   ASSERT_TRUE(bcache_or->Readblk(2, destination_buffer.get()).is_ok());
   EXPECT_EQ(memcmp(source_buffer.get(), destination_buffer.get(), kMinfsBlockSize), 0);
+}
+
+TEST(BcacheTest, FailedMutation) {
+  auto device = std::make_unique<FakeBlockDevice>(kNumBlocks, kBlockSize);
+  FakeBlockDevice* device_ptr = device.get();
+  auto bcache_or = Bcache::Create(std::move(device), kNumBlocks);
+  ASSERT_TRUE(bcache_or.is_ok());
+  bcache_or->DieOnMutationFailure(false);
+  std::unique_ptr<uint8_t[]> source_buffer(new uint8_t[kMinfsBlockSize]);
+
+  // Write 'a' to block 1.
+  memset(source_buffer.get(), 'a', kMinfsBlockSize);
+  ASSERT_TRUE(bcache_or->Writeblk(1, source_buffer.get()).is_ok());
+
+  std::unique_ptr<uint8_t[]> destination_buffer(new uint8_t[kMinfsBlockSize]);
+  // Read 'a' from block 1.
+  memset(source_buffer.get(), 'a', kMinfsBlockSize);
+  ASSERT_TRUE(bcache_or->Readblk(1, destination_buffer.get()).is_ok());
+  EXPECT_EQ(memcmp(source_buffer.get(), destination_buffer.get(), kMinfsBlockSize), 0);
+
+  // Fail the next mutation and die.
+  device_ptr->SetWriteBlockLimit(0);
+  // Write 'b' to block 2.
+  memset(source_buffer.get(), 'b', kMinfsBlockSize);
+  ASSERT_TRUE(bcache_or->Writeblk(2, source_buffer.get()).is_error());
+}
+
+TEST(BcacheTest, DieOnFailedMutation) {
+  auto device = std::make_unique<FakeBlockDevice>(kNumBlocks, kBlockSize);
+  FakeBlockDevice* device_ptr = device.get();
+  auto bcache_or = Bcache::Create(std::move(device), kNumBlocks);
+  ASSERT_TRUE(bcache_or.is_ok());
+  bcache_or->DieOnMutationFailure(true);
+  std::unique_ptr<uint8_t[]> source_buffer(new uint8_t[kMinfsBlockSize]);
+
+  // Write 'a' to block 1.
+  memset(source_buffer.get(), 'a', kMinfsBlockSize);
+  ASSERT_TRUE(bcache_or->Writeblk(1, source_buffer.get()).is_ok());
+
+  std::unique_ptr<uint8_t[]> destination_buffer(new uint8_t[kMinfsBlockSize]);
+  // Read 'a' from block 1.
+  memset(source_buffer.get(), 'a', kMinfsBlockSize);
+  ASSERT_TRUE(bcache_or->Readblk(1, destination_buffer.get()).is_ok());
+  EXPECT_EQ(memcmp(source_buffer.get(), destination_buffer.get(), kMinfsBlockSize), 0);
+
+  // Fail the next mutation and die.
+  device_ptr->SetWriteBlockLimit(0);
+  // Write 'b' to block 2.
+  memset(source_buffer.get(), 'b', kMinfsBlockSize);
+  ASSERT_DEATH(
+      { bcache_or->Writeblk(2, source_buffer.get()).is_ok(); }, "Disk no longer consistent");
 }
 
 }  // namespace

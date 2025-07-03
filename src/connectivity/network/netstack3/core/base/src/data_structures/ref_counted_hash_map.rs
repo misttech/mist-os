@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::collections::hash_map::{Entry, HashMap};
 use core::hash::Hash;
 use core::num::NonZeroUsize;
+
+use netstack3_hashmap::hash_map::{Entry, HashMap};
 
 /// The result of inserting an element into a [`RefCountedHashMap`].
 #[derive(Debug, Eq, PartialEq)]

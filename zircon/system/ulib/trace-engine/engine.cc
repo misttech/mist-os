@@ -926,9 +926,21 @@ EXPORT void trace_release_context(trace_context_t* context) {
   ZX_DEBUG_ASSERT(context == g_context);
   ZX_DEBUG_ASSERT(get_buffer_context_refs(g_context_refs.load(std::memory_order_relaxed)) != 0u);
 
-  // Note the RELEASE fence here since the trace context and trace buffer
-  // contents may have changes from the perspective of other threads.
+  // Regardless of the number of prolonged contexts remaining, if we are the last writer out, we
+  // need to check if there's a pending buffer service. If so, we're responsible for triggering it.
+  //
+  // We need to check this before releasing the context.
+  auto ref_count = g_context_refs.load(std::memory_order_acquire);
+  if (unlikely((ref_count & kBufferCounterMask) == kBufferCounterIncrement)) {
+    // If we are the only writer, it's safe to service the buffer.
+    g_context->ServiceBuffers();
+  }
+
+  // Release: We may have changed the trace buffer contents or the trace state. We need to ensure
+  // that if a reader sees that there are no longer writes in flight, they also see our buffer
+  // changes.
   auto previous = g_context_refs.fetch_sub(kBufferCounterIncrement, std::memory_order_release);
+
   if (unlikely(previous == kBufferCounterIncrement)) {
     // Notify the engine that the last reference was released.
     zx_status_t status = g_event.signal(0u, SIGNAL_CONTEXT_RELEASED);

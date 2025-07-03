@@ -65,10 +65,7 @@ class MockDisplayCoordinator
   MOCK_METHOD(void, GetLatestAppliedConfigStamp, (GetLatestAppliedConfigStampCompleter::Sync&),
               (override));
 
-  MOCK_METHOD(void, CheckConfig,
-              (fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-               CheckConfigCompleter::Sync&),
-              (override));
+  MOCK_METHOD(void, CheckConfig, (CheckConfigCompleter::Sync&), (override));
 
   MOCK_METHOD(void, DiscardConfig, (DiscardConfigCompleter::Sync&), (override));
 

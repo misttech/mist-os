@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::image_assembly_config_builder::ImageAssemblyConfigBuilder;
+use crate::image_assembly_config_builder::{ImageAssemblyConfigBuilder, ValidationMode};
 
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
@@ -28,7 +28,9 @@ pub struct ProductAssembly {
     developer_only_options: Option<DeveloperOnlyOptions>,
     kernel_aib: Utf8PathBuf,
     boot_shim_aib: Utf8PathBuf,
-    validate: bool,
+    validation_mode: ValidationMode,
+    builder_forensics_file_path: Option<Utf8PathBuf>,
+    board_forensics_file_path: Option<Utf8PathBuf>,
 }
 
 impl ProductAssembly {
@@ -44,11 +46,11 @@ impl ProductAssembly {
             board_config.partitions_config.as_ref().map(|p| p.as_utf8_path_buf().clone()),
             image_mode,
             product_config.platform.feature_set_level,
-            Some(SystemReleaseInfo {
-                platform: Some(platform_artifacts.release_info.clone()),
+            SystemReleaseInfo {
+                platform: platform_artifacts.release_info.clone(),
                 product: product_config.product.release_info.clone(),
                 board: board_config.release_info.clone(),
-            }),
+            },
         );
 
         let kernel_aib = platform_artifacts.get_bundle("zircon");
@@ -67,7 +69,9 @@ impl ProductAssembly {
             developer_only_options: None,
             kernel_aib,
             boot_shim_aib,
-            validate: false,
+            validation_mode: ValidationMode::On,
+            builder_forensics_file_path: None,
+            board_forensics_file_path: None,
         })
     }
 
@@ -130,35 +134,17 @@ impl ProductAssembly {
         Ok(())
     }
 
-    pub fn enable_validation(&mut self) {
-        self.validate = true;
+    pub fn set_validation_mode(&mut self, validation_mode: ValidationMode) {
+        self.validation_mode = validation_mode;
     }
 
     pub fn write_forensics_files(
-        &self,
+        &mut self,
         builder_forensics_file_path: Utf8PathBuf,
         board_forensics_file_path: Utf8PathBuf,
-    ) -> Result<()> {
-        if let Some(parent_dir) = builder_forensics_file_path.parent() {
-            std::fs::create_dir_all(parent_dir)
-                .with_context(|| format!("unable to create outdir: {parent_dir}"))?;
-        }
-        let builder_forensics_file = std::fs::File::create(&builder_forensics_file_path)
-            .with_context(|| {
-                format!("Failed to create builder forensics files: {builder_forensics_file_path}")
-            })?;
-        serde_json::to_writer_pretty(builder_forensics_file, &self.builder).with_context(|| {
-            format!("Writing builder forensics file to: {builder_forensics_file_path}")
-        })?;
-
-        let board_forensics_file =
-            std::fs::File::create(&board_forensics_file_path).with_context(|| {
-                format!("Failed to create builder forensics files: {builder_forensics_file_path}")
-            })?;
-        serde_json::to_writer_pretty(board_forensics_file, &self.board_config).with_context(
-            || format!("Writing board forensics file to: {board_forensics_file_path}"),
-        )?;
-        Ok(())
+    ) {
+        self.builder_forensics_file_path = Some(builder_forensics_file_path);
+        self.board_forensics_file_path = Some(board_forensics_file_path);
     }
 
     pub fn build(
@@ -184,7 +170,9 @@ impl ProductAssembly {
         for bundle_path in board_config.input_bundles.values() {
             let bundle = BoardInputBundle::from_dir(&bundle_path)
                 .with_context(|| format!("Reading board input bundle: {bundle_path}"))?;
-            board_input_bundles.push((bundle_path.clone(), bundle));
+            if bundle.should_be_included(platform.build_type) {
+                board_input_bundles.push((bundle_path.clone(), bundle));
+            }
         }
         let board_input_bundles = board_input_bundles;
 
@@ -293,11 +281,12 @@ impl ProductAssembly {
             match platform.feature_set_level {
                 FeatureSetLevel::TestNoPlatform
                 | FeatureSetLevel::Embeddable
-                | FeatureSetLevel::Bootstrap => {
+                | FeatureSetLevel::Bootstrap
+                | FeatureSetLevel::Utility => {
                     // these are the only valid feature set levels for adding these files.
                 }
                 _ => {
-                    bail!("bootfs packages and files can only be added to the 'empty', 'embeddable', or 'bootstrap' feature set levels");
+                    bail!("bootfs packages and files can only be added to the 'empty', 'embeddable', or 'bootstrap', or 'utility' feature set levels");
                 }
             }
         }
@@ -351,8 +340,33 @@ impl ProductAssembly {
             )
             .context("Setting images configuration.")?;
 
+        if let Some(builder_forensics_file_path) = &self.builder_forensics_file_path {
+            if let Some(parent_dir) = builder_forensics_file_path.parent() {
+                std::fs::create_dir_all(parent_dir)
+                    .with_context(|| format!("unable to create outdir: {parent_dir}"))?;
+            }
+            let builder_forensics_file = std::fs::File::create(&builder_forensics_file_path)
+                .with_context(|| {
+                    format!(
+                        "Failed to create builder forensics files: {builder_forensics_file_path}"
+                    )
+                })?;
+            serde_json::to_writer_pretty(builder_forensics_file, &builder).with_context(|| {
+                format!("Writing builder forensics file to: {builder_forensics_file_path}")
+            })?;
+        }
+        if let Some(board_forensics_file_path) = &self.board_forensics_file_path {
+            let board_forensics_file = std::fs::File::create(&board_forensics_file_path)
+                .with_context(|| {
+                    format!("Failed to create builder forensics files: {board_forensics_file_path}")
+                })?;
+            serde_json::to_writer_pretty(board_forensics_file, &board_config).with_context(
+                || format!("Writing board forensics file to: {board_forensics_file_path}"),
+            )?;
+        }
+
         let (image_assembly_config, validation_error) =
-            builder.build_and_validate(&outdir, tools, self.validate)?;
+            builder.build_and_validate(&outdir, tools, self.validation_mode)?;
         if let Some(validation_error) = validation_error {
             return Err(validation_error.into());
         }

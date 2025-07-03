@@ -550,6 +550,11 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
                 AddressRemovedReason::DadFailed => {
                     // Attempt to regenerate the address.
                 }
+                AddressRemovedReason::Forfeited => {
+                    // There's no Ongoing Address Conflict Detection algorithm
+                    // for IPv6 addresses.
+                    unreachable!("IPv6 addresses should not be forfeited");
+                }
             }
 
             let temp_valid_lifetime = match config.config.temporary_address_configuration {
@@ -608,6 +613,11 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
                 AddressRemovedReason::Manual => return,
                 AddressRemovedReason::DadFailed => {
                     // Attempt to regenerate the address.
+                }
+                AddressRemovedReason::Forfeited => {
+                    // There's no Ongoing Address Conflict Detection algorithm
+                    // for IPv6 addresses.
+                    unreachable!("IPv6 addresses should not be forfeited");
                 }
             }
 
@@ -2025,7 +2035,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
 pub(crate) mod testutil {
     use super::*;
 
-    use alloc::collections::HashMap;
+    use netstack3_hashmap::HashMap;
 
     use net_types::ip::Ipv6;
 
@@ -2068,7 +2078,6 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashSet;
     use alloc::vec;
     use core::convert::TryFrom as _;
 
@@ -2078,6 +2087,7 @@ mod tests {
         FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
     use netstack3_base::{CtxPair, IntoCoreTimerCtx};
+    use netstack3_hashmap::HashSet;
     use test_case::test_case;
 
     use super::*;
@@ -2772,6 +2782,9 @@ mod tests {
                 return;
             }
             AddressRemovedReason::DadFailed => {}
+            AddressRemovedReason::Forfeited => {
+                unreachable!("forfeited IPv6 addresses are not tested");
+            }
         }
 
         // If the address was removed due to DAD failure, it should be regenerated with

@@ -704,13 +704,9 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   // One-way call. No reply required.
 }
 
-void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
+void Client::CheckConfig(CheckConfigCompleter::Sync& completer) {
   display::ConfigCheckResult config_check_result = CheckConfigImpl();
   draft_display_config_was_validated_ = config_check_result == display::ConfigCheckResult::kOk;
-
-  if (request->discard) {
-    DiscardConfig();
-  }
 
   completer.Reply(config_check_result.ToFidl());
 }
@@ -989,27 +985,13 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
 display::ConfigCheckResult Client::CheckConfigImpl() {
   TRACE_DURATION("gfx", "Display::Client::CheckConfig");
 
-  // The total number of registered layers is an upper bound on the number of
-  // layers assigned to display configurations.
-  const size_t max_layer_count = std::max(size_t{1}, layers_.size());
-
-  // VLA is guaranteed  be non-empty (causing UB) thanks to the clamping above.
-  //
-  // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
-  // totally supported layers instead.
-  layer_t banjo_layers[max_layer_count];
-
-  // The layer count will be replaced if the client has a valid configuration
-  // for a display.
-  display_config_t banjo_display_config;
-  banjo_display_config.layer_count = 0;
-
-  size_t banjo_layers_index = 0;
   for (const DisplayConfig& display_config : display_configs_) {
     if (display_config.draft_layers_.is_empty()) {
-      // This can happen if the client put together a display configuration, a
-      // new display was added to the system, and the client called
-      // ApplyConfig() before it received the display change event.
+      // `SetDisplayLayers()` prevents the client from directly specifying an
+      // empty layer list for a display. However, this can still happen if the
+      // client put together a display configuration, a new display was added to
+      // the system, and the client called CheckConfig() or ApplyConfig() before
+      // it received the display change event.
       //
       // Skipping over the newly added display is appropriate, because display
       // engine drivers must support operating the hardware between the moment a
@@ -1017,73 +999,92 @@ display::ConfigCheckResult Client::CheckConfigImpl() {
       continue;
     }
 
-    // Frame used for checking that each layer's `display_destination` lies
-    // entirely within the display output.
-    const rect_u_t display_area = {
-        .x = 0,
-        .y = 0,
-        .width = display_config.draft_.mode.h_addressable,
-        .height = display_config.draft_.mode.v_addressable,
-    };
+    return CheckConfigForDisplay(display_config);
+  }
 
-    // Normalize the display configuration, and perform Coordinator-level
-    // checks. The engine drivers API contract does not allow passing
-    // configurations that fail these checks.
-    for (const LayerNode& draft_layer_node : display_config.draft_layers_) {
-      layer_t& banjo_layer = banjo_layers[banjo_layers_index];
-      ++banjo_layers_index;
+  // The client needs to process display changes and prepare a configuration
+  // that accounts for the added / removed displays.
+  return display::ConfigCheckResult::kEmptyConfig;
+}
 
-      banjo_layer = draft_layer_node.layer->draft_layer_config_;
+display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& display_config) {
+  ZX_DEBUG_ASSERT(!display_config.draft_layers_.is_empty());
 
-      if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
-        // Frame for checking that the layer's `image_source` lies entirely within
-        // the source image.
-        const rect_u_t image_area = {
-            .x = 0,
-            .y = 0,
-            .width = banjo_layer.image_metadata.dimensions.width,
-            .height = banjo_layer.image_metadata.dimensions.height,
-        };
-        if (!OriginRectangleContains(image_area, banjo_layer.image_source)) {
-          return display::ConfigCheckResult::kInvalidConfig;
-        }
+  // The cast will not result in UB because the maximum layer count is
+  // guaranteed to be positive.
+  const size_t max_layer_count = display_config.engine_max_layer_count();
+  ZX_DEBUG_ASSERT_MSG(max_layer_count > 0,
+                      "DisplayConfig contract broken: engine_max_layer_count() must be positive");
 
-        // The formats of layer images are negotiated by sysmem between clients
-        // and display engine drivers when being imported, so they are always
-        // accepted by the display coordinator.
-      } else {
-        // For now, solid color fill layers take up the entire area.
-        // `SetColorLayer()` will be revised to explicitly configure an area for
-        // the fill.
-        banjo_layer.display_destination = display_area;
+  // VLA is guaranteed  be non-empty (causing UB) thanks to the contract
+  // mentioned above.
+  //
+  // TODO(https://fxbug.dev/42080896): Do not use VLA. Store this buffer in the
+  // display configuration instead.
+  layer_t banjo_layers[max_layer_count];
+  size_t banjo_layers_index = 0;
 
-        // ApplyConfig() relies on CheckConfig() normalizing the layer. This
-        // workaround can be removed when we revise `SetColorLayer()`.
-        draft_layer_node.layer->draft_layer_config_.display_destination = display_area;
-      }
-      if (!OriginRectangleContains(display_area, banjo_layer.display_destination)) {
-        return display::ConfigCheckResult::kInvalidConfig;
-      }
+  // Frame used for checking that each layer's `display_destination` lies
+  // entirely within the display output.
+  const rect_u_t display_area = {
+      .x = 0,
+      .y = 0,
+      .width = display_config.draft_.mode.h_addressable,
+      .height = display_config.draft_.mode.v_addressable,
+  };
+
+  // Normalize the display configuration, and perform Coordinator-level
+  // checks. The engine drivers API contract does not allow passing
+  // configurations that fail these checks.
+  for (const LayerNode& draft_layer_node : display_config.draft_layers_) {
+    if (banjo_layers_index >= max_layer_count) {
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
 
-    ZX_DEBUG_ASSERT_MSG(display_config.draft_.layer_count == banjo_layers_index,
-                        "Draft configuration layer count %zu does not agree with list size %zu",
-                        display_config.draft_.layer_count, banjo_layers_index);
-    banjo_display_config = display_config.draft_;
-    banjo_display_config.layer_list = banjo_layers;
+    layer_t& banjo_layer = banjo_layers[banjo_layers_index];
+    ++banjo_layers_index;
+
+    banjo_layer = draft_layer_node.layer->draft_layer_config_;
+
+    if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
+      // Frame for checking that the layer's `image_source` lies entirely within
+      // the source image.
+      const rect_u_t image_area = {
+          .x = 0,
+          .y = 0,
+          .width = banjo_layer.image_metadata.dimensions.width,
+          .height = banjo_layer.image_metadata.dimensions.height,
+      };
+      if (!OriginRectangleContains(image_area, banjo_layer.image_source)) {
+        return display::ConfigCheckResult::kInvalidConfig;
+      }
+
+      // The formats of layer images are negotiated by sysmem between clients
+      // and display engine drivers when being imported, so they are always
+      // accepted by the display coordinator.
+    } else {
+      // For now, solid color fill layers take up the entire area.
+      // `SetColorLayer()` will be revised to explicitly configure an area for
+      // the fill.
+      banjo_layer.display_destination = display_area;
+
+      // ApplyConfig() relies on CheckConfig() normalizing the layer. This
+      // workaround can be removed when we revise `SetColorLayer()`.
+      draft_layer_node.layer->draft_layer_config_.display_destination = display_area;
+    }
+    if (!OriginRectangleContains(display_area, banjo_layer.display_destination)) {
+      return display::ConfigCheckResult::kInvalidConfig;
+    }
   }
 
-  if (banjo_display_config.layer_count == 0) {
-    // `SetDisplayLayers()` prevents the client from directly specifying an empty layer list
-    // for a display. However, we can still end up here if the client specified a non-empty
-    // configuration for a display that was removed before the client called `CheckConfig()`.
-    //
-    // It is OK to pass the check, because `ApplyConfig()` will skip the configuration for the
-    // missing display. Conversely, we don't want to fail the check, because the client may be
-    // using `CheckConfig()` to probe the display engine's capabilities, and would likely be
-    // confused by a transient failure they have no control over.
-    return display::ConfigCheckResult::kOk;
-  }
+  ZX_DEBUG_ASSERT_MSG(display_config.draft_.layer_count == banjo_layers_index,
+                      "Draft configuration layer count %zu does not agree with list size %zu",
+                      display_config.draft_.layer_count, banjo_layers_index);
+
+  // The layer count will be replaced if the client has a valid configuration
+  // for a display.
+  display_config_t banjo_display_config = display_config.draft_;
+  banjo_display_config.layer_list = banjo_layers;
 
   {
     TRACE_DURATION("gfx", "Display::Client::CheckConfig engine_driver_client");
@@ -1248,21 +1249,22 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
 
   controller_.AssertMtxAliasHeld(*controller_.mtx());
   for (display::DisplayId added_display_id : added_display_ids) {
-    fbl::AllocChecker alloc_checker;
-    auto display_config = fbl::make_unique_checked<DisplayConfig>(&alloc_checker, added_display_id);
-    if (!alloc_checker.check()) {
-      fdf::warn("Out of memory when processing hotplug");
-      continue;
-    }
-
     zx::result get_supported_pixel_formats_result =
-        controller_.GetSupportedPixelFormats(display_config->id());
+        controller_.GetSupportedPixelFormats(added_display_id);
     if (get_supported_pixel_formats_result.is_error()) {
       fdf::warn("Failed to get pixel formats when processing hotplug: {}",
                 get_supported_pixel_formats_result);
       continue;
     }
-    display_config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
+
+    fbl::AllocChecker alloc_checker;
+    auto display_config = fbl::make_unique_checked<DisplayConfig>(
+        &alloc_checker, added_display_id, std::move(get_supported_pixel_formats_result).value(),
+        controller_.engine_info().max_layer_count());
+    if (!alloc_checker.check()) {
+      fdf::warn("Out of memory when processing hotplug");
+      continue;
+    }
 
     zx::result<std::span<const display::DisplayTiming>> display_timings_result =
         controller_.GetDisplayTimings(display_config->id());

@@ -1328,13 +1328,13 @@ impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec>
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashSet;
     use alloc::vec;
     use alloc::vec::Vec;
 
     use assert_matches::assert_matches;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr};
+    use netstack3_hashmap::HashSet;
     use test_case::test_case;
 
     use crate::device::testutil::{FakeDeviceId, FakeWeakDeviceId};

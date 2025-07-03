@@ -6,9 +6,11 @@
 
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::num::NonZeroU64;
 use std::pin::pin;
 use std::time::Duration;
 
+use assert_matches::assert_matches;
 use async_utils::async_once::Once;
 use dhcpv4::protocol::IntoFidlExt as _;
 use fidl_fuchsia_net_ext::{self as fnet_ext, FromExt as _, IntoExt as _};
@@ -17,7 +19,8 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::future::TryFutureExt as _;
 use futures::stream::{self, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_mac, net_subnet_v4};
-use net_types::ip::Ipv4;
+use net_types::ethernet::Mac;
+use net_types::ip::{Ip, Ipv4};
 use netemul::{DhcpClient, InterfaceConfig, DEFAULT_MTU};
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::realms::{
@@ -29,8 +32,10 @@ use netstack_testing_common::{
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use packet::ParsablePacket as _;
-use sockaddr::{IntoSockAddr as _, TryToSockaddrLl as _};
+use packet::{InnerPacketBuilder, ParsablePacket as _, Serializer};
+use packet_formats::arp::{ArpOp, ArpPacketBuilder};
+use packet_formats::ethernet::EtherType;
+use sockaddr::{EthernetSockaddr, IntoSockAddr as _, TryToSockaddrLl as _};
 use test_case::test_case;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
@@ -365,7 +370,7 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
 
     let dhcp_objects =
         test_dhcp::<CLIENT::DhcpClient>(name, &sandbox, &mut netstack_config, 1, false).await;
-    let TestDhcpRealmAndInterfaces { realm, client_ifaces, _server_ifaces } = &dhcp_objects[0];
+    let TestDhcpRealmAndInterfaces { realm, client_ifaces, server_ifaces: _ } = &dhcp_objects[0];
     let client_iface = &client_ifaces[0];
     let client = client_iface.control();
     let (remove_address, timeout) = if remove_dhcp_address {
@@ -533,7 +538,7 @@ async fn does_not_crash_with_overlapping_subnet_route<
     let realms_and_interfaces =
         test_dhcp::<CLIENT::DhcpClient>(name, &sandbox, &mut netstack_configs, 1, false).await;
     let (client_realm, client_interfaces) = match &realms_and_interfaces[..] {
-        [TestDhcpRealmAndInterfaces { realm, client_ifaces, _server_ifaces: _ }, TestDhcpRealmAndInterfaces { realm: _, client_ifaces: _, _server_ifaces: _ }] => {
+        [TestDhcpRealmAndInterfaces { realm, client_ifaces, server_ifaces: _ }, TestDhcpRealmAndInterfaces { realm: _, client_ifaces: _, server_ifaces: _ }] => {
             (realm, client_ifaces)
         }
         _ => panic!("should have a client realm and a server realm: {:?}", &realms_and_interfaces),
@@ -699,6 +704,28 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
     .await;
 }
 
+/// Returns the next expected address for a DHCP client to acquire, if the
+/// provided address is unavailable
+fn next_candidate_addr(prev: fidl_fuchsia_net::Subnet) -> fidl_fuchsia_net::Subnet {
+    match prev.addr {
+        fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address { addr: mut octets }) => {
+            // The next candidate is the address numerically succeeding provided
+            // address.
+            *octets.last_mut().expect("IPv4 addresses have a non-zero number of octets") += 1;
+
+            fidl_fuchsia_net::Subnet {
+                addr: fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
+                    addr: octets,
+                }),
+                ..prev
+            }
+        }
+        fidl_fuchsia_net::IpAddress::Ipv6(a) => {
+            panic!("expected IPv4 address; got IPv6 address = {:?}", a)
+        }
+    }
+}
+
 #[netstack_test]
 #[variant(SERVER, Netstack)]
 #[variant(CLIENT, NetstackAndDhcpClient)]
@@ -711,26 +738,11 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
-    let expected_acquired = dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired();
-    let expected_addr = match expected_acquired.addr {
-        fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address { addr: mut octets }) => {
-            // We expect to assign the address numericaly succeeding the default client address
-            // since the default client address will be assigned to a neighbor of the client so
-            // the client should decline the offer and restart DHCP.
-            *octets.iter_mut().last().expect("IPv4 addresses have a non-zero number of octets") +=
-                1;
-
-            fidl_fuchsia_net::Subnet {
-                addr: fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
-                    addr: octets,
-                }),
-                ..expected_acquired
-            }
-        }
-        fidl_fuchsia_net::IpAddress::Ipv6(a) => {
-            panic!("expected IPv4 address; got IPv6 address = {:?}", a)
-        }
-    };
+    let dup_addr = dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired();
+    // We expect to assign the next address, as the `expected_acquired` will be
+    // assigned to a neighbor of the client. The client should decline the offer
+    // and restart DHCP.
+    let expected_addr = next_candidate_addr(dup_addr.clone());
 
     let _ = test_dhcp::<CLIENT::DhcpClient>(
         name,
@@ -763,9 +775,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<
                             network: &network,
                         },
                         DhcpTestEndpointConfig {
-                            ep_type: DhcpEndpointType::Unbound {
-                                static_addrs: vec![expected_acquired],
-                            },
+                            ep_type: DhcpEndpointType::Unbound { static_addrs: vec![dup_addr] },
                             network: &network,
                         },
                     ],
@@ -787,7 +797,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<
 struct TestDhcpRealmAndInterfaces<'a> {
     realm: netemul::TestRealm<'a>,
     client_ifaces: Vec<netemul::TestInterface<'a>>,
-    _server_ifaces: Vec<netemul::TestInterface<'a>>,
+    server_ifaces: Vec<netemul::TestInterface<'a>>,
 }
 
 /// test_dhcp provides a flexible way to test DHCP acquisition across various network topologies.
@@ -1007,14 +1017,13 @@ fn test_dhcp<'a, D: DhcpClient>(
                 client_ifaces.push(client);
             }
             let mut server_ifaces = Vec::new();
-            for (server, mut ifaces) in servers {
-                let () = server.stop_serving().await.expect("failed to stop server");
+            for (_server, mut ifaces) in servers {
                 server_ifaces.append(&mut ifaces);
             }
             realms.push(TestDhcpRealmAndInterfaces {
                 realm: netstack_realm,
                 client_ifaces,
-                _server_ifaces: server_ifaces,
+                server_ifaces: server_ifaces,
             });
         }
 
@@ -1441,4 +1450,171 @@ async fn test_dhcp_server_persistence_mode<N: Netstack>(name: &str, mode: Persis
             .await
             .expect("failed to stop dhcpd");
     }
+}
+
+// Verify that Netstack3 with an OutOfStack DHCP client will forfeit an address
+// if it detects a conflict after it's been assigned. After forfeiting, it
+// should acquire a new address.
+#[netstack_test]
+#[variant(SERVER, Netstack)]
+async fn forfeit_address_on_conflict<SERVER: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
+
+    // We expect to assign 'conflicting_addr' but then forfeit it once we detect
+    // a conflict on the network. At which point, the client should decline the
+    // offer, restart DHCP, and acquire `next_addr`.
+    let conflicting_addr = dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired();
+    let next_addr = next_candidate_addr(conflicting_addr.clone());
+
+    let mut realms = [
+        TestNetstackRealmConfig {
+            clients: &[DhcpTestEndpointConfig {
+                ep_type: DhcpEndpointType::Client {
+                    expected_acquired: conflicting_addr,
+                    static_address: None,
+                    // NB: Use fewer DAD transmits than the default to speed up
+                    // the test.
+                    ipv4_dad_transmits_override: Some(1),
+                },
+                network: &network,
+            }],
+            servers: &mut [],
+            netstack_version: NetstackVersion::Netstack3,
+        },
+        TestNetstackRealmConfig {
+            clients: &[],
+            servers: &mut [TestServerConfig {
+                endpoints: &[DhcpTestEndpointConfig {
+                    ep_type: DhcpEndpointType::Server {
+                        static_addrs: vec![dhcpv4_helper::DEFAULT_TEST_CONFIG
+                            .server_addr_with_prefix()
+                            .into_ext()],
+                    },
+                    network: &network,
+                }],
+                settings: Settings {
+                    parameters: &mut dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters(),
+                    options: &mut [],
+                },
+            }],
+            netstack_version: SERVER::VERSION,
+        },
+    ];
+
+    // Drive the network until the DHCP client acquires `conflicting_addr`.
+    let dhcp_objects = test_dhcp::<netstack_testing_common::realms::OutOfStack>(
+        name,
+        &sandbox,
+        &mut realms,
+        1,
+        false,
+    )
+    .await;
+    let (client_objects, server_objects) = assert_matches!(
+        &dhcp_objects[..],
+        [client_objects, server_objects] => (client_objects, server_objects)
+    );
+    let client_iface = assert_matches!(
+        &client_objects.client_ifaces[..],
+        [client_iface] => client_iface
+    );
+    let server_iface = assert_matches!(
+        &server_objects.server_ifaces[..],
+        [server_iface] => server_iface
+    );
+
+    // Connect to the interface state protocol so we can watch the addresses
+    // assigned by the client.
+    let client_state = client_objects
+        .realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("failed to connect to client fuchsia.net.interfaces/State");
+    let client_event_stream =
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::AllInterest,
+        >(&client_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned)
+        .expect("event stream from state");
+    let mut client_event_stream = pin!(client_event_stream);
+    let mut properties =
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(client_iface.id());
+
+    // Verify the conflicting address is assigned:
+    wait_for_address(true, &conflicting_addr, client_event_stream.by_ref(), &mut properties).await;
+
+    // Send a conflicting ARP packet from the server.
+    let socket = server_objects
+        .realm
+        .packet_socket(fidl_fuchsia_posix_socket_packet::Kind::Network)
+        .await
+        .expect("should create packet socket");
+    // NB: It's a conflict because the `sender_ipv4` matches. The rest of the
+    // fields are arbitrary.
+    let sender_ipv4 = match conflicting_addr.addr {
+        fnet::IpAddress::Ipv4(addr) => net_types::ip::Ipv4Addr::new(addr.addr),
+        fnet::IpAddress::Ipv6(addr) => panic!("address {addr:?} should be IPv4"),
+    };
+    let sender_mac = Mac::UNSPECIFIED;
+    let target_mac = Mac::UNSPECIFIED;
+    let target_ipv4 = net_types::ip::Ipv4::UNSPECIFIED_ADDRESS;
+    let buf =
+        ArpPacketBuilder::new(ArpOp::Request, sender_mac, sender_ipv4, target_mac, target_ipv4)
+            .into_serializer()
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b();
+    let remote_addr = libc::sockaddr_ll::from(EthernetSockaddr {
+        interface_id: Some(
+            NonZeroU64::new(server_iface.id()).expect("server_iface ID should be NonZero"),
+        ),
+        addr: Mac::BROADCAST,
+        protocol: EtherType::Arp,
+    })
+    .into_sockaddr();
+    let sent = socket.send_to(buf.as_ref(), &remote_addr).expect("can send");
+    assert_eq!(sent, buf.as_ref().len());
+
+    // Wait for the address to be removed from the client.
+    wait_for_address(false, &conflicting_addr, client_event_stream.by_ref(), &mut properties).await;
+
+    // Wait for the client to acquire the next address.
+    wait_for_address(true, &next_addr, client_event_stream.by_ref(), &mut properties).await;
+}
+
+/// Waits for the given address to be added/removed from the given interface.
+///
+/// When `assigned` is true, waits until the address is assigned. When false,
+/// wait until the address is removed.
+async fn wait_for_address(
+    assigned: bool,
+    addr: &fidl_fuchsia_net::Subnet,
+    event_stream: impl futures::Stream<
+        Item = std::result::Result<
+            fidl_fuchsia_net_interfaces_ext::EventWithInterest<
+                fidl_fuchsia_net_interfaces_ext::AllInterest,
+            >,
+            fidl::Error,
+        >,
+    >,
+    properties: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<
+        (),
+        fidl_fuchsia_net_interfaces_ext::AllInterest,
+    >,
+) {
+    fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(event_stream, properties, |iface| {
+        let addr_present =
+            iface.properties.addresses.iter().any(
+                |&fidl_fuchsia_net_interfaces_ext::Address { addr: found, .. }| found == *addr,
+            );
+        (assigned == addr_present).then_some(())
+    })
+    .on_timeout(netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+        if assigned {
+            panic!("should have observed address {addr:?} assigned")
+        } else {
+            panic!("should have observed address {addr:?} removed")
+        }
+    })
+    .await
+    .expect("watching interface state should succeed");
 }

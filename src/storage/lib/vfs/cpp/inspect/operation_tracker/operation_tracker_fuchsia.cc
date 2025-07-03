@@ -4,6 +4,14 @@
 
 #include "src/storage/lib/vfs/cpp/inspect/operation_tracker/operation_tracker_fuchsia.h"
 
+#include <lib/inspect/cpp/vmo/types.h>
+#include <lib/zx/time.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
+
+#include <mutex>
+#include <string_view>
+
 namespace fs_inspect {
 
 OperationTrackerFuchsia::OperationTrackerFuchsia(inspect::Node& root_node,

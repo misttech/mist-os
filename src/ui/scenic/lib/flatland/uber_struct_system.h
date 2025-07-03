@@ -5,15 +5,15 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_UBER_STRUCT_SYSTEM_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_UBER_STRUCT_SYSTEM_H_
 
+#ifndef NDEBUG
 #include <atomic>
+#endif
 #include <optional>
-#include <queue>
 #include <unordered_map>
 
 #include "src/lib/containers/cpp/mpsc_queue.h"
 #include "src/ui/scenic/lib/flatland/transform_handle.h"
 #include "src/ui/scenic/lib/flatland/uber_struct.h"
-#include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
 
 namespace flatland {
 

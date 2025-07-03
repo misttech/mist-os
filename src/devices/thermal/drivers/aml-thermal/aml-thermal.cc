@@ -40,14 +40,10 @@ zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
   fdf::PDev::DeviceInfo device_info = std::move(device_info_result.value());
 
   // Get the thermal policy metadata.
-  size_t actual;
-  fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config;
-  zx_status_t status =
-      device_get_metadata(device, DEVICE_METADATA_THERMAL_CONFIG, &thermal_config,
-                          sizeof(fuchsia_hardware_thermal::wire::ThermalDeviceInfo), &actual);
-  if (status != ZX_OK || actual != sizeof(fuchsia_hardware_thermal::wire::ThermalDeviceInfo)) {
-    zxlogf(ERROR, "aml-thermal: Could not get thermal config metadata %d", status);
-    return status;
+  zx::result thermal_config = pdev.GetFidlMetadata<fuchsia_hardware_thermal::ThermalDeviceInfo>();
+  if (thermal_config.is_error()) {
+    zxlogf(ERROR, "Failed to get metadata: %s", thermal_config.status_string());
+    return thermal_config.status_value();
   }
 
   fbl::AllocChecker ac;
@@ -58,14 +54,14 @@ zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
   }
 
   // Initialize Temperature Sensor.
-  status = tsensor->Create(device, thermal_config);
+  zx_status_t status = tsensor->Create(device, thermal_config.value());
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-thermal: Could not initialize Temperature Sensor: %d", status);
     return status;
   }
 
   auto thermal_device = fbl::make_unique_checked<AmlThermal>(
-      &ac, device, std::move(tsensor), std::move(thermal_config), device_info.name);
+      &ac, device, std::move(tsensor), std::move(thermal_config.value()), device_info.name);
   if (!ac.check()) {
     zxlogf(ERROR, "aml-thermal; Failed to allocate AmlThermal");
     return ZX_ERR_NO_MEMORY;

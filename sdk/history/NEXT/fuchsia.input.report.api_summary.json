@@ -1039,6 +1039,17 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.input.report/TouchButton.PALM",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.input.report/TouchButton",
+        "strictness": "flexible",
+        "type": "uint8"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.input.report/TouchConfigurationInputMode.MOUSE_COLLECTION",
         "value": "0"
     },
@@ -1105,7 +1116,7 @@
         "kind": "table/member",
         "name": "fuchsia.input.report/TouchInputDescriptor.buttons",
         "ordinal": "4",
-        "type": "vector<uint8>:10"
+        "type": "vector<fuchsia.input.report/TouchButton>:10"
     },
     {
         "kind": "table/member",
@@ -1139,7 +1150,7 @@
         "kind": "table/member",
         "name": "fuchsia.input.report/TouchInputReport.pressed_buttons",
         "ordinal": "2",
-        "type": "vector<uint8>:10"
+        "type": "vector<fuchsia.input.report/TouchButton>:10"
     },
     {
         "kind": "table",

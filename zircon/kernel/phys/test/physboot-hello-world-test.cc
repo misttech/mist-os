@@ -11,6 +11,16 @@
 #include <zircon/assert.h>
 
 #include <phys/handoff.h>
+#include <phys/zircon-abi-spec.h>
+#include <phys/zircon-info-note.h>
+
+namespace {
+
+constexpr ZirconAbiSpec kZirconAbiSpec{};
+
+ZIRCON_INFO_NOTE ZirconInfoNote<kZirconAbiSpec> kZirconAbiSpecNote;
+
+}  // namespace
 
 PhysHandoff* gPhysHandoff = nullptr;
 

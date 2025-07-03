@@ -767,6 +767,10 @@ class VmCowPages final : public VmHierarchyBase,
   void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op, DeferredOps* deferred)
       TA_REQ(lock());
 
+  // The VmObjectPaged is changing its mapping policy from cached to uncached. Clean / invalidate
+  // all existing pages and update page queues if required.
+  void FinishTransitionToUncachedLocked() TA_REQ(lock());
+
   // Promote pages in the specified range for reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
   // Currently used only for pager-backed VMOs to move their pages to the end of the
@@ -805,10 +809,6 @@ class VmCowPages final : public VmHierarchyBase,
   DiscardableVmoTracker* DebugGetDiscardableTracker() const { return discardable_tracker_.get(); }
 
   bool DebugIsHighMemoryPriority() const TA_EXCL(lock());
-
-  // Discard all the pages from a discardable vmo in the |kReclaimable| state. If successful, the
-  // |discardable_state_| is set to |kDiscarded|. Returns the number of pages discarded.
-  uint64_t DiscardPages() TA_EXCL(lock());
 
   // See DiscardableVmoTracker::DebugDiscardablePageCounts().
   struct DiscardablePageCounts {
@@ -885,6 +885,8 @@ class VmCowPages final : public VmHierarchyBase,
     list_add_tail(&list, &page->queue_node);
     page_source_->FreePages(&list);
   }
+
+  static void DebugDumpReclaimCounters();
 
  private:
   // private constructor (use Create...())

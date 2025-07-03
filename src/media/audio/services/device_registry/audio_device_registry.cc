@@ -67,7 +67,7 @@ void AudioDeviceRegistry::DeviceDetected(std::string_view name, fad::DeviceType 
       return;
   }
   AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
-                           std::move(driver_client)));
+                           std::move(driver_client), "DevFS"));
 }
 
 void AudioDeviceRegistry::AddDevice(const std::shared_ptr<Device>& initializing_device) {

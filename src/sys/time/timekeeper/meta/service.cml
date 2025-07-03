@@ -23,7 +23,7 @@
         {
             protocol: [
                 // Program wake alarms.
-                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.alarms.WakeAlarms",
 
                 // Allow adjusting the UTC time estimate. Should be used
                 // sparingly.
@@ -125,7 +125,7 @@
     expose: [
         {
             protocol: [
-                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.alarms.WakeAlarms",
                 "fuchsia.time.test.Rtc",
             ],
             from: "self",

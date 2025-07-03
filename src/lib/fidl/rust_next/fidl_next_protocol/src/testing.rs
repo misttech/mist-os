@@ -5,7 +5,7 @@
 use fidl_next_codec::{
     Chunk, Decode, Decoded, DecoderExt as _, Encode, EncoderExt as _, WireString,
 };
-use fuchsia_async::{Scope, Task};
+use fuchsia_async::Task;
 
 use crate::{
     Client, ClientHandler, ClientSender, Responder, Server, ServerHandler, ServerSender, Transport,
@@ -26,16 +26,14 @@ pub fn assert_decoded<T: for<'a> Decode<&'a mut [Chunk]>>(
 }
 
 pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_end: T) {
-    struct TestServer {
-        scope: Scope,
-    }
+    struct TestServer;
 
     impl<T: Transport + 'static> ServerHandler<T> for TestServer {
-        fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
+        async fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
 
-        fn on_two_way(
+        async fn on_two_way(
             &mut self,
             server: &ServerSender<T>,
             ordinal: u64,
@@ -47,13 +45,11 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
             assert_eq!(&**message, "Ping");
 
             let server = server.clone();
-            self.scope.spawn(async move {
-                server
-                    .send_response(responder, 42, "Pong")
-                    .expect("failed to encode response")
-                    .await
-                    .expect("failed to send response");
-            });
+            server
+                .send_response(responder, 42, "Pong")
+                .expect("failed to encode response")
+                .await
+                .expect("failed to send response");
         }
     }
 
@@ -61,8 +57,7 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
     let client_sender = client.sender().clone();
     let client_task = Task::spawn(async move { client.run_sender().await });
     let mut server = Server::new(server_end);
-    let server_task =
-        Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
+    let server_task = Task::spawn(async move { server.run(TestServer).await });
 
     let message = client_sender
         .send_two_way(42, "Ping")
@@ -83,13 +78,19 @@ pub async fn test_one_way<T: Transport + 'static>(client_end: T, server_end: T) 
     struct TestServer;
 
     impl<T: Transport> ServerHandler<T> for TestServer {
-        fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
+        async fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
             assert_eq!(ordinal, 42);
             let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
             assert_eq!(&**message, "Hello world");
         }
 
-        fn on_two_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer, _: Responder) {
+        async fn on_two_way(
+            &mut self,
+            _: &ServerSender<T>,
+            _: u64,
+            _: T::RecvBuffer,
+            _: Responder,
+        ) {
             panic!("unexpected two-way message");
         }
     }
@@ -114,16 +115,14 @@ pub async fn test_one_way<T: Transport + 'static>(client_end: T, server_end: T) 
 }
 
 pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) {
-    struct TestServer {
-        scope: Scope,
-    }
+    struct TestServer;
 
     impl<T: Transport + 'static> ServerHandler<T> for TestServer {
-        fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
+        async fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
 
-        fn on_two_way(
+        async fn on_two_way(
             &mut self,
             server: &ServerSender<T>,
             ordinal: u64,
@@ -135,13 +134,11 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
             assert_eq!(&**message, "Ping");
 
             let server = server.clone();
-            self.scope.spawn(async move {
-                server
-                    .send_response(responder, 42, "Pong")
-                    .expect("failed to encode response")
-                    .await
-                    .expect("failed to send response");
-            });
+            server
+                .send_response(responder, 42, "Pong")
+                .expect("failed to encode response")
+                .await
+                .expect("failed to send response");
         }
     }
 
@@ -149,8 +146,7 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
     let client_sender = client.sender().clone();
     let client_task = Task::spawn(async move { client.run_sender().await });
     let mut server = Server::new(server_end);
-    let server_task =
-        Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
+    let server_task = Task::spawn(async move { server.run(TestServer).await });
 
     let message = client_sender
         .send_two_way(42, "Ping")
@@ -170,16 +166,14 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
 }
 
 pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server_end: T) {
-    struct TestServer {
-        scope: Scope,
-    }
+    struct TestServer;
 
     impl<T: Transport + 'static> ServerHandler<T> for TestServer {
-        fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
+        async fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
 
-        fn on_two_way(
+        async fn on_two_way(
             &mut self,
             server: &ServerSender<T>,
             ordinal: u64,
@@ -198,13 +192,11 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
             assert_eq!(&**message, response);
 
             let server = server.clone();
-            self.scope.spawn(async move {
-                server
-                    .send_response(responder, ordinal, response)
-                    .expect("server failed to encode response")
-                    .await
-                    .expect("server failed to send response");
-            });
+            server
+                .send_response(responder, ordinal, response)
+                .expect("server failed to encode response")
+                .await
+                .expect("server failed to send response");
         }
     }
 
@@ -212,8 +204,7 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
     let client_sender = client.sender().clone();
     let client_task = Task::spawn(async move { client.run_sender().await });
     let mut server = Server::new(server_end);
-    let server_task =
-        Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
+    let server_task = Task::spawn(async move { server.run(TestServer).await });
 
     let send_one = client_sender.send_two_way(1, "One").expect("client failed to encode request");
     let send_two = client_sender.send_two_way(2, "Two").expect("client failed to encode request");
@@ -252,7 +243,12 @@ pub async fn test_event<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestClient;
 
     impl<T: Transport> ClientHandler<T> for TestClient {
-        fn on_event(&mut self, client: &ClientSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
+        async fn on_event(
+            &mut self,
+            client: &ClientSender<T>,
+            ordinal: u64,
+            buffer: T::RecvBuffer,
+        ) {
             assert_eq!(ordinal, 10);
             let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
             assert_eq!(&**message, "Surprise!");
@@ -264,8 +260,15 @@ pub async fn test_event<T: Transport + 'static>(client_end: T, server_end: T) {
     pub struct TestServer;
 
     impl<T: Transport> ServerHandler<T> for TestServer {
-        fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {}
-        fn on_two_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer, _: Responder) {}
+        async fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {}
+        async fn on_two_way(
+            &mut self,
+            _: &ServerSender<T>,
+            _: u64,
+            _: T::RecvBuffer,
+            _: Responder,
+        ) {
+        }
     }
 
     let mut client = Client::new(client_end);

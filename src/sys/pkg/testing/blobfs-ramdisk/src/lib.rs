@@ -149,27 +149,25 @@ impl BlobfsRamdiskBuilder {
                 fs.serve().await.context("serving single volume filesystem")?,
             ),
             Implementation::Fxblob => {
-                let mut fs =
+                let fs =
                     fs.serve_multi_volume().await.context("serving multi volume filesystem")?;
-                if needs_format {
-                    let _: &mut fs_management::filesystem::ServingVolume = fs
-                        .create_volume(
-                            FXFS_BLOB_VOLUME_NAME,
-                            CreateOptions::default(),
-                            MountOptions { as_blob: Some(true), ..MountOptions::default() },
-                        )
-                        .await
-                        .context("creating blob volume")?;
+                let volume = if needs_format {
+                    fs.create_volume(
+                        FXFS_BLOB_VOLUME_NAME,
+                        CreateOptions::default(),
+                        MountOptions { as_blob: Some(true), ..MountOptions::default() },
+                    )
+                    .await
+                    .context("creating blob volume")?
                 } else {
-                    let _: &mut fs_management::filesystem::ServingVolume = fs
-                        .open_volume(
-                            FXFS_BLOB_VOLUME_NAME,
-                            MountOptions { as_blob: Some(true), ..MountOptions::default() },
-                        )
-                        .await
-                        .context("opening blob volume")?;
-                }
-                ServingFilesystem::MultiVolume(fs)
+                    fs.open_volume(
+                        FXFS_BLOB_VOLUME_NAME,
+                        MountOptions { as_blob: Some(true), ..MountOptions::default() },
+                    )
+                    .await
+                    .context("opening blob volume")?
+                };
+                ServingFilesystem::MultiVolume(fs, volume)
             }
         };
 
@@ -207,24 +205,26 @@ pub struct BlobfsRamdisk {
 /// wrap either blobfs or fxblob.
 enum ServingFilesystem {
     SingleVolume(fs_management::filesystem::ServingSingleVolumeFilesystem),
-    MultiVolume(fs_management::filesystem::ServingMultiVolumeFilesystem),
+    MultiVolume(
+        fs_management::filesystem::ServingMultiVolumeFilesystem,
+        fs_management::filesystem::ServingVolume,
+    ),
 }
 
 impl ServingFilesystem {
     async fn shutdown(self) -> Result<(), Error> {
         match self {
             Self::SingleVolume(fs) => fs.shutdown().await.context("shutting down single volume"),
-            Self::MultiVolume(fs) => fs.shutdown().await.context("shutting down multi volume"),
+            Self::MultiVolume(fs, _volume) => {
+                fs.shutdown().await.context("shutting down multi volume")
+            }
         }
     }
 
     fn exposed_dir(&self) -> Result<&fio::DirectoryProxy, Error> {
         match self {
             Self::SingleVolume(fs) => Ok(fs.exposed_dir()),
-            Self::MultiVolume(fs) => Ok(fs
-                .volume(FXFS_BLOB_VOLUME_NAME)
-                .ok_or(anyhow!("missing blob volume"))?
-                .exposed_dir()),
+            Self::MultiVolume(_fs, volume) => Ok(volume.exposed_dir()),
         }
     }
 
@@ -232,7 +232,7 @@ impl ServingFilesystem {
     fn blob_dir_name(&self) -> &'static str {
         match self {
             Self::SingleVolume(_) => "blob-exec",
-            Self::MultiVolume(_) => "root",
+            Self::MultiVolume(_, _) => "root",
         }
     }
 
@@ -247,7 +247,7 @@ impl ServingFilesystem {
                 )
                 .context("opening svc dir")?,
             )),
-            Self::MultiVolume(_) => Ok(Some(
+            Self::MultiVolume(_, _) => Ok(Some(
                 fuchsia_fs::directory::open_directory_async(
                     self.exposed_dir()?,
                     "svc",
@@ -289,7 +289,7 @@ impl ServingFilesystem {
     fn implementation(&self) -> Implementation {
         match self {
             Self::SingleVolume(_) => Implementation::CppBlobfs,
-            Self::MultiVolume(_) => Implementation::Fxblob,
+            Self::MultiVolume(_, _) => Implementation::Fxblob,
         }
     }
 }

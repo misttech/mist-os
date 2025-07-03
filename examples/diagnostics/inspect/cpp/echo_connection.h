@@ -5,7 +5,7 @@
 #ifndef EXAMPLES_DIAGNOSTICS_INSPECT_CPP_ECHO_CONNECTION_H_
 #define EXAMPLES_DIAGNOSTICS_INSPECT_CPP_ECHO_CONNECTION_H_
 
-#include <fidl/examples/routing/echo/cpp/fidl.h>
+#include <fidl/fidl.examples.routing.echo/cpp/fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 
 namespace example {
@@ -15,10 +15,10 @@ struct EchoConnectionStats {
   inspect::UintProperty total_requests;
 };
 
-class EchoConnection : public fidl::examples::routing::echo::Echo {
+class EchoConnection : public fidl::Server<fidl_examples_routing_echo::Echo> {
  public:
   explicit EchoConnection(std::weak_ptr<EchoConnectionStats> stats);
-  void EchoString(::fidl::StringPtr value, EchoStringCallback callback) override;
+  void EchoString(EchoStringRequest& request, EchoStringCompleter::Sync& completer) override;
 
  private:
   EchoConnection(const EchoConnection&) = delete;

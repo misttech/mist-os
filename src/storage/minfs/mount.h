@@ -35,6 +35,10 @@ struct MountOptions {
   // For testing only: if true, run fsck after every transaction.
   bool fsck_after_every_transaction = false;
 
+  // Die if a mutating transaction to the device fails. Sometimes turned off in tests to not crash
+  // when simulating I/O failures.
+  bool die_on_mutation_failure = true;
+
   // Number of slices to preallocate for data when the filesystem is created.
   uint32_t fvm_data_slices = 1;
 

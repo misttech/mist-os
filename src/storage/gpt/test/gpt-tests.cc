@@ -351,9 +351,6 @@ class LibGptTest {
     return kGptMetadataSize / blk_size_;
   }
 
-  // Returns the full device path.
-  const char* GetDevicePath() const { return disk_path_; }
-
   // Remove all partition from GPT and keep device in GPT initialized state.
   void Reset() {
     zx::result device = component::Connect<fuchsia_hardware_block_volume::Volume>(disk_path_);

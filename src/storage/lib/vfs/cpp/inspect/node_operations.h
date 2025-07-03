@@ -7,6 +7,10 @@
 
 #include "src/storage/lib/vfs/cpp/inspect/operation_tracker.h"
 
+#ifdef __Fuchsia__
+#include <lib/inspect/cpp/vmo/types.h>
+#endif
+
 namespace fs_inspect {
 
 // Common node operations most filesystems implement.

@@ -4,7 +4,7 @@
 
 //! Test utilities for dealing with time.
 
-use alloc::collections::{BinaryHeap, HashMap};
+use alloc::collections::BinaryHeap;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -16,6 +16,7 @@ use core::time::Duration;
 use netstack3_sync::Mutex;
 
 use assert_matches::assert_matches;
+use netstack3_hashmap::HashMap;
 
 use crate::context::CtxPair;
 use crate::ref_counted_hash_map::{RefCountedHashSet, RemoveResult};

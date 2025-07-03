@@ -1741,8 +1741,12 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
     // have pended during the critical section.
     Guard<CriticalMutex> guard{&lock_};
     if (pending_access_faults_.load() != 0) {
-      arch::Yield();
-      continue;
+      guard.CallUnlocked([] { arch::Yield(); });
+      // There could still be pending_access_faults_, but they do not have the
+      // lock and we have no way to block and give them our priority. Instead of
+      // spinning and hoping they get scheduled and take the lock we perform one
+      // iteration of harvesting and then give them another chance to take the
+      // lock.
     }
     ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
         LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));

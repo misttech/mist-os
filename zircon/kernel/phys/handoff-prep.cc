@@ -98,6 +98,10 @@ HandoffPrep::HandoffPrep(ElfImage kernel)
   fbl::AllocChecker ac;
   handoff_ = New(handoff, ac);
   ZX_ASSERT_MSG(ac.check(), "Failed to allocate PhysHandoff!");
+
+  ktl::optional spec = kernel_.GetZirconInfo<ZirconAbiSpec>();
+  ZX_ASSERT_MSG(spec, "no Zircon ELF note containing the ZirconAbiSpec!");
+  abi_spec_ = *spec;
 }
 
 PhysVmo HandoffPrep::MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
@@ -165,17 +169,6 @@ void HandoffPrep::FinishVmObjects() {
 }
 
 void HandoffPrep::SetMemory() {
-  // TODO(https://fxbug.dev/355731771): Bootloaders and boot shims should be
-  // providing a PERIPHERAL range that already covers UART MMIO, but there is
-  // currently a gap in that coverage.
-  if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-    GetUartDriver().Visit([&]<typename KernelDriver>(const KernelDriver& driver) {
-      if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
-        ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
-      }
-    });
-  }
-
   // Normalizes types so that only those that are of interest to the kernel
   // remain.
   auto normed_type = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
@@ -186,7 +179,6 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kKernelPageTables:
       case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kPermanentPhysHandoff:
-      case memalloc::Type::kPeripheral:
       case memalloc::Type::kPhysLog:
       case memalloc::Type::kReservedLow:
       case memalloc::Type::kTemporaryPhysHandoff:
@@ -214,6 +206,10 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kNvram:
       // Truncations should now go into effect.
       case memalloc::Type::kTruncatedRam:
+      // kPeripheral range content has been distilled in
+      // PhysHandoff::periph_ranges and does not need to be present in this
+      // accounting.
+      case memalloc::Type::kPeripheral:
         return ktl::nullopt;
 
       default:
@@ -427,8 +423,6 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   SummarizeMiscZbiItems(zbi);
   gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
 
-  ArchHandoff(patch_info);
-
   SetInstrumentation();
 
   // This transfers the log, so logging after this is not preserved.
@@ -436,12 +430,8 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   // TODO(mcgrathr): Rename to physboot.log with some prefix.
   PublishLog("i/logs/physboot", ktl::move(*ktl::exchange(gLog, nullptr)));
 
-  // Now that all time samples have been collected, copy gBootTimes into the
-  // hand-off.
-  handoff()->times = gBootTimes;
-
   handoff()->kernel_physical_load_address = kernel_.physical_load_address();
-  ConstructKernelAddressSpace(uart);
+  ZirconAbi abi = ConstructKernelAddressSpace(uart);
 
   // Finalize the published VMOs (e.g., the log published just above), VMARs,
   // and mappings.
@@ -451,11 +441,18 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   // to the kernel, which is affected by other set-up routines.
   SetMemory();
 
+  // One last log before the next line where we effectively disable logging
+  // altogether.
+  debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
+         gSymbolize->name(), kernel_.physical_load_address(), kernel_.entry());
+
   // Hand-off the serial driver. There may be no more logging beyond this point.
   handoff()->uart = ktl::move(uart).TakeUart();
 
-  debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
-         gSymbolize->name(), kernel_.physical_load_address(), kernel_.entry());
-  kernel_.Handoff<void(PhysHandoff*)>(handoff());
-  ZX_PANIC("ElfImage::Handoff returned!");
+  // Now that all time samples have been collected, copy gBootTimes into the
+  // hand-off.
+  handoff()->times = gBootTimes;
+
+  // Now for the remaining arch-specific settings and the actual hand-off...
+  ArchDoHandoff(abi, patch_info);
 }

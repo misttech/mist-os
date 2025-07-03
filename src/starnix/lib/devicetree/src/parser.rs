@@ -37,6 +37,27 @@ pub enum ParseError {
     ZeroCopyError,
 }
 
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::InvalidMagicNumber => write!(f, "Invalid magic number"),
+            ParseError::UnsupportedVersion => write!(f, "Unsupported version"),
+            ParseError::Utf8Error(e) => write!(f, "Utf8 error: {}", e),
+            ParseError::MalformedStructure(e) => write!(f, "Malformed structure: {}", e),
+            ParseError::ZeroCopyError => write!(f, "Zero copy error"),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ParseError::Utf8Error(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
 /// Parses a full `Devicetree` instance from `data`.
 pub fn parse_devicetree<'a>(data: &'a [u8]) -> Result<Devicetree<'a>, ParseError> {
     // Parse and verify the header.
@@ -133,8 +154,7 @@ fn parse_item_and_increment_offset<'a, T: FromBytes + KnownLayout + Immutable>(
 /// characters.
 fn parse_string<'a>(data: &'a [u8], offset: &mut usize) -> Result<&'a str, ParseError> {
     let str_slice = &data[*offset..];
-    let null_index =
-        str_slice.iter().position(|c| *c == 0).ok_or_else(|| ParseError::ZeroCopyError)?;
+    let null_index = str_slice.iter().position(|c| *c == 0).ok_or(ParseError::ZeroCopyError)?;
     *offset += null_index + 1;
     // Align the offset to the next 4-byte boundary.
     *offset = (*offset + 3) & !3;

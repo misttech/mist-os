@@ -80,9 +80,12 @@ pub async fn construct_fxfs(
 #[cfg(test)]
 mod tests {
     use super::{construct_fxfs, ConstructedFxfs};
+
     use crate::base_package::construct_base_package;
     use crate::AssembledSystem;
+
     use assembly_images_config::Fxfs;
+    use assembly_release_info::SystemReleaseInfo;
     use camino::{Utf8Path, Utf8PathBuf};
     use image_assembly_config::ImageAssemblyConfig;
     use serde_json::json;
@@ -160,7 +163,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         let base_package =
             construct_base_package(&mut assembled_system, dir, "system_image", &product_config)

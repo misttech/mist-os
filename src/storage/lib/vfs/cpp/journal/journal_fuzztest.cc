@@ -2,15 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
 #include <lib/sync/completion.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <zircon/errors.h>
+#include <zircon/time.h>
+#include <zircon/types.h>
+
+#include <memory>
+#include <utility>
 
 #include <storage/buffer/blocking_ring_buffer.h>
 
-#include "fuzzer_utils.h"
+#include "src/storage/lib/vfs/cpp/journal/fuzzer_utils.h"
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
 
 namespace fs {
 namespace {
@@ -40,7 +47,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
     sync_completion_t sync_completion;
     journal.schedule_task(
         journal.Sync().then([&sync_completion](fpromise::result<void, zx_status_t>& result) mutable
-                            -> fpromise::result<void, zx_status_t> {
+                                -> fpromise::result<void, zx_status_t> {
           sync_completion_signal(&sync_completion);
           return result;
         }));

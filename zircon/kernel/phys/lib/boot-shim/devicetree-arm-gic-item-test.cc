@@ -25,17 +25,17 @@ class ArmDevicetreeGicItemTest
   using Mixin::TearDownTestSuite;
 
   auto get_mmio_observer() {
-    return [this](const boot_shim::DevicetreeMmioRange& r) { ranges_.push_back(r); };
+    return [this](const boot_shim::MmioRange& r) { ranges_.push_back(r); };
   }
 
-  std::span<const boot_shim::DevicetreeMmioRange> mmio_ranges() const { return ranges_; }
+  std::span<const boot_shim::MmioRange> mmio_ranges() const { return ranges_; }
 
  private:
-  std::vector<boot_shim::DevicetreeMmioRange> ranges_;
+  std::vector<boot_shim::MmioRange> ranges_;
 };
 
 TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
-  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::MmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -92,7 +92,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
-  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::MmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -145,7 +145,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV3Uint64Stride) {
-  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::MmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -190,7 +190,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3Uint64Stride) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV3FourStride) {
-  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::MmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -235,7 +235,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3FourStride) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV3SubsumedStride) {
-  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::MmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -281,7 +281,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3SubsumedStride) {
 
 // We dont support GicV3 with MSI yet, not reflected in the driver configuration.
 TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
-  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::MmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -325,7 +325,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, ParseCrosvm) {
-  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::MmioRange>({
       {
           .address = 0x3fff0000,
           .size = 0x10000,

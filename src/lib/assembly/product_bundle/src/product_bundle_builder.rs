@@ -251,9 +251,9 @@ impl ProductBundleBuilder {
             name: product_bundle_name.clone(),
             version: product_bundle_version.clone(),
             sdk_version: sdk_version.clone(),
-            system_a: system_a.as_ref().and_then(|s| s.system_release_info.clone()),
-            system_b: system_b.as_ref().and_then(|s| s.system_release_info.clone()),
-            system_r: system_r.as_ref().and_then(|s| s.system_release_info.clone()),
+            system_a: system_a.as_ref().and_then(|s| Some(s.system_release_info.clone())),
+            system_b: system_b.as_ref().and_then(|s| Some(s.system_release_info.clone())),
+            system_r: system_r.as_ref().and_then(|s| Some(s.system_release_info.clone())),
         });
 
         // Construct the product bundle.
@@ -606,7 +606,7 @@ mod test {
     use assembled_system::{AssembledSystem, Image};
     use assembly_container::{AssemblyContainer, DirectoryPathBuf};
     use assembly_partitions_config::{Partition, PartitionsConfig, Slot};
-    use assembly_release_info::ProductBundleReleaseInfo;
+    use assembly_release_info::{ProductBundleReleaseInfo, SystemReleaseInfo};
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_repo::test_utils;
@@ -629,7 +629,7 @@ mod test {
             images: vec![],
             board_name: "board_name".into(),
             partitions_config: Some(DirectoryPathBuf::new(partitions_path)),
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
 
         let product_bundle_path = tempdir.join("pb");
@@ -654,7 +654,7 @@ mod test {
                 name: "name".to_string(),
                 version: "version".to_string(),
                 sdk_version: "not_built_from_sdk".to_string(),
-                system_a: None,
+                system_a: Some(SystemReleaseInfo::new_for_testing()),
                 system_b: None,
                 system_r: None,
             }),
@@ -700,7 +700,7 @@ mod test {
             images: vec![Image::ZBI { path: zbi_path, signed: false }],
             board_name: "board_name".into(),
             partitions_config: Some(DirectoryPathBuf::new(partitions_path)),
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
 
         // Construct the PB.
@@ -759,7 +759,7 @@ mod test {
                 name: "name".to_string(),
                 version: "version".to_string(),
                 sdk_version: "custom_sdk_version".to_string(),
-                system_a: None,
+                system_a: Some(SystemReleaseInfo::new_for_testing()),
                 system_b: None,
                 system_r: None,
             }),

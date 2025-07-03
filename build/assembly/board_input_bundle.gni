@@ -72,6 +72,10 @@ import("//build/python/python_action.gni")
 #      output filename of the form
 #      {target_out_dir}/{target_name}.format_costs_persistent_fidl.
 #
+#  include_in (optional; default=all)
+#    [string] Which build types to include this BIB.
+#    Options: all, eng, user_and_userdebug
+#
 #  version (optional)
 #    [string] String representing the release version for this board config.
 #    Either this field or "version_file" must be set.
@@ -117,6 +121,15 @@ template("board_input_bundle") {
   creation_deps = []
   creation_inputs = []
   creation_args = []
+
+  include_in = "all"
+  if (defined(invoker.include_in)) {
+    include_in = invoker.include_in
+  }
+  creation_args += [
+    "--include-in",
+    include_in,
+  ]
 
   assert(
       defined(invoker.version) || defined(invoker.version_file),

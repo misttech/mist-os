@@ -9,10 +9,7 @@ group("tests") {
     "buildstats:buildstats_tests($host_toolchain)",
     "chrometrace:chrometrace_test($host_toolchain)",
     "clangtrace:clangtrace_test($host_toolchain)",
-    "compdb:compdb_tests($host_toolchain)",
-    "ninjagraph:ninjagraph_tests($host_toolchain)",
-    "ninjalog:ninjalog_tests($host_toolchain)",
-    "ninjatrace:ninjatrace_tests($host_toolchain)",
+    "ninjacommand:ninjacommand_tests($host_toolchain)",
     "rbetrace:rbetrace_test($host_toolchain)",
   ]
 }

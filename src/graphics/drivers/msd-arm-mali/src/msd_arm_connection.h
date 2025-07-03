@@ -50,15 +50,12 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
     virtual void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) = 0;
     virtual AddressSpaceObserver* NdtGetAddressSpaceObserver() = 0;
     virtual ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() = 0;
-    // TODO(b/417848695): refactor this to NdtMapPageRangeBus
-    virtual magma::PlatformBusMapper* GetBusMapper() = 0;
+    virtual magma::PlatformBusMapper* NdtGetBusMapper() = 0;
     virtual bool NdtIsProtectedModeSupported() = 0;
     // Called after the connection's destructor has been called, so the
     // refcount should be 0.
     virtual void NdtDeregisterConnection() = 0;
     virtual void NdtSetCurrentThreadToDefaultPriority() = 0;
-    // TODO(b/417848695): refactor this so it's passed into the lambda functions where it's used?
-    virtual PerformanceCounters* performance_counters() = 0;
     virtual std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) = 0;
     virtual std::thread::id NdtGetDeviceThreadId() = 0;
     virtual msd::MagmaMemoryPressureLevel NdtGetCurrentMemoryPressureLevel() = 0;
@@ -197,9 +194,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   size_t FreeUnusedJitRegionsIfNeeded() FIT_REQUIRES(address_lock_);
   bool RemoveMappingLocked(uint64_t gpu_va) FIT_REQUIRES(address_lock_);
 
-  PerformanceCounters* performance_counters() { return owner_->performance_counters(); }
-
-  magma::PlatformBusMapper* GetBusMapper() override { return owner_->GetBusMapper(); }
+  magma::PlatformBusMapper* GetBusMapper() override { return owner_->NdtGetBusMapper(); }
 
   msd::msd_client_id_t client_id_;
 

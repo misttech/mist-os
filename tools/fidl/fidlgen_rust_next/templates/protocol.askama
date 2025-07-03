@@ -1,17 +1,6 @@
-{% let non_canonical_name = protocol.name.decl_name().non_canonical() %}
-{% let protocol_base_name = protocol.name.decl_name().camel() %}
-{% let protocol_name = filters::ident(protocol_base_name)? %}
-{% let module_name = filters::ident(protocol.name.decl_name().snake())? %}
-
-{% let client_sender_name = format!("{protocol_base_name}ClientSender") %}
-{% let client_handler_name = format!("{protocol_base_name}ClientHandler") %}
-
-{% let server_sender_name = format!("{protocol_base_name}ServerSender") %}
-{% let server_handler_name = format!("{protocol_base_name}ServerHandler") %}
-
 /// The type corresponding to the {{ non_canonical_name }} protocol.
-{{ self::doc_string(protocol.attributes) -}}
-{% if context.config.emit_debug_impls -%}
+{{ self.doc_string(protocol.attributes) -}}
+{% if self.emit_debug_impls() -%}
     #[derive(Debug)]
 {%- endif %}
 pub struct {{ protocol_name }};
@@ -26,19 +15,17 @@ pub mod {{ module_name }} {
     pub mod prelude {
         pub use crate::{
             {{ protocol_name }},
-            {{ client_sender_name }},
             {{ client_handler_name }},
-            {{ server_sender_name }},
             {{ server_handler_name }},
             {{ module_name }},
         };
         {% for ident in self.prelude_method_type_idents() %}
-            pub use {{ context.natural_id(ident) }};
+            pub use {{ self.natural_id(ident) }};
         {% endfor %}
     }
 
     {% for method in protocol.methods %}
-        {% let method_name = filters::ident(method.name.camel())? %}
+        {% let method_name = filters::camel(method.name)? %}
         pub struct {{ method_name }};
 
         impl ::fidl_next::Method for {{ method_name }} {
@@ -48,7 +35,7 @@ pub mod {{ module_name }} {
 
             {% if method.kind == ProtocolMethodKind::OneWay || method.kind == ProtocolMethodKind::TwoWay %}
                 {% if let Some(request) = method.maybe_request_payload %}
-                    type Request = {{ context.static_wire_type(request) }};
+                    type Request = {{ self.static_wire_type(request) }};
                 {% else %}
                     type Request = ();
                 {% endif %}
@@ -70,12 +57,12 @@ pub mod {{ module_name }} {
                             <
                                 'static,
                             {% if let Some(success) = method.maybe_response_success_type.as_ref() %}
-                                {{ context.static_wire_type(success) }},
+                                {{ self.static_wire_type(success) }},
                             {% else %}
                                 (),
                             {% endif %}
                             {% if let Some(error) = method.maybe_response_err_type.as_ref() %}
-                                {{ context.static_wire_type(error) }},
+                                {{ self.static_wire_type(error) }},
                             {% else %}
                                 (),
                             {% endif %}
@@ -84,21 +71,21 @@ pub mod {{ module_name }} {
                             ::fidl_next::WireFlexible<
                                 'static,
                             {% if let Some(success) = method.maybe_response_success_type.as_ref() %}
-                                {{ context.static_wire_type(success) }}
+                                {{ self.static_wire_type(success) }}
                             {% else %}
                                 ()
                             {% endif %}
                             >
                         {% else %}
                             {% if let Some(response) = method.maybe_response_payload.as_ref() %}
-                                {{ context.static_wire_type(response) }}
+                                {{ self.static_wire_type(response) }}
                             {% else %}
                                 ()
                             {% endif %}
                         {% endif %}
                     {% when ProtocolMethodKind::Event %}
                         {% if let Some(response) = method.maybe_response_payload.as_ref() %}
-                            {{ context.static_wire_type(response) }}
+                            {{ self.static_wire_type(response) }}
                         {% else %}
                             ()
                         {% endif %}
@@ -106,136 +93,300 @@ pub mod {{ module_name }} {
                 ;
         }
     {% endfor %}
-}
 
-/// A helper trait for the `{{ non_canonical_name }}` client sender.
-pub trait {{ client_sender_name }} {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        {% for method in protocol.methods %}
+            {% if let Some(args) = self.get_method_args_struct(method) %}
+                {% let method_type_name = filters::camel(method.name)? %}
+                {% let is_static = args.shape.max_out_of_line == 0 %}
 
-    {% for method in protocol.methods %}
-        {% let method_name = filters::ident(method.name.snake())? %}
-        {% let method_type_name = filters::ident(method.name.camel())? %}
+                pub struct {{ method_type_name }}<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                > {
+                    {% for (i, member) in args.members.iter().enumerate() %}
+                        {{ member.name|snake }}: T{{ i }},
+                    {% endfor %}
+                }
 
-        {% match method.kind %}
-            {% when ProtocolMethodKind::OneWay %}
-                {{ self::doc_string(method.attributes) -}}
-                {% if let Some(request) = method.maybe_request_payload %}
-                    fn {{ method_name }}<___R>(
-                        &self,
-                        request: ___R,
-                    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                    where
-                        ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.static_wire_type(request) }},
-                        >;
-                {% else %}
-                    fn {{ method_name }}(
-                        &self,
-                    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-                {% endif %}
-            {% when ProtocolMethodKind::TwoWay %}
-                {{ self::doc_string(method.attributes) -}}
-                {% if let Some(request) = method.maybe_request_payload %}
-                    fn {{ method_name }}<___R>(
-                        &self,
-                        request: ___R,
-                    ) -> Result<
-                        ::fidl_next::ResponseFuture<
-                            '_,
-                            Self::Transport,
-                            {{ module_name }}::{{ method_type_name }},
-                        >,
-                        ::fidl_next::EncodeError,
-                    >
-                    where
-                        ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.static_wire_type(request) }},
-                        >;
-                {% else %}
-                    fn {{ method_name }}(
-                        &self,
-                    ) -> Result<
-                        ::fidl_next::ResponseFuture<
-                            '_,
-                            Self::Transport,
-                            {{ module_name }}::{{ method_type_name }},
-                        >,
-                        ::fidl_next::EncodeError,
-                    >;
-                {% endif %}
-            {% when ProtocolMethodKind::Event %}
-        {% endmatch %}
-    {% endfor %}
-}
+                impl<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                > ::fidl_next::Encodable for {{ method_type_name }}<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                >
+                where
+                    {% for (i, member) in args.members.iter().enumerate() %}
+                        T{{ i }}: ::fidl_next::Encodable<Encoded = {{ self.static_wire_type(member.ty) }}>,
+                    {% endfor %}
+                {
+                    type Encoded = {{ self.static_wire_type(method.maybe_request_payload.as_ref().or(method.maybe_response_payload.as_ref()).unwrap()) }};
+                }
 
-impl<___T> {{ client_sender_name }} for ::fidl_next::ClientSender<___T, {{ protocol_name }}>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+                unsafe impl<
+                    ___E,
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                > ::fidl_next::Encode<___E> for {{ method_type_name }}<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                >
+                where
+                    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+                    {% if !is_static %}
+                        ___E: ::fidl_next::Encoder,
+                    {% endif %}
+                    {% if args.is_resource %}
+                        ___E: ::fidl_next::fuchsia::HandleEncoder,
+                    {% endif %}
+                    {% for (i, member) in args.members.iter().enumerate() %}
+                        T{{ i }}: ::fidl_next::Encode<___E, Encoded = {{ self.static_wire_type(member.ty) }}>,
+                    {% endfor %}
+                {
+                    #[inline]
+                    fn encode(
+                        self,
+                        encoder: &mut ___E,
+                        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+                    ) -> Result<(), ::fidl_next::EncodeError> {
+                        ::fidl_next::munge! {
+                            let Self::Encoded {
+                                {% for member in args.members -%}
+                                    {{ member.name|snake }},
+                                {% endfor %}
+                            } = out;
+                        }
 
-    {% for method in protocol.methods %}
-        {% let method_name = filters::ident(method.name.snake())? %}
-        {% let method_type_name = filters::ident(method.name.camel())? %}
-
-        {% match method.kind %}
-            {% when ProtocolMethodKind::OneWay %}
-                {{ self::doc_string(method.attributes) -}}
-                {% if let Some(request) = method.maybe_request_payload %}
-                    fn {{ method_name }}<___R>(
-                        &self,
-                        request: ___R,
-                    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                    where
-                        ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.static_wire_type(request) }},
-                        >,
-                    {
-                        self.as_untyped().send_one_way({{ method.ordinal }}, request)
+                        {% for member in args.members %}
+                            {% let member_name = filters::snake(member.name)? %}
+                            ::fidl_next::Encode::encode(self.{{ member_name }}, encoder, {{ member_name }})?;
+                        {% endfor %}
+                        Ok(())
                     }
-                {% else %}
-                    fn {{ method_name }}(
-                        &self,
-                    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-                        self.as_untyped().send_one_way({{ method.ordinal }}, ())
-                    }
+                }
+            {% endif %}
+        {% endfor %}
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::{{ protocol_name }}
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = {{ client_sender_name }}<___T>;
+            type ServerSender = {{ server_sender_name }}<___T>;
+        }
+
+        /// The client sender for the `{{ non_canonical_name }}` protocol.
+        pub struct {{ client_sender_name }}<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> {{ client_sender_name }}<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            {% for method in protocol.methods %}
+                {% let method_name = filters::snake(method.name)? %}
+                {% let method_type_name = filters::camel(method.name)? %}
+
+                {% match method.kind %}
+                    {% when ProtocolMethodKind::OneWay %}
+                        {% if let Some(args) = self.get_method_args_struct(method) %}
+                            {% let is_static = args.shape.max_out_of_line == 0 %}
+
+                            {{ self.doc_string(method.attributes) -}}
+                            pub fn {{ method_name }}(
+                                &self,
+                                {% for member in args.members %}
+                                    {{ member.name|snake }}: impl ::fidl_next::Encode<
+                                        <___T as ::fidl_next::Transport>::SendBuffer,
+                                        Encoded = {{ self.static_wire_type(member.ty) }},
+                                    >,
+                                {% endfor %}
+                            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+                            where
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::encoder::InternalHandleEncoder,
+                                {% if !is_static %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+                                {% endif %}
+                                {% if args.is_resource %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+                                {% endif %}
+                            {
+                                self.{{ method_name }}_with({{ method_type_name }} {
+                                    {% for member in args.members %}
+                                        {{ member.name|snake }},
+                                    {% endfor %}
+                                })
+                            }
+                        {% endif %}
+
+                        {{ self.doc_string(method.attributes) -}}
+                        {% if let Some(request) = method.maybe_request_payload %}
+                            pub fn {{ method_name }}_with<___R>(
+                                &self,
+                                request: ___R,
+                            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+                            where
+                                ___R: ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = {{ self.static_wire_type(request) }},
+                                >,
+                            {
+                                self.sender.send_one_way({{ method.ordinal }}, request)
+                            }
+                        {% else %}
+                            pub fn {{ method_name }}(
+                                &self,
+                            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                                self.sender.send_one_way({{ method.ordinal }}, ())
+                            }
+                        {% endif %}
+                    {% when ProtocolMethodKind::TwoWay %}
+                        {% if let Some(args) = self.get_method_args_struct(method) %}
+                            {% let is_static = args.shape.max_out_of_line == 0 %}
+
+                            {{ self.doc_string(method.attributes) -}}
+                            pub fn {{ method_name }}(
+                                &self,
+                                {% for member in args.members %}
+                                    {{ member.name|snake }}: impl ::fidl_next::Encode<
+                                        <___T as ::fidl_next::Transport>::SendBuffer,
+                                        Encoded = {{ self.static_wire_type(member.ty) }},
+                                    >,
+                                {% endfor %}
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::{{ method_type_name }}, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::encoder::InternalHandleEncoder,
+                                {% if !is_static %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+                                {% endif %}
+                                {% if args.is_resource %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+                                {% endif %}
+                            {
+                                self.{{ method_name }}_with({{ method_type_name }} {
+                                    {% for member in args.members %}
+                                        {{ member.name|snake }},
+                                    {% endfor %}
+                                })
+                            }
+                        {% endif %}
+
+                        {{ self.doc_string(method.attributes) -}}
+                        {% if let Some(request) = method.maybe_request_payload %}
+                            pub fn {{ method_name }}_with<___R>(
+                                &self,
+                                request: ___R,
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::{{ method_type_name }}, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                ___R: ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = {{ self.static_wire_type(request) }},
+                                >,
+                            {
+                                self.sender.send_two_way({{ method.ordinal }}, request)
+                                    .map(::fidl_next::ResponseFuture::from_untyped)
+                            }
+                        {% else %}
+                            pub fn {{ method_name }}(
+                                &self,
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::{{ method_type_name }}, ___T>,
+                                ::fidl_next::EncodeError,
+                            > {
+                                self.sender.send_two_way({{ method.ordinal }}, ())
+                                    .map(::fidl_next::ResponseFuture::from_untyped)
+                            }
+                        {% endif %}
+                    {% when ProtocolMethodKind::Event %}
+                {% endmatch %}
+            {% endfor %}
+        }
+
+        /// The server sender for the `{{ non_canonical_name }}` protocol.
+        #[repr(transparent)]
+        pub struct {{ server_sender_name }}<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> {{ server_sender_name }}<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            {% for method in protocol.methods %}
+                {% let method_name = filters::snake(method.name)? %}
+                {% let method_type_name = filters::camel(method.name)? %}
+
+                {% if method.kind == ProtocolMethodKind::Event %}
+                    {% if let Some(args) = self.get_method_args_struct(method) %}
+                        {% let is_static = args.shape.max_out_of_line == 0 %}
+
+                        {{ self.doc_string(method.attributes) -}}
+                        pub fn {{ method_name }}(
+                            &self,
+                            {% for member in args.members %}
+                                {{ member.name|snake }}: impl ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = {{ self.static_wire_type(member.ty) }},
+                                >,
+                            {% endfor %}
+                        ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+                        where
+                            <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::encoder::InternalHandleEncoder,
+                            {% if !is_static %}
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+                            {% endif %}
+                            {% if args.is_resource %}
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+                            {% endif %}
+                        {
+                            self.{{ method_name }}_with({{ method_type_name }} {
+                                {% for member in args.members %}
+                                    {{ member.name|snake }},
+                                {% endfor %}
+                            })
+                        }
+                    {% endif %}
+
+                    {{ self.doc_string(method.attributes) -}}
+                    {% if method.maybe_response_payload.is_some() %}
+                        {% let method_type_name = filters::camel(method.name)? %}
+                        pub fn {{ method_name }}_with<___R>(
+                            &self,
+                            request: ___R,
+                        ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+                        where
+                            ___R: ::fidl_next::Encode<
+                                <___T as ::fidl_next::Transport>::SendBuffer,
+                                Encoded = <super::{{ method_type_name }} as ::fidl_next::Method>::Response,
+                            >,
+                        {
+                            self.sender.send_event({{ method.ordinal }}, request)
+                        }
+                    {% else %}
+                        pub fn {{ method_name }}(
+                            &self,
+                        ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                            self.sender.send_event({{ method.ordinal }}, ())
+                        }
+                    {% endif %}
                 {% endif %}
-            {% when ProtocolMethodKind::TwoWay %}
-                {{ self::doc_string(method.attributes) -}}
-                {% if let Some(request) = method.maybe_request_payload %}
-                    fn {{ method_name }}<___R>(
-                        &self,
-                        request: ___R,
-                    ) -> Result<
-                        ::fidl_next::ResponseFuture<'_, Self::Transport, {{ module_name }}::{{ method_type_name }}>,
-                        ::fidl_next::EncodeError,
-                    >
-                    where
-                        ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.static_wire_type(request) }},
-                        >,
-                    {
-                        self.as_untyped().send_two_way({{ method.ordinal }}, request)
-                            .map(::fidl_next::ResponseFuture::from_untyped)
-                    }
-                {% else %}
-                    fn {{ method_name }}(
-                        &self,
-                    ) -> Result<
-                        ::fidl_next::ResponseFuture<'_, Self::Transport, {{ module_name }}::{{ method_type_name }}>,
-                        ::fidl_next::EncodeError,
-                    > {
-                        self.as_untyped().send_two_way({{ method.ordinal }}, ())
-                            .map(::fidl_next::ResponseFuture::from_untyped)
-                    }
-                {% endif %}
-            {% when ProtocolMethodKind::Event %}
-        {% endmatch %}
-    {% endfor %}
+            {% endfor %}
+        }
+    }
 }
 
 /// A client handler for the {{ non_canonical_name }} protocol.
@@ -244,71 +395,72 @@ where
 pub trait {{ client_handler_name }}<___T: ::fidl_next::Transport> {
     {% for method in protocol.methods %}
         {% if method.kind == ProtocolMethodKind::Event %}
-            {% let method_name = filters::ident(method.name.snake())? %}
-            {% let method_type_name = filters::ident(method.name.camel())? %}
+            {% let method_name = filters::snake(method.name)? %}
+            {% let method_type_name = filters::camel(method.name)? %}
 
-            {{ self::doc_string(method.attributes) -}}
+            {{ self.doc_string(method.attributes) -}}
             fn {{ method_name }}(
                 &mut self,
-                sender: &::fidl_next::ClientSender<___T, {{ protocol_name }}>,
+                sender: &::fidl_next::ClientSender<{{ protocol_name }}, ___T>,
                 {% if method.maybe_response_payload.is_some() %}
-                    event: ::fidl_next::Response<___T, {{ module_name }}::{{ method_type_name }}>,
+                    event: ::fidl_next::Response<{{ module_name }}::{{ method_type_name }}, ___T>,
                 {% endif %}
-            );
+            ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
         {% endif %}
     {% endfor %}
 
     {% if protocol.openness != ProtocolOpenness::Closed %}
         fn on_unknown_interaction(
             &mut self,
-            sender: &::fidl_next::ClientSender<___T, {{ protocol_name }}>,
+            sender: &::fidl_next::ClientSender<{{ protocol_name }}, ___T>,
             ordinal: u64,
-        ) {
+        ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send {
             {# TODO: send epitaph before closing #}
             sender.close();
+            ::core::future::ready(())
         }
     {% endif %}
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for {{ protocol_name }}
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for {{ protocol_name }}
 where
+    ___H: {{ client_handler_name }}<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: {{ client_handler_name }}<___T>,
     {% for method in protocol.methods %}
         {% if method.maybe_response_payload.is_some() %}
-            {% let method_type_name = filters::ident(method.name.camel())? %}
+            {% let method_type_name = filters::camel(method.name)? %}
             <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Response:
                 ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
         {% endif %}
     {% endfor %}
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             {% for method in protocol.methods %}
-                {% let method_name = filters::ident(method.name.snake())? %}
+                {% let method_name = filters::snake(method.name)? %}
                 {% if method.kind == ProtocolMethodKind::Event %}
                     {{ method.ordinal }} => {
                         {% if method.maybe_response_payload.is_some() %}
                             match ::fidl_next::DecoderExt::decode(buffer) {
-                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded).await,
                                 Err(e) => {
                                     {# TODO: send epitaph / log error #}
                                     sender.close();
                                 }
                             }
                         {% else %}
-                            handler.{{ method_name}}(sender);
+                            handler.{{ method_name}}(sender).await;
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(sender, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal).await,
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}
@@ -317,71 +469,6 @@ where
             {% endif %}
         }
     }
-}
-
-/// A helper trait for the `{{ non_canonical_name }}` server sender.
-pub trait {{ server_sender_name }} {
-    type Transport: ::fidl_next::Transport;
-
-    {% for method in protocol.methods %}
-        {% let method_name = filters::ident(method.name.snake())? %}
-
-        {% if method.kind == ProtocolMethodKind::Event %}
-            {{ self::doc_string(method.attributes) -}}
-            {% if method.maybe_response_payload.is_some() %}
-                {% let method_type_name = filters::ident(method.name.camel())? %}
-                fn {{ method_name }}<___R>(
-                    &self,
-                    request: ___R,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                where
-                    ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                        Encoded = <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Response,
-                    >;
-            {% else %}
-                fn {{ method_name }}(
-                    &self,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-            {% endif %}
-        {% endif %}
-    {% endfor %}
-}
-
-impl<___T> {{ server_sender_name }} for ::fidl_next::ServerSender<___T, {{ protocol_name }}>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-
-    {% for method in protocol.methods %}
-        {% let method_name = filters::ident(method.name.snake())? %}
-
-        {% if method.kind == ProtocolMethodKind::Event %}
-            {{ self::doc_string(method.attributes) -}}
-            {% if method.maybe_response_payload.is_some() %}
-                {% let method_type_name = filters::ident(method.name.camel())? %}
-                fn {{ method_name }}<___R>(
-                    &self,
-                    request: ___R,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                where
-                    ___R: ::fidl_next::Encode<
-                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                        Encoded = <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Response,
-                    >,
-                {
-                    self.as_untyped().send_event({{ method.ordinal }}, request)
-                }
-            {% else %}
-                fn {{ method_name }}(
-                    &self,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-                    self.as_untyped().send_event({{ method.ordinal }}, ())
-                }
-            {% endif %}
-        {% endif %}
-    {% endfor %}
 }
 
 /// A server handler for the {{ non_canonical_name }} protocol.
@@ -389,29 +476,29 @@ where
 /// See [`{{ protocol_name }}`] for more details.
 pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
     {% for method in protocol.methods %}
-        {% let method_name = filters::ident(method.name.snake())? %}
-        {% let method_type_name = filters::ident(method.name.camel())? %}
+        {% let method_name = filters::snake(method.name)? %}
+        {% let method_type_name = filters::camel(method.name)? %}
 
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
-                {{ self::doc_string(method.attributes) -}}
+                {{ self.doc_string(method.attributes) -}}
                 fn {{ method_name }}(
                     &mut self,
-                    sender: &::fidl_next::ServerSender<___T, {{ protocol_name }}>,
+                    sender: &::fidl_next::ServerSender<{{ protocol_name }}, ___T>,
                     {% if let Some(request) = method.maybe_request_payload %}
-                        request: ::fidl_next::Request<___T, {{ module_name }}::{{ method_type_name }}>,
+                        request: ::fidl_next::Request<{{ module_name }}::{{ method_type_name }}, ___T>,
                     {% endif %}
-                );
+                ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
             {% when ProtocolMethodKind::TwoWay %}
-                {{ self::doc_string(method.attributes) -}}
+                {{ self.doc_string(method.attributes) -}}
                 fn {{ method_name }}(
                     &mut self,
-                    sender: &::fidl_next::ServerSender<___T, {{ protocol_name }}>,
+                    sender: &::fidl_next::ServerSender<{{ protocol_name }}, ___T>,
                     {% if let Some(request) = method.maybe_request_payload %}
-                        request: ::fidl_next::Request<___T, {{ module_name }}::{{ method_type_name }}>,
+                        request: ::fidl_next::Request<{{ module_name }}::{{ method_type_name }}, ___T>,
                     {% endif %}
                     responder: ::fidl_next::Responder<{{ module_name }}::{{ method_type_name }}>,
-                );
+                ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
             {% when ProtocolMethodKind::Event %}
         {% endmatch %}
     {% endfor %}
@@ -419,54 +506,55 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
     {% if protocol.openness != ProtocolOpenness::Closed %}
         fn on_unknown_interaction(
             &mut self,
-            sender: &::fidl_next::ServerSender<___T, {{ protocol_name }}>,
+            sender: &::fidl_next::ServerSender<{{ protocol_name }}, ___T>,
             ordinal: u64,
-        ) {
+        ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send {
             {# TODO: send epitaph before closing #}
             sender.close();
+            ::core::future::ready(())
         }
     {% endif %}
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for {{ protocol_name }}
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for {{ protocol_name }}
 where
+    ___H: {{ server_handler_name }}<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: {{ server_handler_name }}<___T>,
     {% for method in protocol.methods %}
         {% if method.maybe_request_payload.is_some() %}
-            {% let method_type_name = filters::ident(method.name.camel())? %}
+            {% let method_type_name = filters::camel(method.name)? %}
             <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Request:
                 ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
         {% endif %}
     {% endfor %}
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             {% for method in protocol.methods %}
-                {% let method_name = filters::ident(method.name.snake())? %}
+                {% let method_name = filters::snake(method.name)? %}
                 {% if method.kind == ProtocolMethodKind::OneWay %}
                     {{ method.ordinal }} => {
                         {% if let Some(request) = method.maybe_request_payload %}
                             match ::fidl_next::DecoderExt::decode(buffer) {
-                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded).await,
                                 Err(e) => {
                                     {# TODO: send epitaph / log error #}
                                     sender.close();
                                 }
                             }
                         {% else %}
-                            handler.{{ method_name}}(sender);
+                            handler.{{ method_name}}(sender).await;
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(sender, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal).await,
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}
@@ -476,36 +564,36 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
             {% for method in protocol.methods %}
-                {% let method_name = filters::ident(method.name.snake())? %}
+                {% let method_name = filters::snake(method.name)? %}
                 {% if method.kind == ProtocolMethodKind::TwoWay %}
                     {{ method.ordinal }} => {
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
                         {% if let Some(request) = method.maybe_request_payload %}
                             match ::fidl_next::DecoderExt::decode(buffer) {
-                                Ok(decoded) => handler.{{ method_name }}(sender, decoded, responder),
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded, responder).await,
                                 Err(e) => {
                                     {# TODO: send epitaph / log error #}
                                     sender.close();
                                 }
                             }
                         {% else %}
-                            handler.{{ method_name}}(sender, responder);
+                            handler.{{ method_name}}(sender, responder).await;
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(sender, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal).await,
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}

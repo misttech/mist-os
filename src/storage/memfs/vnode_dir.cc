@@ -4,8 +4,31 @@
 
 #include "src/storage/memfs/vnode_dir.h"
 
-#include <sys/stat.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/memfs/dnode.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode_file.h"
@@ -41,19 +64,12 @@ zx_status_t VnodeDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out)
   if (!IsDirectory()) {
     return ZX_ERR_NOT_FOUND;
   }
-  Dnode* dn;
-  zx_status_t r = dnode_->Lookup(name, &dn);
-  ZX_DEBUG_ASSERT(r <= 0);
-  if (r == ZX_OK) {
-    if (dn == nullptr) {
-      // Looking up our own vnode
-      *out = fbl::RefPtr<VnodeDir>(this);
-    } else {
-      // Looking up a different vnode
-      *out = dn->AcquireVnode();
-    }
+  Dnode* dn = dnode_->Lookup(name);
+  if (dn == nullptr) {
+    return ZX_ERR_NOT_FOUND;
   }
-  return r;
+  *out = dn->AcquireVnode();
+  return ZX_OK;
 }
 
 zx::result<fs::VnodeAttributes> VnodeDir::GetAttributes() const {
@@ -71,14 +87,15 @@ zx::result<fs::VnodeAttributes> VnodeDir::GetAttributes() const {
   });
 }
 
-zx_status_t VnodeDir::Readdir(fs::VdirCookie* cookie, void* data, size_t len, size_t* out_actual) {
-  fs::DirentFiller df(data, len);
+zx_status_t VnodeDir::Readdir(fs::VdirCookie* cookie, void* dirents, size_t len,
+                              size_t* out_actual) {
+  fs::DirentFiller df(dirents, len);
   if (!IsDirectory()) {
     // This WAS a directory, but it has been deleted.
     *out_actual = 0;
     return ZX_OK;
   }
-  dnode_->Readdir(&df, cookie);
+  dnode_->Readdir(df, cookie);
   *out_actual = df.BytesFilled();
   return ZX_OK;
 }
@@ -88,23 +105,18 @@ zx::result<fbl::RefPtr<fs::Vnode>> VnodeDir::Create(std::string_view name, fs::C
     return zx::error(status);
   }
 
-  fbl::AllocChecker ac;
   fbl::RefPtr<memfs::Vnode> vn;
   bool is_dir = false;
   switch (type) {
     case fs::CreationType::kDirectory: {
-      vn = fbl::AdoptRef(new (&ac) memfs::VnodeDir(memfs_));
+      vn = fbl::MakeRefCounted<memfs::VnodeDir>(memfs_);
       is_dir = true;
       break;
     }
     case fs::CreationType::kFile: {
-      vn = fbl::AdoptRef(new (&ac) memfs::VnodeFile(memfs_));
+      vn = fbl::MakeRefCounted<VnodeFile>(memfs_);
       break;
     }
-  }
-
-  if (!ac.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   if (zx_status_t status = AttachVnode(vn, name, is_dir); status != ZX_OK) {
@@ -116,21 +128,19 @@ zx::result<fbl::RefPtr<fs::Vnode>> VnodeDir::Create(std::string_view name, fs::C
 
 zx_status_t VnodeDir::Unlink(std::string_view name, bool must_be_dir) {
   if (!IsDirectory()) {
-    // Calling unlink from unlinked, empty directory
+    // Calling unlink from unlinked, empty directory.
     return ZX_ERR_BAD_STATE;
   }
-  Dnode* dn;
-  zx_status_t r;
-  if ((r = dnode_->Lookup(name, &dn)) != ZX_OK) {
-    return r;
-  } else if (dn == nullptr) {
-    // Cannot unlink directory 'foo' using the argument 'foo/.'
-    return ZX_ERR_UNAVAILABLE;
-  } else if (!dn->IsDirectory() && must_be_dir) {
+  Dnode* dn = dnode_->Lookup(name);
+  if (dn == nullptr) {
+    return ZX_ERR_NOT_FOUND;
+  }
+  if (!dn->IsDirectory() && must_be_dir) {
     // Path ending in "/" was requested, implying that the dnode must be a directory
     return ZX_ERR_NOT_DIR;
-  } else if ((r = dn->CanUnlink()) != ZX_OK) {
-    return r;
+  }
+  if (zx_status_t status = dn->CanUnlink(); status != ZX_OK) {
+    return status;
   }
 
   dn->Detach();
@@ -146,17 +156,16 @@ zx_status_t VnodeDir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view ol
     return ZX_ERR_NOT_FOUND;
   }
 
-  Dnode* olddn;
-  zx_status_t r;
+  Dnode* olddn = dnode_->Lookup(oldname);
   // The source must exist
-  if ((r = dnode_->Lookup(oldname, &olddn)) != ZX_OK) {
-    return r;
+  if (olddn == nullptr) {
+    return ZX_ERR_NOT_FOUND;
   }
-  ZX_DEBUG_ASSERT(olddn != nullptr);
 
   if (!olddn->IsDirectory() && (src_must_be_dir || dst_must_be_dir)) {
     return ZX_ERR_NOT_DIR;
-  } else if ((newdir->ino() == ino_) && (oldname == newname)) {
+  }
+  if ((newdir->ino() == ino_) && (oldname == newname)) {
     // Renaming a file or directory to itself?
     // Shortcut success case
     return ZX_OK;
@@ -168,42 +177,29 @@ zx_status_t VnodeDir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view ol
     return ZX_ERR_INVALID_ARGS;
   }
 
+  // Allocate the new name for the dnode, either by
+  // (1) Stealing it from the previous dnode, if it exists
+  // (2) Allocating a new name, if creating a new name.
+  std::string name;
   // The destination may or may not exist
-  Dnode* targetdn;
-  r = newdir->dnode_->Lookup(newname, &targetdn);
-  bool target_exists = (r == ZX_OK);
-  if (target_exists) {
-    ZX_DEBUG_ASSERT(targetdn != nullptr);
+  Dnode* target_dnode = newdir->dnode_->Lookup(newname);
+  if (target_dnode != nullptr) {
     // The target exists. Validate and unlink it.
-    if (olddn == targetdn) {
+    if (olddn == target_dnode) {
       // Cannot rename node to itself
       return ZX_ERR_INVALID_ARGS;
     }
-    if (olddn->IsDirectory() != targetdn->IsDirectory()) {
+    if (olddn->IsDirectory() != target_dnode->IsDirectory()) {
       // Cannot rename files to directories (and vice versa)
       return olddn->IsDirectory() ? ZX_ERR_NOT_DIR : ZX_ERR_NOT_FILE;
-    } else if ((r = targetdn->CanUnlink()) != ZX_OK) {
-      return r;
     }
-  } else if (r != ZX_ERR_NOT_FOUND) {
-    return r;
-  }
-
-  // Allocate the new name for the dnode, either by
-  // (1) Stealing it from the previous dnode, if it used the same name, or
-  // (2) Allocating a new name, if creating a new name.
-  std::unique_ptr<char[]> namebuffer(nullptr);
-  if (target_exists) {
-    namebuffer = targetdn->TakeName();
-    targetdn->Detach();
+    if (zx_status_t status = target_dnode->CanUnlink(); status != ZX_OK) {
+      return status;
+    }
+    name = target_dnode->TakeName();
+    target_dnode->Detach();
   } else {
-    fbl::AllocChecker ac;
-    namebuffer.reset(new (&ac) char[newname.length() + 1]);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    memcpy(namebuffer.get(), newname.data(), newname.length());
-    namebuffer[newname.length()] = '\0';
+    name = newname;
   }
 
   // NOTE:
@@ -212,7 +208,7 @@ zx_status_t VnodeDir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view ol
   // beyond this point.
 
   std::unique_ptr<Dnode> moved_node = olddn->RemoveFromParent();
-  olddn->PutName(std::move(namebuffer), newname.length());
+  olddn->PutName(std::move(name));
   Dnode::AddChild(newdir->dnode_, std::move(moved_node));
   return ZX_OK;
 }
@@ -230,39 +226,33 @@ zx_status_t VnodeDir::Link(std::string_view name, fbl::RefPtr<fs::Vnode> target)
     return ZX_ERR_NOT_FILE;
   }
 
-  if (dnode_->Lookup(name, nullptr) == ZX_OK) {
+  if (dnode_->Lookup(name) != nullptr) {
     // The destination should not exist
     return ZX_ERR_ALREADY_EXISTS;
   }
 
   // Make a new dnode for the new name, attach the target vnode to it
-  std::unique_ptr<Dnode> targetdn;
-  if ((targetdn = Dnode::Create(name, vn)) == nullptr) {
-    return ZX_ERR_NO_MEMORY;
+  auto target_dnone = Dnode::Create(std::string(name), vn);
+  if (target_dnone.is_error()) {
+    return target_dnone.status_value();
   }
 
   // Attach the new dnode to its parent
-  Dnode::AddChild(dnode_, std::move(targetdn));
+  Dnode::AddChild(dnode_, std::move(target_dnone).value());
 
   return ZX_OK;
 }
 
 zx_status_t VnodeDir::CreateFromVmo(std::string_view name, zx_handle_t vmo, zx_off_t off,
                                     zx_off_t len) {
-  zx_status_t status;
-  if ((status = CanCreate(name)) != ZX_OK) {
+  if (zx_status_t status = CanCreate(name); status != ZX_OK) {
     return status;
   }
 
   std::lock_guard lock(mutex_);
 
-  fbl::AllocChecker ac;
-  fbl::RefPtr<Vnode> vn;
-  vn = fbl::AdoptRef(new (&ac) VnodeVmo(memfs_, vmo, off, len));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  if ((status = AttachVnode(vn, name, false)) != ZX_OK) {
+  auto vn = fbl::MakeRefCounted<VnodeVmo>(memfs_, vmo, off, len);
+  if (zx_status_t status = AttachVnode(vn, name, false); status != ZX_OK) {
     return status;
   }
 
@@ -273,31 +263,27 @@ zx_status_t VnodeDir::CanCreate(std::string_view name) const {
   if (!IsDirectory()) {
     return ZX_ERR_BAD_STATE;
   }
-  zx_status_t status;
-  if ((status = dnode_->Lookup(name, nullptr)) == ZX_ERR_NOT_FOUND) {
-    return ZX_OK;
-  } else if (status == ZX_OK) {
+  if (dnode_->Lookup(name) != nullptr) {
     return ZX_ERR_ALREADY_EXISTS;
   }
-  return status;
+  return ZX_OK;
 }
 
 zx_status_t VnodeDir::AttachVnode(const fbl::RefPtr<Vnode>& vn, std::string_view name, bool isdir) {
-  // dnode takes a reference to the vnode
-  std::unique_ptr<Dnode> dn;
-  if ((dn = Dnode::Create(name, vn)) == nullptr) {
-    return ZX_ERR_NO_MEMORY;
+  zx::result<std::unique_ptr<Dnode>> dn = Dnode::Create(std::string(name), vn);
+  if (dn.is_error()) {
+    return dn.status_value();
   }
 
-  // Identify that the vnode is a directory (vn->dnode_ != nullptr) so that
-  // addding a child will also increment the parent link_count (after all,
-  // directories contain a ".." entry, which is a link to their parent).
+  // Identify that the vnode is a directory (vn->dnode_ != nullptr) so that adding a child will also
+  // increment the parent link_count (after all, directories contain a ".." entry, which is a link
+  // to their parent).
   if (isdir) {
-    vn->dnode_ = dn.get();
+    vn->dnode_ = dn.value().get();
   }
 
-  // parent takes first reference
-  Dnode::AddChild(dnode_, std::move(dn));
+  // Parent takes first reference.
+  Dnode::AddChild(dnode_, std::move(dn).value());
   return ZX_OK;
 }
 

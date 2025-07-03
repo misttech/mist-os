@@ -9,7 +9,7 @@ use crate::vfs::{
     FsString, MountInfo, Mounts, NamespaceNode, UnlinkKind,
 };
 use bitflags::bitflags;
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, RwLock, RwLockWriteGuard};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, RwLock, RwLockWriteGuard};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::{Errno, ENOENT};
 use starnix_uapi::file_mode::{Access, FileMode};
@@ -381,7 +381,7 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.create_dir_for_testing(locked, current_task, name)
     }
@@ -395,7 +395,7 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // TODO: apply_umask
         self.create_entry(
@@ -432,7 +432,7 @@ impl DirEntry {
         flags: OpenFlags,
     ) -> Result<DirEntryHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // Only directories can have children.
         if !self.node.is_dir() {
@@ -874,7 +874,7 @@ impl DirEntry {
             CreationResult::Created => (child, false),
             CreationResult::Existed { create_fn } => {
                 if child.ops.revalidate(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     current_task,
                     &child,
                 )? {

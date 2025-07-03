@@ -94,13 +94,6 @@ static const std::vector<fpbus::Irq> display_irqs{
     }},
 };
 
-static std::vector<fpbus::Metadata> display_panel_metadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_CONFIG),
-        // No metadata for this item.
-    }},
-};
-
 static const std::vector<fpbus::Bti> display_btis{
     {{
         .iommu_index = 0,
@@ -109,23 +102,15 @@ static const std::vector<fpbus::Bti> display_btis{
 };
 
 zx::result<> PostInit::InitDisplay() {
-  display_panel_t display_panel_info[] = {
-      {
-          .width = 600,
-          .height = 1024,
-      },
+  const std::vector<fpbus::Metadata> display_panel_metadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
+          .data = std::vector(reinterpret_cast<uint8_t*>(&panel_type_),
+                              reinterpret_cast<uint8_t*>(&panel_type_) + sizeof(panel_type_)),
+      }},
   };
 
-  if (display_id_) {
-    display_panel_info[0].panel_type = PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364;
-  } else {
-    display_panel_info[0].panel_type = PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO;
-  }
-  display_panel_metadata[0].data() =
-      std::vector(reinterpret_cast<uint8_t*>(&display_panel_info),
-                  reinterpret_cast<uint8_t*>(&display_panel_info) + sizeof(display_panel_info));
-
-  const fpbus::Node display_dev = []() {
+  const fpbus::Node display_dev = [&]() {
     fpbus::Node dev = {};
     dev.name() = "display";
     dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;

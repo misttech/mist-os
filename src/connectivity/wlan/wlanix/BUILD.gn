@@ -9,6 +9,11 @@ import("//build/rust/rustc_binary.gni")
 fidl("fuchsia.wlan.wlanix") {
   sources = [ "wlanix.fidl" ]
 
+  # This is needed due to http://b/422844461.
+  # We need arbitrarily large messages for persistence,
+  # above what FIDL can normally handle.
+  excluded_checks = [ "vector-bounds-not-specified" ]
+
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.ieee80211",
     "//zircon/vdso/zx",

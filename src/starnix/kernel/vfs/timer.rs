@@ -13,7 +13,7 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
 };
 use starnix_logging::log_warn;
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::time::{duration_from_timespec, timespec_from_duration, timespec_is_zero};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -70,12 +70,16 @@ impl TimerFile {
     /// Creates a new anonymous `TimerFile` in `kernel`.
     ///
     /// Returns an error if the `zx::Timer` could not be created.
-    pub fn new_file(
+    pub fn new_file<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         wakeup_type: TimerWakeup,
         timeline: Timeline,
         flags: OpenFlags,
-    ) -> Result<FileHandle, Errno> {
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let timer: Arc<dyn TimerOps> = match (wakeup_type, timeline) {
             (TimerWakeup::Regular, Timeline::Monotonic) => Arc::new(MonotonicZxTimer::new()),
             (TimerWakeup::Regular, Timeline::BootInstant | Timeline::RealTime) => {
@@ -90,6 +94,7 @@ impl TimerFile {
         };
 
         Ok(Anon::new_private_file(
+            locked,
             current_task,
             Box::new(TimerFile {
                 timer,

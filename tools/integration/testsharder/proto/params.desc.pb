@@ -1,6 +1,6 @@
 
-š
-params.prototestshardergoogle/protobuf/duration.proto"–
+Ý
+params.prototestshardergoogle/protobuf/duration.proto"Ù
 Params)
 environment_tags (	RenvironmentTagsB
 target_duration (2.google.protobuf.DurationRtargetDuration+
@@ -20,4 +20,7 @@ image_deps	 (R	imageDeps
 shard_timeout (2.google.protobuf.DurationRshardTimeout2
 disabled_device_types (	RdisabledDeviceTypes
 pool (	Rpool
-use_tcg (RuseTcgB<Z:go.fuchsia.dev/fuchsia/tools/integration/testsharder/protobproto3
+use_tcg (RuseTcg 
+experiments (	Rexperiments
+zircon_args (	R
+zirconArgsB<Z:go.fuchsia.dev/fuchsia/tools/integration/testsharder/protobproto3

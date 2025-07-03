@@ -80,8 +80,8 @@ void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
   }
 }
 
-void CheckMmioRanges(cpp20::span<const boot_shim::DevicetreeMmioRange> actual,
-                     cpp20::span<const boot_shim::DevicetreeMmioRange> expected) {
+void CheckMmioRanges(cpp20::span<const boot_shim::MmioRange> actual,
+                     cpp20::span<const boot_shim::MmioRange> expected) {
   size_t matched_count = 0;
 
   for (size_t i = 0; i < expected.size(); ++i) {

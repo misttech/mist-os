@@ -49,7 +49,6 @@ fuchsia_cc_driver("nelson-module-driver") {
   sources = [
     "nelson-adc.cc",
     "nelson-audio.cc",
-    "nelson-backlight.cc",
     "nelson-bluetooth.cc",
     "nelson-buttons.cc",
     "nelson-canvas.cc",
@@ -72,7 +71,6 @@ fuchsia_cc_driver("nelson-module-driver") {
     "nelson-tee.cc",
     "nelson-thermal.cc",
     "nelson-thermistor.cc",
-    "nelson-touch.cc",
     "nelson-usb.cc",
     "nelson-video.cc",
     "nelson.cc",
@@ -99,6 +97,7 @@ fuchsia_cc_driver("nelson-module-driver") {
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
@@ -108,6 +107,7 @@ fuchsia_cc_driver("nelson-module-driver") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
@@ -125,7 +125,6 @@ fuchsia_cc_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
     "//src/devices/bind/fuchsia.broadcom.platform.sdio:fuchsia.broadcom.platform.sdio_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
-    "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
     "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
@@ -153,7 +152,6 @@ fuchsia_cc_driver("nelson-module-driver") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
-    "//src/ui/backlight/drivers/ti-lp8556:metadata",
 
     # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
     "//src/lib/ddk:ddk-deprecated-binding-headers",

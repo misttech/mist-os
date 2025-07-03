@@ -16,6 +16,7 @@
             protocol: [
                 "fuchsia.component.resolution.Resolver",
                 "fuchsia.pkg.Cup",
+                "fuchsia.pkg.internal.OtaDownloader",
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.PackageResolver-ota",
                 "fuchsia.pkg.RepositoryManager",
@@ -76,6 +77,7 @@
             protocol: [
                 "fuchsia.component.resolution.Resolver",
                 "fuchsia.pkg.Cup",
+                "fuchsia.pkg.internal.OtaDownloader",
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.PackageResolver-ota",
                 "fuchsia.pkg.RepositoryManager",

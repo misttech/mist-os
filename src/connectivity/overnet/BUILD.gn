@@ -19,6 +19,5 @@ group("tests_no_e2e") {
   deps = [
     "lib:tests",
     "tests:tests_no_e2e",
-    "usb:tests",
   ]
 }

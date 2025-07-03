@@ -331,12 +331,11 @@ pub enum PacketOrigin<I: Ip, D> {
 
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
-    use alloc::collections::HashSet;
-
     use derivative::Derivative;
     use net_types::ip::IpAddress;
     use netstack3_base::testutil::FakeCoreCtx;
     use netstack3_base::{NotFoundError, StrongDeviceIdentifier};
+    use netstack3_hashmap::HashSet;
 
     use crate::internal::base::{IpRouteTablesContext, IpStateContext};
     use crate::internal::routing::rules::Rule;
@@ -483,14 +482,13 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashSet;
-
     use ip_test_macro::ip_test;
     use itertools::Itertools;
     use log::trace;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::ip::{Ipv6, Ipv6Addr};
     use netstack3_base::testutil::{MultipleDevicesId, TestAddrs};
+    use netstack3_hashmap::HashSet;
     use test_case::test_case;
 
     use super::*;

@@ -7,7 +7,7 @@ use crate::rights::Rights;
 use async_trait::async_trait;
 use clonable_error::ClonableError;
 use cm_rust::{CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, UseDeclCommon};
-use cm_types::Name;
+use cm_types::{Availability, Name};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::{DowncastErrorForTest, Explain, RouterError};
 use std::sync::Arc;
@@ -260,6 +260,9 @@ pub enum RoutingError {
     #[error("`{capability_id}` was not exposed to `{moniker}` from `#{child_moniker}`")]
     UseFromChildExposeNotFound { child_moniker: ChildName, moniker: Moniker, capability_id: String },
 
+    #[error("`{capability_id}` was not exposed from `/`")]
+    UseFromRootExposeNotFound { capability_id: String },
+
     #[error("routing a capability from an unsupported source type `{source_type}` at `{moniker}`")]
     UnsupportedRouteSource { source_type: String, moniker: ExtendedMoniker },
 
@@ -282,6 +285,9 @@ pub enum RoutingError {
 
     #[error("routed capability was the wrong type at component `{moniker}`. Was: {actual}, expected: {expected}")]
     BedrockWrongCapabilityType { actual: String, expected: String, moniker: ExtendedMoniker },
+
+    #[error("expected type {type_name} for routed capability at component `{moniker}`, but type was missing")]
+    BedrockMissingCapabilityType { type_name: String, moniker: ExtendedMoniker },
 
     #[error("there was an error remoting a capability at component `{moniker}`")]
     BedrockRemoteCapability { moniker: Moniker },
@@ -380,6 +386,7 @@ impl Explain for RoutingError {
             | RoutingError::ExposeFromChildExposeNotFound { .. }
             | RoutingError::ExposeFromFrameworkNotFound { .. }
             | RoutingError::UseFromChildExposeNotFound { .. }
+            | RoutingError::UseFromRootExposeNotFound { .. }
             | RoutingError::UnsupportedRouteSource { .. }
             | RoutingError::UnsupportedCapabilityType { .. }
             | RoutingError::EventsRoutingError(_)
@@ -388,6 +395,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockFailedToSend { .. }
             | RoutingError::RouteSourceShutdown { .. }
+            | RoutingError::BedrockMissingCapabilityType { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
@@ -449,6 +457,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::BedrockNotCloneable { moniker }
             | RoutingError::BedrockSourceDictionaryCollision { moniker }
             | RoutingError::BedrockFailedToSend { moniker, .. }
+            | RoutingError::BedrockMissingCapabilityType { moniker, .. }
             | RoutingError::BedrockWrongCapabilityType { moniker, .. }
             | RoutingError::NonDebugRoutesUnsupported { moniker }
             | RoutingError::DebugRoutesUnsupported { moniker }
@@ -465,9 +474,8 @@ impl From<RoutingError> for ExtendedMoniker {
             RoutingError::CapabilityFromComponentManagerNotFound { .. }
             | RoutingError::OfferFromComponentManagerNotFound { .. }
             | RoutingError::RegisterFromComponentManagerNotFound { .. }
-            | RoutingError::UseFromComponentManagerNotFound { .. } => {
-                ExtendedMoniker::ComponentManager
-            }
+            | RoutingError::UseFromComponentManagerNotFound { .. }
+            | RoutingError::UseFromRootExposeNotFound { .. } => ExtendedMoniker::ComponentManager,
         }
     }
 }
@@ -789,7 +797,7 @@ pub trait ErrorReporter: Clone + Send + Sync + 'static {
         &self,
         request: &RouteRequestErrorInfo,
         err: &RouterError,
-        route_target: Option<sandbox::WeakInstanceToken>,
+        route_target: sandbox::WeakInstanceToken,
     );
 }
 
@@ -802,7 +810,11 @@ pub struct RouteRequestErrorInfo {
 
 impl RouteRequestErrorInfo {
     pub fn availability(&self) -> cm_rust::Availability {
-        self.availability.clone()
+        self.availability
+    }
+
+    pub fn for_builtin(capability_type: CapabilityTypeName, name: &Name) -> Self {
+        Self { capability_type, name: name.clone(), availability: Availability::Required }
     }
 }
 
@@ -842,6 +854,46 @@ impl From<&cm_rust::OfferDecl> for RouteRequestErrorInfo {
             capability_type: value.into(),
             name: value.target_name().clone(),
             availability: value.availability().clone(),
+        }
+    }
+}
+
+impl From<&cm_rust::ResolverRegistration> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::ResolverRegistration) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: CapabilityTypeName::Resolver,
+            name: value.source_name().clone(),
+            availability: Availability::Required,
+        }
+    }
+}
+
+impl From<&cm_rust::RunnerRegistration> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::RunnerRegistration) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: CapabilityTypeName::Runner,
+            name: value.source_name().clone(),
+            availability: Availability::Required,
+        }
+    }
+}
+
+impl From<&cm_rust::DebugRegistration> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::DebugRegistration) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: CapabilityTypeName::Protocol,
+            name: value.source_name().clone(),
+            availability: Availability::Required,
+        }
+    }
+}
+
+impl From<&cm_rust::CapabilityDecl> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::CapabilityDecl) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: value.into(),
+            name: value.name().clone(),
+            availability: Availability::Required,
         }
     }
 }

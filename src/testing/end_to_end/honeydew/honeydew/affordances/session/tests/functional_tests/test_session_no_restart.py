@@ -9,9 +9,11 @@ from typing import Set
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
+from honeydew import errors
 from honeydew.affordances.session import errors as session_errors
 from honeydew.affordances.session import session_using_ffx
 from honeydew.fuchsia_device import fuchsia_device
+from honeydew.utils import common
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +38,10 @@ class SessionAffordanceNoRestartTests(fuchsia_base_test.FuchsiaBaseTest):
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
+
+    def teardown_test(self) -> None:
+        self.device.close()
+        super().teardown_test()
 
     def test_add_component(self) -> None:
         """Test case for session.add_component()"""
@@ -73,17 +79,33 @@ class SessionAffordanceNoRestartTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for session.cleanup()."""
 
         self.device.session.ensure_started()
-        self.device.session.add_component(_TILE_URL)
 
-        before_cleanup = self._elements()
+        before_add = self._elements()
+        self.device.session.add_component(_TILE_URL)
+        after_add = self._elements()
+
+        added_elements = after_add - before_add
+        asserts.assert_equal(len(added_elements), 1)
+        added_element = list(added_elements)[0]
+
+        _LOGGER.info(f"added element: {added_element}")
 
         session = self.device.session
         session._cleanup()
 
-        after_cleanup = self._elements()
+        def element_removed() -> bool:
+            elements = self._elements()
+            _LOGGER.info(f"current elements: {elements}")
+            return added_element not in self._elements()
 
-        # The cleanup should remove at least one component.
-        asserts.assert_greater(len(before_cleanup), len(after_cleanup))
+        try:
+            common.wait_for_state(
+                state_fn=element_removed,
+                expected_state=True,
+                wait_time=2,  # Time to wait between retries in seconds
+            )
+        except errors.HoneydewTimeoutError:
+            self.fail("The added element is not removed.")
 
 
 if __name__ == "__main__":

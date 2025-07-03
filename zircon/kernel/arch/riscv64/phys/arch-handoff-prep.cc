@@ -17,14 +17,6 @@
 
 ArchPatchInfo ArchPreparePatchInfo() { return {}; }
 
-void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {
-  ZX_DEBUG_ASSERT(handoff_);
-  ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
-
-  arch_handoff.boot_hart_id = gArchPhysInfo->boot_hart_id;
-  arch_handoff.cpu_features = gArchPhysInfo->cpu_features;
-}
-
 void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
                                            ktl::span<const ktl::byte> payload) {
   ZX_DEBUG_ASSERT(handoff_);
@@ -35,8 +27,9 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
       switch (header.extra) {
         case ZBI_KERNEL_DRIVER_RISCV_PLIC:
           ZX_ASSERT(payload.size() >= sizeof(zbi_dcfg_riscv_plic_driver_t));
-          arch_handoff.plic_driver =
-              *reinterpret_cast<const zbi_dcfg_riscv_plic_driver_t*>(payload.data());
+          arch_handoff.plic_driver = RiscvPlicDriverConfig{
+              .zbi = *reinterpret_cast<const zbi_dcfg_riscv_plic_driver_t*>(payload.data()),
+          };
           SaveForMexec(header, payload);
           break;
         case ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER:
@@ -55,4 +48,44 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
       break;
     }
   }
+}
+
+void HandoffPrep::ArchConstructKernelAddressSpace() {
+  ZX_DEBUG_ASSERT(handoff_);
+  ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
+
+  if (arch_handoff.plic_driver) {
+    const zbi_dcfg_riscv_plic_driver_t& config = arch_handoff.plic_driver->zbi;
+    arch_handoff.plic_driver->mmio =
+        PublishSingleMmioMappingVmar("PLIC"sv, config.mmio_phys, config.size_bytes);
+  }
+}
+
+void HandoffPrep::ArchDoHandoff(ZirconAbi abi, const ArchPatchInfo& patch_info) {
+  ZX_DEBUG_ASSERT(handoff_);
+  ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
+
+  arch_handoff.boot_hart_id = gArchPhysInfo->boot_hart_id;
+  arch_handoff.cpu_features = gArchPhysInfo->cpu_features;
+
+  __asm__ volatile(
+      // We want the kernel's main to be at the root of the call stack, so
+      // clear the return address and frame pointer.
+      "mv ra, zero\n"
+      "mv s0, zero\n"
+
+      // TODO(https://fxbug.dev/42164859): Set the machine stack pointer
+      // TODO(https://fxbug.dev/42164859): Set or clear the would-be shadow call stack pointer
+      // TODO(https://fxbug.dev/42164859): Set the thread pointer.
+
+      "mv a0, %[handoff]\n"
+      "jr %[entry]"
+      :                                //
+      : [entry] "r"(kernel_.entry()),  //
+        [handoff] "r"(handoff_),       //
+        "m"(*handoff_)                 // Ensures no store to the handoff can be regarded as dead
+      : "a0"                           //
+  );
+
+  __UNREACHABLE;
 }

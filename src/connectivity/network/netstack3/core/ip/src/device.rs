@@ -27,12 +27,12 @@ use net_types::ip::{
 };
 use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, AssignedAddrIpExt, Counter, DeferredResourceRemovalContext, DeviceIdContext,
-    EventContext, ExistsError, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,
-    IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr, Ipv6DeviceAddr,
-    NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext, RngContext,
-    SendFrameError, StrongDeviceIdentifier, TimerContext, TimerHandler, TxMetadataBindingsTypes,
-    WeakDeviceIdentifier, WeakIpAddressId,
+    AnyDevice, AssignedAddrIpExt, Counter, CounterCollectionSpec, DeferredResourceRemovalContext,
+    DeviceIdContext, EventContext, ExistsError, HandleableTimer, Instant, InstantBindingsTypes,
+    InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr,
+    Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext,
+    RngContext, SendFrameError, StrongDeviceIdentifier, TimerContext, TimerHandler,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier, WeakIpAddressId,
 };
 use netstack3_filter::ProofOfEgressCheck;
 use packet::{BufferMut, Serializer};
@@ -48,7 +48,8 @@ use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
 use crate::internal::device::dad::{
-    DadHandler, DadIncomingPacketResult, DadIpExt, DadTimerId, Ipv6PacketResultMetadata, NeedsDad,
+    DadHandler, DadIncomingPacketResult, DadIpExt, DadTimerId, Ipv4DadAddressInfo,
+    Ipv6PacketResultMetadata, NeedsDad,
 };
 use crate::internal::device::nud::NudIpHandler;
 use crate::internal::device::route_discovery::{
@@ -394,6 +395,9 @@ pub enum AddressRemovedReason {
     Manual,
     /// The address was removed because it was detected as a duplicate via DAD.
     DadFailed,
+    /// The address was voluntarily forfeited because a conflict was detected
+    /// during ongoing address conflict detection.
+    Forfeited,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, GenericOverIp)]
@@ -839,7 +843,7 @@ pub trait IpDeviceHandler<I: IpDeviceIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// there was one before any action was taken. That is, this method returns
     /// `IpAddressState::Tentative` when the address was tentatively assigned
     /// (and now removed), `IpAddressState::Assigned` if the address was
-    /// assigned (and so not removed), otherwise `IpAddressState::Unassigned`.
+    /// assigned (and possibly removed), otherwise `IpAddressState::Unassigned`.
     ///
     /// For IPv4, a DAD packet is either an ARP request or response. For IPv6 a
     /// DAD packet is either a Neighbor Solicitation or a Neighbor
@@ -881,67 +885,104 @@ impl<
             Err(NotFoundError) => return IpAddressState::Unavailable,
         };
 
-        match self.with_ip_device_configuration(device_id, |_config, mut core_ctx| {
-            core_ctx.handle_incoming_packet(bindings_ctx, device_id, &addr_id, packet_data)
-        }) {
-            DadIncomingPacketResult::Assigned => return IpAddressState::Assigned,
-            DadIncomingPacketResult::Tentative { meta } => {
-                #[derive(GenericOverIp)]
-                #[generic_over_ip(I, Ip)]
-                struct Wrapped<I: IpDeviceIpExt>(I::IncomingPacketResultMeta);
-                let is_looped_back = I::map_ip_in(
-                    Wrapped(meta),
-                    // Note: Looped back ARP probes are handled directly in the
-                    // ARP engine.
-                    |Wrapped(())| false,
-                    // Per RFC 7527 section 4.2:
-                    //   If the node has been configured to use the Enhanced DAD algorithm and
-                    //   an interface on the node receives any NS(DAD) message where the
-                    //   Target Address matches the interface address (in tentative or
-                    //   optimistic state), the receiver compares the nonce included in the
-                    //   message, with any stored nonce on the receiving interface.  If a
-                    //   match is found, the node SHOULD log a system management message,
-                    //   SHOULD update any statistics counter, and MUST drop the received
-                    //   message.  If the received NS(DAD) message includes a nonce and no
-                    //   match is found with any stored nonce, the node SHOULD log a system
-                    //   management message for a DAD-failed state and SHOULD update any
-                    //   statistics counter.
-                    |Wrapped(Ipv6PacketResultMetadata { matched_nonce })| matched_nonce,
-                );
+        let orig_state =
+            match self.with_ip_device_configuration(device_id, |_config, mut core_ctx| {
+                core_ctx.handle_incoming_packet(bindings_ctx, device_id, &addr_id, packet_data)
+            }) {
+                DadIncomingPacketResult::Assigned { should_remove } => {
+                    if !should_remove {
+                        // Return `Assigned` without removing the address.
+                        return IpAddressState::Assigned;
+                    } else {
+                        // Otherwise fall through to address removal.
 
-                if is_looped_back {
-                    // Increment a counter (IPv6 only).
-                    self.increment_both(device_id, |c| {
-                        #[derive(GenericOverIp)]
-                        #[generic_over_ip(I, Ip)]
-                        struct InCounters<'a, I: IpDeviceIpExt>(&'a I::RxCounters<Counter>);
-                        I::map_ip_in::<_, _>(
-                            InCounters(&c.version_rx),
-                            |_counters| unreachable!("Looped back ARP probes are dropped in ARP"),
-                            |InCounters(counters)| &counters.drop_looped_back_dad_probe,
-                        )
-                    });
-
-                    // Return `Tentative` without removing the address if the
-                    // probe is looped back.
-                    return IpAddressState::Tentative;
+                        // Note: RFC 5227 section 2.4 states that:
+                        //   Before abandoning an address due to a conflict,
+                        //   hosts SHOULD actively attempt to reset any existing
+                        //   connections using that address.  This mitigates
+                        //   some security threats posed by address reconfiguration
+                        //
+                        // For now we don't reset any TCP connections, but in
+                        // the future may decide it's appropriate to do so.
+                        IpAddressState::Assigned
+                    }
                 }
-            }
-            DadIncomingPacketResult::Uninitialized => {}
-        }
+                DadIncomingPacketResult::Tentative { meta } => {
+                    #[derive(GenericOverIp)]
+                    #[generic_over_ip(I, Ip)]
+                    struct Wrapped<I: IpDeviceIpExt>(I::IncomingPacketResultMeta);
+                    let is_looped_back = I::map_ip_in(
+                        Wrapped(meta),
+                        // Note: Looped back ARP probes are handled directly in the
+                        // ARP engine.
+                        |Wrapped(())| false,
+                        // Per RFC 7527 section 4.2:
+                        //   If the node has been configured to use the Enhanced DAD algorithm and
+                        //   an interface on the node receives any NS(DAD) message where the
+                        //   Target Address matches the interface address (in tentative or
+                        //   optimistic state), the receiver compares the nonce included in the
+                        //   message, with any stored nonce on the receiving interface.  If a
+                        //   match is found, the node SHOULD log a system management message,
+                        //   SHOULD update any statistics counter, and MUST drop the received
+                        //   message.  If the received NS(DAD) message includes a nonce and no
+                        //   match is found with any stored nonce, the node SHOULD log a system
+                        //   management message for a DAD-failed state and SHOULD update any
+                        //   statistics counter.
+                        |Wrapped(Ipv6PacketResultMetadata { matched_nonce })| matched_nonce,
+                    );
+
+                    if is_looped_back {
+                        // Increment a counter (IPv6 only).
+                        self.increment_both(device_id, |c| {
+                            #[derive(GenericOverIp)]
+                            #[generic_over_ip(I, Ip)]
+                            struct InCounters<'a, I: IpDeviceIpExt>(
+                                &'a <I::RxCounters as CounterCollectionSpec>::CounterCollection<
+                                    Counter,
+                                >,
+                            );
+                            I::map_ip_in::<_, _>(
+                                InCounters(&c.version_rx),
+                                |_counters| {
+                                    unreachable!("Looped back ARP probes are dropped in ARP")
+                                },
+                                |InCounters(counters)| &counters.drop_looped_back_dad_probe,
+                            )
+                        });
+
+                        // Return `Tentative` without removing the address if the
+                        // probe is looped back.
+                        return IpAddressState::Tentative;
+                    } else {
+                        // Otherwise fall through to address removal.
+                        IpAddressState::Tentative
+                    }
+                }
+                DadIncomingPacketResult::Uninitialized => IpAddressState::Unavailable,
+            };
 
         // If we're here, we've had a conflicting packet and we should remove the
         // address.
+        let removal_reason = match orig_state {
+            // Conflicts while assigned are part of ongoing conflict detection
+            // and are considered forfeits.
+            IpAddressState::Assigned => AddressRemovedReason::Forfeited,
+            // Conflicts while tentative or unavailable are considered DAD
+            // failures.
+            IpAddressState::Tentative | IpAddressState::Unavailable => {
+                AddressRemovedReason::DadFailed
+            }
+        };
         match del_ip_addr(
             self,
             bindings_ctx,
             device_id,
             DelIpAddr::AddressId(addr_id),
-            AddressRemovedReason::DadFailed,
+            removal_reason,
         ) {
             Ok(result) => {
                 bindings_ctx.defer_removal_result(result);
-                IpAddressState::Tentative
+                orig_state
             }
             Err(NotFoundError) => {
                 // We may have raced with user removal of this address.
@@ -1847,7 +1888,7 @@ where
             bindings_ctx,
             &device_id,
             sender_addr,
-            (),
+            Ipv4DadAddressInfo::SourceAddr,
         );
         match sender_addr_state {
             // As Per RFC 5227 section 2.4:
@@ -1859,14 +1900,11 @@ where
             //   indicating some other host also thinks it is validly using this
             //   address.
             IpAddressState::Assigned => {
-                // TODO(https://fxbug.dev/42077260): Implement one of the
-                // address defence strategies outlined in RFC 5227 section 2.4.
                 info!("DAD received conflicting ARP packet for assigned addr=({sender_addr})");
             }
-            IpAddressState::Tentative => {
-                debug!("DAD received conflicting ARP packet for tentative addr=({sender_addr})");
+            s @ IpAddressState::Tentative | s @ IpAddressState::Unavailable => {
+                debug!("DAD received conflicting ARP packet for addr=({sender_addr}), state={s:?}");
             }
-            IpAddressState::Unavailable => {}
         }
     }
 
@@ -1885,17 +1923,16 @@ where
             bindings_ctx,
             &device_id,
             target_addr,
-            (),
+            Ipv4DadAddressInfo::TargetAddr,
         );
         let assigned = match target_addr_state {
             // Unlike the sender_addr, it's not concerning to receive an ARP
             // packet whose target_addr is assigned to us.
             IpAddressState::Assigned => true,
-            IpAddressState::Tentative => {
-                debug!("DAD received conflicting ARP packet for tentative addr=({sender_addr})");
+            s @ IpAddressState::Tentative | s @ IpAddressState::Unavailable => {
+                debug!("DAD received conflicting ARP packet for addr=({target_addr}), state={s:?}");
                 false
             }
-            IpAddressState::Unavailable => false,
         };
         assigned
     } else {

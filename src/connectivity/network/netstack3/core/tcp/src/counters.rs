@@ -41,7 +41,10 @@ pub type TcpCountersWithoutSocket<I> = IpMarked<I, TcpCountersWithoutSocketInner
 ///
 /// The counter type `C` is generic to facilitate testing.
 #[derive(Default, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct TcpCountersWithoutSocketInner<C = Counter> {
     /// Count of received IP packets that were dropped because they had
     /// unexpected IP addresses (either src or dst).
@@ -74,7 +77,10 @@ pub type TcpCountersWithSocket<I> = IpMarked<I, TcpCountersWithSocketInner<Count
 /// The counter type `C` is generic to facilitate testing.
 // TODO(https://fxbug.dev/42052878): Add counters for SYN cookies.
 #[derive(Default, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct TcpCountersWithSocketInner<C = Counter> {
     /// Count of received TCP segments that were successfully dispatched to a
     /// socket.
@@ -377,89 +383,5 @@ pub(crate) mod testutil {
 
     pub(crate) type CounterExpectations = TcpCountersWithSocketInner<u64>;
 
-    impl From<&TcpCountersWithSocketInner> for CounterExpectations {
-        fn from(counters: &TcpCountersWithSocketInner) -> CounterExpectations {
-            let TcpCountersWithSocketInner {
-                received_segments_dispatched,
-                listener_queue_overflow,
-                segment_send_errors,
-                segments_sent,
-                passive_open_no_route_errors,
-                passive_connection_openings,
-                active_open_no_route_errors,
-                active_connection_openings,
-                failed_connection_attempts,
-                failed_port_reservations,
-                resets_received,
-                resets_sent,
-                syns_received,
-                syns_sent,
-                fins_received,
-                fins_sent,
-                timeouts,
-                retransmits,
-                slow_start_retransmits,
-                fast_retransmits,
-                sack_retransmits,
-                fast_recovery,
-                sack_recovery,
-                established_closed,
-                established_resets,
-                established_timedout,
-                loss_recovered,
-                dup_acks,
-            } = counters;
-            TcpCountersWithSocketInner {
-                received_segments_dispatched: received_segments_dispatched.get(),
-                listener_queue_overflow: listener_queue_overflow.get(),
-                segment_send_errors: segment_send_errors.get(),
-                segments_sent: segments_sent.get(),
-                passive_open_no_route_errors: passive_open_no_route_errors.get(),
-                passive_connection_openings: passive_connection_openings.get(),
-                active_open_no_route_errors: active_open_no_route_errors.get(),
-                active_connection_openings: active_connection_openings.get(),
-                failed_connection_attempts: failed_connection_attempts.get(),
-                failed_port_reservations: failed_port_reservations.get(),
-                resets_received: resets_received.get(),
-                resets_sent: resets_sent.get(),
-                syns_received: syns_received.get(),
-                syns_sent: syns_sent.get(),
-                fins_received: fins_received.get(),
-                fins_sent: fins_sent.get(),
-                timeouts: timeouts.get(),
-                retransmits: retransmits.get(),
-                slow_start_retransmits: slow_start_retransmits.get(),
-                fast_retransmits: fast_retransmits.get(),
-                sack_retransmits: sack_retransmits.get(),
-                fast_recovery: fast_recovery.get(),
-                sack_recovery: sack_recovery.get(),
-                established_closed: established_closed.get(),
-                established_resets: established_resets.get(),
-                established_timedout: established_timedout.get(),
-                loss_recovered: loss_recovered.get(),
-                dup_acks: dup_acks.get(),
-            }
-        }
-    }
-
     pub(crate) type CounterExpectationsWithoutSocket = TcpCountersWithoutSocketInner<u64>;
-
-    impl From<&TcpCountersWithoutSocketInner> for CounterExpectationsWithoutSocket {
-        fn from(counters: &TcpCountersWithoutSocketInner) -> CounterExpectationsWithoutSocket {
-            let TcpCountersWithoutSocketInner {
-                invalid_ip_addrs_received,
-                invalid_segments_received,
-                valid_segments_received,
-                received_segments_no_dispatch,
-                checksum_errors,
-            } = counters;
-            TcpCountersWithoutSocketInner {
-                invalid_ip_addrs_received: invalid_ip_addrs_received.get(),
-                invalid_segments_received: invalid_segments_received.get(),
-                valid_segments_received: valid_segments_received.get(),
-                received_segments_no_dispatch: received_segments_no_dispatch.get(),
-                checksum_errors: checksum_errors.get(),
-            }
-        }
-    }
 }

@@ -134,13 +134,6 @@ ArchPatchInfo ArchPreparePatchInfo() {
   };
 }
 
-void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {
-  ZX_DEBUG_ASSERT(handoff_);
-  ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
-
-  arch_handoff.alternate_vbar = patch_info.alternate_vbar;
-}
-
 void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
                                            ktl::span<const ktl::byte> payload) {
   ZX_DEBUG_ASSERT(handoff_);
@@ -202,11 +195,12 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
           break;
         case ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND: {
           fbl::AllocChecker ac;
+          size_t num_ele = payload.size() / sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t);
           ZX_ASSERT_MSG(
               payload.size() % sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t) == 0,
               "Payload size of ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND was %zu, must be multiple of %zu",
               payload.size(), sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t));
-          ktl::span buffer = New(arch_handoff.psci_cpu_suspend_driver, ac, payload.size());
+          ktl::span buffer = New(arch_handoff.psci_cpu_suspend_driver, ac, num_ele);
           ZX_ASSERT_MSG(ac.check(),
                         "cannot allocate %zu bytes for ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND",
                         payload.size());
@@ -230,4 +224,34 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
       break;
     }
   }
+}
+
+void HandoffPrep::ArchConstructKernelAddressSpace() {}
+
+void HandoffPrep::ArchDoHandoff(ZirconAbi abi, const ArchPatchInfo& patch_info) {
+  ZX_DEBUG_ASSERT(handoff_);
+  ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
+
+  arch_handoff.alternate_vbar = patch_info.alternate_vbar;
+
+  __asm__ volatile(
+      // We want the kernel's main to be at the root of the call stack, so
+      // clear the return address and frame pointer.
+      "mov x29, xzr\n"
+      "mov x30, xzr\n"
+
+      // TODO(https://fxbug.dev/42164859): Set the machine stack pointer
+      // TODO(https://fxbug.dev/42164859): Set or clear the would-be shadow call stack pointer
+      // TODO(https://fxbug.dev/42164859): Set the thread pointer.
+
+      "mov x0, %[handoff]\n"
+      "br %[entry]"
+      :                                //
+      : [entry] "r"(kernel_.entry()),  //
+        [handoff] "r"(handoff_),       //
+        "m"(*handoff_)                 // Ensures no store to the handoff can be regarded as dead
+      : "x0"                           //
+  );
+
+  __UNREACHABLE;
 }

@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use crate::{
-    expose_root, get_serial_number, parse_features, parse_numbered_handles, run_container_features,
+    expose_root, parse_features, parse_numbered_handles, run_container_features,
     serve_component_runner, serve_container_controller, serve_graphical_presenter, Features,
     MountAction,
 };
 use anyhow::{anyhow, bail, Context, Error};
 use bootreason::get_android_bootreason;
 use bstr::{BString, ByteSlice};
+use devicetree::parser::parse_devicetree;
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
@@ -29,7 +30,7 @@ use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::container_namespace::ContainerNamespace;
-use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
+use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager};
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
@@ -45,7 +46,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::{errno, rlimit, tid_t};
+use starnix_uapi::{errno, tid_t};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -54,11 +55,12 @@ use zx::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
-    fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
+    fuchsia_inspect as inspect, fuchsia_runtime as fruntime, fuchsia_zbi as zbi,
 };
 
 use std::sync::Weak;
@@ -500,6 +502,70 @@ pub async fn create_component_from_stream(
     bail!("did not receive Start request");
 }
 
+async fn get_bootargs() -> Result<String, Error> {
+    let items =
+        connect_to_protocol::<fboot::ItemsMarker>().context("Failed to connect to boot items")?;
+
+    let items_response = items
+        .get2(zbi::ZbiType::DeviceTree.into_raw(), None)
+        .await
+        .context("FIDL: Failed to get devicetree item")?
+        .map_err(|e| anyhow!("Failed to get devicetree item {:?}", e))?;
+
+    let Some(item) = items_response.last() else {
+        return Ok(Default::default());
+    };
+
+    let devicetree_vmo = &item.payload;
+    let bytes = devicetree_vmo
+        .read_to_vec(0, item.length as u64)
+        .context("Failed to read devicetree vmo")?;
+    let dt = parse_devicetree(&bytes).context("Failed to parse devicetree")?;
+
+    dt.root_node
+        .find("chosen")
+        .and_then(|n| {
+            n.get_property("bootargs")
+                .map(|p| std::str::from_utf8(&p.value[..p.value.len() - 1]).unwrap().to_owned())
+        })
+        .context("Couldn't find bootargs")
+}
+
+fn parse_cmdline(cmdline: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current_arg = String::new();
+    let mut in_quotes = false;
+    let mut chars = cmdline.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            ' ' if !in_quotes => {
+                if !current_arg.is_empty() {
+                    args.push(current_arg);
+                    current_arg = String::new();
+                }
+            }
+            '"' => {
+                in_quotes = !in_quotes;
+            }
+            '\\' => {
+                if let Some(next_c) = chars.next() {
+                    current_arg.push(next_c);
+                } else {
+                    current_arg.push('\\');
+                }
+            }
+            _ => {
+                current_arg.push(c);
+            }
+        }
+    }
+    if !current_arg.is_empty() {
+        args.push(current_arg);
+    }
+    args
+}
+
 async fn create_container(
     start_info: &mut ContainerStartInfo,
     kernel_extra_features: &[String],
@@ -516,12 +582,18 @@ async fn create_container(
     log_debug!("Creating container with {:#?}", features);
     let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
     if features.android_serialno {
-        match get_serial_number().await {
-            Ok(serial) => {
-                kernel_cmdline.extend(b" androidboot.serialno=");
-                kernel_cmdline.extend(&*serial);
+        match get_bootargs().await {
+            Ok(args) => {
+                for item in parse_cmdline(&args) {
+                    if item.starts_with("androidboot.force_normal_boot") {
+                        // TODO(https://fxbug.dev/424152964): Support force_normal_boot.
+                        continue;
+                    }
+                    kernel_cmdline.extend(b" ");
+                    kernel_cmdline.extend(item.bytes());
+                }
             }
-            Err(err) => log_warn!("could not get serial number: {err:?}"),
+            Err(err) => log_warn!("could not get bootargs: {err:?}"),
         }
     }
     if features.android_bootreason {
@@ -543,8 +615,7 @@ async fn create_container(
     }
 
     // Collect a vector of functions to be invoked while constructing /proc/device-tree
-    let mut procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)> =
-        Vec::new();
+    let mut procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)> = Vec::new();
     if features.nanohub {
         procfs_device_tree_setup.push(starnix_modules_nanohub::nanohub_procfs_builder);
     }
@@ -585,7 +656,7 @@ async fn create_container(
         None
     };
 
-    log_debug!("final kernel cmdline: {kernel_cmdline:?}");
+    log_info!("final kernel cmdline: {kernel_cmdline:?}");
     kernel_node.record_string("cmdline", kernel_cmdline.to_str_lossy());
     let kernel = Kernel::new(
         kernel_cmdline,
@@ -722,7 +793,7 @@ async fn create_container(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         init_task,
         move |locked, init_task| {
-            parse_numbered_handles(init_task, None, &init_task.files).expect("");
+            parse_numbered_handles(locked, init_task, None, &init_task.files).expect("");
             init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])
         },
         move |result| {
@@ -751,7 +822,7 @@ async fn create_container(
 
 fn create_fs_context(
     locked: &mut Locked<Unlocked>,
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     features: &Features,
     start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
@@ -777,56 +848,38 @@ fn create_fs_context(
         // /container/component will be a tmpfs where component using the starnix kernel will have their
         // package mounted.
         let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
-        let container_fs = LayeredFs::new_fs(
+        let component_tmpfs = TmpFs::new_fs(locked, kernel);
+        let remotefs = create_remotefs_filesystem(
+            locked,
             kernel,
-            create_remotefs_filesystem(
-                kernel,
-                pkg_dir_proxy,
-                FileSystemOptions { source: "data".into(), ..Default::default() },
-                rights,
-            )?,
-            BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
+            pkg_dir_proxy,
+            FileSystemOptions { source: "data".into(), ..Default::default() },
+            rights,
+        )?;
+        let container_fs = LayeredFs::new_fs(
+            locked,
+            kernel,
+            remotefs,
+            BTreeMap::from([("component".into(), component_tmpfs)]),
         );
         mappings.push(("container".into(), container_fs));
     }
     if features.custom_artifacts {
-        mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
+        mappings.push(("custom_artifacts".into(), TmpFs::new_fs(locked, kernel)));
     }
     if features.test_data {
-        mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
+        mappings.push(("test_data".into(), TmpFs::new_fs(locked, kernel)));
     }
 
     if !mappings.is_empty() {
         // If this container has enabled any features that mount directories that might not exist
         // in the root file system, we add a LayeredFs to hold these mappings.
-        root.fs = LayeredFs::new_fs(kernel, root.fs, mappings.into_iter().collect());
+        root.fs = LayeredFs::new_fs(locked, kernel, root.fs, mappings.into_iter().collect());
     }
     if features.rootfs_rw {
-        root.fs = OverlayStack::wrap_fs_in_writable_layer(kernel, root.fs)?;
+        root.fs = OverlayStack::wrap_fs_in_writable_layer(locked, kernel, root.fs)?;
     }
     Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
-}
-
-pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
-    let set_rlimit = |resource, value| {
-        task.thread_group()
-            .limits
-            .lock()
-            .set(resource, rlimit { rlim_cur: value, rlim_max: value });
-    };
-
-    for rlimit in rlimits.iter() {
-        let (key, value) =
-            rlimit.split_once('=').ok_or_else(|| anyhow!("Invalid rlimit: {rlimit}"))?;
-        let value = value.parse::<u64>()?;
-        match key {
-            "RLIMIT_NOFILE" => set_rlimit(Resource::NOFILE, value),
-            _ => {
-                bail!("Unknown rlimit: {key}");
-            }
-        }
-    }
-    Ok(())
 }
 
 fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
@@ -1005,7 +1058,7 @@ async fn serve_task_provider(mut job_requests: TaskProviderRequestStream) -> Res
 
 #[cfg(test)]
 mod test {
-    use super::wait_for_init_file;
+    use super::{parse_cmdline, wait_for_init_file};
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
     use starnix_core::testing::create_kernel_task_and_unlocked;
@@ -1016,15 +1069,30 @@ mod test {
     use starnix_uapi::vfs::ResolveFlags;
     use starnix_uapi::CLONE_FS;
 
+    #[test]
+    fn test_parse_cmdline() {
+        let cmdline =
+            r#"first second=third "fourth fifth" sixth="seventh eighth" "ninth\" tenth" eleventh"#;
+        let expected = vec![
+            "first",
+            "second=third",
+            "fourth fifth",
+            "sixth=seventh eighth",
+            "ninth\" tenth",
+            "eleventh",
+        ];
+        assert_eq!(parse_cmdline(cmdline), expected);
+    }
+
     #[fuchsia::test]
     async fn test_init_file_already_exists() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
         let path = "/path";
         current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::CREAT,
@@ -1048,11 +1116,10 @@ mod test {
 
     #[fuchsia::test]
     async fn test_init_file_wait_required() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
-        let init_task =
-            current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
+        let init_task = current_task.clone_task_for_test(locked, CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
         let test_init_tid = current_task.get_tid();
@@ -1071,7 +1138,7 @@ mod test {
         // Create the file that is being waited on.
         current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::CREAT,
@@ -1087,11 +1154,10 @@ mod test {
 
     #[fuchsia::test]
     async fn test_init_exits_before_file_exists() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
-        let init_task =
-            current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
+        let init_task = current_task.clone_task_for_test(locked, CLONE_FS as u64, Some(SIGCHLD));
         const STARTUP_FILE_PATH: &str = "/path";
 
         let test_init_tid = init_task.get_tid();

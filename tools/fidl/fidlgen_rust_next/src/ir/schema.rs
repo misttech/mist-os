@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use super::{
-    Bits, CompId, CompIdent, Const, DeclType, Enum, Library, Protocol, Service, Struct, Table,
-    TypeAlias, TypeShape, Union,
+    Bits, CompId, CompIdent, Const, Decl, DeclType, Enum, Library, Protocol, Service, Struct,
+    Table, TypeAlias, TypeShape, Union,
 };
 
 /// A FIDL JSON IR schema.
@@ -30,6 +30,8 @@ pub struct Schema {
     #[serde(deserialize_with = "crate::de::index")]
     pub struct_declarations: HashMap<CompIdent, Struct>,
     #[serde(deserialize_with = "crate::de::index")]
+    pub external_struct_declarations: HashMap<CompIdent, Struct>,
+    #[serde(deserialize_with = "crate::de::index")]
     pub table_declarations: HashMap<CompIdent, Table>,
     #[serde(deserialize_with = "crate::de::index")]
     pub union_declarations: HashMap<CompIdent, Union>,
@@ -40,34 +42,34 @@ pub struct Schema {
 }
 
 impl Schema {
-    pub fn get_decl_type(&self, ident: &CompId) -> Option<&DeclType> {
+    pub fn get_local_decl(&self, ident: &CompId) -> Option<&dyn Decl> {
+        match self.declarations.get(ident)? {
+            DeclType::Alias => Some(self.alias_declarations.get(ident)?),
+            DeclType::Bits => Some(self.bits_declarations.get(ident)?),
+            DeclType::Const => Some(self.const_declarations.get(ident)?),
+            DeclType::Enum => Some(self.enum_declarations.get(ident)?),
+            DeclType::Protocol => Some(self.protocol_declarations.get(ident)?),
+            DeclType::Service => Some(self.service_declarations.get(ident)?),
+            DeclType::Struct => Some(self.struct_declarations.get(ident)?),
+            DeclType::Table => Some(self.table_declarations.get(ident)?),
+            DeclType::Union => Some(self.union_declarations.get(ident)?),
+            DeclType::NewType | DeclType::Resource | DeclType::Overlay => None,
+        }
+    }
+
+    pub fn get_decl_type(&self, ident: &CompId) -> Option<DeclType> {
         let library = ident.library();
         if library == self.name {
-            self.declarations.get(ident)
+            Some(self.get_local_decl(ident)?.decl_type())
         } else {
-            self.library_dependencies.get(library)?.declarations.get(ident).map(|decl| &decl.kind)
+            Some(self.library_dependencies.get(library)?.declarations.get(ident)?.kind)
         }
     }
 
     pub fn get_type_shape(&self, ident: &CompId) -> Option<&TypeShape> {
         let library = ident.library();
         if library == self.name {
-            match self.declarations.get(ident)? {
-                DeclType::Struct => Some(&self.struct_declarations.get(ident)?.shape),
-                DeclType::Table => Some(&self.table_declarations.get(ident)?.shape),
-                DeclType::Union => Some(&self.union_declarations.get(ident)?.shape),
-                // Enums don't include a type shape because we can technically get that information
-                // from its underlying integer type
-                DeclType::Enum => None,
-                DeclType::Bits | DeclType::NewType => todo!(),
-                // These aren't types and don't have type shapes
-                DeclType::Alias
-                | DeclType::Const
-                | DeclType::Resource
-                | DeclType::Overlay
-                | DeclType::Protocol
-                | DeclType::Service => None,
-            }
+            self.get_local_decl(ident)?.type_shape()
         } else {
             self.library_dependencies.get(library)?.declarations.get(ident)?.shape.as_ref()
         }

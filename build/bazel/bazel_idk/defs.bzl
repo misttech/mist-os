@@ -5,7 +5,32 @@
 """Rules used to define IDK atoms."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@fuchsia_build_info//:args.bzl", "warn_on_sdk_changes")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load(":cpp_verification.bzl", "verify_no_pragma_once")
+load("//build/bazel/rules:golden_files.bzl", "verify_golden_files")
+
+_TYPES_SUPPORTING_UNSTABLE_ATOMS = [
+    # LINT.IfChange(unstable_atom_types)
+    "cc_source_library",
+    "fidl_library",
+
+    # LINT.ThenChange(//build/sdk/sdk_atom.gni:unstable_atom_types, //build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/idk_generator.py)
+]
+_TYPES_NOT_REQUIRING_COMPATIBILITY = [
+    # LINT.IfChange(non_compatibility_types)
+    "bind_library",
+    "companion_host_tool",
+    "dart_library",
+    "data",
+    "documentation",
+    "experimental_python_e2e_test",
+    "ffx_tool",
+    "host_tool",
+    "package",
+    "version_history",
+    # LINT.ThenChange(//build/sdk/sdk_atom.gni:non_compatibility_types)
+]
 
 # TOOD(https://fxbug.dev/417304469): `sdk_area`,  and some other
 # fields of this provider do not belong in prebuild info. `idk_deps` may
@@ -22,11 +47,11 @@ FuchsiaIdkAtomInfo = provider(
         "is_stable": "[bool] Whether the atom is stable",
         "api_area": "[string] The API area responsible for maintaining this atom",
         "api_file_path": "Path to the file representing the API canonically exposed by this atom.",
-        "api_contents": "List of scopes for the files making up the atom's API.",
-        "atom_files": "[dict[str,File]] a { dest -> source } map of files for this atom",
+        "api_contents_map": "List of scopes for the files making up the atom's API.",
+        "atom_files_map": "[dict[str,File]] a { dest -> source } map of files for this atom",
         "idk_deps": "[list[label]] Other atoms the atom directly depends on",
         "atoms_depset": "[depset[FuchsiaIdkAtomInfo]] The full set of other atoms the atom depends on",
-        "build_deps": "[list[label]] List of dependencies that should not be reflected in IDKs",
+        "atom_build_deps": "[list[label]] List of dependencies related to building the atom that should not be reflected in IDKs",
         "additional_prebuild_info": "[dict[str,list[Any]]] A dictionary of type-specific prebuild info for the atom. All values are lists, even if there is only one value",
     },
 )
@@ -47,47 +72,88 @@ def _get_idk_deps(underlying_deps):
     idk_deps = []
     return [_get_idk_label(dep) for dep in underlying_deps] + idk_deps
 
-def _idk_atom_impl(ctx):
-    if (not ctx.attr.api_file_path) != (not ctx.attr.api_contents):
-        fail("`api_file_path` and `api_contents` must be specified together.")
+def _compute_atom_api_impl(ctx):
+    args = ctx.actions.args()
+    args.add("--output", ctx.outputs.generated_api_file.path)
 
-    # TODO(https://fxbug.dev/417305295): Verify the API with
-    # `ctx.attr.api_file_path` and `ctx.attr.contents`.
+    for dest_path, source_target in ctx.attr.api_contents_map.items():
+        source_label = source_target.label
+        source_path = source_label.package + "/" + source_label.name
 
-    # TODO(https://fxbug.dev/417305295): Generate internal metadata (.sdk) file
-    # if necessary. See https://fxbug.dev/407083737.
+        # `add()` supports at most two parameters, so add the third separately.
+        args.add("--file", dest_path)
+        args.add(source_path)
 
-    # TODO(https://fxbug.dev/417305295): Verify category compatibility,
-    # `ctx.attr.api_area`, etc. Some of
-    # this could potentially be deferred until generate_idk, especially if not
-    # building the internal build metadata (see above).
+    # `ctx.files.api_contents_map` contains just the source files.
+    inputs_depset = depset(ctx.files.api_contents_map)
 
+    ctx.actions.run(
+        outputs = [ctx.outputs.generated_api_file],
+        inputs = inputs_depset,
+        executable = ctx.executable._script,
+        arguments = [args],
+        mnemonic = "ComputeAtomApi",
+        progress_message = "Computing API for %s" % ctx.outputs.generated_api_file.short_path,
+    )
+
+    return [DefaultInfo(files = depset([ctx.outputs.generated_api_file]))]
+
+_compute_atom_api = rule(
+    doc = "Computes the contents of the .api file for an atom.",
+    implementation = _compute_atom_api_impl,
+    provides = [DefaultInfo],
+    attrs = {
+        "api_contents_map": attr.string_keyed_label_dict(
+            doc = "A dictionary of files that make up the API for this atom, " +
+                  "mapping the destination path of a file relative to the " +
+                  "IDK  root to its source file label.",
+            mandatory = True,
+            default = {},
+            allow_files = True,
+        ),
+        "generated_api_file": attr.output(
+            mandatory = True,
+            doc = "The output API file.",
+        ),
+        "_script": attr.label(
+            default = Label("//build/sdk:compute_atom_api"),
+            executable = True,
+            cfg = "exec",
+        ),
+    },
+)
+
+def _create_idk_atom_impl(ctx):
+    all_deps_depset = depset(direct = ctx.files.idk_deps + ctx.files.atom_build_deps)
     idk_deps = ctx.attr.idk_deps
 
-    return [FuchsiaIdkAtomInfo(
-        label = ctx.label,
-        idk_name = ctx.attr.idk_name,
-        id = ctx.attr.id,
-        meta_dest = ctx.attr.meta_dest,
-        type = ctx.attr.type,
-        category = ctx.attr.category,
-        is_stable = ctx.attr.stable,
-        api_area = ctx.attr.api_area,
-        api_file_path = ctx.attr.api_file_path,
-        api_contents = ctx.attr.api_contents,
-        atom_files = ctx.attr.files,
-        idk_deps = idk_deps,
-        atoms_depset = depset(
-            direct = idk_deps,
-            transitive = [dep[FuchsiaIdkAtomInfo].atoms_depset for dep in idk_deps],
+    return [
+        DefaultInfo(files = all_deps_depset),
+        FuchsiaIdkAtomInfo(
+            label = ctx.label,
+            idk_name = ctx.attr.idk_name,
+            id = ctx.attr.id,
+            meta_dest = ctx.attr.meta_dest,
+            type = ctx.attr.type,
+            category = ctx.attr.category,
+            is_stable = ctx.attr.stable,
+            api_area = ctx.attr.api_area,
+            api_file_path = ctx.attr.api_file_path,
+            api_contents_map = ctx.attr.api_contents_map,
+            atom_files_map = ctx.attr.files_map,
+            idk_deps = idk_deps,
+            atoms_depset = depset(
+                direct = idk_deps,
+                transitive = [dep[FuchsiaIdkAtomInfo].atoms_depset for dep in idk_deps],
+            ),
+            atom_build_deps = ctx.attr.atom_build_deps,
+            additional_prebuild_info = ctx.attr.additional_prebuild_info,
         ),
-        build_deps = ctx.attr.build_deps,
-        additional_prebuild_info = ctx.attr.additional_prebuild_info,
-    )]
+    ]
 
-idk_atom = rule(
-    doc = """Generate an IDK atom.""",
-    implementation = _idk_atom_impl,
+_create_idk_atom = rule(
+    doc = """Define an IDK atom. Do not instantiate directly - use `idk_atom()` instead.""",
+    implementation = _create_idk_atom_impl,
     provides = [FuchsiaIdkAtomInfo],
     attrs = {
         "idk_name": attr.string(
@@ -140,11 +206,11 @@ Possible values, from most restrictive to least restrictive:
         "api_file_path": attr.string(
             doc = "Path to the file representing the API canonically exposed by this atom. " +
                   "This file is used to ensure modifications to the API are explicitly acknowledged. " +
-                  "If this attribute is set, `api_contents` must be set as well. If not specified, no such modification checks are performed.",
+                  "If this attribute is set, `api_contents_map` must be set as well. If not specified, no such modification checks are performed.",
             mandatory = False,
             default = "",
         ),
-        "api_contents": attr.string_keyed_label_dict(
+        "api_contents_map": attr.string_keyed_label_dict(
             doc = "A dictionary of files making up the atom's API, mapping the destination path " +
                   "of  a file relative to the IDK root to its source file label. " +
                   "The set of files will be used to verify that the API has not changed locally. " +
@@ -154,7 +220,7 @@ Possible values, from most restrictive to least restrictive:
             default = {},
             allow_files = True,
         ),
-        "files": attr.string_keyed_label_dict(
+        "files_map": attr.string_keyed_label_dict(
             doc = "A dictionary of files for this atom, mapping the destination " +
                   "path of a file relative to the IDK root to its source file label.",
             mandatory = False,
@@ -164,13 +230,13 @@ Possible values, from most restrictive to least restrictive:
         "idk_deps": attr.label_list(
             providers = [FuchsiaIdkAtomInfo],
             doc = "Bazel labels for other SDK elements this element publicly depends on at build time." +
-                  "These labels must point to `idk_atom` targets.",
+                  "These labels must point to `_create_idk_atom` targets.",
             mandatory = False,
         ),
-        "build_deps": attr.label_list(
-            providers = [CcInfo],
-            doc = "List of dependencies that should not be reflected in IDKs. " +
-                  "Mostly useful for code generation.",
+        "atom_build_deps": attr.label_list(
+            providers = [DefaultInfo],
+            doc = "List of dependencies related to building the atom that should not be reflected in IDKs. " +
+                  "Mostly useful for code generation and validation.",
             mandatory = False,
         ),
         "additional_prebuild_info": attr.string_list_dict(
@@ -182,7 +248,94 @@ Possible values, from most restrictive to least restrictive:
     },
 )
 
+# TODO(https://fxbug.dev/417305295): Make this a symbolic macro after updating
+# to Bazel 8 and move all the args descriptions from _create_idk_atom() to here
+# and reference those definitions from _create_idk_atom().
+def idk_atom(
+        name,
+        type,
+        stable,
+        testonly,
+        api_file_path = None,
+        api_contents_map = None,
+        atom_build_deps = [],
+        **kwargs):
+    """Generate an IDK atom and ensure proper validation of it.
+
+    Args:
+        name: The name of the IDK atom target.
+        type: See _create_idk_atom().
+        stable:  See _create_idk_atom().
+        api_file_path: See _create_idk_atom().
+        api_contents_map:  See _create_idk_atom().
+        atom_build_deps:  See _create_idk_atom().
+        testonly: Standard definition.
+        **kwargs: Additional arguments for the underlying atom.  See _create_idk_atom().
+    """
+
+    if type not in _TYPES_SUPPORTING_UNSTABLE_ATOMS and not stable:
+        fail("`stable` must be true unless the type ('%s') is one of %s." % (type, _TYPES_SUPPORTING_UNSTABLE_ATOMS))
+
+    if (not api_file_path) != (not api_contents_map):
+        fail("`api_file_path` and `api_contents_map` must be specified together.")
+
+    is_type_not_requiring_compatibility = type in _TYPES_NOT_REQUIRING_COMPATIBILITY
+    if stable and not api_file_path and not is_type_not_requiring_compatibility:
+        fail("All atoms with types ('%s') requiring compatibility must specify an `api_file_path` unless explicitly unstable." % type)
+
+    _verify_api = api_file_path != None
+    if _verify_api:
+        if not api_contents_map:
+            fail("`api_contents_map` cannot be empty.")
+
+        generate_api_target_name = "%s_generate_api" % name
+        verify_api_target_name = "%s_verify_api" % name
+
+        # GN-generated files generally have `_sdk` from the target name.
+        # TODO(https://fxbug.dev/425931839): Change this to `_idk` or drop it
+        # once GN is no longer generating such files.
+        current_api_file = "%s_sdk.api" % name
+
+        _compute_atom_api(
+            name = generate_api_target_name,
+            api_contents_map = api_contents_map,
+            generated_api_file = current_api_file,
+            testonly = testonly,
+            visibility = ["//visibility:private"],
+        )
+
+        verify_golden_files(
+            name = verify_api_target_name,
+            candidate_files = [current_api_file],
+            golden_files = [api_file_path],
+            only_warn_on_changes = warn_on_sdk_changes,
+            testonly = testonly,
+            visibility = ["//visibility:private"],
+        )
+
+        atom_build_deps.append(":%s" % verify_api_target_name)
+
+    # TODO(https://fxbug.dev/417305295): Generate internal metadata (.sdk) file
+    # if necessary. See https://fxbug.dev/407083737.
+
+    # TODO(https://fxbug.dev/417305295): Verify category compatibility,
+    # `api_area`, etc. Some of this could potentially be deferred until
+    # generate_idk, especially if not building the internal build metadata (see
+    # above).
+
+    _create_idk_atom(
+        name = name + "_idk",
+        type = type,
+        stable = stable,
+        api_file_path = api_file_path,
+        api_contents_map = api_contents_map,
+        atom_build_deps = atom_build_deps,
+        testonly = testonly,
+        **kwargs
+    )
+
 def _idk_molecule_impl(ctx):
+    all_deps_depset = depset(direct = ctx.files.deps)
     idk_deps = ctx.attr.deps
 
     # Build the atoms depset, excluding molecules while including their atoms.
@@ -199,11 +352,14 @@ def _idk_molecule_impl(ctx):
 
     atoms_depset = depset(direct = direct_deps, transitive = transitive_depsets)
 
-    return [FuchsiaIdkMoleculeInfo(
-        label = ctx.label,
-        idk_deps = ctx.attr.deps,
-        atoms_depset = atoms_depset,
-    )]
+    return [
+        DefaultInfo(files = all_deps_depset),
+        FuchsiaIdkMoleculeInfo(
+            label = ctx.label,
+            idk_deps = ctx.attr.deps,
+            atoms_depset = atoms_depset,
+        ),
+    ]
 
 idk_molecule = rule(
     doc = "Generate an IDK molecule.",
@@ -224,10 +380,11 @@ idk_molecule = rule(
 # (https://bazel.build/reference/be/c-cpp#cc_library) or the results of
 # `fx format-code`, which reorders most non-common arguments alphabetically at
 # call sites.
-# TODO(https://fxbug.dev/417305295): Add the following arguments supported by
+# TODO(https://fxbug.dev/417305295): Add the following argument supported by
 # the GN `sdk_source_set()` template if necessary. Note that
-# `sdk_static_library()` and `sdk_shared_library()` do not support them.
-# * `non_idk_deps` (GN equivalent: `non_sdk_public_deps`)
+# `sdk_static_library()` and `sdk_shared_library()` do not support it.
+# When adding support, assert that it is only used for
+# "//sdk/fidl/zbi:zbi.c.checked-in"
 # * `non_idk_implementation_deps` (GN equivalent: `non_sdk_deps`)
 def idk_cc_source_library(
         name,
@@ -251,6 +408,8 @@ def idk_cc_source_library(
         # TODO(https://fxbug.dev/417305295): Add this argument if there is a way
         # to tell Bazel to not always compile the source set.
         # build_as_static = False,
+        # TODO(https://fxbug.dev/425931839): Remove when no longer converting to GN.
+        public_configs = [],  # Unused in Bazel, for GN conversion only.
         **kwargs):
     """Defines a C++_source library that can be exported to an IDK.
 
@@ -259,7 +418,7 @@ def idk_cc_source_library(
             GN equivalent: `target_name`
         idk_name: Name of the library in the IDK. Usually matches `name`.
             GN equivalent: `sdk_name`
-        category: Publication level of the library in the IDK. See idk_atom().
+        category: Publication level of the library in the IDK. See _create_idk_atom().
         stable: Whether this source library is stabilized.
             When true, an .api file is generated. When false, the atom is marked
             as unstable in the final IDK.
@@ -270,10 +429,10 @@ def idk_cc_source_library(
             This file is used to ensure modifications to the library's API are
             explicitly acknowledged.
             If not specified, the path will be "<idk_name>.api".
-            GN equivalent: ``api`
+            GN equivalent: `api`
             Not allowed when `stable` is false.
         deps: List of labels for other IDK elements this element publicly depends on at build time.
-            These labels must point to targets with corresponding `idk_atom` targets.
+            These labels must point to targets with corresponding `_create_idk_atom` targets.
             GN equivalent: `public_deps`
         srcs: The list of C and C++ source and header files that are processed to create the library target.
             GN equivalent: `sources`
@@ -281,7 +440,7 @@ def idk_cc_source_library(
         hdrs: The list of C and C++ header files published by this library to be directly included by sources in dependent rules.
             GN equivalent: `public`
         implementation_deps: List of labels for other IDK elements this element depends on at build time.
-            These labels must point to targets with corresponding `idk_atom` targets.
+            These labels must point to targets with corresponding `_create_idk_atom` targets.
             GN equivalent: `deps`.
         include_base: Path to the root directory for includes.
             This path will be added to the underlying libraries `includes`.
@@ -291,6 +450,7 @@ def idk_cc_source_library(
             GN equivalent: `sdk_headers_for_internal_use`
         testonly: Standard definition.
         visibility: Standard definition.
+        public_configs: Unused in Bazel, for GN conversion only.
         **kwargs: Additional arguments for the underlying library.
     """
 
@@ -317,8 +477,6 @@ def idk_cc_source_library(
         srcs = srcs,
         data = allowlist_deps,
         hdrs = hdrs,
-        # TODO(https://fxbug.dev/417305295): If we must support `non_idk_deps`,
-        # add it below.
         deps = deps,
         # TODO(https://fxbug.dev/417305295): If we must support
         # `non_idk_implementation_deps`, add it below.
@@ -336,35 +494,57 @@ def idk_cc_source_library(
     # Determine destinations in the IDK for headers and sources.
     idk_metadata_headers = []
     idk_metadata_sources = []
-    idk_header_files = {}
+    idk_header_files_map = {}
 
     for header in hdrs:
         relative_destination = paths.relativize(header, include_base)
         destination = include_dest + "/" + relative_destination
         idk_metadata_headers.append(destination)
-        idk_header_files |= {destination: header}
+        idk_header_files_map |= {destination: header}
 
-    idk_files = dict(idk_header_files)
+    idk_files_map = dict(idk_header_files_map)
 
     for source in srcs:
         source_dest_path = idk_root_path + "/" + source
         idk_metadata_sources.append(source_dest_path)
-        idk_files |= {source_dest_path: source}
+        idk_files_map |= {source_dest_path: source}
 
-    # TODO(https://fxbug.dev/417305295): Verify pragma. Add to `build_deps`.
-    # TODO(https://fxbug.dev/417305295): Verify public headers. Add to
-    # `build_deps`.
     # TODO(https://fxbug.dev/417306131): Implement PlaSA support. Add to
-    # `build_deps`.
+    # `atom_build_deps`.
 
     idk_deps = _get_idk_deps(deps) + _get_idk_deps(implementation_deps)
 
-    # TODO(https://fxbug.dev/417305295): If we must support `non_idk_deps`
-    # and/or `non_idk_implementation_deps`, add them here.
+    # Dependencies for generating the actual IDK atom (not the underlying library).
+    # TODO(https://fxbug.dev/417305295): If we must support
+    # `non_idk_implementation_deps`, add it here.
     # TODO(https://fxbug.dev/417307356): When implementing prebuilt
     # libraries, add `[":%s" % name]`. It may also be necessary to return
     # `DefaultInfo` from the underlying library.
-    build_deps = []
+    atom_build_deps = []
+
+    # Ensure there are no duplicate files specified by providing all source
+    # files as a single list of labels. Bazel will report an error if the
+    # combined list containes duplicates. All this target really does is provide
+    # a clearer error message than if we relied on combining the lists in the
+    # `verify_no_pragma_once()` rule below.
+    verify_no_duplicate_files_target_name = "%s_verify_no_duplicate_files_in_hdrs_and_srcs" % name
+    native.filegroup(
+        name = verify_no_duplicate_files_target_name,
+        data = hdrs + srcs,
+        testonly = testonly,
+        visibility = ["//visibility:private"],
+    )
+    atom_build_deps.append(":%s" % verify_no_duplicate_files_target_name)
+
+    # For simplicity, check all source files, including non-header files in `srcs`.
+    verify_pragma_once_target_name = "%s_verify_pragma_once" % name
+    verify_no_pragma_once(
+        name = verify_pragma_once_target_name,
+        files = hdrs + srcs,
+        testonly = testonly,
+        visibility = ["//visibility:private"],
+    )
+    atom_build_deps.append(":%s" % verify_pragma_once_target_name)
 
     if stable:
         api_path = idk_name + ".api"
@@ -373,10 +553,10 @@ def idk_cc_source_library(
                 fail("The specified `api` file (`%s`) matches the default. `api` only needs to be specified when overriding the default." % api_file_path)
             api_path = api_file_path
 
-        api_contents = idk_header_files
+        api_contents_map = idk_header_files_map
     else:
         api_path = None
-        api_contents = None
+        api_contents_map = None
 
     # The atom's visibility should allow IDK contents/definition rules to depend
     # on the atom in addition to the visibility of the underlying library.
@@ -394,7 +574,7 @@ def idk_cc_source_library(
             atom_visibility += visibility
 
     idk_atom(
-        name = name + "_idk",
+        name = name,
         idk_name = idk_name,
         id = "sdk://" + idk_root_path,
         meta_dest = idk_root_path + "/meta.json",
@@ -405,10 +585,10 @@ def idk_cc_source_library(
         stable = stable,
         api_area = api_area,
         api_file_path = api_path,
-        api_contents = api_contents,
-        files = idk_files,
+        api_contents_map = api_contents_map,
+        files_map = idk_files_map,
         idk_deps = idk_deps,
-        build_deps = build_deps,
+        atom_build_deps = atom_build_deps,
         additional_prebuild_info = {
             "include_dir": [include_dest],
             "sources": idk_metadata_sources,

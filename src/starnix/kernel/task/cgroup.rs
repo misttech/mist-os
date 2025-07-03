@@ -12,7 +12,7 @@ use starnix_core::signals::{send_freeze_signal, SignalInfo};
 use starnix_core::task::{ThreadGroup, ThreadGroupKey, WaitQueue, Waiter};
 use starnix_core::vfs::{FsStr, FsString, PathBuilder};
 use starnix_logging::{log_warn, trace_duration, track_stub, CATEGORY_STARNIX};
-use starnix_sync::{Mutex, MutexGuard};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, MutexGuard, ThreadGroupLimits};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
@@ -83,7 +83,11 @@ pub trait CgroupOps: Send + Sync + 'static {
     fn id(&self) -> u64;
 
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
-    fn add_process(&self, thread_group: &ThreadGroup) -> Result<(), Errno>;
+    fn add_process(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        thread_group: &ThreadGroup,
+    ) -> Result<(), Errno>;
 
     /// Create a new sub-cgroup as a child of this cgroup. Errors if the cgroup is deleted, or a
     /// child with `name` already exists.
@@ -112,7 +116,7 @@ pub trait CgroupOps: Send + Sync + 'static {
     fn get_freezer_state(&self) -> CgroupFreezerState;
 
     /// Freeze all tasks in the cgroup.
-    fn freeze(&self);
+    fn freeze(&self, locked: &mut Locked<FileOpsCore>);
 
     /// Thaw all tasks in the cgroup.
     fn thaw(&self);
@@ -223,13 +227,17 @@ impl CgroupOps for CgroupRoot {
         0
     }
 
-    fn add_process(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
+    fn add_process(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        thread_group: &ThreadGroup,
+    ) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
         match pid_table.entry(thread_group.into()) {
             hash_map::Entry::Occupied(entry) => {
                 // If pid is in a child cgroup, remove it.
                 if let Some(cgroup) = entry.get().upgrade() {
-                    cgroup.state.lock().remove_process(thread_group)?;
+                    cgroup.state.lock().remove_process(locked, thread_group)?;
                 }
                 entry.remove();
             }
@@ -281,7 +289,7 @@ impl CgroupOps for CgroupRoot {
         Default::default()
     }
 
-    fn freeze(&self) {
+    fn freeze(&self, _locked: &mut Locked<FileOpsCore>) {
         unreachable!("Root cgroup cannot freeze any processes.");
     }
 
@@ -381,18 +389,24 @@ impl CgroupState {
         });
     }
 
-    fn freeze_thread_group(&self, thread_group: &ThreadGroup) {
+    fn freeze_thread_group<L>(&self, locked: &mut Locked<L>, thread_group: &ThreadGroup)
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
         // lock while iterating and sending the signal.
         // SAFETY: static TempRefs are released after all signals are queued.
         let tasks = thread_group.read().tasks().map(TempRef::into_static).collect::<Vec<_>>();
         for task in tasks {
-            send_freeze_signal(&task, self.create_freeze_waiter())
+            send_freeze_signal(locked, &task, self.create_freeze_waiter())
                 .expect("sending freeze signal should not fail");
         }
     }
 
-    fn thaw_thread_group(&self, thread_group: &ThreadGroup) {
+    fn thaw_thread_group<L>(&self, _locked: &mut Locked<L>, thread_group: &ThreadGroup)
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
         // lock while iterating and sending the signal.
         // SAFETY: static TempRefs are released after all signals are queued.
@@ -407,31 +421,48 @@ impl CgroupState {
         std::cmp::max(self.self_freezer_state, self.inherited_freezer_state)
     }
 
-    fn add_process(&mut self, thread_group: &ThreadGroup) -> Result<(), Errno> {
+    fn add_process<L>(
+        &mut self,
+        locked: &mut Locked<L>,
+        thread_group: &ThreadGroup,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         if self.deleted {
             return error!(ENOENT);
         }
         self.processes.insert(thread_group.into());
 
         if self.get_effective_freezer_state() == FreezerState::Frozen {
-            self.freeze_thread_group(&thread_group);
+            self.freeze_thread_group(locked, &thread_group);
         }
         Ok(())
     }
 
-    fn remove_process(&mut self, thread_group: &ThreadGroup) -> Result<(), Errno> {
+    fn remove_process<L>(
+        &mut self,
+        locked: &mut Locked<L>,
+        thread_group: &ThreadGroup,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         if self.deleted {
             return error!(ENOENT);
         }
         self.processes.remove(&thread_group.into());
 
         if self.get_effective_freezer_state() == FreezerState::Frozen {
-            self.thaw_thread_group(thread_group);
+            self.thaw_thread_group(locked, thread_group);
         }
         Ok(())
     }
 
-    fn propagate_freeze(&mut self, inherited_freezer_state: FreezerState) {
+    fn propagate_freeze<L>(&mut self, locked: &mut Locked<L>, inherited_freezer_state: FreezerState)
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         let prev_effective_freezer_state = self.get_effective_freezer_state();
         self.inherited_freezer_state = inherited_freezer_state;
         if prev_effective_freezer_state == FreezerState::Frozen {
@@ -442,12 +473,12 @@ impl CgroupState {
             let Some(thread_group) = thread_group.upgrade() else {
                 continue;
             };
-            self.freeze_thread_group(&thread_group);
+            self.freeze_thread_group(locked, &thread_group);
         }
 
         // Freeze all children cgroups while holding self state lock
         for child in self.children.get_children() {
-            child.state.lock().propagate_freeze(FreezerState::Frozen);
+            child.state.lock().propagate_freeze(locked, FreezerState::Frozen);
         }
     }
 
@@ -550,7 +581,11 @@ impl CgroupOps for Cgroup {
         self.id
     }
 
-    fn add_process(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
+    fn add_process(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        thread_group: &ThreadGroup,
+    ) -> Result<(), Errno> {
         let root = self.root()?;
         let mut pid_table = root.pid_table.lock();
         match pid_table.entry(thread_group.into()) {
@@ -564,14 +599,14 @@ impl CgroupOps for Cgroup {
                 // If thread_group is in another cgroup, we need to remove it first.
                 track_stub!(TODO("https://fxbug.dev/383374687"), "check permissions");
                 if let Some(other_cgroup) = entry.get().upgrade() {
-                    other_cgroup.state.lock().remove_process(thread_group)?;
+                    other_cgroup.state.lock().remove_process(locked, thread_group)?;
                 }
 
-                self.state.lock().add_process(thread_group)?;
+                self.state.lock().add_process(locked, thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
             hash_map::Entry::Vacant(entry) => {
-                self.state.lock().add_process(thread_group)?;
+                self.state.lock().add_process(locked, thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
         }
@@ -645,11 +680,11 @@ impl CgroupOps for Cgroup {
         }
     }
 
-    fn freeze(&self) {
+    fn freeze(&self, locked: &mut Locked<FileOpsCore>) {
         trace_duration!(CATEGORY_STARNIX, c"CgroupFreeze");
         let mut state = self.state.lock();
         let inherited_freezer_state = state.inherited_freezer_state;
-        state.propagate_freeze(inherited_freezer_state);
+        state.propagate_freeze(locked, inherited_freezer_state);
         state.self_freezer_state = FreezerState::Frozen;
     }
 
@@ -685,19 +720,21 @@ mod test {
 
     #[::fuchsia::test]
     async fn cgroup_clone_task_in_frozen_cgroup() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let root = &kernel.cgroups.cgroup2;
         let cgroup = root.new_child("test".into()).expect("new_child on root cgroup succeeds");
 
-        let process = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        cgroup.add_process(process.thread_group()).expect("add process to cgroup");
-        cgroup.freeze();
+        let process = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+        cgroup
+            .add_process(locked.cast_locked(), process.thread_group())
+            .expect("add process to cgroup");
+        cgroup.freeze(locked.cast_locked());
         assert_eq!(cgroup.get_pids(&kernel).first(), Some(process.get_pid()).as_ref());
         assert_eq!(root.get_cgroup(process.thread_group()).unwrap().as_ptr(), Arc::as_ptr(&cgroup));
 
         let thread = process.clone_task_for_test(
-            &mut locked,
+            locked,
             (CLONE_THREAD | CLONE_SIGHAND | CLONE_VM) as u64,
             Some(SIGCHLD),
         );

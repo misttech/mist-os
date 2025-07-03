@@ -10,6 +10,7 @@ SECTIONS {
     *(.rodata*)
    } :load
   .text : { *(.text*) } :load
+  .eh_frame : { *(.eh_frame) } :load
   .note : { *(.note.gnu.build-id) } :load :note
   .hash : { *(.hash) } :load
   .dynamic : { *(.dynamic) } :load :dynamic
@@ -17,11 +18,6 @@ SECTIONS {
   .dynsym : { *(.dynsym) }
   .dynstr : { *(.dynstr) }
   .got : { *(.got.plt) *(.got) }
-
-  /DISCARD/ : {
-    *(.eh_frame)
-  }
-
 }
 
 PHDRS {

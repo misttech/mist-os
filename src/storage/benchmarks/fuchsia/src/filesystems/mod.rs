@@ -8,7 +8,9 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::CryptMarker;
 use fidl_fuchsia_io as fio;
-use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
+use fs_management::filesystem::{
+    ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume,
+};
 use fs_management::FSConfig;
 use fuchsia_merkle::Hash;
 use std::path::Path;
@@ -68,7 +70,7 @@ pub trait BlobFilesystem: CacheClearableFilesystem {
 
 enum FsType {
     SingleVolume(ServingSingleVolumeFilesystem),
-    MultiVolume(ServingMultiVolumeFilesystem),
+    MultiVolume(ServingMultiVolumeFilesystem, ServingVolume),
 }
 
 pub type CryptClientFn = Arc<dyn Fn() -> ClientEnd<CryptMarker> + Send + Sync>;
@@ -95,9 +97,9 @@ impl FsManagementFilesystemInstance {
         );
         fs.format().await.expect("Failed to format the filesystem");
         let serving_filesystem = if fs.config().is_multi_volume() {
-            let mut serving_filesystem =
+            let serving_filesystem =
                 fs.serve_multi_volume().await.expect("Failed to start the filesystem");
-            let vol = serving_filesystem
+            let mut vol = serving_filesystem
                 .create_volume(
                     "default",
                     CreateOptions::default(),
@@ -110,7 +112,7 @@ impl FsManagementFilesystemInstance {
                 .await
                 .expect("Failed to create volume");
             vol.bind_to_path(MOUNT_PATH).expect("Failed to bind the volume");
-            FsType::MultiVolume(serving_filesystem)
+            FsType::MultiVolume(serving_filesystem, vol)
         } else {
             let mut serving_filesystem = fs.serve().await.expect("Failed to start the filesystem");
             serving_filesystem.bind_to_path(MOUNT_PATH).expect("Failed to bind the filesystem");
@@ -129,9 +131,7 @@ impl FsManagementFilesystemInstance {
         let fs = self.serving_filesystem.as_ref().unwrap();
         match fs {
             FsType::SingleVolume(serving_filesystem) => serving_filesystem.exposed_dir(),
-            FsType::MultiVolume(serving_filesystem) => {
-                serving_filesystem.volume("default").unwrap().exposed_dir()
-            }
+            FsType::MultiVolume(_, serving_volume) => serving_volume.exposed_dir(),
         }
     }
 
@@ -141,7 +141,7 @@ impl FsManagementFilesystemInstance {
         let fs = self.serving_filesystem.as_ref().unwrap();
         match fs {
             FsType::SingleVolume(serving_filesystem) => serving_filesystem.exposed_dir(),
-            FsType::MultiVolume(serving_filesystem) => serving_filesystem.exposed_dir(),
+            FsType::MultiVolume(serving_filesystem, _) => serving_filesystem.exposed_dir(),
         }
     }
 }
@@ -152,7 +152,10 @@ impl Filesystem for FsManagementFilesystemInstance {
         if let Some(fs) = self.serving_filesystem.take() {
             match fs {
                 FsType::SingleVolume(fs) => fs.shutdown().await.expect("Failed to stop filesystem"),
-                FsType::MultiVolume(fs) => fs.shutdown().await.expect("Failed to stop filesystem"),
+                FsType::MultiVolume(fs, vol) => {
+                    vol.shutdown().await.expect("Failed to stop volume");
+                    fs.shutdown().await.expect("Failed to stop filesystem")
+                }
             }
         }
     }
@@ -175,11 +178,12 @@ impl CacheClearableFilesystem for FsManagementFilesystemInstance {
                 serving_filesystem.bind_to_path(MOUNT_PATH).expect("Failed to bind the filesystem");
                 FsType::SingleVolume(serving_filesystem)
             }
-            FsType::MultiVolume(serving_filesystem) => {
+            FsType::MultiVolume(serving_filesystem, volume) => {
+                volume.shutdown().await.expect("Failed to stop the volume");
                 serving_filesystem.shutdown().await.expect("Failed to stop the filesystem");
-                let mut serving_filesystem =
+                let serving_filesystem =
                     self.fs.serve_multi_volume().await.expect("Failed to start the filesystem");
-                let vol = serving_filesystem
+                let mut vol = serving_filesystem
                     .open_volume(
                         "default",
                         MountOptions {
@@ -191,7 +195,7 @@ impl CacheClearableFilesystem for FsManagementFilesystemInstance {
                     .await
                     .expect("Failed to create volume");
                 vol.bind_to_path(MOUNT_PATH).expect("Failed to bind the volume");
-                FsType::MultiVolume(serving_filesystem)
+                FsType::MultiVolume(serving_filesystem, vol)
             }
         };
         self.serving_filesystem = Some(serving_filesystem);

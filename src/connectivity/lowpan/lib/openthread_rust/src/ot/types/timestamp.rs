@@ -123,9 +123,9 @@ impl Timestamp {
         self.0.to_le_bytes()
     }
 
-    /// Returns the timestamp as an instance of `chrono::naive::NaiveDateTime`.
-    pub fn to_naive_date_time(&self) -> chrono::naive::NaiveDateTime {
-        chrono::naive::NaiveDateTime::from_timestamp_micros(self.as_micros().try_into().unwrap())
+    /// Returns the timestamp as an instance of `chrono::DateTime`.
+    pub fn to_date_time(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::from_timestamp_micros(self.as_micros().try_into().unwrap())
             .expect("time to be within range")
     }
 }
@@ -177,14 +177,14 @@ impl From<Timestamp> for openthread_sys::otTimestamp {
 impl Debug for Timestamp {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let authoritative = if self.is_authoritative() { "authoritative" } else { "" };
-        write!(f, "{:12X} ({:?}{})", self.0, self.to_naive_date_time(), authoritative)
+        write!(f, "{:12X} ({:?}{})", self.0, self.to_date_time().naive_utc(), authoritative)
     }
 }
 
 impl Display for Timestamp {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let authoritative = if self.is_authoritative() { " authoritative" } else { "" };
-        write!(f, "{}{}", self.to_naive_date_time(), authoritative)
+        write!(f, "{}{}", self.to_date_time().naive_utc(), authoritative)
     }
 }
 

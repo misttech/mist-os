@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/nand/c/banjo.h>
 #include <fuchsia/hardware/nand/cpp/banjo.h>
 #include <inttypes.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/vmo.h>
@@ -98,6 +99,9 @@ class NandDevice : public DeviceType, public ddk::NandProtocol<NandDevice, ddk::
 
   uintptr_t mapped_addr_ = 0;
   zx::vmo vmo_;
+
+  // The mapping for the wear info vmo. May be empty, check for nullptr before use.
+  fzl::VmoMapper wear_info_;
 
   NandParams params_;
 

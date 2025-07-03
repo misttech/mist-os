@@ -20,16 +20,19 @@ namespace fad = fuchsia_audio_device;
 
 namespace media_audio {
 
-class InspectorWarningTest : public InspectorTest {};
+class InspectorWarningTest : public InspectorTest {
+ protected:
+  static inline const std::string kClassName = "InspectorWarningTest";
+};
 
 // The relevant fields are `added at` and `failed at` -- located at // root/Devices/[device name]/
 TEST_F(InspectorWarningTest, FailedDevice) {
   auto fake_driver = CreateFakeCodecOutput();
   fake_driver->set_health_state(false);
   auto before_added = zx::clock::get_monotonic();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
   RunLoopUntilIdle();
 
   auto hierarchy = GetHierarchy();
@@ -72,9 +75,9 @@ TEST_F(InspectorWarningTest, FailedDevice) {
 TEST_F(InspectorWarningTest, FailedThenRemovedDevice) {
   auto fake_driver = CreateFakeCodecOutput();
   fake_driver->set_health_state(false);
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
   RunLoopUntilIdle();
 
   // We should see that it failed before it was removed.

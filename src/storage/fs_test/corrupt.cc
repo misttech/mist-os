@@ -156,7 +156,8 @@ TEST_P(CorruptTest, OutOfOrderWrites) {
       }
     }
 
-    ASSERT_EQ(fs.Unmount().status_value(), ZX_OK);
+    // Ignore the result. We can't guarantee clean unmount of a filesystem that is unable to write.
+    std::ignore = fs.Unmount();
     ASSERT_EQ(fs.GetRamDisk()->Wake().status_value(), ZX_OK);
   }
 

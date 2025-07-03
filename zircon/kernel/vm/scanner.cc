@@ -15,6 +15,7 @@
 #include <kernel/thread.h>
 #include <ktl/utility.h>
 #include <lk/init.h>
+#include <object/memory_watchdog.h>
 #include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/physical_page_borrowing_config.h>
@@ -343,6 +344,33 @@ void scanner_pop_disable_count() {
     scanner_operation.fetch_or(kScannerOpEnable);
     scanner_request_event.Signal();
     scanner_disabled_event.Unsignal();
+  }
+}
+
+void scanner_debug_dump_state_before_panic() {
+  VmCowPages::DebugDumpReclaimCounters();
+  // Retrieve a reference to any possible eviction related threads.
+  Thread* threads[] = {
+      GetMemoryWatchdog().DebugGetWorkerThread(),
+      Pmm::Node().GetEvictor()->DebugGetEvictorThread(),
+      Pmm::Node().GetPageQueues()->DebugGetMruThread(),
+      Pmm::Node().GetPageQueues()->DebugGetLruThread(),
+      []() TA_NO_THREAD_SAFETY_ANALYSIS -> Thread* { return scanner_thread; }(),
+  };
+  // Attempt to dump information and backtraces for all the threads.
+  for (Thread* thread : threads) {
+    if (!thread) {
+      // The given thread may not exist due to current system state or configuration, if so just
+      // skip it.
+      continue;
+    }
+    // This is the unsafe part where we assume that we are not racing with any fundamental state
+    // changes to the system we received these threads from, and hence they are still valid Thread
+    // objects.
+    Backtrace backtrace;
+    thread->GetBacktrace(backtrace);
+    thread->Dump(true);
+    backtrace.Print();
   }
 }
 

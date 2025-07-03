@@ -29,99 +29,17 @@ constexpr size_t kRegSize = 0x00002000 / sizeof(uint32_t);  // in 32 bits chunks
 
 // Temperature Sensor
 // Copied from sherlock-thermal.cc
-constexpr fht::wire::ThermalTemperatureInfo TripPoint(float temp_c, float hysteresis_c,
-                                                      uint16_t cpu_opp_big, uint16_t cpu_opp_little,
-                                                      uint16_t gpu_opp) {
-  return {
+fht::ThermalTemperatureInfo TripPoint(float temp_c, float hysteresis_c, uint16_t cpu_opp_big,
+                                      uint16_t cpu_opp_little, uint16_t gpu_opp) {
+  return {{
       .up_temp_celsius = temp_c + hysteresis_c,
       .down_temp_celsius = temp_c - hysteresis_c,
       .fan_level = 0,
       .big_cluster_dvfs_opp = cpu_opp_big,
       .little_cluster_dvfs_opp = cpu_opp_little,
       .gpu_clk_freq_source = gpu_opp,
-  };
+  }};
 }
-
-constexpr auto
-    sherlock_thermal_config =
-        fht::wire::ThermalDeviceInfo{
-            .active_cooling = false,
-            .passive_cooling = true,
-            .gpu_throttling = true,
-            .num_trip_points = 6,
-            .big_little = true,
-            .critical_temp_celsius = 102.0f,
-            .trip_point_info =
-                {
-                    TripPoint(55.0f, 2.0f, 9, 10, 4),
-                    TripPoint(75.0f, 2.0f, 8, 9, 4),
-                    TripPoint(80.0f, 2.0f, 7, 8, 3),
-                    TripPoint(90.0f, 2.0f, 6, 7, 3),
-                    TripPoint(95.0f, 2.0f, 5, 6, 3),
-                    TripPoint(100.0f, 2.0f, 4, 5, 2),
-                    // 0 Kelvin is impossible, marks end of TripPoints
-                    TripPoint(-273.15f, 2.0f, 0, 0, 0),
-                },
-            .opps = {// kBigClusterPowerDomain.
-                     fuchsia_hardware_thermal::wire::OperatingPoint{
-                         .opp =
-                             {
-                                 fht::wire::OperatingPointEntry{.freq_hz = 100000000,
-                                                                .volt_uv = 751000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 250000000,
-                                                                .volt_uv = 751000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 500000000,
-                                                                .volt_uv = 751000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 667000000,
-                                                                .volt_uv = 751000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1000000000,
-                                                                .volt_uv = 771000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1200000000,
-                                                                .volt_uv = 771000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1398000000,
-                                                                .volt_uv = 791000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1512000000,
-                                                                .volt_uv = 821000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1608000000,
-                                                                .volt_uv = 861000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1704000000,
-                                                                .volt_uv = 891000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1704000000,
-                                                                .volt_uv = 891000},
-                             },
-                         .latency = 0,
-                         .count = 11,
-                     },
-                     // kLittleClusterPowerDomain.
-                     fuchsia_hardware_thermal::wire::OperatingPoint{
-                         .opp =
-                             {
-                                 fht::wire::OperatingPointEntry{.freq_hz = 100000000,
-                                                                .volt_uv = 731000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 250000000,
-                                                                .volt_uv = 731000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 500000000,
-                                                                .volt_uv = 731000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 667000000,
-                                                                .volt_uv = 731000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1000000000,
-                                                                .volt_uv = 731000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1200000000,
-                                                                .volt_uv = 731000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1398000000,
-                                                                .volt_uv = 761000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1512000000,
-                                                                .volt_uv = 791000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1608000000,
-                                                                .volt_uv = 831000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1704000000,
-                                                                .volt_uv = 861000},
-                                 fht::wire::OperatingPointEntry{.freq_hz = 1896000000,
-                                                                .volt_uv = 1011000},
-                             },
-                         .latency = 0,
-                         .count = 11,
-                     }}};
 
 }  // namespace
 
@@ -133,6 +51,88 @@ class FakeAmlTSensor : public AmlTSensor {
   static std::unique_ptr<FakeAmlTSensor> Create(fdf::MmioBuffer sensor_base_mmio,
                                                 fdf::MmioBuffer trim_mmio, fdf::MmioBuffer hiu_mmio,
                                                 bool less) {
+    const fht::ThermalDeviceInfo
+        kSherlockThermalConfig{
+            {.active_cooling = false,
+             .passive_cooling = true,
+             .gpu_throttling = true,
+             .num_trip_points = 6,
+             .big_little = true,
+             .critical_temp_celsius = 102.0f,
+             .trip_point_info =
+                 {
+                     TripPoint(55.0f, 2.0f, 9, 10, 4),
+                     TripPoint(75.0f, 2.0f, 8, 9, 4),
+                     TripPoint(80.0f, 2.0f, 7, 8, 3),
+                     TripPoint(90.0f, 2.0f, 6, 7, 3),
+                     TripPoint(95.0f, 2.0f, 5, 6, 3),
+                     TripPoint(100.0f, 2.0f, 4, 5, 2),
+                     // 0 Kelvin is impossible, marks end of TripPoints
+                     TripPoint(-273.15f, 2.0f, 0, 0, 0),
+                 },
+             .opps = {// kBigClusterPowerDomain.
+                      fuchsia_hardware_thermal::OperatingPoint{
+                          {
+                              .opp =
+                                  {
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 100000000, .volt_uv = 751000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 250000000, .volt_uv = 751000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 500000000, .volt_uv = 751000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 667000000, .volt_uv = 751000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1000000000, .volt_uv = 771000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1200000000, .volt_uv = 771000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1398000000, .volt_uv = 791000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1512000000, .volt_uv = 821000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1608000000, .volt_uv = 861000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1704000000, .volt_uv = 891000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1704000000, .volt_uv = 891000}},
+                                  },
+                              .latency = 0,
+                              .count = 11,
+                          }},
+                      // kLittleClusterPowerDomain.
+                      fht::OperatingPoint{
+                          {
+                              .opp =
+                                  {
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 100000000, .volt_uv = 731000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 250000000, .volt_uv = 731000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 500000000, .volt_uv = 731000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 667000000, .volt_uv = 731000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1000000000, .volt_uv = 731000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1200000000, .volt_uv = 731000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1398000000, .volt_uv = 761000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1512000000, .volt_uv = 791000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1608000000, .volt_uv = 831000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1704000000, .volt_uv = 861000}},
+                                      fht::OperatingPointEntry{
+                                          {.freq_hz = 1896000000, .volt_uv = 1011000}},
+                                  },
+                              .latency = 0,
+                              .count = 11,
+                          }}}}};
+
     fbl::AllocChecker ac;
 
     auto test = fbl::make_unique_checked<FakeAmlTSensor>(&ac, std::move(sensor_base_mmio),
@@ -141,10 +141,10 @@ class FakeAmlTSensor : public AmlTSensor {
       return nullptr;
     }
 
-    auto config = sherlock_thermal_config;
+    auto config = kSherlockThermalConfig;
     if (less) {
-      config.num_trip_points = 2;
-      config.trip_point_info[2].up_temp_celsius = -273.15f + 2.0f;
+      config.num_trip_points() = 2;
+      config.trip_point_info()[2].up_temp_celsius() = -273.15f + 2.0f;
     }
 
     EXPECT_OK(test->InitSensor(config, PDEV_PID_AMLOGIC_T931));

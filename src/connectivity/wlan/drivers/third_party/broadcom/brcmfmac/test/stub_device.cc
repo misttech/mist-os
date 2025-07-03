@@ -5,8 +5,6 @@
 
 #include <zircon/types.h>
 
-#include <ddktl/init-txn.h>
-
 namespace wlan {
 namespace brcmfmac {
 

@@ -1483,7 +1483,6 @@ pub(crate) mod ipv6_source_address_selection {
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::boxed::Box;
-    use alloc::collections::HashMap;
     use alloc::vec::Vec;
     use core::num::NonZeroUsize;
 
@@ -1493,6 +1492,7 @@ pub(crate) mod testutil {
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId};
     use netstack3_base::{SendFrameContext, SendFrameError};
     use netstack3_filter::Tuple;
+    use netstack3_hashmap::HashMap;
 
     use super::*;
     use crate::internal::base::{

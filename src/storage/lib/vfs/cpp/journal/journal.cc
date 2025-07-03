@@ -4,16 +4,32 @@
 
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
 
+#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/time.h>
+#include <zircon/types.h>
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <utility>
+#include <vector>
 
 #include <safemath/checked_math.h>
+#include <storage/buffer/blocking_ring_buffer.h>
+#include <storage/operation/operation.h>
+#include <storage/operation/unbuffered_operation.h>
 
-#include "entry_view.h"
-#include "format_assertions.h"
-#include "storage/operation/unbuffered_operation.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/journal_writer.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace fs {
 namespace {
@@ -51,9 +67,8 @@ fpromise::result<void, zx_status_t> SignalSyncComplete(sync_completion_t* comple
 fpromise::result<> ToVoidError(fpromise::result<void, zx_status_t> result) {
   if (result.is_ok()) {
     return fpromise::ok();
-  } else {
-    return fpromise::error();
   }
+  return fpromise::error();
 }
 
 }  // namespace
@@ -98,9 +113,8 @@ void Journal::FlushPending() {
   schedule_task(journal_sequencer_.wrap(fpromise::make_promise([this]() -> fpromise::result<> {
     if (writer_.HavePendingWork()) {
       return ToVoidError(writer_.Flush());
-    } else {
-      return fpromise::ok();
     }
+    return fpromise::ok();
   })));
 
   // Blocks will still be reserved, but they'll shortly be in-flight and later released.
@@ -159,7 +173,7 @@ zx_status_t Journal::CommitTransaction(Transaction transaction) {
   }
 
   if (!writer_.IsWritebackEnabled()) {
-    FX_LOGST(DEBUG, "journal") << "Not commiting; writeback disabled";
+    FX_LOGST(DEBUG, "journal") << "Not committing; writeback disabled";
     return ZX_ERR_IO_REFUSED;
   }
 

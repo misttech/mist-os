@@ -221,7 +221,11 @@ where
     }
 
     /// Provides an iterator over the diagnostics hierarchy returning properties in pre-order.
-    pub fn property_iter(&self) -> DiagnosticsHierarchyIterator<'_, Key> {
+    pub fn property_iter(&self) -> DiagnosticsHierarchyIterator<'_, Key, PropertyIter> {
+        DiagnosticsHierarchyIterator::new(self)
+    }
+
+    pub fn error_iter(&self) -> DiagnosticsHierarchyIterator<'_, Key, ErrorIter> {
         DiagnosticsHierarchyIterator::new(self)
     }
 
@@ -329,26 +333,83 @@ struct WorkStackEntry<'a, Key> {
     key: Vec<&'a str>,
 }
 
-pub struct DiagnosticsHierarchyIterator<'a, Key> {
+pub struct PropertyIter;
+pub struct ErrorIter;
+
+pub struct DiagnosticsHierarchyIterator<'a, Key, PropOrIterMarker> {
     work_stack: Vec<WorkStackEntry<'a, Key>>,
     current_key: Vec<&'a str>,
     current_node: Option<&'a DiagnosticsHierarchy<Key>>,
-    current_property_index: usize,
+    current_index: usize,
+    phantom: std::marker::PhantomData<PropOrIterMarker>,
 }
 
-impl<'a, Key> DiagnosticsHierarchyIterator<'a, Key> {
+enum EndOfTheLine<'a, T, Key> {
+    Yes(Option<T>),
+    No(&'a DiagnosticsHierarchy<Key>),
+}
+
+impl<'a, Key, Marker> DiagnosticsHierarchyIterator<'a, Key, Marker> {
     /// Creates a new iterator for the given `hierarchy`.
     fn new(hierarchy: &'a DiagnosticsHierarchy<Key>) -> Self {
         DiagnosticsHierarchyIterator {
             work_stack: vec![WorkStackEntry { node: hierarchy, key: vec![&hierarchy.name] }],
             current_key: vec![],
             current_node: None,
-            current_property_index: 0,
+            current_index: 0,
+            phantom: std::marker::PhantomData,
         }
+    }
+
+    /// Get the next node. This abstracts stack management away from the type being iterated over.
+    fn get_node<T, U: 'a, F: FnOnce(&'a DiagnosticsHierarchy<Key>) -> &Vec<U>>(
+        &mut self,
+        iterable_node_data: F,
+    ) -> EndOfTheLine<'a, (Vec<&'a str>, Option<&'a T>), Key> {
+        match self.current_node {
+            // If we are going through a node's data, that node will be set here.
+            Some(node) => EndOfTheLine::No(node),
+            None => {
+                // If we don't have a node we are currently working with, then go to the next
+                // node in our stack.
+                let Some(WorkStackEntry { node, key }) = self.work_stack.pop() else {
+                    return EndOfTheLine::Yes(None);
+                };
+
+                // Push to the stack all children of the new node.
+                for child in node.children.iter() {
+                    let mut child_key = key.clone();
+                    child_key.push(&child.name);
+                    self.work_stack.push(WorkStackEntry { node: child, key: child_key })
+                }
+
+                // If this node doesn't have any data we care about, we still want to return that it
+                // exists, so we return with a None for data type we are examining.
+                if iterable_node_data(node).is_empty() {
+                    return EndOfTheLine::Yes(Some((key.clone(), None)));
+                }
+
+                self.current_index = 0;
+                self.current_key = key;
+
+                EndOfTheLine::No(node)
+            }
+        }
+    }
+
+    fn advance_index<T>(
+        &mut self,
+        data: &'a [T],
+        new_current: &'a DiagnosticsHierarchy<Key>,
+    ) -> &'a T {
+        let datum = &data[self.current_index];
+        self.current_index += 1;
+        self.current_node = Some(new_current);
+        datum
     }
 }
 
-impl<'a, Key> Iterator for DiagnosticsHierarchyIterator<'a, Key> {
+impl<'a, Key> Iterator for DiagnosticsHierarchyIterator<'a, Key, PropertyIter> {
     /// Each item is a path to the node holding the resulting property.
     /// If a node has no properties, a `None` will be returned for it.
     /// If a node has properties a `Some` will be returned for each property and no `None` will be
@@ -357,47 +418,50 @@ impl<'a, Key> Iterator for DiagnosticsHierarchyIterator<'a, Key> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let node = match self.current_node {
-                // If we are going through a node properties, that node will be set here.
-                Some(node) => node,
-                None => {
-                    // If we don't have a node we are currently working with, then go to the next
-                    // node in our stack.
-                    let WorkStackEntry { node, key } = self.work_stack.pop()?;
-
-                    // Push to the stack all children of the new node.
-                    for child in node.children.iter() {
-                        let mut child_key = key.clone();
-                        child_key.push(&child.name);
-                        self.work_stack.push(WorkStackEntry { node: child, key: child_key })
-                    }
-
-                    // If this node doesn't have any properties, we still want to return that it
-                    // exists, so we return with a property=None.
-                    if node.properties.is_empty() {
-                        return Some((key.clone(), None));
-                    }
-
-                    self.current_property_index = 0;
-                    self.current_key = key;
-
-                    node
-                }
+            let node = match self.get_node(|node| &node.properties) {
+                EndOfTheLine::Yes(r) => return r,
+                EndOfTheLine::No(n) => n,
             };
 
             // We were already done with this node. Try the next item in our stack.
-            if self.current_property_index == node.properties.len() {
+            if self.current_index == node.properties.len() {
                 self.current_node = None;
                 continue;
             }
 
-            // Return the current property and advance our index to the next property we want to
+            // Return the current property and advance our index to the next node we want to
             // explore.
-            let property = &node.properties[self.current_property_index];
-            self.current_property_index += 1;
-            self.current_node = Some(node);
+            let property = self.advance_index(&node.properties, node);
 
             return Some((self.current_key.clone(), Some(property)));
+        }
+    }
+}
+
+impl<'a, Key> Iterator for DiagnosticsHierarchyIterator<'a, Key, ErrorIter> {
+    /// Each item is a path to the node with a missing link.
+    /// If a node has no missing links, a `None` will be returned for it.
+    /// If a node has missing links a `Some` will be returned for each link and no `None` will be
+    /// returned.
+    type Item = (Vec<&'a str>, Option<&'a MissingValue>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let node = match self.get_node(|node| &node.missing) {
+                EndOfTheLine::Yes(r) => return r,
+                EndOfTheLine::No(n) => n,
+            };
+
+            // We were already done with this node. Try the next item in our stack.
+            if self.current_index == node.missing.len() {
+                self.current_node = None;
+                continue;
+            }
+
+            // Return the current error and advance our index to the next node we want to
+            // explore.
+            let err = self.advance_index(&node.missing, node);
+            return Some((self.current_key.clone(), Some(err)));
         }
     }
 }
@@ -1181,8 +1245,24 @@ mod tests {
         assert_eq!(num_entries, expected_num_entries);
     }
 
+    fn validate_hierarchy_error_iteration(
+        mut results_vec: Vec<(Vec<String>, Option<MissingValue>)>,
+        test_hierarchy: DiagnosticsHierarchy,
+    ) {
+        let expected_num_entries = results_vec.len();
+        let mut num_entries = 0;
+        for (key, reason) in test_hierarchy.error_iter() {
+            num_entries += 1;
+            let (expected_key, expected_reason) = results_vec.pop().unwrap();
+            assert_eq!(reason, expected_reason.as_ref());
+            assert_eq!(key.to_vec().join("/"), expected_key.to_vec().join("/"));
+        }
+
+        assert_eq!(num_entries, expected_num_entries);
+    }
+
     #[fuchsia::test]
-    fn test_diagnostics_hierarchy_iteration() {
+    fn test_diagnostics_hierarchy_property_iteration() {
         let double_array_data = vec![-1.2, 2.3, 3.4, 4.5, -5.6];
         let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
         let string_data = chars.iter().cycle().take(6000).collect::<String>();
@@ -1279,6 +1359,55 @@ mod tests {
         ];
 
         validate_hierarchy_iteration(results_vec, test_hierarchy);
+    }
+
+    #[fuchsia::test]
+    fn test_diagnostics_hierarchy_error_iteration() {
+        let mut test_hierarchy = DiagnosticsHierarchy::new(
+            "root".to_string(),
+            vec![],
+            vec![
+                DiagnosticsHierarchy::new(
+                    "child-1".to_string(),
+                    vec![],
+                    vec![DiagnosticsHierarchy::new("child-1-1".to_string(), vec![], vec![])],
+                ),
+                DiagnosticsHierarchy::new("child-2".to_string(), vec![], vec![]),
+            ],
+        );
+
+        test_hierarchy.add_missing(MissingValueReason::LinkInvalid, "root".to_string());
+        test_hierarchy.children[0]
+            .add_missing(MissingValueReason::LinkNeverExpanded, "child-1".to_string());
+        test_hierarchy.children[0].children[0]
+            .add_missing(MissingValueReason::Timeout, "child-1-1".to_string());
+
+        let results_vec = vec![
+            (
+                vec!["root".to_string(), "child-1".to_string(), "child-1-1".to_string()],
+                Some(MissingValue {
+                    reason: MissingValueReason::Timeout,
+                    name: "child-1-1".to_string(),
+                }),
+            ),
+            (
+                vec!["root".to_string(), "child-1".to_string()],
+                Some(MissingValue {
+                    reason: MissingValueReason::LinkNeverExpanded,
+                    name: "child-1".to_string(),
+                }),
+            ),
+            (vec!["root".to_string(), "child-2".to_string()], None),
+            (
+                vec!["root".to_string()],
+                Some(MissingValue {
+                    reason: MissingValueReason::LinkInvalid,
+                    name: "root".to_string(),
+                }),
+            ),
+        ];
+
+        validate_hierarchy_error_iteration(results_vec, test_hierarchy);
     }
 
     #[fuchsia::test]

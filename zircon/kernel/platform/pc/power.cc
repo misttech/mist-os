@@ -22,9 +22,11 @@
 #include <arch/x86/mp.h>
 #include <ktl/atomic.h>
 #include <platform/efi_bootbyte.h>
-#include <platform/keyboard.h>
+#include <platform/pc/keyboard.h>
 
 #include <ktl/enforce.h>
+
+namespace {
 
 // The I/O port to write to for QEMU debug exit.
 const uint16_t kQEMUDebugExitPort = 0xf4;
@@ -36,7 +38,9 @@ const uint8_t kQEMUExitCode = 0x1f;
 static_assert(kQEMUExitCode != 0 && kQEMUExitCode % 2 != 0,
               "QEMU exit code must be non-zero and odd.");
 
-static void reboot(void) {
+ktl::atomic<cpu_mask_t> halted_cpus(0);
+
+void reboot() {
   // select the default reboot reason
   efi_bootbyte_set_reason(0u);
   x86_reboot_reason_func_t reboot_reason = x86_get_microarch_config()->reboot_reason;
@@ -48,23 +52,21 @@ static void reboot(void) {
   pc_keyboard_reboot();
 }
 
-static void reboot_recovery() {
+void reboot_recovery() {
   efi_bootbyte_set_reason(2u);
   x86_reboot_reason_func_t reboot_reason = x86_get_microarch_config()->reboot_reason;
   if (reboot_reason)
     reboot_reason(2u);
 }
 
-static void reboot_bootloader() {
+void reboot_bootloader() {
   efi_bootbyte_set_reason(4u);
   x86_reboot_reason_func_t reboot_reason = x86_get_microarch_config()->reboot_reason;
   if (reboot_reason)
     reboot_reason(4u);
 }
 
-static ktl::atomic<cpu_mask_t> halted_cpus(0);
-
-static void halt_other_cpus(void) {
+void halt_other_cpus() {
   static ktl::atomic<int> halted(0);
 
   if (halted.exchange(1) == 0) {
@@ -97,7 +99,9 @@ static void halt_other_cpus(void) {
   }
 }
 
-void platform_halt_cpu(void) {
+}  // namespace
+
+void platform_halt_cpu() {
   // Signal that this CPU is in its halt loop
   halted_cpus.fetch_or(cpu_num_to_mask(arch_curr_cpu_num()));
 }

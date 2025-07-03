@@ -16,7 +16,7 @@ pub fn make_dir(
         "ctl" => vfs::pseudo_directory! {
             "validation" => validation::Validation::new(
                 blobfs,
-                base_packages.list_blobs().to_owned()
+                base_packages,
             )
         },
     }

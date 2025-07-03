@@ -18,6 +18,8 @@ _platform_configuration_base = {
     include_netsvc = true
   }
   storage = {
+    # TODO(https://fxbug.dev/425727583): Remove to enable
+    storage_host_enabled = false
     filesystems = {
       image_name = "bringup"
       image_mode = "no_image"

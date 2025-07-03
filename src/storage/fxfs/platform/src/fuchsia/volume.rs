@@ -477,6 +477,7 @@ impl FxVolume {
         loop {
             let mut should_terminate = false;
             let mut should_flush = false;
+            let mut low_mem = false;
             let mut should_purge_layer_files = false;
             let mut should_update_cache_limit = false;
 
@@ -487,7 +488,7 @@ impl FxVolume {
                     let new_level = new_level.unwrap();
                     // At critical levels, it's okay to undertake expensive work immediately
                     // to reclaim memory.
-                    should_flush = matches!(new_level, MemoryPressureLevel::Critical);
+                    low_mem = matches!(new_level, MemoryPressureLevel::Critical);
                     should_purge_layer_files = true;
                     if new_level != level {
                         level = new_level;
@@ -519,18 +520,21 @@ impl FxVolume {
             if should_terminate {
                 break;
             }
-
+            // Maybe close extra files *before* iterating them for flush/low mem.
+            if should_update_cache_limit {
+                self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
+            }
             if should_flush {
                 self.flush_all_files(false).await;
                 self.dirent_cache.recycle_stale_files();
+            } else if low_mem {
+                // This is a softer version of flushing files, so don't bother if we're flushing.
+                self.minimize_memory().await;
             }
             if should_purge_layer_files {
                 for layer in self.store.tree().immutable_layer_set().layers {
                     layer.purge_cached_data();
                 }
-            }
-            if should_update_cache_limit {
-                self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
             }
         }
         debug!(store_id = self.store.store_object_id(); "FxVolume::background_task end");
@@ -580,6 +584,22 @@ impl FxVolume {
             flushed += 1;
         }
         debug!(store_id = self.store.store_object_id(), file_count = flushed; "FxVolume flushed");
+    }
+
+    #[trace]
+    async fn minimize_memory(&self) {
+        for file in self.cache.files() {
+            if let Some(node) = file.into_opened_node() {
+                if let Err(e) = node.handle().minimize_memory().await {
+                    warn!(
+                        store_id = self.store.store_object_id(),
+                        oid = node.object_id(),
+                        error:? = e;
+                        "Failed to flush",
+                    )
+                }
+            }
+        }
     }
 
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.
@@ -632,6 +652,162 @@ impl FxVolume {
     pub fn refault_tracker(&self) -> &RefaultTracker {
         &self.refault_tracker
     }
+
+    pub async fn handle_file_backed_volume_provider_requests(
+        this: Weak<Self>,
+        scope: ExecutionScope,
+        mut requests: FileBackedVolumeProviderRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) = requests.try_next().await? {
+            match request {
+                FileBackedVolumeProviderRequest::Open {
+                    parent_directory_token,
+                    name,
+                    server_end,
+                    control_handle: _,
+                } => {
+                    // Try and get an active guard before upgrading.
+                    let Some(_guard) = scope.try_active_guard() else {
+                        bail!("Volume shutting down")
+                    };
+                    let Some(this) = this.upgrade() else { bail!("FxVolume dropped") };
+                    match this
+                        .scope
+                        .token_registry()
+                        // NB: For now, we only expect these calls in a regular (non-blob) volume.
+                        // Hard-code the type for simplicity; attempts to call on a blob volume will
+                        // get an error.
+                        .get_owner(parent_directory_token)
+                        .and_then(|dir| {
+                            dir.ok_or(zx::Status::BAD_HANDLE).and_then(|dir| {
+                                dir.into_any()
+                                    .downcast::<FxDirectory>()
+                                    .map_err(|_| zx::Status::BAD_HANDLE)
+                            })
+                        }) {
+                        Ok(dir) => {
+                            dir.open_block_file(&name, server_end).await;
+                        }
+                        Err(status) => {
+                            let _ = server_end.close_with_epitaph(status)?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn handle_project_id_requests(
+        this: Weak<Self>,
+        scope: ExecutionScope,
+        mut requests: ProjectIdRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) = requests.try_next().await? {
+            // Try and get an active guard before upgrading.
+            let Some(_guard) = scope.try_active_guard() else { bail!("Volume shutting down") };
+            let Some(this) = this.upgrade() else { bail!("FxVolume dropped") };
+            let store_id = this.store.store_object_id();
+
+            match request {
+                ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
+                    .send(
+                    this.store().set_project_limit(project_id, bytes, nodes).await.map_err(
+                        |error| {
+                            error!(error:?, store_id, project_id; "Failed to set project limit");
+                            map_to_raw_status(error)
+                        },
+                    ),
+                )?,
+                ProjectIdRequest::Clear { responder, project_id } => responder.send(
+                    this.store().clear_project_limit(project_id).await.map_err(|error| {
+                        error!(error:?, store_id, project_id; "Failed to clear project limit");
+                        map_to_raw_status(error)
+                    }),
+                )?,
+                ProjectIdRequest::SetForNode { responder, node_id, project_id } => {
+                    responder
+                        .send(this.store().set_project_for_node(node_id, project_id).await.map_err(
+                        |error| {
+                            error!(error:?, store_id, node_id, project_id; "Failed to apply node.");
+                            map_to_raw_status(error)
+                        },
+                    ))?
+                }
+                ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
+                    this.store().get_project_for_node(node_id).await.map_err(|error| {
+                        error!(error:?, store_id, node_id; "Failed to get node.");
+                        map_to_raw_status(error)
+                    }),
+                )?,
+                ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
+                    this.store().clear_project_for_node(node_id).await.map_err(|error| {
+                        error!(error:?, store_id, node_id; "Failed to clear for node.");
+                        map_to_raw_status(error)
+                    }),
+                )?,
+                ProjectIdRequest::List { responder, token } => {
+                    responder.send(match this.list_projects(&token).await {
+                        Ok((ref entries, ref next_token)) => Ok((entries, next_token.as_ref())),
+                        Err(error) => {
+                            error!(error:?, store_id, token:?; "Failed to list projects.");
+                            Err(map_to_raw_status(error))
+                        }
+                    })?
+                }
+                ProjectIdRequest::Info { responder, project_id } => {
+                    responder.send(match this.project_info(project_id).await {
+                        Ok((ref limit, ref usage)) => Ok((limit, usage)),
+                        Err(error) => {
+                            error!(error:?, store_id, project_id; "Failed to get project info.");
+                            Err(map_to_raw_status(error))
+                        }
+                    })?
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Maximum entries to fit based on 64KiB message size minus 16 bytes of header, 16 bytes
+    // of vector header, 16 bytes for the optional token header, and 8 bytes of token value.
+    // https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/max-out-pagination
+    const MAX_PROJECT_ENTRIES: usize = 8184;
+
+    // Calls out to the inner volume to list available projects, removing and re-adding the fidl
+    // wrapper types for the pagination token.
+    async fn list_projects(
+        &self,
+        last_token: &Option<Box<ProjectIterToken>>,
+    ) -> Result<(Vec<u64>, Option<ProjectIterToken>), Error> {
+        let (entries, token) = self
+            .store()
+            .list_projects(
+                match last_token {
+                    None => 0,
+                    Some(v) => v.value,
+                },
+                Self::MAX_PROJECT_ENTRIES,
+            )
+            .await?;
+        Ok((entries, token.map(|value| ProjectIterToken { value })))
+    }
+
+    async fn project_info(&self, project_id: u64) -> Result<(BytesAndNodes, BytesAndNodes), Error> {
+        let (limit, usage) = self.store().project_info(project_id).await?;
+        // At least one of them needs to be around to return anything.
+        ensure!(limit.is_some() || usage.is_some(), FxfsError::NotFound);
+        Ok((
+            limit.map_or_else(
+                || BytesAndNodes { bytes: u64::MAX, nodes: u64::MAX },
+                |v| BytesAndNodes { bytes: v.0, nodes: v.1 },
+            ),
+            usage.map_or_else(
+                || BytesAndNodes { bytes: 0, nodes: 0 },
+                |v| BytesAndNodes { bytes: v.0, nodes: v.1 },
+            ),
+        ))
+    }
 }
 
 #[cfg(any(test, feature = "testing"))]
@@ -681,6 +857,12 @@ pub trait RootDir: FxNode + DirectoryEntry {
 pub struct FxVolumeAndRoot {
     volume: Arc<FxVolume>,
     root: Arc<dyn RootDir>,
+
+    // This is used for service connections and anything that isn't the actual volume.
+    admin_scope: ExecutionScope,
+
+    // The outgoing directory that the volume might be served on.
+    outgoing_dir: Arc<Simple>,
 }
 
 impl FxVolumeAndRoot {
@@ -700,7 +882,12 @@ impl FxVolumeAndRoot {
             .placeholder()
             .unwrap()
             .commit(&root.clone().as_node());
-        Ok(Self { volume, root })
+        Ok(Self {
+            volume,
+            root,
+            admin_scope: ExecutionScope::new(),
+            outgoing_dir: vfs::directory::immutable::simple(),
+        })
     }
 
     pub fn volume(&self) -> &Arc<FxVolume> {
@@ -711,160 +898,21 @@ impl FxVolumeAndRoot {
         &self.root
     }
 
+    pub fn admin_scope(&self) -> &ExecutionScope {
+        &self.admin_scope
+    }
+
+    pub fn outgoing_dir(&self) -> &Arc<Simple> {
+        &self.outgoing_dir
+    }
+
     // The same as root but downcasted to FxDirectory.
     pub fn root_dir(&self) -> Arc<FxDirectory> {
         self.root().clone().into_any().downcast::<FxDirectory>().expect("Invalid type for root")
     }
 
-    pub async fn handle_project_id_requests(
-        &self,
-        mut requests: ProjectIdRequestStream,
-    ) -> Result<(), Error> {
-        let store_id = self.volume.store.store_object_id();
-        while let Some(request) = requests.try_next().await? {
-            match request {
-                ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
-                    .send(
-                    self.volume.store().set_project_limit(project_id, bytes, nodes).await.map_err(
-                        |error| {
-                            error!(error:?, store_id, project_id; "Failed to set project limit");
-                            map_to_raw_status(error)
-                        },
-                    ),
-                )?,
-                ProjectIdRequest::Clear { responder, project_id } => {
-                    responder
-                        .send(self.volume.store().clear_project_limit(project_id).await.map_err(
-                        |error| {
-                            error!(error:?, store_id, project_id; "Failed to clear project limit");
-                            map_to_raw_status(error)
-                        },
-                    ))?
-                }
-                ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
-                    self.volume.store().set_project_for_node(node_id, project_id).await.map_err(
-                        |error| {
-                            error!(error:?, store_id, node_id, project_id; "Failed to apply node.");
-                            map_to_raw_status(error)
-                        },
-                    ),
-                )?,
-                ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
-                    self.volume.store().get_project_for_node(node_id).await.map_err(|error| {
-                        error!(error:?, store_id, node_id; "Failed to get node.");
-                        map_to_raw_status(error)
-                    }),
-                )?,
-                ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
-                    self.volume.store().clear_project_for_node(node_id).await.map_err(|error| {
-                        error!(error:?, store_id, node_id; "Failed to clear for node.");
-                        map_to_raw_status(error)
-                    }),
-                )?,
-                ProjectIdRequest::List { responder, token } => {
-                    responder.send(match self.list_projects(&token).await {
-                        Ok((ref entries, ref next_token)) => Ok((entries, next_token.as_ref())),
-                        Err(error) => {
-                            error!(error:?, store_id, token:?; "Failed to list projects.");
-                            Err(map_to_raw_status(error))
-                        }
-                    })?
-                }
-                ProjectIdRequest::Info { responder, project_id } => {
-                    responder.send(match self.project_info(project_id).await {
-                        Ok((ref limit, ref usage)) => Ok((limit, usage)),
-                        Err(error) => {
-                            error!(error:?, store_id, project_id; "Failed to get project info.");
-                            Err(map_to_raw_status(error))
-                        }
-                    })?
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub async fn handle_file_backed_volume_provider_requests(
-        &self,
-        mut requests: FileBackedVolumeProviderRequestStream,
-    ) -> Result<(), Error> {
-        while let Some(request) = requests.try_next().await? {
-            match request {
-                FileBackedVolumeProviderRequest::Open {
-                    parent_directory_token,
-                    name,
-                    server_end,
-                    control_handle: _,
-                } => match self
-                    .volume
-                    .scope
-                    .token_registry()
-                    // NB: For now, we only expect these calls in a regular (non-blob) volume.
-                    // Hard-code the type for simplicity; attempts to call on a blob volume will
-                    // get an error.
-                    .get_owner(parent_directory_token)
-                    .and_then(|dir| {
-                        dir.ok_or(zx::Status::BAD_HANDLE).and_then(|dir| {
-                            dir.into_any()
-                                .downcast::<FxDirectory>()
-                                .map_err(|_| zx::Status::BAD_HANDLE)
-                        })
-                    }) {
-                    Ok(dir) => {
-                        dir.open_block_file(&name, server_end).await;
-                    }
-                    Err(status) => {
-                        let _ = server_end.close_with_epitaph(status)?;
-                    }
-                },
-            }
-        }
-        Ok(())
-    }
-
     pub fn into_volume(self) -> Arc<FxVolume> {
         self.volume
-    }
-
-    // Maximum entries to fit based on 64KiB message size minus 16 bytes of header, 16 bytes
-    // of vector header, 16 bytes for the optional token header, and 8 bytes of token value.
-    // https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/max-out-pagination
-    const MAX_PROJECT_ENTRIES: usize = 8184;
-
-    // Calls out to the inner volume to list available projects, removing and re-adding the fidl
-    // wrapper types for the pagination token.
-    async fn list_projects(
-        &self,
-        last_token: &Option<Box<ProjectIterToken>>,
-    ) -> Result<(Vec<u64>, Option<ProjectIterToken>), Error> {
-        let (entries, token) = self
-            .volume
-            .store()
-            .list_projects(
-                match last_token {
-                    None => 0,
-                    Some(v) => v.value,
-                },
-                Self::MAX_PROJECT_ENTRIES,
-            )
-            .await?;
-        Ok((entries, token.map(|value| ProjectIterToken { value })))
-    }
-
-    async fn project_info(&self, project_id: u64) -> Result<(BytesAndNodes, BytesAndNodes), Error> {
-        let (limit, usage) = self.volume.store().project_info(project_id).await?;
-        // At least one of them needs to be around to return anything.
-        ensure!(limit.is_some() || usage.is_some(), FxfsError::NotFound);
-        Ok((
-            limit.map_or_else(
-                || BytesAndNodes { bytes: u64::MAX, nodes: u64::MAX },
-                |v| BytesAndNodes { bytes: v.0, nodes: v.1 },
-            ),
-            usage.map_or_else(
-                || BytesAndNodes { bytes: 0, nodes: 0 },
-                |v| BytesAndNodes { bytes: v.0, nodes: v.1 },
-            ),
-        ))
     }
 }
 
@@ -1635,7 +1683,7 @@ mod tests {
         fixture.close().await;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_project_limit_persistence() {
         const BYTES_LIMIT_1: u64 = 123456;
         const NODES_LIMIT_1: u64 = 4321;
@@ -1648,8 +1696,8 @@ mod tests {
         let volume_store_id;
         let node_id;
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
-            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
             let volumes_directory = VolumesDirectory::new(
                 root_volume(filesystem.clone()).await.unwrap(),
                 Weak::new(),
@@ -1663,15 +1711,6 @@ mod tests {
                 .await
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
-
-            // TODO(https://fxbug.dev/378924259): Migrate to open3.
-            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                Path::validate_and_split(VOLUME_NAME).unwrap(),
-                volume_server_end.into_channel().into(),
-            );
 
             let (volume_dir_proxy, dir_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -1758,16 +1797,14 @@ mod tests {
                 PROJECT_ID
             );
 
-            std::mem::drop(volume_proxy);
             volumes_directory.terminate().await;
-            std::mem::drop(volumes_directory);
             filesystem.close().await.expect("close filesystem failed");
-            device = filesystem.take_device().await;
         }
+        device = filesystem.take_device().await;
+        device.ensure_unique();
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
         {
-            device.ensure_unique();
-            device.reopen(false);
-            let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
             fsck(filesystem.clone()).await.expect("Fsck");
             fsck_volume(filesystem.as_ref(), volume_store_id, None).await.expect("Fsck volume");
             let volumes_directory = VolumesDirectory::new(
@@ -1841,8 +1878,8 @@ mod tests {
             volumes_directory.terminate().await;
             std::mem::drop(volumes_directory);
             filesystem.close().await.expect("close filesystem failed");
-            device = filesystem.take_device().await;
         }
+        device = filesystem.take_device().await;
         device.ensure_unique();
         device.reopen(false);
         let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
@@ -1875,7 +1912,7 @@ mod tests {
         filesystem.close().await.expect("close filesystem failed");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_project_limit_accounting() {
         const BYTES_LIMIT: u64 = 123456;
         const NODES_LIMIT: u64 = 4321;
@@ -1886,8 +1923,8 @@ mod tests {
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
         let first_object_id;
         let mut bytes_usage;
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
-            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
             let volumes_directory = VolumesDirectory::new(
                 root_volume(filesystem.clone()).await.unwrap(),
                 Weak::new(),
@@ -1901,15 +1938,6 @@ mod tests {
                 .await
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
-
-            // TODO(https://fxbug.dev/378924259): Migrate to open3.
-            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                Path::validate_and_split(VOLUME_NAME).unwrap(),
-                volume_server_end.into_channel().into(),
-            );
 
             let (volume_dir_proxy, dir_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -2010,16 +2038,14 @@ mod tests {
                 bytes
             };
 
-            std::mem::drop(volume_proxy);
             volumes_directory.terminate().await;
-            std::mem::drop(volumes_directory);
             filesystem.close().await.expect("close filesystem failed");
-            device = filesystem.take_device().await;
         }
+        device = filesystem.take_device().await;
+        device.ensure_unique();
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
         {
-            device.ensure_unique();
-            device.reopen(false);
-            let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
             fsck(filesystem.clone()).await.expect("Fsck");
             fsck_volume(filesystem.as_ref(), volume_store_id, Some(Arc::new(InsecureCrypt::new())))
                 .await
@@ -2035,15 +2061,6 @@ mod tests {
                 .mount_volume(VOLUME_NAME, Some(Arc::new(InsecureCrypt::new())), false)
                 .await
                 .expect("mount unencrypted volume failed");
-
-            // TODO(https://fxbug.dev/378924259): Migrate to open3.
-            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                Path::validate_and_split(VOLUME_NAME).unwrap(),
-                volume_server_end.into_channel().into(),
-            );
 
             let (root_proxy, project_proxy) = {
                 let (volume_dir_proxy, dir_server_end) =
@@ -2166,12 +2183,10 @@ mod tests {
                 assert_eq!(nodes, 0);
             };
 
-            std::mem::drop(volume_proxy);
             volumes_directory.terminate().await;
-            std::mem::drop(volumes_directory);
             filesystem.close().await.expect("close filesystem failed");
-            device = filesystem.take_device().await;
         }
+        device = filesystem.take_device().await;
         device.ensure_unique();
         device.reopen(false);
         let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
@@ -2182,7 +2197,7 @@ mod tests {
         filesystem.close().await.expect("close filesystem failed");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_project_node_inheritance() {
         const BYTES_LIMIT: u64 = 123456;
         const NODES_LIMIT: u64 = 4321;
@@ -2193,8 +2208,8 @@ mod tests {
         const PROJECT_ID: u64 = 42;
         let volume_store_id;
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
-            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
             let volumes_directory = VolumesDirectory::new(
                 root_volume(filesystem.clone()).await.unwrap(),
                 Weak::new(),
@@ -2208,15 +2223,6 @@ mod tests {
                 .await
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
-
-            // TODO(https://fxbug.dev/378924259): Migrate to open3.
-            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                Path::validate_and_split(VOLUME_NAME).unwrap(),
-                volume_server_end.into_channel().into(),
-            );
 
             let (volume_dir_proxy, dir_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -2350,12 +2356,10 @@ mod tests {
             let BytesAndNodes { nodes, .. } =
                 project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
             assert_eq!(nodes, 3);
-            std::mem::drop(volume_proxy);
             volumes_directory.terminate().await;
-            std::mem::drop(volumes_directory);
             filesystem.close().await.expect("close filesystem failed");
-            device = filesystem.take_device().await;
         }
+        device = filesystem.take_device().await;
         device.ensure_unique();
         device.reopen(false);
         let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
@@ -2366,15 +2370,15 @@ mod tests {
         filesystem.close().await.expect("close filesystem failed");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_project_listing() {
         const VOLUME_NAME: &str = "A";
         const FILE_NAME: &str = "B";
         const NON_ZERO_PROJECT_ID: u64 = 3;
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
         let volume_store_id;
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
-            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
             let volumes_directory = VolumesDirectory::new(
                 root_volume(filesystem.clone()).await.unwrap(),
                 Weak::new(),
@@ -2388,14 +2392,6 @@ mod tests {
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
 
-            // TODO(https://fxbug.dev/378924259): Migrate to open3.
-            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                Path::validate_and_split(VOLUME_NAME).unwrap(),
-                volume_server_end.into_channel().into(),
-            );
             let (volume_dir_proxy, dir_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_directory
@@ -2405,9 +2401,9 @@ mod tests {
                 connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
                     .expect("Unable to connect to project id service");
             // This is just to ensure that the small numbers below can be used for this test.
-            assert!(FxVolumeAndRoot::MAX_PROJECT_ENTRIES >= 4);
+            assert!(FxVolume::MAX_PROJECT_ENTRIES >= 4);
             // Create a bunch of proxies. 3 more than the limit to ensure pagination.
-            let num_entries = u64::try_from(FxVolumeAndRoot::MAX_PROJECT_ENTRIES + 3).unwrap();
+            let num_entries = u64::try_from(FxVolume::MAX_PROJECT_ENTRIES + 3).unwrap();
             for project_id in 1..=num_entries {
                 project_proxy.set_limit(project_id, 1, 1).await.unwrap().expect("To set limits");
             }
@@ -2455,7 +2451,7 @@ mod tests {
             // If this `unwrap()` fails, it is likely the MAX_PROJECT_ENTRIES is too large for fidl.
             let (mut entries, mut next_token) =
                 project_proxy.list(None).await.unwrap().expect("To get project listing");
-            assert_eq!(entries.len(), FxVolumeAndRoot::MAX_PROJECT_ENTRIES);
+            assert_eq!(entries.len(), FxVolume::MAX_PROJECT_ENTRIES);
             assert!(next_token.is_some());
             assert!(entries.contains(&1));
             assert!(entries.contains(&3));
@@ -2476,7 +2472,7 @@ mod tests {
             project_proxy.clear(3).await.unwrap().expect("Clear project");
             (entries, next_token) =
                 project_proxy.list(None).await.unwrap().expect("To get project listing");
-            assert_eq!(entries.len(), FxVolumeAndRoot::MAX_PROJECT_ENTRIES);
+            assert_eq!(entries.len(), FxVolume::MAX_PROJECT_ENTRIES);
             assert!(next_token.is_some());
             assert!(!entries.contains(&num_entries));
             assert!(!entries.contains(&1));
@@ -2494,15 +2490,13 @@ mod tests {
             project_proxy.clear(4).await.unwrap().expect("Clear project");
             (entries, next_token) =
                 project_proxy.list(None).await.unwrap().expect("To get project listing");
-            assert_eq!(entries.len(), FxVolumeAndRoot::MAX_PROJECT_ENTRIES);
+            assert_eq!(entries.len(), FxVolume::MAX_PROJECT_ENTRIES);
             assert!(next_token.is_none());
             assert!(entries.contains(&num_entries));
-            std::mem::drop(volume_proxy);
             volumes_directory.terminate().await;
-            std::mem::drop(volumes_directory);
             filesystem.close().await.expect("close filesystem failed");
-            device = filesystem.take_device().await;
         }
+        device = filesystem.take_device().await;
         device.ensure_unique();
         device.reopen(false);
         let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();

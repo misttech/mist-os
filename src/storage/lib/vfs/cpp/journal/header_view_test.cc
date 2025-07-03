@@ -4,6 +4,10 @@
 
 #include "src/storage/lib/vfs/cpp/journal/header_view.h"
 
+#include <zircon/errors.h>
+
+#include <cstddef>
+#include <cstdint>
 #include <span>
 
 #include <gtest/gtest.h>

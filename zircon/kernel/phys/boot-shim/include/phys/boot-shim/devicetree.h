@@ -31,7 +31,7 @@
 #include <phys/new.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 
 // Bootstrapping data from the devicetree blob.
 struct DevicetreeBoot {
@@ -68,14 +68,17 @@ using Arm64StandardBootShimItems =
     boot_shim::StandardBootShimItems<boot_shim::UartItem<>,                               //
                                      boot_shim::PoolMemConfigItem,                        //
                                      boot_shim::NvramItem,                                //
+                                     boot_shim::RebootReasonItem,                         //
                                      boot_shim::DevicetreeSerialNumberItem,               //
-                                     boot_shim::ArmDevicetreePsciItem,                    //
                                      boot_shim::ArmDevicetreeGicItem,                     //
                                      boot_shim::DevicetreeDtbItem,                        //
                                      boot_shim::GenericWatchdogItem<WatchdogMmioHelper>,  //
                                      boot_shim::ArmDevicetreeCpuTopologyItem,             //
-                                     boot_shim::RebootReasonItem,                         //
-                                     boot_shim::ArmDevicetreeTimerItem>;
+                                     boot_shim::ArmDevicetreeTimerItem,                   //
+                                     boot_shim::ArmDevicetreeTimerMmioItem,               //
+                                     boot_shim::ArmDevicetreePsciItem,                    //
+                                     boot_shim::ArmDevicetreePsciCpuSuspendItem           //
+                                     >;
 
 // Accessor obtaining the boot hart ID, RISCV only.
 struct BootHartIdGetter {
@@ -194,32 +197,7 @@ class BootShimHelper {
 
     // Determine at compile time if the item is present, if so initialize them.
     if constexpr (options.generate_peripheral_ranges) {
-      shim_.set_mmio_observer([](boot_shim::DevicetreeMmioRange mmio_range) {
-        auto& pool = Allocation::GetPool();
-        memalloc::Range peripheral_range = {
-            .addr = mmio_range.address,
-            .size = mmio_range.size,
-            .type = memalloc::Type::kPeripheral,
-        };
-        // This may reintroduce reserved ranges from the initial memory bootstrap as peripheral
-        // ranges, since reserved ranges are no longer tracked and are represented as wholes in the
-        // memory. This should be harmless, since the implications is that an uncached mapping will
-        // be created but not touched.
-        if (pool.MarkAsPeripheral(peripheral_range).is_error()) {
-          printf("Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n",
-                 peripheral_range.addr, peripheral_range.end());
-        }
-      });
-
-      GetUartDriver().Visit([this]<typename KernelDriver>(const KernelDriver& driver) {
-        // Mark the UART MMIO range as peripheral range.
-        if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
-          if (Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_error()) {
-            printf("%s: Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n",
-                   shim_.shim_name(), uart_mmio->addr, uart_mmio->end());
-          }
-        }
-      });
+      shim_.set_mmio_observer(MarkAsPeripheral);
     }
 
     // This will initialize these common set of items if they are present, otherwise they will
@@ -272,6 +250,25 @@ class BootShimHelper {
             "%s: WARNING Failed to inflate peripheral ranges, page allocation may be suboptimal.\n",
             shim_.shim_name());
       }
+    }
+  }
+
+  static void MarkAsPeripheral(boot_shim::MmioRange mmio_range) {
+    const memalloc::Range peripheral_range = {
+        .addr = mmio_range.address,
+        .size = mmio_range.size,
+        .type = memalloc::Type::kPeripheral,
+    };
+
+    // This may reintroduce reserved ranges from the initial memory
+    // bootstrap as peripheral ranges, since reserved ranges are no longer
+    // tracked and are represented as wholes in the memory.  This should be
+    // harmless, since the implications is that an uncached mapping will be
+    // created but not touched.
+    auto& pool = Allocation::GetPool();
+    if (pool.MarkAsPeripheral(peripheral_range).is_error()) {
+      printf("Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n", peripheral_range.addr,
+             peripheral_range.end());
     }
   }
 

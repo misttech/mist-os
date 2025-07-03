@@ -105,6 +105,7 @@ TEST_F(ProdConfigTest, DefaultSnapshot) {
                                                "device.feedback-id",
                                                "device.num-cpus",
                                                "device.runtime",
+                                               "device.total-suspended-time",
                                                "device.uptime",
                                                "device.utc-time",
                                                "hardware.board.name",

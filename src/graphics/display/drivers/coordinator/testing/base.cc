@@ -13,14 +13,17 @@
 
 #include <memory>
 #include <optional>
+#include <utility>
 
 #include <fbl/auto_lock.h>
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
+#include "src/graphics/display/drivers/fake/fake-display-device-config.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display_coordinator {
@@ -38,8 +41,12 @@ void TestBase::SetUp() {
   ASSERT_NE(create_sysmem_provider_result.value(), nullptr);
 
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
+      .engine_info = display::EngineInfo({
+          .max_layer_count = 1,
+          .max_connected_display_count = 1,
+          .is_capture_supported = true,
+      }),
       .periodic_vsync = false,
-      .no_buffer_access = false,
   };
   fake_display_stack_ = std::make_unique<fake_display::FakeDisplayStack>(
       std::move(create_sysmem_provider_result).value(), kDeviceConfig);

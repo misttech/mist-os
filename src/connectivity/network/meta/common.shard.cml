@@ -200,12 +200,9 @@
             availability: "same_as_target",
         },
         {
-            // TODO(https://fxbug.dev/422756661): Set "from" back to "parent" and remove
-            // optionality once USB disconnect issue is resolved.
             config: "fuchsia.power.SuspendEnabled",
-            from: "void",
+            from: "parent",
             to: "#netstack",
-            availability: "optional",
         },
         {
             storage: "cache",

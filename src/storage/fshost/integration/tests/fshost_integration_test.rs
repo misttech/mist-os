@@ -15,7 +15,10 @@ use fs_management::DATA_TYPE_GUID;
 use fshost_test_fixture::disk_builder::{
     DataSpec, VolumesSpec, BLOBFS_MAX_BYTES, TEST_DISK_BLOCK_SIZE,
 };
-use fshost_test_fixture::{round_down, TestFixture, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS};
+use fshost_test_fixture::{
+    round_down, BlockDeviceConfig, BlockDeviceIdentifiers, BlockDeviceParent, TestFixture,
+    VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
+};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::FutureExt as _;
 use regex::Regex;
@@ -372,6 +375,21 @@ async fn set_volume_limit() {
     fixture.tear_down().await;
 }
 
+#[cfg(feature = "fxblob")]
+async fn shutdown_starnix_volume(exposed_dir: fio::DirectoryProxy) {
+    let (proxy, server_end) = create_proxy::<fidl_fuchsia_fs::AdminMarker>();
+    exposed_dir
+        .open(
+            &format!("svc/{}", fidl_fuchsia_fs::AdminMarker::PROTOCOL_NAME),
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end.into(),
+        )
+        .expect("fidl transport error");
+
+    proxy.shutdown().await.expect("fidl transport error");
+}
+
 #[fuchsia::test]
 #[cfg(feature = "fxblob")]
 async fn create_unmount_and_remount_starnix_volume() {
@@ -415,7 +433,8 @@ async fn create_unmount_and_remount_starnix_volume() {
     .await
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
-    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    shutdown_starnix_volume(exposed_dir_proxy).await;
 
     let disk = fixture.tear_down().await.unwrap();
     let mut builder = new_builder().with_disk_from(disk);
@@ -499,6 +518,8 @@ async fn create_mount_and_remount_starnix_volume() {
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
 
+    shutdown_starnix_volume(exposed_dir_proxy).await;
+
     let crypt = fixture.connect_to_crypt();
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -565,7 +586,8 @@ async fn create_starnix_volume_wipes_previous_volume() {
     .await
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
-    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    shutdown_starnix_volume(exposed_dir_proxy).await;
 
     let disk = fixture.tear_down().await.unwrap();
     let mut builder = new_builder().with_disk_from(disk);
@@ -752,7 +774,14 @@ async fn ramdisk_image_serves_zbi_ramdisk_contents_with_unformatted_data() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxfs", ignore)]
+#[cfg_attr(
+    not(any(
+        feature = "f2fs",
+        feature = "minfs-no-zxcrypt",
+        all(not(feature = "storage-host"), feature = "minfs"),
+    )),
+    ignore
+)]
 async fn shred_data_volume_not_supported() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec());
@@ -764,17 +793,25 @@ async fn shred_data_volume_not_supported() {
         .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
-    admin
+    let status = admin
         .shred_data_volume()
         .await
         .expect("shred_data_volume FIDL failed")
         .expect_err("shred_data_volume should fail");
+    assert_eq!(zx::Status::from_raw(status), zx::Status::NOT_SUPPORTED);
 
     fixture.tear_down().await;
 }
 
 #[fuchsia::test]
-#[cfg_attr(not(feature = "fxfs"), ignore)]
+#[cfg_attr(
+    any(
+        feature = "f2fs",
+        feature = "minfs-no-zxcrypt",
+        all(not(feature = "storage-host"), feature = "minfs"),
+    ),
+    ignore
+)]
 async fn shred_data_volume_when_mounted() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec());
@@ -922,7 +959,8 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
     .await
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
-    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    shutdown_starnix_volume(exposed_dir_proxy).await;
 
     let disk = fixture.tear_down().await.unwrap();
     let mut builder = new_builder().with_disk_from(disk);
@@ -962,7 +1000,14 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(not(feature = "fxfs"), ignore)]
+#[cfg_attr(
+    any(
+        feature = "f2fs",
+        feature = "minfs-no-zxcrypt",
+        all(not(feature = "storage-host"), feature = "minfs"),
+    ),
+    ignore
+)]
 async fn shred_data_volume_from_recovery() {
     let mut builder = new_builder();
     builder.with_disk().with_gpt().format_volumes(volumes_spec());
@@ -1134,7 +1179,6 @@ async fn reset_volumes_no_existing_data_volume() {
 // Toggle migration mode
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/397763081): support disk migration on storage-host
 #[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_toggle() {
     let mut builder = new_builder();
@@ -1165,7 +1209,6 @@ async fn migration_toggle() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/397763081): support disk migration on storage-host
 #[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_to_fxfs() {
     let mut builder = new_builder();
@@ -1187,7 +1230,6 @@ async fn migration_to_fxfs() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/397763081): support disk migration on storage-host
 #[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_to_minfs() {
     let mut builder = new_builder();
@@ -1597,6 +1639,95 @@ async fn fuse_gpt_once_container_found() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     task.join().await;
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn device_config() {
+    let mut builder = new_builder().with_device_config(vec![
+        BlockDeviceConfig {
+            device: String::from("fts"),
+            from: BlockDeviceIdentifiers {
+                label: String::from("fts"),
+                parent: BlockDeviceParent::Gpt,
+            },
+        },
+        BlockDeviceConfig {
+            device: String::from("test-device"),
+            from: BlockDeviceIdentifiers {
+                label: String::from("boot_a"),
+                parent: BlockDeviceParent::Gpt,
+            },
+        },
+        BlockDeviceConfig {
+            device: String::from("boot_b"),
+            from: BlockDeviceIdentifiers {
+                label: String::from("boot_b"),
+                parent: BlockDeviceParent::Gpt,
+            },
+        },
+    ]);
+    builder
+        .with_disk()
+        .with_gpt()
+        .format_volumes(volumes_spec())
+        .with_extra_gpt_partition("fts")
+        .with_extra_gpt_partition("boot_a")
+        .with_extra_gpt_partition("boot_b");
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let fts_dir = fixture.dir("block/fts", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&fts_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
+
+    let boot_a_dir = fixture.dir("block/test-device", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&boot_a_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
+
+    let boot_b_dir = fixture.dir("block/boot_b", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&boot_b_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn gpt_all_binds_multiple_disks() {
+    let mut builder = new_builder().with_device_config(vec![BlockDeviceConfig {
+        device: String::from("test-part"),
+        from: BlockDeviceIdentifiers {
+            label: String::from("test_part"),
+            parent: BlockDeviceParent::Gpt,
+        },
+    }]);
+    builder.fshost().set_config_value("gpt_all", true);
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
+    builder.with_extra_disk().with_gpt().with_extra_gpt_partition("test_part");
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    // Check that the extra partition is available.
+    let test_part_dir = fixture.dir("block/test-part", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&test_part_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
 
     fixture.tear_down().await;
 }

@@ -6,19 +6,17 @@
 
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::task::{CurrentTask, KernelStats};
 use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
-use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
-    fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless,
-    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr,
+    fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless, FileOps, FsNode,
+    FsNodeOps,
 };
 use starnix_logging::{bug_ref, log_error};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
-use starnix_uapi::auth::FsCred;
+use starnix_sync::{DeviceOpen, Locked, Unlocked};
 use starnix_uapi::device_type::{DeviceType, ZRAM_MAJOR};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -68,64 +66,19 @@ impl BlockDeviceInfo for ZramDevice {
     }
 }
 
-pub struct ZramDeviceDirectory {
-    device: Weak<ZramDevice>,
-    base_dir: BlockDeviceDirectory,
-}
-
-impl ZramDeviceDirectory {
-    pub fn new(device: Device, zram_device: Weak<ZramDevice>) -> Self {
-        let base_dir = BlockDeviceDirectory::new(device, zram_device.clone());
-        Self { device: zram_device, base_dir }
-    }
-}
-
-impl FsNodeOps for ZramDeviceDirectory {
-    fs_node_impl_dir_readonly!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        let mut entries = self.base_dir.create_file_ops_entries();
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"idle".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"mm_stat".into(),
-            inode: None,
-        });
-        Ok(VecDirectory::new_file(entries))
-    }
-
-    fn lookup(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        node: &FsNode,
-        current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        match &**name {
-            b"idle" => Ok(node.fs().create_node_and_allocate_node_id(
-                StubEmptyFile::new_node("zram idle file", bug_ref!("https://fxbug.dev/322892951")),
-                FsNodeInfo::new(mode!(IFREG, 0o664), FsCred::root()),
-            )),
-            b"mm_stat" => {
-                let device = self.device.upgrade().ok_or_else(|| errno!(EINVAL))?;
-                Ok(node.fs().create_node_and_allocate_node_id(
-                    MmStatFile::new_node(device),
-                    FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-                ))
-            }
-            _ => self.base_dir.lookup(locked, node, current_task, name),
-        }
-    }
+fn build_zram_device_directory(
+    device: &Device,
+    zram_device: Arc<ZramDevice>,
+    dir: &SimpleDirectoryMutator,
+) {
+    let block_info = Arc::downgrade(&zram_device) as Weak<dyn BlockDeviceInfo>;
+    build_block_device_directory(device, block_info, dir);
+    dir.entry(
+        "idle",
+        StubEmptyFile::new_node("zram idle file", bug_ref!("https://fxbug.dev/322892951")),
+        mode!(IFREG, 0o664),
+    );
+    dir.entry("mm_stat", MmStatFile::new_node(zram_device), mode!(IFREG, 0o444));
 }
 
 #[derive(Clone)]
@@ -166,22 +119,17 @@ impl DynamicFileSource for MmStatFile {
     }
 }
 
-pub fn zram_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask)
-where
-    L: LockBefore<FileOpsCore>,
-{
-    let zram_dev = Arc::new(ZramDevice::default());
-    let zram_dev_weak = Arc::downgrade(&zram_dev);
-    let kernel = system_task.kernel();
-    let registry = &kernel.device_registry;
-    let virtual_block_class = registry.objects.virtual_block_class();
-    registry.register_device(
+pub fn zram_device_init(locked: &mut Locked<Unlocked>, system_task: &CurrentTask) {
+    let zram_device = Arc::new(ZramDevice::default());
+    let zram_device_clone = zram_device.clone();
+    let registry = &system_task.kernel().device_registry;
+    registry.register_device_with_dir(
         locked,
         system_task,
         "zram0".into(),
         DeviceMetadata::new("zram0".into(), DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
-        virtual_block_class,
-        move |dev| ZramDeviceDirectory::new(dev, zram_dev_weak.clone()),
-        zram_dev,
+        registry.objects.virtual_block_class(),
+        |device, dir| build_zram_device_directory(device, zram_device_clone, dir),
+        zram_device,
     );
 }

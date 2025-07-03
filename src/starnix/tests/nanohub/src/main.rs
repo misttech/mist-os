@@ -4,12 +4,17 @@
 
 use component_events::events::{EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
+use fake_nanohub_server::mock_nanohub_server;
 use fake_socket_tunnel::mock_socket_tunnel;
-use fidl_fuchsia_hardware_sockettunnel::DeviceMarker;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmBuilderParams, Ref, Route,
 };
 use log::info;
+use {
+    fidl_fuchsia_hardware_google_nanohub as fnanohub,
+    fidl_fuchsia_hardware_sockettunnel as fsockettunnel,
+};
+mod fake_nanohub_server;
 mod fake_socket_tunnel;
 
 #[fuchsia::main]
@@ -23,6 +28,25 @@ async fn main() {
     .await
     .unwrap();
 
+    let nanohub_server_mock = builder
+        .add_local_child(
+            "fake_nanohub_server",
+            move |handles: LocalComponentHandles| Box::pin(mock_nanohub_server(handles)),
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fnanohub::DeviceMarker>())
+                .from(&nanohub_server_mock)
+                .to(Ref::child("kernel")),
+        )
+        .await
+        .unwrap();
+
     let socket_tunnel_mock = builder
         .add_local_child(
             "fake_socket_tunnel",
@@ -35,7 +59,7 @@ async fn main() {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<DeviceMarker>())
+                .capability(Capability::protocol::<fsockettunnel::DeviceMarker>())
                 .from(&socket_tunnel_mock)
                 .to(Ref::child("kernel")),
         )

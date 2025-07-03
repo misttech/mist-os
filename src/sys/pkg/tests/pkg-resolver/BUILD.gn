@@ -332,6 +332,20 @@ rustc_test("eager_updates") {
   sources = [ "src/eager_updates.rs" ]
 }
 
+rustc_test("ota_downloader") {
+  edition = "2021"
+  source_root = "src/ota_downloader.rs"
+  deps = [
+    ":lib",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//src/lib/fuchsia",
+    "//src/sys/pkg/lib/fuchsia-pkg-testing",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
+  ]
+  sources = [ "src/ota_downloader.rs" ]
+}
+
 fuchsia_test_component("dynamic_repositories_disabled-component") {
   component_name = "dynamic-repositories-disabled"
   manifest = "meta/dynamic-repositories-disabled.cml"
@@ -431,6 +445,12 @@ fuchsia_test_component("eager_updates-component") {
   deps = [ ":eager_updates" ]
 }
 
+fuchsia_test_component("ota_downloader-component") {
+  component_name = "ota-downloader"
+  manifest = "meta/ota-downloader.cml"
+  deps = [ ":ota_downloader" ]
+}
+
 renamed_binary("pkg_resolver-binary") {
   dest = "bin/pkg_resolver"
   source = "$root_out_dir/grand_swd_binary"
@@ -480,6 +500,7 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
     ":dynamic_repositories_disabled-component",
     ":dynamic_rewrite_disabled-component",
     ":eager_updates-component",
+    ":ota_downloader-component",
     ":get_hash-component",
     ":metrics-component",
     ":persists_tuf_metadata-component",

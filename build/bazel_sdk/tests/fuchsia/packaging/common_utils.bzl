@@ -4,6 +4,11 @@
 
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
+load(
+    "@rules_fuchsia//fuchsia:private_defs.bzl",
+    "FUCHSIA_API_LEVEL_TARGET",
+    "REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET",
+)
 
 def _failure_test_impl(ctx):
     env = analysistest.begin(ctx)
@@ -25,7 +30,7 @@ no_repo_default_api_level_failure_test = analysistest.make(
         "expected_failure_message": attr.string(),
     },
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "",
     },
 )
 
@@ -36,7 +41,7 @@ unknown_repo_default_api_level_failure_test = analysistest.make(
         "expected_failure_message": attr.string(),
     },
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "98765",
     },
 )
 
@@ -47,6 +52,6 @@ unknown_override_api_level_failure_test = analysistest.make(
         "expected_failure_message": attr.string(),
     },
     config_settings = {
-        "@fuchsia_sdk//flags:fuchsia_api_level": "123456",
+        FUCHSIA_API_LEVEL_TARGET: "123456",
     },
 )

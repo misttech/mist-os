@@ -4,7 +4,11 @@
 
 #include "src/storage/lib/vfs/cpp/journal/background_executor.h"
 
+#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
+
 #include <condition_variable>
+#include <cstddef>
 #include <mutex>
 
 #include <gtest/gtest.h>

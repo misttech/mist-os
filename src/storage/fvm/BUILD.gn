@@ -221,6 +221,7 @@ fvm_deps = [
   "//src/lib/fuchsia-sync",
   "//src/lib/trace/rust:trace-provider",
   "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
+  "//src/storage/fvm/fidl/fuchsia.fvm:fuchsia.fvm_rust",
   "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
   "//src/storage/lib/block_client/rust",
   "//src/storage/lib/block_server",
@@ -288,6 +289,15 @@ resource("golden") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-fuchsia_unittest_package("fvm-rust-tests") {
-  deps = [ ":fvm_rust_test" ]
+fuchsia_unittest_component("fvm-rust-test") {
+  manifest = "meta/fvm_rust_test.cml"
+  deps = [
+    ":fvm_rust_test",
+    "//src/storage/lib/fs_management:fs_management_shard",
+  ]
+}
+
+fuchsia_test_package("fvm-rust-tests") {
+  test_components = [ ":fvm-rust-test" ]
+  deps = [ "//src/storage/blobfs/bin:blobfs-component" ]
 }

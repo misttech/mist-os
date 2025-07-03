@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/component_manager/tests/meta/elf_runner_and_environment_custom_logsink.shard.cml",
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "syslog/use.shard.cml",
     ],
     children: [

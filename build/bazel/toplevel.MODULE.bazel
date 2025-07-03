@@ -3,12 +3,12 @@
 # found in the LICENSE file.
 
 """
-IMPORTANT: This file is only used when BzlMod is enabled when generating
-the Bazel workspace used by the Fuchsia platform build. Keep it in sync
-with toplevel.WORKSPACE.basel whenever possible!
-
 This file will appear as MODULE.bazel in the top-level Bazel workspace
 used by the Fuchsia platform build.
+
+NOTE: If you update any of the dependencies in this file, or introduce new
+dependencies, make sure to run `fx update-bazel-vendor-dir` to update the Bazel
+vendor directory. See `fx help update-bazel-vendor-dir` for details.
 """
 
 module(
@@ -37,7 +37,6 @@ local_path_override(
     path = "third_party/abseil-cpp",
 )
 
-# This is a @pigweed dependency.
 bazel_dep(name = "emboss", version = "", repo_name = "com_google_emboss")
 local_path_override(
     module_name = "emboss",
@@ -62,6 +61,12 @@ local_path_override(
 
 # TODO(https://fxbug.dev/131788): Use //third_party/re2 when it's upgraded to this version.
 bazel_dep(name = "re2", version = "2024-07-02.bcr.1")
+
+bazel_dep(name = "rapidjson", version = "")
+local_path_override(
+    module_name = "rapidjson",
+    path = "third_party/rapidjson",
+)
 
 # fuchsia_build_generated/gn_target_dir is a symlink to the content
 # of the @gn_targets repository. At `fx gen` time, it will point to
@@ -124,6 +129,7 @@ fuchsia_sdk_ext = use_extension(
 )
 fuchsia_sdk_ext.local(
     buildifier = "@fuchsia_build_config//:host_prebuilts/buildifier",
+    # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk.
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash",
     # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
@@ -152,7 +158,9 @@ fuchsia_sdk_repository(
     name = "internal_sdk",
     local_paths = ["@@+_repo_rules+fuchsia_internal_only_idk"],
     # The @internal_sdk repository is populated from the same content as @fuchsia_internal_only_idk.
+    # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
     # NOTE: It's unclear why @@rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk does
     # NOT work here. Leaving it as-is for now since this target is planned to be
     # removed.

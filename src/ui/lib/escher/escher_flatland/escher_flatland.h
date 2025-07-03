@@ -98,7 +98,7 @@ class EscherFlatland {
   std::unique_ptr<Escher> escher_;
   std::unique_ptr<DebugFont> debug_font_;
   fidl::SyncClient<fuchsia_ui_composition::Flatland> flatland_;
-  fidl::SyncClient<fuchsia_time_alarms::Wake> wake_alarms_;
+  fidl::SyncClient<fuchsia_time_alarms::WakeAlarms> wake_alarms_;
   bool enable_wake_alarms_ = false;
   vk::Extent2D image_extent_;
   std::string name_;

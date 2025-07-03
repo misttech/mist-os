@@ -786,6 +786,19 @@ zx_status_t SdioControllerDevice::PowerOnReset() {
   funcs_ = {};
   hw_info_ = {};
 
+  // The device was turned off and is now back in the idle state. Change the bus settings to match
+  // the device state so they stay in sync.
+  if (zx_status_t status = sdmmc_->SetBusWidth(SDMMC_BUS_WIDTH_ONE); status != ZX_OK) {
+    return status;
+  }
+  if (zx_status_t status = sdmmc_->SetTiming(SDMMC_TIMING_LEGACY); status != ZX_OK) {
+    return status;
+  }
+  if (zx_status_t status = sdmmc_->SetBusFreq(kInitializationFrequencyHz); status != ZX_OK) {
+    return status;
+  }
+
+  sdmmc_->ClearRca();
   return ProbeLocked();
 }
 

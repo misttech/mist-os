@@ -7,7 +7,14 @@
 #include <lib/cksum.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <storage/buffer/block_buffer.h>
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"
 

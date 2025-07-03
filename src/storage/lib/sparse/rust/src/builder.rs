@@ -10,16 +10,17 @@ use std::ops::Range;
 
 /// Input data for a SparseImageBuilder.
 pub enum DataSource {
+    /// Heap allocated buffer.
     Buffer(Box<[u8]>),
     /// Read `size` bytes from `reader`.
-    Reader {
-        reader: Box<dyn Read>,
-        size: u64,
-    },
+    Reader { reader: Box<dyn Read>, size: u64 },
     /// Skips this many bytes.
     Skip(u64),
     /// Repeats the given u32, this many times.
     Fill(u32, u64),
+    #[cfg(target_os = "fuchsia")]
+    /// Read `size` bytes from `vmo` at `offset`.
+    Vmo { vmo: zx::Vmo, size: u64, offset: u64 },
 }
 
 /// Builds sparse image files from a set of input DataSources.
@@ -90,6 +91,18 @@ impl SparseImageBuilder {
                     ensure!(size % self.block_size as u64 == 0, "Invalid Fill length {}", size);
                     for size in ChunkedRange::new(0..size, self.max_chunk_size) {
                         chunk_writer.write_fill_chunk(size, value)?;
+                    }
+                }
+                #[cfg(target_os = "fuchsia")]
+                DataSource::Vmo { vmo, size, mut offset } => {
+                    ensure!(size % self.block_size as u64 == 0, "Invalid Vmo size {}", size);
+                    let mut buffer =
+                        vec![0; std::cmp::min(size as usize, self.max_chunk_size as usize)];
+                    for size in ChunkedRange::new(0..size, self.max_chunk_size) {
+                        let buffer = &mut buffer[0..size as usize];
+                        vmo.read(buffer, offset).unwrap();
+                        chunk_writer.write_raw_chunk(size, Cursor::new(buffer))?;
+                        offset += size as u64;
                     }
                 }
             };
@@ -194,6 +207,8 @@ mod tests {
     use super::*;
     use crate::format::CHUNK_HEADER_SIZE;
     use crate::reader::SparseReader;
+    #[cfg(target_os = "fuchsia")]
+    use zx::HandleBased as _;
 
     #[test]
     fn test_chunked_range() {
@@ -378,5 +393,54 @@ mod tests {
             .add_chunk(DataSource::Skip(u64::MAX - 15))
             .build(&mut Sink);
         assert!(result.is_err());
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    #[test]
+    fn test_build_with_vmo() {
+        let mut builder = SparseImageBuilder::new();
+        builder.max_chunk_size = BLK_SIZE;
+        let size = (BLK_SIZE * 2) as u64;
+        let vmo = zx::Vmo::create(size).unwrap();
+        const PART_1: [u8; BLK_SIZE as usize] = [0xABu8; BLK_SIZE as usize];
+        const PART_2: [u8; BLK_SIZE as usize] = [0xCBu8; BLK_SIZE as usize];
+        vmo.write(&PART_1, 0).unwrap();
+        vmo.write(&PART_2, BLK_SIZE as u64).unwrap();
+        // We add two separate data sources sharing the same VMO but with a different offset.
+        let mut output = vec![];
+        builder
+            .add_chunk(DataSource::Vmo {
+                vmo: vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                size: BLK_SIZE as u64,
+                offset: 0,
+            })
+            .add_chunk(DataSource::Vmo { vmo, size: BLK_SIZE as u64, offset: BLK_SIZE as u64 })
+            .build(&mut Cursor::new(&mut output))
+            .unwrap();
+
+        let reader = SparseReader::new(Cursor::new(&output)).unwrap();
+        assert_eq!(
+            reader.chunks(),
+            &[
+                (
+                    Chunk::Raw { start: 0, size: BLK_SIZE.into() },
+                    Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE) as u64)
+                ),
+                (
+                    Chunk::Raw { start: BLK_SIZE as u64, size: BLK_SIZE.into() },
+                    Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE) as u64)
+                )
+            ]
+        );
+        assert_eq!(
+            output[(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE) as usize
+                ..(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE + BLK_SIZE) as usize],
+            PART_1
+        );
+        assert_eq!(
+            output[(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE) as usize
+                ..(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE * 2) as usize],
+            PART_2
+        );
     }
 }

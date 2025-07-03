@@ -28,7 +28,6 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::uapi;
 use std::ffi::CString;
 use std::ops::DerefMut;
-use std::sync::Arc;
 #[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
@@ -88,7 +87,7 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
 }
 
 async fn spawn_console(
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     payload: fstarcontainer::ControllerSpawnConsoleRequest,
 ) -> Result<Result<u8, fstarcontainer::SpawnConsoleError>, Error> {
     if let (Some(console_in), Some(console_out), Some(binary_path)) =
@@ -110,7 +109,7 @@ async fn spawn_console(
         let window_size = to_winsize(payload.window_size);
         let current_task = create_init_child_process(
             kernel.kthreads.unlocked_for_async().deref_mut(),
-            kernel,
+            &kernel.weak_self.upgrade().expect("Kernel must still be alive"),
             &binary_path,
             None,
         )?;
@@ -127,9 +126,9 @@ async fn spawn_console(
                 current_task.exec(locked, executable, binary_path, argv, environ)?;
                 let (pty, pts) = create_main_and_replica(locked, &current_task, window_size)?;
                 let fd_flags = FdFlags::empty();
-                assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
-                assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
-                assert_eq!(2, current_task.add_file(pts, fd_flags)?.raw());
+                assert_eq!(0, current_task.add_file(locked, pts.clone(), fd_flags)?.raw());
+                assert_eq!(1, current_task.add_file(locked, pts.clone(), fd_flags)?.raw());
+                assert_eq!(2, current_task.add_file(locked, pts, fd_flags)?.raw());
                 Ok(pty)
             },
             move |result| {
@@ -263,8 +262,12 @@ async fn connect_to_vsock(
         fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
     };
 
-    let pipe =
-        create_fuchsia_pipe(system_task, bridge_socket, OpenFlags::RDWR | OpenFlags::NONBLOCK)?;
+    let pipe = create_fuchsia_pipe(
+        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+        system_task,
+        bridge_socket,
+        OpenFlags::RDWR | OpenFlags::NONBLOCK,
+    )?;
     socket.downcast_socket::<VsockSocket>().unwrap().remote_connection(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         &socket,
@@ -309,13 +312,13 @@ fn forward_to_pty(
 
     let pty_source = pty;
     kernel.kthreads.spawn({
-        move |mut locked, current_task| {
+        move |locked, current_task| {
             let _result: Result<(), Error> =
                 fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
                     loop {
                         buffer.reset();
-                        let bytes = pty_source.read(&mut locked, current_task, &mut buffer)?;
+                        let bytes = pty_source.read(locked, current_task, &mut buffer)?;
                         if bytes == 0 {
                             return Ok(());
                         }

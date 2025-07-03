@@ -967,7 +967,7 @@ static int recover_bad_blk(NDM ndm) {
   bpn = ndm->xfr_fblk * ndm->pgs_per_blk + ndm->xfr_bad_po;
 
   // Mark block bad and do bad block recovery for write failure.
-  return ndmMarkBadBlock(ndm, bpn, WRITE_PAGE);
+  return ndmMarkBadBlock(ndm, bpn, WRITE_PAGE, (ui32)-1);
 }
 
 //    init_ndm: Initialize an NDM by reading the flash
@@ -1286,6 +1286,8 @@ NDM ndmAddDev(const NDMDrvr* dvr) {
   ndm->last_wr_vbn = ndm->last_wr_pbn = (ui32)-1;
   ndm->last_rd_vbn = ndm->last_rd_pbn = (ui32)-1;
   ndm->format_with_v2 = dvr->format_version_2;
+  ndm->on_marked_bad_cb = NULL;
+  ndm->on_marked_bad_cb_data = NULL;
 
   // Install driver callback routine function pointers.
   ndm->write_page = dvr->write_data_and_spare;

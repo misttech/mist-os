@@ -42,7 +42,8 @@ class Device : public std::enable_shared_from_this<Device> {
   static std::shared_ptr<Device> Create(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                                         async_dispatcher_t* dispatcher, std::string_view name,
                                         fuchsia_audio_device::DeviceType device_type,
-                                        fuchsia_audio_device::DriverClient driver_client);
+                                        fuchsia_audio_device::DriverClient driver_client,
+                                        const std::string& added_by);
   ~Device();
 
   template <typename ProtocolT>
@@ -229,7 +230,7 @@ class Device : public std::enable_shared_from_this<Device> {
 
   Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
          std::string_view name, fuchsia_audio_device::DeviceType device_type,
-         fuchsia_audio_device::DriverClient driver_client);
+         fuchsia_audio_device::DriverClient driver_client, const std::string& added_by);
 
   //
   // Device initialization is essentially a "wait for multiple objects" operation.
@@ -349,9 +350,9 @@ class Device : public std::enable_shared_from_this<Device> {
   // Correctly functioning hardware and drivers should never result in any timeouts.
   //
   // We use this value for individual driver FIDL calls, by default.
-  static constexpr zx::duration kDefaultShortCmdTimeout = zx::sec(2);
+  static constexpr zx::duration kDefaultShortCmdTimeout = zx::sec(10);
   // We use this value only for 2 "meta-commands" of multiple FIDL calls issued as a set.
-  static constexpr zx::duration kDefaultLongCmdTimeout = zx::sec(4);
+  static constexpr zx::duration kDefaultLongCmdTimeout = zx::sec(20);
 
   enum class DriverCommandState : uint8_t { Idle, Waiting, Overdue, Unresponsive };
   void SetDriverCommandState(DriverCommandState state) { driver_cmd_state_ = state; }

@@ -25,7 +25,7 @@
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 #include <phys/trampoline-boot.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 #include <phys/zbi.h>
 
 #include "legacy-boot-shim.h"

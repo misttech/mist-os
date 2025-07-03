@@ -68,6 +68,7 @@ rustc_test("driver") {
     "src/retained_packages.rs",
     "src/space.rs",
     "src/sync.rs",
+    "src/write_blobs.rs",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }

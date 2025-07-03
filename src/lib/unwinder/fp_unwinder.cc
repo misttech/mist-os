@@ -31,6 +31,8 @@ Error FramePointerUnwinder::Step(Memory* stack, const Registers& current, Regist
     case Registers::Arch::kX64:
       fp_reg = RegisterID::kX64_rbp;
       break;
+    case Registers::Arch::kArm32:
+      return Error("Not implemented yet.");
     case Registers::Arch::kArm64:
       fp_reg = RegisterID::kArm64_x29;
       break;

@@ -70,7 +70,7 @@ class TestLoopBase : public loop_fixture::RealLoop {
   // Returns a zx::eventpair that should be held onto for the duration of the test. When released
   // the target driver and children are restarted again and lose access to the test-specific
   // power protocols.
-  zx::eventpair PrepareDriver(std::string_view node_filter, std::string_view driver_url,
+  zx::eventpair PrepareDriver(std::string_view node_filter, std::string_view driver_url_suffix,
                               bool expect_new_koid);
 
   // Create and export a component framework dictionary that contains connectors for the various

@@ -136,6 +136,11 @@
             to: [ "#starnix_runner" ],
         },
         {
+            protocol: [ "fuchsia.boot.Items" ],
+            from: "parent",
+            to: [ "#starnix_runner" ],
+        },
+        {
             protocol: [
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.feedback.LastRebootInfoProvider",
@@ -202,6 +207,13 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
+            from: "#fastrpc",
+            to: "#starnix_runner",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.hardware.sockettunnel.Device",
             from: "#sockettunnel",
             to: "#starnix_runner",
@@ -246,7 +258,7 @@
             availability: "optional",
         },
         {
-            protocol: [ "fuchsia.time.alarms.Wake" ],
+            protocol: [ "fuchsia.time.alarms.WakeAlarms" ],
             from: "#timekeeper",
             to: [ "#starnix_runner" ],
         },

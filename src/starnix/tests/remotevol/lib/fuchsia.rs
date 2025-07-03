@@ -22,25 +22,28 @@ pub async fn open_sysrq_trigger(realm: &RealmInstance) -> fio::FileProxy {
     .unwrap()
 }
 
+pub async fn is_starnix_volume_mounted() -> Option<bool> {
+    let test_fxfs_inspect =
+        ArchiveReader::inspect().select_all_for_component("test-fxfs").snapshot().await.unwrap();
+    if test_fxfs_inspect.len() == 0 {
+        return None;
+    }
+    let payload = test_fxfs_inspect[0].payload.as_ref().unwrap();
+    // Fxfs won't export the GUID property if the volume is locked (which is the case when an
+    // encrypted volume is unmounted).
+    if let Some(child) = payload.get_child_by_path(&["stores", "test_fxfs_user_volume"]) {
+        Some(child.get_property("guid").is_some())
+    } else {
+        None
+    }
+}
+
 pub async fn wait_for_starnix_volume_to_be_mounted() {
     loop {
+        if is_starnix_volume_mounted().await == Some(true) {
+            return;
+        }
         fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
-        let test_fxfs_inspect = ArchiveReader::inspect()
-            .select_all_for_component("test-fxfs")
-            .snapshot()
-            .await
-            .unwrap();
-        if test_fxfs_inspect.len() == 0 {
-            continue;
-        }
-        let payload = test_fxfs_inspect[0].payload.as_ref().unwrap();
-        if let Some(child) = payload.get_child("starnix_volume") {
-            if child.get_property("mounted").and_then(|p| p.boolean()) == Some(true) {
-                break;
-            }
-        } else {
-            continue;
-        }
     }
 }
 

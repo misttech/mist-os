@@ -185,6 +185,8 @@ class DriverTestCommon {
     outgoing_directory_client_ =
         env_wrapper_.SyncCall(&EnvWrapper<EnvironmentType>::TakeOutgoingClient);
 
+    AddServiceValidation(start_args);
+
     start_result_ = StartDriverInner(std::move(start_args));
     return *start_result_;
   }
@@ -203,6 +205,8 @@ class DriverTestCommon {
     outgoing_directory_client_ =
         env_wrapper_.SyncCall(&EnvWrapper<EnvironmentType>::TakeOutgoingClient);
     args_modifier(start_args);
+
+    AddServiceValidation(start_args);
 
     start_result_ = StartDriverInner(std::move(start_args));
     return *start_result_;
@@ -259,6 +263,12 @@ class DriverTestCommon {
     return std::move(client_end);
   }
 
+  // This will enable the service instance validation on the driver. Equivalent to setting
+  // `service_connect_validation: "true"` in the cml of the driver.
+  // This must be called before |StartDriver|/|StartDriverWithCustomStartArgs| as it will only
+  // take affect on the next start of the driver and cannot modify an already started driver.
+  void SetServiceValidator(bool enable) { enable_service_connect_validation_ = enable; }
+
  private:
   virtual zx::result<> StartDriverInner(fdf::DriverStartArgs start_args) = 0;
   virtual zx::result<> StopDriverInner() = 0;
@@ -266,6 +276,22 @@ class DriverTestCommon {
   virtual void ShutdownAndDestroyDriverInner() = 0;
 
   bool StartedSuccessfully() const { return start_result_.has_value() && start_result_->is_ok(); }
+
+  void AddServiceValidation(fdf::DriverStartArgs& start_args) {
+    if (enable_service_connect_validation_) {
+      if (start_args.program() == std::nullopt) {
+        start_args.program(fuchsia_data::Dictionary{});
+      }
+
+      if (start_args.program()->entries() == std::nullopt) {
+        start_args.program().value().entries(std::vector<fuchsia_data::DictionaryEntry>{});
+      }
+
+      start_args.program()->entries()->push_back(fuchsia_data::DictionaryEntry(
+          "service_connect_validation", std::make_unique<fuchsia_data::DictionaryValue>(
+                                            fuchsia_data::DictionaryValue::WithStr("true"))));
+    }
+  }
 
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
@@ -275,6 +301,8 @@ class DriverTestCommon {
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
   std::optional<zx::result<>> start_result_;
   std::optional<zx::result<>> prepare_stop_result_;
+
+  bool enable_service_connect_validation_ = false;
 };
 
 }  // namespace internal

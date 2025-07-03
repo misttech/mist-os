@@ -22,8 +22,8 @@ use netstack3_core::device::{
 };
 use netstack3_core::device_socket::{
     DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-    EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
-    SendFrameErrorReason, SentFrame, SocketId, SocketInfo, TargetDevice,
+    EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceiveFrameError,
+    ReceivedFrame, SendFrameErrorReason, SentFrame, SocketId, SocketInfo, TargetDevice,
 };
 use netstack3_core::sync::{Mutex, RwLock};
 use packet::Buf;
@@ -33,7 +33,7 @@ use zx::{self as zx, HandleBased as _};
 use crate::bindings::bpf::{SocketFilterProgram, SocketFilterResult};
 use crate::bindings::devices::BindingId;
 use crate::bindings::errno::ErrnoError;
-use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::queue::{BodyLen, MessageQueue, NoSpace};
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
 use crate::bindings::socket::{IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 use crate::bindings::util::{
@@ -63,14 +63,14 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
         device: &DeviceId<Self>,
         frame: Frame<&[u8]>,
         raw: &[u8],
-    ) {
+    ) -> Result<(), ReceiveFrameError> {
         let SocketState { queue, kind, bpf_filter } = state;
 
         // Run BPF filter if any. The filter may request the packet
         // to be truncated or dropped.
         let truncated_size = match bpf_filter.read().as_ref() {
             Some(program) => match program.run(*kind, frame, raw) {
-                SocketFilterResult::Reject => return,
+                SocketFilterResult::Reject => return Ok(()),
                 SocketFilterResult::Accept(size) => size,
             },
             None => usize::MAX,
@@ -86,7 +86,7 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
         let truncated_size = body.len().min(truncated_size);
         let body = body[..truncated_size].to_vec();
         let message = Message { data, body };
-        queue.lock().receive(message);
+        queue.lock().receive(message).map_err(|NoSpace {}| ReceiveFrameError::QueueFull)
     }
 }
 
@@ -208,11 +208,15 @@ impl BindingData {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         }
 
-        let id = ctx.api().device_socket().create(SocketState {
-            queue: Mutex::new(MessageQueue::new(local_event)),
+        let state = SocketState {
+            queue: Mutex::new(MessageQueue::new(
+                local_event,
+                ctx.bindings_ctx().settings.device.read().packet_receive_buffer.default(),
+            )),
             kind,
             bpf_filter: RwLock::new(None),
-        });
+        };
+        let id = ctx.api().device_socket().create(state);
 
         BindingData { peer_event, id }
     }
@@ -351,11 +355,14 @@ impl<'a> RequestHandler<'a> {
     }
 
     fn set_receive_buffer(self, size: u64) {
-        let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
+        let Self { ctx, data: BindingData { peer_event: _, id } } = self;
 
         let SocketState { queue, .. } = id.socket_state();
         let mut queue = queue.lock();
-        queue.set_max_available_messages_size(size.try_into().unwrap_or(usize::MAX))
+        queue.set_max_available_messages_size(
+            size.try_into().unwrap_or(usize::MAX),
+            &ctx.bindings_ctx().settings.device.read().packet_receive_buffer,
+        )
     }
 
     fn receive_buffer(self) -> u64 {
@@ -363,7 +370,7 @@ impl<'a> RequestHandler<'a> {
 
         let SocketState { queue, .. } = id.socket_state();
         let queue = queue.lock();
-        queue.max_available_messages_size().try_into().unwrap_or(u64::MAX)
+        queue.max_available_messages_size().get().try_into().unwrap_or(u64::MAX)
     }
 
     fn send_msg(

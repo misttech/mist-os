@@ -8,7 +8,8 @@ use core::{concat, stringify};
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    EncodeRef, FromWire, FromWireOption, FromWireOptionRef, FromWireRef, Slot, Wire,
+    EncodeOptionRef, EncodeRef, FromWire, FromWireOption, FromWireOptionRef, FromWireRef, Slot,
+    Wire,
 };
 
 macro_rules! endpoint {
@@ -19,7 +20,13 @@ macro_rules! endpoint {
         #[doc = $doc]
         #[derive(Debug)]
         #[repr(transparent)]
-        pub struct $name<T, P> {
+        pub struct $name<
+            P,
+            #[cfg(feature = "fuchsia")]
+            T = zx::Channel,
+            #[cfg(not(feature = "fuchsia"))]
+            T,
+        > {
             transport: T,
             _protocol: PhantomData<P>,
         }
@@ -32,8 +39,8 @@ macro_rules! endpoint {
         // - `$name` is `#[repr(transparent)]` over the transport `T`, and `zero_padding` calls
         //   `T::zero_padding` on `transport`. `_protocol` is a ZST which does not have any padding
         //   bytes to zero-initialize.
-        unsafe impl<T: Wire, P: 'static> Wire for $name<T, P> {
-            type Decoded<'de> = $name<T::Decoded<'de>, P>;
+        unsafe impl<P: 'static, T: Wire> Wire for $name<P, T> {
+            type Decoded<'de> = $name<P, T::Decoded<'de>>;
 
             #[inline]
             fn zero_padding(out: &mut MaybeUninit<Self>) {
@@ -42,15 +49,15 @@ macro_rules! endpoint {
             }
         }
 
-        impl<T, P> $name<T, P> {
+        impl<P, T> $name<P, T> {
             #[doc = concat!(
                 "Converts from `&",
                 stringify!($name),
-                "<T, P>` to `",
+                "<P, T>` to `",
                 stringify!($name),
-                "<&T, P>`.",
+                "<P, &T>`.",
             )]
-            pub fn as_ref(&self) -> $name<&T, P> {
+            pub fn as_ref(&self) -> $name<P, &T> {
                 $name { transport: &self.transport, _protocol: PhantomData }
             }
 
@@ -67,11 +74,11 @@ macro_rules! endpoint {
 
         // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `decode` calls
         // `T::decode` on `transport`. `_protocol` is a ZST which does not have any data to decode.
-        unsafe impl<D, T, P> Decode<D> for $name<T, P>
+        unsafe impl<D, P, T> Decode<D> for $name<P, T>
         where
             D: ?Sized,
-            T: Decode<D>,
             P: 'static,
+            T: Decode<D>,
         {
             fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
                 munge!(let Self { transport, _protocol: _ } = slot);
@@ -79,29 +86,29 @@ macro_rules! endpoint {
             }
         }
 
-        impl<T, P> Encodable for $name<T, P>
+        impl<P, T> Encodable for $name<P, T>
         where
             T: Encodable,
             P: 'static,
         {
-            type Encoded = $name<T::Encoded, P>;
+            type Encoded = $name<P, T::Encoded>;
         }
 
-        impl<T, P> EncodableOption for $name<T, P>
+        impl<P, T> EncodableOption for $name<P, T>
         where
             T: EncodableOption,
             P: 'static,
         {
-            type EncodedOption = $name<T::EncodedOption, P>;
+            type EncodedOption = $name<P, T::EncodedOption>;
         }
 
         // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode` calls
         // `T::encode` on `transport`. `_protocol` is a ZST which does not have any data to encode.
-        unsafe impl<E, T, P> Encode<E> for $name<T, P>
+        unsafe impl<E, P, T> Encode<E> for $name<P, T>
         where
             E: ?Sized,
-            T: Encode<E>,
             P: 'static,
+            T: Encode<E>,
         {
             fn encode(
                 self,
@@ -116,11 +123,11 @@ macro_rules! endpoint {
         // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode_ref` calls
         // `T::encode_ref` on `transport`. `_protocol` is a ZST which does not have any data to
         // encode.
-        unsafe impl<E, T, P> EncodeRef<E> for $name<T, P>
+        unsafe impl<E, P, T> EncodeRef<E> for $name<P, T>
         where
             E: ?Sized,
-            T: EncodeRef<E>,
             P: 'static,
+            T: EncodeRef<E>,
         {
             fn encode_ref(
                 &self,
@@ -134,11 +141,11 @@ macro_rules! endpoint {
         // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode_option`
         // calls `T::encode_option` on `transport`. `_protocol` is a ZST which does not have any
         // data to encode.
-        unsafe impl<E, T, P> EncodeOption<E> for $name<T, P>
+        unsafe impl<E, P, T> EncodeOption<E> for $name<P, T>
         where
             E: ?Sized,
-            T: EncodeOption<E>,
             P: 'static,
+            T: EncodeOption<E>,
         {
             fn encode_option(
                 this: Option<Self>,
@@ -150,12 +157,31 @@ macro_rules! endpoint {
             }
         }
 
-        impl<T, P, U> FromWire<$name<U, P>> for $name<T, P>
+        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode_option_ref`
+        // calls `T::encode_option_ref` on `transport`. `_protocol` is a ZST which does not have any
+        // data to encode.
+        unsafe impl<E, P, T> EncodeOptionRef<E> for $name<P, T>
+        where
+            E: ?Sized,
+            P: 'static,
+            T: EncodeOptionRef<E>,
+        {
+            fn encode_option_ref(
+                this: Option<&Self>,
+                encoder: &mut E,
+                out: &mut MaybeUninit<Self::EncodedOption>,
+            ) -> Result<(), EncodeError> {
+                munge!(let Self::EncodedOption { transport, _protocol: _ } = out);
+                T::encode_option_ref(this.map(|this| &this.transport), encoder, transport)
+            }
+        }
+
+        impl<P, T, U> FromWire<$name<P, U>> for $name<P, T>
         where
             T: FromWire<U>,
         {
             #[inline]
-            fn from_wire(wire: $name<U, P>) -> Self {
+            fn from_wire(wire: $name<P, U>) -> Self {
                 $name {
                     transport: T::from_wire(wire.transport),
                     _protocol: PhantomData,
@@ -163,12 +189,12 @@ macro_rules! endpoint {
             }
         }
 
-        impl<T, P, U> FromWireRef<$name<U, P>> for $name<T, P>
+        impl<P, T, U> FromWireRef<$name<P, U>> for $name<P, T>
         where
             T: FromWireRef<U>,
         {
             #[inline]
-            fn from_wire_ref(wire: &$name<U, P>) -> Self {
+            fn from_wire_ref(wire: &$name<P, U>) -> Self {
                 $name {
                     transport: T::from_wire_ref(&wire.transport),
                     _protocol: PhantomData,
@@ -176,14 +202,14 @@ macro_rules! endpoint {
             }
         }
 
-        impl<T, P, U> FromWireOption<$name<U, P>> for $name<T, P>
+        impl<P, T, U> FromWireOption<$name<P, U>> for $name<P, T>
         where
+            P: 'static,
             T: FromWireOption<U>,
             U: Wire,
-            P: 'static,
         {
             #[inline]
-            fn from_wire_option(wire: $name<U, P>) -> Option<Self> {
+            fn from_wire_option(wire: $name<P, U>) -> Option<Self> {
                 T::from_wire_option(wire.transport).map(|transport| $name {
                     transport,
                     _protocol: PhantomData,
@@ -191,14 +217,14 @@ macro_rules! endpoint {
             }
         }
 
-        impl<T, P, U> FromWireOptionRef<$name<U, P>> for $name<T, P>
+        impl<P, T, U> FromWireOptionRef<$name<P, U>> for $name<P, T>
         where
+            P: 'static,
             T: FromWireOptionRef<U>,
             U: Wire,
-            P: 'static,
         {
             #[inline]
-            fn from_wire_option_ref(wire: &$name<U, P>) -> Option<Self> {
+            fn from_wire_option_ref(wire: &$name<P, U>) -> Option<Self> {
                 T::from_wire_option_ref(&wire.transport).map(|transport| $name {
                     transport,
                     _protocol: PhantomData,
@@ -207,12 +233,12 @@ macro_rules! endpoint {
         }
 
         #[cfg(feature = "compat")]
-        impl<T, P1, P2> From<$name<T, P1>> for ::fidl::endpoints::$name<P2>
+        impl<P1, P2, T> From<$name<P1, T>> for ::fidl::endpoints::$name<P2>
         where
             ::fidl::Channel: From<T>,
             P2: From<P1>,
         {
-            fn from(from: $name<T, P1>) -> Self {
+            fn from(from: $name<P1, T>) -> Self {
                 Self::new(from.transport.into())
             }
         }

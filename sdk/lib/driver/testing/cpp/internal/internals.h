@@ -48,6 +48,33 @@ class EnvWrapper {
       user_env_served_ = true;
     }
 
+    start_args->start_args.node_offers(std::vector<fuchsia_driver_framework::Offer>{});
+    for (auto& [service, instances] : test_environment_.incoming_directory().GetDriverServices()) {
+      for (auto& instance : instances) {
+        start_args->start_args.node_offers()->push_back(
+            fuchsia_driver_framework::Offer::WithDriverTransport(
+                fuchsia_component_decl::Offer::WithService(fuchsia_component_decl::OfferService{{
+                    .source_name = service,
+                    .target_name = service,
+                    .renamed_instances = std::vector<fuchsia_component_decl::NameMapping>(
+                        {fuchsia_component_decl::NameMapping(instance, instance)}),
+                }})));
+      }
+    }
+
+    for (auto& [service, instances] : test_environment_.incoming_directory().GetZirconServices()) {
+      for (auto& instance : instances) {
+        start_args->start_args.node_offers()->push_back(
+            fuchsia_driver_framework::Offer::WithZirconTransport(
+                fuchsia_component_decl::Offer::WithService(fuchsia_component_decl::OfferService{{
+                    .source_name = service,
+                    .target_name = service,
+                    .renamed_instances = std::vector<fuchsia_component_decl::NameMapping>(
+                        {fuchsia_component_decl::NameMapping(instance, instance)}),
+                }})));
+      }
+    }
+
     return std::move(start_args->start_args);
   }
 

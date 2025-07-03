@@ -118,23 +118,17 @@ If a binary in this package needs to be updated, you'll need to uncomment the de
 
 ## Fetch configuration
 
-To cause the package to be downloaded, there is an entry in the
-[prebuilts](https://fuchsia.googlesource.com/integration/+/HEAD/prebuilts) file of
-`//integration` (in the internal repo it's in the `fuchsia` subdirectory).
+To cause the package to be downloaded, there is an entry in
+`//manifests/prebuilts`. Substitute the tag you specified for the CIPD package
+in the "version" field in that file.
 
-To update to a new package, you must have the internal integration repository checked out. See the
-internal checkout instructions for how to do this.
-
-Then substitute the tag you specified in in the CIPD package in the "version" field of the prebuilts
-file.
-
-Don't forget to run `//integration/update-lockfiles.sh` after making changes to `prebuilts`!
+Don't forget to run `//manifests/update-lockfiles.sh` after making changes to `prebuilts`!
 
 Note that the "attributes" attribute specified that this package won't be downloaded unless the user
 opts-in as described earlier.
 
-To test that the updated download works:
+To test that the updated manifest works:
 
 ```
-jiri fetch-packages -local-manifest=true
+jiri fetch-packages -local-manifest-project=fuchsia
 ```

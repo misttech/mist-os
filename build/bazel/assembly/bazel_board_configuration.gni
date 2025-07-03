@@ -67,6 +67,7 @@ template("bazel_board_configuration") {
           label = get_label_info(":${board_configuration_target}",
                                  "label_with_toolchain")
           name = board_name
+          cipd_name = board_name
           outdir = rebase_path(board_configuration_out, root_build_dir)
         },
       ]

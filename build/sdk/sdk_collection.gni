@@ -45,6 +45,8 @@ import("sdk_molecule.gni")
 template("sdk_collection") {
   assert(defined(invoker.category), "Must define an SDK category")
 
+  visibility = [ ":*" ]
+
   # Compute target and host triples, which will be written to the
   # top-level meta/manifest.json file for this collection.
   target_triple = target_cpu
@@ -82,11 +84,8 @@ template("sdk_collection") {
     main = target_name
     collection_prebuild_info = "${target_name}_prebuild_info"
     prebuild_manifest = "${target_name}_prebuild_manifest"
-    idk_meta_manifest_json = "${target_name}_idk_meta_manifest_json"
-    export_manifest = "${target_name}_export_manifest"
+    generate_meta_files = "${target_name}_generate_meta_files"
     verify_final_build_manifest = "${target_name}_verify_manifest"
-    verify_idk_meta_manifest_json =
-        "${target_name}_verify_idk_meta_manifest_json"
   }
 
   files = {
@@ -99,13 +98,10 @@ template("sdk_collection") {
     final_build_manifest = "${root_out_dir}/sdk/manifest/${collection_name}"
     local_build_manifest = "${target_gen_dir}/${targets.main}.sdk"
 
-    # IDK-like manifests.
-    idk_meta_manifest_json =
-        "${target_gen_dir}/${collection_name}.idk_meta_manifest_json.json"
+    # The main manifest in the IDK that references all atoms.
     collection_manifest_relative_path = "meta/manifest.json"
-
-    # Export manifest.
-    export_manifest = "${target_gen_dir}/${collection_name}.export_manifest"
+    idk_meta_manifest_json =
+        "${exported_collection_dir}/${collection_manifest_relative_path}"
 
     # Metadata about the collection that is generated at GN gen time.
     prebuild_manifest = "${root_out_dir}/sdk/prebuild/${collection_name}.json"
@@ -114,10 +110,6 @@ template("sdk_collection") {
   # Generates an internal molecule target, which creates an internal IDK build
   # manifest file describing all atoms in it.
   sdk_molecule(targets.local_build_manifest) {
-    # Do not expose this molecule to other targets. Depending directly on the
-    # contents of an SDK foregoes API verification, which is not desirable.
-    visibility = [ ":*" ]
-
     # Ensure the internal manifest is named foo.sdk instead of foo_molecule.sdk
     output_name = targets.main
 
@@ -159,136 +151,10 @@ template("sdk_collection") {
     deps = [ ":${targets.final_build_manifest}" ]
   }
 
-  # Generates the top-level metadata file (which will later be symlinked at
-  # meta/manifest.json) describing the various parts of the SDK collection.
-  python_action(targets.idk_meta_manifest_json) {
-    forward_variables_from(invoker, [ "testonly" ])
-
-    binary_label = "//build/sdk:generate_idk_meta_manifest_json"
-
-    inputs = [ files.local_build_manifest ]
-
-    outputs = [ files.idk_meta_manifest_json ]
-
-    args = [
-      "--manifest",
-      rebase_path(files.local_build_manifest, root_build_dir),
-      "--meta",
-      rebase_path(files.idk_meta_manifest_json, root_build_dir),
-      "--target-arch",
-      target_triple,
-      "--host-arch",
-      host_triple,
-      "--schema-version",
-      sdk_metadata_schema_version,
-    ]
-
-    if (defined(invoker.id) && invoker.id != "") {
-      args += [
-        "--id",
-        invoker.id,
-      ]
-    }
-
-    public_deps = [ ":${targets.local_build_manifest}" ]
-  }
-
-  # Verifies that the collection manifest (which will later be symlinked at
-  # meta/manifest.json) file is valid.
-  validate_json(targets.verify_idk_meta_manifest_json) {
-    forward_variables_from(invoker, [ "testonly" ])
-
-    data = files.idk_meta_manifest_json
-
-    schema = "//build/sdk/meta/manifest.json"
-    sources = [
-      # This file is imported by all schemas.
-      "//build/sdk/meta/common.json",
-    ]
-
-    public_deps = [ ":${targets.idk_meta_manifest_json}" ]
-  }
-
-  additional_export_files = [
-    {
-      source = files.idk_meta_manifest_json
-      dest = files.collection_manifest_relative_path
-      deps = [ ":${targets.idk_meta_manifest_json}" ]
-    },
-  ]
-
-  # Generate an input export manifest that will be used to create
-  # the export directory from the content listed in final_build_manifest.
-  # The manifest was previously used to create an archive, hence the binary
-  # label name.
-  python_action(targets.export_manifest) {
-    forward_variables_from(invoker, [ "testonly" ])
-
-    binary_label = "//build/sdk:generate_archive_manifest_from_sdk_manifest"
-
-    inputs = [ files.local_build_manifest ]
-
-    outputs = [ files.export_manifest ]
-
-    args = [
-      "--manifest",
-      rebase_path(inputs[0], root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-    ]
-
-    deps = [ ":${targets.local_build_manifest}" ]
-
-    foreach(file, additional_export_files) {
-      inputs += [ file.source ]
-      args += [
-        "--mapping",
-        file.dest,
-        rebase_path(file.source, root_build_dir),
-      ]
-      deps += file.deps
-    }
-  }
-
-  # Populate the content of the $BUILD_DIR/sdk/exported/{collection_name}/
-  # directory from the content of the export manifest.
-  action(targets.export) {
-    forward_variables_from(invoker, [ "testonly" ])
-
-    script = "//build/sdk/export_sdk.py"
-
-    inputs = [ files.export_manifest ]
-
-    _out_dir = files.exported_collection_dir
-    _stamp_file = "${target_gen_dir}/${target_name}.exported"
-
-    outputs = [
-      _stamp_file,
-
-      # One of many symlinks the script creates based on the export manifest.
-      "${_out_dir}/${files.collection_manifest_relative_path}",
-    ]
-
-    depfile = "${_stamp_file}.d"
-
-    args = [
-      "--out-dir",
-      rebase_path(_out_dir, root_build_dir),
-      "--stamp-file",
-      rebase_path(_stamp_file, root_build_dir),
-      "--manifest",
-      rebase_path(files.export_manifest, root_build_dir),
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-    ]
-
-    deps = [ ":${targets.export_manifest}" ]
-  }
-
   # Adds prebuild metadata that is used to generate the collection manifest. The
   # main target cannot do this because it depends on the
   # `idk_prebuild_manifest()` instance, which must depend on the target with
-  # this metadata..
+  # this metadata.
   group(targets.collection_prebuild_info) {
     metadata = {
       idk_atom_prebuild_info = [
@@ -301,8 +167,6 @@ template("sdk_collection") {
           atom_meta = {
             dest = files.collection_manifest_relative_path
           }
-          atom_meta_json_file =
-              rebase_path(files.idk_meta_manifest_json, root_build_dir)
           prebuild_info = {
             arch = {
               host = host_triple
@@ -319,24 +183,62 @@ template("sdk_collection") {
 
   idk_prebuild_manifest(targets.prebuild_manifest) {
     forward_variables_from(invoker, [ "testonly" ])
-    visibility = [ ":${targets.main}" ]
+
     output = files.prebuild_manifest
     deps = all_collection_deps + [ ":${targets.collection_prebuild_info}" ]
   }
 
-  group(targets.main) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
+  python_action(targets.generate_meta_files) {
+    forward_variables_from(invoker, [ "testonly" ])
 
-    deps = [
-      ":${targets.prebuild_manifest}",
-      ":${targets.verify_idk_meta_manifest_json}",
+    binary_label = "//build/sdk/generate_prebuild_idk"
+
+    inputs = [ files.prebuild_manifest ]
+
+    _stamp_file = "${target_gen_dir}/${target_name}.exported"
+
+    depfile = "${target_gen_dir}/${target_name}.d"
+
+    outputs = [
+      _stamp_file,
+      files.idk_meta_manifest_json,
     ]
 
-    public_deps = [ ":${targets.export}" ]
+    args = [
+      "--output-dir",
+      rebase_path(files.exported_collection_dir, root_build_dir),
+      "--build-dir",
+      rebase_path(root_build_dir, root_build_dir),
+      "--prebuild-manifest",
+      rebase_path(files.prebuild_manifest, root_build_dir),
+      "--fuchsia-source-dir",
+      rebase_path("//", root_build_dir),
+      "--stamp-file",
+      rebase_path(_stamp_file, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+
+    # TODO(https://fxbug.dev/333907192): Remove along with internal only IDK.
+    if (defined(invoker.include_internal_atoms) &&
+        invoker.include_internal_atoms) {
+      args += [ "--include-internal-atoms" ]
+    }
+
+    deps = [ ":${targets.prebuild_manifest}" ]
+  }
+
+  group(targets.main) {
+    forward_variables_from(invoker, [ "testonly" ])
+
+    if (defined(invoker.visibility)) {
+      visibility = []
+      visibility = invoker.visibility
+    }
+
+    deps = [ ":${targets.generate_meta_files}" ]
+
+    public_deps = []
 
     # The build manifest is only needed by legacy use cases.
     _collections_needing_build_manifest = [

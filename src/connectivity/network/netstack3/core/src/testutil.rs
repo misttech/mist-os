@@ -6,11 +6,10 @@
 
 #![cfg(any(test, feature = "testutils"))]
 
-pub use netstack3_base::testutil::TestIpExt;
+pub use netstack3_base::testutil::{FakeDeviceId, TestIpExt};
 pub use netstack3_filter::testutil::new_filter_egress_ip_packet;
 
 use alloc::borrow::ToOwned;
-use alloc::collections::HashMap;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -30,9 +29,10 @@ use net_types::ip::{
 use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::{DynDebugReferences, Mutex};
 use netstack3_base::testutil::{
-    FakeAtomicInstant, FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks,
-    FakeNetworkSpec, FakeSocketWritableListener, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
-    MonotonicIdentifier, TestAddrs, WithFakeFrameContext, WithFakeTimerContext,
+    AlwaysDefaultsSettingsContext, FakeAtomicInstant, FakeCryptoRng, FakeFrameCtx, FakeInstant,
+    FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeSocketWritableListener, FakeTimerCtx,
+    FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs, WithFakeFrameContext,
+    WithFakeTimerContext,
 };
 use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
@@ -47,7 +47,7 @@ use netstack3_device::ethernet::{
 use netstack3_device::loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
 use netstack3_device::pure_ip::{PureIpDeviceId, PureIpWeakDeviceId};
 use netstack3_device::queue::{ReceiveQueueBindingsContext, TransmitQueueBindingsContext};
-use netstack3_device::socket::{DeviceSocketBindingsContext, DeviceSocketTypes};
+use netstack3_device::socket::{DeviceSocketBindingsContext, DeviceSocketTypes, ReceiveFrameError};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_device::{
     self as device, for_any_device_id, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
@@ -57,13 +57,18 @@ use netstack3_filter::testutil::NoOpSocketOpsFilter;
 use netstack3_filter::{
     FilterBindingsTypes, FilterTimerId, SocketOpsFilter, SocketOpsFilterBindingContext,
 };
-use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+use netstack3_hashmap::HashMap;
+use netstack3_icmp_echo::{
+    IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId, ReceiveIcmpEchoError,
+};
 use netstack3_ip::device::{
     IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
     Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
 use netstack3_ip::nud::{self, LinkResolutionContext, LinkResolutionNotifier};
-use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes};
+use netstack3_ip::raw::{
+    RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, ReceivePacketError,
+};
 use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, DeviceIpLayerMetadata,
     IpLayerEvent, IpLayerTimerId, RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
@@ -71,7 +76,9 @@ use netstack3_ip::{
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, TcpBindingsTypes};
-use netstack3_udp::{UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId};
+use netstack3_udp::{
+    ReceiveUdpError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
+};
 use packet::{Buf, BufferMut};
 use zerocopy::SplitByteSlice;
 
@@ -883,11 +890,6 @@ impl TcpBindingsTypes for FakeBindingsCtx {
             client,
         )
     }
-
-    fn default_buffer_sizes() -> BufferSizes {
-        // Use the test-only default impl.
-        BufferSizes::default()
-    }
 }
 
 #[cfg(not(loom))]
@@ -1301,11 +1303,12 @@ impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx 
         _device_id: &DeviceId<Self>,
         _meta: UdpPacketMeta<I>,
         body: &[u8],
-    ) {
+    ) -> Result<(), ReceiveUdpError> {
         let mut state = self.state_mut();
         let received =
             (&mut *state).udp_state_mut::<I>().entry(id.clone()).or_insert_with(Vec::default);
         received.push(body.to_owned());
+        Ok(())
     }
 }
 
@@ -1323,8 +1326,8 @@ impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
         _dst_ip: I::Addr,
         _id: u16,
         data: B,
-    ) {
-        I::map_ip(
+    ) -> Result<(), ReceiveIcmpEchoError> {
+        I::map_ip_in(
             (IpInvariant(self.state_mut()), conn.clone()),
             |(IpInvariant(mut state), conn)| {
                 let replies = state.icmpv4_replies.entry(conn).or_insert_with(Vec::default);
@@ -1334,7 +1337,8 @@ impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
                 let replies = state.icmpv6_replies.entry(conn).or_insert_with(Vec::default);
                 replies.push(data.as_ref().to_owned());
             },
-        )
+        );
+        Ok(())
     }
 }
 
@@ -1358,8 +1362,9 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {
         device: &DeviceId<Self>,
         _frame: device::socket::Frame<&[u8]>,
         raw_frame: &[u8],
-    ) {
+    ) -> Result<(), ReceiveFrameError> {
         state.lock().push((device.downgrade(), raw_frame.into()));
+        Ok(())
     }
 }
 
@@ -1369,7 +1374,7 @@ impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCt
         _socket: &RawIpSocketId<I, WeakDeviceId<Self>, Self>,
         _packet: &I::Packet<B>,
         _device: &DeviceId<Self>,
-    ) {
+    ) -> Result<(), ReceivePacketError> {
         unimplemented!()
     }
 }
@@ -1423,6 +1428,8 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         Ok(())
     }
 }
+
+impl AlwaysDefaultsSettingsContext for FakeBindingsCtx {}
 
 /// Wraps all events emitted by Core into a single enum type.
 #[derive(Debug, Eq, PartialEq, Hash, GenericOverIp)]

@@ -90,11 +90,11 @@ pub struct ControlGroupFile {
 }
 
 impl ControlGroupFile {
-    fn new(kernel: &Arc<Kernel>, cgroup: Weak<dyn CgroupOps>) -> Self {
+    fn new(kernel: &Kernel, cgroup: Weak<dyn CgroupOps>) -> Self {
         Self {
             cgroup: cgroup.clone(),
             dynamic_file: DynamicFile::new(ControlGroupFileSource {
-                kernel: Arc::downgrade(kernel),
+                kernel: kernel.weak_self.clone(),
                 cgroup: cgroup.clone(),
             }),
         }
@@ -111,7 +111,7 @@ impl FileOps for ControlGroupFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -130,7 +130,7 @@ impl FileOps for ControlGroupFile {
             return error!(EINVAL);
         };
 
-        self.cgroup()?.add_process(&thread_group)?;
+        self.cgroup()?.add_process(locked, &thread_group)?;
 
         Ok(bytes.len())
     }

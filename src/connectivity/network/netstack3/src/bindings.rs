@@ -26,6 +26,7 @@ mod error;
 mod filter;
 mod health_check_worker;
 mod inspect;
+mod interface_config;
 mod interfaces_admin;
 mod interfaces_watcher;
 mod multicast_admin;
@@ -39,6 +40,7 @@ mod reference_notifier;
 mod resource_removal;
 mod root_fidl_worker;
 mod routes;
+mod settings;
 mod socket;
 mod stack_fidl_worker;
 mod time;
@@ -81,7 +83,11 @@ use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
 use crate::bindings::bpf::EbpfManager;
 use crate::bindings::counters::BindingsCounters;
+pub use crate::bindings::interface_config::InterfaceConfigDefaults;
+use crate::bindings::interface_config::InterfaceConfigType;
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
+use crate::bindings::settings::Settings;
+use crate::bindings::socket::queue::NoSpace;
 use crate::bindings::time::{AtomicStackTime, StackTime};
 use crate::bindings::util::ScopeExt as _;
 use net_types::ethernet::Mac;
@@ -90,23 +96,26 @@ use net_types::ip::{
 };
 use net_types::SpecifiedAddr;
 use netstack3_core::device::{
-    DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
-    EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, PureIpDeviceId,
-    ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
+    DeviceConfigurationUpdate, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
+    DeviceSendFrameError, EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice,
+    LoopbackDeviceId, PureIpDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
+    WeakDeviceId,
 };
 use netstack3_core::error::ExistsError;
 use netstack3_core::filter::{FilterBindingsTypes, SocketOpsFilter, SocketOpsFilterBindingContext};
-use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+use netstack3_core::icmp::{
+    IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId, ReceiveIcmpEchoError,
+};
 use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-    IpLayerEvent, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationUpdate, Lifetime, RouterAdvertisementEvent, SlaacConfigurationUpdate,
+    AddIpAddrSubnetError, AddressRemovedReason, IpDeviceEvent, IpLayerEvent,
+    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Lifetime,
+    RouterAdvertisementEvent,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::udp::{
-    UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
+    ReceiveUdpError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
 };
 use netstack3_core::{
     neighbor, CoreTxMetadata, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
@@ -117,6 +126,8 @@ use netstack3_core::{
 pub(crate) use inspect::InspectPublisher;
 
 mod ctx {
+    use crate::bindings::interface_config::InterfaceConfigDefaults;
+
     use super::*;
     use thiserror::Error;
 
@@ -156,6 +167,7 @@ mod ctx {
     impl Ctx {
         fn new(
             config: GlobalConfig,
+            interface_config: &InterfaceConfigDefaults,
             routes_change_sink: routes::ChangeSink,
             resource_removal: ResourceRemovalSink,
             multicast_admin: MulticastAdminEventSinks,
@@ -164,6 +176,7 @@ mod ctx {
         ) -> Self {
             let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(
                 config,
+                interface_config,
                 routes_change_sink,
                 resource_removal,
                 multicast_admin,
@@ -229,7 +242,10 @@ mod ctx {
     }
 
     impl NetstackSeed {
-        pub(crate) fn new(config: GlobalConfig) -> Self {
+        pub(crate) fn new(
+            config: GlobalConfig,
+            interface_config: &InterfaceConfigDefaults,
+        ) -> Self {
             let (interfaces_worker, interfaces_watcher_sink, interfaces_event_sink) =
                 interfaces_watcher::Worker::new();
             let (routes_change_sink, routes_change_runner) = routes::create_sink_and_runner();
@@ -240,6 +256,7 @@ mod ctx {
             let (power_worker, power_sink) = PowerWorker::new();
             let ctx = Ctx::new(
                 config,
+                &interface_config,
                 routes_change_sink,
                 resource_removal_sink,
                 multicast_admin_sinks,
@@ -266,7 +283,7 @@ mod ctx {
 
     impl Default for NetstackSeed {
         fn default() -> Self {
-            Self::new(Default::default())
+            Self::new(Default::default(), &Default::default())
         }
     }
 }
@@ -365,9 +382,6 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 #[derive(Debug, Default)]
 pub(crate) struct GlobalConfig {
     pub(crate) suspend_enabled: bool,
-    /// Whether to configure interfaces with opaque IIDs by default. Note that the
-    /// IID generation method can still be overridden per-interface.
-    pub(crate) default_opaque_iids: bool,
 }
 
 pub(crate) struct BindingsCtxInner {
@@ -381,11 +395,13 @@ pub(crate) struct BindingsCtxInner {
     counters: BindingsCounters,
     ebpf_manager: EbpfManager,
     power: PowerWorkerSink,
+    settings: Settings,
 }
 
 impl BindingsCtxInner {
     fn new(
         config: GlobalConfig,
+        interface_config: &InterfaceConfigDefaults,
         routes_change_sink: routes::ChangeSink,
         resource_removal: ResourceRemovalSink,
         multicast_admin: MulticastAdminEventSinks,
@@ -403,6 +419,7 @@ impl BindingsCtxInner {
             counters: Default::default(),
             ebpf_manager: Default::default(),
             power,
+            settings: Settings::new(interface_config),
         }
     }
 }
@@ -648,7 +665,7 @@ impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
         dst_ip: I::Addr,
         id: u16,
         data: B,
-    ) {
+    ) -> Result<(), ReceiveIcmpEchoError> {
         conn.external_data().receive_icmp_echo_reply(device, src_ip, dst_ip, id, data)
     }
 }
@@ -665,8 +682,10 @@ impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsC
         device_id: &DeviceId<BindingsCtx>,
         meta: UdpPacketMeta<I>,
         body: &[u8],
-    ) {
-        id.external_data().receive_udp(device_id, meta, body)
+    ) -> Result<(), ReceiveUdpError> {
+        id.external_data()
+            .receive_udp(device_id, meta, body)
+            .map_err(|NoSpace {}| ReceiveUdpError::QueueFull)
     }
 }
 
@@ -705,7 +724,16 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                 );
                 match reason {
                     AddressRemovedReason::Manual => (),
-                    AddressRemovedReason::DadFailed => self.notify_dad_failed(&device, addr.into()),
+                    AddressRemovedReason::DadFailed => self.notify_address_removed(
+                        &device,
+                        addr.into(),
+                        interfaces_admin::AddressStateProviderCancellationReason::DadFailed,
+                    ),
+                    AddressRemovedReason::Forfeited => self.notify_address_removed(
+                        &device,
+                        addr.into(),
+                        interfaces_admin::AddressStateProviderCancellationReason::Forfeited,
+                    ),
                 }
             }
             IpDeviceEvent::AddressStateChanged { device, addr, state } => {
@@ -831,6 +859,28 @@ impl DeferredResourceRemovalContext for BindingsCtx {
     }
 }
 
+impl Ctx {
+    pub(crate) fn apply_interface_defaults(&mut self, device_id: &DeviceId<BindingsCtx>) {
+        let config_type = match device_id {
+            DeviceId::Ethernet(_) => InterfaceConfigType::Ethernet,
+            DeviceId::PureIp(_) => InterfaceConfigType::PureIp,
+            DeviceId::Blackhole(_) => InterfaceConfigType::Blackhole,
+            DeviceId::Loopback(_) => InterfaceConfigType::Loopback,
+        };
+        let defaults = self.bindings_ctx().settings.interface_defaults.read();
+        let ipv6_config = defaults.to_core_ipv6_update(config_type);
+        let ipv4_config = defaults.to_core_ipv4_update(config_type);
+        let device_config = defaults.to_core_device_update(config_type);
+
+        let _: Ipv6DeviceConfigurationUpdate =
+            self.api().device_ip::<Ipv6>().update_configuration(&device_id, ipv6_config).unwrap();
+        let _: Ipv4DeviceConfigurationUpdate =
+            self.api().device_ip::<Ipv4>().update_configuration(&device_id, ipv4_config).unwrap();
+        let _: DeviceConfigurationUpdate =
+            self.api().device_any().update_configuration(&device_id, device_config).unwrap();
+    }
+}
+
 impl BindingsCtx {
     fn notify_interface_update(&self, device: &DeviceId<BindingsCtx>, event: InterfaceUpdate) {
         device
@@ -857,10 +907,11 @@ impl BindingsCtx {
         })
     }
 
-    fn notify_dad_failed(
+    fn notify_address_removed(
         &mut self,
         device: &DeviceId<BindingsCtx>,
         address: SpecifiedAddr<IpAddr>,
+        reason: interfaces_admin::AddressStateProviderCancellationReason,
     ) {
         device.external_state().with_common_info_mut(|i| {
             if let Some(address_info) = i.addresses.get_mut(&address) {
@@ -868,7 +919,7 @@ impl BindingsCtx {
                     &mut address_info.address_state_provider;
                 if let Some(sender) = cancelation_sender.take() {
                     sender
-                        .send(interfaces_admin::AddressStateProviderCancellationReason::DadFailed)
+                        .send(reason)
                         .expect("assignment state receiver unexpectedly disconnected");
                 }
             }
@@ -1094,41 +1145,7 @@ impl Netstack {
         let loopback: DeviceId<_> = loopback.into();
         self.ctx.bindings_ctx().devices.add_device(binding_id_alloc, loopback.clone());
 
-        // Don't need DAD and IGMP/MLD on loopback.
-        let ip_config = IpDeviceConfigurationUpdate {
-            ip_enabled: Some(true),
-            unicast_forwarding_enabled: Some(false),
-            multicast_forwarding_enabled: Some(false),
-            gmp_enabled: Some(false),
-            dad_transmits: Some(None),
-        };
-
-        let _: Ipv4DeviceConfigurationUpdate = self
-            .ctx
-            .api()
-            .device_ip::<Ipv4>()
-            .update_configuration(
-                &loopback,
-                Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode: None },
-            )
-            .unwrap();
-        let _: Ipv6DeviceConfigurationUpdate = self
-            .ctx
-            .api()
-            .device_ip::<Ipv6>()
-            .update_configuration(
-                &loopback,
-                Ipv6DeviceConfigurationUpdate {
-                    max_router_solicitations: Some(None),
-                    slaac_config: SlaacConfigurationUpdate {
-                        stable_address_configuration: None,
-                        temporary_address_configuration: None,
-                    },
-                    ip_config,
-                    mld_mode: None,
-                },
-            )
-            .unwrap();
+        self.ctx.apply_interface_defaults(&loopback);
         add_loopback_ip_addrs(&mut self.ctx, &loopback).expect("error adding loopback addresses");
         add_loopback_routes(self.ctx.bindings_ctx(), &loopback).await;
 
@@ -1187,6 +1204,8 @@ pub(crate) enum Service {
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     SocketControl(fidl_fuchsia_net_filter::SocketControlRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
+    SettingsControl(fidl_fuchsia_net_settings::ControlRequestStream),
+    SettingsState(fidl_fuchsia_net_settings::StateRequestStream),
 }
 
 impl NetstackSeed {
@@ -1522,6 +1541,14 @@ impl NetstackSeed {
                 Service::HealthCheck(health_check) => services_handle
                     .spawn_request_stream_handler(health_check, |rs| {
                         health_check_worker::serve(rs)
+                    }),
+                Service::SettingsControl(state) => services_handle
+                    .spawn_request_stream_handler(state, |rs| {
+                        settings::serve_control(netstack.ctx.clone(), rs)
+                    }),
+                Service::SettingsState(control) => services_handle
+                    .spawn_request_stream_handler(control, |rs| {
+                        settings::serve_state(netstack.ctx.clone(), rs)
                     }),
             })
             .collect::<()>();

@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 use crate::bedrock::aggregate_router::{AggregateRouterFn, AggregateSource};
-use crate::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
+use crate::bedrock::request_metadata::Metadata;
 use crate::bedrock::structured_dict::{
     ComponentEnvironment, ComponentInput, ComponentOutput, StructuredDictMap,
 };
-use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
 use crate::bedrock::with_service_renames_and_filter::WithServiceRenamesAndFilter;
 use crate::capability_source::{
     AggregateCapability, AggregateInstance, AggregateMember, AnonymizedAggregateSource,
@@ -15,7 +14,7 @@ use crate::capability_source::{
 };
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
-use crate::{DictExt, LazyGet, Sources, WithAvailability, WithDefault, WithErrorReporter};
+use crate::{DictExt, LazyGet, Sources, WithPorcelain};
 use async_trait::async_trait;
 use cm_rust::{
     CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
@@ -29,12 +28,11 @@ use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
     Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
-    RouterResponse, WeakInstanceToken,
+    RouterResponse,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::{Arc, LazyLock};
-use strum::IntoEnumIterator;
+use std::sync::Arc;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 lazy_static! {
@@ -217,11 +215,12 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             .insert(
                 environment_decl.name.clone(),
                 build_environment(
-                    &component.moniker(),
+                    component,
                     &child_component_output_dictionary_routers,
                     &component_input,
                     environment_decl,
                     &program_output_dict,
+                    &error_reporter,
                 ),
             )
             .ok();
@@ -265,7 +264,6 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     unreachable!();
                 };
                 let availability = *use_.availability();
-                let target: WeakInstanceToken = component.as_weak().into();
                 let aggregate = (aggregate_router_fn)(
                     component.clone(),
                     vec![AggregateSource::Collection { collection_name: collection_name.clone() }],
@@ -276,13 +274,15 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                         sources: Sources::new(cm_rust::CapabilityTypeName::Service),
                         instances: vec![],
                     }),
-                )
-                .with_default(
-                    metadata_for_porcelain_type(CapabilityTypeName::Service),
+                    CapabilityTypeName::Service,
                     availability,
-                    target,
                 )
-                .with_error_reporter(RouteRequestErrorInfo::from(use_), error_reporter.clone());
+                .with_porcelain_with_default(CapabilityTypeName::Service)
+                .availability(availability)
+                .target(component)
+                .error_info(use_)
+                .error_reporter(error_reporter.clone())
+                .build();
                 if let Err(e) = program_input
                     .namespace()
                     .insert_capability(use_.path().unwrap(), aggregate.into())
@@ -528,7 +528,6 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     }
                 }
                 let availability = *first_expose.availability();
-                let target: WeakInstanceToken = component.as_weak().into();
                 let aggregate = (aggregate_router_fn)(
                     component.clone(),
                     aggregate_sources,
@@ -544,11 +543,8 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                         sources: Sources::new(cm_rust::CapabilityTypeName::Service),
                         instances: vec![],
                     }),
-                )
-                .with_default(
-                    metadata_for_porcelain_type(CapabilityTypeName::Service),
+                    CapabilityTypeName::Service,
                     availability,
-                    target,
                 );
                 component_output
                     .capabilities()
@@ -683,11 +679,12 @@ fn new_aggregate_router_from_service_offers<C: ComponentInstanceInterface + 'sta
         }
     }
     let availability = *offer_bundle.first().unwrap().availability();
-    let target: WeakInstanceToken = component.as_weak().into();
-    (aggregate_router_fn)(component.clone(), aggregate_sources, source).with_default(
-        metadata_for_porcelain_type(CapabilityTypeName::Service),
+    (aggregate_router_fn)(
+        component.clone(),
+        aggregate_sources,
+        source,
+        CapabilityTypeName::Service,
         availability,
-        target,
     )
 }
 
@@ -747,12 +744,13 @@ fn group_expose_aggregates(exposes: &Vec<cm_rust::ExposeDecl>) -> Vec<Vec<&cm_ru
     groupings.into_iter().map(|(_key, grouping)| grouping).collect()
 }
 
-fn build_environment(
-    moniker: &Moniker,
+fn build_environment<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
     environment_decl: &cm_rust::EnvironmentDecl,
     program_output_dict: &Dict,
+    error_reporter: &impl ErrorReporter,
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
     if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
@@ -764,7 +762,13 @@ fn build_environment(
     }
     let debug = environment_decl.debug_capabilities.iter().map(|debug_registration| {
         let cm_rust::DebugRegistration::Protocol(debug) = debug_registration;
-        (&debug.source_name, debug.target_name.clone(), &debug.source, CapabilityTypeName::Protocol)
+        (
+            &debug.source_name,
+            debug.target_name.clone(),
+            &debug.source,
+            CapabilityTypeName::Protocol,
+            RouteRequestErrorInfo::from(debug_registration),
+        )
     });
     let runners = environment_decl.runners.iter().map(|runner| {
         (
@@ -772,6 +776,7 @@ fn build_environment(
             runner.target_name.clone(),
             &runner.source,
             CapabilityTypeName::Runner,
+            RouteRequestErrorInfo::from(runner),
         )
     });
     let resolvers = environment_decl.resolvers.iter().map(|resolver| {
@@ -780,15 +785,18 @@ fn build_environment(
             Name::new(&resolver.scheme).unwrap(),
             &resolver.source,
             CapabilityTypeName::Resolver,
+            RouteRequestErrorInfo::from(resolver),
         )
     });
-    for (source_name, target_name, source, cap_type) in debug.chain(runners).chain(resolvers) {
+    let moniker = component.moniker();
+    for (source_name, target_name, source, porcelain_type, route_request) in
+        debug.chain(runners).chain(resolvers)
+    {
         let source_path =
             SeparatedPath { dirname: Default::default(), basename: source_name.clone() };
         let router: Router<Connector> = match &source {
             cm_rust::RegistrationSource::Parent => {
                 use_from_parent_router::<Connector>(component_input, source_path, moniker)
-                    .with_porcelain_type(cap_type, moniker.clone())
             }
             cm_rust::RegistrationSource::Self_ => program_output_dict
                 .get_router_or_not_found::<Connector>(
@@ -797,8 +805,7 @@ fn build_environment(
                         moniker,
                         source_path.iter_segments().join("/"),
                     ),
-                )
-                .with_porcelain_type(cap_type, moniker.clone()),
+                ),
             cm_rust::RegistrationSource::Child(child_name) => {
                 let child_name = ChildName::parse(child_name).expect("invalid child name");
                 let Some(child_component_output) =
@@ -806,18 +813,23 @@ fn build_environment(
                 else {
                     continue;
                 };
-                let r: Router<Connector> = child_component_output.clone().lazy_get(
+                child_component_output.clone().lazy_get(
                     source_path,
                     RoutingError::use_from_child_expose_not_found(
                         &child_name,
-                        &moniker,
+                        moniker,
                         source_name.clone(),
                     ),
-                );
-                r.with_porcelain_type(cap_type, moniker.clone())
+                )
             }
         };
-        let dict_to_insert_to = match cap_type {
+        let router = router
+            .with_porcelain_no_default(porcelain_type)
+            .availability(Availability::Required)
+            .target(component)
+            .error_info(route_request)
+            .error_reporter(error_reporter.clone());
+        let dict_to_insert_to = match porcelain_type {
             CapabilityTypeName::Protocol => environment.debug(),
             CapabilityTypeName::Runner => environment.runners(),
             CapabilityTypeName::Resolver => environment.resolvers(),
@@ -965,17 +977,11 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     let router: Router<Data> = match config_use.source() {
         cm_rust::UseSource::Parent => {
             use_from_parent_router::<Data>(component_input, source_path.to_owned(), moniker)
-                .with_porcelain_type(porcelain_type, moniker.clone())
         }
-        cm_rust::UseSource::Self_ => program_output_dict
-            .get_router_or_not_found::<Data>(
-                &source_path,
-                RoutingError::use_from_self_not_found(
-                    moniker,
-                    source_path.iter_segments().join("/"),
-                ),
-            )
-            .with_porcelain_type(porcelain_type, moniker.clone()),
+        cm_rust::UseSource::Self_ => program_output_dict.get_router_or_not_found::<Data>(
+            &source_path,
+            RoutingError::use_from_self_not_found(moniker, source_path.iter_segments().join("/")),
+        ),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child_component_output) =
@@ -983,15 +989,14 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
             else {
                 panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
             };
-            let r: Router<Data> = child_component_output.clone().lazy_get(
+            child_component_output.clone().lazy_get(
                 source_path.to_owned(),
                 RoutingError::use_from_child_expose_not_found(
                     &child_name,
                     &moniker,
                     config_use.source_name().clone(),
                 ),
-            );
-            r.with_porcelain_type(porcelain_type, moniker.clone())
+            )
         }
         // The following are not used with config capabilities.
         cm_rust::UseSource::Environment => return,
@@ -1002,13 +1007,14 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     };
 
     let availability = *config_use.availability();
-    let target: WeakInstanceToken = component.as_weak().into();
     match program_input.config().insert_capability(
         &config_use.target_name,
         router
-            .with_availability(moniker.clone(), availability)
-            .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
-            .with_error_reporter(RouteRequestErrorInfo::from(config_use), error_reporter)
+            .with_porcelain_with_default(porcelain_type)
+            .availability(availability)
+            .target(component)
+            .error_info(config_use)
+            .error_reporter(error_reporter)
             .into(),
     ) {
         Ok(()) => (),
@@ -1053,17 +1059,11 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
     let router: Router<T> = match use_.source() {
         cm_rust::UseSource::Parent => {
             use_from_parent_router::<T>(component_input, source_path.to_owned(), moniker)
-                .with_porcelain_type(porcelain_type, moniker.clone())
         }
-        cm_rust::UseSource::Self_ => program_output_dict
-            .get_router_or_not_found::<T>(
-                &source_path,
-                RoutingError::use_from_self_not_found(
-                    moniker,
-                    source_path.iter_segments().join("/"),
-                ),
-            )
-            .with_porcelain_type(porcelain_type, moniker.clone()),
+        cm_rust::UseSource::Self_ => program_output_dict.get_router_or_not_found::<T>(
+            &source_path,
+            RoutingError::use_from_self_not_found(moniker, source_path.iter_segments().join("/")),
+        ),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child_component_output) =
@@ -1071,15 +1071,14 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
             else {
                 panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
             };
-            let r: Router<T> = child_component_output.clone().lazy_get(
+            child_component_output.clone().lazy_get(
                 source_path.to_owned(),
                 RoutingError::use_from_child_expose_not_found(
                     &child_name,
                     &moniker,
                     use_.source_name().clone(),
                 ),
-            );
-            r.with_porcelain_type(porcelain_type, moniker.clone())
+            )
         }
         cm_rust::UseSource::Framework if use_.is_from_dictionary() => {
             Router::<T>::new_error(RoutingError::capability_from_framework_not_found(
@@ -1087,15 +1086,13 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
                 source_path.iter_segments().join("/"),
             ))
         }
-        cm_rust::UseSource::Framework => framework_dict
-            .get_router_or_not_found::<T>(
-                &source_path,
-                RoutingError::capability_from_framework_not_found(
-                    moniker,
-                    source_path.iter_segments().join("/"),
-                ),
-            )
-            .with_porcelain_type(porcelain_type, moniker.clone()),
+        cm_rust::UseSource::Framework => framework_dict.get_router_or_not_found::<T>(
+            &source_path,
+            RoutingError::capability_from_framework_not_found(
+                moniker,
+                source_path.iter_segments().join("/"),
+            ),
+        ),
         cm_rust::UseSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
                 moniker,
@@ -1111,35 +1108,27 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
             let cm_rust::UseDecl::Protocol(use_protocol) = use_ else {
                 panic!("non-protocol capability used with a debug source, this should be prevented by manifest validation");
             };
-            component_input
-                .environment()
-                .debug()
-                .get_router_or_not_found::<T>(
+            component_input.environment().debug().get_router_or_not_found::<T>(
+                &use_protocol.source_name,
+                RoutingError::use_from_environment_not_found(
+                    moniker,
+                    "protocol",
                     &use_protocol.source_name,
-                    RoutingError::use_from_environment_not_found(
-                        moniker,
-                        "protocol",
-                        &use_protocol.source_name,
-                    ),
-                )
-                .with_porcelain_type(use_.into(), moniker.clone())
+                ),
+            )
         }
         cm_rust::UseSource::Environment => {
             let cm_rust::UseDecl::Runner(use_runner) = use_ else {
                 panic!("non-runner capability used with an environment source, this should be prevented by manifest validation");
             };
-            component_input
-                .environment()
-                .runners()
-                .get_router_or_not_found::<T>(
+            component_input.environment().runners().get_router_or_not_found::<T>(
+                &use_runner.source_name,
+                RoutingError::use_from_environment_not_found(
+                    moniker,
+                    "runner",
                     &use_runner.source_name,
-                    RoutingError::use_from_environment_not_found(
-                        moniker,
-                        "runner",
-                        &use_runner.source_name,
-                    ),
-                )
-                .with_porcelain_type(porcelain_type, moniker.clone())
+                ),
+            )
         }
         cm_rust::UseSource::Collection(_) => {
             // Collection sources are handled separately, in `build_component_sandbox`
@@ -1148,11 +1137,13 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
     };
 
     let availability = *use_.availability();
-    let target: WeakInstanceToken = component.as_weak().into();
     let router = router
-        .with_availability(moniker.clone(), availability)
-        .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
-        .with_error_reporter(RouteRequestErrorInfo::from(use_), error_reporter);
+        .with_porcelain_with_default(porcelain_type)
+        .availability(availability)
+        .target(&component)
+        .error_info(use_)
+        .error_reporter(error_reporter)
+        .build();
 
     if let Some(target_path) = use_.path() {
         if let Err(e) = program_input.namespace().insert_capability(target_path, router.into()) {
@@ -1167,34 +1158,6 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
             _ => panic!("unexpected capability type: {:?}", use_),
         }
     }
-}
-
-fn metadata_for_porcelain_type(
-    typename: CapabilityTypeName,
-) -> Arc<dyn Fn(Availability) -> Dict + Send + Sync + 'static> {
-    type MetadataMap =
-        HashMap<CapabilityTypeName, Arc<dyn Fn(Availability) -> Dict + Send + Sync + 'static>>;
-    static CLOSURES: LazyLock<MetadataMap> = LazyLock::new(|| {
-        fn entry_for_typename(
-            typename: CapabilityTypeName,
-        ) -> (CapabilityTypeName, Arc<dyn Fn(Availability) -> Dict + Send + Sync + 'static>)
-        {
-            let v = Arc::new(move |availability: Availability| {
-                let metadata = Dict::new();
-                metadata
-                    .insert(
-                        Name::new(METADATA_KEY_TYPE).unwrap(),
-                        Capability::Data(Data::String(typename.to_string())),
-                    )
-                    .expect("failed to build default metadata?");
-                metadata.set_metadata(availability);
-                metadata
-            });
-            (typename, v)
-        }
-        CapabilityTypeName::iter().map(entry_for_typename).collect()
-    });
-    CLOSURES.get(&typename).unwrap().clone()
 }
 
 /// Builds a router that obtains a capability that the program uses from `parent`.
@@ -1268,19 +1231,15 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
                     source_path.iter_segments().join("/"),
                 )
             };
-            let router =
-                component_input.capabilities().get_router_or_not_found::<T>(&source_path, err);
-            router.with_porcelain_type(porcelain_type, component.moniker().clone())
+            component_input.capabilities().get_router_or_not_found::<T>(&source_path, err)
         }
-        cm_rust::OfferSource::Self_ => program_output_dict
-            .get_router_or_not_found::<T>(
-                &source_path,
-                RoutingError::offer_from_self_not_found(
-                    &component.moniker(),
-                    source_path.iter_segments().join("/"),
-                ),
-            )
-            .with_porcelain_type(porcelain_type, component.moniker().clone()),
+        cm_rust::OfferSource::Self_ => program_output_dict.get_router_or_not_found::<T>(
+            &source_path,
+            RoutingError::offer_from_self_not_found(
+                &component.moniker(),
+                source_path.iter_segments().join("/"),
+            ),
+        ),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             match child_component_output_dictionary_routers.get(&child_name) {
@@ -1289,22 +1248,14 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
                     &component.moniker(),
                     source_path.iter_segments().join("/"),
                 )),
-                Some(child_component_output) => {
-                    let router: Router<T> = child_component_output.clone().lazy_get(
-                        source_path.to_owned(),
-                        RoutingError::offer_from_child_expose_not_found(
-                            &child_name,
-                            &component.moniker(),
-                            offer.source_name().clone(),
-                        ),
-                    );
-                    match offer {
-                        cm_rust::OfferDecl::Protocol(_) => {
-                            router.with_porcelain_type(porcelain_type, component.moniker().clone())
-                        }
-                        _ => router,
-                    }
-                }
+                Some(child_component_output) => child_component_output.clone().lazy_get(
+                    source_path.to_owned(),
+                    RoutingError::offer_from_child_expose_not_found(
+                        &child_name,
+                        &component.moniker(),
+                        offer.source_name().clone(),
+                    ),
+                ),
             }
         }
         cm_rust::OfferSource::Framework => {
@@ -1314,14 +1265,13 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
                 );
                 return;
             }
-            let router = framework_dict.get_router_or_not_found::<T>(
+            framework_dict.get_router_or_not_found::<T>(
                 &source_path,
                 RoutingError::capability_from_framework_not_found(
                     &component.moniker(),
                     source_path.iter_segments().join("/"),
                 ),
-            );
-            router.with_porcelain_type(offer.into(), component.moniker().clone())
+            )
         }
         cm_rust::OfferSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
@@ -1356,11 +1306,13 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
     // general. However, supporting the general case simplifies the logic and establishes a nice
     // symmetry between program_input_dict, component_output_dict, and {child,collection}_inputs.
     let availability = *offer.availability();
-    let target: WeakInstanceToken = component.as_weak().into();
     let router = router
-        .with_availability(component.moniker().clone(), availability)
-        .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
-        .with_error_reporter(RouteRequestErrorInfo::from(offer), error_reporter)
+        .with_porcelain_with_default(porcelain_type)
+        .availability(availability)
+        .target(component)
+        .error_info(offer)
+        .error_reporter(error_reporter)
+        .build()
         .with_service_renames_and_filter(offer.clone());
     match target_dict.insert_capability(target_name, router.into()) {
         Ok(()) => (),
@@ -1405,34 +1357,26 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
 
     let porcelain_type = CapabilityTypeName::from(expose);
     let router: Router<T> = match expose.source() {
-        cm_rust::ExposeSource::Self_ => program_output_dict
-            .get_router_or_not_found::<T>(
-                &source_path,
-                RoutingError::expose_from_self_not_found(
-                    &component.moniker(),
-                    source_path.iter_segments().join("/"),
-                ),
-            )
-            .with_porcelain_type(porcelain_type, component.moniker().clone()),
+        cm_rust::ExposeSource::Self_ => program_output_dict.get_router_or_not_found::<T>(
+            &source_path,
+            RoutingError::expose_from_self_not_found(
+                &component.moniker(),
+                source_path.iter_segments().join("/"),
+            ),
+        ),
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             if let Some(child_component_output) =
                 child_component_output_dictionary_routers.get(&child_name)
             {
-                let router: Router<T> = child_component_output.clone().lazy_get(
+                child_component_output.clone().lazy_get(
                     source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
                         &child_name,
                         &component.moniker(),
                         expose.source_name().clone(),
                     ),
-                );
-                match expose {
-                    cm_rust::ExposeDecl::Protocol(_) => {
-                        router.with_porcelain_type(porcelain_type, component.moniker().clone())
-                    }
-                    _ => router,
-                }
+                )
             } else {
                 Router::<T>::new_error(RoutingError::expose_from_child_instance_not_found(
                     &child_name,
@@ -1448,15 +1392,13 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
                 );
                 return;
             }
-            framework_dict
-                .get_router_or_not_found::<T>(
-                    &source_path,
-                    RoutingError::capability_from_framework_not_found(
-                        &component.moniker(),
-                        source_path.iter_segments().join("/"),
-                    ),
-                )
-                .with_porcelain_type(porcelain_type, component.moniker().clone())
+            framework_dict.get_router_or_not_found::<T>(
+                &source_path,
+                RoutingError::capability_from_framework_not_found(
+                    &component.moniker(),
+                    source_path.iter_segments().join("/"),
+                ),
+            )
         }
         cm_rust::ExposeSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
@@ -1482,13 +1424,14 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
         cm_rust::ExposeSource::Collection(_name) => return,
     };
     let availability = *expose.availability();
-    let target: WeakInstanceToken = component.as_weak().into();
     match target_dict.insert_capability(
         target_name,
         router
-            .with_availability(component.moniker().clone(), availability)
-            .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
-            .with_error_reporter(RouteRequestErrorInfo::from(expose), error_reporter)
+            .with_porcelain_with_default(porcelain_type)
+            .availability(availability)
+            .target(component)
+            .error_info(expose)
+            .error_reporter(error_reporter)
             .into(),
     ) {
         Ok(()) => (),

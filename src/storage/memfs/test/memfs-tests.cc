@@ -4,25 +4,43 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/fd.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fit/defer.h>
+#include <lib/zx/result.h>
 #include <lib/zx/stream.h>
 #include <lib/zx/vmo.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
 #include <future>
 #include <limits>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
+#include <fbl/ref_ptr.h>
 #include <fbl/unique_fd.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/predicates/status.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode_dir.h"
 

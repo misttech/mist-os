@@ -8,14 +8,13 @@
 use super::{
     check_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
     fs_node_set_label_with_task, has_fs_node_permissions, permissions_from_flags, set_cached_sid,
-    task_effective_sid, todo_has_fs_node_permissions, Auditable, FileSystemLabelState, FsNodeLabel,
-    FsNodeSecurityXattr, FsNodeSidAndClass, PermissionFlags, TaskAttrs, TaskAttrsOverride,
+    task_effective_sid, todo_has_fs_node_permissions, Auditable, FsNodeLabel, FsNodeSecurityXattr,
+    FsNodeSidAndClass, PermissionFlags, TaskAttrs, TaskAttrsOverride,
 };
 
 use crate::task::CurrentTask;
 use crate::vfs::{
-    Anon, DirEntryHandle, FileSystem, FsNode, FsStr, FsString, PathBuilder, UnlinkKind,
-    ValueOrSize, XattrOp,
+    Anon, DirEntryHandle, FsNode, FsStr, FsString, PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
 use crate::TODO_DENY;
 use bstr::BStr;
@@ -63,12 +62,7 @@ pub(in crate::security) fn fs_node_notify_security_context(
     }
 
     let fs = fs_node.fs();
-    if !matches!(
-        *fs.security_state.state.0.lock(),
-        FileSystemLabelState::Labeled {
-            label: FileSystemLabel { scheme: FileSystemLabelingScheme::FsUse { .. }, .. }
-        }
-    ) {
+    if !fs.security_state.state.supports_xattr() {
         return error!(ENOTSUP);
     }
     let sid = security_server
@@ -118,13 +112,15 @@ pub(in crate::security) fn fs_node_init_with_dentry(
     // Obtain labeling information for the `FileSystem`. If none has been resolved yet then queue the
     // `dir_entry` to be labeled later.
     let fs = fs_node.fs();
-    let label = match &mut *fs.security_state.state.0.lock() {
-        FileSystemLabelState::Unlabeled { pending_entries, .. } => {
-            log_debug!("Queuing FsNode for {:?} for labeling", dir_entry);
-            pending_entries.insert(WeakKey::from(dir_entry));
-            return Ok(());
-        }
-        FileSystemLabelState::Labeled { label } => label.clone(),
+    let label = if let Some(label) = fs.security_state.state.label() {
+        label
+    } else {
+        log_debug!("Queuing FsNode for {:?} for labeling", dir_entry);
+        fs.security_state.state.pending_entries.lock().insert(WeakKey::from(dir_entry));
+
+        // Labelling may have completed while we were inserting the `DirEntry` so check again.
+        let Some(label) = fs.security_state.state.label() else { return Ok(()) };
+        label
     };
 
     let sid = match label.scheme {
@@ -137,7 +133,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                 (FsUseType::Xattr, Some(locked)) => {
                     // Determine the SID from the "security.selinux" attribute.
                     let attr = fs_node.ops().get_xattr(
-                        &mut locked.cast_locked::<FileOpsCore>(),
+                        locked.cast_locked::<FileOpsCore>(),
                         fs_node,
                         current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -163,7 +159,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                                     .sid_to_security_context(root_or_fs_sid)
                                     .unwrap();
                                 fs_node.ops().set_xattr(
-                                    &mut locked.cast_locked::<FileOpsCore>(),
+                                    locked.cast_locked::<FileOpsCore>(),
                                     fs_node,
                                     current_task,
                                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -178,7 +174,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                             }
                         }
                     };
-                    maybe_sid.unwrap_or_else(||{
+                    maybe_sid.unwrap_or_else(|| {
                         // The node does not have a label, so apply the filesystem's default SID.
                         log_warn!(
                             "Unlabeled node {:?} in {} ({:?}-labeled) filesystem",
@@ -380,39 +376,29 @@ fn compute_new_file_sid(
 /// `current_task` under the specified `parent` node.
 /// Policy-defined labeling rules, including transitions, are taken into account.
 ///
-/// If no policy has yet been applied to the `parent`s [`create:vfs::FileSystem`] then no SID
-/// is returned.
+/// Note that this cannot be called prior to a policy being loaded, and the file system label
+/// resolved, since those are prerequisites for the `FileSystemLabel` being available.
 pub(in crate::security) fn compute_new_fs_node_sid(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-    fs: &FileSystem,
+    fs_label: &FileSystemLabel,
     parent: Option<&FsNode>,
     new_node_class: FsNodeClass,
     name: &FsStr,
-) -> Result<Option<(SecurityId, FileSystemLabel)>, Errno> {
-    let fs_label = match &*fs.security_state.state.0.lock() {
-        FileSystemLabelState::Unlabeled { .. } => {
-            return Ok(None);
-        }
-        FileSystemLabelState::Labeled { label } => label.clone(),
-    };
-
-    // If the filesystem has a label then by definition a policy has been loaded.
-    let sid = match new_node_class {
+) -> Result<SecurityId, Errno> {
+    Ok(match new_node_class {
         FsNodeClass::Socket(new_socket_class) => {
             compute_new_socket_sid(security_server, current_task, new_socket_class, name)?
         }
         FsNodeClass::File(new_file_class) => compute_new_file_sid(
             security_server,
             current_task,
-            &fs_label,
+            fs_label,
             parent,
             new_file_class,
             name,
         )?,
-    };
-
-    Ok(Some((sid, fs_label)))
+    })
 }
 
 /// Called by file-system implementations when creating the `FsNode` for a new file.
@@ -435,42 +421,45 @@ pub(in crate::security) fn fs_node_init_on_create(
 
     // If the `new_node` does not already have a specific security class selected then choose one
     // based on its file mode.
-    fs_node_ensure_class(new_node)?;
+    let new_node_class = fs_node_ensure_class(new_node)?;
+
+    // If the file system is not yet labeled (i.e. no policy has been loaded) then no label can
+    // be applied yet.
+    let fs = new_node.fs();
+    let Some(fs_label) = fs.security_state.state.label() else {
+        return Ok(None);
+    };
 
     // Determine the SID with which to label the `new_node` with, dependent on the file
     // class, etc. This will only fail if the filesystem containing the nodes does not yet
     // have labeling information resolved.
-    let new_node_class = new_node.security_state.lock().class;
-    if let Some((sid, label)) = compute_new_fs_node_sid(
+    let sid = compute_new_fs_node_sid(
         security_server,
         current_task,
-        &new_node.fs(),
+        fs_label,
         parent,
         new_node_class,
         name.into(),
-    )? {
-        // for the caller to apply to `new_node`.
-        let (sid, xattr) = match label.scheme {
-            FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
-                let xattr = (fs_use_type == FsUseType::Xattr)
-                    .then(|| make_fs_node_security_xattr(security_server, sid))
-                    .transpose()?;
-                (sid, xattr)
-            }
-            FileSystemLabelingScheme::Mountpoint { .. } => (sid, None),
-            FileSystemLabelingScheme::GenFsCon => {
-                // Defer labeling to `fs_node_init_with_dentry()`, so that the path of the new
-                // node can be taken into account.
-                return Ok(None);
-            }
-        };
+    )?;
 
-        set_cached_sid(new_node, sid);
+    let (sid, xattr) = match fs_label.scheme {
+        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
+            let xattr = (fs_use_type == FsUseType::Xattr)
+                .then(|| make_fs_node_security_xattr(security_server, sid))
+                .transpose()?;
+            (sid, xattr)
+        }
+        FileSystemLabelingScheme::Mountpoint { .. } => (sid, None),
+        FileSystemLabelingScheme::GenFsCon => {
+            // Defer labeling to `fs_node_init_with_dentry()`, so that the path of the new
+            // node can be taken into account.
+            return Ok(None);
+        }
+    };
 
-        Ok(xattr)
-    } else {
-        Ok(None)
-    }
+    set_cached_sid(new_node, sid);
+
+    Ok(xattr)
 }
 
 /// Called to label file nodes not linked in any filesystem's directory structure, e.g.
@@ -550,16 +539,18 @@ fn may_create(
 
     // Verify that the caller has permission to create new nodes of the desired type.
     let new_file_class = file_class_from_file_mode(new_file_mode)?.into();
-    let new_file_sid = compute_new_fs_node_sid(
-        security_server,
-        current_task,
-        &fs,
-        Some(parent),
-        new_file_class,
-        name.into(),
-    )?
-    .map(|(sid, _)| sid)
-    .unwrap_or_else(|| InitialSid::File.into());
+    let new_file_sid = if let Some(fs_label) = fs.security_state.state.label() {
+        compute_new_fs_node_sid(
+            security_server,
+            current_task,
+            fs_label,
+            Some(parent),
+            new_file_class,
+            name.into(),
+        )?
+    } else {
+        InitialSid::File.into()
+    };
 
     let audit_context = &[current_task.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
@@ -572,21 +563,19 @@ fn may_create(
     )?;
 
     // Verify that the new node's label is permitted to be created in the target filesystem.
-    let filesystem_sid = match &*fs.security_state.state.0.lock() {
-        FileSystemLabelState::Labeled { label } => Ok(label.sid),
-        FileSystemLabelState::Unlabeled { .. } => {
-            track_stub!(
-                TODO("https://fxbug.dev/367585803"),
-                "may_create() should not be called until policy load has completed"
-            );
-            error!(EPERM)
-        }
-    }?;
+    let Some(fs_label) = fs.security_state.state.label() else {
+        track_stub!(
+            TODO("https://fxbug.dev/367585803"),
+            "may_create() should not be called until policy load has completed"
+        );
+        return error!(EPERM);
+    };
+
     check_permission(
         &permission_check,
         current_task.kernel(),
         new_file_sid,
-        filesystem_sid,
+        fs_label.sid,
         FileSystemPermission::Associate,
         audit_context.into(),
     )?;
@@ -1104,7 +1093,7 @@ where
     // to `get_xattr()`.
     if name != FsStr::new(XATTR_NAME_SELINUX.to_bytes()) || Anon::is_private(fs_node) {
         return fs_node.ops().get_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             name,
@@ -1118,7 +1107,7 @@ where
     let sid = fs_node_effective_sid_and_class(&fs_node).sid;
     if sid == InitialSid::Unlabeled.into() {
         let result = fs_node.ops().get_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             name,
@@ -1153,7 +1142,7 @@ where
 {
     if name != FsStr::new(XATTR_NAME_SELINUX.to_bytes()) || Anon::is_private(fs_node) {
         return fs_node.ops().set_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             name,
@@ -1165,21 +1154,18 @@ where
     // If the "security.selinux" attribute is being modified then the result depends on the
     // `FileSystem`'s labeling scheme.
     let fs = fs_node.fs();
-    let fs_label = match &mut *fs.security_state.state.0.lock() {
-        FileSystemLabelState::Unlabeled { .. } => {
-            // If the `FileSystem` has not yet been labeled then store the xattr but leave the
-            // label on the in-memory `fs_node` to be set up when the `FileSystem`'s labeling state
-            // has been initialized, during load of the initial policy.
-            return fs_node.ops().set_xattr(
-                &mut locked.cast_locked::<FileOpsCore>(),
-                fs_node,
-                current_task,
-                name,
-                value,
-                op,
-            );
-        }
-        FileSystemLabelState::Labeled { label } => label.clone(),
+    let Some(fs_label) = fs.security_state.state.label() else {
+        // If the `FileSystem` has not yet been labeled then store the xattr but leave the
+        // label on the in-memory `fs_node` to be set up when the `FileSystem`'s labeling state
+        // has been initialized, during load of the initial policy.
+        return fs_node.ops().set_xattr(
+            locked.cast_locked::<FileOpsCore>(),
+            fs_node,
+            current_task,
+            name,
+            value,
+            op,
+        );
     };
 
     // If the "mountpoint"-labeling is used by this filesystem then setting labels is not supported.
@@ -1229,7 +1215,7 @@ where
 
     // Apply the change to the file node.
     let result = fs_node.ops().set_xattr(
-        &mut locked.cast_locked::<FileOpsCore>(),
+        locked.cast_locked::<FileOpsCore>(),
         fs_node,
         current_task,
         name,
@@ -1286,7 +1272,7 @@ mod tests {
 
                 // Remove the "security.selinux" label, if any.
                 let _ = node.ops().remove_xattr(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     node,
                     &current_task,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1294,7 +1280,7 @@ mod tests {
                 assert_eq!(
                     node.ops()
                         .get_xattr(
-                            &mut locked.cast_locked::<FileOpsCore>(),
+                            locked.cast_locked::<FileOpsCore>(),
                             node,
                             &current_task,
                             XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1308,7 +1294,7 @@ mod tests {
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
                 fs_node_init_with_dentry(
-                    Some(&mut locked.cast_locked()),
+                    Some(locked.cast_locked()),
                     &security_server,
                     &current_task,
                     dir_entry,
@@ -1347,7 +1333,7 @@ mod tests {
                 // Set the security label to a value which is not a valid Security Context.
                 node.ops()
                     .set_xattr(
-                        &mut locked.cast_locked::<FileOpsCore>(),
+                        locked.cast_locked::<FileOpsCore>(),
                         node,
                         &current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1360,7 +1346,7 @@ mod tests {
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
                 fs_node_init_with_dentry(
-                    Some(&mut locked.cast_locked()),
+                    Some(locked.cast_locked()),
                     &security_server,
                     &current_task,
                     dir_entry,
@@ -1402,7 +1388,7 @@ mod tests {
                 // the corresponding SID cached.
                 node.ops()
                     .set_xattr(
-                        &mut locked.cast_locked::<FileOpsCore>(),
+                        locked.cast_locked::<FileOpsCore>(),
                         node,
                         &current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1413,7 +1399,7 @@ mod tests {
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
                 fs_node_init_with_dentry(
-                    Some(&mut locked.cast_locked()),
+                    Some(locked.cast_locked()),
                     &security_server,
                     &current_task,
                     dir_entry,
@@ -1455,7 +1441,7 @@ mod tests {
                 let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 node.set_xattr(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     current_task,
                     &current_task.fs().root().mount,
                     XATTR_NAME_SELINUX.to_bytes().into(),

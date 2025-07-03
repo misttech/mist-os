@@ -112,7 +112,7 @@ TEST_F(ProcessMemoryReleaseTest, NoPendingSIGKILL) {
 }
 
 TEST_F(ProcessMemoryReleaseTest, SuccessfulRelease) {
-  // Create a pipe for synchronization between parent and child
+  // Create a pipe to share memory pointer
   int pipe_fds[2];
   ASSERT_THAT(pipe(pipe_fds), SyscallSucceeds());
   int read_fd = pipe_fds[0];
@@ -141,18 +141,12 @@ TEST_F(ProcessMemoryReleaseTest, SuccessfulRelease) {
     for (size_t i = 0; i < kMemSizeBytes; i += page_size) {
       p[i] = static_cast<char>(i % 256);
     }
-
-    // Signal parent that memory allocation and initialization are done.
-    char signal_byte = 'R';  // 'R' for Ready.
-    ASSERT_THAT(write(write_fd, &signal_byte, 1), SyscallSucceedsWithValue(1));
-
+    ASSERT_THAT(dprintf(write_fd, "%p", (void*)p), SyscallSucceeds());
     close(write_fd);
 
-    // Wait to be killed by the parent.
-    pause();
+    // Wait the parent catches the WSTOPSIG and sends back SIGCONT
+    raise(SIGSTOP);
 
-    // Clean up mmapped memory (though SIGKILL will typically prevent this).
-    mem->Unmap();
     _exit(EXIT_SUCCESS);  // Should ideally not be reached if killed.
   }
 
@@ -163,22 +157,41 @@ TEST_F(ProcessMemoryReleaseTest, SuccessfulRelease) {
   ASSERT_THAT(ptrace(PTRACE_SEIZE, child_pid, 0, PTRACE_O_TRACEEXIT), SyscallSucceeds())
       << "ptrace PTRACE_SEIZE failed: " << strerror(errno);
 
-  // Wait for the child's signal indicating it's ready.
-  char received_byte;
-  ASSERT_THAT(read(read_fd, &received_byte, 1), SyscallSucceedsWithValue(1));
-  ASSERT_EQ('R', received_byte) << "parent: received incorrect signal byte from child";
-  close(read_fd);
-
   // Open a pidfd for the child process.
   int child_pidfd = DoPidFdOpen(child_pid);
   ASSERT_THAT(child_pidfd, SyscallSucceeds());
-  ASSERT_THAT(kill(child_pid, SIGKILL), SyscallSucceeds());
+
+  int status;
+  // Sync with child when the child has completed the memory allocation
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
+      << " WSTOPSIG = " << WSTOPSIG(status);
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+
+  // Read the memory pointer
+  char pipe_buffer[64];
+  void* restored_ptr = nullptr;
+  ssize_t bytes_read = read(read_fd, pipe_buffer, sizeof(pipe_buffer));
+  close(read_fd);
+  ASSERT_GT(bytes_read, 0);
+  std::stringstream ss_read;
+  ss_read << std::hex;      // Set stream to interpret input as hexadecimal
+  ss_read << pipe_buffer;   // Put the string buffer into the stringstream
+  ss_read >> restored_ptr;  // Read the pointer directly
+  std::cout << "parent ptr: " << restored_ptr << "\n";
+
+  // Use process_vm_readv to check the memory
+  std::vector<char> buffer(kMemSizeBytes);
+  struct iovec local_iov = {.iov_base = buffer.data(), .iov_len = kMemSizeBytes};
+  struct iovec remote_iov = {.iov_base = restored_ptr, .iov_len = kMemSizeBytes};
+  ASSERT_THAT(process_vm_readv(child_pid, &local_iov, 1, &remote_iov, 1, 0),
+              SyscallSucceedsWithValue(kMemSizeBytes));
 
   // Wait for the PTRACE_EVENT_EXIT
-  int status;
   ASSERT_THAT(waitpid(child_pid, &status, 0), SyscallSucceedsWithValue(child_pid))
       << "waitpid for PTRACE_EVENT_EXIT failed: " << strerror(errno);
-  ASSERT_TRUE(WIFSTOPPED(status)) << "Child not stopped for PTRACE_EVENT_EXIT";
+  ASSERT_FALSE(WIFEXITED(status)) << "Child not stopped for PTRACE_EVENT_EXIT";
   ASSERT_EQ(status >> 8, (SIGTRAP | (PTRACE_EVENT_EXIT << 8)))
       << "Child not stopped with PTRACE_EVENT_EXIT";
 
@@ -189,14 +202,12 @@ TEST_F(ProcessMemoryReleaseTest, SuccessfulRelease) {
   EXPECT_GT(msize, GetProcessRSSMemorySize(child_pid) + 1024);
   EXPECT_EQ(maps_str, GetMapsString(child_pid));
 
+  for (size_t i = 0; i < kMemSizeBytes; ++i) {
+    EXPECT_EQ(buffer[i], 0) << "Memory at offset " << i << " is not zero";
+  }
+
   // Wait for the child process to terminate and check its status.
   ASSERT_THAT(ptrace(PTRACE_CONT, child_pid, 0, 0), SyscallSucceeds());
   ASSERT_THAT(waitpid(child_pid, &status, 0), SyscallSucceeds());
-
-  // Verify the child was terminated by SIGKILL.
-  ASSERT_TRUE(WIFSIGNALED(status))
-      << "parent: child process did not terminate due to a signal. Status: " << status;
-  ASSERT_EQ(SIGKILL, WTERMSIG(status))
-      << "parent: child process not terminated by SIGKILL. Terminating signal: "
-      << WTERMSIG(status);
+  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
 }

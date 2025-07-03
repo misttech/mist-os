@@ -263,8 +263,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   //
   // The following operations may be invoked on a Vnode, even if it has not been "Open()"-ed.
 
-  // Attempt to find child of vn, child returned on success. Name is len bytes long, and does not
-  // include a null terminator.
+  // Attempt to find child of vn, child returned on success.
   virtual zx_status_t Lookup(std::string_view name, fbl::RefPtr<Vnode>* out);
 
   // Get attributes of the vnode.

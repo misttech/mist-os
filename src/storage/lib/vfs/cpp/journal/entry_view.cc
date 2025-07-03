@@ -2,26 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "entry_view.h"
+#include "src/storage/lib/vfs/cpp/journal/entry_view.h"
 
 #include <lib/cksum.h>
-#include <zircon/types.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <span>
 #include <vector>
 
+#include <storage/buffer/block_buffer_view.h>
 #include <storage/operation/operation.h>
+
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
 
 JournalEntryView::JournalEntryView(storage::BlockBufferView view)
-    : view_(std::move(view)),
+    : view_(view),
       header_(std::span<uint8_t>(reinterpret_cast<uint8_t*>(view_.Data(0)), view_.BlockSize())) {}
 
 JournalEntryView::JournalEntryView(storage::BlockBufferView view,
                                    const std::vector<storage::BufferedOperation>& operations,
                                    uint64_t sequence_number)
-    : view_(std::move(view)),
+    : view_(view),
       header_(std::span<uint8_t>(reinterpret_cast<uint8_t*>(view_.Data(0)), view_.BlockSize()),
               view_.length() - kEntryMetadataBlocks, sequence_number) {
   Encode(operations, sequence_number);

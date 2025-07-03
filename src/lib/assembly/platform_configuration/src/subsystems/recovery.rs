@@ -3,12 +3,20 @@
 // found in the LICENSE file.
 
 use std::fs::File;
+use std::io::Write as _;
 
 use crate::subsystems::prelude::*;
+use crate::util;
 use anyhow::Context;
 use assembly_config_capabilities::{Config, ConfigValueType};
+use assembly_config_schema::assembly_config::{
+    CompiledComponentDefinition, CompiledPackageDefinition,
+};
 use assembly_config_schema::platform_config::recovery_config::{RecoveryConfig, SystemRecovery};
-use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
+use assembly_constants::{
+    BootfsCompiledPackageDestination, CompiledPackageDestination, FileEntry, PackageDestination,
+    PackageSetDestination,
+};
 use assembly_images_config::VolumeConfig;
 
 pub(crate) struct RecoverySubsystem;
@@ -19,6 +27,8 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         let (config, volume_config) = *configs;
+
+        let gendir = context.get_gendir().context("getting gen dir for recovery subsystem")?;
 
         if let Some(mapping) = &config.factory_reset_trigger_config {
             // If configuration is provided for the factory-reset-trigger component, include it
@@ -33,10 +43,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                 }
             });
 
-            let config_file_path = context
-                .get_gendir()
-                .context("getting gen dir for factory-reset-trigger config file")?
-                .join("forced-fdr-channel-indices.config");
+            let config_file_path = gendir.join("forced-fdr-channel-indices.config");
             let config_file = File::create(&config_file_path).with_context(|| {
                 format!("Creating factory-reset-trigger config file: {config_file_path}")
             })?;
@@ -78,6 +85,8 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
 
         if let Some(system_recovery) = &config.system_recovery {
             context.ensure_feature_set_level(&[FeatureSetLevel::Utility], "System Recovery")?;
+
+            let mut configure_system_recovery = true;
             match system_recovery {
                 SystemRecovery::Fdr => builder.platform_bundle("recovery_fdr"),
                 SystemRecovery::Android => {
@@ -85,37 +94,76 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                     builder.platform_bundle("fastbootd_usb_support");
                     builder.platform_bundle("adb_support");
                 }
+                SystemRecovery::Bootfs(bootfs_recovery_config) => {
+                    let cml_template =
+                        context.get_resource("bootfs_recovery.bootstrap_shard.cml.template");
+                    let cml_template = std::fs::read_to_string(cml_template.clone())
+                        .with_context(|| format!("Reading template: {cml_template}"))?;
+
+                    let cml = util::render_bootfs_cml_template(
+                        &bootfs_recovery_config.product_component_url,
+                        &cml_template,
+                    )?;
+
+                    let cml_name = "bootfs_recovery.cml";
+                    let cml_path = gendir.join(cml_name);
+                    let mut cml_file = std::fs::File::create(&cml_path)?;
+                    cml_file.write_all(cml.as_bytes())?;
+                    let components = vec![CompiledComponentDefinition {
+                        component_name: "bootstrap".into(),
+                        shards: vec![cml_path.into()],
+                    }];
+                    let destination = CompiledPackageDestination::Boot(
+                        BootfsCompiledPackageDestination::Bootstrap,
+                    );
+                    let def = CompiledPackageDefinition {
+                        name: destination.clone(),
+                        components,
+                        contents: vec![],
+                        includes: vec![],
+                        bootfs_package: true,
+                    };
+                    builder
+                        .compiled_package(destination.clone(), def)
+                        .with_context(|| format!("Inserting compiled package: {destination}"))?;
+
+                    // A default package for bootfs recovery is not
+                    // provided and should be provided by the product.
+                    configure_system_recovery = false;
+                }
             }
 
-            // Create the recovery domain configuration package
-            let directory = builder
-                .add_domain_config(PackageSetDestination::Blob(
-                    PackageDestination::SystemRecoveryConfig,
-                ))
-                .directory("system-recovery-config");
+            if configure_system_recovery {
+                // Create the recovery domain configuration package
+                let directory = builder
+                    .add_domain_config(PackageSetDestination::Blob(
+                        PackageDestination::SystemRecoveryConfig,
+                    ))
+                    .directory("system-recovery-config");
 
-            let logo_source = if let Some(logo) = &config.logo {
-                logo.clone()
-            } else {
-                context.get_resource("fuchsia-logo.riv")
-            };
-            directory
-                .entry(FileEntry { source: logo_source, destination: "logo.riv".to_owned() })
-                .context("Adding logo to system-recovery-config")?;
-
-            if let Some(instructions_source) = &config.instructions {
+                let logo_source = if let Some(logo) = &config.logo {
+                    logo.clone()
+                } else {
+                    context.get_resource("fuchsia-logo.riv")
+                };
                 directory
-                    .entry(FileEntry {
-                        source: instructions_source.clone(),
-                        destination: "instructions.txt".to_owned(),
-                    })
-                    .context("Adding instructions.txt to system-recovery-config")?;
-            }
+                    .entry(FileEntry { source: logo_source, destination: "logo.riv".to_owned() })
+                    .context("Adding logo to system-recovery-config")?;
 
-            if config.check_for_managed_mode {
-                directory
-                    .entry_from_contents("check_fdr_restriction.json", "{}")
-                    .context("Adding check_fdr_restriction.json to system-recovery_config")?;
+                if let Some(instructions_source) = &config.instructions {
+                    directory
+                        .entry(FileEntry {
+                            source: instructions_source.clone(),
+                            destination: "instructions.txt".to_owned(),
+                        })
+                        .context("Adding instructions.txt to system-recovery-config")?;
+                }
+
+                if config.check_for_managed_mode {
+                    directory
+                        .entry_from_contents("check_fdr_restriction.json", "{}")
+                        .context("Adding check_fdr_restriction.json to system-recovery_config")?;
+                }
             }
         }
 

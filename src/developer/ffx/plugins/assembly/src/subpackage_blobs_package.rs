@@ -60,6 +60,7 @@ mod tests {
     use super::*;
 
     use assembled_system::{BlobfsContents, Image};
+    use assembly_release_info::SystemReleaseInfo;
     use camino::Utf8PathBuf;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageBuilder;
@@ -136,7 +137,7 @@ mod tests {
             }],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
 
         // Construct the subpackage blobs package.

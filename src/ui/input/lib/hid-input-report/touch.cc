@@ -335,10 +335,10 @@ ParseResult Touch::CreateDescriptor(fidl::AnyArena& allocator,
 
   // Set the buttons array.
   {
-    fidl::VectorView<uint8_t> buttons(allocator, num_buttons_);
+    fidl::VectorView<fuchsia_input_report::wire::TouchButton> buttons(allocator, num_buttons_);
     size_t index = 0;
     for (auto& button : buttons_) {
-      buttons[index++] = button.usage.usage;
+      buttons[index++] = fuchsia_input_report::wire::TouchButton(button.usage.usage);
     }
     input.set_buttons(allocator, std::move(buttons));
   }
@@ -443,9 +443,9 @@ ParseResult Touch::ParseInputReportInternal(const uint8_t* data, size_t len,
     }
   }
 
-  fidl::VectorView<uint8_t> fidl_buttons(allocator, buttons_size);
+  fidl::VectorView<fuchsia_input_report::wire::TouchButton> fidl_buttons(allocator, buttons_size);
   for (size_t i = 0; i < buttons_size; i++) {
-    fidl_buttons[i] = buttons[i];
+    fidl_buttons[i] = fuchsia_input_report::wire::TouchButton(buttons[i]);
   }
   touch.set_pressed_buttons(allocator, std::move(fidl_buttons));
 

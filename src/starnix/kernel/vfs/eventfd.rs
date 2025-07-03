@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_sync::Mutex;
-
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
 };
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -38,14 +36,19 @@ pub struct EventFdFileObject {
     eventfd_type: EventFdType,
 }
 
-pub fn new_eventfd(
+pub fn new_eventfd<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     value: u32,
     eventfd_type: EventFdType,
     blocking: bool,
-) -> FileHandle {
+) -> FileHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let open_flags = if blocking { OpenFlags::RDWR } else { OpenFlags::RDWR | OpenFlags::NONBLOCK };
     Anon::new_private_file(
+        locked,
         current_task,
         Box::new(EventFdFileObject {
             inner: Mutex::new(EventFdInner {

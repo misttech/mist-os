@@ -4,7 +4,19 @@
 
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+
 #include <gtest/gtest.h>
+#include <storage/buffer/block_buffer.h>
+
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
 namespace {

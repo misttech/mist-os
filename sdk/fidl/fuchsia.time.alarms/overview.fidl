@@ -1,0 +1,19 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+/// APIs for handling wake alarms.
+///
+/// Wake alarms are alarms that can also wake the system in case it is in a low
+/// power state. They are used to ensure that a task is performed regardless if
+/// a suspend intervenes.
+///
+/// Scheduled alarms do not persist across reboots.
+///
+/// # Summary
+///
+/// * [WakeAlarms]: Provides scheduling platform-wide wake alarms.  These alarms
+///   can wake a suspended system if needed.  The ability to wake the system
+///   must be supported by the platform to obtain the wake behavior.
+@available(added=NEXT)
+library fuchsia.time.alarms;

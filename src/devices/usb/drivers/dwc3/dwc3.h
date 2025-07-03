@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.phy/cpp/fidl.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -32,6 +33,8 @@
 #include <usb/descriptors.h>
 #include <usb/sdk/request-fidl.h>
 
+#include "src/devices/usb/drivers/dwc3/dwc3-event-fifo.h"
+#include "src/devices/usb/drivers/dwc3/dwc3-trb-fifo.h"
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 
 namespace dwc3 {
@@ -45,12 +48,6 @@ class PlatformExtension {
   virtual zx::result<> Suspend() = 0;
   virtual zx::result<> Resume() = 0;
 };
-
-// A dma_buffer::ContiguousBuffer is cached, but leaves cache management to the user. These methods
-// wrap zx_cache_flush with sensible boundary checking and validation.
-zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length);
-zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
-                                 size_t length);
 
 class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
@@ -90,16 +87,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
                              fidl::UnknownMethodCompleter::Sync& completer) override { /* no-op */ }
 
  private:
-  zx::result<> CommonCancelAll(uint8_t ep_addr);
-  void DciIntfSetSpeed(fuchsia_hardware_usb_descriptor::wire::UsbSpeed speed)
-      __TA_REQUIRES(dci_lock_);
-  void DciIntfSetConnected(bool connected) __TA_REQUIRES(dci_lock_);
-  zx::result<size_t> DciIntfControl(const fuchsia_hardware_usb_descriptor::wire::UsbSetup* setup,
-                                    const uint8_t* write_buffer, size_t write_size,
-                                    uint8_t* read_buffer, size_t read_size)
-      __TA_REQUIRES(dci_lock_);
-
-  static inline const uint32_t kEventBufferSize = zx_system_get_page_size();
+  const std::string_view kScheduleProfileRole = "fuchsia.devices.usb.drivers.dwc3.interrupt";
   static inline const uint32_t kEp0BufferSize = UINT16_MAX + 1;
 
   // physical endpoint numbers.  We use 0 and 1 for EP0, and let the device-mode
@@ -113,146 +101,25 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   static inline constexpr zx::duration kEndpointDeadline{zx::sec(10)};
 
   struct UserEndpoint;
-  struct RequestInfo {
-    size_t actual;
-    zx_status_t status;
-    UserEndpoint* uep;
-    usb::RequestVariant req;
-  };
-
-  // Like a usb::RequestQueue for usb::FidlRequests.
-  //
-  // TODO(hansens) We should probably implement something like this in usb/request-fidl.h
-  class FidlRequestQueue {
-   public:
-    FidlRequestQueue() = default;
-
-    // Movable, not copyable.
-    FidlRequestQueue(FidlRequestQueue&& other) {
-      std::lock_guard<std::mutex> lock(lock_);
-      q_ = std::move(other.q_);
-      other.q_.clear();
-    }
-
-    FidlRequestQueue& operator=(FidlRequestQueue&& other) {
-      std::lock_guard<std::mutex> other_lock(other.lock_);
-      std::lock_guard<std::mutex> my_lock(lock_);
-      q_ = std::move(other.q_);
-      other.q_.clear();
-      return *this;
-    }
-
-    FidlRequestQueue(const FidlRequestQueue&) = delete;
-    FidlRequestQueue& operator=(const FidlRequestQueue&) = delete;
-
-    void push(RequestInfo&& info) {
-      std::lock_guard<std::mutex> lock(lock_);
-
-      if (info.uep == nullptr) {
-        FDF_LOG(ERROR, "[BUG] Enqueuing usb::FidlRequest with no corresponding uep");
-      }
-      ZX_ASSERT(info.uep != nullptr);  // Halt and catch fire.
-
-      q_.push_front(std::move(info));
-    }
-
-    // Pushes to the (semantic) front of the queue, cutting the line.
-    void push_next(RequestInfo&& info) {
-      std::lock_guard<std::mutex> lock(lock_);
-      q_.push_back(std::move(info));
-    }
-
-    // Pop the next value from the queue, if any.
-    std::optional<RequestInfo> pop() {
-      std::lock_guard<std::mutex> lock(lock_);
-      std::optional<RequestInfo> opt{std::nullopt};
-
-      if (!q_.empty()) {
-        opt.emplace(std::move(q_.back()));
-        q_.pop_back();
-      }
-
-      return opt;
-    }
-
-    bool empty() const {
-      std::lock_guard<std::mutex> lock(lock_);
-      return q_.empty();
-    }
-
-    void CompleteAll(zx_status_t status, size_t size) {
-      std::lock_guard<std::mutex> _(lock_);
-
-      while (!q_.empty()) {
-        RequestInfo info{std::move(q_.back())};
-        q_.pop_back();
-        info.uep->server->RequestComplete(status, size, std::move(info.req));
-      }
-    }
-
-   private:
-    mutable std::mutex lock_;
-    std::deque<RequestInfo> q_ __TA_GUARDED(lock_);  // Queued front-to-back.
-  };
-
-  enum class IrqSignal : uint32_t {
-    Invalid = 0,
-    Exit = 1,
-    Wakeup = 2,
-  };
-
-  struct Fifo {
-    static inline const uint32_t kFifoSize = zx_system_get_page_size();
-
-    zx_status_t Init(zx::bti& bti);
-    void Release();
-    void Reset() {
-      current = nullptr;
-      next = first;
-    }
-
-    zx_paddr_t GetTrbPhys(dwc3_trb_t* trb) const {
-      ZX_DEBUG_ASSERT((trb >= first) && (trb <= last));
-      return buffer->phys() + ((trb - first) * sizeof(*trb));
-    }
-
-    std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
-    dwc3_trb_t* first{nullptr};    // first TRB in the fifo
-    dwc3_trb_t* next{nullptr};     // next free TRB in the fifo
-    dwc3_trb_t* current{nullptr};  // TRB for currently pending transaction
-    dwc3_trb_t* last{nullptr};     // last TRB in the fifo (link TRB)
-  };
-
   class EpServer : public usb::EndpointServer {
    public:
     EpServer(const zx::bti& bti, Dwc3* dwc3, UserEndpoint* uep)
-        : usb::EndpointServer{bti, uep->ep.ep_num}, dwc3_{dwc3}, uep_{uep} {
-      auto result =
-          fdf::SynchronizedDispatcher::Create({}, "ep-dispatcher", [&](fdf_dispatcher_t*) {});
-      if (result.is_error()) {
-        FDF_LOG(ERROR, "Could not initialize dispatcher: %s", result.status_string());
-        return;
-      }
-      dispatcher_ = std::move(result.value());
-    }
+        : usb::EndpointServer{bti, uep->ep.ep_num}, dwc3_{dwc3}, uep_{uep} {}
 
-    ~EpServer() override {
-      dispatcher_.ShutdownAsync();
-      dispatcher_.release();
-    }
+    void CancelAll(zx_status_t reason);
 
+    std::queue<usb::RequestVariant> queued_reqs;     // requests waiting to be processed
+    std::optional<usb::RequestVariant> current_req;  // request currently being processed (if any)
+
+   private:
     // fuchsia_hardware_usb_endpoint::Endpoint protocol implementation.
     void GetInfo(GetInfoCompleter::Sync& completer) override;
     void QueueRequests(QueueRequestsRequest& request,
                        QueueRequestsCompleter::Sync& completer) override;
     void CancelAll(CancelAllCompleter::Sync& completer) override;
 
-    async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
-
-   private:
     Dwc3* dwc3_{nullptr};         // Must outlive this instance.
     UserEndpoint* uep_{nullptr};  // Must outlive this instance.
-    fdf::SynchronizedDispatcher dispatcher_;
   };
 
   struct Endpoint {
@@ -270,15 +137,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     bool IsOutput() const { return IsOutput(ep_num); }
     bool IsInput() const { return IsInput(ep_num); }
 
-    void Reset() {
-      enabled = false;
-      got_not_ready = false;
-      stalled = false;
-    }
-
-    FidlRequestQueue queued_reqs;            // requests waiting to be processed
-    std::optional<RequestInfo> current_req;  // request currently being processed (if any)
-    uint32_t rsrc_id{0};                     // resource ID for current_req
+    uint32_t rsrc_id{0};  // resource ID for current_req
 
     const uint8_t ep_num{0};
     uint8_t type{0};  // control, bulk, interrupt or isochronous
@@ -289,10 +148,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
     bool got_not_ready{false};
     bool stalled{false};
-
-    // Used for synchronizing endpoint state and ep specific hardware registers
-    // This should be acquired before Dwc3::lock_ if acquiring both locks.
-    std::mutex lock;
   };
 
   struct UserEndpoint {
@@ -302,13 +157,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     UserEndpoint(UserEndpoint&&) = delete;
     UserEndpoint& operator=(UserEndpoint&&) = delete;
 
-    void Reset() {
-      std::lock_guard<std::mutex> _(ep.lock);
-      fifo.Reset();
-      ep.Reset();
-    }
-
-    __TA_GUARDED(ep.lock) Fifo fifo;
+    TrbFifo fifo;
     Endpoint ep;
     std::optional<EpServer> server;
   };
@@ -331,7 +180,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       endpoints_ = std::make_unique<UserEndpoint[]>(count_);
       for (size_t i = 0; i < count_; ++i) {
         UserEndpoint& uep = endpoints_[i];
-        std::lock_guard<std::mutex> lock(uep.ep.lock);
         const_cast<uint8_t&>(uep.ep.ep_num) = static_cast<uint8_t>(i) + kUserEndpointStartNum;
         uep.server.emplace(bti, dwc3, &uep);
       }
@@ -363,15 +211,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     Ep0(Ep0&&) = delete;
     Ep0& operator=(Ep0&&) = delete;
 
-    void Reset() {
-      std::lock_guard<std::mutex> _(lock);
-      shared_fifo.Reset();
-      cur_setup = {};
-      cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
-      out.Reset();
-      in.Reset();
-    }
-
     enum class State {
       None,
       Setup,        // Queued setup phase
@@ -382,16 +221,12 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       Status,       // Waiting for status to complete
     };
 
-    std::mutex lock;
-
-    __TA_GUARDED(lock) Fifo shared_fifo;
-    __TA_GUARDED(lock) std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
-    __TA_GUARDED(lock) State state { Ep0::State::None };
-    __TA_GUARDED(lock) Endpoint out;
-    __TA_GUARDED(lock) Endpoint in;
-    __TA_GUARDED(lock) fuchsia_hardware_usb_descriptor::wire::UsbSetup cur_setup;
-
-    __TA_GUARDED(lock)
+    TrbFifo shared_fifo;
+    std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
+    State state = Ep0::State::None;
+    Endpoint out;
+    Endpoint in;
+    fuchsia_hardware_usb_descriptor::wire::UsbSetup cur_setup;
     fuchsia_hardware_usb_descriptor::wire::UsbSpeed cur_speed{
         fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined};
   };
@@ -413,105 +248,70 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   zx_status_t AcquirePDevResources();
   zx_status_t Init();
-  libsync::Completion init_done_;  // Signaled at the end of Init().
   void ReleaseResources();
 
-  // The IRQ thread and its two top level event decoders.
-  int IrqThread();
-  zx::result<> SetIrqThreadSchedulerRole();
+  // IRQ thread's two top level event decoders.
   void HandleEvent(uint32_t event);
   void HandleEpEvent(uint32_t event);
 
-  [[nodiscard]] zx_status_t SignalIrqThread(IrqSignal signal) {
-    if (!irq_bound_to_port_) {
-      return ZX_ERR_BAD_STATE;
-    }
-
-    zx_port_packet_t pkt{
-        .key = 0,
-        .type = ZX_PKT_TYPE_USER,
-        .status = ZX_OK,
-    };
-    pkt.user.u32[0] = static_cast<std::underlying_type_t<decltype(signal)>>(signal);
-
-    return irq_port_.queue(&pkt);
-  }
-
-  IrqSignal GetIrqSignal(const zx_port_packet_t& pkt) {
-    if (pkt.type != ZX_PKT_TYPE_USER) {
-      return IrqSignal::Invalid;
-    }
-    return static_cast<IrqSignal>(pkt.user.u32[0]);
-  }
-
   // Handlers for global events posted to the event buffer by the controller HW.
-  void HandleResetEvent() __TA_EXCLUDES(lock_);
-  void HandleConnectionDoneEvent() __TA_EXCLUDES(lock_);
-  void HandleDisconnectedEvent() __TA_EXCLUDES(lock_);
+  void HandleResetEvent();
+  void HandleConnectionDoneEvent();
+  void HandleDisconnectedEvent();
 
   // Handlers for end-point specific events posted to the event buffer by the controller HW.
-  void HandleEpTransferCompleteEvent(uint8_t ep_num) __TA_EXCLUDES(lock_);
-  void HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage) __TA_EXCLUDES(lock_);
-  void HandleEpTransferStartedEvent(uint8_t ep_num, uint32_t rsrc_id) __TA_EXCLUDES(lock_);
+  void HandleEpTransferCompleteEvent(uint8_t ep_num);
+  void HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage);
+  void HandleEpTransferStartedEvent(uint8_t ep_num, uint32_t rsrc_id);
 
-  [[nodiscard]] zx_status_t CheckHwVersion() __TA_REQUIRES(lock_);
-  [[nodiscard]] zx_status_t ResetHw() __TA_REQUIRES(lock_);
-  void StartEvents() __TA_REQUIRES(lock_);
-  void SetDeviceAddress(uint32_t address) __TA_REQUIRES(lock_);
+  [[nodiscard]] zx_status_t CheckHwVersion();
+  [[nodiscard]] zx_status_t ResetHw();
+  void StartEvents();
+  void SetDeviceAddress(uint32_t address);
 
   // EP0 stuff
-  zx_status_t Ep0Init() __TA_EXCLUDES(lock_);
-  void Ep0Reset() __TA_EXCLUDES(lock_);
-  void Ep0Start() __TA_EXCLUDES(lock_);
-  void Ep0QueueSetupLocked() __TA_REQUIRES(ep0_.lock) __TA_EXCLUDES(lock_);
-  void Ep0StartEndpoints() __TA_REQUIRES(ep0_.lock) __TA_EXCLUDES(lock_);
-  zx::result<size_t> HandleEp0Setup(const fuchsia_hardware_usb_descriptor::wire::UsbSetup& setup,
-                                    void* buffer, size_t length) __TA_REQUIRES(ep0_.lock)
-      __TA_EXCLUDES(lock_);
-  void HandleEp0TransferCompleteEvent(uint8_t ep_num) __TA_EXCLUDES(lock_, ep0_.lock);
-  void HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage)
-      __TA_EXCLUDES(lock_, ep0_.lock);
+  zx_status_t Ep0Init();
+  void Ep0Reset();
+  void Ep0Start();
+  void Ep0QueueSetup();
+  void Ep0StartEndpoints();
+  void HandleEp0Setup(size_t length);
+  void HandleEp0TransferCompleteEvent(uint8_t ep_num);
+  void HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage);
 
   // General EP stuff
-  void EpEnable(const Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
-  void EpSetConfig(Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
-  zx_status_t EpSetStall(Endpoint& ep, bool stall) __TA_EXCLUDES(lock_);
-  void EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
-      __TA_EXCLUDES(lock_);
-  void EpEndTransfers(Endpoint& ep, zx_status_t reason) __TA_EXCLUDES(lock_);
-  void EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t* dst)
-      __TA_EXCLUDES(lock_);
+  void EpEnable(Endpoint& ep, bool enable);
+  void EpSetConfig(Endpoint& ep, bool enable);
+  zx_status_t EpSetStall(Endpoint& ep, bool stall);
+  void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer,
+                       size_t length);
+  void EpReset(Endpoint& ep);
 
   // Methods specific to user endpoints
-  void UserEpQueueNext(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock) __TA_EXCLUDES(lock_);
-  zx_status_t CancelAll(Endpoint& ep) __TA_EXCLUDES(lock_, ep.lock);
+  void UserEpReset(UserEndpoint& uep);
+  void UserEpQueueNext(UserEndpoint& uep);
 
-  // Cancel all currently in flight requests, and return a list of requests
-  // which were in-flight.  Note that these requests have not been completed
-  // yet.  It is the responsibility of the caller to (eventually) take care of
-  // this once the lock has been dropped.
-  [[nodiscard]] FidlRequestQueue CancelAllLocked(Endpoint& ep) __TA_REQUIRES(ep.lock)
-      __TA_EXCLUDES(lock_);
+  void ResetEndpoints();
 
   // Commands
-  void CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) __TA_EXCLUDES(lock_);
-  void CmdEpSetConfig(const Endpoint& ep, bool modify) __TA_EXCLUDES(lock_);
-  void CmdEpTransferConfig(const Endpoint& ep) __TA_EXCLUDES(lock_);
-  void CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) __TA_EXCLUDES(lock_);
-  void CmdEpEndTransfer(const Endpoint& ep) __TA_EXCLUDES(lock_);
-  void CmdEpSetStall(const Endpoint& ep) __TA_EXCLUDES(lock_);
-  void CmdEpClearStall(const Endpoint& ep) __TA_EXCLUDES(lock_);
+  void CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id);
+  void CmdEpSetConfig(const Endpoint& ep, bool modify);
+  void CmdEpTransferConfig(const Endpoint& ep);
+  void CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys);
+  void CmdEpEndTransfer(const Endpoint& ep);
+  void CmdEpSetStall(const Endpoint& ep);
+  void CmdEpClearStall(const Endpoint& ep);
 
   // Start to operate in peripheral mode.
-  void StartPeripheralMode() __TA_EXCLUDES(lock_);
-  void ResetConfiguration() __TA_EXCLUDES(lock_);
+  void StartPeripheralMode();
+  void ResetConfiguration();
 
-  std::mutex lock_;
-  std::mutex dci_lock_;
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
 
   fdf::PDev pdev_;
 
-  fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface> dci_intf_ __TA_GUARDED(dci_lock_);
+  fidl::WireClient<fuchsia_hardware_usb_dci::UsbDciInterface> dci_intf_;
 
   std::optional<ddk::MmioBuffer> mmio_;
 
@@ -519,22 +319,12 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   bool has_pinned_memory_{false};
 
   zx::interrupt irq_;
-  zx::port irq_port_;
-  bool irq_bound_to_port_{false};
 
-  thrd_t irq_thread_;
-  std::atomic<bool> irq_thread_started_{false};
-
-  std::unique_ptr<dma_buffer::ContiguousBuffer> event_buffer_;
+  EventFifo event_fifo_;
+  async::IrqMethod<Dwc3, &Dwc3::HandleIrq> irq_handler_{this};
 
   Ep0 ep0_;
   UserEndpointCollection user_endpoints_;
-
-  FidlRequestQueue pending_completions_;
-
-  // TODO(johngro): What lock protects this?  Right now, it is effectively
-  // endpoints_[0].lock(), but how do we express this?
-  bool configured_ = false;
 
   std::unique_ptr<PlatformExtension> platform_extension_;
 

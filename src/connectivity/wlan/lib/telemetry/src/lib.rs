@@ -45,6 +45,8 @@ pub enum TelemetryEvent {
     ClientIfaceDestroyed {
         iface_id: u16,
     },
+    IfaceCreationFailure,
+    IfaceDestructionFailure,
     ScanStart,
     ScanResult {
         result: ScanResult,
@@ -151,6 +153,7 @@ pub fn serve_telemetry(
         persistence_req_sender,
         &time_matrix_client,
     );
+    let iface_logger = processors::iface::IfaceLogger::new(cobalt_proxy.clone());
     let power_logger = processors::power::PowerLogger::new(cobalt_proxy.clone(), &inspect_node);
     let recovery_logger = processors::recovery::RecoveryLogger::new(cobalt_proxy.clone());
     let mut scan_logger = processors::scan::ScanLogger::new(cobalt_proxy.clone());
@@ -199,6 +202,12 @@ pub fn serve_telemetry(
                         ClientIfaceDestroyed { iface_id } => {
                             client_iface_counters_logger.handle_iface_destroyed(iface_id).await;
                             power_logger.handle_iface_destroyed(iface_id).await;
+                        }
+                        IfaceCreationFailure => {
+                            iface_logger.handle_iface_creation_failure().await;
+                        }
+                        IfaceDestructionFailure => {
+                            iface_logger.handle_iface_destruction_failure().await;
                         }
                         ScanStart => {
                             scan_logger.handle_scan_start().await;

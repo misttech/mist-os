@@ -14,13 +14,14 @@ namespace unwinder {
 
 struct Frame {
   enum class Trust {
-    kScan,      // From scanning the stack with heuristics, least reliable.
-    kSCS,       // From the shadow call stack.
-    kFP,        // From the frame pointer.
-    kPLT,       // From PLT unwinder.
-    kArmEhAbi,  // From the ARM Exception Handling ABI .ARM.exidx/.ARM.extab sections.
-    kCFI,       // From call frame info / .eh_frame section.
-    kContext,   // From the input / context, most reliable.
+    kScan,       // From scanning the stack with heuristics, least reliable.
+    kSCS,        // From the shadow call stack.
+    kSigReturn,  // From a sigreturn trampoline.
+    kFP,         // From the frame pointer.
+    kPLT,        // From PLT unwinder.
+    kArmEhAbi,   // From the ARM Exception Handling ABI .ARM.exidx/.ARM.extab sections.
+    kCFI,        // From call frame info / .eh_frame section.
+    kContext,    // From the input / context, most reliable.
   };
 
   // Register status at each return site. Unknown registers may be included.

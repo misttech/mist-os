@@ -163,18 +163,19 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
 
   FX_DCHECK(0 <= start && start < end && end <= transforms.size());
 
-  const auto x = world_point[0];
-  const auto y = world_point[1];
+  const float x = world_point[0];
+  const float y = world_point[1];
 
   std::vector<zx_koid_t> hits = {};
   hits.reserve(end - start);
 
   for (size_t i = start; i < end; ++i) {
     const auto& transform = transforms[i];
-    FX_DCHECK(root_transforms.find(transform) != root_transforms.end());
+    FX_DCHECK(root_transforms.contains(transform));
     const auto& root_transform = root_transforms.at(transform);
 
-    const auto clip_region = utils::ConvertRectToRectF(global_clip_regions[i]);
+    // TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it here.
+    const auto clip_region = global_clip_regions[i].ToFidlRectF();
 
     // Skip anonymous views.
     if (const auto local_root = view_refs.find(root_transform);
@@ -280,8 +281,8 @@ view_tree::BoundingBox ComputeBoundingBox(
     const TransformHandle parent_transform_handle = it->second;
     if (const auto clip_region_it = clip_regions.find(parent_transform_handle);
         clip_region_it != clip_regions.end()) {
-      const auto [_x, _y, width, height] = clip_region_it->second;
-      max_bounds = {static_cast<float>(width), static_cast<float>(height)};
+      const auto& extent = clip_region_it->second.extent();
+      max_bounds = {static_cast<float>(extent.width()), static_cast<float>(extent.height())};
     }
   }
 
@@ -367,7 +368,7 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
     TransformHandle::InstanceId link_instance_id, TransformHandle root) {
   TRACE_DURATION("gfx", "flatland::ComputeGlobalTopologyData");
   // There should never be an UberStruct for the |link_instance_id|.
-  FX_DCHECK(uber_structs.find(link_instance_id) == uber_structs.end());
+  FX_DCHECK(!uber_structs.contains(link_instance_id));
 
 #ifdef USE_FLATLAND_VERBOSE_LOGGING
   {
@@ -534,9 +535,7 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
     // For each node in the local topology, save the TransformClipRegion of its child instances.
     for (auto& [child_handle, child_clip_region] :
          uber_structs.at(current_entry.handle.GetInstanceId())->local_clip_regions) {
-      TransformClipRegion clip_region;
-      fidl::Clone(child_clip_region, &clip_region);
-      clip_regions.try_emplace(child_handle, std::move(clip_region));
+      clip_regions.try_emplace(child_handle, child_clip_region);
     }
 
     // If this entry was the last child for the previous parent, pop that off the stack.

@@ -7,25 +7,28 @@ use crate::crypt;
 use crate::device::constants::{BLOB_VOLUME_LABEL, DATA_VOLUME_LABEL, UNENCRYPTED_VOLUME_LABEL};
 use anyhow::{Context, Error};
 use async_trait::async_trait;
+use fidl_fuchsia_fs_startup::CheckOptions;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
 use std::collections::HashSet;
 
-pub struct FxfsContainer(ServingMultiVolumeFilesystem);
+pub struct FxfsContainer {
+    fs: ServingMultiVolumeFilesystem,
+}
 
 impl FxfsContainer {
     pub fn new(fs: ServingMultiVolumeFilesystem) -> Self {
-        Self(fs)
+        Self { fs }
     }
 }
 
 #[async_trait]
 impl Container for FxfsContainer {
     fn fs(&mut self) -> &mut ServingMultiVolumeFilesystem {
-        &mut self.0
+        &mut self.fs
     }
 
     fn into_fs(self: Box<Self>) -> ServingMultiVolumeFilesystem {
-        self.0
+        self.fs
     }
 
     fn blobfs_volume_label(&self) -> &'static str {
@@ -33,8 +36,8 @@ impl Container for FxfsContainer {
     }
 
     async fn maybe_check_blob_volume(&mut self) -> Result<(), Error> {
-        self.0
-            .check_volume(BLOB_VOLUME_LABEL, None)
+        self.fs
+            .check_volume(BLOB_VOLUME_LABEL, CheckOptions::default())
             .await
             .context("Failed to verify the blob volume")
     }
@@ -46,12 +49,9 @@ impl Container for FxfsContainer {
             expected.remove(volume.as_str());
         }
         if expected.is_empty() {
-            match crypt::fxfs::unlock_data_volume(&mut self.0, &launcher.config).await {
-                Ok(Some((crypt_service, volume_name, _))) => {
-                    return Ok(Filesystem::ServingVolumeInMultiVolume(
-                        Some(crypt_service),
-                        volume_name,
-                    ))
+            match crypt::fxfs::unlock_data_volume(&mut self.fs, &launcher.config).await {
+                Ok(Some((crypt_service, _, volume))) => {
+                    return Ok(Filesystem::ServingVolumeInMultiVolume(Some(crypt_service), volume))
                 }
                 Ok(None) => {
                     log::warn!(
@@ -75,21 +75,15 @@ impl Container for FxfsContainer {
 
     async fn format_data(&mut self, launcher: &FilesystemLauncher) -> Result<Filesystem, Error> {
         self.remove_all_non_blob_volumes().await?;
-
-        let (crypt_service, volume_name, _) =
-            crypt::fxfs::init_data_volume(&mut self.0, &launcher.config)
+        let (crypt_service, _, volume) =
+            crypt::fxfs::init_data_volume(&mut self.fs, &launcher.config)
                 .await
                 .context("initializing data volume encryption")?;
 
-        Ok(Filesystem::ServingVolumeInMultiVolume(Some(crypt_service), volume_name))
+        Ok(Filesystem::ServingVolumeInMultiVolume(Some(crypt_service), volume))
     }
 
     async fn shred_data(&mut self) -> Result<(), Error> {
-        crypt::fxfs::shred_key_bag(
-            self.0
-                .volume_mut(UNENCRYPTED_VOLUME_LABEL)
-                .context("Failed to find unencrypted volume")?,
-        )
-        .await
+        crypt::fxfs::shred_key_bag(&self.fs).await
     }
 }

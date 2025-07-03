@@ -761,8 +761,11 @@ fn send_mld_v1_packet<BC: MldBindingsContext, CC: MldSendContext<BC>>(
 /// Statistics about MLD.
 ///
 /// The counter type `C` is generic to facilitate testing.
-#[derive(Debug, Default)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Default, Debug)]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct MldCounters<C = Counter> {
     /// Count of MLDv1 queries received.
     rx_mldv1_query: C,
@@ -844,7 +847,8 @@ mod tests {
         FakeWeakDeviceId, TestIpExt,
     };
     use netstack3_base::{
-        CounterContext, CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext,
+        CounterCollection, CounterContext, CtxPair, InstantContext as _, IntoCoreTimerCtx,
+        SendFrameContext,
     };
     use packet::{Buf, BufferMut, ParseBuffer};
     use packet_formats::gmp::GroupRecordType;
@@ -1075,49 +1079,12 @@ mod tests {
             &self,
             core_ctx: &mut CC,
         ) {
+            assert_eq!(self, &core_ctx.counters().cast(), "stack-wide counter mismatch");
             assert_eq!(
                 self,
-                &CounterExpectations::from(core_ctx.counters()),
-                "stack-wide counter mismatch"
-            );
-            assert_eq!(
-                self,
-                &CounterExpectations::from(core_ctx.per_resource_counters(&FakeDeviceId)),
+                &core_ctx.per_resource_counters(&FakeDeviceId).cast(),
                 "device-specific counter mismatch"
             );
-        }
-    }
-
-    impl From<&MldCounters> for CounterExpectations {
-        fn from(mld_counters: &MldCounters) -> CounterExpectations {
-            let MldCounters {
-                rx_mldv1_query,
-                rx_mldv2_query,
-                rx_mldv1_report,
-                rx_mldv2_report,
-                rx_leave_group,
-                rx_err_missing_router_alert,
-                rx_err_bad_src_addr,
-                rx_err_bad_hop_limit,
-                tx_mldv1_report,
-                tx_mldv2_report,
-                tx_leave_group,
-                tx_err,
-            } = mld_counters;
-            CounterExpectations {
-                rx_mldv1_query: rx_mldv1_query.get(),
-                rx_mldv2_query: rx_mldv2_query.get(),
-                rx_mldv1_report: rx_mldv1_report.get(),
-                rx_mldv2_report: rx_mldv2_report.get(),
-                rx_leave_group: rx_leave_group.get(),
-                rx_err_missing_router_alert: rx_err_missing_router_alert.get(),
-                rx_err_bad_src_addr: rx_err_bad_src_addr.get(),
-                rx_err_bad_hop_limit: rx_err_bad_hop_limit.get(),
-                tx_mldv1_report: tx_mldv1_report.get(),
-                tx_mldv2_report: tx_mldv2_report.get(),
-                tx_leave_group: tx_leave_group.get(),
-                tx_err: tx_err.get(),
-            }
         }
     }
 

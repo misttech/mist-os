@@ -36,10 +36,10 @@ allow_tear_off_abi_breakage = [
 
 if (is_host) {
   abi_compat_deps = [
-    "//src/lib/flyweights",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:flyweights",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:serde",

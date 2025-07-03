@@ -21,7 +21,7 @@ std::optional<zbi_dcfg_simple_t> ParseConfig<zbi_dcfg_simple_t>(std::string_view
 
 template <>
 void UnparseConfig(const zbi_dcfg_simple_t& config, FILE* out) {
-  UnparseInts(out, config.mmio_phys, config.irq);
+  UnparseInts(out, config.mmio_phys, config.irq, config.flags);
 }
 
 template <>

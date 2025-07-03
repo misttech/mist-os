@@ -512,7 +512,7 @@ mod tests {
                     create_touch_contact(1u32, Position { x: 0.0, y: 0.0 }),
                     create_touch_contact(2u32, Position { x: 10.0, y: 10.0 }),
                 ],
-                pressed_buttons,
+                HashSet::new(),
                 zx::MonotonicInstant::get(),
                 &touchpad_descriptor,
             ),
@@ -591,7 +591,7 @@ mod tests {
                 },
                 "004_touchpad_event": {
                     event_time: AnyProperty,
-                    pressed_buttons: pressed_buttons_vec,
+                    pressed_buttons: Vec::<u64>::new(),
                     injector_contacts: {
                         "1": {
                             position_x_mm: 0.0f64,

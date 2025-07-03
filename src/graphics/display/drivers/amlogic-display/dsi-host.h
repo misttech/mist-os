@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_HOST_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -33,7 +34,8 @@ class DsiHost {
   // `panel_config` must be non-null and must outlive the `DsiHost` instance.
   //
   // Returns a non-null pointer to the DsiHost instance on success.
-  static zx::result<std::unique_ptr<DsiHost>> Create(fdf::Namespace& incoming, uint32_t panel_type,
+  static zx::result<std::unique_ptr<DsiHost>> Create(fdf::Namespace& incoming,
+                                                     display::PanelType panel_type,
                                                      const PanelConfig* panel_config);
 
   // Production code should prefer using the `Create()` factory method.
@@ -48,8 +50,9 @@ class DsiHost {
   // `lcd` must not be nullptr. It may depend on `designware_dsi_host_controller`.
   // `phy` must not be nullptr. It may depend on `designware_dsi_host_controller`.
   explicit DsiHost(
-      uint32_t panel_type, const PanelConfig* panel_config, fdf::MmioBuffer mipi_dsi_top_mmio,
-      fdf::MmioBuffer hhi_mmio, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
+      display::PanelType panel_type, const PanelConfig* panel_config,
+      fdf::MmioBuffer mipi_dsi_top_mmio, fdf::MmioBuffer hhi_mmio,
+      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
       std::unique_ptr<designware_dsi::DsiHostController> designware_dsi_host_controller,
       std::unique_ptr<Lcd> lcd, std::unique_ptr<MipiPhy> phy, bool enabled);
 
@@ -75,7 +78,7 @@ class DsiHost {
   void Disable();
   void Dump();
 
-  uint32_t panel_type() const { return panel_type_; }
+  display::PanelType panel_type() const { return panel_type_; }
 
  private:
   void PhyEnable();
@@ -103,7 +106,7 @@ class DsiHost {
 
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio_;
 
-  uint32_t panel_type_;
+  display::PanelType panel_type_;
   const PanelConfig& panel_config_;
 
   bool enabled_ = false;

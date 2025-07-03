@@ -5,58 +5,37 @@
 """Rule for creating a ELF sizes summary file for a Fuchsia image."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(":providers.bzl", "FuchsiaProductImageInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_elf_sizes_impl(ctx):
-    images_intermediates = ctx.attr.product[FuchsiaProductImageInfo].images_intermediates
+    images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
     zbi = get_fuchsia_sdk_toolchain(ctx).zbi
 
-    extracted_zbi_bootfs_dir = ctx.actions.declare_directory(ctx.label.name + "_extracted_zbi_bootfs")
-    extracted_zbi_json = ctx.actions.declare_file(ctx.label.name + "_extracted_zbi_bootfs.json")
-    ctx.actions.run_shell(
-        inputs = [zbi] + ctx.files.product,
-        outputs = [
-            extracted_zbi_bootfs_dir,
-            extracted_zbi_json,
-        ],
-        command = " ".join([
-            zbi.path,
-            "--extract",
-            "--output-dir",
-            extracted_zbi_bootfs_dir.path,
-            "--json-output",
-            extracted_zbi_json.path,
-            # NOTE: This currently only supports fuchsia.zbi, for other ZBIs
-            # we'll need a way to figure out their names.
-            images_intermediates.path + "/fuchsia.zbi",
-        ]),
-        progress_message = "Extracting bootfs for %s" % ctx.label.name,
-        **LOCAL_ONLY_ACTION_KWARGS
+    gen_dir_path = "{basedir}/{label_name}_gen".format(
+        basedir = images_out.dirname,
+        label_name = ctx.label.name,
     )
-
     elf_sizes_json = ctx.actions.declare_file(ctx.label.name + "_elf_sizes.json")
 
     ctx.actions.run(
-        inputs = ctx.files.product + [
-            extracted_zbi_bootfs_dir,
-            extracted_zbi_json,
-        ],
+        inputs = ctx.files.product + [zbi],
         outputs = [
             elf_sizes_json,
         ],
         executable = ctx.executable._elf_sizes_py,
         arguments = [
+            "--assembly-dir",
+            images_out.path,
+            "--zbi-tool",
+            zbi.path,
+            "--scratch-dir",
+            gen_dir_path,
             "--sizes",
             elf_sizes_json.path,
-            "--blobs",
-            images_intermediates.path + "/blobs.json",
-            "--zbi",
-            extracted_zbi_json.path,
-            "--bootfs-dir",
-            extracted_zbi_bootfs_dir.path,
         ],
+        mnemonic = "ElfSizes",
         **LOCAL_ONLY_ACTION_KWARGS
     )
 

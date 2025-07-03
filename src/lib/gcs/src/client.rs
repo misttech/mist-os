@@ -14,8 +14,9 @@ use hyper::header::CONTENT_LENGTH;
 use hyper::{Body, Response, StatusCode};
 use std::fs::{create_dir_all, File};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use url::Url;
 
 /// A snapshot of the progress.
 #[derive(Clone, Debug, PartialEq)]
@@ -318,6 +319,16 @@ impl Client {
     /// List objects in `bucket` with matching `prefix`.
     pub async fn list(&self, bucket: &str, prefix: &str) -> Result<Vec<String>> {
         self.token_store.list(&self.https, bucket, prefix, /*limit=*/ None).await
+    }
+
+    /// Upload objects to `bucket` with `prefix`.
+    pub async fn upload(
+        &self,
+        bucket: &str,
+        object_name: &str,
+        file_path: &PathBuf,
+    ) -> Result<Url> {
+        self.token_store.upload(&self.https, bucket, object_name, file_path).await
     }
 }
 

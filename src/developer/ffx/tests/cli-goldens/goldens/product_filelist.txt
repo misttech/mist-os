@@ -1,4 +1,5 @@
 ffx/product.golden
+ffx/product/create-old.golden
 ffx/product/create.golden
 ffx/product/download.golden
 ffx/product/get-artifacts.golden

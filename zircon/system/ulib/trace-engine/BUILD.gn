@@ -31,6 +31,8 @@ template("trace_engine_library") {
     public_deps += trace_engine_header_deps
 
     sources = [
+      "buffer.cc",
+      "buffer.h",
       "context.cc",
       "context_api.cc",
       "context_impl.h",
@@ -38,6 +40,8 @@ template("trace_engine_library") {
       "hash_table.h",
       "include/lib/trace-engine/buffer_internal.h",
       "nonce.cc",
+      "rolling_buffer.cc",
+      "rolling_buffer.h",
     ]
     deps = [
       "//sdk/lib/async:async-cpp",

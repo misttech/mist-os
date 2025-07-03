@@ -19,11 +19,7 @@ driver_bind_rules("registers_bind") {
 
 fuchsia_cc_driver("registers-driver") {
   output_name = "registers"
-  sources = [ "registers.cc" ]
-  deps = [
-    ":common",
-    "//src/devices/lib/driver:driver_runtime",
-  ]
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("registers") {
@@ -40,30 +36,34 @@ fuchsia_driver_package("package") {
 
 test("registers-test") {
   output_name = "registers-test"
-  sources = [
-    "registers-test.cc",
-    "registers.cc",
-  ]
+  sources = [ "registers-test.cc" ]
   deps = [
     ":common",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/mock-mmio/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/lib/fidl-metadata",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
-group("common") {
+source_set("common") {
+  sources = [
+    "registers.cc",
+    "registers.h",
+  ]
   public_deps = [
     ":registers_bind",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
-    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -71,6 +71,13 @@ group("common") {
 fuchsia_unittest_package("registers-test-package") {
   package_name = "registers-test"
   deps = [ ":registers-test" ]
+  test_specs = {
+    log_settings = {
+      # Metadata validation produces ERROR messages.
+      # Avoid failing these to allow testing expected failures.
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

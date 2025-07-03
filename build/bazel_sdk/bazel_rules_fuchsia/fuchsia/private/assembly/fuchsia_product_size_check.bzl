@@ -25,9 +25,7 @@ mkdir -p $FFX_ISOLATE_DIR
     --assembly-manifest $IMAGES_PATH \
     --size-breakdown-output $SIZE_FILE \
     --visualization-dir $VISUALIZATION_DIR \
-    --gerrit-output $SIZE_REPORT_PRODUCT_FILE \
-    --blobfs-creep-budget $CREEP_LIMIT \
-    --platform-resources-budget $PLATFORM_RESOURCES_BUDGET
+    {extra_args}
 """
 
 def _fuchsia_product_size_check_impl(ctx):
@@ -52,21 +50,43 @@ def _fuchsia_product_size_check_impl(ctx):
 
     final_outputs = [size_file, size_report_product_file] + visualization_outputs
 
+    _env = {
+        "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
+        "IMAGES_PATH": images_out.path + "/assembled_system.json",
+        "SIZE_FILE": size_file.path,
+        "VISUALIZATION_DIR": visualization_dir_path,
+    }
+    extra_args = []
+
+    # If blobfs_creep_limit and platform_resources_budget are empty return an empty size report file
+    # if only one of them is missing exit with an error otherwise make a size report file.
+
+    if ctx.attr.blobfs_creep_limit == None and ctx.attr.platform_resources_budget == None:
+        ctx.actions.write(output = size_report_product_file, content = "{}")
+
+    elif ctx.attr.blobfs_creep_limit == None:
+        fail("Attribute blobfs_creep_limit is missing for %s." % ctx.label.name)
+
+    elif ctx.attr.platform_resources_budget == None:
+        fail("Attribute platform_resources_budget is missing for %s." % ctx.label.name)
+
+    else:
+        extra_args += [
+            "--gerrit-output",
+            size_report_product_file.path,
+            "--blobfs-creep-budget",
+            str(ctx.attr.blobfs_creep_limit),
+            "--platform-resources-budget",
+            str(ctx.attr.platform_resources_budget),
+        ]
     ctx.actions.run_shell(
         inputs = ctx.files.product_image + get_ffx_assembly_inputs(fuchsia_toolchain),
         outputs = final_outputs + [ffx_isolate_dir],
         command = _SIZE_CHECKER_RUNNER_SH.format(
             ffx_assembly_args = " ".join(get_ffx_assembly_args(fuchsia_toolchain)),
+            extra_args = " ".join(extra_args),
         ),
-        env = {
-            "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
-            "IMAGES_PATH": images_out.path + "/assembled_system.json",
-            "SIZE_FILE": size_file.path,
-            "VISUALIZATION_DIR": visualization_dir_path,
-            "SIZE_REPORT_PRODUCT_FILE": size_report_product_file.path,
-            "CREEP_LIMIT": str(ctx.attr.blobfs_creep_limit),
-            "PLATFORM_RESOURCES_BUDGET": str(ctx.attr.platform_resources_budget),
-        },
+        env = _env,
         progress_message = "Size checking for %s" % ctx.label.name,
         **LOCAL_ONLY_ACTION_KWARGS
     )

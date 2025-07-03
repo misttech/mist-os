@@ -17,7 +17,7 @@ use futures::{Future, StreamExt as _};
 use log::{error, info};
 use {fidl_fuchsia_process_lifecycle as fprocess_lifecycle, fuchsia_async as fasync};
 
-use bindings::{GlobalConfig, InspectPublisher, NetstackSeed, Service};
+use bindings::{GlobalConfig, InspectPublisher, InterfaceConfigDefaults, NetstackSeed, Service};
 
 /// Runs Netstack3.
 pub fn main() {
@@ -62,39 +62,41 @@ pub fn main() {
         .add_service_connector(Service::DebugDiagnostics)
         .add_fidl_service(Service::DebugInterfaces)
         .add_fidl_service(Service::DnsServerWatcher)
-        .add_fidl_service(Service::Stack)
-        .add_fidl_service(Service::Socket)
-        .add_fidl_service(Service::PacketSocket)
-        .add_fidl_service(Service::RawSocket)
-        .add_fidl_service(Service::RootInterfaces)
-        .add_fidl_service(Service::RootFilter)
-        .add_fidl_service(Service::RootRoutesV4)
-        .add_fidl_service(Service::RootRoutesV6)
-        .add_fidl_service(Service::RoutesState)
-        .add_fidl_service(Service::RoutesStateV4)
-        .add_fidl_service(Service::RoutesStateV6)
-        .add_fidl_service(Service::RoutesAdminV4)
-        .add_fidl_service(Service::RoutesAdminV6)
-        .add_fidl_service(Service::RouteTableProviderV4)
-        .add_fidl_service(Service::RouteTableProviderV6)
-        .add_fidl_service(Service::RuleTableV4)
-        .add_fidl_service(Service::RuleTableV6)
+        .add_fidl_service(Service::FilterControl)
+        .add_fidl_service(Service::FilterState)
+        .add_fidl_service(Service::HealthCheck)
         .add_fidl_service(Service::Interfaces)
         .add_fidl_service(Service::InterfacesAdmin)
         .add_fidl_service(Service::MulticastAdminV4)
         .add_fidl_service(Service::MulticastAdminV6)
-        .add_fidl_service(Service::FilterState)
-        .add_fidl_service(Service::FilterControl)
         .add_fidl_service(Service::NdpWatcher)
         .add_fidl_service(Service::Neighbor)
         .add_fidl_service(Service::NeighborController)
-        .add_fidl_service(Service::HealthCheck)
-        .add_fidl_service(Service::SocketControl);
+        .add_fidl_service(Service::PacketSocket)
+        .add_fidl_service(Service::RawSocket)
+        .add_fidl_service(Service::RootFilter)
+        .add_fidl_service(Service::RootInterfaces)
+        .add_fidl_service(Service::RootRoutesV4)
+        .add_fidl_service(Service::RootRoutesV6)
+        .add_fidl_service(Service::RoutesAdminV4)
+        .add_fidl_service(Service::RoutesAdminV6)
+        .add_fidl_service(Service::RoutesState)
+        .add_fidl_service(Service::RoutesStateV4)
+        .add_fidl_service(Service::RoutesStateV6)
+        .add_fidl_service(Service::RouteTableProviderV4)
+        .add_fidl_service(Service::RouteTableProviderV6)
+        .add_fidl_service(Service::RuleTableV4)
+        .add_fidl_service(Service::RuleTableV6)
+        .add_fidl_service(Service::SettingsControl)
+        .add_fidl_service(Service::SettingsState)
+        .add_fidl_service(Service::Socket)
+        .add_fidl_service(Service::SocketControl)
+        .add_fidl_service(Service::Stack);
 
-    let seed = NetstackSeed::new(GlobalConfig {
-        suspend_enabled: *suspend_enabled,
-        default_opaque_iids: *opaque_iids,
-    });
+    let seed = NetstackSeed::new(
+        GlobalConfig { suspend_enabled: *suspend_enabled },
+        &InterfaceConfigDefaults { opaque_iids: *opaque_iids },
+    );
 
     let inspect_publisher = InspectPublisher::new();
     inspect_publisher

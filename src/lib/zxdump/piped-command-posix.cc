@@ -15,7 +15,7 @@
 
 namespace zxdump {
 
-fit::result<std::string> PipedCommand::StartArgv(cpp20::span<const char*> argv) {
+fit::result<std::string> PipedCommand::StartArgv(std::span<const char*> argv) {
   ZX_DEBUG_ASSERT(pid_ == -1);
 
   pid_ = fork();

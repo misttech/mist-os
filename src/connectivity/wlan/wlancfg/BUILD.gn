@@ -69,6 +69,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_rust",
     "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_rust",
     "//src/connectivity/wlan/lib/ieee80211-testutils",
+    "//src/connectivity/wlan/wlancfg/src/util/testing/macros:proc_macros",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_util",

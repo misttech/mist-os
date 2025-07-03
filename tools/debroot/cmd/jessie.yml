@@ -17,6 +17,7 @@ packages:
   - package: libc6
   - package: libc6-dev
   - package: libgl1-mesa-dev
+  - package: libgl1-mesa-glx
   - package: libglapi-mesa
   - package: libglu1-mesa
   - package: libglu1-mesa-dev

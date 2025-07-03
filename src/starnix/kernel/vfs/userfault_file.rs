@@ -10,7 +10,7 @@ use crate::vfs::{
 };
 use linux_uapi::{UFFDIO_CONTINUE, UFFDIO_COPY, UFFDIO_WAKE, UFFDIO_WRITEPROTECT, UFFDIO_ZEROPAGE};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, UserFaultInner};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked, UserFaultInner};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserRef;
@@ -89,14 +89,18 @@ pub struct UserFaultFile {
 const_assert_eq!(UFFDIO, 0xAA);
 
 impl UserFaultFile {
-    pub fn new(
+    pub fn new<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         open_flags: OpenFlags,
         _user_mode_only: bool,
-    ) -> FileHandle {
+    ) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let mm = current_task.mm().unwrap();
         let inner = Arc::new(UserFault::new(Arc::downgrade(&mm)));
-        Anon::new_file(current_task, Box::new(Self { inner }), open_flags, "[userfaultfd]")
+        Anon::new_file(locked, current_task, Box::new(Self { inner }), open_flags, "[userfaultfd]")
     }
 
     fn api_handshake<L>(

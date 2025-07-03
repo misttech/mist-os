@@ -360,7 +360,7 @@ void arch_mp_reschedule(cpu_mask_t mask) {
   }
 }
 
-void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) {
+void ArchIdlePowerThread::EnterIdleState() {
   // Preemption and Interrupts *must* be disabled at this point in time.  We are
   // not allowed to re-enable preemption during this method.  We are only
   // allowed to re-enable interrupts at the very last instant before dropping

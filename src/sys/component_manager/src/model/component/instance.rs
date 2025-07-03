@@ -477,7 +477,7 @@ impl ResolvedInstanceState {
             build_framework_dictionary(component),
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
-            RoutingFailureErrorReporter::new(component.as_weak()),
+            RoutingFailureErrorReporter::new(),
             &AggregateRouter::new,
         );
         Self::extend_program_input_namespace_with_legacy(
@@ -932,7 +932,7 @@ impl ResolvedInstanceState {
                 &self.sandbox.framework_dict,
                 &self.sandbox.capability_sourced_capabilities_dict,
                 &child_input,
-                RoutingFailureErrorReporter::new(component.as_weak()),
+                RoutingFailureErrorReporter::new(),
                 &AggregateRouter::new,
             );
         }

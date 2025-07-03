@@ -13,7 +13,6 @@ use starnix_core::vfs::fs_args::MountParams;
 use starnix_core::vfs::{FileSystemHandle, FileSystemOptions, FsString};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::mount_flags::MountFlags;
-use std::sync::Arc;
 
 pub struct MountAction {
     pub path: FsString,
@@ -23,8 +22,8 @@ pub struct MountAction {
 
 impl MountAction {
     pub fn new_for_root(
-        _locked: &mut Locked<Unlocked>,
-        kernel: &Arc<Kernel>,
+        locked: &mut Locked<Unlocked>,
+        kernel: &Kernel,
         pkg: &fio::DirectorySynchronousProxy,
         spec: &str,
     ) -> Result<MountAction, Error> {
@@ -36,9 +35,9 @@ impl MountAction {
         // The root file system needs to be creatable without a task because we mount the root
         // file system before creating the initial task.
         let fs = match spec.fs_type.as_slice() {
-            b"remote_bundle" => RemoteBundle::new_fs(kernel, pkg, options, rights)?,
-            b"remotefs" => create_remotefs_filesystem(kernel, pkg, options, rights)?,
-            b"tmpfs" => TmpFs::new_fs_with_options(kernel, options)?,
+            b"remote_bundle" => RemoteBundle::new_fs(locked, kernel, pkg, options, rights)?,
+            b"remotefs" => create_remotefs_filesystem(locked, kernel, pkg, options, rights)?,
+            b"tmpfs" => TmpFs::new_fs_with_options(locked, kernel, options)?,
             _ => bail!("unsupported root file system: {}", spec.fs_type),
         };
 
@@ -57,12 +56,16 @@ impl MountAction {
 
         let fs = match spec.fs_type.as_slice() {
             // The remote_bundle file system is available only via the mounts declaration in CML.
-            b"remote_bundle" => RemoteBundle::new_fs(current_task.kernel(), pkg, options, rights)?,
+            b"remote_bundle" => {
+                RemoteBundle::new_fs(locked, current_task.kernel(), pkg, options, rights)?
+            }
 
             // When used in a mounts declaration in CML, remotefs is relative to the pkg directory,
             // which is different than when remotefs is used with the mount() syscall. In that case,
             // remotefs is relative to the data directory.
-            b"remotefs" => create_remotefs_filesystem(current_task.kernel(), pkg, options, rights)?,
+            b"remotefs" => {
+                create_remotefs_filesystem(locked, current_task.kernel(), pkg, options, rights)?
+            }
 
             // The remotedir file system is used to mount a directory capability from the container
             // namespace. Cannot be used with a component running inside a container. Cannot be used
@@ -78,7 +81,13 @@ impl MountAction {
 
                 let dir_proxy = fio::DirectorySynchronousProxy::new(dir_channel);
                 options.source = b".".into();
-                create_remotefs_filesystem(current_task.kernel(), &dir_proxy, options, rights)?
+                create_remotefs_filesystem(
+                    locked,
+                    current_task.kernel(),
+                    &dir_proxy,
+                    options,
+                    rights,
+                )?
             }
             _ => current_task.create_filesystem(locked, spec.fs_type.as_ref(), options)?,
         };

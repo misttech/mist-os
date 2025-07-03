@@ -5,7 +5,7 @@
 //! Defines a thread safe accept queue to be shared between listener and
 //! connected sockets.
 
-use alloc::collections::{HashMap, VecDeque};
+use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 #[cfg(test)]
 use alloc::vec::Vec;
@@ -17,6 +17,7 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use netstack3_base::sync::Mutex;
 use netstack3_base::Inspector;
+use netstack3_hashmap::HashMap;
 
 /// A notifier used to tell Bindings about new pending connections for a single
 /// socket.
@@ -298,8 +299,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashSet;
     use assert_matches::assert_matches;
+    use netstack3_hashmap::HashSet;
 
     #[test]
     fn push_ready_pop() {

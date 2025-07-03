@@ -23,8 +23,6 @@ use {
 };
 
 const NANOSECONDS_PER_SECOND: u64 = 10_u64.pow(9);
-// TODO(https://fxbug.dev/332322792): Replace with an integer conversion.
-const SECONDS_PER_NANOSECOND: f64 = 1.0 / NANOSECONDS_PER_SECOND as f64;
 
 // TODO(https://fxbug.dev/317991807): Remove #[async_trait] when supported by compiler.
 #[async_trait]
@@ -259,61 +257,82 @@ impl Device {
             .map_err(|e| anyhow!("Error setting device gain state: {e}"))
     }
 
+    // TODO(https://fxbug.dev/424469332): Use standard affine operators, when available in Rust.
+    fn frame_for_running_time(
+        &self,
+        current_time_nanos: i64,
+        offset_nanos: i64,
+        offset_frames: u64,
+        frames_per_second: u64,
+    ) -> u64 {
+        let running_time_nanos = (current_time_nanos - offset_nanos) as u64;
+        let frames_nanos_per_second = running_time_nanos * frames_per_second;
+        let running_frames = frames_nanos_per_second / NANOSECONDS_PER_SECOND;
+        running_frames + offset_frames
+    }
+
     pub async fn play(
         &mut self,
         element_id: fadevice::ElementId,
         mut socket: WavSocket,
         active_channels_bitmask: Option<u64>,
     ) -> Result<fac::PlayerPlayResponse, ControllerError> {
+        fuchsia_trace::duration!(c"audio-streaming", c"audio_ffx_daemon::Device::play");
+
+        // Read header from socket, get the format from the header
         let spec = socket.read_header().await?;
         let format = Format::from(spec);
 
+        // Create ring buffer
         let ring_buffer =
             self.device_controller.lock().await.create_ring_buffer(element_id, format).await?;
 
-        let mut silenced_frames = 0u64;
-        let mut late_wakeups = 0;
-        let mut next_frame_to_write = 0u64; // The number of frames written to the ring buffer.
+        // RingBuffer::SetActiveChannels
+        let mut _active_channels_set_time = None;
+        if let Some(active_channels_bitmask) = active_channels_bitmask {
+            _active_channels_set_time =
+                Some(ring_buffer.set_active_channels(active_channels_bitmask).await?);
 
-        let nanos_per_wakeup_interval = 10e6f64; // 10 milliseconds
+            // TODO: handle the possibility that active_channels_set_time exceeds start_time.
+            // In practice, this is unlikely to be a problem since we start with an entire ring
+            // buffer of silence, before adding the content to be played.
+
+            fuchsia_trace::instant!(
+                c"audio-streaming",
+                c"audio_ffx_daemon::Device::play->set_active_channels",
+                fuchsia_trace::Scope::Process,
+                "active_channels_bitmask" => active_channels_bitmask,
+                "active_channels_set_time" => _active_channels_set_time.unwrap().into_nanos()
+            );
+        }
+
+        let frame_size = format.bytes_per_frame() as u64;
+        let rb_size_bytes = ring_buffer.vmo_buffer().data_size_bytes();
+        let rb_size_frames = rb_size_bytes / frame_size;
+        let consumer_bytes = ring_buffer.consumer_bytes();
+
         let wakeup_interval = zx::MonotonicDuration::from_millis(10);
 
-        let frames_per_nanosecond = format.frames_per_second as f64 * SECONDS_PER_NANOSECOND;
+        // Initially, fill the entire buffer with silence
+        let initial_bytes_of_silence = rb_size_bytes;
 
-        let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();
-        let consumer_bytes = ring_buffer.consumer_bytes();
-        let bytes_per_wakeup_interval =
-            (nanos_per_wakeup_interval * frames_per_nanosecond * format.bytes_per_frame() as f64)
-                .floor() as u64;
+        let mut next_running_frame_to_write: u64 = 0;
+        let silence = vec![format.sample_type.silence_value(); initial_bytes_of_silence as usize];
+        ring_buffer
+            .vmo_buffer()
+            .write_to_frame(next_running_frame_to_write, &silence)
+            .context("Failed to pre-write silence to buffer")?;
+        next_running_frame_to_write += initial_bytes_of_silence / frame_size;
 
-        if consumer_bytes + bytes_per_wakeup_interval > bytes_in_rb {
-            return Err(anyhow!(
-                "Ring buffer not large enough for internal delay. Ring buffer bytes: {}, 
-            consumer + producer bytes: {}",
-                bytes_in_rb,
-                consumer_bytes + bytes_per_wakeup_interval
-            )
-            .into());
-        }
-
-        let mut active_channels_set_time = None;
-        if let Some(active_channels_bitmask) = active_channels_bitmask {
-            active_channels_set_time =
-                Some(ring_buffer.set_active_channels(active_channels_bitmask).await?);
-        }
-
+        // RingBuffer::Start
         let start_time = ring_buffer.start().await?;
-
-        let t_zero = zx::MonotonicInstant::from_nanos(std::cmp::max(
-            active_channels_set_time.unwrap_or(zx::MonotonicInstant::from_nanos(0)).into_nanos(),
-            start_time.into_nanos(),
-        ));
-
-        // To start, wait until at least t0 + (wakeup_interval) so we can start writing at
-        // the first bytes in the ring buffer.
-        fuchsia_async::Timer::new(t_zero).await;
-
-        let mut last_wakeup = t_zero;
+        fuchsia_trace::instant!(
+            c"audio-streaming",
+            c"audio_ffx_daemon::Device::play->initial silence & RB::start",
+            fuchsia_trace::Scope::Process,
+            "initial_bytes_of_silence" => initial_bytes_of_silence,
+            "start_time" => start_time.into_nanos()
+        );
 
         /*
             - Sleep for time equivalent to a small portion of ring buffer
@@ -329,104 +348,134 @@ impl Device {
             writing the silence value until all bytes in the ring buffer have been written
             back to silence.
 
+            In the following diagram, both driver and client proceed from left to right
+            within the ring buffer, as time progresses.
+
                                               driver read
                                                 region
                                         ┌───────────────────────┐
-                                        ▼ internal delay bytes  ▼
+                                        ▼   'consumer_bytes'    ▼
             +-----------------------------------------------------------------------+
             |                              (rb pointer in here)                     |
             +-----------------------------------------------------------------------+
-                    ▲                   ▲
-                    |                   |
-                last frame            write up to
-                written                 here
-                    └─────────┬─────────┘
+                    ▲                   ▲                        ▲
+                    |                   |                        |
+                last frame           write up              first "safe" frame we
+                written              to here               could write (only used
+                    └─────────┬─────────┘                  for underrun checks)
                         this length will
                         vary depending
                         on wakeup time
+
+                Note: these two pointers are AHEAD
+                of the hardware read pointer, but
+                have wrapped around in the ring.
         */
 
+        // At time 0, the first safely written frame is just beyond consumer_bytes (which represents
+        // the server's driver_transfer_bytes zone, starting at 0 for an outgoing RingBuffer).
+        let first_safe_frame_offset: u64 = (consumer_bytes + frame_size - 1) / frame_size;
+        // `consumer_bytes` should already be frame-aligned, but we make sure of it.
+        // We track this position purely to double-check that we have not underrun our padding.
+
+        // When refilling the buffer, we aim to keep it ENTIRELY full. We cannot fill beyond this
+        // offset, since at that point we reach the portion of the buffer allocated to the driver.
+        let target_fill_frame_offset: u64 = rb_size_frames;
+
+        // We track and display the total number of content bytes played.
+        let mut bytes_processed: u64 = 0;
+        // We also display the number of times we underran (woke up too late).
+        let mut late_wakeups_count = 0u64;
+        // After playing the user content, we play another ring buffer of silence before stopping.
+        let mut silenced_frames = 0u64;
+        // We track and log the largest data operation to this VMO.
+        let mut max_write_size_bytes = 0u64;
+
+        fuchsia_async::Timer::new(start_time).await;
         let mut timer = fuchsia_async::Interval::new(wakeup_interval);
 
         loop {
             timer.next().await;
 
-            // Check that we woke up on time. Approximate ring buffer pointer position based on
-            // the current time and the expected rate of how fast it moves.
-            // Ring buffer pointer should be ahead of last byte written.
             let now = zx::MonotonicInstant::get();
-
-            let duration_since_last_wakeup = now - last_wakeup;
-            last_wakeup = now;
-
-            let total_time_elapsed = now - t_zero;
-            let total_rb_frames_elapsed =
-                frames_per_nanosecond * total_time_elapsed.into_nanos() as f64;
-
-            let rb_frames_elapsed_since_last_wakeup =
-                frames_per_nanosecond * duration_since_last_wakeup.into_nanos() as f64;
-
-            let new_frames_available_to_write =
-                total_rb_frames_elapsed.floor() as u64 - next_frame_to_write;
-            let num_bytes_to_write =
-                new_frames_available_to_write * format.bytes_per_frame() as u64;
-
-            // In a given wakeup period, the "unsafe bytes" we avoid writing to
-            // are the range of bytes that the driver will read from during that period,
-            // since the written data wouldn't update in time.
-            // There are (consumer_bytes + bytes_per_wakeup_interval) unsafe bytes since writes
-            // can take up to one period in the worst case. The remaining bytes in the ring buffer
-            // are safe to write to since the driver will read the updated data.
-            // If the difference in elapsed frames and what we expect to write is
-            // greater than the range of safe bytes, we've woken up too late and
-            // some of the audio data will not be read by the driver.
-
-            if ((rb_frames_elapsed_since_last_wakeup.floor() as i64
-                - new_frames_available_to_write as i64)
-                * format.bytes_per_frame() as i64)
-                .abs() as u64
-                > bytes_in_rb - (consumer_bytes + bytes_per_wakeup_interval)
-            {
-                log::info!(
-                    "Woke up {} ns late",
-                    duration_since_last_wakeup.into_nanos() as f64 - nanos_per_wakeup_interval
+            let now_nanos = now.into_nanos();
+            let first_safe_frame = self.frame_for_running_time(
+                now_nanos,
+                start_time.into_nanos(),
+                first_safe_frame_offset,
+                format.frames_per_second.into(),
+            );
+            let prev_running_frame_to_write = next_running_frame_to_write;
+            if first_safe_frame > next_running_frame_to_write {
+                log::warn!(
+                    "Woke up {} frames too late (in addition to our padding!)",
+                    first_safe_frame - next_running_frame_to_write
                 );
-                late_wakeups += 1;
+
+                // Fill silence ... or is it too late for that?
+
+                late_wakeups_count += 1;
+            }
+            let target_fill_frame: u64 = self.frame_for_running_time(
+                now_nanos,
+                start_time.into_nanos(),
+                target_fill_frame_offset,
+                format.frames_per_second.into(),
+            );
+            if target_fill_frame < next_running_frame_to_write {
+                continue;
             }
 
-            // We copy from socket to this intermediate buffer, and from there to ring buffer.
+            let num_frames_to_write = target_fill_frame - next_running_frame_to_write;
+            let num_bytes_to_write = num_frames_to_write * frame_size;
+            max_write_size_bytes = std::cmp::max(num_bytes_to_write, max_write_size_bytes);
+
             let mut buf = vec![format.sample_type.silence_value(); num_bytes_to_write as usize];
 
+            // Read from the socket into a buffer of duration `wakeup_interval`.
+            // We use this intermediate buffer to simplify aspects of wraparound.
             let bytes_read_from_socket = socket.read_until_full(&mut buf).await?;
 
-            if bytes_read_from_socket == 0 {
-                silenced_frames += new_frames_available_to_write;
-            }
-
+            bytes_processed += bytes_read_from_socket;
             if bytes_read_from_socket < num_bytes_to_write {
-                let partial_silence_bytes = new_frames_available_to_write
-                    * format.bytes_per_frame() as u64
-                    - bytes_read_from_socket as u64;
-                silenced_frames += partial_silence_bytes / format.bytes_per_frame() as u64;
+                let new_silence_bytes = num_bytes_to_write - bytes_read_from_socket;
+                silenced_frames += new_silence_bytes / frame_size;
             }
 
+            // Copy from the `wakeup_interval` buffer into the cross-process VMO.
             ring_buffer
                 .vmo_buffer()
-                .write_to_frame(next_frame_to_write, &buf)
+                .write_to_frame(next_running_frame_to_write, &buf)
                 .context("Failed to write to buffer")?;
-            next_frame_to_write += new_frames_available_to_write;
+            next_running_frame_to_write += num_frames_to_write;
 
-            // We want entire ring buffer to be silenced.
-            if silenced_frames * format.bytes_per_frame() as u64 >= bytes_in_rb {
+            fuchsia_trace::instant!(
+                c"audio-streaming",
+                c"audio_ffx_daemon::Device::play write",
+                fuchsia_trace::Scope::Process,
+                "bytes_read_from_socket" => bytes_read_from_socket,
+                "num_bytes_to_write" => num_bytes_to_write,
+                "num_frames_to_write" => num_frames_to_write,
+                "num_buffered_frames (low)" => (prev_running_frame_to_write - first_safe_frame) as i64,
+                "num_buffered_frames (high)" => (next_running_frame_to_write - first_safe_frame) as i64,
+                "prev_running_frame_to_write" => prev_running_frame_to_write,
+                "next_running_frame_to_write" => next_running_frame_to_write,
+                "bytes_processed" => bytes_processed,
+                "silenced_frames" => silenced_frames,
+                "max_write_size_bytes" => max_write_size_bytes
+            );
+
+            // Overwrite the entire VMO with silence, before stopping the RingBuffer.
+            if silenced_frames >= rb_size_frames {
                 break;
             }
         }
 
         ring_buffer.stop().await?;
 
-        println!("Successfully played all audio data. Woke up late {} times.", late_wakeups);
+        println!("Successfully played all audio data. Woke up late {} times.", late_wakeups_count);
 
-        Ok(fac::PlayerPlayResponse { bytes_processed: None, ..Default::default() })
+        Ok(fac::PlayerPlayResponse { bytes_processed: Some(bytes_processed), ..Default::default() })
     }
 
     pub async fn record(

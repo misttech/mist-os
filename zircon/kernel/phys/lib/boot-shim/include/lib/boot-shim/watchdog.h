@@ -80,8 +80,10 @@ struct QualcomMsmWatchdog {
       return std::nullopt;
     }
 
-    (*mmio_observer)(DevicetreeMmioRange{.address = decoded_node->addr,
-                                         .size = static_cast<size_t>(decoded_node->size)});
+    (*mmio_observer)(MmioRange{
+        .address = decoded_node->addr,
+        .size = static_cast<size_t>(decoded_node->size),
+    });
 
     return zbi_dcfg_generic32_watchdog_t{
         .pet_action =

@@ -192,10 +192,14 @@ impl<T: Transport> Future for ResponseFuture<'_, T> {
 pub trait ClientHandler<T: Transport> {
     /// Handles a received client event.
     ///
-    /// The client cannot handle more messages until `on_event` completes. If `on_event` may block,
-    /// perform asynchronous work, or take a long time to process a message, it should offload work
-    /// to an async task.
-    fn on_event(&mut self, sender: &ClientSender<T>, ordinal: u64, buffer: T::RecvBuffer);
+    /// The client cannot handle more messages until `on_event` completes. If `on_event` should
+    /// handle requests in parallel, it should spawn a new async task and return.
+    fn on_event(
+        &mut self,
+        sender: &ClientSender<T>,
+        ordinal: u64,
+        buffer: T::RecvBuffer,
+    ) -> impl Future<Output = ()> + Send;
 }
 
 /// A client for an endpoint.
@@ -246,7 +250,7 @@ impl<T: Transport> Client<T> {
             let (txid, ordinal) =
                 decode_header::<T>(&mut buffer).map_err(ProtocolError::InvalidMessageHeader)?;
             if txid == 0 {
-                handler.on_event(&self.sender, ordinal, buffer);
+                handler.on_event(&self.sender, ordinal, buffer).await;
             } else {
                 let mut responses = self.sender.shared.responses.lock().unwrap();
                 let locker = responses
@@ -278,5 +282,5 @@ impl<T: Transport> Client<T> {
 pub struct IgnoreEvents;
 
 impl<T: Transport> ClientHandler<T> for IgnoreEvents {
-    fn on_event(&mut self, _: &ClientSender<T>, _: u64, _: T::RecvBuffer) {}
+    async fn on_event(&mut self, _: &ClientSender<T>, _: u64, _: T::RecvBuffer) {}
 }

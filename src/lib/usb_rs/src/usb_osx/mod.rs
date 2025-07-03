@@ -6,6 +6,7 @@ use crate::{
     DeviceDescriptor, DeviceEvent, DeviceHandle, Endpoint, EndpointDescriptor, EndpointDirection,
     EndpointType, Error, InterfaceDescriptor, Result,
 };
+use fuchsia_async::{MonotonicDuration, TimeoutExt};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::future::poll_fn;
 use futures::task::AtomicWaker;
@@ -26,7 +27,11 @@ use iokit_wrappers::{
     NotifyPort, PlugInInterface, RunLoop,
 };
 
-pub struct DeviceHandleInner(IOService, Arc<RunLoop>);
+pub struct DeviceHandleInner {
+    service: IOService,
+    run_loop: Arc<RunLoop>,
+    pub(crate) serial: Option<String>,
+}
 
 impl DeviceHandleInner {
     pub fn debug_name(&self) -> String {
@@ -35,10 +40,11 @@ impl DeviceHandleInner {
 
     pub fn scan_interfaces(
         &self,
+        _urb_pool_size: usize,
         f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
     ) -> Result<Interface> {
         let dev: DeviceInterface500 =
-            PlugInInterface::new(self.0.clone(), GetIOUSBDeviceUserClientTypeID())?
+            PlugInInterface::new(self.service.clone(), GetIOUSBDeviceUserClientTypeID())?
                 .query_interface()?;
         let device_descriptor = dev.descriptor();
 
@@ -100,10 +106,17 @@ fn handle_event(
         .take_while(|&x| x != 0);
 
     for device in iter {
-        let _ = data.event_sender.unbounded_send(f(DeviceHandleInner(
-            IOService::from_raw(device),
-            Arc::clone(&run_loop),
-        )
+        let service = IOService::from_raw(device);
+        let dev: DeviceInterface500 =
+            PlugInInterface::new(service.clone(), GetIOUSBDeviceUserClientTypeID())?
+                .query_interface()?;
+        let serial = dev.serial_number();
+
+        let _ = data.event_sender.unbounded_send(f(DeviceHandleInner {
+            service,
+            run_loop: Arc::clone(&run_loop),
+            serial,
+        }
         .into()));
     }
 }
@@ -114,6 +127,27 @@ extern "C" fn added(refcon: *mut ::std::os::raw::c_void, iterator: iokit_usb::io
 
 extern "C" fn removed(refcon: *mut ::std::os::raw::c_void, iterator: iokit_usb::io_iterator_t) {
     handle_event(refcon, iterator, DeviceEvent::Removed)
+}
+
+/// Lists all USB devices currently on the bus.
+pub fn enumerate_devices() -> Result<Vec<DeviceHandle>> {
+    let mut res: Vec<DeviceHandle> = vec![];
+    block_on(async {
+        let stream = wait_for_devices(true, false)?;
+        loop {
+            match stream.next().on_timeout(MonotonicDuration::from_secs(1), || {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Timed out reading from bulk interface",
+                ))
+            }) {
+                Ok(Some(dh)) => res.push(dh),
+                Ok(None) => break,
+                Err(_) => break,
+            }
+        }
+    })?;
+    Ok(res)
 }
 
 /// Waits for USB devices to appear on the bus.

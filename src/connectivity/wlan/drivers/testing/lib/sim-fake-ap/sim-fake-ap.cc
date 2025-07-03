@@ -4,7 +4,6 @@
 
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <zircon/assert.h>
 
 namespace wlan::simulation {

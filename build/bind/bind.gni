@@ -43,8 +43,6 @@ template("_bind_library_sdk") {
     },
   ]
 
-  # Identify metadata for dependencies.
-  sdk_metas = []
   sdk_deps = []
   all_deps = []
   if (defined(invoker.deps)) {
@@ -54,40 +52,7 @@ template("_bind_library_sdk") {
     full_label = get_label_info(dep, "label_no_toolchain")
     sdk_dep = "${full_label}_sdk"
     sdk_deps += [ sdk_dep ]
-    gen_dir = get_label_info(sdk_dep, "target_gen_dir")
-    name = get_label_info(sdk_dep, "name")
-    sdk_metas += [ "$gen_dir/$name.meta.json" ]
   }
-
-  # Generate the library metadata.
-  meta_file = "$target_gen_dir/${target_name}.sdk_meta.json"
-  meta_target_name = "${target_name}_meta"
-
-  action(meta_target_name) {
-    script = "//build/bind/gen_sdk_meta.py"
-
-    inputs = sdk_metas
-
-    # Use the unrebased source name. GN automatically converts
-    # sources to be relative to the build directory.
-    sources = sdk_unrebased_sources
-
-    outputs = [ meta_file ]
-
-    args = [
-             "--out",
-             rebase_path(meta_file, root_build_dir),
-             "--name",
-             library_name,
-             "--root",
-             file_base,
-             "--specs",
-           ] + rebase_path(sdk_metas, root_build_dir) + [ "--sources" ] +
-           sdk_sources
-
-    deps = sdk_deps
-  }
-
   _prebuild_info = {
     deps = all_deps
     library_name = library_name
@@ -101,7 +66,6 @@ template("_bind_library_sdk") {
     forward_variables_from(invoker, [ "sdk_area" ])
 
     meta = {
-      source = meta_file
       source_prebuild_info = _prebuild_info
       dest = "$file_base/meta.json"
       type = "bind_library"
@@ -109,13 +73,7 @@ template("_bind_library_sdk") {
 
     files = all_files
 
-    non_sdk_deps = [ ":$meta_target_name" ]
-
-    deps = []
-    foreach(dep, all_deps) {
-      label = get_label_info(dep, "label_no_toolchain")
-      deps += [ "${label}_sdk" ]
-    }
+    deps = sdk_deps
   }
 }
 

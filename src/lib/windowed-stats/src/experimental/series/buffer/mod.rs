@@ -57,6 +57,8 @@ pub trait RingBuffer<A> {
 
     fn push(&mut self, item: A);
 
+    fn fill(&mut self, item: A, count: NonZeroUsize);
+
     fn serialize(&self, write: impl Write) -> io::Result<()>;
 
     // TODO(https://fxbug.dev/369886210): Implement a durability query. This is the duration of the
@@ -115,6 +117,10 @@ impl RingBuffer<f32> for Uncompressed<f32> {
         self.0.push(item);
     }
 
+    fn fill(&mut self, item: f32, count: NonZeroUsize) {
+        self.0.fill(item, count);
+    }
+
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
         self.0.serialize(&mut write)
     }
@@ -137,6 +143,10 @@ where
 
     fn push(&mut self, item: A) {
         self.0.push(item.into());
+    }
+
+    fn fill(&mut self, item: A, count: NonZeroUsize) {
+        self.0.fill(item.into(), count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
@@ -164,6 +174,10 @@ where
 
     fn push(&mut self, item: A) {
         self.0.push(item.into());
+    }
+
+    fn fill(&mut self, item: A, count: NonZeroUsize) {
+        self.0.fill(item.into(), count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
@@ -195,6 +209,12 @@ where
         }
     }
 
+    fn fill(&mut self, item: A, count: NonZeroUsize) {
+        if let Err(e) = self.0.fill(item.into(), count) {
+            warn!("DeltaSimple8bRleRingBuffer::fill error: {}", e);
+        }
+    }
+
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
         self.0.serialize(&mut write)
     }
@@ -223,6 +243,10 @@ impl RingBuffer<i64> for DeltaZigzagSimple8bRle<i64> {
         self.0.push(item)
     }
 
+    fn fill(&mut self, item: i64, count: NonZeroUsize) {
+        self.0.fill(item, count);
+    }
+
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
         self.0.serialize(&mut write)
     }
@@ -244,6 +268,10 @@ impl RingBuffer<u64> for DeltaZigzagSimple8bRle<u64> {
 
     fn push(&mut self, item: u64) {
         self.0.push(item)
+    }
+
+    fn fill(&mut self, item: u64, count: NonZeroUsize) {
+        self.0.fill(item, count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {

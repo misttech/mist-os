@@ -6,7 +6,7 @@ use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
     fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SymlinkNode,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::auth::FsCred;
@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 pub struct SimpleDirectoryMutator {
     fs: FileSystemHandle,
-    directory: Arc<SimpleDirectory>,
+    pub directory: Arc<SimpleDirectory>,
 }
 
 impl SimpleDirectoryMutator {
@@ -33,9 +33,10 @@ impl SimpleDirectoryMutator {
     }
 
     pub fn entry(&self, name: &str, ops: impl Into<Box<dyn FsNodeOps>>, mode: FileMode) {
+        let name: FsString = name.into();
         let node =
             self.fs.create_node_and_allocate_node_id(ops, FsNodeInfo::new(mode, FsCred::root()));
-        self.node(name.into(), node);
+        self.node(name, node);
     }
 
     pub fn entry_etc(
@@ -52,26 +53,26 @@ impl SimpleDirectoryMutator {
         self.node(name, node);
     }
 
-    pub fn subdir(&self, name: &str, mode: u32, build_subdir: impl Fn(&Self)) {
-        let dir = {
-            let mut entries = self.directory.entries.lock();
-            let name: &FsStr = name.into();
-            if let Some(node) = entries.get(name) {
-                assert!(node.info().mode == mode!(IFDIR, mode));
-                let dir = node
-                    .downcast_ops::<Arc<SimpleDirectory>>()
-                    .expect("subdir is a SimpleDirectory");
-                dir.clone()
-            } else {
-                let dir = SimpleDirectory::new();
-                let info = FsNodeInfo::new(mode!(IFDIR, mode), FsCred::root());
-                let node = self.fs.create_node_and_allocate_node_id(dir.clone(), info);
-                entries.insert(name.into(), node);
-                dir
-            }
-        };
+    pub fn symlink(&self, name: &FsStr, target: &FsStr) {
+        let (ops, info) = SymlinkNode::new(target, FsCred::root());
+        let node = self.fs.create_node_and_allocate_node_id(ops, info);
+        self.node(name.into(), node);
+    }
+
+    pub fn subdir(&self, name: &str, mode: u32, build_subdir: impl FnOnce(&Self)) {
+        let name: &FsStr = name.into();
+        self.subdir2(name, mode, build_subdir);
+    }
+
+    // TODO: Figure out a better way to overload this function for &str and &FsStr.
+    pub fn subdir2(&self, name: &FsStr, mode: u32, build_subdir: impl FnOnce(&Self)) {
+        let dir = self.directory.subdir(&self.fs, name, mode);
         let mutator = SimpleDirectoryMutator::new(self.fs.clone(), dir);
         build_subdir(&mutator);
+    }
+
+    pub fn remove(&self, name: &FsStr) {
+        self.directory.remove(name);
     }
 }
 
@@ -82,6 +83,80 @@ pub struct SimpleDirectory {
 impl SimpleDirectory {
     pub fn new() -> Arc<Self> {
         Arc::new(SimpleDirectory { entries: Default::default() })
+    }
+
+    pub fn remove(&self, name: &FsStr) {
+        self.entries.lock().remove(name);
+    }
+
+    fn walk<'a>(self: &Arc<Self>, path: &'a FsStr) -> Option<(Arc<Self>, &'a FsStr)> {
+        fn check_component(component: &FsStr) {
+            assert!(!component.is_empty());
+
+            let dot: &FsStr = b".".into();
+            assert_ne!(component, dot);
+
+            let dotdot: &FsStr = b"..".into();
+            assert_ne!(component, dotdot);
+        }
+
+        let mut components = path.split(|c| *c == b'/');
+        let basename = components.next_back()?;
+        let basename: &FsStr = basename.into();
+        check_component(basename);
+        let mut parent = self.clone();
+        while let Some(component) = components.next() {
+            let component: &FsStr = component.into();
+            check_component(component);
+            let Some(next) = parent.get_dir(component) else {
+                return None;
+            };
+            parent = next;
+        }
+        Some((parent, basename))
+    }
+
+    pub fn edit(
+        self: &Arc<Self>,
+        fs: &FileSystemHandle,
+        callback: impl FnOnce(&SimpleDirectoryMutator),
+    ) {
+        let mutator = SimpleDirectoryMutator::new(fs.clone(), self.clone());
+        callback(&mutator);
+    }
+
+    pub fn subdir(&self, fs: &FileSystemHandle, name: &FsStr, mode: u32) -> Arc<SimpleDirectory> {
+        let mut entries = self.entries.lock();
+        if let Some(node) = entries.get(name) {
+            assert!(node.info().mode == mode!(IFDIR, mode));
+            let dir =
+                node.downcast_ops::<Arc<SimpleDirectory>>().expect("subdir is a SimpleDirectory");
+            dir.clone()
+        } else {
+            let dir = SimpleDirectory::new();
+            let info = FsNodeInfo::new(mode!(IFDIR, mode), FsCred::root());
+            let node = fs.create_node_and_allocate_node_id(dir.clone(), info);
+            entries.insert(name.into(), node);
+            dir
+        }
+    }
+
+    fn get(&self, name: &FsStr) -> Option<FsNodeHandle> {
+        let entries = self.entries.lock();
+        entries.get(name).cloned()
+    }
+
+    fn get_dir(&self, name: &FsStr) -> Option<Arc<SimpleDirectory>> {
+        let entries = self.entries.lock();
+        entries
+            .get(name)
+            .and_then(|node| node.downcast_ops::<Arc<SimpleDirectory>>())
+            .map(Arc::clone)
+    }
+
+    pub fn lookup(self: &Arc<Self>, path: &FsStr) -> Option<FsNodeHandle> {
+        let (parent, basename) = self.walk(path)?;
+        parent.get(basename)
     }
 }
 

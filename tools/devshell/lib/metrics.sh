@@ -990,8 +990,22 @@ function metrics-init {
   fi
 
   local subcommand="$1"
+  local args="$2"
+
+  # We will not show user notices for metrics in the following cases:
+  # - the subcommand is metrics
+  # - the subcommand is ffx and there's no fuchsia.analytics.ffx_invoker=fx argument
+  #   This is because when ffx has the --config fuchsia.analytics.ffx_invoker=fx argument
+  #   it will not display the user notices, so we will need to display it. When ffx
+  #   does not have the --config fuchsia.analytics.ffx_invoker=fx argument, we need
+  #   to hide the user notices since ffx will display one.
+  # - the subcommand with args is `ffx config analytics ...`. This is to make sure
+  #   ffx config analytics <anything> will not show the user notices.
   local hide_init_warning=0
-  if [[ "$subcommand" == "metrics" || "$subcommand" == "ffx" ]]; then
+  if [[ "$subcommand" == "metrics" \
+        || ( "$subcommand" == "ffx" && ! "$args" =~ "fuchsia.analytics.ffx_invoker=fx" ) \
+        || ( "$subcommand" == "ffx" && "$args" =~ "config analytics" ) \
+  ]]; then
     hide_init_warning=1
   fi
   metrics-read-and-validate "${hide_init_warning}"

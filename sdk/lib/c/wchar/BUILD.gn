@@ -6,18 +6,26 @@ import("../libc.gni")
 
 llvm_libc_source_set("wchar") {
   functions = [
+    "wcpcpy",
+    "wcpncpy",
     "wcscat",
     "wcschr",
+    "wcscmp",
     "wcscpy",
     "wcslen",
     "wcsncat",
     "wcsncmp",
+    "wcsncpy",
     "wcspbrk",
+    "wcsrchr",
     "wcsspn",
     "wcsstr",
     "wmemchr",
     "wmemcmp",
     "wmemcpy",
+    "wmemmove",
     "wmemset",
+
+    # "wmempcpy",  # not in the legacy (musl) ABI or header, maybe add it
   ]
 }

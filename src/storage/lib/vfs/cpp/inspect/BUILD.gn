@@ -29,11 +29,14 @@ static_library("inspect") {
       "operation_tracker/operation_tracker_fuchsia.h",
     ]
     public_deps += [
-      "//src/storage/lib/block_client/cpp",
+      "//src/storage/lib/block_client/cpp:interface",
       "//zircon/system/ulib/inspect",
     ]
 
-    deps += [ "//sdk/lib/fit" ]
+    deps += [
+      "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+      "//sdk/lib/fit-promise",
+    ]
   } else {
     sources += [ "operation_tracker/operation_tracker_stub.h" ]
   }
@@ -49,10 +52,16 @@ test("inspect_unittests") {
 
   deps = [
     ":inspect",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
     "//sdk/lib/inspect/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/lib/block_client/cpp:fake_device",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/zx",
   ]
 }
 

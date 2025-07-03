@@ -184,18 +184,12 @@ mod tests {
     use starnix_uapi::file_mode::FileMode;
 
     fn create_fs_node() -> FsNodeHandle {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         current_task
             .fs()
             .root()
-            .create_node(
-                &mut locked,
-                &current_task,
-                "foo".into(),
-                FileMode::IFREG,
-                DeviceType::NONE,
-            )
+            .create_node(locked, &current_task, "foo".into(), FileMode::IFREG, DeviceType::NONE)
             .expect("create_node")
             .entry
             .node

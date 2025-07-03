@@ -2,53 +2,21 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-""" Various useful bits and pieces. """
+"""Various useful bits and pieces."""
 
 import enum
-import importlib.util
 import json
 import os
-import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 """ The state-save file is at a fixed location in the source tree. """
-_JSON_FILE = "sdk/ctf/disabled_tests.json"
-
-
-# import json_get from its location in the source tree
-# This avoids requiring the script user to mess with Python paths.
-# Assuming this succeeds, util.JsonGet will be the json_get.JsonGet class.
-source_directory = os.path.dirname(os.path.abspath(__file__))
-assert source_directory.endswith(
-    "scripts/disable_ctf_tests"
-), f"Unexpected script location {source_directory}"
-json_get_path = os.path.join(
-    source_directory, "..", "lib", "json_get", "json_get.py"
-)
-spec = importlib.util.spec_from_file_location("json_get", json_get_path)
-if spec and spec.loader:
-    json_get = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(
-        json_get
-    )  # Execute the module to make its contents available
-else:
-    print(f"Could not load json_get from {json_get_path}")
-    sys.exit(1)
-
-if TYPE_CHECKING:
-
-    class JsonGet:
-        def __init__(self, text: str, value: Any = None) -> None:
-            pass
-
-        def match(
-            self, pattern: Any, callback: Any = None, no_match: Any = None
-        ) -> Any:
-            return None
-
-else:
-    JsonGet = json_get.JsonGet
+_FUCHSIA_DIR = os.getenv("FUCHSIA_DIR")
+assert (
+    _FUCHSIA_DIR is not None
+), "FUCHSIA_DIR is not set. Did you set your Fuchsia environment?"
+assert os.path.isdir(_FUCHSIA_DIR), f'"{_FUCHSIA_DIR}" must be a directory'
+_JSON_FILE = f"{_FUCHSIA_DIR}/sdk/ctf/disabled_tests.json"
 
 
 class Status(enum.Enum):
@@ -97,6 +65,7 @@ def save_program_state(state: Any) -> None:
     """Write state into a JSON-formatted file."""
     with open(_JSON_FILE, "w") as f:
         json.dump(state, f, default=_vars_or_obj, indent=2)
+        f.write("\n")
 
 
 def load_program_state() -> Any:

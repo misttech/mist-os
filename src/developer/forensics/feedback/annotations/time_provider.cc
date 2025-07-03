@@ -17,24 +17,14 @@
 namespace forensics::feedback {
 namespace {
 
-ErrorOrString GetRuntime(timekeeper::Clock* clock) {
-  const auto runtime = FormatDuration(zx::duration(clock->MonotonicNow().to_timespec()));
-  if (!runtime) {
-    FX_LOGS(ERROR) << "Got negative runtime from timekeeper::Clock::MonotonicNow()";
+ErrorOrString GetFormattedDuration(zx::duration duration, std::string_view error_source) {
+  const std::optional<std::string> formatted_duration = FormatDuration(duration);
+  if (!formatted_duration) {
+    FX_LOGS(ERROR) << "Got negative value from '" << error_source << "'";
     return ErrorOrString(Error::kBadValue);
   }
 
-  return ErrorOrString(*runtime);
-}
-
-ErrorOrString GetUptime(timekeeper::Clock* clock) {
-  const auto uptime = FormatDuration(zx::duration(clock->BootNow().to_timespec()));
-  if (!uptime) {
-    FX_LOGS(ERROR) << "Got negative uptime from timekeeper::Clock::BootNow()";
-    return ErrorOrString(Error::kBadValue);
-  }
-
-  return ErrorOrString(*uptime);
+  return ErrorOrString(*formatted_duration);
 }
 
 }  // namespace
@@ -54,6 +44,7 @@ TimeProvider::TimeProvider(async_dispatcher_t* dispatcher, zx::unowned_clock clo
 std::set<std::string> TimeProvider::GetAnnotationKeys() {
   return {
       kDeviceRuntimeKey,
+      kDeviceTotalSuspendedTimeKey,
       kDeviceUptimeKey,
       kDeviceUtcTimeKey,
   };
@@ -70,9 +61,16 @@ Annotations TimeProvider::Get() {
     return ErrorOrString(Error::kMissingValue);
   }();
 
+  const zx::duration monotonic_now = zx::duration(clock_->MonotonicNow().to_timespec());
+  const zx::duration boot_now = zx::duration(clock_->BootNow().to_timespec());
+  const zx::duration time_suspended = boot_now - monotonic_now;
+
   return {
-      {kDeviceRuntimeKey, GetRuntime(clock_.get())},
-      {kDeviceUptimeKey, GetUptime(clock_.get())},
+      {kDeviceRuntimeKey, GetFormattedDuration(monotonic_now, "timekeeper::Clock::MonotonicNow()")},
+      {kDeviceTotalSuspendedTimeKey,
+       GetFormattedDuration(time_suspended,
+                            "timekeeper::Clock::BootNow() - timekeeper::Clock::MonotonicNow()")},
+      {kDeviceUptimeKey, GetFormattedDuration(boot_now, "timekeeper::Clock::BootNow()")},
       {kDeviceUtcTimeKey, utc_time},
   };
 }

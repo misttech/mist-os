@@ -81,8 +81,8 @@ impl TaskBuilder {
     where
         L: LockBefore<TaskRelease>,
     {
-        let mut locked = locked.cast_locked::<TaskRelease>();
-        Releasable::release(self, &mut locked);
+        let locked = locked.cast_locked::<TaskRelease>();
+        Releasable::release(self, locked);
     }
 }
 
@@ -93,9 +93,9 @@ impl From<TaskBuilder> for CurrentTask {
 }
 
 impl Releasable for TaskBuilder {
-    type Context<'a: 'b, 'b> = &'a mut Locked<TaskRelease>;
+    type Context<'a> = &'a mut Locked<TaskRelease>;
 
-    fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
+    fn release<'a>(self, locked: Self::Context<'a>) {
         let kernel = Arc::clone(self.kernel());
         let mut pids = kernel.pids.write();
 
@@ -215,9 +215,9 @@ type SyscallRestartFunc = dyn FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) ->
     + Sync;
 
 impl Releasable for CurrentTask {
-    type Context<'a: 'b, 'b> = &'a mut Locked<TaskRelease>;
+    type Context<'a> = &'a mut Locked<TaskRelease>;
 
-    fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
+    fn release<'a>(self, locked: Self::Context<'a>) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
 
@@ -258,8 +258,8 @@ impl CurrentTask {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.kernel().delayed_releaser.apply(&mut locked, self);
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.kernel().delayed_releaser.apply(locked, self);
     }
 
     pub fn weak_task(&self) -> WeakRef<Task> {
@@ -291,8 +291,8 @@ impl CurrentTask {
     where
         L: LockBefore<TaskRelease>,
     {
-        let mut locked = locked.cast_locked::<TaskRelease>();
-        Releasable::release(self, &mut locked);
+        let locked = locked.cast_locked::<TaskRelease>();
+        Releasable::release(self, locked);
     }
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(
@@ -560,7 +560,7 @@ impl CurrentTask {
         flags: OpenFlags,
     ) -> Result<(NamespaceNode, bool), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         context.update_for_path(path);
         let mut parent_content = context.with(SymlinkMode::Follow);
@@ -962,6 +962,7 @@ impl CurrentTask {
             log_warn!("unrecoverable error in exec: {err:?}");
 
             send_standard_signal(
+                locked,
                 self,
                 SignalInfo { code: SI_KERNEL as i32, force: true, ..SignalInfo::default(SIGSEGV) },
             );
@@ -1000,7 +1001,11 @@ impl CurrentTask {
 
         // Update the SELinux state, if enabled.
         // TODO: Do we need to update this state after updating the creds for exec?
-        security::update_state_on_exec(self, &resolved_elf.security_state);
+        security::update_state_on_exec(
+            locked.cast_locked::<MmDumpable>(),
+            self,
+            &resolved_elf.security_state,
+        );
 
         {
             let mut state = self.write();
@@ -1101,6 +1106,7 @@ impl CurrentTask {
 
     pub fn add_seccomp_filter(
         &mut self,
+        locked: &mut Locked<Unlocked>,
         code: Vec<sock_filter>,
         flags: u32,
     ) -> Result<SyscallResult, Errno> {
@@ -1113,7 +1119,7 @@ impl CurrentTask {
         let mut maybe_fd: Option<FdNumber> = None;
 
         if flags & SECCOMP_FILTER_FLAG_NEW_LISTENER != 0 {
-            maybe_fd = Some(SeccompFilterContainer::create_listener(self)?);
+            maybe_fd = Some(SeccompFilterContainer::create_listener(locked, self)?);
         }
 
         // We take the process lock here because we can't change any of the threads
@@ -1182,7 +1188,7 @@ impl CurrentTask {
         // Implementation of SECCOMP_FILTER_STRICT, which has slightly different semantics
         // from user-defined seccomp filters.
         if self.seccomp_filter_state.get() == SeccompStateValue::Strict {
-            return SeccompState::do_strict(self, syscall);
+            return SeccompState::do_strict(locked, self, syscall);
         }
 
         // Run user-defined seccomp filters
@@ -1449,7 +1455,7 @@ impl CurrentTask {
         let pid;
         let command;
         let creds;
-        let scheduler_policy;
+        let scheduler_state;
         let no_new_privs;
         let seccomp_filters;
         let robust_list_head = RobustListHeadPtr::null(self);
@@ -1491,7 +1497,7 @@ impl CurrentTask {
             pid = pids.allocate_pid();
             command = self.command();
             creds = self.creds();
-            scheduler_policy = state.scheduler_policy.fork();
+            scheduler_state = state.scheduler_state.fork();
             timerslack_ns = state.timerslack_ns;
 
             uts_ns = if clone_newuts {
@@ -1564,7 +1570,7 @@ impl CurrentTask {
             child_signal_mask,
             child_kernel_signals,
             vfork_event,
-            scheduler_policy,
+            scheduler_state,
             uts_ns,
             no_new_privs,
             SeccompState::from(&self.seccomp_filter_state),
@@ -1785,7 +1791,7 @@ impl CurrentTask {
                         // turned on, then send a SIGTRAP.
                         if trace_kind == PtraceOptions::TRACEEXEC && !ptrace.is_seized() {
                             // Send a SIGTRAP so that the parent can gain control.
-                            send_signal_first(self, state, SignalInfo::default(SIGTRAP));
+                            send_signal_first(locked, self, state, SignalInfo::default(SIGTRAP));
                         }
 
                         return;

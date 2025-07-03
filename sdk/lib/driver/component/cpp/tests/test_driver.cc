@@ -86,11 +86,11 @@ zx::result<> TestDriver::ServeZirconService() {
   return zx::ok();
 }
 
-zx::result<> TestDriver::ValidateIncomingDriverService() {
+zx::result<> TestDriver::ValidateIncomingDriverService(std::string_view instance) {
   zx::result driver_connect_result =
-      incoming()->Connect<fuchsia_driver_component_test::DriverService::Device>();
+      incoming()->Connect<fuchsia_driver_component_test::DriverService::Device>(instance);
   if (driver_connect_result.is_error()) {
-    FDF_LOG(ERROR, "Couldn't connect to DriverService.");
+    FDF_LOG(WARNING, "Couldn't connect to DriverService.");
     return driver_connect_result.take_error();
   }
 
@@ -98,7 +98,11 @@ zx::result<> TestDriver::ValidateIncomingDriverService() {
   fdf::WireUnownedResult wire_result =
       fdf::WireCall(driver_connect_result.value()).buffer(arena)->DriverMethod();
   if (!wire_result.ok()) {
-    FDF_LOG(ERROR, "Failed to call DriverMethod %s", wire_result.status_string());
+    if (instance != component::kDefaultInstance) {
+      FDF_LOG(WARNING, "Failed to call DriverMethod %s", wire_result.status_string());
+    } else {
+      FDF_LOG(ERROR, "Failed to call DriverMethod %s", wire_result.status_string());
+    }
     return zx::error(wire_result.status());
   }
 
@@ -111,17 +115,21 @@ zx::result<> TestDriver::ValidateIncomingDriverService() {
   return zx::ok();
 }
 
-zx::result<> TestDriver::ValidateIncomingZirconService() {
+zx::result<> TestDriver::ValidateIncomingZirconService(std::string_view instance) {
   zx::result zircon_connect_result =
-      incoming()->Connect<fuchsia_driver_component_test::ZirconService::Device>();
+      incoming()->Connect<fuchsia_driver_component_test::ZirconService::Device>(instance);
   if (zircon_connect_result.is_error()) {
-    FDF_LOG(ERROR, "Couldn't connect to ZirconService.");
+    FDF_LOG(WARNING, "Couldn't connect to ZirconService.");
     return zircon_connect_result.take_error();
   }
 
   fidl::WireResult wire_result = fidl::WireCall(zircon_connect_result.value())->ZirconMethod();
   if (!wire_result.ok()) {
-    FDF_LOG(ERROR, "Failed to call ZirconMethod %s", wire_result.status_string());
+    if (instance != component::kDefaultInstance) {
+      FDF_LOG(WARNING, "Failed to call ZirconMethod %s", wire_result.status_string());
+    } else {
+      FDF_LOG(ERROR, "Failed to call ZirconMethod %s", wire_result.status_string());
+    }
     return zx::error(wire_result.status());
   }
 

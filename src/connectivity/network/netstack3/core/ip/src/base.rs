@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use alloc::boxed::Box;
-use alloc::collections::HashMap;
 use alloc::vec::Vec;
 use core::convert::Infallible as Never;
 use core::fmt::Debug;
@@ -29,12 +28,13 @@ use net_types::{
 use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
-    DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
-    HandleableTimer, InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt,
-    MarkDomain, Marks, Matcher as _, NestedIntoCoreTimerCtx, NotFoundError, ResourceCounterContext,
-    RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
-    TimerHandler, TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
+    AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterCollectionSpec, CounterContext,
+    DeviceIdContext, DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext,
+    FrameDestination, HandleableTimer, InstantContext, IpAddressId, IpDeviceAddr,
+    IpDeviceAddressIdContext, IpExt, MarkDomain, Marks, Matcher as _, NestedIntoCoreTimerCtx,
+    NotFoundError, ResourceCounterContext, RngContext, SendFrameErrorReason,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
+    TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,
@@ -42,6 +42,7 @@ use netstack3_filter::{
     FilterMarkMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, MarkAction,
     TransportPacketSerializer, Tuple, WeakConnectionError, WeakConntrackConnection,
 };
+use netstack3_hashmap::HashMap;
 use packet::{
     Buf, BufferAlloc, BufferMut, GrowBuffer, PacketBuilder as _, PacketConstraints, ParseBufferMut,
     ParseMetadata, SerializeError, Serializer as _,
@@ -2770,7 +2771,9 @@ where
             core_ctx.increment_both(inbound_device, |c| {
                 #[derive(GenericOverIp)]
                 #[generic_over_ip(I, Ip)]
-                struct InCounters<'a, I: IpLayerIpExt>(&'a I::RxCounters<Counter>);
+                struct InCounters<'a, I: IpLayerIpExt>(
+                    &'a <I::RxCounters as CounterCollectionSpec>::CounterCollection<Counter>,
+                );
                 I::map_ip_in::<_, _>(
                     InCounters(&c.version_rx),
                     |_counters| {

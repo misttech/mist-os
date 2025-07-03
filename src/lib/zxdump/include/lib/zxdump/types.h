@@ -6,7 +6,6 @@
 #define SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_TYPES_H_
 
 #include <lib/elfldltl/constants.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/debug.h>
@@ -18,12 +17,13 @@
 #include <cstdint>
 #include <iostream>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
 namespace zxdump {
 
-using ByteView = cpp20::span<const std::byte>;
+using ByteView = std::span<const std::byte>;
 
 // fit::result<zxdump::Error> is used as the return type of many operations.
 // It carries a zx_status_t and a string describing what operation failed.
@@ -81,7 +81,7 @@ template <zx_object_info_topic_t Topic>
 struct InfoTraits;
 
 // zxdump::InfoTraitsType<ZX_INFO_*> is either a singleton zx_info_*_t type
-// or a cpp20::span<...> type for topics that return vectors.
+// or a std::span<...> type for topics that return vectors.
 template <zx_object_info_topic_t Topic>
 using InfoTraitsType = typename InfoTraits<Topic>::type;
 
@@ -100,7 +100,7 @@ struct InfoTraits<ZX_INFO_PROCESS> {
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_THREADS> {
   static constexpr std::string_view kName = "ZX_INFO_PROCESS_THREADS";
-  using type = cpp20::span<const zx_koid_t>;
+  using type = std::span<const zx_koid_t>;
 };
 
 template <>
@@ -112,13 +112,13 @@ struct InfoTraits<ZX_INFO_VMAR> {
 template <>
 struct InfoTraits<ZX_INFO_JOB_CHILDREN> {
   static constexpr std::string_view kName = "ZX_INFO_JOB_CHILDREN";
-  using type = cpp20::span<const zx_koid_t>;
+  using type = std::span<const zx_koid_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_JOB_PROCESSES> {
   static constexpr std::string_view kName = "ZX_INFO_JOB_PROCESSES";
-  using type = cpp20::span<const zx_koid_t>;
+  using type = std::span<const zx_koid_t>;
 };
 
 template <>
@@ -142,19 +142,19 @@ struct InfoTraits<ZX_INFO_TASK_STATS> {
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_MAPS> {
   static constexpr std::string_view kName = "ZX_INFO_PROCESS_MAPS";
-  using type = cpp20::span<const zx_info_maps_t>;
+  using type = std::span<const zx_info_maps_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_VMOS_V1> {
   static constexpr std::string_view kName = "ZX_INFO_PROCESS_VMOS_V1";
-  using type = cpp20::span<const zx_info_vmo_t>;
+  using type = std::span<const zx_info_vmo_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_VMOS> {
   static constexpr std::string_view kName = "ZX_INFO_PROCESS_VMOS";
-  using type = cpp20::span<const zx_info_vmo_t>;
+  using type = std::span<const zx_info_vmo_t>;
 };
 
 template <>
@@ -166,7 +166,7 @@ struct InfoTraits<ZX_INFO_THREAD_STATS> {
 template <>
 struct InfoTraits<ZX_INFO_CPU_STATS> {
   static constexpr std::string_view kName = "ZX_INFO_CPU_STATS";
-  using type = cpp20::span<const zx_info_cpu_stats_t>;
+  using type = std::span<const zx_info_cpu_stats_t>;
 };
 
 template <>
@@ -238,7 +238,7 @@ struct InfoTraits<ZX_INFO_STREAM> {
 template <>
 struct InfoTraits<ZX_INFO_HANDLE_TABLE> {
   static constexpr std::string_view kName = "ZX_INFO_HANDLE_TABLE";
-  using type = cpp20::span<const zx_info_handle_extended_t>;
+  using type = std::span<const zx_info_handle_extended_t>;
 };
 
 template <>
@@ -285,13 +285,13 @@ template <typename T>
 inline constexpr bool kIsSpan = false;
 
 template <typename T>
-inline constexpr bool kIsSpan<cpp20::span<T>> = true;
+inline constexpr bool kIsSpan<std::span<T>> = true;
 
 template <typename T>
 struct RemoveSpan;
 
 template <typename T>
-struct RemoveSpan<cpp20::span<T>> {
+struct RemoveSpan<std::span<T>> {
   using type = T;
 };
 

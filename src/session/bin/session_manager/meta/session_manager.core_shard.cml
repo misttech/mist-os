@@ -315,6 +315,12 @@
             availability: "same_as_target",
         },
         {
+            service: [ "google.powerstats.Service" ],
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
+        },
+        {
             storage: [
                 "cache",
                 "data",
@@ -345,6 +351,12 @@
             from: "parent",
             to: "#session-manager",
             availability: "optional",
+        },
+        {
+            directory: "block",
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
         },
         {
             config: "fuchsia.power.SuspendEnabled",
@@ -433,7 +445,7 @@
             to: "#session-manager",
         },
         {
-            protocol: "fuchsia.time.alarms.Wake",
+            protocol: "fuchsia.time.alarms.WakeAlarms",
             from: "#timekeeper",
             to: "#session-manager",
             source_availability: "unknown",

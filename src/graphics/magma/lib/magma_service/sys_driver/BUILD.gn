@@ -67,3 +67,17 @@ source_set("magma_driver_base") {
     "//zircon/system/ulib/zx",
   ]
 }
+
+source_set("magma_power_manager") {
+  sources = [
+    "magma_power_manager.cc",
+    "magma_power_manager.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+    "//sdk/lib/driver/power/cpp",
+  ]
+  deps = [ "//src/graphics/magma/lib/magma/util:macros" ]
+}

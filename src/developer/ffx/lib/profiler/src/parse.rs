@@ -4,15 +4,28 @@
 
 use ffx_symbolize::{MappingDetails, MappingFlags};
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-pub struct Pid(u64);
+pub struct Pid(pub u64);
+
+impl fmt::Display for Pid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-pub struct Tid(u64);
+pub struct Tid(pub u64);
+
+impl fmt::Display for Tid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModuleDetails {
@@ -31,8 +44,8 @@ pub struct BacktraceDetails(pub u64);
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ProfilingRecordHandler {
-    module_with_mmap_records: Vec<ModuleWithMmapDetails>,
-    backtrace_records: HashMap<Tid, Vec<BacktraceDetails>>,
+    pub module_with_mmap_records: Vec<ModuleWithMmapDetails>,
+    backtrace_records: HashMap<Tid, Vec<Vec<BacktraceDetails>>>,
 }
 
 impl ProfilingRecordHandler {
@@ -40,33 +53,30 @@ impl ProfilingRecordHandler {
         &self.module_with_mmap_records
     }
 
-    pub fn get_backtrace_records(&self) -> &HashMap<Tid, Vec<BacktraceDetails>> {
+    pub fn get_backtrace_records(&self) -> &HashMap<Tid, Vec<Vec<BacktraceDetails>>> {
         &self.backtrace_records
     }
+}
 
-    pub fn parse_markup_line(
-        &mut self,
-        line: &str,
-        tid: Option<Tid>,
-    ) -> Result<(), SymbolizeError> {
-        if line.starts_with("{{{mmap") {
-            if let Some(module_with_mmap_details) = self.module_with_mmap_records.last_mut() {
-                module_with_mmap_details.mmaps.push(parse_mmap_record(line)?);
-            } else {
-                return Err(SymbolizeError::NoModuleRecord(line.to_string()));
-            }
-        } else if line.starts_with("{{{module") {
-            self.module_with_mmap_records
-                .push(ModuleWithMmapDetails { module: parse_module_record(line)?, mmaps: vec![] });
-        } else if line.starts_with("{{{bt") {
-            if let Some(tid) = tid {
-                let bt_record = parse_backtrace_record(line)?;
-                self.backtrace_records.entry(tid).or_insert_with(Vec::new).push(bt_record);
-            } else {
-                return Err(SymbolizeError::TidNotExist);
-            }
-        }
-        Ok(())
+pub enum MarkupLine {
+    Mmap(MappingDetails),
+    Module(ModuleWithMmapDetails),
+    Bt(BacktraceDetails),
+}
+
+pub fn parse_markup_line(line: &str) -> Result<MarkupLine, SymbolizeError> {
+    if line.starts_with("{{{mmap") {
+        let mmap_details = parse_mmap_record(line)?;
+        Ok(MarkupLine::Mmap(mmap_details))
+    } else if line.starts_with("{{{module") {
+        let module_record =
+            ModuleWithMmapDetails { module: parse_module_record(line)?, mmaps: vec![] };
+        Ok(MarkupLine::Module(module_record))
+    } else if line.starts_with("{{{bt") {
+        let bt_record = parse_backtrace_record(line)?;
+        Ok(MarkupLine::Bt(bt_record))
+    } else {
+        Err(SymbolizeError::InvalidMarkup)
     }
 }
 
@@ -176,7 +186,26 @@ impl UnsymbolizedSamples {
                 }
                 ParseStateMachine::SetModuleOrMmap => {
                     if line.starts_with("{{{") {
-                        current_profiling_record_handler.parse_markup_line(&line, None)?;
+                        let parsed_line = parse_markup_line(line)?;
+                        match parsed_line {
+                            MarkupLine::Bt(_) => return Err(SymbolizeError::InvalidMarkup),
+                            MarkupLine::Mmap(mmap_record) => {
+                                if let Some(module_with_mmap_details) =
+                                    current_profiling_record_handler
+                                        .module_with_mmap_records
+                                        .last_mut()
+                                {
+                                    module_with_mmap_details.mmaps.push(mmap_record);
+                                } else {
+                                    return Err(SymbolizeError::NoModuleRecord(line.to_string()));
+                                }
+                            }
+                            MarkupLine::Module(module_record) => {
+                                current_profiling_record_handler
+                                    .module_with_mmap_records
+                                    .push(module_record);
+                            }
+                        }
                         state = ParseStateMachine::SetModuleOrMmap;
                     } else {
                         // first time see an unique pid
@@ -199,8 +228,15 @@ impl UnsymbolizedSamples {
                     if !line.starts_with("{{{") {
                         return Err(SymbolizeError::NoBackTrace);
                     }
+                    // started a new call stack
                     if let Some(profiling_record_handler) = profiling_map.get_mut(&pid) {
-                        profiling_record_handler.parse_markup_line(&line, Some(tid))?;
+                        if let MarkupLine::Bt(bt_details) = parse_markup_line(&line)? {
+                            profiling_record_handler
+                                .backtrace_records
+                                .entry(tid)
+                                .or_insert_with(Vec::new)
+                                .push(vec![bt_details]);
+                        }
                         state = ParseStateMachine::SetBacktrace { pid, tid }
                     } else {
                         return Err(SymbolizeError::NoPid);
@@ -209,7 +245,14 @@ impl UnsymbolizedSamples {
                 ParseStateMachine::SetBacktrace { pid, tid } => {
                     if line.starts_with("{{{") {
                         if let Some(profiling_record_handler) = profiling_map.get_mut(&pid) {
-                            profiling_record_handler.parse_markup_line(&line, Some(tid))?;
+                            if let MarkupLine::Bt(bt_record) = parse_markup_line(line)? {
+                                let call_stacks = profiling_record_handler
+                                    .backtrace_records
+                                    .get_mut(&tid)
+                                    .ok_or_else(|| SymbolizeError::TidNotExist)?;
+                                let last_call_stack = call_stacks.last_mut().unwrap();
+                                last_call_stack.push(bt_record);
+                            }
                         }
                     } else {
                         state = ParseStateMachine::SetPid { pid }
@@ -217,12 +260,16 @@ impl UnsymbolizedSamples {
                 }
             }
         }
+
         Ok(UnsymbolizedSamples { handlers: profiling_map })
     }
 }
 
 #[derive(Error, Debug)]
 pub enum SymbolizeError {
+    #[error("Markup line doesn't match either mmap, module or backtrace.")]
+    InvalidMarkup,
+
     #[error("TID is not set for the current backtrace.")]
     TidNotExist,
 
@@ -333,11 +380,11 @@ mod tests {
             backtrace_records: HashMap::from([
                 (
                     Tid(2616),
-                    vec![BacktraceDetails(0x43dc387f8e10), BacktraceDetails(0x2b069ffa16c)],
+                    vec![vec![BacktraceDetails(0x43dc387f8e10), BacktraceDetails(0x2b069ffa16c)]],
                 ),
                 (
                     Tid(1226),
-                    vec![BacktraceDetails(0x43dc387f8e10), BacktraceDetails(0x3a656c4c85e)],
+                    vec![vec![BacktraceDetails(0x43dc387f8e10), BacktraceDetails(0x3a656c4c85e)]],
                 ),
             ]),
         };
@@ -372,11 +419,12 @@ mod tests {
             backtrace_records: HashMap::from([(
                 Tid(4209),
                 vec![
-                    BacktraceDetails(0x401c0cd1dcea),
-                    BacktraceDetails(0x3bfd834db94),
-                    BacktraceDetails(0x401c0cd1dcea),
-                    BacktraceDetails(0x3bfd834db94),
-                    BacktraceDetails(0x3bfd834e80b),
+                    vec![BacktraceDetails(0x401c0cd1dcea), BacktraceDetails(0x3bfd834db94)],
+                    vec![
+                        BacktraceDetails(0x401c0cd1dcea),
+                        BacktraceDetails(0x3bfd834db94),
+                        BacktraceDetails(0x3bfd834e80b),
+                    ],
                 ],
             )]),
         };

@@ -4,9 +4,7 @@
 
 use serde::Deserialize;
 
-use crate::de::Index;
-
-use super::{Attributes, CompIdent, Type};
+use super::{Attributes, CompIdent, Decl, DeclType, Type};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TypeAlias {
@@ -17,10 +15,20 @@ pub struct TypeAlias {
     pub ty: Type,
 }
 
-impl Index for TypeAlias {
-    type Key = CompIdent;
+impl Decl for TypeAlias {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Bits
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn naming_context(&self) -> Option<&[String]> {
+        None
     }
 }

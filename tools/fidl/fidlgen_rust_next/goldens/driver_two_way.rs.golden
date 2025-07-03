@@ -364,10 +364,7 @@ pub struct TwoWay;
 
 pub mod two_way {
     pub mod prelude {
-        pub use crate::{
-            two_way, TwoWay, TwoWayClientHandler, TwoWayClientSender, TwoWayServerHandler,
-            TwoWayServerSender,
-        };
+        pub use crate::{two_way, TwoWay, TwoWayClientHandler, TwoWayServerHandler};
 
         pub use crate::TwoWayAddRequest;
 
@@ -385,48 +382,115 @@ pub mod two_way {
 
         type Response = crate::WireTwoWayAddResponse;
     }
-}
 
-/// A helper trait for the `TwoWay` client sender.
-pub trait TwoWayClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn add<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, two_way::Add>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireTwoWayAddRequest,
-        >;
-}
+        pub struct Add<T0, T1> {
+            addend1: T0,
 
-impl<___T> TwoWayClientSender for ::fidl_next::ClientSender<___T, TwoWay>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            addend2: T1,
+        }
 
-    fn add<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, two_way::Add>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireTwoWayAddRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(989730524426044687, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<T0, T1> ::fidl_next::Encodable for Add<T0, T1>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireU16>,
+
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::WireU16>,
+        {
+            type Encoded = crate::WireTwoWayAddRequest;
+        }
+
+        unsafe impl<___E, T0, T1> ::fidl_next::Encode<___E> for Add<T0, T1>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireU16>,
+
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireU16>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        addend1,
+                        addend2,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.addend1, encoder, addend1)?;
+
+                ::fidl_next::Encode::encode(self.addend2, encoder, addend2)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::TwoWay
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = TwoWayClientSender<___T>;
+            type ServerSender = TwoWayServerSender<___T>;
+        }
+
+        /// The client sender for the `TwoWay` protocol.
+        pub struct TwoWayClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> TwoWayClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn add(
+                &self,
+
+                addend1: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireU16,
+                >,
+
+                addend2: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireU16,
+                >,
+            ) -> Result<::fidl_next::ResponseFuture<'_, super::Add, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.add_with(Add { addend1, addend2 })
+            }
+
+            pub fn add_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::ResponseFuture<'_, super::Add, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireTwoWayAddRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(989730524426044687, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `TwoWay` protocol.
+        #[repr(transparent)]
+        pub struct TwoWayServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> TwoWayServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -435,17 +499,17 @@ where
 /// See [`TwoWay`] for more details.
 pub trait TwoWayClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for TwoWay
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for TwoWay
 where
+    ___H: TwoWayClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: TwoWayClientHandler<___T>,
 
     <two_way::Add as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -455,18 +519,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `TwoWay` server sender.
-pub trait TwoWayServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> TwoWayServerSender for ::fidl_next::ServerSender<___T, TwoWay>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the TwoWay protocol.
@@ -475,25 +527,25 @@ where
 pub trait TwoWayServerHandler<___T: ::fidl_next::Transport> {
     fn add(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, TwoWay>,
+        sender: &::fidl_next::ServerSender<TwoWay, ___T>,
 
-        request: ::fidl_next::Request<___T, two_way::Add>,
+        request: ::fidl_next::Request<two_way::Add, ___T>,
 
         responder: ::fidl_next::Responder<two_way::Add>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for TwoWay
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for TwoWay
 where
+    ___H: TwoWayServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: TwoWayServerHandler<___T>,
 
     <two_way::Add as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -504,9 +556,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -516,7 +568,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.add(sender, decoded, responder),
+                    Ok(decoded) => handler.add(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }

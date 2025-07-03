@@ -78,7 +78,7 @@ impl NetworkManagerHandle {
     }
 
     /// Initialize the connection to the socketproxy.
-    pub fn init(&self, kernel: &Arc<Kernel>) -> Result<(), anyhow::Error> {
+    pub fn init(&self, kernel: &Kernel) -> Result<(), anyhow::Error> {
         self.0.init(kernel)
     }
 }
@@ -89,7 +89,7 @@ impl NetworkManagerHandle {
 // `NetworkManager` can replay the networks to the socketproxy in the case of
 // the component restarting.
 impl NetworkManager {
-    fn init(&self, kernel: &Arc<Kernel>) -> Result<(), anyhow::Error> {
+    fn init(&self, kernel: &Kernel) -> Result<(), anyhow::Error> {
         let starnix_networks =
             connect_to_protocol_sync::<fnp_socketproxy::StarnixNetworksMarker>()?;
         let (sender, receiver) = mpsc::channel::<()>(1);
@@ -442,10 +442,7 @@ impl NetworkManager {
     }
 }
 
-fn spawn_reconnection_thread(
-    kernel: &Arc<Kernel>,
-    initiate_reconnect_receiver: mpsc::Receiver<()>,
-) {
+fn spawn_reconnection_thread(kernel: &Kernel, initiate_reconnect_receiver: mpsc::Receiver<()>) {
     let handle = kernel.network_manager.clone();
     kernel.kthreads.spawn_future(async move {
         // Channel to handle requests to re-connect the socketproxy proxy.

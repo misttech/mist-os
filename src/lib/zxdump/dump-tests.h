@@ -8,7 +8,6 @@
 #include <lib/fdio/spawn.h>
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/functional.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zxdump/dump.h>
@@ -19,6 +18,7 @@
 
 #include <array>
 #include <cstdio>
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -175,7 +175,7 @@ class TestProcessForSystemInfo : public TestProcessForPropertiesAndInfo {
   template <typename Writer>
   void Dump(Writer& writer) {
     TestProcessForPropertiesAndInfo::Dump(
-        writer, cpp20::bind_front(&TestProcessForSystemInfo::Precollect, this));
+        writer, std::bind_front(&TestProcessForSystemInfo::Precollect, this));
   }
 
   // Verify a dump file for that child was inserted and looks right.
@@ -198,7 +198,7 @@ class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {
   template <typename Writer>
   void Dump(Writer& writer) {
     TestProcessForPropertiesAndInfo::Dump(
-        writer, cpp20::bind_front(&TestProcessForKernelInfo::Precollect, this));
+        writer, std::bind_front(&TestProcessForKernelInfo::Precollect, this));
   }
 
   // Verify a dump file for that child was inserted and looks right.
@@ -311,7 +311,7 @@ class TestProcessForThreads : public TestProcessForPropertiesAndInfo {
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder);
 
-  cpp20::span<const zx_koid_t, kThreadCount> thread_koids() const { return thread_koids_; }
+  std::span<const zx_koid_t, kThreadCount> thread_koids() const { return thread_koids_; }
 
  private:
   static constexpr const char* kChildName = "zxdump-thread-test-child";
@@ -337,7 +337,7 @@ class TestProcessForThreadState : public TestProcessForPropertiesAndInfo {
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder);
 
-  cpp20::span<const zx_koid_t, kThreadCount> thread_koids() const { return thread_koids_; }
+  std::span<const zx_koid_t, kThreadCount> thread_koids() const { return thread_koids_; }
 
  private:
   static constexpr const char* kChildName = "zxdump-thread-state-test-child";
@@ -358,8 +358,8 @@ class TestProcessForElfSearch : public zxdump::testing::TestProcessForProperties
   template <typename Writer>
   void Dump(Writer& writer) {
     zxdump::testing::TestProcessForPropertiesAndInfo::Dump(
-        writer, cpp20::bind_front(&TestProcessForElfSearch::Precollect, this),
-        cpp20::bind_front(&TestProcessForElfSearch::DumpAllMemoryWithBuildIds, this));
+        writer, std::bind_front(&TestProcessForElfSearch::Precollect, this),
+        std::bind_front(&TestProcessForElfSearch::DumpAllMemoryWithBuildIds, this));
   }
 
   // Verify a dump file for that child was inserted and looks right.

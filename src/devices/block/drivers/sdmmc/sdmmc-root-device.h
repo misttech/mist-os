@@ -16,6 +16,8 @@
 
 namespace sdmmc {
 
+constexpr uint32_t kInitializationFrequencyHz = 400'000;
+
 class SdmmcDevice;
 
 class SdmmcRootDevice : public fdf::DriverBase {

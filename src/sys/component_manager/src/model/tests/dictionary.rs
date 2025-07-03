@@ -96,6 +96,63 @@ async fn use_protocol_from_dictionary() {
 }
 
 #[fuchsia::test]
+async fn use_protocol_from_dictionary_not_a_dictionary() {
+    // Test extracting a protocol from a dictionary, but the dictionary is not actually a
+    // dictionary so it should fail with a type error.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol_default("parent_not_dict")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("parent_not_dict")
+                        .source(OfferSource::Self_)
+                        .target_static_child("mid"),
+                )
+                .child_default("mid")
+                .build(),
+        ),
+        (
+            "mid",
+            ComponentDeclBuilder::new()
+                // We don't test "self_not_dict" here because the manifest schema forbids such a
+                // manifest from existing.
+                .use_(UseBuilder::protocol().name("A").from_dictionary("parent_not_dict"))
+                .use_(
+                    UseBuilder::protocol()
+                        .source_static_child("leaf")
+                        .name("B")
+                        .from_dictionary("child_not_dict"),
+                )
+                .child_default("leaf")
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol_default("child_not_dict")
+                .expose(
+                    ExposeBuilder::protocol().name("child_not_dict").source(ExposeSource::Self_),
+                )
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    for path in ["/svc/A", "/svc/B"] {
+        test.check_use(
+            "mid".try_into().unwrap(),
+            CheckUse::Protocol {
+                path: path.parse().unwrap(),
+                expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
+            },
+        )
+        .await;
+    }
+}
+
+#[fuchsia::test]
 async fn use_protocol_from_dictionary_not_used() {
     // Create a dictionary with two protocols. `use` one of the protocols, but not the other.
     // Only the protocol that is `use`d should be accessible.

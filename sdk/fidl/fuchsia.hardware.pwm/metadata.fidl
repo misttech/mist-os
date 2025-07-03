@@ -19,7 +19,8 @@ type PwmChannelInfo = table {
     4: period_ns uint32;
 };
 
-/// Metadata to configure PWM channels. Passed under DEVICE_METADATA_PWM_CHANNELS.
+/// Metadata to configure PWM channels.
+@serializable
 type PwmChannelsMetadata = table {
     1: channels vector<PwmChannelInfo>:MAX;
 };

@@ -20,8 +20,14 @@ namespace {
 namespace fad = fuchsia_audio_device;
 
 class RegistryServerTest : public AudioDeviceRegistryServerTestBase {};
-class RegistryServerCodecTest : public RegistryServerTest {};
-class RegistryServerCompositeTest : public RegistryServerTest {};
+class RegistryServerCodecTest : public RegistryServerTest {
+ protected:
+  static inline const std::string kClassName = "RegistryServerCodecTest";
+};
+class RegistryServerCompositeTest : public RegistryServerTest {
+ protected:
+  static inline const std::string kClassName = "RegistryServerCompositeTest";
+};
 
 /////////////////////
 // An important aspect validated by the RegistryServer tests is the state machine that determines
@@ -109,9 +115,9 @@ TEST_F(RegistryServerTest, WatchWithNoDevicesCompletes) {
 // Client calls WatchDevicesAdded and is notified.  D R W.C|W.D
 TEST_F(RegistryServerCodecTest, WatchBeforeDiscoveryComplete) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -151,9 +157,9 @@ TEST_F(RegistryServerCodecTest, WatchBeforeDiscoveryComplete) {
   EXPECT_FALSE(received_callback);
 
   auto fake_driver2 = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name 2", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -165,9 +171,9 @@ TEST_F(RegistryServerCodecTest, WatchBeforeDiscoveryComplete) {
 // Client calls WatchDevicesAdded, then add device and client is notified.  D R C W|D W
 TEST_F(RegistryServerCodecTest, DiscoveryCompleteBeforeWatch) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -191,9 +197,9 @@ TEST_F(RegistryServerCodecTest, DiscoveryCompleteBeforeWatch) {
   EXPECT_TRUE(received_callback);
 
   auto fake_driver2 = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name 2", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -220,9 +226,9 @@ TEST_F(RegistryServerCodecTest, WatchBeforeDiscoveryWithDevicesDuring) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -245,9 +251,9 @@ TEST_F(RegistryServerCodecTest, WatchBeforeDiscoveryWithDevicesDuring) {
   EXPECT_FALSE(received_callback);
 
   auto fake_driver2 = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name 2", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -267,9 +273,9 @@ TEST_F(RegistryServerCodecTest, DiscoveryBeforeWatchWithDevicesDuring) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -278,9 +284,9 @@ TEST_F(RegistryServerCodecTest, DiscoveryBeforeWatchWithDevicesDuring) {
   registry->server().InitialDeviceDiscoveryIsComplete();
 
   auto fake_driver2 = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name 2", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -307,9 +313,9 @@ TEST_F(RegistryServerCodecTest, DiscoveryBeforeWatchWithDevicesDuring) {
 // Client calls WatchDeviceRemoved, then remove device, then client is notified.
 TEST_F(RegistryServerCodecTest, WatchRemovesThenDeviceRemove) {
   auto fake_driver = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -359,9 +365,9 @@ TEST_F(RegistryServerCodecTest, WatchRemovesThenDeviceRemove) {
 // Remove device, see ADR remove it, then client calls WatchDeviceRemoved and is notified.
 TEST_F(RegistryServerCodecTest, DeviceRemoveThenWatchRemoves) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -426,9 +432,9 @@ TEST_F(RegistryServerCodecTest, DeviceAddRemoveThenWatches) {
   ASSERT_TRUE(received_callback);
 
   auto fake_driver = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -460,9 +466,9 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeCodecNoDirection();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -487,9 +493,9 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 0u);
   fake_driver = CreateFakeCodecNoDirection();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -532,9 +538,9 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
 // Client can open an Observer connection on an added Codec device.
 TEST_F(RegistryServerCodecTest, CreateObserver) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -583,9 +589,9 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
 // Client calls WatchDevicesAdded and is notified.  D R W.C|W.D
 TEST_F(RegistryServerCompositeTest, WatchBeforeDiscoveryComplete) {
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -627,7 +633,7 @@ TEST_F(RegistryServerCompositeTest, WatchBeforeDiscoveryComplete) {
   auto fake_driver2 = CreateFakeComposite();
   adr_service()->AddDevice(Device::Create(
       adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
-      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+      fad::DriverClient::WithComposite(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -639,9 +645,9 @@ TEST_F(RegistryServerCompositeTest, WatchBeforeDiscoveryComplete) {
 // Client calls WatchDevicesAdded, then add device and client is notified.  D R C W|D W
 TEST_F(RegistryServerCompositeTest, DiscoveryCompleteBeforeWatch) {
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -667,7 +673,7 @@ TEST_F(RegistryServerCompositeTest, DiscoveryCompleteBeforeWatch) {
   auto fake_driver2 = CreateFakeComposite();
   adr_service()->AddDevice(Device::Create(
       adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
-      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+      fad::DriverClient::WithComposite(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -694,9 +700,9 @@ TEST_F(RegistryServerCompositeTest, WatchBeforeDiscoveryWithDevicesDuring) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -719,7 +725,7 @@ TEST_F(RegistryServerCompositeTest, WatchBeforeDiscoveryWithDevicesDuring) {
   auto fake_driver2 = CreateFakeComposite();
   adr_service()->AddDevice(Device::Create(
       adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
-      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+      fad::DriverClient::WithComposite(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -739,9 +745,9 @@ TEST_F(RegistryServerCompositeTest, DiscoveryBeforeWatchWithDevicesDuring) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -752,7 +758,7 @@ TEST_F(RegistryServerCompositeTest, DiscoveryBeforeWatchWithDevicesDuring) {
   auto fake_driver2 = CreateFakeComposite();
   adr_service()->AddDevice(Device::Create(
       adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
-      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+      fad::DriverClient::WithComposite(fake_driver2->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 2u);
@@ -777,9 +783,9 @@ TEST_F(RegistryServerCompositeTest, DiscoveryBeforeWatchWithDevicesDuring) {
 // Client calls WatchDeviceRemoved, then remove device, then client is notified.
 TEST_F(RegistryServerCompositeTest, WatchRemovesThenDeviceRemove) {
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -829,9 +835,9 @@ TEST_F(RegistryServerCompositeTest, WatchRemovesThenDeviceRemove) {
 // Remove device, see ADR remove it, then client calls WatchDeviceRemoved and is notified.
 TEST_F(RegistryServerCompositeTest, DeviceRemoveThenWatchRemoves) {
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -896,9 +902,9 @@ TEST_F(RegistryServerCompositeTest, DeviceAddRemoveThenWatches) {
   ASSERT_TRUE(received_callback);
 
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -930,9 +936,9 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -957,9 +963,9 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 0u);
   fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1002,9 +1008,9 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
 // Client can open an Observer connection on an added Composite device.
 TEST_F(RegistryServerCompositeTest, CreateObserver) {
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);

@@ -8,6 +8,7 @@ use starnix_core::mm::memory::MemoryObject;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{Anon, FileHandle, FileOps, FsNodeInfo};
 use starnix_core::{fileops_impl_memory, fileops_impl_noop_sync};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Arc;
@@ -46,6 +47,7 @@ pub struct ImageFile {
 
 impl ImageFile {
     pub fn new_file(
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         info: ImageInfo,
         memory: MemoryObject,
@@ -56,6 +58,7 @@ impl ImageFile {
         node_info.size = memory_size as usize;
         // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
         Anon::new_private_file_extended(
+            locked,
             current_task,
             Box::new(ImageFile { info, memory: Arc::new(memory) }),
             OpenFlags::RDWR,

@@ -58,7 +58,6 @@ _platform_configuration_base = {
   }
 
   storage = {
-    storage_host_enabled = true
   }
 
   ui = {
@@ -115,13 +114,6 @@ _storage_minfs = {
   }
 }
 
-_storage_storage_host = {
-  storage = {
-    mutable_storage_garbage_collection = true
-    storage_host_enabled = true
-  }
-}
-
 _base_packages = [
   {
     # Provides font assets for `platform.fonts.font_collection` above.
@@ -168,21 +160,6 @@ product_assembly_configuration("core_with_minfs") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_minfs, "*")
-  }
-  product = {
-    build_info = default_product_build_info
-  }
-
-  base_packages = _base_packages
-  cache_packages = _cache_packages
-  deps = [ "//build/info:build_info_files" ]
-}
-
-product_assembly_configuration("core_with_storage_host") {
-  testonly = true
-  platform = {
-    forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_storage_host, "*")
   }
   product = {
     build_info = default_product_build_info

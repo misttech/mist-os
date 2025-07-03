@@ -37,6 +37,7 @@ rustc_library("nanohub") {
     "nanohub_comms_directory.rs",
     "nanohub_firmware_file.rs",
     "nanohub_socket_file.rs",
+    "nanohub_sysfs_files.rs",
     "socket_tunnel_file.rs",
   ]
 
@@ -64,4 +65,9 @@ fuchsia_unittest_package("starnix-nanohub-tests") {
   manifest = "meta/starnix_nanohub_tests.cml"
   deps = [ ":nanohub_test" ]
   test_type = "starnix"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

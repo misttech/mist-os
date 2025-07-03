@@ -902,7 +902,7 @@ static int write_page(NDM ndm, uint32_t vpn, const ui8* buf, ui8* spare, int act
 
     // Else if chip error, mark block bad and do bad block recovery.
     else if (rc == -1) {
-      if (ndmMarkBadBlock(ndm, pn, WRITE_PAGE))
+      if (ndmMarkBadBlock(ndm, pn, WRITE_PAGE, vbn))
         return -2;
     }
 
@@ -1082,6 +1082,17 @@ int ndmCheckPage(uint32_t vpn, ui8* data, ui8* spare, NDM ndm) {
   return status;
 }
 
+// ndmSetBadBlockCallback: FTL driver function - register callback for alerting
+//                         when a block is marked bad.
+//
+//      Inputs:      cb = The method to call.
+//              cb_data = The data pointer passed back to the cb.
+//
+void ndmSetBadBlockCallback(OnMarkedBad cb, void* cb_data, NDM ndm) {
+  ndm->on_marked_bad_cb_data = cb_data;
+  ndm->on_marked_bad_cb = cb;
+}
+
 // ndmTransferPage: FTL driver function - transfer a page
 //
 //      Inputs: old_vpn = old virtual page number
@@ -1152,7 +1163,7 @@ int ndmTransferPage(uint32_t old_vpn, uint32_t new_vpn, ui8* buf, ui8* spare, ND
     // Else chip error (-1), mark block bad and do bad block recovery.
     else {
       PfAssert(status == -1);
-      if (ndmMarkBadBlock(ndm, new_pn, WRITE_PAGE)) {
+      if (ndmMarkBadBlock(ndm, new_pn, WRITE_PAGE, new_vbn)) {
         status = -2;
         break;
       }
@@ -1178,15 +1189,7 @@ uint32_t ndmPairOffset(uint32_t page_offset, CNDM ndm) {
 }
 #endif  // INC_FTL_NDM_MLC
 
-// ndmMarkBadBlock: Mark virtual block bad and do bad block recovery
-//
-//      Inputs: ndm = pointer to NDM control block
-//              arg = bad block or page depending on cause
-//              cause = ERASE_BLOCK or WRITE_PAGE failure
-//
-//     Returns: 0 on success, -1 on failure
-//
-int ndmMarkBadBlock(NDM ndm, ui32 arg, ui32 cause) {
+int ndmMarkBadBlockImpl(NDM ndm, ui32 arg, ui32 cause) {
   ui32 bad_b, bad_pn, free_b, i, old_pn, new_pn;
   int status, transfer_finished;
 
@@ -1324,6 +1327,26 @@ int ndmMarkBadBlock(NDM ndm, ui32 arg, ui32 cause) {
 
   // Return success.
   return 0;
+}
+
+// ndmMarkBadBlock: Mark virtual block bad and do bad block recovery
+//
+//      Inputs: ndm = pointer to NDM control block
+//              arg = bad block or page depending on cause
+//              action = ERASE_BLOCK or WRITE_PAGE failure
+//              vbn = virtual block number being replaced
+//
+//     Returns: 0 on success, -1 on failure
+//
+int ndmMarkBadBlock(NDM ndm, ui32 arg, ui32 action, ui32 vbn) {
+  int res = ndmMarkBadBlockImpl(ndm, arg, action);
+
+  // Report block successfully marked bad to the FTL.
+  if (res == 0 && vbn != (ui32)-1 && ndm->on_marked_bad_cb && ndm->on_marked_bad_cb_data) {
+    ndm->on_marked_bad_cb(ndm->on_marked_bad_cb_data, vbn);
+  }
+
+  return res;
 }
 
 //   ndmWrCtrl: Write NDM control information to flash
@@ -1622,7 +1645,7 @@ int ndmWritePages(uint32_t vpn, uint32_t count, const ui8* data, ui8* spare, NDM
       // Else bad block, mark it bad. If error, break to return -1.
       else {
         PfAssert(rc == -1);
-        if (ndmMarkBadBlock(ndm, pn, WRITE_PAGE))
+        if (ndmMarkBadBlock(ndm, pn, WRITE_PAGE, vbn))
           break;
       }
     }
@@ -1862,7 +1885,7 @@ int ndmEraseBlock(ui32 vpn, NDM ndm) {
   if (status < 0) {
     // If chip error, do bad block recovery. Else return fatal error.
     if (status == -1)
-      status = ndmMarkBadBlock(ndm, bn, ERASE_BLOCK);
+      status = ndmMarkBadBlock(ndm, bn, ERASE_BLOCK, vbn);
     else
       FsError2(NDM_EIO, EIO);
   }

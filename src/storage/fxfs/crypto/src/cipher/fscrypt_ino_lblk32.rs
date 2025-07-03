@@ -82,6 +82,16 @@ impl Cipher for FscryptInoLblk32FileCipher {
         let e: Error = zx_status::Status::NOT_SUPPORTED.into();
         Err(e.context("decrypt_filename not supported for InoLblk32File"))
     }
+
+    fn hash_code(&self, _raw_filename: &[u8], _filename: &str) -> u32 {
+        debug_assert!(false, "hash_code called on file cipher");
+        0
+    }
+
+    fn hash_code_casefold(&self, _filename: &str) -> u32 {
+        debug_assert!(false, "hash_code_casefold called on file cipher");
+        0
+    }
 }
 
 #[cfg(test)]

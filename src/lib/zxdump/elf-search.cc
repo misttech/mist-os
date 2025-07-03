@@ -49,7 +49,7 @@ fit::result<Error, zxdump::Buffer<Elf::Phdr>> DetectElf(Process& process,
 }
 
 fit::result<Error, ElfIdentity> DetectElfIdentity(Process& process, const zx_info_maps_t& segment,
-                                                  cpp20::span<const Elf::Phdr> phdrs) {
+                                                  std::span<const Elf::Phdr> phdrs) {
   // Find the first PT_LOAD segment.
   std::optional<uint64_t> first_load;
   for (const auto& phdr : phdrs) {

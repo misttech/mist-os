@@ -145,7 +145,7 @@ impl SdkRoot {
                 match Self::find_sdk_root(&Path::new(&exe_path)) {
                     Ok(Some(root)) => root,
                     Ok(None) => {
-                        log::error!(
+                        log::warn!(
                             "Could not find an SDK manifest in any parent of ffx's directory. \
                              Using {:?} as HostTools root",
                             exe_path.parent().unwrap()

@@ -38,6 +38,10 @@ async fn routes_from_echo() -> Result<(), Error> {
     // Add component to the realm, which is fetched using a fragment-only URL.
     // The child is not exposing a service, so the `eager` option ensures the
     // child starts when the realm is built.
+    // This client is not used a part of the test, but is used to demonstrate
+    // routing between two children and is referenced in documentation.  The test instead accesses
+    // the `fidl.examples.routing.echo.Echo` protocol from the test component as routed in
+    // route_to_test_rust below.
     let echo_client = builder
         .add_child("echo_client", "#meta/echo_client.cm", ChildOptions::new().eager())
         .await?;

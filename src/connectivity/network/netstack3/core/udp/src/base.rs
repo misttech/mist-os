@@ -4,7 +4,6 @@
 
 //! The User Datagram Protocol (UDP).
 
-use alloc::collections::hash_map::DefaultHasher;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::convert::Infallible as Never;
@@ -33,7 +32,7 @@ use netstack3_base::{
     AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, CounterContext,
     DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError, Mark,
     MarkDomain, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
-    ResourceCounterContext as _, RngContext, SocketError, StrongDeviceIdentifier,
+    ResourceCounterContext as _, RngContext, SettingsContext, SocketError, StrongDeviceIdentifier,
     WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_datagram::{
@@ -51,6 +50,7 @@ use netstack3_datagram::{
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
 use netstack3_filter::{SocketIngressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext};
+use netstack3_hashmap::hash_map::DefaultHasher;
 use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
@@ -68,6 +68,7 @@ use thiserror::Error;
 use crate::internal::counters::{
     CombinedUdpCounters, UdpCounterContext, UdpCountersWithSocket, UdpCountersWithoutSocket,
 };
+use crate::internal::settings::UdpSettings;
 
 /// Convenience alias to make names shorter.
 pub(crate) type UdpBoundSocketMap<I, D, BT> =
@@ -497,6 +498,7 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
     type SerializeError = UdpSerializeError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    type Settings = UdpSettings;
     type Counters<I: Ip> = UdpCountersWithSocket<I>;
     type SocketWritableListener = BT::SocketWritableListener;
 
@@ -1070,6 +1072,12 @@ impl UdpPacketMeta<Ipv4> {
     }
 }
 
+/// Errors that Bindings may encounter when receiving a UDP datagram.
+pub enum ReceiveUdpError {
+    /// The socket's receive queue is full and can't hold the datagram.
+    QueueFull,
+}
+
 /// The bindings context handling received UDP frames.
 pub trait UdpReceiveBindingsContext<I: IpExt, D: StrongDeviceIdentifier>: UdpBindingsTypes {
     /// Receives a UDP packet on a socket.
@@ -1079,7 +1087,7 @@ pub trait UdpReceiveBindingsContext<I: IpExt, D: StrongDeviceIdentifier>: UdpBin
         device_id: &D,
         meta: UdpPacketMeta<I>,
         body: &[u8],
-    );
+    ) -> Result<(), ReceiveUdpError>;
 }
 
 /// The bindings context providing external types to UDP sockets.
@@ -1109,6 +1117,7 @@ pub trait UdpBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     + ReferenceNotifiers
     + UdpBindingsTypes
     + SocketOpsFilterBindingContext<D>
+    + SettingsContext<UdpSettings>
 {
 }
 impl<
@@ -1118,7 +1127,8 @@ impl<
             + UdpReceiveBindingsContext<I, D>
             + ReferenceNotifiers
             + UdpBindingsTypes
-            + SocketOpsFilterBindingContext<D>,
+            + SocketOpsFilterBindingContext<D>
+            + SettingsContext<UdpSettings>,
         D: StrongDeviceIdentifier,
     > UdpBindingsContext<I, D> for BC
 {
@@ -1485,41 +1495,52 @@ fn try_deliver<
             DatagramSocketState::Unbound(_) => true,
         };
 
-        if should_deliver {
-            if require_transparent {
-                let (ip_options, _device) = state.get_options_device(core_ctx);
-                // This packet has been transparently proxied, and such packets are only
-                // delivered to transparent sockets.
-                if !ip_options.transparent() {
-                    return false;
-                }
-            }
+        if !should_deliver {
+            return None;
+        }
 
-            let [ip_prefix, ip_options] = header_info.as_bytes();
-            let [udp_header, data] = packet.as_bytes();
-            let mut slices = [ip_prefix, ip_options, udp_header, data];
-            let data = FragmentedByteSlice::new(&mut slices);
-            let filter_result = bindings_ctx.socket_ops_filter().on_ingress(
-                &data,
-                device_id,
-                id.socket_cookie(),
-                state.get_options(core_ctx).marks(),
-            );
-
-            match filter_result {
-                SocketIngressFilterResult::Accept => {
-                    bindings_ctx.receive_udp(id, device_id, meta, packet.body());
-                }
-                SocketIngressFilterResult::Drop => (),
+        if require_transparent {
+            let (ip_options, _device) = state.get_options_device(core_ctx);
+            // This packet has been transparently proxied, and such packets are only
+            // delivered to transparent sockets.
+            if !ip_options.transparent() {
+                return None;
             }
         }
-        should_deliver
+
+        let [ip_prefix, ip_options] = header_info.as_bytes();
+        let [udp_header, data] = packet.as_bytes();
+        let mut slices = [ip_prefix, ip_options, udp_header, data];
+        let data = FragmentedByteSlice::new(&mut slices);
+        let filter_result = bindings_ctx.socket_ops_filter().on_ingress(
+            I::VERSION,
+            data,
+            device_id,
+            id.socket_cookie(),
+            state.get_options(core_ctx).marks(),
+        );
+
+        match filter_result {
+            SocketIngressFilterResult::Accept => {
+                Some(bindings_ctx.receive_udp(id, device_id, meta, packet.body()))
+            }
+            SocketIngressFilterResult::Drop => None,
+        }
     });
 
-    if delivered {
-        core_ctx.increment_both(id, |c| &c.rx_delivered);
+    match delivered {
+        None => false,
+        Some(result) => {
+            core_ctx.increment_both(id, |c| &c.rx_delivered);
+            match result {
+                Ok(()) => {}
+                Err(ReceiveUdpError::QueueFull) => {
+                    core_ctx.increment_both(id, |c| &c.rx_queue_full);
+                }
+            }
+            true
+        }
     }
-    delivered
 }
 
 /// A wrapper for [`try_deliver`] that supports dual stack delivery.
@@ -2736,7 +2757,6 @@ impl<
 #[cfg(test)]
 mod tests {
     use alloc::borrow::ToOwned;
-    use alloc::collections::{HashMap, HashSet};
     use alloc::vec;
     use core::convert::TryInto as _;
     use core::ops::{Deref, DerefMut};
@@ -2759,10 +2779,11 @@ mod tests {
         TestIpExt as _,
     };
     use netstack3_base::{
-        CtxPair, RemoteAddressError, ResourceCounterContext, SendFrameErrorReason,
-        UninstantiableWrapper,
+        CounterCollection, CtxPair, RemoteAddressError, ResourceCounterContext,
+        SendFrameErrorReason, UninstantiableWrapper,
     };
     use netstack3_datagram::MulticastInterfaceSelector;
+    use netstack3_hashmap::{HashMap, HashSet};
     use netstack3_ip::device::IpDeviceStateIpExt;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
     use netstack3_ip::testutil::{DualStackSendIpPacketMeta, FakeIpHeaderInfo};
@@ -2781,6 +2802,8 @@ mod tests {
     #[derivative(Default(bound = ""))]
     struct SocketReceived<I: Ip> {
         packets: Vec<ReceivedPacket<I>>,
+        #[derivative(Default(value = "usize::MAX"))]
+        max_size: usize,
     }
 
     #[derive(Debug, PartialEq)]
@@ -2921,7 +2944,7 @@ mod tests {
         ) -> HashMap<WeakUdpSocketId<I, D::Weak, FakeUdpBindingsCtx<D>>, Vec<&'_ [u8]>> {
             self.received::<I>()
                 .iter()
-                .map(|(id, SocketReceived { packets })| {
+                .map(|(id, SocketReceived { packets, .. })| {
                     (
                         id.clone(),
                         packets.iter().map(|ReceivedPacket { meta: _, body }| &body[..]).collect(),
@@ -2940,13 +2963,15 @@ mod tests {
             _device_id: &D,
             meta: UdpPacketMeta<I>,
             body: &[u8],
-        ) {
-            self.state
-                .received_mut::<I>()
-                .entry(id.downgrade())
-                .or_default()
-                .packets
-                .push(ReceivedPacket { meta, body: body.to_owned() })
+        ) -> Result<(), ReceiveUdpError> {
+            let SocketReceived { packets, max_size } =
+                self.state.received_mut::<I>().entry(id.downgrade()).or_default();
+            if packets.len() < *max_size {
+                packets.push(ReceivedPacket { meta, body: body.to_owned() });
+                Ok(())
+            } else {
+                Err(ReceiveUdpError::QueueFull)
+            }
         }
     }
 
@@ -3419,22 +3444,15 @@ mod tests {
         >,
     ) {
         assert_eq!(
-            CounterExpectationsWithSocket::from(
-                CounterContext::<UdpCountersWithSocket<I>>::counters(core_ctx).as_ref()
-            ),
+            CounterContext::<UdpCountersWithSocket<I>>::counters(core_ctx).cast(),
             with_socket_expects
         );
         assert_eq!(
-            CounterExpectationsWithoutSocket::from(
-                CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).as_ref()
-            ),
+            CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).cast(),
             without_socket_expects
         );
         for (id, expects) in per_socket_expects.into_iter() {
-            assert_eq!(
-                CounterExpectationsWithSocket::from(core_ctx.per_resource_counters(id).as_ref()),
-                expects
-            );
+            assert_eq!(core_ctx.per_resource_counters(id).cast(), expects);
         }
     }
 
@@ -3515,7 +3533,10 @@ mod tests {
             bindings_ctx.state.received::<I>(),
             &HashMap::from([(
                 socket.downgrade(),
-                SocketReceived { packets: vec![ReceivedPacket { meta, body: body.into() }] }
+                SocketReceived {
+                    packets: vec![ReceivedPacket { meta, body: body.into() }],
+                    max_size: usize::MAX
+                }
             )])
         );
 
@@ -3564,6 +3585,58 @@ mod tests {
             };
         check_frame(&frames[0]);
         check_frame(&frames[1]);
+    }
+
+    #[ip_test(I)]
+    fn test_receive_udp_queue_full<I: TestIpExt>() {
+        set_logger_for_test();
+        let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
+        let mut api = UdpApi::<I, _>::new(ctx.as_mut());
+        let local_ip = local_ip::<I>();
+        let remote_ip = remote_ip::<I>();
+        let socket = api.create();
+
+        // Create a listener on the local port, bound to the local IP:
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
+            .expect("listen_udp failed");
+
+        let (core_ctx, bindings_ctx) = api.contexts();
+        // Simulate a full RX queue.
+        {
+            let received =
+                bindings_ctx.state.received_mut::<I>().entry(socket.downgrade()).or_default();
+            received.max_size = 0;
+        }
+
+        // Inject a packet.
+        let body = [1, 2, 3, 4, 5];
+        let meta = UdpPacketMeta::<I> {
+            src_ip: remote_ip.get(),
+            src_port: Some(REMOTE_PORT),
+            dst_ip: local_ip.get(),
+            dst_port: LOCAL_PORT,
+            dscp_and_ecn: DscpAndEcn::default(),
+        };
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &body[..])
+            .expect("receive udp packet should succeed");
+
+        assert_counters(
+            api.core_ctx(),
+            CounterExpectationsWithSocket {
+                rx_delivered: 1,
+                rx_queue_full: 1,
+                ..Default::default()
+            },
+            CounterExpectationsWithoutSocket { rx: 1, ..Default::default() },
+            [(
+                &socket,
+                CounterExpectationsWithSocket {
+                    rx_delivered: 1,
+                    rx_queue_full: 1,
+                    ..Default::default()
+                },
+            )],
+        )
     }
 
     /// Tests that UDP packets without a connection are dropped.
@@ -4369,7 +4442,8 @@ mod tests {
                     packets: vec![
                         ReceivedPacket { meta: meta_1, body: body.into() },
                         ReceivedPacket { meta: meta_2, body: body.into() }
-                    ]
+                    ],
+                    max_size: usize::MAX,
                 }
             )])
         );
@@ -4400,7 +4474,10 @@ mod tests {
             bindings_ctx.state.received(),
             &HashMap::from([(
                 listener.downgrade(),
-                SocketReceived { packets: vec![ReceivedPacket { meta, body: vec![] }] }
+                SocketReceived {
+                    packets: vec![ReceivedPacket { meta, body: vec![] }],
+                    max_size: usize::MAX
+                }
             )])
         );
     }
@@ -6377,7 +6454,8 @@ mod tests {
                             dst_port: LOCAL_PORT,
                             dscp_and_ecn: DscpAndEcn::default(),
                         }
-                    }]
+                    }],
+                    max_size: usize::MAX,
                 }
             )])
         );
@@ -7082,7 +7160,8 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::testutil::create_primary_id((), Default::default());
+            let primary =
+                datagram::testutil::create_primary_id((), Default::default(), &Default::default());
             let id = UdpSocketId(PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id
@@ -7144,7 +7223,8 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::testutil::create_primary_id((), Default::default());
+            let primary =
+                datagram::testutil::create_primary_id((), Default::default(), &Default::default());
             let id = UdpSocketId(PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id

@@ -21,6 +21,7 @@ load(
 )
 load(
     "//fuchsia/private/assembly:fuchsia_board_input_bundle.bzl",
+    _INCLUDE_IN = "INCLUDE_IN",
     _fuchsia_board_input_bundle = "fuchsia_board_input_bundle",
     _fuchsia_prebuilt_board_input_bundle = "fuchsia_prebuilt_board_input_bundle",
 )
@@ -173,6 +174,7 @@ fuchsia_partition = _fuchsia_partition
 # constants
 BUILD_TYPES = _BUILD_TYPES
 PARTITION_TYPE = _PARTITION_TYPE
+INCLUDE_IN = _INCLUDE_IN
 SLOT = _SLOT
 ARCH = _ARCH
 INPUT_DEVICE_TYPE = _INPUT_DEVICE_TYPE

@@ -133,7 +133,7 @@ if (current_toolchain != default_toolchain) {
 # similar tools). Pass it to rustc by specifying `@rust_api_level_cfg_flags.txt`
 # in the command line.
 generated_file("api_level_cfg_flags") {
-  outputs = [ "$root_build_dir/rust_api_level_cfg_flags.txt" ]
+  outputs = [ "$root_out_dir/rust_api_level_cfg_flags.txt" ]
   output_conversion = "list lines"
   contents = []
 

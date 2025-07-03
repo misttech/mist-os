@@ -208,7 +208,8 @@ TEST_P(FsckAfterEveryTransactionTest, PurgeOnRemountSucceeds) {
   auto* ram_disk = fs().GetRamDisk();
   EXPECT_EQ(ram_disk->SleepAfter(0).status_value(), ZX_OK);
 
-  EXPECT_EQ(fs().Unmount().status_value(), ZX_OK);
+  // We shouldn't expect a filesystem that can't write to shutdown cleanly.
+  std::ignore = fs().Unmount();
 
   EXPECT_EQ(ram_disk->Wake().status_value(), ZX_OK);
 

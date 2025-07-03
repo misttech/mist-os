@@ -341,10 +341,7 @@ pub struct OneWay;
 
 pub mod one_way {
     pub mod prelude {
-        pub use crate::{
-            one_way, OneWay, OneWayClientHandler, OneWayClientSender, OneWayServerHandler,
-            OneWayServerSender,
-        };
+        pub use crate::{one_way, OneWay, OneWayClientHandler, OneWayServerHandler};
 
         pub use crate::OneWaySendRequest;
     }
@@ -360,40 +357,99 @@ pub mod one_way {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `OneWay` client sender.
-pub trait OneWayClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn send<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireOneWaySendRequest,
-        >;
-}
+        pub struct Send<T0> {
+            payload: T0,
+        }
 
-impl<___T> OneWayClientSender for ::fidl_next::ClientSender<___T, OneWay>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<T0> ::fidl_next::Encodable for Send<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WirePayload>,
+        {
+            type Encoded = crate::WireOneWaySendRequest;
+        }
 
-    fn send<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireOneWaySendRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(7942965975761529343, request)
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for Send<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WirePayload>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        payload,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.payload, encoder, payload)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::OneWay
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = OneWayClientSender<___T>;
+            type ServerSender = OneWayServerSender<___T>;
+        }
+
+        /// The client sender for the `OneWay` protocol.
+        pub struct OneWayClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> OneWayClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn send(
+                &self,
+
+                payload: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WirePayload,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.send_with(Send { payload })
+            }
+
+            pub fn send_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireOneWaySendRequest,
+                >,
+            {
+                self.sender.send_one_way(7942965975761529343, request)
+            }
+        }
+
+        /// The server sender for the `OneWay` protocol.
+        #[repr(transparent)]
+        pub struct OneWayServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> OneWayServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -402,14 +458,14 @@ where
 /// See [`OneWay`] for more details.
 pub trait OneWayClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for OneWay
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for OneWay
 where
+    ___H: OneWayClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: OneWayClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -421,47 +477,35 @@ where
     }
 }
 
-/// A helper trait for the `OneWay` server sender.
-pub trait OneWayServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> OneWayServerSender for ::fidl_next::ServerSender<___T, OneWay>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-}
-
 /// A server handler for the OneWay protocol.
 ///
 /// See [`OneWay`] for more details.
 pub trait OneWayServerHandler<___T: ::fidl_next::Transport> {
     fn send(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, OneWay>,
+        sender: &::fidl_next::ServerSender<OneWay, ___T>,
 
-        request: ::fidl_next::Request<___T, one_way::Send>,
-    );
+        request: ::fidl_next::Request<one_way::Send, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for OneWay
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for OneWay
 where
+    ___H: OneWayServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: OneWayServerHandler<___T>,
 
     <one_way::Send as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             7942965975761529343 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.send(sender, decoded),
+                Ok(decoded) => handler.send(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -473,9 +517,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

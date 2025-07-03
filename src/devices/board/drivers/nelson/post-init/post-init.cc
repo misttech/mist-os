@@ -34,8 +34,13 @@ constexpr std::array<const char*, 2> kBoardOptionNodeNames = {
     "hw-id-4",
 };
 
-constexpr std::array<const char*, 2> kDisplayIdNodeNames = {
+constexpr std::array<const char*, 1> kPanelDdicModelNodeNames = {
+    // Corresponds to pin `ID0` on Nelson display modules.
     "disp-soc-id0",
+};
+
+constexpr std::array<const char*, 1> kPanelVendorNodeNames = {
+    // Corresponds to pin `ID1` on Nelson display modules.
     "disp-soc-id1",
 };
 
@@ -55,6 +60,47 @@ enum {
 }  // namespace
 
 namespace nelson {
+
+namespace {
+
+// Values map to GPIO pin semantics for the display module ID1 pin.
+enum class PanelVendor : uint32_t {
+  kKd = 0,
+  kBoe = 1,
+};
+
+// Values map to GPIO pin semantics for the display module ID0 pin.
+enum class PanelDdicModel : uint32_t {
+  kFitipowerJd9364 = 0,
+  kFitipowerJd9365 = 1,
+};
+
+zx::result<display::PanelType> GetPanelType(PanelVendor panel_vendor,
+                                            PanelDdicModel panel_ddic_model) {
+  switch (panel_vendor) {
+    case PanelVendor::kKd:
+      switch (panel_ddic_model) {
+        case PanelDdicModel::kFitipowerJd9364:
+          return zx::ok(display::PanelType::kKdKd070d82FitipowerJd9364);
+        case PanelDdicModel::kFitipowerJd9365:
+          return zx::ok(display::PanelType::kKdKd070d82FitipowerJd9365);
+      }
+      break;
+    case PanelVendor::kBoe:
+      switch (panel_ddic_model) {
+        case PanelDdicModel::kFitipowerJd9364:
+          return zx::ok(display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson);
+        case PanelDdicModel::kFitipowerJd9365:
+          return zx::ok(display::PanelType::kBoeTv070wsmFitipowerJd9365);
+      }
+      break;
+  }
+  FDF_LOG(ERROR, "Invalid GPIO panel type: panel vendor %" PRIu32 " panel DDIC model %" PRIu32,
+          static_cast<uint32_t>(panel_vendor), static_cast<uint32_t>(panel_ddic_model));
+  return zx::error(ZX_ERR_INVALID_ARGS);
+}
+
+}  // namespace
 
 void PostInit::Start(fdf::StartCompleter completer) {
   parent_.Bind(std::move(node()));
@@ -95,7 +141,19 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = IdentifyPanel(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   if (zx::result result = InitDisplay(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
+  if (zx::result result = InitTouch(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
+  if (zx::result result = InitBacklight(); result.is_error()) {
     return completer(result.take_error());
   }
 
@@ -146,12 +204,36 @@ zx::result<> PostInit::InitBoardInfo() {
   }
   board_option_ = *board_option;
 
-  zx::result<uint32_t> display_id =
-      ReadGpios({kDisplayIdNodeNames.data(), kDisplayIdNodeNames.size()});
-  if (display_id.is_error()) {
-    return display_id.take_error();
+  return zx::ok();
+}
+
+zx::result<> PostInit::IdentifyPanel() {
+  zx::result<uint32_t> panel_vendor_result =
+      ReadGpios({kPanelVendorNodeNames.data(), kPanelVendorNodeNames.size()});
+  if (panel_vendor_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read panel vendor GPIOs: %s", panel_vendor_result.status_string());
+    return panel_vendor_result.take_error();
   }
-  display_id_ = *display_id;
+  // The cast result will always be a valid member because the `ReadGpios()`
+  // result for a single GPIO is guaranteed to be 0 or 1.
+  PanelVendor panel_vendor = static_cast<PanelVendor>(std::move(panel_vendor_result).value());
+
+  zx::result<uint32_t> panel_ddic_model_result =
+      ReadGpios({kPanelDdicModelNodeNames.data(), kPanelDdicModelNodeNames.size()});
+  if (panel_ddic_model_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read panel DDIC model GPIOs: %s",
+            panel_ddic_model_result.status_string());
+    return panel_ddic_model_result.take_error();
+  }
+  PanelDdicModel panel_ddic_model =
+      static_cast<PanelDdicModel>(std::move(panel_ddic_model_result).value());
+
+  zx::result<display::PanelType> panel_type_result = GetPanelType(panel_vendor, panel_ddic_model);
+  if (panel_type_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get panel type: %s", panel_type_result.status_string());
+    return panel_type_result.take_error();
+  }
+  panel_type_ = std::move(panel_type_result).value();
 
   return zx::ok();
 }
@@ -169,7 +251,7 @@ zx::result<> PostInit::SetInspectProperties() {
   root_ = inspector_.GetRoot().CreateChild("nelson_board_driver");
   board_build_property_ = root_.CreateUint("board_build", board_build_);
   board_option_property_ = root_.CreateUint("board_option", board_option_);
-  display_id_property_ = root_.CreateUint("display_id", display_id_);
+  panel_type_property_ = root_.CreateUint("panel_type", static_cast<uint32_t>(panel_type_));
 
   return zx::ok();
 }

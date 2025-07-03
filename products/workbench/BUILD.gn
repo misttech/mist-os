@@ -4,6 +4,16 @@
 
 import("//build/bazel/assembly/bazel_product_bundle.gni")
 
+group("products") {
+  testonly = true
+  deps = []
+  if (current_cpu == "x64") {
+    deps += [ ":workbench_eng.x64_product_config" ]
+  } else if (current_cpu == "arm64") {
+    deps += [ ":workbench_eng.arm64_product_config" ]
+  }
+}
+
 # A GN target to perform system assembly in Bazel exclusively, using
 # Ninja-generated inputs.
 
@@ -26,6 +36,8 @@ if (current_cpu == "x64") {
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = "//products/workbench:product_bundle_eng.x64"
     bazel_product_image_target = "//products/workbench:assembly_eng.x64"
+    bazel_product_config_target = ":assembly_config_eng"
+    bazel_product_config_name = "workbench_eng"
     bazel_recovery_image_target = "//products/zedboot:x64"
     bazel_elf_sizes_target = "//products/workbench:elf_sizes.x64"
     bazel_inputs_from_gn = [
@@ -44,6 +56,8 @@ if (current_cpu == "arm64") {
     bazel_product_bundle_target =
         "//products/workbench:product_bundle_eng.arm64"
     bazel_product_image_target = "//products/workbench:assembly_eng.arm64"
+    bazel_product_config_target = ":assembly_config_eng"
+    bazel_product_config_name = "workbench_eng"
     bazel_recovery_image_target = "//products/zedboot:arm64"
     bazel_elf_sizes_target = "//products/workbench:elf_sizes.arm64"
     bazel_inputs_from_gn = [

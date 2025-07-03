@@ -30,6 +30,7 @@
 #include <phys/new.h>
 #include <phys/uart.h>
 #include <phys/zbitl-allocation.h>
+#include <phys/zircon-abi-spec.h>
 
 struct ArchPatchInfo;
 struct BootOptions;
@@ -103,6 +104,10 @@ class HandoffPrep {
   void PublishExtraVmo(PhysVmo&& vmo);
 
  private:
+  // TODO(https://fxbug.dev/42164859): Populate with prepared elements of C++
+  // ABI set-up (e.g., mapped stacks).
+  struct ZirconAbi {};
+
   // Comprises a list in scratch memory of the pending VM objects so they can
   // be packed into a single array at the end (via NewFromList()).
   template <ktl::derived_from<PhysVmObject> VmObject>
@@ -204,7 +209,7 @@ class HandoffPrep {
       uintptr_t paddr = reinterpret_cast<uintptr_t>(pages.get());
       PhysMapping mapping(mapping_name, PhysMapping::Type::kNormal, vaddr, size, paddr,
                           PhysMapping::Permissions::Rw());
-      void* ptr = CreateMapping(mapping);
+      void* ptr = static_cast<void*>(CreateMapping(mapping).data());
       mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
 
       return {ptr, Capability{ktl::move(pages), ptr}};
@@ -246,12 +251,12 @@ class HandoffPrep {
 
     // Creates the provided mapping and publishes it within the associated VMAR
     // being built up.
-    void* PublishMapping(PhysMapping mapping) {
+    MappedMemoryRange PublishMapping(PhysMapping mapping) {
       ZX_DEBUG_ASSERT(vmar_.base <= mapping.vaddr);
       ZX_DEBUG_ASSERT(mapping.vaddr_end() <= vmar_.end());
-      void* addr = CreateMapping(mapping);
+      ktl::span mapped = CreateMapping(mapping);
       mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
-      return addr;
+      return {mapped, mapping.paddr};
     }
 
     // Publishes the PhysVmar in the hand-off.
@@ -285,7 +290,7 @@ class HandoffPrep {
   static PhysVmo MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
                              size_t content_size);
 
-  static void* CreateMapping(const PhysMapping& mapping);
+  static MappedMemoryRange CreateMapping(const PhysMapping& mapping);
 
   // Packs a list of pending VM objects into a single hand-off span in sorted
   // order.
@@ -306,9 +311,6 @@ class HandoffPrep {
   }
 
   void SaveForMexec(const zbi_header_t& header, ktl::span<const ktl::byte> payload);
-
-  // General arch-specific data that isn't drawn from a ZBI item.
-  void ArchHandoff(const ArchPatchInfo&);
 
   // The arch-specific protocol for a given item.
   // Defined in //zircon/kernel/arch/$cpu/phys/arch-handoff-prep-zbi.cc.
@@ -347,8 +349,22 @@ class HandoffPrep {
   }
 
   // Publishes a PhysVmar with a single mapping covering its extent, returning
-  // its mapped virtual address.
-  void* PublishSingleMappingVmar(PhysMapping mapping);
+  // its mapped virtual address range.
+  MappedMemoryRange PublishSingleMappingVmar(PhysMapping mapping);
+
+  // A variation that assumes a first-class mapping and allocates and the
+  // virtual addresses itself. The provided address range may be
+  // non-page-aligned, in which the virtual mapping of [addr, addr + size) is
+  // returned directly rather than with page alignment.
+  MappedMemoryRange PublishSingleMappingVmar(ktl::string_view name, PhysMapping::Type type,
+                                             uintptr_t addr, size_t size,
+                                             PhysMapping::Permissions perms);
+
+  // A specialization for an MMIO range.
+  MappedMmioRange PublishSingleMmioMappingVmar(ktl::string_view name, uintptr_t addr, size_t size) {
+    return PublishSingleMappingVmar(name, PhysMapping::Type::kMmio, addr, size,
+                                    PhysMapping::Permissions::Rw());
+  }
 
   // This constructs a PhysElfImage from an ELF file in the KernelStorage.
   PhysElfImage MakePhysElfImage(KernelStorage::Bootfs::iterator file, ktl::string_view name);
@@ -363,10 +379,27 @@ class HandoffPrep {
   // This must be the very last set-up routine called within DoHandoff().
   void SetMemory();
 
-  void ConstructKernelAddressSpace(const UartDriver& uart);
+  // Constructs and populates the kernel's address space, and returns the
+  // mapped realizations of its ABI requirements per abi_spec_.
+  ZirconAbi ConstructKernelAddressSpace(const UartDriver& uart);
+  void ArchConstructKernelAddressSpace();  // The arch-specific subroutine
+
+  // Finalizes handoff_.arch and performs the final, architecture-specific
+  // subroutine of DoHandoff().
+  //
+  // This call intends to hand off - and thus either explicitly set or
+  // explicitly clear to zero - all of the aspects of machine state that
+  // constitute the C++ ABI, but to leave the rest of the machine state (like
+  // exception handlers) in the ambient phys state until the kernel is on its
+  // feet far enough to reset all that stuff for itself.
+  //
+  // Note that by the time this has been called the UART driver has been taken
+  // and no more logging is permitted.
+  [[noreturn]] void ArchDoHandoff(ZirconAbi abi, const ArchPatchInfo& patch_info);
 
   const ElfImage kernel_;
   PhysHandoff* handoff_ = nullptr;
+  ZirconAbiSpec abi_spec_{};
   TemporaryDataAllocator temporary_data_allocator_;
   PermanentDataAllocator permanent_data_allocator_;
   VirtualAddressAllocator first_class_mapping_allocator_;

@@ -817,7 +817,6 @@ pub mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashMap;
     use alloc::sync::Arc;
     use alloc::vec;
     use alloc::vec::Vec;
@@ -827,6 +826,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::ip::{AddrSubnet, Ipv4};
     use netstack3_base::{AssignedAddrIpExt, MarkDomain, Marks, SegmentHeader};
+    use netstack3_hashmap::HashMap;
     use test_case::test_case;
 
     use super::*;

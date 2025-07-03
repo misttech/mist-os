@@ -4,10 +4,9 @@
 
 #include "registers.h"
 
-#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 
 #include <string>
 
@@ -19,135 +18,134 @@ namespace registers {
 namespace {
 
 template <typename T>
-T GetMask(const fuchsia_hardware_registers::wire::Mask& mask);
+T GetMask(const fuchsia_hardware_registers::Mask& mask);
 
 template <>
-uint8_t GetMask(const fuchsia_hardware_registers::wire::Mask& mask) {
-  return static_cast<uint8_t>(mask.r8());
+uint8_t GetMask(const fuchsia_hardware_registers::Mask& mask) {
+  return static_cast<uint8_t>(mask.r8().value());
 }
 template <>
-uint16_t GetMask(const fuchsia_hardware_registers::wire::Mask& mask) {
-  return static_cast<uint16_t>(mask.r16());
+uint16_t GetMask(const fuchsia_hardware_registers::Mask& mask) {
+  return static_cast<uint16_t>(mask.r16().value());
 }
 template <>
-uint32_t GetMask(const fuchsia_hardware_registers::wire::Mask& mask) {
-  return static_cast<uint32_t>(mask.r32());
+uint32_t GetMask(const fuchsia_hardware_registers::Mask& mask) {
+  return static_cast<uint32_t>(mask.r32().value());
 }
 template <>
-uint64_t GetMask(const fuchsia_hardware_registers::wire::Mask& mask) {
-  return static_cast<uint64_t>(mask.r64());
-}
-
-zx::result<std::vector<uint8_t>> ParseMetadata(
-    const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata) {
-  for (const auto& m : metadata) {
-    if (m.type == DEVICE_METADATA_REGISTERS) {
-      size_t size;
-      auto status = m.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
-        continue;
-      }
-
-      std::vector<uint8_t> metadata;
-      metadata.resize(size);
-      status = m.data.read(metadata.data(), 0, metadata.size());
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
-        continue;
-      }
-
-      return zx::ok(std::move(metadata));
-    }
-  }
-
-  FDF_LOG(ERROR, "Failed to parse metadata.");
-  return zx::error(ZX_ERR_NOT_FOUND);
+uint64_t GetMask(const fuchsia_hardware_registers::Mask& mask) {
+  return static_cast<uint64_t>(mask.r64().value());
 }
 
 template <typename T>
-zx::result<> CheckOverlappingBits(
-    const fidl::ObjectView<fuchsia_hardware_registers::wire::Metadata>& metadata,
-    const std::map<uint32_t, std::shared_ptr<MmioInfo>>& mmios) {
+zx::result<> CheckOverlappingBits(const fuchsia_hardware_registers::Metadata& metadata,
+                                  const std::map<uint32_t, std::shared_ptr<MmioInfo>>& mmios) {
   std::map<uint32_t, std::map<size_t, T>> overlap;
-  for (const auto& reg : metadata->registers()) {
-    if (!reg.has_name() || !reg.has_mmio_id() || !reg.has_masks()) {
+  for (const auto& reg : metadata.registers().value()) {
+    if (!reg.name().has_value() || !reg.mmio_id().has_value() || !reg.masks().has_value()) {
       // Doesn't have to have all Register IDs.
       continue;
     }
 
-    if (mmios.find(reg.mmio_id()) == mmios.end()) {
-      FDF_LOG(ERROR, "%s: Invalid MMIO ID %u for Register %.*s.\n", __func__, reg.mmio_id(),
-              static_cast<int>(reg.name().size()), reg.name().data());
+    auto mmio_id = reg.mmio_id().value();
+    if (!mmios.contains(mmio_id)) {
+      FDF_LOG(ERROR, "Invalid MMIO ID %u for Register %s", mmio_id, reg.name().value().c_str());
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    for (const auto& m : reg.masks()) {
-      if (m.mmio_offset() / sizeof(T) >= mmios.at(reg.mmio_id())->locks_.size()) {
-        FDF_LOG(ERROR, "%s: Invalid offset.\n", __func__);
+    for (const auto& m : reg.masks().value()) {
+      auto mmio_offset = m.mmio_offset().value();
+      if (mmio_offset / sizeof(T) >= mmios.at(mmio_id)->locks_.size()) {
+        FDF_LOG(ERROR, "Invalid offset");
         return zx::error(ZX_ERR_INTERNAL);
+      }
+
+      if (!m.mask().has_value()) {
+        FDF_LOG(ERROR, "Makse missing mask property");
+        return zx::error(ZX_ERR_INVALID_ARGS);
       }
 
       if (!m.overlap_check_on()) {
         continue;
       }
 
-      if (overlap.find(reg.mmio_id()) == overlap.end()) {
-        overlap[reg.mmio_id()] = {};
-      }
-      if (overlap[reg.mmio_id()].find(m.mmio_offset() / sizeof(T)) ==
-          overlap[reg.mmio_id()].end()) {
-        overlap[reg.mmio_id()][m.mmio_offset() / sizeof(T)] = 0;
+      if (overlap.find(mmio_id) == overlap.end()) {
+        overlap[mmio_id] = {};
       }
 
-      auto& bits = overlap[reg.mmio_id()][m.mmio_offset() / sizeof(T)];
-      auto mask = GetMask<T>(m.mask());
-      if (bits & mask) {
-        FDF_LOG(ERROR, "%s: Overlapping bits in MMIO ID %u, Register No. %lu, Bit mask 0x%lx\n",
-                __func__, reg.mmio_id(), m.mmio_offset() / sizeof(T),
-                static_cast<uint64_t>(bits & mask));
-        return zx::error(ZX_ERR_INTERNAL);
+      for (int i = 0; i < m.count(); i++) {
+        auto idx = mmio_offset / sizeof(T) + i;
+        if (overlap[mmio_id].find(idx) == overlap[mmio_id].end()) {
+          overlap[mmio_id][idx] = 0;
+        }
+
+        auto& bits = overlap[mmio_id][idx];
+        auto mask = GetMask<T>(m.mask().value());
+        if (bits & mask) {
+          FDF_LOG(ERROR, "Overlapping bits in MMIO ID %u, Register No. %lu, Bit mask 0x%lx",
+                  mmio_id, idx, static_cast<uint64_t>(bits & mask));
+          return zx::error(ZX_ERR_INTERNAL);
+        }
+        bits |= mask;
       }
-      bits |= mask;
     }
   }
 
   return zx::ok();
 }
 
-zx::result<> ValidateMetadata(
-    const fidl::ObjectView<fuchsia_hardware_registers::wire::Metadata>& metadata,
-    const std::map<uint32_t, std::shared_ptr<MmioInfo>>& mmios) {
-  if (!metadata->has_registers()) {
-    FDF_LOG(ERROR, "Metadata incomplete");
+zx::result<> ValidateMetadata(const fuchsia_hardware_registers::Metadata& metadata,
+                              const std::map<uint32_t, std::shared_ptr<MmioInfo>>& mmios) {
+  if (!metadata.registers().has_value()) {
+    FDF_LOG(ERROR, "Metadata missing registers field");
     return zx::error(ZX_ERR_INTERNAL);
   }
   bool begin = true;
-  fuchsia_hardware_registers::wire::Mask::Tag tag;
-  for (const auto& reg : metadata->registers()) {
-    if (!reg.has_name() || !reg.has_mmio_id() || !reg.has_masks()) {
-      FDF_LOG(ERROR, "Metadata incomplete");
+  fuchsia_hardware_registers::Mask::Tag tag;
+  const auto& registers = metadata.registers().value();
+  for (size_t i = 0; i < registers.size(); ++i) {
+    const auto& reg = registers[i];
+    if (!reg.name().has_value()) {
+      FDF_LOG(ERROR, "Register %lu missing name field", i);
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    if (!reg.mmio_id().has_value()) {
+      FDF_LOG(ERROR, "Register %lu missing mmio_id field", i);
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    if (!reg.masks().has_value()) {
+      FDF_LOG(ERROR, "Register %lu missing masks field", i);
       return zx::error(ZX_ERR_INTERNAL);
     }
 
+    const auto& masks = reg.masks().value();
     if (begin) {
-      tag = reg.masks().begin()->mask().Which();
+      tag = masks.begin()->mask().value().Which();
       begin = false;
     }
 
-    for (const auto& mask : reg.masks()) {
-      if (!mask.has_mask() || !mask.has_mmio_offset() || !mask.has_count()) {
-        FDF_LOG(ERROR, "Metadata incomplete");
+    for (size_t j = 0; j < masks.size(); ++j) {
+      const auto& mask = masks[j];
+      if (!mask.mask().has_value()) {
+        FDF_LOG(ERROR, "Mask %lu of register %lu missing mask field", j, i);
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+      if (!mask.mmio_offset().has_value()) {
+        FDF_LOG(ERROR, "Mask %lu of register %lu missing mmio_offset field", j, i);
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+      if (!mask.count().has_value()) {
+        FDF_LOG(ERROR, "Mask %lu of register %lu missing count field", j, i);
         return zx::error(ZX_ERR_INTERNAL);
       }
 
-      if (mask.mask().Which() != tag) {
+      if (mask.mask().value().Which() != tag) {
         FDF_LOG(ERROR, "Width of registers don't match up.");
         return zx::error(ZX_ERR_INTERNAL);
       }
 
-      if (mask.mmio_offset() % SWITCH_BY_TAG(tag, GetSize)) {
-        FDF_LOG(ERROR, "%s: Mask with offset 0x%08lx is not aligned", __func__, mask.mmio_offset());
+      if (mask.mmio_offset().value() % SWITCH_BY_TAG(tag, GetSize)) {
+        FDF_LOG(ERROR, "Mask with offset 0x%08lx is not aligned", mask.mmio_offset().value());
         return zx::error(ZX_ERR_INTERNAL);
       }
     }
@@ -204,24 +202,32 @@ zx::result<> RegistersDevice::CreateNode(Register<T>& reg) {
 
 template <typename T>
 zx::result<> RegistersDevice::Create(
-    fuchsia_hardware_registers::wire::RegistersMetadataEntry& reg) {
-  if (!reg.has_name() || !reg.has_mmio_id() || !reg.has_masks()) {
-    // Doesn't have to have all Register IDs.
-    return zx::error(ZX_ERR_BAD_STATE);
+    const fuchsia_hardware_registers::RegistersMetadataEntry& reg) {
+  if (!reg.name().has_value()) {
+    FDF_LOG(ERROR, "Register missing name field");
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  if (!reg.mmio_id().has_value()) {
+    FDF_LOG(ERROR, "Register missing mmio_id field");
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  if (!reg.masks().has_value()) {
+    FDF_LOG(ERROR, "Register missing masks field");
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   std::map<uint64_t, std::pair<T, uint32_t>> masks;
-  for (const auto& m : reg.masks()) {
-    auto mask = GetMask<T>(m.mask());
-    masks.emplace(m.mmio_offset(), std::make_pair(mask, m.count()));
+  for (const auto& m : reg.masks().value()) {
+    auto mask = GetMask<T>(m.mask().value());
+    masks.emplace(m.mmio_offset().value(), std::make_pair(mask, m.count().value()));
   }
   return std::visit(
       [&](auto&& d) { return CreateNode(d); },
-      registers_.emplace_back(std::in_place_type<Register<T>>, mmios_[reg.mmio_id()],
-                              std::string(reg.name().data(), reg.name().size()), std::move(masks)));
+      registers_.emplace_back(std::in_place_type<Register<T>>, mmios_[reg.mmio_id().value()],
+                              std::string(reg.name().value()), std::move(masks)));
 }
 
-zx::result<> RegistersDevice::MapMmio(fuchsia_hardware_registers::wire::Mask::Tag& tag) {
+zx::result<> RegistersDevice::MapMmio(fuchsia_hardware_registers::Mask::Tag& tag) {
   zx::result result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to open pdev service: %s", result.status_string());
@@ -274,69 +280,44 @@ zx::result<> RegistersDevice::MapMmio(fuchsia_hardware_registers::wire::Mask::Ta
 
 zx::result<> RegistersDevice::Start() {
   // Get metadata.
-  std::vector<uint8_t> metadata;
-  {
-    zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open compat service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto compat = fidl::WireSyncClient(std::move(result.value()));
-    if (!compat.is_valid()) {
-      FDF_LOG(ERROR, "Failed to get compat");
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-
-    auto data = compat->GetMetadata();
-    if (!data.ok()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", data.error().FormatDescription().c_str());
-      return zx::error(data.error().status());
-    }
-    if (data->is_error()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", zx_status_get_string(data->error_value()));
-      return data->take_error();
-    }
-
-    auto vals = ParseMetadata(data.value()->metadata);
-    if (vals.is_error()) {
-      FDF_LOG(ERROR, "Failed to ParseMetadata %s", zx_status_get_string(vals.error_value()));
-      return vals.take_error();
-    }
-    metadata = std::move(vals.value());
+  zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
+    return pdev_client.take_error();
   }
-  auto parsed_metadata =
-      fidl::InplaceUnpersist<fuchsia_hardware_registers::wire::Metadata>(cpp20::span(metadata));
-  if (parsed_metadata.is_error()) {
-    FDF_LOG(ERROR, "InplaceUnpersist failed %s",
-            parsed_metadata.error_value().FormatDescription().c_str());
-    return zx::error(parsed_metadata.error_value().status());
+  fdf::PDev pdev{std::move(pdev_client.value())};
+  zx::result metadata_result = pdev.GetFidlMetadata<fuchsia_hardware_registers::Metadata>();
+  if (metadata_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get metadata: %s", metadata_result.status_string());
+    return metadata_result.take_error();
   }
-  auto tag = parsed_metadata->registers()[0].masks()[0].mask().Which();
+  const auto& metadata = metadata_result.value();
+  auto tag = metadata.registers().value()[0].masks().value()[0].mask().value().Which();
 
   // Get mmio.
   {
     auto result = MapMmio(tag);
     if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to map MMIOs %d", result.error_value());
+      FDF_LOG(ERROR, "Failed to map MMIOs: %s", result.status_string());
       return result.take_error();
     }
   }
 
   // Validate metadata.
   {
-    auto result = ValidateMetadata(parsed_metadata.value(), mmios_);
+    auto result = ValidateMetadata(metadata, mmios_);
     if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to validate metadata %d", result.error_value());
+      FDF_LOG(ERROR, "Failed to validate metadata: %s", result.status_string());
       return result.take_error();
     }
   }
 
   // Create devices.
-  for (auto& reg : parsed_metadata->registers()) {
+  for (const auto& reg : metadata.registers().value()) {
     auto result = SWITCH_BY_TAG(tag, Create, reg);
     if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to create device for %s %d",
-              reg.has_name() ? reg.name().data() : "Unknown", result.error_value());
+      FDF_LOG(ERROR, "Failed to create device for %s: %s", reg.name().value().c_str(),
+              result.status_string());
     }
   }
 

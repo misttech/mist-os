@@ -14,7 +14,7 @@ use starnix_core::vfs::{
 };
 use starnix_core::{fileops_impl_nonseekable, fileops_impl_noop_sync};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_types::PAGE_SIZE;
 use starnix_uapi::auth::FsCred;
@@ -25,7 +25,7 @@ use std::borrow::Cow;
 use std::sync::{Arc, LazyLock};
 
 pub fn trace_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -33,7 +33,8 @@ pub fn trace_fs(
 
     let handle = current_task.kernel().expando.get_or_init(|| {
         TraceFsHandle(
-            TraceFs::new_fs(current_task, options).expect("tracefs constructed with valid options"),
+            TraceFs::new_fs(locked, current_task, options)
+                .expect("tracefs constructed with valid options"),
         )
     });
     Ok(handle.0.clone())
@@ -57,13 +58,17 @@ impl FileSystemOps for TraceFs {
 }
 
 impl TraceFs {
-    pub fn new_fs(
+    pub fn new_fs<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let kernel = current_task.kernel();
         let trace_event_queue = Arc::new(TraceEventQueue::new(&kernel.inspect_node)?);
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, TraceFs, options)?;
+        let fs = FileSystem::new(locked, kernel, CacheMode::Uncached, TraceFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         dir.node(

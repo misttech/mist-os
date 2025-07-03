@@ -48,8 +48,8 @@ impl ZigzagSimple8bRleRingBuffer {
 
     /// Push |count| counts of the new value onto the ZigzagSimple8bRleRingBuffer.
     /// This might evict one or more oldest values in the process.
-    pub fn push_multiple(&mut self, value: i64, count: NonZeroUsize) -> Vec<Simple8bRleBlock> {
-        self.buffer.push_multiple(zigzag_encode(value), count)
+    pub fn fill(&mut self, value: i64, count: NonZeroUsize) -> Vec<Simple8bRleBlock> {
+        self.buffer.fill(zigzag_encode(value), count)
     }
 
     pub(crate) fn metadata(&self) -> Simple8bRleBufferMetadata {
@@ -123,9 +123,9 @@ mod tests {
     }
 
     #[test]
-    fn test_zigzag_simple8b_rle_ring_buffer_push_multiple() {
+    fn test_zigzag_simple8b_rle_ring_buffer_fill() {
         let mut ring_buffer = ZigzagSimple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
-        ring_buffer.push_multiple(1, NonZeroUsize::new(10).unwrap());
+        ring_buffer.fill(1, NonZeroUsize::new(10).unwrap());
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");

@@ -35,6 +35,7 @@ mod eager_package_manager;
 mod error;
 mod inspect_util;
 mod metrics_util;
+mod ota_downloader;
 mod repository;
 mod repository_manager;
 mod repository_service;
@@ -207,7 +208,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         Arc::clone(&system_cache_list),
         Arc::clone(&repo_manager),
         Arc::clone(&rewrite_manager),
-        blob_fetcher,
+        blob_fetcher.clone(),
         MAX_CONCURRENT_PACKAGE_FETCHES,
         Arc::clone(&resolver_service_inspect_state),
     );
@@ -237,10 +238,8 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         let repo_manager = Arc::clone(&repo_manager);
         let rewrite_manager = Arc::clone(&rewrite_manager);
         let package_resolver = package_resolver.clone();
-        let base_package_index = Arc::clone(&base_package_index);
-        let system_cache_list = Arc::clone(&system_cache_list);
+        let pkg_cache = pkg_cache.clone();
         let cobalt_sender = cobalt_sender.clone();
-        let resolver_service_inspect_state = Arc::clone(&resolver_service_inspect_state);
         let eager_package_manager = Arc::clone(&eager_package_manager);
         move |gc_protection| {
             let repo_manager = Arc::clone(&repo_manager);
@@ -335,8 +334,16 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
 
     let component_resolver_cb = move |stream| {
         fasync::Task::local(
-            async move { component_resolver::serve(stream).await }
+            component_resolver::serve(stream)
                 .unwrap_or_else(|e| error!("serve_component_resolver_failed: {:#}", e)),
+        )
+        .detach()
+    };
+
+    let ota_downloader_cb = move |stream| {
+        fasync::Task::local(
+            ota_downloader::serve(stream, blob_fetcher.clone(), pkg_cache.clone())
+                .unwrap_or_else(|e| error!("run_cup_service failed: {:#}", anyhow!(e))),
         )
         .detach()
     };
@@ -352,7 +359,8 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         .add_fidl_service(repo_cb)
         .add_fidl_service(rewrite_cb)
         .add_fidl_service(cup_cb)
-        .add_fidl_service(component_resolver_cb);
+        .add_fidl_service(component_resolver_cb)
+        .add_fidl_service(ota_downloader_cb);
 
     fs.take_and_serve_directory_handle().context("while serving directory handle")?;
 

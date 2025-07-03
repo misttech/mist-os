@@ -19,26 +19,27 @@ driver_bind_rules("aml-pwm-regulator-bind") {
   ]
 }
 
-group("common") {
+source_set("common") {
+  sources = [
+    "aml-pwm-regulator.cc",
+    "aml-pwm-regulator.h",
+  ]
+  deps = [ "//sdk/lib/driver/platform-device/cpp" ]
   public_deps = [
     ":aml-pwm-regulator-bind",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.regulator:fuchsia.regulator_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
     "//zircon/system/ulib/fbl",
   ]
 }
 
 fuchsia_cc_driver("aml-pwm-regulator-driver") {
   output_name = "aml-pwm-regulator"
-  sources = [ "aml-pwm-regulator.cc" ]
   deps = [ ":common" ]
 }
 
@@ -56,17 +57,14 @@ fuchsia_driver_package("package") {
 
 test("aml-pwm-regulator-test-bin") {
   output_name = "aml-pwm-regulator-test"
-  sources = [
-    "aml-pwm-regulator-test.cc",
-    "aml-pwm-regulator.cc",
-  ]
+  sources = [ "aml-pwm-regulator-test.cc" ]
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
+    "//sdk/lib/driver/fake-platform-device/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,

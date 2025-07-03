@@ -54,4 +54,13 @@ pub struct RecoveryConfig {
 pub enum SystemRecovery {
     Fdr,
     Android,
+    Bootfs(BootfsRecoveryConfig),
+}
+
+/// Details of bootfs recovery if it is selected
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct BootfsRecoveryConfig {
+    /// Url of the product-provided bootfs recovery component
+    pub product_component_url: String,
 }

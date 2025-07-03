@@ -16,6 +16,10 @@
                 // regarding opening binder.
                 "BinderTest.OpenBinderNoTestDomain",
                 "BinderTest.OpenBinderWithTestDomain",
+                "ContextManagerPermission/ContextManagerPermission.BecomeServiceManager/0",
+                "ContextManagerPermission/ContextManagerPermission.BecomeServiceManager/1",
+                "CallPermission/CallPermission.DoCall/0",
+                "CallPermission/CallPermission.DoCall/1",
 
                 // TODO: https://fxbug.dev/322843830 - Make (SE)Starnix match the (SE)Linux behavior
                 // demonstrated in this test.
@@ -26,6 +30,10 @@
                 // corresponding to any open file descriptors.
                 "InheritTest.FsNodePermissionDeniedFdRemappedToNull",
 
+                // TODO: https://fxbug.dev/378655436 - Reset ITIMER_REAL during `exec` when the `siginh`
+                // permission is denied.
+                "InheritTest.SiginhDeniedItimerRealReset",
+
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of unknown policy class Ids.
                 "SeLinuxFsCreate.InvalidComputeCreateClassId",
                 "SeLinuxFsAccess.UnknownClassIdIsAccepted",
@@ -33,9 +41,6 @@
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API validation of fields.
                 "SeLinuxFsAccess.ClassIdMayHaveTrailingNonNumericData",
                 "SeLinuxFsAccess.FourthArgumentIsNotValidated",
-
-                // TODO: https://fxbug.dev/364569703 - Implement correct SO_PEERSEC for socketpair() sockets.
-                "SocketPeerSecTest.SocketPairUnixStream",
             ],
         },
     ],

@@ -486,46 +486,46 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_dup2() {
         // Most tests are handled by test_sys_dup3, only test the case where both fds are equals.
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let fd = FdNumber::from_raw(42);
-        assert_eq!(sys_dup2(&mut locked, &current_task, fd, fd), error!(EBADF));
+        assert_eq!(sys_dup2(locked, &current_task, fd, fd), error!(EBADF));
         let file_handle = current_task
-            .open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)
+            .open_file(locked, "data/testfile.txt".into(), OpenFlags::RDONLY)
             .expect("open_file");
-        let fd = current_task.add_file(file_handle, FdFlags::empty()).expect("add");
-        assert_eq!(sys_dup2(&mut locked, &current_task, fd, fd), Ok(fd));
+        let fd = current_task.add_file(locked, file_handle, FdFlags::empty()).expect("add");
+        assert_eq!(sys_dup2(locked, &current_task, fd, fd), Ok(fd));
     }
 
     #[::fuchsia::test]
     async fn test_sys_creat() -> Result<(), Errno> {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let path_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let path = "newfile.txt";
         current_task.write_memory(path_addr, path.as_bytes())?;
         let fd = sys_creat(
-            &mut locked,
+            locked,
             &current_task,
             UserCString::new(&current_task, path_addr),
             FileMode::default(),
         )?;
-        let _file_handle = current_task.open_file(&mut locked, path.into(), OpenFlags::RDONLY)?;
+        let _file_handle = current_task.open_file(locked, path.into(), OpenFlags::RDONLY)?;
         assert!(!current_task.files.get_fd_flags_allowing_opath(fd)?.contains(FdFlags::CLOEXEC));
         Ok(())
     }
 
     #[::fuchsia::test]
     async fn test_time() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let time1 = sys_time(&mut locked, &current_task, Default::default()).expect("time");
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let time1 = sys_time(locked, &current_task, Default::default()).expect("time");
         assert!(time1 > 0);
         let address = map_memory(
-            &mut locked,
+            locked,
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<__kernel_time_t>() as u64,
         );
         zx::MonotonicDuration::from_seconds(2).sleep();
-        let time2 = sys_time(&mut locked, &current_task, address.into()).expect("time");
+        let time2 = sys_time(locked, &current_task, address.into()).expect("time");
         assert!(time2 >= time1 + 2);
         assert!(time2 < time1 + 10);
         let time3: __kernel_time_t = current_task.read_object(address.into()).expect("read_object");

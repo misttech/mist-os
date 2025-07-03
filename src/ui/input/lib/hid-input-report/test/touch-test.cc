@@ -127,7 +127,8 @@ TEST(TouchscreenTest, ParadiseV1Touchpad) {
   EXPECT_EQ(68000, descriptor.touch().input().contacts()[0].position_y().range.max);
 
   EXPECT_EQ(1, descriptor.touch().input().buttons().count());
-  EXPECT_EQ(1, descriptor.touch().input().buttons()[0]);
+  EXPECT_EQ(fuchsia_input_report::wire::TouchButton::kPalm,
+            descriptor.touch().input().buttons()[0]);
 
   // Now use the parsed descriptor to interpret a touchpad report.
   paradise_touchpad_v1_t touch_report = {};
@@ -154,7 +155,8 @@ TEST(TouchscreenTest, ParadiseV1Touchpad) {
   EXPECT_EQ(1562, input_report.touch().contacts()[0].position_x());
   EXPECT_EQ(781, input_report.touch().contacts()[0].position_y());
   EXPECT_EQ(1, input_report.touch().pressed_buttons().count());
-  EXPECT_EQ(1, input_report.touch().pressed_buttons()[0]);
+  EXPECT_EQ(fuchsia_input_report::wire::TouchButton::kPalm,
+            input_report.touch().pressed_buttons()[0]);
 }
 
 TEST(TouchscreenTest, DeviceType) {
@@ -369,7 +371,8 @@ TEST(TouchscreenTest, AtlasTouchpad) {
     ASSERT_TRUE(input_report.has_touch());
     ASSERT_TRUE(input_report.touch().has_pressed_buttons());
     ASSERT_EQ(input_report.touch().pressed_buttons().count(), 1);
-    EXPECT_EQ(input_report.touch().pressed_buttons()[0], 1);
+    EXPECT_EQ(input_report.touch().pressed_buttons()[0],
+              fuchsia_input_report::wire::TouchButton::kPalm);
     ASSERT_TRUE(input_report.touch().has_contacts());
     ASSERT_EQ(input_report.touch().contacts().count(), 3);
     size_t tmp_counter = 0;

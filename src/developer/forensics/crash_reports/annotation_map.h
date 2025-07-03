@@ -60,10 +60,17 @@ class AnnotationMap {
   AnnotationMap& Set(const std::string& key, const ErrorOrString& val) {
     // Set the annotation as with the value or "unknown" and add a value under
     // "debug.$key.error" explaining why.
-    return (val.HasValue())
-               ? Set(key, val.Value())
-               : Set(key, "unknown")
-                     .Set(fxl::StringPrintf("debug.%s.error", key.c_str()), val.Error());
+    if (val.HasValue()) {
+      return Set(key, val.Value());
+    }
+
+    // Don't include the debug annotation if the reason is kNotAvailableInProduct because this
+    // clutters crash reports with annotations that are expected to be missing.
+    if (val.Error() != Error::kNotAvailableInProduct) {
+      return Set(key, "unknown").Set(fxl::StringPrintf("debug.%s.error", key.c_str()), val.Error());
+    }
+
+    return *this;
   }
 
   // Errors.

@@ -20,10 +20,10 @@ load(
 
 # Remove sources that require file system and posix socket support
 excluded_sources = [
-    "src/crypto/bio/connect.c",
-    "src/crypto/bio/fd.c",
-    "src/crypto/bio/socket.c",
-    "src/crypto/bio/socket_helper.c",
+    "src:crypto/bio/connect.c",
+    "src:crypto/bio/fd.c",
+    "src:crypto/bio/socket.c",
+    "src:crypto/bio/socket_helper.c",
 ]
 crypto_sources_no_excludes = [src for src in crypto_sources if src not in excluded_sources]
 
@@ -32,7 +32,7 @@ cc_library(
     srcs = crypto_sources_no_excludes + crypto_internal_headers +
            ssl_sources + ssl_internal_headers,
     hdrs = crypto_headers + ssl_headers + fips_fragments,
-    includes = ["src/include"],
+    includes = ["src:include"],
     defines =
         [
             # This can be removed once boringssl threading primitives are implemented,

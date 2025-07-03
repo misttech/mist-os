@@ -18,10 +18,7 @@
     clippy::redundant_clone,
     clippy::precedence
 )]
-
-// TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove
-// this module.
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 mod api;
 mod context;
@@ -35,6 +32,13 @@ mod transport;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
+/// Data structures.
+pub mod data_structures {
+    /// Read-copy-update data structures.
+    pub mod rcu {
+        pub use netstack3_base::rcu::{ReadGuard, SynchronizedWriterRcu, WriteGuard};
+    }
+}
 /// The device layer.
 pub mod device {
     #[path = "."]
@@ -53,7 +57,7 @@ pub mod device {
     }
 
     // Re-exported types.
-    pub use netstack3_base::DeviceNameMatcher;
+    pub use netstack3_base::{DeviceNameMatcher, StrongDeviceIdentifier};
     pub use netstack3_device::blackhole::{BlackholeDevice, BlackholeDeviceId};
     pub use netstack3_device::ethernet::{
         EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
@@ -83,8 +87,8 @@ pub mod device_socket {
     pub use netstack3_base::{FrameDestination, SendFrameErrorReason};
     pub use netstack3_device::socket::{
         DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-        EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SentFrame, SocketId,
-        SocketInfo, TargetDevice, WeakDeviceSocketId,
+        EthernetHeaderParams, Frame, IpFrame, Protocol, ReceiveFrameError, ReceivedFrame,
+        SentFrame, SocketId, SocketInfo, TargetDevice, WeakDeviceSocketId,
     };
 }
 
@@ -119,7 +123,10 @@ pub mod inspect {
 
 /// Methods for dealing with ICMP sockets.
 pub mod icmp {
-    pub use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+    pub use netstack3_icmp_echo::{
+        IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoSettings, IcmpSocketId,
+        ReceiveIcmpEchoError,
+    };
 }
 
 /// The Internet Protocol, versions 4 and 6.
@@ -154,7 +161,7 @@ pub mod ip {
     pub use netstack3_ip::raw::{
         RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,
         RawIpSocketSendToError, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-        WeakRawIpSocketId,
+        ReceivePacketError, WeakRawIpSocketId,
     };
     pub use netstack3_ip::socket::{
         IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
@@ -221,8 +228,8 @@ pub mod tcp {
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
         OriginalDestinationError, ReceiveBuffer, SendBuffer, SetDeviceError, SetReuseAddrError,
-        SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId, UnboundInfo,
-        DEFAULT_FIN_WAIT2_TIMEOUT,
+        SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSettings, TcpSocketId,
+        UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 
@@ -234,14 +241,14 @@ pub mod trace {
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use netstack3_base::{Counter, WorkQueueReport};
+    pub use netstack3_base::{BufferSizeSettings, Counter, PositiveIsize, WorkQueueReport};
 }
 
 /// Methods for dealing with UDP sockets.
 pub mod udp {
     pub use netstack3_udp::{
-        SendError, SendToError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext,
-        UdpRemotePort, UdpSocketId,
+        ReceiveUdpError, SendError, SendToError, UdpBindingsTypes, UdpPacketMeta,
+        UdpReceiveBindingsContext, UdpRemotePort, UdpSettings, UdpSocketId,
     };
 }
 
@@ -251,8 +258,8 @@ pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TxMetadata,
-    TxMetadataBindingsTypes,
+    MapDerefExt, ReferenceNotifiers, RngContext, SettingsContext, TimerBindingsTypes, TimerContext,
+    TxMetadata, TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};
 pub use time::{AtomicInstant, Instant, TimerId};

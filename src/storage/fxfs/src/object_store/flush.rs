@@ -132,20 +132,19 @@ impl ObjectStore {
             info!(store_id = self.store_object_id(); "OS: begin flush");
         }
 
-        let layer_file_sizes =
-            if matches!(&*self.lock_state.lock(), LockState::Locked) {
-                self.flush_locked(&txn_guard).await.with_context(|| {
-                    format!("Failed to flush object store {}", self.store_object_id)
-                })?;
-                None
-            } else {
-                match self.flush_unlocked(&txn_guard).await.with_context(|| {
-                    format!("Failed to flush object store {}", self.store_object_id)
-                })? {
-                    FlushResult::Ok(layer_file_sizes) => Some(layer_file_sizes),
-                    FlushResult::CryptError(error) => return Ok(FlushResult::CryptError(error)),
-                }
-            };
+        if matches!(&*self.lock_state.lock(), LockState::Locked) {
+            self.flush_locked(&txn_guard).await.with_context(|| {
+                format!("Failed to flush object store {}", self.store_object_id)
+            })?;
+        } else {
+            if let FlushResult::CryptError(error) = self
+                .flush_unlocked(&txn_guard)
+                .await
+                .with_context(|| format!("Failed to flush object store {}", self.store_object_id))?
+            {
+                return Ok(FlushResult::CryptError(error));
+            }
+        }
 
         if trace {
             info!(store_id = self.store_object_id(); "OS: end flush");
@@ -157,9 +156,6 @@ impl ObjectStore {
         let mut counters = self.counters.lock();
         counters.num_flushes += 1;
         counters.last_flush_time = Some(std::time::SystemTime::now());
-        if let Some(layer_file_sizes) = layer_file_sizes {
-            counters.persistent_layer_file_sizes = layer_file_sizes;
-        }
         // Return the earliest version used by a struct in the tree
         Ok(FlushResult::Ok(self.tree.get_earliest_version()))
     }

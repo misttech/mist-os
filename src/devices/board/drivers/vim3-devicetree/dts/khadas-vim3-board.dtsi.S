@@ -167,8 +167,6 @@
 		display-detect = <&display_detect>;
 		display-detect-names = "MIPI_DSI";
 		panel-type = <0xc>;
-		display-width = <1080>;
-		display-height = <1920>;
 	};
 
 	function_button: adc-buttons {

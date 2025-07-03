@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::dict_ext::request_with_dictionary_replacement;
 use crate::{DictExt, RoutingError};
 use async_trait::async_trait;
 use cm_types::IterablePath;
@@ -42,10 +43,13 @@ impl<R: Routable<Dict> + 'static, T: CapabilityBound> LazyGet<T> for R {
                 // If `debug` is true, that should only apply to the capability at `path`.
                 // Here we're looking up the containing dictionary, so set `debug = false`, to
                 // obtain the actual Dict and not its debug info.
-                let init_request = request.as_ref().map(|r| r.try_clone()).transpose()?;
+                let init_request = if self.path.iter_segments().count() > 1 {
+                    request_with_dictionary_replacement(request.as_ref())?
+                } else {
+                    request.as_ref().map(|r| r.try_clone()).transpose()?
+                };
                 match self.router.route(init_request, false).await? {
                     RouterResponse::<Dict>::Capability(dict) => {
-                        let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
                         let moniker: ExtendedMoniker = self.not_found_error.clone().into();
                         let resp =
                             dict.get_with_request(&moniker, &self.path, request, debug).await?;

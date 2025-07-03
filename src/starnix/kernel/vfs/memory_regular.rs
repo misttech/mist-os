@@ -233,6 +233,7 @@ impl MemoryRegularFile {
     }
 
     pub fn write(
+        locked: &mut Locked<FileOpsCore>,
         memory: &Arc<MemoryObject>,
         file: &FileObject,
         current_task: &CurrentTask,
@@ -286,11 +287,12 @@ impl MemoryRegularFile {
             }
 
             // Check against the FSIZE limt
-            let fsize_limit = current_task.thread_group().get_rlimit(Resource::FSIZE) as usize;
+            let fsize_limit =
+                current_task.thread_group().get_rlimit(locked, Resource::FSIZE) as usize;
             if write_end > fsize_limit {
                 if offset >= fsize_limit {
                     // Write starts beyond the FSIZE limt.
-                    send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
+                    send_standard_signal(locked, current_task, SignalInfo::default(SIGXFSZ));
                     return error!(EFBIG);
                 }
 
@@ -364,13 +366,13 @@ macro_rules! fileops_impl_memory {
 
         fn write(
             &$self,
-            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             current_task: &$crate::task::CurrentTask,
             offset: usize,
             data: &mut dyn $crate::vfs::buffers::InputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
-            $crate::vfs::MemoryRegularFile::write($memory, file, current_task, offset, data)
+            $crate::vfs::MemoryRegularFile::write(locked, $memory, file, current_task, offset, data)
         }
 
         fn get_memory(
@@ -438,7 +440,7 @@ pub fn new_memfd(
     }
 
     let fs = current_task.kernel().expando.get_or_init(|| {
-        let tmpfs = TmpFs::new_fs(current_task.kernel());
+        let tmpfs = TmpFs::new_fs(locked, current_task.kernel());
         security::file_system_resolve_security(locked, &current_task, &tmpfs)
             .expect("resolve fs security");
         let mount = Mount::new(WhatToMount::Fs(tmpfs.clone()), Default::default());

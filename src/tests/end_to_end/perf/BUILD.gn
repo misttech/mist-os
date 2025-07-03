@@ -60,7 +60,6 @@ group("test") {
     "//src/diagnostics:benchmarks",
     "//src/graphics/benchmarks",
     "//src/lib/diagnostics:benchmarks",
-    "//src/lib/flyweights/benchmarks",
     "//src/media/audio/audio_core/mixer/tools:benchmarks",
     "//src/performance/trace_bench:benchmarks",
     "//src/power:benchmarks",

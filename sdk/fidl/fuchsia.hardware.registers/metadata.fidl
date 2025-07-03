@@ -42,6 +42,7 @@ type RegistersMetadataEntry = table {
     3: masks vector<MaskEntry>:MAX;
 };
 
+@serializable
 type Metadata = table {
     /// Vector of Registers metadata. One for each register to be published.
     1: registers vector<RegistersMetadataEntry>:MAX;

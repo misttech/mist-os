@@ -271,10 +271,27 @@ class TracingUsingFc(tracing.Tracing):
         self._tracing_active = False
 
     def terminate(self) -> None:
-        """Terminates the trace session without saving the trace."""
-        if self._trace_controller_proxy is not None:
-            self._trace_controller_proxy.close_cleanly()
-        self._reset_state()
+        """Terminates the trace session, waiting for it to fully stop."""
+        if not self._session_initialized:
+            self._reset_state()
+            return
+
+        async def _terminate_and_wait() -> None:
+            if self._trace_controller_proxy:
+                self._trace_controller_proxy.close_cleanly()
+            if self._trace_socket:
+                await self._wait_for_peer_closed(self._trace_socket)
+
+        try:
+            asyncio.run(_terminate_and_wait())
+        except (RuntimeError, fc.ZxStatus, TracingError) as e:
+            _LOGGER.warning(
+                "Could not cleanly wait for trace termination: %s. "
+                "Forcibly resetting state.",
+                e,
+            )
+        finally:
+            self._reset_state()
 
     def terminate_and_download(
         self, directory: str, trace_file: str | None = None
@@ -343,3 +360,33 @@ class TracingUsingFc(tracing.Tracing):
         self._reset_state()
 
         return trace_buffer
+
+    async def _wait_for_peer_closed(self, socket: AsyncSocket) -> None:
+        """Waits for the remote end of a socket to close, discarding all data.
+
+        This is used to ensure a session is fully terminated before proceeding,
+        preventing race conditions. It's an alternative to `read_all()` when
+        the trace data is not needed.
+
+        Args:
+            socket: The async socket to wait on.
+
+        Raises:
+            TracingError: If a Zircon error other than PEER_CLOSED occurs.
+        """
+        _LOGGER.debug("Waiting for trace socket peer to close...")
+        while True:
+            try:
+                # We call read() repeatedly to drain the socket buffer, but we
+                # don't store the data. The loop will exit when read() raises
+                # ZX_ERR_PEER_CLOSED.
+                await socket.read()
+            except fc.ZxStatus as zx:
+                if zx.args[0] == fc.ZxStatus.ZX_ERR_PEER_CLOSED:
+                    _LOGGER.debug("Trace socket peer closed.")
+                    break
+                raise TracingError(
+                    "An unexpected error occurred while waiting for the "
+                    "trace socket to close."
+                ) from zx
+        socket.socket.close()

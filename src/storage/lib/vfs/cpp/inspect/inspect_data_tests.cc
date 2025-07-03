@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire_types.h>
 #include <lib/zx/result.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <optional>
+#include <cstdint>
 
 #include <gtest/gtest.h>
 
@@ -15,6 +18,7 @@ using VolumeManagerInfo = fuchsia_hardware_block_volume::wire::VolumeManagerInfo
 using VolumeInfo = fuchsia_hardware_block_volume::wire::VolumeInfo;
 
 namespace fs_inspect {
+namespace {
 
 // Fake block device used to validate calculation of reported size information under fs.volume.
 class FakeBlockDevice final : public block_client::FakeBlockDevice {
@@ -104,4 +108,5 @@ TEST(VfsInspectData, GetSizeInfoFromDevice) {
   EXPECT_EQ(expected_size_info.available_space_bytes, size_info->available_space_bytes);
 }
 
+}  // namespace
 }  // namespace fs_inspect

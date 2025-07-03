@@ -377,6 +377,27 @@ class ScopedMMap {
   size_t length_;
 };
 
+// A RRAI classes than handles a mount. The container will ensure the
+// unmount when the object is deleted.
+class ScopedMount {
+ public:
+  static fit::result<int, ScopedMount> Mount(const std::string &source, const std::string &target,
+                                             const std::string &filesystemtype,
+                                             unsigned long mountflags, const void *data);
+  ScopedMount(const ScopedMount &) = delete;
+  ScopedMount &operator=(const ScopedMount &) = delete;
+  ScopedMount &operator=(ScopedMount &&other) = delete;
+  ScopedMount(ScopedMount &&other) noexcept;
+  ~ScopedMount();
+
+  void Unmount();
+
+ private:
+  explicit ScopedMount(std::string target_path);
+  std::string target_path_;
+  bool is_mounted_ = false;
+};
+
 // Returns the first memory mapping that matches the given predicate.
 std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,
                                                  std::string_view maps);

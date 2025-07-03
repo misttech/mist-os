@@ -55,6 +55,9 @@ if (!is_host) {
 
       # For `fx bazel2gn`
       "//build/tools/bazel2gn:host($host_toolchain)",
+
+      # For `fx disable_ctf_tests`
+      "//scripts/disable_ctf_tests:install",
     ]
   }
 }

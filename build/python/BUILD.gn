@@ -34,10 +34,6 @@ if (is_host) {
   }
 }
 
-python_binary("gen_sdk_metadata_and_file_sources") {
-  main_source = "gen_sdk_metadata_and_file_sources.py"
-}
-
 python_binary("compress_lacewing_inputs") {
   main_source = "compress_lacewing_inputs.py"
 }

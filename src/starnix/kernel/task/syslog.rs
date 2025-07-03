@@ -11,7 +11,7 @@ use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_component::client::connect_to_protocol_sync;
 use serde::Deserialize;
 use starnix_sync::{Locked, Mutex, Unlocked};
-use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
+use starnix_uapi::auth::CAP_SYSLOG;
 use starnix_uapi::errors::{errno, error, Errno, EAGAIN};
 use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::vfs::FdEvents;
@@ -28,9 +28,10 @@ pub struct Syslog {
     syscall_subscription: OnceLock<Mutex<LogSubscription>>,
 }
 
+#[derive(Debug)]
 pub enum SyslogAccess {
-    DevKmsg,
-    ProcKmsg,
+    DevKmsgRead,
+    ProcKmsg(SyslogAction),
     Syscall(SyslogAction),
 }
 
@@ -52,19 +53,30 @@ impl Syslog {
     }
 
     /// Validates that syslog access is unrestricted, or that the `current_task` has the relevant
-    /// capability, or global admin capability.
+    /// capability, and applies the SELinux policy.
     pub fn validate_access(current_task: &CurrentTask, access: SyslogAccess) -> Result<(), Errno> {
+        let (action, check_capabilities) = match access {
+            SyslogAccess::ProcKmsg(SyslogAction::Open) => (SyslogAction::Open, true),
+            SyslogAccess::DevKmsgRead => (SyslogAction::ReadAll, true),
+            SyslogAccess::Syscall(a) => (a, true),
+            // If we got here we already validated Open on /proc/kmsg.
+            SyslogAccess::ProcKmsg(a) => (a, false),
+        };
+
         // According to syslog(2) man, ReadAll (3) and SizeBuffer (10) are allowed unprivileged
-        // access only if restrict_dmsg is 0;
-        if matches!(access, SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer))
-            && !current_task.kernel().restrict_dmesg.load(Ordering::Relaxed)
-        {
-            return Ok(());
+        // access only if restrict_dmsg is 0.
+        let action_is_privileged = !matches!(
+            access,
+            SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer)
+                | SyslogAccess::DevKmsgRead,
+        );
+        let restrict_dmesg = current_task.kernel().restrict_dmesg.load(Ordering::Relaxed);
+        if check_capabilities && (action_is_privileged || restrict_dmesg) {
+            security::check_task_capable(current_task, CAP_SYSLOG)?;
         }
-        if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
-            return Ok(());
-        }
-        security::check_task_capable(current_task, CAP_SYSLOG)
+
+        security::check_syslog_access(current_task, action)?;
+        Ok(())
     }
 
     pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {

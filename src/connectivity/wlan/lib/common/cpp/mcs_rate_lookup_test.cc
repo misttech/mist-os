@@ -14,7 +14,6 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <zircon/errors.h>
 

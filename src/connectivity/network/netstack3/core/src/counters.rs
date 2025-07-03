@@ -251,6 +251,7 @@ fn inspect_icmp_rx_counters<I: Ip>(inspector: &mut impl Inspector, counters: &Ic
         time_exceeded,
         parameter_problem,
         packet_too_big,
+        queue_full,
     } = counters.as_ref();
     inspector.record_counter("EchoRequest", echo_request);
     inspector.record_counter("EchoReply", echo_reply);
@@ -262,6 +263,7 @@ fn inspect_icmp_rx_counters<I: Ip>(inspector: &mut impl Inspector, counters: &Ic
     inspector.record_counter("Error", error);
     inspector.record_counter("ErrorDeliveredToTransportLayer", error_delivered_to_transport_layer);
     inspector.record_counter("ErrorDeliveredToSocket", error_delivered_to_socket);
+    inspector.record_counter("DroppedQueueFull", queue_full);
 }
 
 fn inspect_icmp_tx_counters<I: Ip>(inspector: &mut impl Inspector, counters: &IcmpTxCounters<I>) {

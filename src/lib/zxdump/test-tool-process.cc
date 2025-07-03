@@ -6,12 +6,12 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <lib/stdcompat/string_view.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 
 #include <cstdlib>
 #include <filesystem>
+#include <string_view>
 
 #include <gtest/gtest.h>
 
@@ -468,7 +468,7 @@ TestToolProcess::File& TestToolProcess::File::ZstdCompress() const {
 }
 
 TestToolProcess::File& TestToolProcess::File::ZstdDecompress() const {
-  ZX_ASSERT(cpp20::ends_with(std::string_view(name_), kZstdSuffix));
+  ZX_ASSERT(std::string_view(name_).ends_with(kZstdSuffix));
   File& plain_file = owner_->MakeFile(name_.substr(0, name_.size() - kZstdSuffix.size()));
   TestToolProcess zstd_tool;
   zstd_tool.Init(owner_->tmp_path());

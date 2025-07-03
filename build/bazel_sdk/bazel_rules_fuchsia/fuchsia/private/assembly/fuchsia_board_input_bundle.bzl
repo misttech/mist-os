@@ -12,6 +12,12 @@ load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaBoardInputBundleInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir_with_file")
 
+INCLUDE_IN = struct(
+    ALL = "all",
+    ENG = "eng",
+    USER_AND_USERDEBUG = "user_and_userdebug",
+)
+
 def _fuchsia_board_input_bundle_impl(ctx):
     sdk = get_fuchsia_sdk_toolchain(ctx)
 
@@ -133,6 +139,8 @@ def _fuchsia_board_input_bundle_impl(ctx):
         "board-input-bundle",
         "--name",
         ctx.label.name,
+        "--include-in",
+        ctx.attr.include_in,
         "--output",
         board_input_bundle_dir.path,
     ] + creation_args
@@ -217,6 +225,11 @@ fuchsia_board_input_bundle = rule(
             doc = "Path to sysmem format costs files",
             default = [],
             allow_files = True,
+        ),
+        "include_in": attr.string(
+            doc = "Which build types to include this BIB",
+            default = INCLUDE_IN.ALL,
+            values = [INCLUDE_IN.ALL, INCLUDE_IN.ENG, INCLUDE_IN.USER_AND_USERDEBUG],
         ),
         "version": attr.string(
             doc = "Release version string",

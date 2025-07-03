@@ -1344,7 +1344,7 @@ mod tests {
         assert_eq!(
             ipv6.add(IpAddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
-                DadState::Assigned,
+                DadState::Assigned { ran_dad: false },
                 Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
                     properties: CommonAddressProperties { valid_until, ..Default::default() },
                     ..Default::default()

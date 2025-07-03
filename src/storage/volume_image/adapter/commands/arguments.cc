@@ -195,7 +195,13 @@ fpromise::result<std::vector<PartitionParams>, std::string> PartitionParams::Fro
     empty_data_partition.encrypted = false;
     // Reserve the minimum amount of space required for minfs, plus an extra slice for zxcrypt.
     // This ensures that generated images will always be big enough to format minfs.
-    empty_data_partition.options.max_bytes = (1 + minfs::kMinfsMinimumSlices) * options.slice_size;
+    // NB: we always give at least 8MiB for data (plus 1 slice for zxcrypt), which is only relevant
+    // for products which have a non-default slice size.  This limit is selected to preserve
+    // compatibility with old behaviour, and because minfs might actually need more space when very
+    // small slices are used.
+    empty_data_partition.options.max_bytes =
+        std::max(options.slice_size + (8ul * 1024 * 1024),
+                 (1 + minfs::kMinfsMinimumSlices) * options.slice_size);
 
     partitions.push_back(empty_data_partition);
   }

@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.tee/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -72,41 +73,36 @@ static tee_thread_config_t tee_thread_cfg[] = {
      }}};
 
 zx_status_t Astro::TeeInit() {
-  std::vector<fpbus::Metadata> metadata;
-
-  fpbus::Node tee_dev;
-  tee_dev.name() = "tee";
-  tee_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
-  tee_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
-  tee_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OPTEE;
-  tee_dev.mmio() = astro_tee_mmios;
-  tee_dev.bti() = astro_tee_btis;
-  tee_dev.smc() = astro_tee_smcs;
-
-  auto optee_status = fidl_metadata::tee::TeeMetadataToFidl(
+  zx::result tee_metadata = fidl_metadata::tee::TeeMetadataToFidl(
       ASTRO_OPTEE_DEFAULT_THREAD_COUNT,
       cpp20::span<const tee_thread_config_t>(tee_thread_cfg, std::size(tee_thread_cfg)));
-  if (optee_status.is_error()) {
-    zxlogf(ERROR, "%s: failed to fidl encode optee thread config: %d", __func__,
-           optee_status.error_value());
-    return optee_status.error_value();
+  if (!tee_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to create tee metadata: %s", tee_metadata.status_string());
+    return tee_metadata.status_value();
   }
 
-  auto& data = optee_status.value();
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = fuchsia_hardware_tee::TeeMetadata::kSerializableName,
+          .data = std::move(tee_metadata.value()),
+      }},
+  };
 
-  metadata.emplace_back([&]() {
-    fpbus::Metadata ret;
-    ret.id() = std::to_string(DEVICE_METADATA_TEE_THREAD_CONFIG);
-    ret.data() = std::move(data);
-    return ret;
-  }());
-
-  tee_dev.metadata() = std::move(metadata);
+  fpbus::Node node{{
+      .name = "tee",
+      .vid = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC,
+      .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC,
+      .did = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OPTEE,
+      .mmio = astro_tee_mmios,
+      .bti = astro_tee_btis,
+      .smc = astro_tee_smcs,
+      .metadata = std::move(metadata),
+  }};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('TEE_');
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
-      fidl::ToWire(fidl_arena, tee_dev),
+      fidl::ToWire(fidl_arena, node),
       fidl::ToWire(fidl_arena, fdf::CompositeNodeSpec{{.name = "tee", .parents2 = {}}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Tee(tee_dev) request failed: %s",

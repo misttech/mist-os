@@ -10,6 +10,7 @@ use fidl_fuchsia_io::FileProxy;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use futures::StreamExt;
 use log::info;
+use remotevol_fuchsia_test_util::is_starnix_volume_mounted;
 use std::collections::BTreeMap;
 
 /// The purpose of this test is to ensure that Starnix unmounts its volume on container shutdown.
@@ -32,7 +33,6 @@ async fn o_shutdown() {
     info!(realm_moniker:%; "started");
     let container_moniker = format!("{realm_moniker}/debian_container");
     let kernel_moniker = format!("{realm_moniker}/kernel");
-    let test_fxfs_moniker = format!("test-fxfs");
 
     let mut kernel_logs = ArchiveReader::logs()
         .select_all_for_component(kernel_moniker.as_str())
@@ -54,16 +54,7 @@ async fn o_shutdown() {
     );
 
     info!("collecting test-fxfs inspect");
-    let test_fxfs_inspect = ArchiveReader::inspect()
-        .select_all_for_component(test_fxfs_moniker)
-        .snapshot()
-        .await
-        .unwrap();
-    assert_eq!(test_fxfs_inspect.len(), 1);
-    let payload = test_fxfs_inspect[0].payload.as_ref().unwrap();
-    let child = payload.get_child("starnix_volume").unwrap();
-    info!("make sure the starnix volume was unmounted on shutdown");
-    assert!(child.get_property("mounted").and_then(|p| p.boolean()) == Some(false));
+    assert_eq!(is_starnix_volume_mounted().await, Some(false));
 }
 
 async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {

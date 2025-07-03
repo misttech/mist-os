@@ -16,7 +16,7 @@
     clippy::precedence
 )]
 
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 mod context;
 mod convert;
@@ -28,11 +28,13 @@ mod event;
 mod frame;
 mod inspect;
 mod ip;
+mod map_deref;
 mod matchers;
 mod num;
 mod port_alloc;
 mod resource_references;
 mod rng;
+mod settings;
 mod tcp;
 mod test_only;
 mod time;
@@ -41,7 +43,10 @@ mod work_queue;
 
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
-pub use counters::{Counter, CounterContext, CounterRepr, ResourceCounterContext};
+pub use counters::{
+    Counter, CounterCollection, CounterCollectionSpec, CounterContext, CounterRepr,
+    ResourceCounterContext,
+};
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::address::{
     AssignedAddrIpExt, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr,
@@ -67,6 +72,7 @@ pub use ip::{
     BroadcastIpExt, IcmpErrorCode, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt,
     IpTypesIpExt, Mark, MarkDomain, MarkStorage, Marks, Mms, WrapBroadcastMarker,
 };
+pub use map_deref::{MapDeref, MapDerefExt};
 pub use matchers::{DeviceNameMatcher, Matcher, SubnetMatcher};
 pub use num::PositiveIsize;
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
@@ -75,13 +81,14 @@ pub use resource_references::{
     RemoveResourceResult, RemoveResourceResultWithContext,
 };
 pub use rng::RngContext;
+pub use settings::{BufferSizeSettings, SettingsContext};
 pub use tcp::base::{Control, FragmentedPayload, Mss};
 pub use tcp::segment::{
     HandshakeOptions, Options, Payload, PayloadLen, SackBlock, SackBlocks, Segment, SegmentHeader,
     SegmentOptions, VerifiedTcpSegment,
 };
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
-pub use test_only::{TestOnlyFrom, TestOnlyPartialEq};
+pub use test_only::TestOnlyPartialEq;
 pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{
     AtomicInstant, CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes,
@@ -96,6 +103,11 @@ pub mod ref_counted_hash_map {
     pub use crate::data_structures::ref_counted_hash_map::{
         InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
     };
+}
+
+/// Read-copy-update data structure.
+pub mod rcu {
+    pub use crate::data_structures::rcu::{ReadGuard, SynchronizedWriterRcu, WriteGuard};
 }
 
 /// Common types and utilities for sockets.
@@ -167,6 +179,7 @@ pub mod testutil {
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, FakeTxMetadata, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
+    pub use crate::settings::testutil::AlwaysDefaultsSettingsContext;
     pub use crate::socket::sndbuf::testutil::FakeSocketWritableListener;
     pub use crate::time::testutil::{
         FakeAtomicInstant, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,

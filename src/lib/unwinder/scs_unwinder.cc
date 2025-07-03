@@ -18,6 +18,8 @@ Error ShadowCallStackUnwinder::Step(Memory* scs, const Registers& current, Regis
   switch (current.arch()) {
     case Registers::Arch::kX64:
       return Error("Shadow call stack is not supported on x64");
+    case Registers::Arch::kArm32:
+      return Error("Shadow call stack is not supported on arm32");
     case Registers::Arch::kArm64:
       scs_reg = RegisterID::kArm64_x18;
       break;

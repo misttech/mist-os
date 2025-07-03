@@ -120,6 +120,9 @@ std::vector<std::string> Metrics::GetPropertyNames<inspect::UintProperty>() {
   property_names.push_back("nand.erase_block.max_wear");
   property_names.push_back("nand.initial_bad_blocks");
   property_names.push_back("nand.running_bad_blocks");
+  property_names.push_back("nand.total_bad_blocks");
+  property_names.push_back("nand.worn_blocks_detected");
+  property_names.push_back("nand.projected_bad_blocks");
   for (int i = 0; i < kReasonCount; ++i)
     property_names.push_back(GetMapBlockEndPageFailureReasonPropertyName(i));
   return property_names;
@@ -146,6 +149,9 @@ Metrics::Metrics()
   max_wear_ = root_.CreateUint("nand.erase_block.max_wear", 0);
   initial_bad_blocks_ = root_.CreateUint("nand.initial_bad_blocks", 0);
   running_bad_blocks_ = root_.CreateUint("nand.running_bad_blocks", 0);
+  total_bad_blocks_ = root_.CreateUint("nand.total_bad_blocks", 0);
+  worn_blocks_detected_ = root_.CreateUint("nand.worn_blocks_detected", 0);
+  projected_bad_blocks_ = root_.CreateUint("nand.projected_bad_blocks", 0);
   for (int i = 0; i < kReasonCount; ++i) {
     map_block_end_page_failure_reasons_[i] =
         root_.CreateUint(GetMapBlockEndPageFailureReasonPropertyName(i), 0);

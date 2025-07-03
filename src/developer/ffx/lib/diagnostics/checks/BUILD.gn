@@ -13,7 +13,6 @@ rustc_library("lib") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/diagnostics:lib",
     "//src/developer/ffx/lib/discovery:lib",
-    "//src/developer/ffx/lib/fastboot:lib",
     "//src/developer/ffx/lib/fastboot/connection_factory:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/netext:lib",
@@ -21,6 +20,21 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:termion",
+  ]
+
+  test_deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/developer/ffx/lib/addr:lib",
+    "//src/lib/fdomain/client",
+    "//src/lib/fdomain/local",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures-lite",
   ]
   sources = [ "src/lib.rs" ]
 }

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "../hash_table.h"
+
 #include <stddef.h>
 #include <zircon/types.h>
-#include <zxtest/zxtest.h>
 
 #include <array>
-#include <string>
 
-#include "../hash_table.h"
+#include <zxtest/zxtest.h>
 
 namespace trace {
 namespace {

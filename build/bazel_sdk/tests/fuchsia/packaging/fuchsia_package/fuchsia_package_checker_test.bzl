@@ -5,8 +5,20 @@
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@rules_fuchsia//fuchsia:private_defs.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "FuchsiaPackageInfo", "get_fuchsia_api_level", "get_fuchsia_sdk_toolchain")
-load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
+load(
+    "@rules_fuchsia//fuchsia:private_defs.bzl",
+    "FUCHSIA_API_LEVEL_TARGET",
+    "FUCHSIA_TOOLCHAIN_DEFINITION",
+    "FuchsiaPackageInfo",
+    "REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET",
+    "get_fuchsia_api_level",
+    "get_fuchsia_sdk_toolchain",
+)
+load(
+    "//test_utils:py_test_utils.bzl",
+    "PY_TOOLCHAIN_DEPS",
+    "create_python3_shell_wrapper_provider",
+)
 
 _PACKAGE_RESOURCE_ATTRS = {
     "manifests": attr.string_list(
@@ -199,7 +211,7 @@ fuchsia_package_checker_test = rule(
 
 # Ideally, we could check the API level that would be applied and compare it's ABI to
 # `ctx.attr.expected_abi_revision` (or just compare levels). However, there does not appear to be
-# any indication of the API level, and "@fuchsia_sdk//flags:fuchsia_api_level" is empty.
+# any indication of the API level, and FUCHSIA_API_LEVEL_TARGET is empty.
 # Thus, this is just a simple check that there is no error and the blobs are as expected.
 # Similarly, `package_name` and other aspects of the package cannot be verified.
 def _fuchsia_package_checker_analysistest_impl(ctx):
@@ -222,7 +234,7 @@ no_repo_default_api_level_fuchsia_package_checker_test = analysistest.make(
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "",
     },
 )
 
@@ -230,14 +242,14 @@ repo_default_unknown_api_level_fuchsia_package_checker_test = analysistest.make(
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "98765",
     },
 )
 repo_default_api_level_next_fuchsia_package_checker_test = analysistest.make(
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "NEXT",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "NEXT",
     },
 )
 
@@ -245,7 +257,7 @@ repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test = 
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
-        "@fuchsia_sdk//flags:fuchsia_api_level": "NEXT",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "98765",
+        FUCHSIA_API_LEVEL_TARGET: "NEXT",
     },
 )

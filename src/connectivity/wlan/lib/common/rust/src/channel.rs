@@ -4,8 +4,8 @@
 
 use crate::ie;
 use anyhow::format_err;
+use fidl_fuchsia_wlan_common as fidl_common;
 use std::fmt;
-use {banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common};
 
 // IEEE Std 802.11-2016, Annex E
 // Note the distinction of index for primary20 and index for center frequency.
@@ -43,19 +43,6 @@ impl Cbw {
             Cbw::Cbw160 => (fidl_common::ChannelBandwidth::Cbw160, 0),
             Cbw::Cbw80P80 { secondary80 } => {
                 (fidl_common::ChannelBandwidth::Cbw80P80, *secondary80)
-            }
-        }
-    }
-
-    pub fn to_banjo(&self) -> (banjo_common::ChannelBandwidth, u8) {
-        match self {
-            Cbw::Cbw20 => (banjo_common::ChannelBandwidth::CBW20, 0),
-            Cbw::Cbw40 => (banjo_common::ChannelBandwidth::CBW40, 0),
-            Cbw::Cbw40Below => (banjo_common::ChannelBandwidth::CBW40BELOW, 0),
-            Cbw::Cbw80 => (banjo_common::ChannelBandwidth::CBW80, 0),
-            Cbw::Cbw160 => (banjo_common::ChannelBandwidth::CBW160, 0),
-            Cbw::Cbw80P80 { secondary80 } => {
-                (banjo_common::ChannelBandwidth::CBW80P80, *secondary80)
             }
         }
     }
@@ -325,20 +312,6 @@ impl TryFrom<&fidl_common::WlanChannel> for Channel {
             primary: fidl_channel.primary,
             cbw: Cbw::from_fidl(fidl_channel.cbw, fidl_channel.secondary80)?,
         })
-    }
-}
-
-impl From<Channel> for banjo_common::WlanChannel {
-    fn from(channel: Channel) -> banjo_common::WlanChannel {
-        let (cbw, secondary80) = channel.cbw.to_banjo();
-        banjo_common::WlanChannel { primary: channel.primary, cbw, secondary80 }
-    }
-}
-
-impl From<&Channel> for banjo_common::WlanChannel {
-    fn from(channel: &Channel) -> banjo_common::WlanChannel {
-        let (cbw, secondary80) = channel.cbw.to_banjo();
-        banjo_common::WlanChannel { primary: channel.primary, cbw, secondary80 }
     }
 }
 

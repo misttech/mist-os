@@ -49,7 +49,7 @@ pub async fn register(
         }
     }
 
-    let bind_result = driver_development_proxy.bind_all_unbound_nodes().await?;
+    let bind_result = driver_development_proxy.bind_all_unbound_nodes2().await?;
 
     match bind_result {
         Ok(result) => {

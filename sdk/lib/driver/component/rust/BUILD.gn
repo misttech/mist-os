@@ -22,6 +22,7 @@ rustc_library("rust") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component/config",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/namespace",
     "//third_party/rust_crates:anyhow",

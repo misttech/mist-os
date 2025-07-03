@@ -194,6 +194,32 @@ TEST_F(FixtureBasedTest, ValidateDriverIncomingServices) {
   ASSERT_EQ(ZX_OK, result.status_value());
   result = driver_test().driver()->ValidateIncomingZirconService();
   ASSERT_EQ(ZX_OK, result.status_value());
+
+  // Check the bad instance paths.
+  result = driver_test().driver()->ValidateIncomingDriverService("bad_instance");
+  ASSERT_EQ(ZX_ERR_PEER_CLOSED, result.status_value());
+  result = driver_test().driver()->ValidateIncomingZirconService("bad_instance");
+  ASSERT_EQ(ZX_ERR_PEER_CLOSED, result.status_value());
+
+  // Restart it to enable service validation.
+  result = driver_test().StopDriver();
+  ASSERT_EQ(ZX_OK, result.status_value());
+  driver_test().ShutdownAndDestroyDriver();
+  driver_test().SetServiceValidator(true);
+  result = driver_test().StartDriver();
+  ASSERT_EQ(ZX_OK, result.status_value());
+
+  // Check the valid instances again.
+  result = driver_test().driver()->ValidateIncomingDriverService();
+  ASSERT_EQ(ZX_OK, result.status_value());
+  result = driver_test().driver()->ValidateIncomingZirconService();
+  ASSERT_EQ(ZX_OK, result.status_value());
+
+  // Check the bad instance.
+  result = driver_test().driver()->ValidateIncomingDriverService("bad_instance");
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, result.status_value());
+  result = driver_test().driver()->ValidateIncomingZirconService("bad_instance");
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, result.status_value());
 }
 
 TEST_F(FixtureBasedTest, ConnectWithDevfs) {

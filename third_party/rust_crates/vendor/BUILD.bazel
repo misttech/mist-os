@@ -115,6 +115,18 @@ alias(
 )
 
 alias(
+    name = "arc-swap-1.7.1",
+    actual = "//third_party/rust_crates/vendor/arc-swap-1.7.1:arc_swap",
+    tags = ["manual"],
+)
+
+alias(
+    name = "arc-swap",
+    actual = "//third_party/rust_crates/vendor/arc-swap-1.7.1:arc_swap",
+    tags = ["manual"],
+)
+
+alias(
     name = "argh-0.1.12",
     actual = "//third_party/rust_crates/vendor/argh-0.1.12:argh",
     tags = ["manual"],
@@ -475,14 +487,14 @@ alias(
 )
 
 alias(
-    name = "chrono-0.4.34",
-    actual = "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+    name = "chrono-0.4.41",
+    actual = "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
     tags = ["manual"],
 )
 
 alias(
     name = "chrono",
-    actual = "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+    actual = "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
     tags = ["manual"],
 )
 
@@ -903,6 +915,18 @@ alias(
 alias(
     name = "flate2",
     actual = "//third_party/rust_crates/vendor/flate2-1.1.1:flate2",
+    tags = ["manual"],
+)
+
+alias(
+    name = "flyweights-0.1.5",
+    actual = "//third_party/rust_crates/vendor/flyweights-0.1.5:flyweights",
+    tags = ["manual"],
+)
+
+alias(
+    name = "flyweights",
+    actual = "//third_party/rust_crates/vendor/flyweights-0.1.5:flyweights",
     tags = ["manual"],
 )
 
@@ -1359,18 +1383,6 @@ alias(
 alias(
     name = "linked-hash-map",
     actual = "//third_party/rust_crates/vendor/linked-hash-map-0.5.6:linked_hash_map",
-    tags = ["manual"],
-)
-
-alias(
-    name = "lipsum-0.6.0",
-    actual = "//third_party/rust_crates/vendor/lipsum-0.6.0:lipsum",
-    tags = ["manual"],
-)
-
-alias(
-    name = "lipsum",
-    actual = "//third_party/rust_crates/vendor/lipsum-0.6.0:lipsum",
     tags = ["manual"],
 )
 

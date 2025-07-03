@@ -63,23 +63,26 @@ class _MemoryProfileMetrics(trace_metrics.MetricsProcessor):
                 )
             )
 
-        for (
-            process_group_name,
-            process_name_pattern,
-        ) in self._process_groups.items():
-            private_populated = sum(
-                proc["memory"]["private_populated"]
-                for proc in self._process_profile["CompleteDigest"]["processes"]
-                if fnmatch.fnmatch(proc["name"], process_name_pattern)
-            )
-            metrics.append(
-                trace_metrics.TestCaseResult(
-                    label=f"Memory/Process/{process_group_name}/PrivatePopulated",
-                    unit=trace_metrics.Unit.bytes,
-                    values=[private_populated],
-                    doc=(f"{self.DESCRIPTION_BASE}: {process_group_name}"),
+        if self._process_profile:
+            for (
+                process_group_name,
+                process_name_pattern,
+            ) in self._process_groups.items():
+                private_populated = sum(
+                    proc["memory"]["private_populated"]
+                    for proc in self._process_profile["CompleteDigest"][
+                        "processes"
+                    ]
+                    if fnmatch.fnmatch(proc["name"], process_name_pattern)
                 )
-            )
+                metrics.append(
+                    trace_metrics.TestCaseResult(
+                        label=f"Memory/Process/{process_group_name}/PrivatePopulated",
+                        unit=trace_metrics.Unit.bytes,
+                        values=[private_populated],
+                        doc=(f"{self.DESCRIPTION_BASE}: {process_group_name}"),
+                    )
+                )
         return metrics
 
     def process_freeform_metrics(

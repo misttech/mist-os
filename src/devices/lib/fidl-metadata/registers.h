@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_LIB_FIDL_METADATA_REGISTERS_H_
 #define SRC_DEVICES_LIB_FIDL_METADATA_REGISTERS_H_
 
+#include <fidl/fuchsia.hardware.registers/cpp/fidl.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
@@ -35,10 +36,14 @@ using Register16 = Register<uint16_t>;
 using Register32 = Register<uint32_t>;
 using Register64 = Register<uint64_t>;
 
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register8> registers);
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register16> registers);
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register32> registers);
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register64> registers);
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register8> registers);
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register16> registers);
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register32> registers);
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register64> registers);
 
 }  // namespace fidl_metadata::registers
 

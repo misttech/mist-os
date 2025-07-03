@@ -577,7 +577,7 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
   // Updates all Links reachable from |root_transform|, which must be the root transform of one of
   // the active Flatland instances.
   //
-  // Tests that call this function are testing both Flatland and LinkSystem::UpdateLinks().
+  // Tests that call this function are testing both Flatland and LinkSystem::UpdateLinkWatchers().
   void UpdateLinks(TransformHandle root_transform) {
     // Run the looper in case there are queued commands in, e.g., ObjectLinker.
     RunLoopUntilIdle();
@@ -590,8 +590,8 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
     const auto matrices =
         flatland::ComputeGlobalMatrices(data.topology_vector, data.parent_indices, snapshot);
 
-    link_system_->UpdateLinks(data.topology_vector, data.live_handles, matrices,
-                              display_pixel_ratio_, snapshot);
+    link_system_->UpdateLinkWatchers(data.topology_vector, data.live_handles, matrices, snapshot);
+    link_system_->UpdateDevicePixelRatio(display_pixel_ratio_);
 
     // Run the looper again to process any queued FIDL events (i.e., Link callbacks).
     RunLoopUntilIdle();
@@ -2318,10 +2318,8 @@ TEST_F(FlatlandTest, ChildViewAutomaticallyClipsBounds) {
     EXPECT_NE(clip_itr, uber_struct->local_clip_regions.end());
 
     auto clip_region = clip_itr->second;
-    EXPECT_EQ(clip_region.x, 0);
-    EXPECT_EQ(clip_region.y, 0);
-    EXPECT_EQ(clip_region.width, kWidth);
-    EXPECT_EQ(clip_region.height, kHeight);
+    EXPECT_EQ(clip_region,
+              TransformClipRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight}));
   }
 
   // Change the bounds via a call to |SetViewProperties| and make sure they've changed.
@@ -2341,10 +2339,8 @@ TEST_F(FlatlandTest, ChildViewAutomaticallyClipsBounds) {
     EXPECT_NE(clip_itr, uber_struct->local_clip_regions.end());
 
     auto clip_region = clip_itr->second;
-    EXPECT_EQ(clip_region.x, 0);
-    EXPECT_EQ(clip_region.y, 0);
-    EXPECT_EQ(clip_region.width, kWidth);
-    EXPECT_EQ(clip_region.height, kHeight);
+    EXPECT_EQ(clip_region,
+              TransformClipRegion({.x = 0, .y = 0, .width = kWidth, .height = kHeight}));
   }
 }
 
@@ -2402,10 +2398,9 @@ TEST_F(FlatlandTest, ViewportClippingPersistsAcrossInstances) {
   auto child_root_handle = topology_data.topology_vector[3];
   EXPECT_EQ(child->GetRoot(), child_root_handle);
   auto child_root_clip = global_clip_regions[3];
-  EXPECT_EQ(child_root_clip.x, 0);
-  EXPECT_EQ(child_root_clip.x, 0);
-  EXPECT_EQ(child_root_clip.width, kViewportWidth);
-  EXPECT_EQ(child_root_clip.height, kViewportHeight);
+  EXPECT_EQ(
+      child_root_clip,
+      TransformClipRegion({.x = 0, .y = 0, .width = kViewportWidth, .height = kViewportHeight}));
 }
 
 TEST_F(FlatlandTest, DefaultHitRegion_IsInfinite) {
@@ -3670,7 +3665,7 @@ TEST_F(FlatlandTest, LinkSystem_WhenSettingDevicePixelRatio_ItShouldBeTransmitte
   const ContentId kLinkId = {2};
 
   const glm::vec2 initial_dpr = {3.f, 4.f};
-  link_system_->set_device_pixel_ratio(initial_dpr);
+  link_system_->UpdateDevicePixelRatio(initial_dpr);
 
   auto [parent_viewport_watcher_client_end, parent_viewport_watcher_server_end] =
       fidl::Endpoints<ParentViewportWatcher>::Create();
@@ -3703,7 +3698,7 @@ TEST_F(FlatlandTest, LinkSystem_WhenSettingDevicePixelRatio_ItShouldBeTransmitte
 
   // Set a new DPR.
   const glm::vec2 new_dpr = {5.f, 6.f};
-  link_system_->set_device_pixel_ratio(new_dpr);
+  link_system_->UpdateDevicePixelRatio(new_dpr);
 
   {  // Observe the new DPR being delivered.
     std::optional<LayoutInfo> layout;
@@ -4777,10 +4772,7 @@ TEST_F(FlatlandTest, SetClipBoundaryErrorCases) {
     auto clip_region_itr = uber_struct->local_clip_regions.find(transform_handle);
     EXPECT_NE(clip_region_itr, uber_struct->local_clip_regions.end());
     auto clip_region = clip_region_itr->second;
-    EXPECT_EQ(rect.x(), clip_region.x);
-    EXPECT_EQ(rect.y(), clip_region.y);
-    EXPECT_EQ(rect.width(), clip_region.width);
-    EXPECT_EQ(rect.height(), clip_region.height);
+    EXPECT_EQ(TransformClipRegion::From(rect), clip_region);
 
     fuchsia_math::Rect rect_bad = {0, 0, -20, 30};
     flatland->SetClipBoundary(kTransformId,
@@ -4850,10 +4842,7 @@ TEST_F(FlatlandTest, SetClipBoundaryErrorCases) {
     clip_region_itr = uber_struct->local_clip_regions.find(transform_handle);
     EXPECT_NE(clip_region_itr, uber_struct->local_clip_regions.end());
     auto clip_region = clip_region_itr->second;
-    EXPECT_EQ(rect.x(), clip_region.x);
-    EXPECT_EQ(rect.y(), clip_region.y);
-    EXPECT_EQ(rect.width(), clip_region.width);
-    EXPECT_EQ(rect.height(), clip_region.height);
+    EXPECT_EQ(TransformClipRegion::From(rect), clip_region);
 
     // Set it to be null again.
     flatland->SetClipBoundary(kTransformId, nullptr);

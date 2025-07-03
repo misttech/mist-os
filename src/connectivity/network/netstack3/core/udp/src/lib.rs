@@ -14,13 +14,13 @@
     clippy::redundant_clone,
     clippy::precedence
 )]
-
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 #[path = "."]
 mod internal {
     pub(super) mod base;
     pub(super) mod counters;
+    pub(super) mod settings;
 }
 
 pub use internal::counters::{
@@ -29,8 +29,10 @@ pub use internal::counters::{
 
 pub use internal::base::{
     BoundSockets, BoundStateContext, DualStackBoundStateContext, NonDualStackBoundStateContext,
-    SendError, SendToError, Sockets, StateContext, UdpApi, UdpBindingsContext, UdpBindingsTypes,
-    UdpIpTransportContext, UdpPacketMeta, UdpReceiveBindingsContext, UdpRemotePort, UdpSocketId,
-    UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState, UdpStateContext,
-    UseUdpIpTransportContextBlanket,
+    ReceiveUdpError, SendError, SendToError, Sockets, StateContext, UdpApi, UdpBindingsContext,
+    UdpBindingsTypes, UdpIpTransportContext, UdpPacketMeta, UdpReceiveBindingsContext,
+    UdpRemotePort, UdpSocketId, UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState,
+    UdpStateContext, UseUdpIpTransportContextBlanket,
 };
+
+pub use internal::settings::UdpSettings;

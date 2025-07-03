@@ -146,7 +146,7 @@
             to: [ "#kernel" ],
         },
         {
-            protocol: [ "fuchsia.time.alarms.Wake" ],
+            protocol: [ "fuchsia.time.alarms.WakeAlarms" ],
             from: "#timekeeper",
             to: [ "#kernel" ],
         },

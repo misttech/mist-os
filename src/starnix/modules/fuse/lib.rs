@@ -226,6 +226,7 @@ pub fn new_fuse_fs(
         .clone();
 
     let fs = FileSystem::new(
+        locked,
         current_task.kernel(),
         CacheMode::Cached(CacheConfig::default()),
         FuseFs { connection: connection.clone(), default_permissions },
@@ -249,16 +250,17 @@ pub fn new_fuse_fs(
     Ok(fs)
 }
 
-fn fuse_connections(kernel: &Arc<Kernel>) -> Arc<FuseConnections> {
+fn fuse_connections(kernel: &Kernel) -> Arc<FuseConnections> {
     kernel.expando.get::<FuseConnections>()
 }
 
 pub fn new_fusectl_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FuseCtlFs, options)?;
+    let fs =
+        FileSystem::new(locked, current_task.kernel(), CacheMode::Uncached, FuseCtlFs, options)?;
 
     let root_ino = fs.allocate_ino();
     fs.create_root_with_info(

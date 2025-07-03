@@ -57,3 +57,5 @@ per-file {**/,}README.md = aaronwood@google.com
 per-file **.cml = aaronwood@google.com
 
 per-file .ignore = *
+
+per-file GEMINI.md = file:.gemini/OWNERS

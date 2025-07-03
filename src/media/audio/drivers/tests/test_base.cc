@@ -498,10 +498,17 @@ void TestBase::ValidateDaiFormatSets(
     auto& format_set = dai_format_sets[i];
 
     ASSERT_FALSE(format_set.number_of_channels.empty());
+    bool supports_stereo = false;
+    bool supports_non_stereo = false;
     // Ensure number_of_channels are unique.
     for (size_t j = 0; j < format_set.number_of_channels.size(); ++j) {
       EXPECT_GT(format_set.number_of_channels[j], 0u);
       EXPECT_LE(format_set.number_of_channels[j], 256u);
+      if (format_set.number_of_channels[j] == 2) {
+        supports_stereo = true;
+      } else {
+        supports_non_stereo = true;
+      }
       for (size_t k = j + 1; k < format_set.number_of_channels.size(); ++k) {
         EXPECT_NE(format_set.number_of_channels[j], format_set.number_of_channels[k])
             << "number_of_channels[" << j << "] must not equal number_of_channels[" << k << "]";
@@ -519,6 +526,8 @@ void TestBase::ValidateDaiFormatSets(
     }
 
     ASSERT_FALSE(format_set.frame_formats.empty());
+    bool must_support_stereo = false;
+    bool permits_non_stereo = false;
     // Ensure frame_formats are unique.
     for (size_t j = 0; j < format_set.frame_formats.size(); ++j) {
       auto& format_1 = format_set.frame_formats[j];
@@ -545,6 +554,31 @@ void TestBase::ValidateDaiFormatSets(
         }
         FAIL() << "frame_formats[" << j << "] must not equal frame_formats[" << k << "]";
         __UNREACHABLE;
+      }
+      if (format_1.is_frame_format_standard() &&
+          (format_1.frame_format_standard() ==
+               fuchsia::hardware::audio::DaiFrameFormatStandard::I2S ||
+           format_1.frame_format_standard() ==
+               fuchsia::hardware::audio::DaiFrameFormatStandard::STEREO_LEFT ||
+           format_1.frame_format_standard() ==
+               fuchsia::hardware::audio::DaiFrameFormatStandard::STEREO_RIGHT)) {
+        must_support_stereo = true;
+      } else {
+        permits_non_stereo = true;
+      }
+    }
+    if (must_support_stereo) {
+      // Some DaiFrameFormats are Stereo by definition.
+      // If one of those formats is listed, ensure that Stereo is supported.
+      EXPECT_TRUE(supports_stereo)
+          << "DaiFormatSet[" << i
+          << "] contains a Stereo DaiFrameFormat but does not support Stereo";
+
+      // And if ONLY those formats are listed, ensure that ONLY Stereo is supported.
+      if (!permits_non_stereo) {
+        EXPECT_FALSE(supports_non_stereo)
+            << "DaiFormatSet[" << i
+            << "] contains only Stereo DaiFrameFormats but includes a non-Stereo config";
       }
     }
 
@@ -735,6 +769,17 @@ void TestBase::ValidateDaiFormat(const fuchsia::hardware::audio::DaiFormat& dai_
   EXPECT_GT(dai_format.number_of_channels, 0u);
   EXPECT_LE(dai_format.number_of_channels, 64u);
   EXPECT_GT(dai_format.channels_to_use_bitmask, 0u);
+
+  // Certain DaiFrameFormats require Stereo.
+  if (dai_format.frame_format.is_frame_format_standard() &&
+      (dai_format.frame_format.frame_format_standard() ==
+           fuchsia::hardware::audio::DaiFrameFormatStandard::I2S ||
+       dai_format.frame_format.frame_format_standard() ==
+           fuchsia::hardware::audio::DaiFrameFormatStandard::STEREO_LEFT ||
+       dai_format.frame_format.frame_format_standard() ==
+           fuchsia::hardware::audio::DaiFrameFormatStandard::STEREO_RIGHT)) {
+    EXPECT_EQ(dai_format.number_of_channels, 2u);
+  }
 }
 
 // For debugging purposes

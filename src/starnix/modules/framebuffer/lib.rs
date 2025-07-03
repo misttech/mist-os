@@ -10,13 +10,12 @@ use crate::server::{init_viewport_scene, start_presentation_loop, FramebufferSer
 use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
 use starnix_logging::{log_info, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -73,7 +72,7 @@ impl Framebuffer {
         enable_visual_debugging: bool,
     ) -> Result<Arc<Framebuffer>, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
@@ -89,7 +88,6 @@ impl Framebuffer {
             "fb0".into(),
             DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
             graphics_class,
-            DeviceDirectory::new,
             FramebufferDevice { framebuffer: framebuffer.clone() },
         );
 
@@ -167,7 +165,7 @@ impl Framebuffer {
     /// # Parameters
     /// * `incoming_dir`: the incoming service directory under which the
     ///   `fuchsia.element.GraphicalPresenter` protocol can be retrieved.
-    pub fn start_server(&self, kernel: &Arc<Kernel>, incoming_dir: Option<fio::DirectoryProxy>) {
+    pub fn start_server(&self, kernel: &Kernel, incoming_dir: Option<fio::DirectoryProxy>) {
         if let Some(server) = &self.server {
             let view_bound_protocols = self.view_bound_protocols.lock().take().unwrap();
             let view_identity = self.view_identity.lock().take().unwrap();

@@ -93,16 +93,17 @@
 
 namespace {
 
-int bpf(int cmd, union bpf_attr attr) { return (int)syscall(__NR_bpf, cmd, &attr, sizeof(attr)); }
+int bpf(int cmd, union bpf_attr* attr) { return (int)syscall(__NR_bpf, cmd, attr, sizeof(*attr)); }
 
 void TestMapCreationFail(uint32_t type, uint32_t key_size, uint32_t value_size,
                          uint32_t max_entries, int expected_errno) {
-  int result = bpf(BPF_MAP_CREATE, (union bpf_attr){
-                                       .map_type = type,
-                                       .key_size = key_size,
-                                       .value_size = value_size,
-                                       .max_entries = max_entries,
-                                   });
+  bpf_attr attr = {
+      .map_type = type,
+      .key_size = key_size,
+      .value_size = value_size,
+      .max_entries = max_entries,
+  };
+  int result = bpf(BPF_MAP_CREATE, &attr);
   EXPECT_EQ(result, -1);
   // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (errno == EPERM) {
@@ -123,73 +124,53 @@ TEST(BpfTest, HashMapSizeZero) { TestMapCreationFail(BPF_MAP_TYPE_HASH, 1, 1024,
 
 TEST(BpfTest, HashMapZeroKeySize) { TestMapCreationFail(BPF_MAP_TYPE_HASH, 0, 1024, 10, EINVAL); }
 
-class BpfMapTest : public testing::Test {
+class BpfTestBase : public testing::Test {
  protected:
   void SetUp() override {
-    array_fd_ = SAFE_SYSCALL_SKIP_ON_EPERM(bpf(BPF_MAP_CREATE, (union bpf_attr){
-                                                                   .map_type = BPF_MAP_TYPE_ARRAY,
-                                                                   .key_size = sizeof(int),
-                                                                   .value_size = 1024,
-                                                                   .max_entries = 10,
-                                                               }));
-    map_fd_ = SAFE_SYSCALL_SKIP_ON_EPERM(bpf(BPF_MAP_CREATE, (union bpf_attr){
-                                                                 .map_type = BPF_MAP_TYPE_HASH,
-                                                                 .key_size = sizeof(int),
-                                                                 .value_size = sizeof(int),
-                                                                 .max_entries = 10,
-                                                             }));
-    ringbuf_fd_ = SAFE_SYSCALL_SKIP_ON_EPERM(
-        bpf(BPF_MAP_CREATE, (union bpf_attr){
-                                .map_type = BPF_MAP_TYPE_RINGBUF,
-                                .key_size = 0,
-                                .value_size = 0,
-                                .max_entries = static_cast<uint32_t>(getpagesize()),
-                            }));
+    testing::Test::SetUp();
 
-    CheckMapInfo();
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "bpf() system call requires CAP_SYS_ADMIN";
+    }
   }
 
-  void CheckMapInfo() { CheckMapInfo(map_fd_); }
+  fbl::unique_fd LoadProgram(const bpf_insn* program, size_t len, uint32_t prog_type,
+                             uint32_t expected_attach_type) {
+    char buffer[4096];
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.prog_type = prog_type;
+    attr.expected_attach_type = expected_attach_type;
+    attr.insns = reinterpret_cast<uint64_t>(program);
+    attr.insn_cnt = static_cast<uint32_t>(len);
+    attr.license = reinterpret_cast<uint64_t>("N/A");
+    attr.log_buf = reinterpret_cast<uint64_t>(buffer);
+    attr.log_size = 4096;
+    attr.log_level = 1;
 
-  void CheckMapInfo(int map_fd) {
-    struct bpf_map_info map_info;
-    EXPECT_EQ(bpf(BPF_OBJ_GET_INFO_BY_FD,
-                  (union bpf_attr){
-                      .info =
-                          {
-                              .bpf_fd = (unsigned)map_fd_,
-                              .info_len = sizeof(map_info),
-                              .info = (uintptr_t)&map_info,
-                          },
-                  }),
-              0)
-        << strerror(errno);
-    EXPECT_EQ(map_info.type, BPF_MAP_TYPE_HASH);
-    EXPECT_EQ(map_info.key_size, sizeof(int));
-    EXPECT_EQ(map_info.value_size, sizeof(int));
-    EXPECT_EQ(map_info.max_entries, 10u);
-    EXPECT_EQ(map_info.map_flags, 0u);
+    return fbl::unique_fd(SAFE_SYSCALL(bpf(BPF_PROG_LOAD, &attr)));
   }
 
-  void Pin(int fd, const char* pin_path) {
-    unlink(pin_path);
-    ASSERT_EQ(bpf(BPF_OBJ_PIN,
-                  (union bpf_attr){
-                      .pathname = reinterpret_cast<uintptr_t>(pin_path),
-                      .bpf_fd = static_cast<unsigned>(fd),
-                  }),
-              0)
-        << strerror(errno);
+  fbl::unique_fd CreateMap(uint32_t type, uint32_t key_size, uint32_t value_size,
+                           uint32_t max_entries) {
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.map_type = type;
+    attr.key_size = key_size;
+    attr.value_size = value_size;
+    attr.max_entries = max_entries;
+
+    return fbl::unique_fd(SAFE_SYSCALL(bpf(BPF_MAP_CREATE, &attr)));
   }
 
-  int BpfGetFdMapId(const int fd) {
+  int BpfGetMapId(const int fd) {
     struct bpf_map_info info = {};
     union bpf_attr attr = {.info = {
                                .bpf_fd = static_cast<uint32_t>(fd),
                                .info_len = sizeof(info),
                                .info = reinterpret_cast<uint64_t>(&info),
                            }};
-    int rv = bpf(BPF_OBJ_GET_INFO_BY_FD, attr);
+    int rv = bpf(BPF_OBJ_GET_INFO_BY_FD, &attr);
     if (rv)
       return rv;
     if (attr.info.info_len < offsetof(bpf_map_info, id) + sizeof(info.id)) {
@@ -199,10 +180,72 @@ class BpfMapTest : public testing::Test {
     return info.id;
   }
 
+  int BpfGetProgId(const int fd) {
+    struct bpf_prog_info info = {};
+    union bpf_attr attr = {.info = {
+                               .bpf_fd = static_cast<uint32_t>(fd),
+                               .info_len = sizeof(info),
+                               .info = reinterpret_cast<uint64_t>(&info),
+                           }};
+    int rv = bpf(BPF_OBJ_GET_INFO_BY_FD, &attr);
+    if (rv)
+      return rv;
+    if (attr.info.info_len < offsetof(bpf_prog_info, id) + sizeof(info.id)) {
+      errno = EOPNOTSUPP;
+      return -1;
+    };
+    return info.id;
+  }
+};
+
+class BpfMapTest : public BpfTestBase {
+ protected:
+  void SetUp() override {
+    BpfTestBase::SetUp();
+
+    if (IsSkipped())
+      return;
+
+    array_fd_ = CreateMap(BPF_MAP_TYPE_ARRAY, sizeof(int), 1024, 10);
+    map_fd_ = CreateMap(BPF_MAP_TYPE_HASH, sizeof(int), sizeof(int), 10);
+    ringbuf_fd_ = CreateMap(BPF_MAP_TYPE_RINGBUF, 0, 0, static_cast<uint32_t>(getpagesize()));
+
+    CheckMapInfo();
+  }
+
+  void CheckMapInfo() { CheckMapInfo(map_fd_.get()); }
+
+  void CheckMapInfo(int map_fd) {
+    struct bpf_map_info map_info;
+    bpf_attr attr = {
+        .info =
+            {
+                .bpf_fd = (unsigned)map_fd_.get(),
+                .info_len = sizeof(map_info),
+                .info = (uintptr_t)&map_info,
+            },
+    };
+    EXPECT_EQ(bpf(BPF_OBJ_GET_INFO_BY_FD, &attr), 0) << strerror(errno);
+    EXPECT_EQ(map_info.type, BPF_MAP_TYPE_HASH);
+    EXPECT_EQ(map_info.key_size, sizeof(int));
+    EXPECT_EQ(map_info.value_size, sizeof(int));
+    EXPECT_EQ(map_info.max_entries, 10u);
+    EXPECT_EQ(map_info.map_flags, 0u);
+  }
+
+  void Pin(int fd, const char* pin_path) {
+    unlink(pin_path);
+    bpf_attr attr = {
+        .pathname = reinterpret_cast<uintptr_t>(pin_path),
+        .bpf_fd = static_cast<unsigned>(fd),
+    };
+    ASSERT_EQ(bpf(BPF_OBJ_PIN, &attr), 0) << strerror(errno);
+  }
+
   int BpfLock(int fd, short type) {
     if (fd < 0)
       return fd;  // pass any errors straight through
-    int mapId = BpfGetFdMapId(fd);
+    int mapId = BpfGetMapId(fd);
     if (mapId <= 0) {
       EXPECT_GT(mapId, 0);
       return -1;
@@ -223,10 +266,11 @@ class BpfMapTest : public testing::Test {
   }
 
   int BpfFdGet(const char* pathname, uint32_t flag) {
-    return bpf(BPF_OBJ_GET, {
-                                .pathname = reinterpret_cast<uint64_t>(pathname),
-                                .file_flags = flag,
-                            });
+    bpf_attr attr = {
+        .pathname = reinterpret_cast<uint64_t>(pathname),
+        .file_flags = flag,
+    };
+    return bpf(BPF_OBJ_GET, &attr);
   }
 
   int MapRetrieveLocklessRW(const char* pathname) { return BpfFdGet(pathname, 0); }
@@ -249,18 +293,7 @@ class BpfMapTest : public testing::Test {
 
   // Run the given bpf program.
   void Run(const bpf_insn* program, size_t len) {
-    char buffer[4096];
-    union bpf_attr attr;
-    memset(&attr, 0, sizeof(attr));
-    attr.prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
-    attr.insns = reinterpret_cast<uint64_t>(program);
-    attr.insn_cnt = static_cast<uint32_t>(len);
-    attr.license = reinterpret_cast<uint64_t>("N/A");
-    attr.log_buf = reinterpret_cast<uint64_t>(buffer);
-    attr.log_size = 4096;
-    attr.log_level = 1;
-
-    fbl::unique_fd prog_fd(SAFE_SYSCALL(bpf(BPF_PROG_LOAD, attr)));
+    fbl::unique_fd prog_fd = LoadProgram(program, len, BPF_PROG_TYPE_SOCKET_FILTER, 0);
     int sk[2];
     SAFE_SYSCALL(socketpair(AF_UNIX, SOCK_DGRAM, 0, sk));
     fbl::unique_fd sk0(sk[0]);
@@ -373,40 +406,39 @@ class BpfMapTest : public testing::Test {
     Run(program, sizeof(program) / sizeof(program[0]));
   }
 
-  int array_fd() const { return array_fd_; }
-  int map_fd() const { return map_fd_; }
-  int ringbuf_fd() const { return ringbuf_fd_; }
+  int array_fd() const { return array_fd_.get(); }
+  int map_fd() const { return map_fd_.get(); }
+  int ringbuf_fd() const { return ringbuf_fd_.get(); }
 
  private:
-  int array_fd_ = -1;
-  int map_fd_ = -1;
-  int ringbuf_fd_ = -1;
-};  // namespace
+  fbl::unique_fd array_fd_;
+  fbl::unique_fd map_fd_;
+  fbl::unique_fd ringbuf_fd_;
+};
 
 TEST_F(BpfMapTest, Map) {
   const int NUM_VALUES = 2;
 
   for (int i = 0; i < NUM_VALUES; ++i) {
     int v = i + 1;
-    EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
-                  (union bpf_attr){
-                      .map_fd = (unsigned)map_fd(),
-                      .key = (uintptr_t)(&i),
-                      .value = (uintptr_t)(&v),
-                  }),
-              0)
-        << strerror(errno);
+    bpf_attr attr = {
+        .map_fd = (unsigned)map_fd(),
+        .key = (uintptr_t)(&i),
+        .value = (uintptr_t)(&v),
+    };
+    EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM, &attr), 0) << strerror(errno);
   }
 
   std::vector<int> keys;
   int next_key;
   int* last_key = nullptr;
   for (;;) {
-    int err = bpf(BPF_MAP_GET_NEXT_KEY, (union bpf_attr){
-                                            .map_fd = (unsigned)map_fd(),
-                                            .key = (uintptr_t)last_key,
-                                            .next_key = (uintptr_t)&next_key,
-                                        });
+    bpf_attr attr = {
+        .map_fd = (unsigned)map_fd(),
+        .key = (uintptr_t)last_key,
+        .next_key = (uintptr_t)&next_key,
+    };
+    int err = bpf(BPF_MAP_GET_NEXT_KEY, &attr);
     if (err < 0 && errno == ENOENT)
       break;
     ASSERT_GE(err, 0) << strerror(errno);
@@ -421,36 +453,31 @@ TEST_F(BpfMapTest, Map) {
 
   for (int i = 0; i < NUM_VALUES; ++i) {
     int v;
-    EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM,
-                  (union bpf_attr){
-                      .map_fd = (unsigned)map_fd(),
-                      .key = (uintptr_t)(&i),
-                      .value = (uintptr_t)(&v),
-                  }),
-              0)
-        << strerror(errno);
+    bpf_attr attr = {
+        .map_fd = (unsigned)map_fd(),
+        .key = (uintptr_t)(&i),
+        .value = (uintptr_t)(&v),
+    };
+    EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM, &attr), 0) << strerror(errno);
     EXPECT_EQ(v, i + 1);
   }
 
   for (int i = 0; i < NUM_VALUES; ++i) {
-    EXPECT_EQ(bpf(BPF_MAP_DELETE_ELEM,
-                  (union bpf_attr){
-                      .map_fd = (unsigned)map_fd(),
-                      .key = (uintptr_t)(&i),
-                  }),
-              0)
-        << strerror(errno);
+    bpf_attr attr = {
+        .map_fd = (unsigned)map_fd(),
+        .key = (uintptr_t)(&i),
+    };
+    EXPECT_EQ(bpf(BPF_MAP_DELETE_ELEM, &attr), 0) << strerror(errno);
   }
 
   for (int i = 0; i < NUM_VALUES; ++i) {
     int v;
-    EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM,
-                  (union bpf_attr){
-                      .map_fd = (unsigned)map_fd(),
-                      .key = (uintptr_t)(&i),
-                      .value = (uintptr_t)(&v),
-                  }),
-              -1);
+    bpf_attr attr = {
+        .map_fd = (unsigned)map_fd(),
+        .key = (uintptr_t)(&i),
+        .value = (uintptr_t)(&v),
+    };
+    EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM, &attr), -1);
     EXPECT_EQ(errno, ENOENT);
   }
 
@@ -461,19 +488,92 @@ TEST_F(BpfMapTest, PinMap) {
   const char* pin_path = "/sys/fs/bpf/foo";
 
   unlink(pin_path);
-  ASSERT_EQ(bpf(BPF_OBJ_PIN,
-                (union bpf_attr){
-                    .pathname = (uintptr_t)pin_path,
-                    .bpf_fd = (unsigned)map_fd(),
-                }),
-            0)
-      << strerror(errno);
+  bpf_attr attr = {
+      .pathname = (uintptr_t)pin_path,
+      .bpf_fd = (unsigned)map_fd(),
+  };
+  ASSERT_EQ(bpf(BPF_OBJ_PIN, &attr), 0) << strerror(errno);
   EXPECT_EQ(access(pin_path, F_OK), 0) << strerror(errno);
 
   EXPECT_EQ(close(map_fd()), 0);
-  int map_fd = bpf(BPF_OBJ_GET, (union bpf_attr){.pathname = (uintptr_t)pin_path});
+  attr = {.pathname = (uintptr_t)pin_path};
+  int map_fd = bpf(BPF_OBJ_GET, &attr);
   ASSERT_GE(map_fd, 0) << strerror(errno);
   CheckMapInfo(map_fd);
+}
+
+TEST_F(BpfMapTest, FreezeMap) {
+  // 1. Write an initial value to the map.
+  int key = 0;
+  std::vector<char> value(1024, 'A');
+  bpf_attr attr = {
+      .map_fd = static_cast<unsigned>(array_fd()),
+      .key = reinterpret_cast<uintptr_t>(&key),
+      .value = reinterpret_cast<uintptr_t>(value.data()),
+  };
+  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM, &attr), 0) << strerror(errno);
+
+  // 2. Freeze the map.
+  attr = {.map_fd = static_cast<unsigned>(array_fd())};
+  EXPECT_EQ(bpf(BPF_MAP_FREEZE, &attr), 0) << strerror(errno);
+
+  // 3. Attempt to write to the map again (this should fail).
+  std::vector<char> new_value(1024, 'B');
+  attr = {
+      .map_fd = static_cast<unsigned>(array_fd()),
+      .key = reinterpret_cast<uintptr_t>(&key),
+      .value = reinterpret_cast<uintptr_t>(new_value.data()),
+  };
+  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM, &attr), -1);
+  EXPECT_EQ(errno, EPERM);
+
+  // 4. Read the value back to confirm it wasn't changed.
+  std::vector<char> read_value(1024, 0);
+  attr = {
+      .map_fd = static_cast<unsigned>(array_fd()),
+      .key = reinterpret_cast<uintptr_t>(&key),
+      .value = reinterpret_cast<uintptr_t>(read_value.data()),
+  };
+  EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM, &attr), 0) << strerror(errno);
+  EXPECT_EQ(value, read_value);
+}
+
+TEST_F(BpfMapTest, FreezeMmapInteraction) {
+  // Create a mappable array map.
+  bpf_attr attr = {
+      .map_type = BPF_MAP_TYPE_ARRAY,
+      .key_size = sizeof(int),
+      .value_size = static_cast<uint32_t>(getpagesize()),
+      .max_entries = 1,
+      .map_flags = BPF_F_MMAPABLE,
+  };
+  fbl::unique_fd mappable_map_fd(SAFE_SYSCALL_SKIP_ON_EPERM(bpf(BPF_MAP_CREATE, &attr)));
+  ASSERT_TRUE(mappable_map_fd.is_valid());
+
+  // 1. Mmap the map, then try to freeze it. Should fail with EBUSY.
+  {
+    auto mapping = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, mappable_map_fd.get(), 0));
+
+    attr = {.map_fd = static_cast<unsigned>(mappable_map_fd.get())};
+    EXPECT_EQ(bpf(BPF_MAP_FREEZE, &attr), -1);
+    EXPECT_EQ(errno, EBUSY);
+  }
+
+  // 2. Now that it is unmapped, freezing should succeed.
+  EXPECT_EQ(bpf(BPF_MAP_FREEZE, &attr), 0) << strerror(errno);
+
+  // 3. Try to mmap the frozen map. Should fail with EPERM.
+  EXPECT_EQ(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ | PROT_WRITE,
+                                          MAP_SHARED, mappable_map_fd.get(), 0)
+                .error_value(),
+            EPERM);
+
+  // Also check read-only mmap
+  EXPECT_EQ(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ, MAP_SHARED,
+                                          mappable_map_fd.get(), 0)
+                .error_value(),
+            EPERM);
 }
 
 TEST_F(BpfMapTest, LockTest) {
@@ -643,29 +743,42 @@ TEST_F(BpfMapTest, RingBufferWrapAround) {
   ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
   ASSERT_EQ(0u, producer_pos->load(std::memory_order_acquire));
 
-  // Write first message that's 3016 bytes long.
-  size_t msg_size = 3016;
-  uint32_t value = 0x6143abcd;
-  WriteToRingBufferLarge(value, msg_size);
-  ASSERT_EQ(3024u, producer_pos->load(std::memory_order_acquire));
-  uint32_t* msg_ptr = reinterpret_cast<uint32_t*>(data + 8);
-  for (size_t i = 0; i < msg_size / 4; ++i) {
-    ASSERT_EQ(msg_ptr[i], value);
-  }
+  struct TestMessage {
+    size_t size;
+    uint32_t value;
+  } messages[] = {
+      {
+          .size = 3016,
+          .value = 0x6143abcd,
+      },
+      // Wrap-around in the middle of the message blob.
+      {
+          .size = 2072,
+          .value = 0xc23414f2,
+      },
+      {
+          .size = 3072,
+          .value = 0x12345678,
+      },
+      // Wrap-around at the edge between message header and the message itself
+      // (8 + 3016 + 8 + 2072 + 8 + 3072 + 8 = 8192).
+      {
+          .size = 128,
+          .value = 0xdeadbeef,
+      },
+  };
 
-  // Consume the message.
-  uint32_t pos = producer_pos->load(std::memory_order_acquire);
-  consumer_pos->store(pos, std::memory_order_release);
-
-  // Write a second message that wraps around to the head of the buffer.
-  uint32_t value2 = 0xc23414f2;
-  size_t msg_size2 = 2072;
-  WriteToRingBufferLarge(value2, msg_size2);
-
-  EXPECT_GT(producer_pos->load(std::memory_order_acquire), static_cast<uint32_t>(getpagesize()));
-  msg_ptr = reinterpret_cast<uint32_t*>(data + pos + 8);
-  for (size_t i = 0; i < msg_size2 / 4; ++i) {
-    ASSERT_EQ(msg_ptr[i], value2);
+  for (const auto& message : messages) {
+    // Queue a message.
+    WriteToRingBufferLarge(message.value, message.size);
+    uint32_t* msg_ptr =
+        reinterpret_cast<uint32_t*>(data + (consumer_pos->load() + 8) % getpagesize());
+    for (size_t i = 0; i < message.size / 4; ++i) {
+      ASSERT_EQ(msg_ptr[i], message.value);
+    }
+    // Consume the message.
+    uint32_t pos = producer_pos->load(std::memory_order_acquire);
+    consumer_pos->store(pos, std::memory_order_release);
   }
 }
 
@@ -724,7 +837,7 @@ TEST_F(BpfMapTest, NotificationsRingBufTest) {
   EXPECT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
 }
 
-class BpfCgroupTest : public testing::Test {
+class BpfCgroupTest : public BpfTestBase {
  protected:
   const uint16_t BLOCKED_PORT = 1236;
 
@@ -738,22 +851,6 @@ class BpfCgroupTest : public testing::Test {
 
     root_cgroup_.reset(open(temp_dir_.path().c_str(), O_RDONLY));
     assert(root_cgroup_);
-  }
-
-  fbl::unique_fd LoadProgram(const bpf_insn* program, size_t len, uint32_t expected_attach_type) {
-    char buffer[4096];
-    union bpf_attr attr;
-    memset(&attr, 0, sizeof(attr));
-    attr.prog_type = BPF_PROG_TYPE_CGROUP_SOCK_ADDR;
-    attr.expected_attach_type = expected_attach_type;
-    attr.insns = reinterpret_cast<uint64_t>(program);
-    attr.insn_cnt = static_cast<uint32_t>(len);
-    attr.license = reinterpret_cast<uint64_t>("N/A");
-    attr.log_buf = reinterpret_cast<uint64_t>(buffer);
-    attr.log_size = 4096;
-    attr.log_level = 1;
-
-    return fbl::unique_fd(bpf(BPF_PROG_LOAD, attr));
   }
 
   fbl::unique_fd LoadBlockPortProgram(uint32_t expected_attach_type) {
@@ -775,7 +872,8 @@ class BpfCgroupTest : public testing::Test {
         BPF_RETURN(),
     };
 
-    return LoadProgram(program, sizeof(program) / sizeof(program[0]), expected_attach_type);
+    return LoadProgram(program, sizeof(program) / sizeof(program[0]),
+                       BPF_PROG_TYPE_CGROUP_SOCK_ADDR, expected_attach_type);
   }
 
   void AttachToRootCgroup(uint32_t attach_type, int prog_fd) {
@@ -784,7 +882,7 @@ class BpfCgroupTest : public testing::Test {
     attr.target_fd = root_cgroup_.get();
     attr.attach_bpf_fd = prog_fd;
     attr.attach_type = attach_type;
-    ASSERT_EQ(bpf(BPF_PROG_ATTACH, attr), 0) << " errno: " << errno;
+    ASSERT_EQ(bpf(BPF_PROG_ATTACH, &attr), 0) << " errno: " << errno;
   }
 
   int TryDetachFromRootCgroup(uint32_t attach_type) {
@@ -792,7 +890,7 @@ class BpfCgroupTest : public testing::Test {
     memset(&attr, 0, sizeof(attr));
     attr.target_fd = root_cgroup_.get();
     attr.attach_type = attach_type;
-    return bpf(BPF_PROG_DETACH, attr);
+    return bpf(BPF_PROG_DETACH, &attr);
   }
 
   void DetachFromRootCgroup(uint32_t attach_type) {
@@ -914,6 +1012,81 @@ TEST_F(BpfCgroupTest, ProgFdEpoll) {
 
   ASSERT_EQ(epoll_ctl(epollfd.get(), EPOLL_CTL_ADD, prog.get(), &ev), -1);
   ASSERT_EQ(errno, EPERM);
+}
+
+class BpfIdTest : public BpfTestBase {
+ protected:
+  std::optional<int> GetNext(int cmd, int start_id) {
+    bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.start_id = start_id;
+    int result = bpf(cmd, &attr);
+    if (result < 0) {
+      return std::nullopt;
+    }
+    return attr.next_id;
+  }
+
+  std::vector<int> GetObjectList(int get_next_cmd) {
+    int last = 0;
+    std::vector<int> result;
+    while (true) {
+      auto next = GetNext(get_next_cmd, last);
+      if (!next) {
+        EXPECT_EQ(errno, ENOENT);
+        break;
+      }
+      last = *next;
+      result.push_back(*next);
+    }
+    return result;
+  }
+
+  std::vector<int> GetProgIds() { return GetObjectList(BPF_PROG_GET_NEXT_ID); }
+  std::vector<int> GetMapIds() { return GetObjectList(BPF_MAP_GET_NEXT_ID); }
+};
+
+TEST_F(BpfIdTest, ProgIds) {
+  auto progs_before = GetProgIds();
+
+  // A bpf program that blocks bind on 42.
+  bpf_insn program[] = {
+      // r0 <- 1
+      BPF_MOV_IMM(0, 1),
+      // exit
+      BPF_RETURN(),
+  };
+
+  auto prog =
+      LoadProgram(program, sizeof(program) / sizeof(program[0]), BPF_PROG_TYPE_SOCKET_FILTER, 0);
+  int prog_id = BpfGetProgId(prog.get());
+
+  auto progs_after = GetProgIds();
+
+  ASSERT_TRUE(std::find(progs_before.begin(), progs_before.end(), prog_id) == progs_before.end());
+  ASSERT_TRUE(std::find(progs_after.begin(), progs_after.end(), prog_id) != progs_after.end());
+
+  prog.reset();
+
+  progs_after = GetProgIds();
+  ASSERT_TRUE(std::find(progs_after.begin(), progs_after.end(), prog_id) == progs_after.end());
+}
+
+TEST_F(BpfIdTest, MapIds) {
+  auto maps_before = GetMapIds();
+
+  auto map = CreateMap(BPF_MAP_TYPE_ARRAY, sizeof(int), 1024, 10);
+  int map_id = BpfGetMapId(map.get());
+
+  auto maps_after = GetMapIds();
+
+  ASSERT_TRUE(std::find(maps_before.begin(), maps_before.end(), map_id) == maps_before.end());
+  ASSERT_TRUE(std::find(maps_after.begin(), maps_after.end(), map_id) != maps_after.end());
+
+  map.reset();
+
+  maps_after = GetMapIds();
+  ASSERT_TRUE(std::find(maps_after.begin(), maps_after.end(), map_id) == maps_after.end());
 }
 
 }  // namespace

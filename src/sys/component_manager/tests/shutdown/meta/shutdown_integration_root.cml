@@ -5,9 +5,8 @@
 // Realm for the shutdown integration test, it requests the SystemController protocol
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
     ],
     children: [
         {

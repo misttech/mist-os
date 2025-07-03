@@ -5,12 +5,12 @@
 //! Defines the entry point of TCP packets, by directing them into the correct
 //! state machine.
 
-use alloc::collections::hash_map;
 use core::fmt::Debug;
 use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
 use log::{debug, error, warn};
+use net_types::ip::Ip;
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::socket::{
     AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
@@ -24,6 +24,7 @@ use netstack3_base::{
 use netstack3_filter::{
     FilterIpExt, SocketIngressFilterResult, SocketOpsFilter, TransportPacketSerializer,
 };
+use netstack3_hashmap::hash_map;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
@@ -529,6 +530,7 @@ fn try_handle_incoming_for_connection_dual_stack<SockI, WireI, CC, BC, H>(
 ) -> ConnectionIncomingSegmentDisposition
 where
     SockI: DualStackIpExt,
+    WireI: Ip,
     BC: TcpBindingsContext<CC::DeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
@@ -1229,6 +1231,7 @@ fn run_socket_ingress_filter<I, BC, D>(
     tcp_segment: &TcpSegment<&'_ [u8]>,
 ) -> SocketIngressFilterResult
 where
+    I: Ip,
     BC: TcpBindingsContext<D>,
     D: StrongDeviceIdentifier,
 {
@@ -1238,7 +1241,8 @@ where
     let data = FragmentedByteSlice::new(&mut slices);
 
     bindings_ctx.socket_ops_filter().on_ingress(
-        &data,
+        I::VERSION,
+        data,
         incoming_device,
         socket_cookie,
         &socket_options.ip_options.marks,

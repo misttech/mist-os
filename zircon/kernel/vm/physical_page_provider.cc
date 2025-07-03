@@ -20,16 +20,6 @@ KCOUNTER(physical_reclaim_total_requests, "physical.reclaim.total_requests")
 KCOUNTER(physical_reclaim_succeeded_requests, "physical.reclaim.succeeded_requests")
 KCOUNTER(physical_reclaim_failed_requests, "physical.reclaim.failed_requests")
 
-namespace {
-
-const PageSourceProperties kProperties{
-    .is_user_pager = false,
-    .is_preserving_page_content = false,
-    .is_providing_specific_physical_pages = true,
-};
-
-}  // namespace
-
 PhysicalPageProvider::PhysicalPageProvider(uint64_t size) : size_(size) { LTRACEF("\n"); }
 
 PhysicalPageProvider::~PhysicalPageProvider() {
@@ -50,7 +40,14 @@ PhysicalPageProvider::~PhysicalPageProvider() {
   Pmm::Node().FreeList(&free_list_);
 }
 
-const PageSourceProperties& PhysicalPageProvider::properties() const { return kProperties; }
+PageSourceProperties PhysicalPageProvider::properties() const {
+  return PageSourceProperties{
+      .is_user_pager = false,
+      .is_preserving_page_content = false,
+      .is_providing_specific_physical_pages = true,
+      .supports_request_type = {true, false, false},
+  };
+}
 
 void PhysicalPageProvider::Init(VmCowPages* cow_pages, PageSource* page_source, paddr_t phys_base) {
   DEBUG_ASSERT(cow_pages);
@@ -68,7 +65,7 @@ void PhysicalPageProvider::Init(VmCowPages* cow_pages, PageSource* page_source, 
 // start of WaitOnEvent.
 void PhysicalPageProvider::SendAsyncRequest(PageRequest* request) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
 
@@ -90,14 +87,14 @@ void PhysicalPageProvider::SendAsyncRequest(PageRequest* request) {
 
 void PhysicalPageProvider::QueueRequestLocked(PageRequest* request) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   ASSERT(!closed_);
   pending_requests_.push_back(request);
 }
 
 void PhysicalPageProvider::ClearAsyncRequest(PageRequest* request) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
 
@@ -112,8 +109,8 @@ void PhysicalPageProvider::ClearAsyncRequest(PageRequest* request) {
 
 void PhysicalPageProvider::SwapAsyncRequest(PageRequest* old, PageRequest* new_req) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(old)));
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(new_req)));
+  DEBUG_ASSERT(GetRequestType(old) == page_request_type::READ);
+  DEBUG_ASSERT(GetRequestType(new_req) == page_request_type::READ);
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
 
@@ -138,6 +135,13 @@ void PhysicalPageProvider::FreePages(list_node* pages) {
       return;
     }
   }
+  // This should always be called in a way that is serialized with other operations on our
+  // cow_pages_, otherwise there is a race where an operation on the cow_pages_ could observe an
+  // absence of pages, but then be unable to retrieve them because it is not synchronized with this
+  // FreePages call. Both parties using the paged_vmo_lock serves to create a synchronization that
+  // avoids this scenario.
+  ASSERT(page_source_);
+  AssertHeld(*page_source_->paged_vmo_lock());
   // This marks the pages loaned, and makes them FREE_LOANED for potential use by other clients that
   // are ok with getting loaned pages when allocating. Must hold the loaned_state_lock_ as we are
   // manipulating the loaned state of pages that could get inspected by UnloanRange due to
@@ -195,7 +199,7 @@ bool PhysicalPageProvider::DequeueRequest(uint64_t* request_offset, uint64_t* re
   }
   PageRequest* request = pending_requests_.pop_front();
   DEBUG_ASSERT(request);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   *request_offset = GetRequestOffset(request);
   *request_length = GetRequestLen(request);
   DEBUG_ASSERT(InRange(*request_offset, *request_length, size_));
@@ -476,12 +480,8 @@ void PhysicalPageProvider::Dump(uint depth, uint32_t max_items) {
                cow_pages_, phys_base_, closed_);
   printer.BeginList(max_items);
   for (auto& req : pending_requests_) {
-    DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(&req)));
+    DEBUG_ASSERT(GetRequestType(&req) == page_request_type::READ);
     printer.Emit("  pending req [0x%lx, 0x%lx)", GetRequestOffset(&req), GetRequestLen(&req));
   }
   printer.EndList();
-}
-
-bool PhysicalPageProvider::SupportsPageRequestType(page_request_type type) const {
-  return type == page_request_type::READ;
 }

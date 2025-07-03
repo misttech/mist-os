@@ -8,13 +8,40 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
-use anyhow::Result;
+use crate::BuildType;
+use anyhow::{anyhow, Result};
 use assembly_constants::Arm64DebugDapSoc;
 use assembly_container::{assembly_container, AssemblyContainer, DirectoryPathBuf, WalkPaths};
 use assembly_images_config::BoardFilesystemConfig;
 use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+
+/// The architecture of the hardware.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Architecture {
+    /// x64.
+    #[default]
+    X64,
+
+    /// arm64.
+    ARM64,
+
+    /// riscv64.
+    RISCV64,
+}
+
+impl std::fmt::Display for Architecture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::X64 => write!(f, "x64"),
+            Self::ARM64 => write!(f, "arm64"),
+            Self::RISCV64 => write!(f, "riscv64"),
+        }
+    }
+}
 
 /// This struct provides information about the "board" that a product is being
 /// assembled to run on.
@@ -24,6 +51,9 @@ use serde::{Deserialize, Serialize};
 pub struct BoardInformation {
     /// The name of the board.
     pub name: String,
+
+    /// The architecture of the hardware.
+    pub arch: Architecture,
 
     /// Metadata about the board that's provided to the 'fuchsia.hwinfo.Board'
     /// protocol and to the Board Driver via the PlatformID and BoardInfo ZBI
@@ -118,19 +148,8 @@ pub struct BoardInformation {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 
-    /// Release version that this board config corresponds to.
-    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
-    /// repositories start using release_info below.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_version: Option<String>,
-
     /// Release information about this assembly container artifact.
-    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_info: Option<BoardReleaseInfo>,
+    pub release_info: BoardReleaseInfo,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
@@ -181,6 +200,10 @@ pub struct BoardInputBundle {
     /// The name of the board input bundle.
     pub name: String,
 
+    /// Which builds types to include this BIB.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub include_in: IncludeInBuildType,
+
     /// These are the drivers that are included by this bundle.
     #[walk_paths]
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -203,19 +226,49 @@ pub struct BoardInputBundle {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub configuration: Option<BoardProvidedConfig>,
 
-    /// Release version that this board config corresponds to.
-    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
-    /// repositories start using release_info below.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_version: Option<String>,
-
     /// Release information about this assembly container artifact.
-    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_info: Option<ReleaseInfo>,
+    pub release_info: ReleaseInfo,
+}
+
+/// Which build type to include a particular BIB.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum IncludeInBuildType {
+    /// Include in all build types.
+    #[default]
+    All,
+
+    /// Only include in eng build types.
+    Eng,
+
+    /// Only include in user and userdebug build types.
+    UserAndUserdebug,
+}
+
+impl FromStr for IncludeInBuildType {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "all" => Ok(Self::All),
+            "eng" => Ok(Self::Eng),
+            "user_and_userdebug" => Ok(Self::UserAndUserdebug),
+            _ => Err(anyhow!("Cannot parse --include-in from string: {}", &s)),
+        }
+    }
+}
+
+impl BoardInputBundle {
+    /// Return whether this BIB should be included in a product with the given
+    /// build type.
+    pub fn should_be_included(&self, build_type: BuildType) -> bool {
+        match (&self.include_in, build_type) {
+            (&IncludeInBuildType::All, _) => true,
+            (&IncludeInBuildType::Eng, BuildType::Eng) => true,
+            (&IncludeInBuildType::Eng, BuildType::User | BuildType::UserDebug) => false,
+            (&IncludeInBuildType::UserAndUserdebug, BuildType::User | BuildType::UserDebug) => true,
+            (&IncludeInBuildType::UserAndUserdebug, BuildType::Eng) => false,
+        }
+    }
 }
 
 /// This struct defines board-provided configuration for platform services and
@@ -434,6 +487,15 @@ mod test {
     fn test_basic_board_deserialize() {
         let json = serde_json::json!({
             "name": "sample board",
+            "arch": "x64",
+            "release_info": {
+                "info": {
+                    "name": "",
+                    "repository": "",
+                    "version": "",
+                },
+                "bib_sets": [],
+            }
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
@@ -444,7 +506,7 @@ mod test {
 
     #[test]
     fn test_board_default_serialization() {
-        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\"}").unwrap();
+        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\", \"arch\": \"x64\", \"release_info\": {\"info\": { \"name\": \"\", \"repository\": \"\", \"version\": \"\" }, \"bib_sets\": [] }}").unwrap();
         crate::common::tests::value_serialization_helper(value);
     }
 
@@ -476,6 +538,7 @@ mod test {
 
         let json = serde_json::json!({
             "name": "sample board",
+            "arch": "x64",
             "hardware_info": {
                 "name": "hwinfo_name",
                 "vendor_id": 1,
@@ -498,6 +561,14 @@ mod test {
                     "enable_debug_access_port_for_soc": "amlogic-t931g",
                 }
             },
+            "release_info": {
+                "info": {
+                    "name": "",
+                    "repository": "",
+                    "version": "",
+                },
+                "bib_sets": [],
+            }
         });
         serde_json::to_writer(config_file, &json).unwrap();
         let resolved = BoardInformation::from_dir(&dir_path).unwrap();

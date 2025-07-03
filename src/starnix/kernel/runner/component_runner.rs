@@ -26,7 +26,7 @@ use starnix_core::vfs::{
 };
 use starnix_core::{security, signals};
 use starnix_logging::{log_debug, log_error, log_info, log_warn};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::{Capabilities, Credentials};
 use starnix_uapi::device_type::DeviceType;
@@ -255,6 +255,7 @@ pub async fn start_component(
                 }
 
                 parse_numbered_handles(
+                    locked,
                     current_task,
                     start_info.numbered_handles,
                     &current_task.files,
@@ -332,6 +333,7 @@ async fn serve_component_controller(
                 Ok(ComponentControllerRequest::Stop { .. }) => {
                     if let Some(task) = task.upgrade() {
                         signals::send_standard_signal(
+                            task.kernel().kthreads.unlocked_for_async().deref_mut(),
                             task.as_ref(),
                             signals::SignalInfo::default(SIGINT),
                         );
@@ -340,7 +342,11 @@ async fn serve_component_controller(
                 }
                 Ok(ComponentControllerRequest::Kill { .. }) => {
                     if let Some(task) = task.upgrade() {
-                        signals::send_standard_signal(&task, signals::SignalInfo::default(SIGKILL));
+                        signals::send_standard_signal(
+                            task.kernel().kthreads.unlocked_for_async().deref_mut(),
+                            &task,
+                            signals::SignalInfo::default(SIGKILL),
+                        );
                         log_info!("Sent SIGKILL to program {:}", task.command().to_string_lossy());
                         controller_handle.shutdown_with_epitaph(zx::Status::from_raw(
                             fcomponent::Error::InstanceDied.into_primitive() as i32,
@@ -376,7 +382,7 @@ fn generate_component_path<L>(
     system_task: &CurrentTask,
 ) -> Result<String, Error>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     // Checking container directory already exists.
     // If this lookup fails, the container might not have the "container" feature enabled.
@@ -413,6 +419,7 @@ where
 /// If there is a `numbered_handles` of type `HandleType::User0`, that is
 /// interpreted as the server end of the ShellController protocol.
 pub fn parse_numbered_handles(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     numbered_handles: Option<Vec<fprocess::HandleInfo>>,
     files: &FdTable,
@@ -421,20 +428,17 @@ pub fn parse_numbered_handles(
         for numbered_handle in numbered_handles {
             let info = HandleInfo::try_from(numbered_handle.id)?;
             if info.handle_type() == HandleType::FileDescriptor {
-                files.insert(
-                    current_task,
-                    FdNumber::from_raw(info.arg().into()),
-                    create_file_from_handle(current_task, numbered_handle.handle)?,
-                )?;
+                let file = create_file_from_handle(locked, current_task, numbered_handle.handle)?;
+                files.insert(locked, current_task, FdNumber::from_raw(info.arg().into()), file)?;
             }
         }
     }
 
-    let stdio = SyslogFile::new_file(current_task);
+    let stdio = SyslogFile::new_file(locked, current_task);
     // If no numbered handle is provided for each stdio handle, default to syslog.
     for i in [0, 1, 2] {
         if files.get(FdNumber::from_raw(i)).is_err() {
-            files.insert(current_task, FdNumber::from_raw(i), stdio.clone())?;
+            files.insert(locked, current_task, FdNumber::from_raw(i), stdio.clone())?;
         }
     }
 
@@ -471,7 +475,7 @@ impl MountRecord {
         mount_options: Option<&String>,
     ) -> Result<(), Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
@@ -522,6 +526,7 @@ impl MountRecord {
         };
 
         let fs = RemoteFs::new_fs(
+            locked,
             system_task.kernel(),
             client_end,
             FileSystemOptions { source: path.into(), params, ..Default::default() },

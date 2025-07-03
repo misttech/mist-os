@@ -14,7 +14,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 
 assert(!bootfs_only)
 
-if (!use_bazel_images_only) {
+# Product size checker.
+if (!use_bazel_images_only && size_checker_input != {
+                              }) {
   _assembly_manifest =
       "$root_build_dir/obj/build/images/fuchsia/fuchsia/assembled_system.json"
 
@@ -27,6 +29,7 @@ if (!use_bazel_images_only) {
       "$target_out_dir/visualization/D3BlobTreeMap.js",
       "$target_out_dir/visualization/d3_v3/LICENSE",
       "$target_out_dir/visualization/d3_v3/d3.js",
+      "$target_out_dir/size_report_product.json",
     ]
     testonly = true
     ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
@@ -41,21 +44,13 @@ if (!use_bazel_images_only) {
       rebase_path("$target_out_dir/visualization", root_build_dir),
       "--size-breakdown-output",
       rebase_path("$target_out_dir/size_breakdown.txt", root_build_dir),
+      "--gerrit-output",
+      rebase_path("$target_out_dir/size_report_product.json", root_build_dir),
+      "--blobfs-creep-budget",
+      "$blobfs_size_creep_limit",
+      "--platform-resources-budget",
+      "8013047",
     ]
-
-    # Only create gerrit size report if necessary.
-    if (size_checker_input != {
-        }) {
-      args += [
-        "--gerrit-output",
-        rebase_path("$target_out_dir/size_report_product.json", root_build_dir),
-        "--blobfs-creep-budget",
-        "$blobfs_size_creep_limit",
-        "--platform-resources-budget",
-        "8013047",
-      ]
-      outputs += [ "$target_out_dir/size_report_product.json" ]
-    }
     deps = [ "//build/images/fuchsia:fuchsia.image_assembler" ]
     metadata = {
       product_size_checker_output = [
@@ -70,6 +65,7 @@ if (!use_bazel_images_only) {
   }
 }
 
+# Package size checker.
 if (size_checker_input != {
     }) {
   generated_file("size_checker_json") {
@@ -82,12 +78,7 @@ if (size_checker_input != {
     generator = ":size_checker_json"
     outputs = [ "${root_build_dir}/size_checker.json" ]
   }
-}
 
-if (!use_bazel_images_only && blobfs_capacity != false &&
-    max_blob_contents_size != false &&
-    size_checker_input != {
-    }) {
   _output_dir =
       get_label_info(":convert_size_limits_to_size_budgets", "target_out_dir")
   _size_budgets_blobfs_file = "${_output_dir}/size_budgets.json"
@@ -183,20 +174,31 @@ if (!use_bazel_images_only && blobfs_capacity != false &&
       rebase_path("$target_out_dir/verbose_output.json", root_build_dir),
     ]
   }
+}
 
-  json_merge("size_report.json") {
-    sources = [
-      "$target_out_dir/size_report_blobfs.json",
-      "$target_out_dir/size_report_product.json",
-    ]
-    testonly = true
-    deps = [
-      ":run_product_size_checker",
-      ":verify_size_budget_blobfs",
-    ]
-    metadata = {
-      gerrit_size_reports =
-          [ rebase_path("$target_out_dir/size_report.json", root_build_dir) ]
-    }
+json_merge("size_report.json") {
+  testonly = true
+
+  # Add the image size checker.
+  sources = [ "$target_out_dir/../fuchsia/product_bundle.size_report.json" ]
+  deps = [ "//build/images/fuchsia:product_bundle" ]
+
+  # Add the product size checker.
+  if (!use_bazel_images_only && size_checker_input != {
+                                }) {
+    sources += [ "$target_out_dir/size_report_product.json" ]
+    deps += [ ":run_product_size_checker" ]
+  }
+
+  # Add the package size checker.
+  if (size_checker_input != {
+      }) {
+    sources += [ "$target_out_dir/size_report_blobfs.json" ]
+    deps += [ ":verify_size_budget_blobfs" ]
+  }
+
+  metadata = {
+    gerrit_size_reports =
+        [ rebase_path("$target_out_dir/size_report.json", root_build_dir) ]
   }
 }

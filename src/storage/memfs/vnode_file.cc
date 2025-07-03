@@ -4,12 +4,29 @@
 
 #include "src/storage/memfs/vnode_file.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/zx/result.h>
 #include <lib/zx/stream.h>
 #include <lib/zx/vmo.h>
-#include <zircon/syscalls-next.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
+#include <utility>
+
+#include <fbl/algorithm.h>
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/memfs/memfs.h"
+#include "src/storage/memfs/vnode.h"
 
 namespace memfs {
 

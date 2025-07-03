@@ -22,19 +22,6 @@ properties:
     description: Panel type ID defined in
       src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h
 
-  display-width:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: Number of pixels in the width of the panel.
-
-  display-height:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: Number of pixels in the height of the panel.
-
-dependentRequired:
-  panel-type: [display-width, display-height]
-  display-width: [display-height, panel-type]
-  display-height: [display-width, panel-type]
-
 additionalProperties: true
 
 examples:
@@ -42,6 +29,4 @@ examples:
     hdmi-display {
       compatible = "test,display";
       panel-type = <0xc>;
-      display-width = <1920>;
-      display-height = <1080>;
     };

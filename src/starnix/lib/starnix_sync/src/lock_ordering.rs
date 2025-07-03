@@ -9,9 +9,9 @@ lock_ordering! {
     // UninterruptibleLock represents a virtual level before which lock must be interruptible.
     Unlocked => UninterruptibleLock,
     // Artificial level for ResourceAccessor.add_file_with_flags(..)
-    Unlocked => ResourceAccessorAddFile,
+    Unlocked => ResourceAccessorLevel,
     // Artificial level for DeviceOps.open(..)
-    ResourceAccessorAddFile => DeviceOpen,
+    ResourceAccessorLevel => DeviceOpen,
     // Artificial level for several FileOps and FsNodeOps method forming a connected group
     // because of dependencies between them: FileOps.read, FsNode.create_file_ops, ...
     DeviceOpen => FileOpsCore,
@@ -31,6 +31,9 @@ lock_ordering! {
     UninterruptibleLock => KernelIpTables,
     // Kernel.swap_files
     UninterruptibleLock => KernelSwapFiles,
+    // ThreadGroup.limits
+    ProcessGroupState => ThreadGroupLimits,
+    MmDumpable => ThreadGroupLimits,
     // MemoryManager.dumpable
     UninterruptibleLock => MmDumpable,
     // ProcessGroup.mutable_state.
@@ -40,13 +43,19 @@ lock_ordering! {
     // ProcessGroup.mutable_state. Artificial locks above need to be before it because of
     // dependencies in DevPtsFile.{read, write, ioctl}.
     FileOpsCore => ProcessGroupState,
-    // Bpf locks
-    UninterruptibleLock => BpfPrograms,
+    // eBPF locks
+    UninterruptibleLock => EbpfStateLock,
     // Userfaultfd
     FileOpsCore => UserFaultInner,
     UninterruptibleLock => UserFaultInner,
     // MemoryPressureMonitor
     UninterruptibleLock => MemoryPressureMonitor,
     FileOpsCore => MemoryPressureMonitor,
-    MemoryPressureMonitor => MemoryPressureMonitorClientState
+    MemoryPressureMonitor => MemoryPressureMonitorClientState,
+    // Fastrpc
+    UninterruptibleLock => FastrpcInnerState,
+    // MemoryXattrStorage
+    UninterruptibleLock => MemoryXattrStorageLevel,
+    // Bpf Map State objects
+    UninterruptibleLock => BpfMapStateLevel,
 }

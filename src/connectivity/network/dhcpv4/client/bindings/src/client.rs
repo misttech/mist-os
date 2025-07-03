@@ -490,6 +490,7 @@ impl Client {
                     | fnet_interfaces_admin::AddressRemovalReason::InvalidProperties
                     | fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                     | fnet_interfaces_admin::AddressRemovalReason::DadFailed
+                    | fnet_interfaces_admin::AddressRemovalReason::Forfeited
                     | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
                         log::error!(
                             "{debug_log_prefix} unexpected removal reason \
@@ -689,7 +690,8 @@ fn into_address_event(
                     )
                 }
                 r @ fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
-                | r @ fnet_interfaces_admin::AddressRemovalReason::DadFailed => {
+                | r @ fnet_interfaces_admin::AddressRemovalReason::DadFailed
+                | r @ fnet_interfaces_admin::AddressRemovalReason::Forfeited => {
                     log::warn!("{debug_log_prefix} address rejected: {r:?}");
                     dhcp_client_core::client::AddressEvent::Rejected
                 }

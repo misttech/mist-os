@@ -20,11 +20,11 @@ use crate::object_store::{ObjectStore, NO_OWNER};
 use crate::range::RangeExt;
 use crate::serialized_types::{Version, LATEST_VERSION};
 use crate::{debug_assert_not_too_long, metrics};
-use anyhow::{bail, ensure, Context, Error};
+use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
 use event_listener::Event;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{NumericProperty as _, UintProperty};
+use fuchsia_inspect::{Inspector, LazyNode, NumericProperty as _, UintProperty};
 use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use fxfs_crypto::Crypt;
@@ -423,23 +423,36 @@ impl FxFilesystemBuilder {
             device.flush().await.context("Device flush failed")?;
         }
 
-        let filesystem = Arc::new(FxFilesystem {
-            device,
-            block_size,
-            objects: objects.clone(),
-            journal,
-            commit_mutex: futures::lock::Mutex::new(()),
-            lock_manager: LockManager::new(),
-            flush_task: Mutex::new(None),
-            trim_task: Mutex::new(None),
-            closed: AtomicBool::new(true),
-            shutdown_event: Event::new(),
-            trace: self.trace,
-            graveyard: Graveyard::new(objects.clone()),
-            completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
-            options: filesystem_options,
-            in_flight_transactions: AtomicU64::new(0),
-            transaction_limit_event: Event::new(),
+        let filesystem = Arc::new_cyclic(|weak: &Weak<FxFilesystem>| {
+            let weak = weak.clone();
+            FxFilesystem {
+                device,
+                block_size,
+                objects: objects.clone(),
+                journal,
+                commit_mutex: futures::lock::Mutex::new(()),
+                lock_manager: LockManager::new(),
+                flush_task: Mutex::new(None),
+                trim_task: Mutex::new(None),
+                closed: AtomicBool::new(true),
+                shutdown_event: Event::new(),
+                trace: self.trace,
+                graveyard: Graveyard::new(objects.clone()),
+                completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
+                options: filesystem_options,
+                in_flight_transactions: AtomicU64::new(0),
+                transaction_limit_event: Event::new(),
+                _stores_node: metrics::register_fs(move || {
+                    let weak = weak.clone();
+                    Box::pin(async move {
+                        if let Some(fs) = weak.upgrade() {
+                            fs.populate_stores_node().await
+                        } else {
+                            Err(anyhow!("Filesystem has been dropped"))
+                        }
+                    })
+                }),
+            }
         });
 
         filesystem.journal().set_image_builder_mode(image_builder_mode);
@@ -544,6 +557,9 @@ pub struct FxFilesystem {
     // NOTE: This *must* go last so that when users take the device from a closed filesystem, the
     // filesystem has dropped all other members first (Rust drops members in declaration order).
     device: DeviceHolder,
+
+    // The "stores" node in the Inspect tree.
+    _stores_node: LazyNode,
 }
 
 #[fxfs_trace::trace]
@@ -908,6 +924,24 @@ impl FxFilesystem {
     pub async fn truncate_guard(&self, store_id: u64, object_id: u64) -> TruncateGuard<'_> {
         let keys = lock_keys![LockKey::truncate(store_id, object_id,)];
         TruncateGuard(self.lock_manager().write_lock(keys).await)
+    }
+
+    async fn populate_stores_node(&self) -> Result<Inspector, Error> {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let root = inspector.root();
+        root.record_child("__root", |n| self.root_store().record_data(n));
+        let object_manager = self.object_manager();
+        let volume_directory = object_manager.volume_directory();
+        let layer_set = volume_directory.store().tree().layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = volume_directory.iter(&mut merger).await?;
+        while let Some((name, id, _)) = iter.get() {
+            if let Some(store) = object_manager.store(id) {
+                root.record_child(name.to_string(), |n| store.record_data(n));
+            }
+            iter.advance().await?;
+        }
+        Ok(inspector)
     }
 }
 

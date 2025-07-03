@@ -4,8 +4,17 @@
 
 #include "src/storage/memfs/vnode.h"
 
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
+#include <zircon/time.h>
+
+#include <atomic>
+#include <cstdint>
+#include <ctime>
+
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
-#include "src/storage/memfs/dnode.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/memfs/memfs.h"
 
 namespace memfs {
 

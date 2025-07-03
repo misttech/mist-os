@@ -311,11 +311,15 @@ impl SeccompFilterContainer {
     }
 
     /// Creates a new listener for use by SECCOMP_RET_USER_NOTIF.  Returns its fd.
-    pub fn create_listener(current_task: &CurrentTask) -> Result<FdNumber, Errno> {
+    pub fn create_listener(
+        locked: &mut Locked<Unlocked>,
+        current_task: &CurrentTask,
+    ) -> Result<FdNumber, Errno> {
         // Create the `Anon` handle file before taking the write lock on the task, because
         // `Anon::new_file()` needs to read the `current_task` SID to label the file object.
         let the_notifier = SeccompNotifier::new();
         let handle = Anon::new_file(
+            locked,
             current_task,
             Box::new(SeccompNotifierFileObject { notifier: the_notifier.clone() }),
             OpenFlags::RDWR,
@@ -328,7 +332,7 @@ impl SeccompFilterContainer {
         if filters.notifier.is_some() {
             return error!(EBUSY);
         }
-        let fd = current_task.add_file(handle, FdFlags::CLOEXEC)?;
+        let fd = current_task.add_file(locked, handle, FdFlags::CLOEXEC)?;
         {
             let mut state = the_notifier.lock();
             state.add_thread();
@@ -400,12 +404,16 @@ impl SeccompState {
 
     /// Check to see if this syscall is allowed in STRICT mode, and, if not,
     /// send the current task a SIGKILL.
-    pub fn do_strict(task: &Task, syscall: &Syscall) -> Option<Result<SyscallResult, Errno>> {
+    pub fn do_strict(
+        locked: &mut Locked<Unlocked>,
+        task: &Task,
+        syscall: &Syscall,
+    ) -> Option<Result<SyscallResult, Errno>> {
         if syscall.decl.number as u32 != __NR_exit
             && syscall.decl.number as u32 != __NR_read
             && syscall.decl.number as u32 != __NR_write
         {
-            send_standard_signal(task, SignalInfo::default(SIGKILL));
+            send_standard_signal(locked, task, SignalInfo::default(SIGKILL));
             return Some(Err(errno_from_code!(0)));
         }
         None
@@ -514,7 +522,7 @@ impl SeccompState {
                     force: true,
                 };
 
-                send_standard_signal(current_task, siginfo);
+                send_standard_signal(locked, current_task, siginfo);
                 Some(Err(errno_from_code!(-(syscall.decl.number as i16))))
             }
             SeccompAction::UserNotif => {
@@ -707,7 +715,7 @@ impl SeccompAction {
         *dst |= 1 << self.logged_bit_offset();
     }
 
-    pub fn is_logged(&self, kernel: &Arc<Kernel>, filter_flag: bool) -> bool {
+    pub fn is_logged(&self, kernel: &Kernel, filter_flag: bool) -> bool {
         if kernel.actions_logged.load(Ordering::Relaxed) & (1 << self.logged_bit_offset()) != 0 {
             match self {
                 // Per the documentation on audit logging of seccomp actions in
@@ -726,7 +734,7 @@ impl SeccompAction {
         }
     }
 
-    pub fn set_actions_logged(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
+    pub fn set_actions_logged(kernel: &Kernel, data: &[u8]) -> Result<(), Errno> {
         let mut new_actions_logged: u16 = 0;
         for action_res in data.fields_with(|c| c.is_ascii_whitespace()) {
             if let Ok(action) = action_res.to_str() {
@@ -749,7 +757,7 @@ impl SeccompAction {
         Ok(())
     }
 
-    pub fn get_actions_logged(kernel: &Arc<Kernel>) -> Vec<u8> {
+    pub fn get_actions_logged(kernel: &Kernel) -> Vec<u8> {
         let al = kernel.actions_logged.load(Ordering::Relaxed);
         let mut result: String = "".to_string();
         for action in Self::all_actions() {

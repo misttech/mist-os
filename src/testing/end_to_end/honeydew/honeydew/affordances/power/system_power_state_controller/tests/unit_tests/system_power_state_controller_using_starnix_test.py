@@ -177,7 +177,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
             device_logger=self.mock_device_logger,
             inspect=self.mock_inspect,
             device_name=str(_INPUT_ARGS["device_name"]),
-            starnix=self.mock_starnix,
+            starnix_affordance=self.mock_starnix,
         )
 
     @mock.patch.object(

@@ -8,6 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <math.h>
@@ -23,16 +24,32 @@
 
 namespace ti {
 
-enum {
-  // These values are shared with the Nelson bootloader, and must be kept in sync.
-  kPanelTypeUnknown = 0,
-  kPanelTypeKdFiti9364 = 1,
-  kPanelTypeBoeFiti9364 = 2,
-  kPanelTypeInxFiti9364 = 3,
-  kPanelTypeKdFiti9365 = 4,
-  kPanelTypeBoeFiti9365 = 5,
-  kPanelTypeBoeSit7703 = 6,
+// Panel type ID provided by the bootloader to Zircon.
+//
+// Values must be kept in sync with the bootloader implementation.
+enum class BootloaderPanelType : uint32_t {
+  kKdFiti9364 = 1,
+  kBoeFiti9364 = 2,
+  // 3 was for kFiti9364
+  kKdFiti9365 = 4,
+  kBoeFiti9365 = 5,
+  // 6 was for kSit7703.
 };
+
+display::PanelType ToDisplayPanelType(BootloaderPanelType bootloader_panel_type) {
+  switch (bootloader_panel_type) {
+    case BootloaderPanelType::kKdFiti9364:
+      return display::PanelType::kKdKd070d82FitipowerJd9364;
+    case BootloaderPanelType::kBoeFiti9364:
+      return display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson;
+    case BootloaderPanelType::kKdFiti9365:
+      return display::PanelType::kKdKd070d82FitipowerJd9365;
+    case BootloaderPanelType::kBoeFiti9365:
+      return display::PanelType::kBoeTv070wsmFitipowerJd9365;
+  }
+  zxlogf(ERROR, "Unknown panel type %" PRIu32, static_cast<uint32_t>(bootloader_panel_type));
+  return display::PanelType::kUnknown;
+}
 
 // Refer to <internal>/vendor/amlogic/video-common/ambient_temp/lp8556.cc
 // Lookup tables containing the slope and y-intercept for a linear equation used
@@ -44,7 +61,6 @@ constexpr std::array<double,
                      static_cast<std::size_t>(Lp8556Device::PanelType::kNumTypes)>
     kLowBrightnessSlopeTable = {
         22.4,  // PanelType::kBoe
-        22.1,  // PanelType::kInx
         22.2,  // PanelType::kKd
         22.2,  // PanelType::kUnknown
 };
@@ -52,7 +68,6 @@ constexpr std::array<double,
                      static_cast<std::size_t>(Lp8556Device::PanelType::kNumTypes)>
     kLowBrightnessInterceptTable = {
         1236.0,  // PanelType::kBoe
-        1431.0,  // PanelType::kInx
         1319.0,  // PanelType::kKd
         1329.0,  // PanelType::kUnknown
 };
@@ -69,9 +84,6 @@ constexpr std::array<std::array<double, kTableSize>,
         // PanelType::kBoe
         {19.80, 19.80, 19.80, 19.80, 19.90, 20.00, 20.10, 20.20, 20.30, 20.40, 20.50, 20.53, 20.53,
          20.53, 20.53, 20.53},
-        // PanelType::kInx
-        {19.70, 19.70, 19.70, 19.70, 19.80, 19.90, 20.00, 20.10, 20.20, 20.27, 20.30, 20.30, 20.30,
-         20.30, 20.30, 20.30},
         // PanelType::kKd
         {19.67, 19.67, 19.67, 19.67, 19.77, 19.93, 20.03, 20.13, 20.20, 20.27, 20.37, 20.37, 20.37,
          20.37, 20.37, 20.37},
@@ -269,6 +281,79 @@ void Lp8556Device::GetSensorName(GetSensorNameCompleter::Sync& completer) {
   completer.Reply(fidl::StringView::FromExternal(kPowerSensorName));
 }
 
+namespace {
+
+zx::result<display::PanelType> GetDisplayPanelInfoFromPanelTypeMetadata(zx_device_t* parent) {
+  size_t actual = 0;
+  display::PanelType display_panel_type;
+  zx_status_t get_panel_info_status =
+      device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_DISPLAY_PANEL_TYPE,
+                                   &display_panel_type, sizeof(display_panel_type), &actual);
+
+  if (get_panel_info_status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get display panel info from metadata: %s",
+           zx_status_get_string(get_panel_info_status));
+    return zx::error(get_panel_info_status);
+  }
+  if (actual != sizeof(display_panel_type)) {
+    zxlogf(ERROR, "Unexpected display panel info size: %zu", actual);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  return zx::ok(display_panel_type);
+}
+
+zx::result<display::PanelType> GetDisplayPanelInfoFromBootloaderMetadata(zx_device_t* parent) {
+  size_t actual = 0;
+  BootloaderPanelType bootloader_panel_type;
+  zx_status_t get_panel_type_status =
+      device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_BOARD_PRIVATE,
+                                   &bootloader_panel_type, sizeof(bootloader_panel_type), &actual);
+
+  if (get_panel_type_status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get panel type from bootloader metadata: %s",
+           zx_status_get_string(get_panel_type_status));
+    return zx::error(get_panel_type_status);
+  }
+  if (actual != sizeof(BootloaderPanelType)) {
+    zxlogf(ERROR, "Unexpected panel ID size: %zu", actual);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  return zx::ok(ToDisplayPanelType(bootloader_panel_type));
+}
+
+}  // namespace
+
+zx::result<display::PanelType> Lp8556Device::GetDisplayPanelInfo() {
+  zx::result<display::PanelType> panel_type_result =
+      GetDisplayPanelInfoFromPanelTypeMetadata(parent());
+  if (panel_type_result.is_ok()) {
+    return panel_type_result;
+  }
+
+  // If the display panel info is not available from the panel type metadata,
+  // try to get it from the bootloader metadata.
+  zxlogf(WARNING,
+         "Failed to get display panel info from panel type metadata: %s. "
+         "Trying bootloader metadata.",
+         panel_type_result.status_string());
+
+  zx::result<display::PanelType> bootloader_metadata_result =
+      GetDisplayPanelInfoFromBootloaderMetadata(parent());
+
+  if (bootloader_metadata_result.is_ok()) {
+    return zx::ok(bootloader_metadata_result.value());
+  }
+
+  // If the panel type is not available to the backlight driver (on Astro and
+  // Sherlock), or the panel type is unknown to the board driver (on Nelson),
+  // we use `display::PanelType::kUnknown` to fall back to the default backlight power
+  // configurations.
+  if (bootloader_metadata_result.status_value() == ZX_ERR_NOT_FOUND) {
+    return zx::ok(display::PanelType::kUnknown);
+  }
+  return bootloader_metadata_result;
+}
+
 zx_status_t Lp8556Device::Init() {
   root_ = inspector_.GetRoot().CreateChild("ti-lp8556");
   double brightness_nits = 0.0;
@@ -316,15 +401,12 @@ zx_status_t Lp8556Device::Init() {
     }
   }
 
-  if (zx_status_t status =
-          device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_BOARD_PRIVATE,
-                                       &panel_type_id_, sizeof(panel_type_id_), &actual);
-      status != ZX_OK) {
-    panel_type_id_ = kPanelTypeUnknown;
-  } else if (actual != sizeof(panel_type_id_)) {
-    LOG_ERROR("Unexpected panel ID size: %zu", actual);
-    return ZX_ERR_BAD_STATE;
+  zx::result<display::PanelType> panel_type_result = GetDisplayPanelInfo();
+  if (panel_type_result.is_error()) {
+    LOG_ERROR("Failed to get display panel info: %s", panel_type_result.status_string());
+    return panel_type_result.status_value();
   }
+  panel_type_ = std::move(panel_type_result).value();
 
   zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
       fuchsia_hardware_platform_device::Service::Device>(parent(), "pdev");
@@ -353,7 +435,7 @@ zx_status_t Lp8556Device::Init() {
   power_watts_property_ = root_.CreateDouble("power_watts", backlight_power_);
 
   board_pid_property_ = root_.CreateUint("board_pid", board_pid_);
-  panel_id_property_ = root_.CreateUint("panel_id", panel_type_id_);
+  panel_id_property_ = root_.CreateUint("panel_id", static_cast<uint32_t>(panel_type_));
   panel_type_property_ = root_.CreateUint("panel_type", static_cast<uint32_t>(GetPanelType()));
 
   return ZX_OK;
@@ -472,17 +554,14 @@ double Lp8556Device::GetDriverEfficiency(double backlight_brightness) {
 }
 
 Lp8556Device::PanelType Lp8556Device::GetPanelType() const {
-  switch (panel_type_id_) {
-    case kPanelTypeBoeFiti9364:
-    case kPanelTypeBoeFiti9365:
-    case kPanelTypeBoeSit7703:
+  switch (panel_type_) {
+    case display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9365:
       return Lp8556Device::PanelType::kBoe;
-    case kPanelTypeInxFiti9364:
-      return Lp8556Device::PanelType::kInx;
-    case kPanelTypeKdFiti9364:
-    case kPanelTypeKdFiti9365:
+    case display::PanelType::kKdKd070d82FitipowerJd9364:
+    case display::PanelType::kKdKd070d82FitipowerJd9365:
       return Lp8556Device::PanelType::kKd;
-    case kPanelTypeUnknown:
+    case display::PanelType::kUnknown:
     default:
       return Lp8556Device::PanelType::kUnknown;
   }

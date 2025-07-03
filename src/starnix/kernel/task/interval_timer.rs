@@ -4,12 +4,13 @@
 
 use crate::signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo};
 use crate::task::{
-    CurrentTask, GenericDuration, HrTimer, HrTimerHandle, TargetTime, ThreadGroup, Timeline,
-    TimerId, TimerWakeup,
+    CurrentTask, GenericDuration, HrTimer, HrTimerHandle, Kernel, TargetTime, ThreadGroup,
+    Timeline, TimerId, TimerWakeup,
 };
 use crate::time::utc::estimate_boot_deadline_from_utc;
 use crate::vfs::timer::TimerOps;
 use assert_matches::assert_matches;
+use std::ops::DerefMut;
 
 use futures::stream::AbortHandle;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
@@ -120,6 +121,7 @@ impl IntervalTimer {
 
     async fn start_timer_loop(
         self: &IntervalTimerHandle,
+        kernel: &Kernel,
         system_task: &CurrentTask,
         timer_thread_group: WeakRef<ThreadGroup>,
     ) {
@@ -201,7 +203,12 @@ impl IntervalTimer {
                                         tid;
                                         "sending signal for timer"
                                     );
-                                    send_signal(&target, signal_info).unwrap_or_else(|e| {
+                                    send_signal(
+                                        kernel.kthreads.unlocked_for_async().deref_mut(),
+                                        &target,
+                                        signal_info,
+                                    )
+                                    .unwrap_or_else(|e| {
                                         log_warn!("Failed to queue timer signal: {}", e)
                                     });
                                 }
@@ -245,14 +252,18 @@ impl IntervalTimer {
                     new_value.it_value,
                 )?)
         };
-        let interval = duration_from_timespec(new_value.it_interval)?;
 
+        // Stop the current running task.
+        guard.disarm();
+
+        let interval = duration_from_timespec(new_value.it_interval)?;
+        guard.interval = interval;
         if let Some(hr_timer) = &self.hr_timer {
+            // It is important for power management that the hrtimer is marked as interval, as
+            // interval timers may prohibit container suspension.  Note that marking `is_interval`
+            // changes the hrtimer ID, which is only allowed if the hrtimer is not running.
             *hr_timer.is_interval.lock() = guard.interval != zx::SyntheticDuration::default();
         }
-
-        // Stop the current running task;
-        guard.disarm();
 
         if target_time.is_zero() {
             return Ok(());
@@ -260,7 +271,6 @@ impl IntervalTimer {
 
         guard.armed = true;
         guard.target_time = target_time;
-        guard.interval = interval;
         guard.on_setting_changed();
 
         let kernel_ref = current_task.kernel().clone();
@@ -277,9 +287,12 @@ impl IntervalTimer {
                     return;
                 }
 
-                let (abortable_future, abort_handle) = futures::future::abortable(
-                    self_ref.start_timer_loop(kernel_ref.kthreads.system_task(), thread_group),
-                );
+                let (abortable_future, abort_handle) =
+                    futures::future::abortable(self_ref.start_timer_loop(
+                        &kernel_ref,
+                        kernel_ref.kthreads.system_task(),
+                        thread_group,
+                    ));
                 guard.abort_handle = Some(abort_handle);
                 abortable_future
             }

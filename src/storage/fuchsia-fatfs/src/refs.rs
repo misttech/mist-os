@@ -9,8 +9,20 @@ use crate::filesystem::FatFilesystemInner;
 use crate::node::Node;
 use crate::types::{Dir, File};
 use scopeguard::defer;
+use std::cell::{Ref, RefMut};
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use zx::Status;
+
+pub trait Wrapper<'a> {
+    type Target: 'a;
+
+    /// Extracts a reference to the wrapped value. The lifetime is restored to that of `fs`.
+    fn get(&self, fs: &'a FatFilesystemInner) -> Option<&Self::Target>;
+
+    /// Extracts a mutable reference to the wrapped value. The lifetime is restored to that of `fs`.
+    fn get_mut(&mut self, fs: &'a FatFilesystemInner) -> Option<&mut Self::Target>;
+}
 
 pub struct FatfsDirRef {
     inner: Option<Dir<'static>>,
@@ -26,22 +38,6 @@ impl FatfsDirRef {
 
     pub fn empty() -> Self {
         FatfsDirRef { inner: None, open_count: 0 }
-    }
-
-    /// Extracts a reference to the wrapped value. The lifetime is restored to
-    /// that of _fs.
-    pub fn borrow<'a>(&'a self, _fs: &'a FatFilesystemInner) -> Option<&'a Dir<'a>> {
-        unsafe { std::mem::transmute(self.inner.as_ref()) }
-    }
-
-    /// Extracts a mutable reference to the wrapped value. The lifetime is restored to
-    /// that of _fs.
-    pub fn borrow_mut<'a>(&'a mut self, _fs: &'a FatFilesystemInner) -> Option<&'a mut Dir<'a>> {
-        // We need to transmute() back to the right lifetime because otherwise rust forces us to
-        // return a &'static mut, because it thinks that any references within the file must be to
-        // objects with a static lifetime. This isn't the case (because the lifetime is determined
-        // by the lock on FatFilesystemInner, which we know is held), so this is safe.
-        unsafe { std::mem::transmute(self.inner.as_mut()) }
     }
 
     /// Reopen the FatfsDirRef if open count > 0.
@@ -109,6 +105,22 @@ impl FatfsDirRef {
     }
 }
 
+impl<'a> Wrapper<'a> for FatfsDirRef {
+    type Target = Dir<'a>;
+
+    fn get(&self, _fs: &'a FatFilesystemInner) -> Option<&Dir<'a>> {
+        unsafe { std::mem::transmute(self.inner.as_ref()) }
+    }
+
+    fn get_mut(&mut self, _fs: &'a FatFilesystemInner) -> Option<&mut Dir<'a>> {
+        // We need to transmute() back to the right lifetime because otherwise rust forces us to
+        // return a &'static mut, because it thinks that any references within the file must be to
+        // objects with a static lifetime. This isn't the case (because the lifetime is determined
+        // by the lock on FatFilesystemInner, which we know is held), so this is safe.
+        unsafe { std::mem::transmute(self.inner.as_mut()) }
+    }
+}
+
 // Safe because whenever the `inner` is used, the filesystem lock is held.
 unsafe impl Sync for FatfsDirRef {}
 unsafe impl Send for FatfsDirRef {}
@@ -131,22 +143,6 @@ impl FatfsFileRef {
     /// ensuring the associated filesystem lives long enough and is pinned.
     pub unsafe fn from(file: File<'_>) -> Self {
         FatfsFileRef { inner: Some(std::mem::transmute(file)), open_count: 1 }
-    }
-
-    /// Extracts a mutable reference to the wrapped value. The lifetime is restored to
-    /// that of _fs.
-    pub fn borrow_mut<'a>(&'a mut self, _fs: &'a FatFilesystemInner) -> Option<&'a mut File<'a>> {
-        // We need to transmute() back to the right lifetime because otherwise rust forces us to
-        // return a &'static mut, because it thinks that any references within the file must be to
-        // objects with a static lifetime. This isn't the case (because the lifetime is determined
-        // by the lock on FatFilesystemInner, which we know is held), so this is safe.
-        unsafe { std::mem::transmute(self.inner.as_mut()) }
-    }
-
-    /// Extracts a reference to the wrapped value. The lifetime is restored to that
-    /// of _fs.
-    pub fn borrow<'a>(&'a self, _fs: &'a FatFilesystemInner) -> Option<&'a File<'a>> {
-        self.inner.as_ref()
     }
 
     /// Reopen the FatfsDirRef if open count > 0.
@@ -200,9 +196,25 @@ impl FatfsFileRef {
     }
 
     /// Extracts the wrapped value, restoring its lifetime to that of _fs, and invalidate
-    /// this FatFsRef. Any future calls to the borrow_*() functions will panic.
+    /// this FatFsRef.
     pub fn take<'a>(&mut self, _fs: &'a FatFilesystemInner) -> Option<File<'a>> {
         self.inner.take()
+    }
+}
+
+impl<'a> Wrapper<'a> for FatfsFileRef {
+    type Target = File<'a>;
+
+    fn get(&self, _fs: &'a FatFilesystemInner) -> Option<&File<'a>> {
+        self.inner.as_ref()
+    }
+
+    fn get_mut(&mut self, _fs: &'a FatFilesystemInner) -> Option<&mut File<'a>> {
+        // We need to transmute() back to the right lifetime because otherwise rust forces us to
+        // return a &'static mut, because it thinks that any references within the file must be to
+        // objects with a static lifetime. This isn't the case (because the lifetime is determined
+        // by the lock on FatFilesystemInner, which we know is held), so this is safe.
+        unsafe { std::mem::transmute(self.inner.as_mut()) }
     }
 }
 
@@ -215,5 +227,41 @@ impl Drop for FatfsFileRef {
         // Need to call take().
         assert_eq!(self.open_count, 0);
         assert!(self.inner.is_none());
+    }
+}
+
+pub struct Guard<'a, T>(&'a FatFilesystemInner, Ref<'a, T>);
+
+impl<'a, T> Guard<'a, T> {
+    pub fn new(fs: &'a FatFilesystemInner, inner: Ref<'a, T>) -> Self {
+        Self(fs, inner)
+    }
+}
+
+impl<'a, T: Wrapper<'a>> Deref for Guard<'a, T> {
+    type Target = T::Target;
+    fn deref(&self) -> &T::Target {
+        self.1.get(self.0).unwrap()
+    }
+}
+
+pub(crate) struct GuardMut<'a, T>(&'a FatFilesystemInner, RefMut<'a, T>);
+
+impl<'a, T> GuardMut<'a, T> {
+    pub fn new(fs: &'a FatFilesystemInner, inner: RefMut<'a, T>) -> Self {
+        Self(fs, inner)
+    }
+}
+
+impl<'a, T: Wrapper<'a>> Deref for GuardMut<'a, T> {
+    type Target = T::Target;
+    fn deref(&self) -> &T::Target {
+        self.1.get(self.0).unwrap()
+    }
+}
+
+impl<'a, T: Wrapper<'a>> DerefMut for GuardMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut T::Target {
+        self.1.get_mut(self.0).unwrap()
     }
 }

@@ -18,7 +18,7 @@ use storage_device::DeviceHolder;
 
 const IMAGE_BLOCKS: u64 = 8192;
 // Version of first image with a verified file included in `create_image()`
-const FSVERITY_VERSION_START: u32 = 35;
+const FSCRYPT_VERSION_START: u32 = 47;
 const IMAGE_BLOCK_SIZE: u32 = 1024;
 const EXPECTED_FILE_CONTENT: &[u8; 8] = b"content.";
 const FXFS_GOLDEN_IMAGE_DIR: &str = "src/storage/fxfs/testdata";
@@ -99,6 +99,16 @@ async fn activity_in_volume(fs: &OpenFxFilesystem, vol: &Arc<ObjectStore>) -> Re
         b"different value",
     )
     .await?;
+
+    // Exercise fscrypt and casefold with unicode filenames.
+    if vol.crypt().is_some() {
+        ops::mkdir(fs, vol, &Path::new("/fscrypt")).await?;
+        ops::enable_fscrypt(fs, vol, &Path::new("/fscrypt"), 2).await?;
+        ops::enable_casefold(vol, &Path::new("/fscrypt")).await?;
+        ops::put(fs, vol, &Path::new("/fscrypt/Straße.txt"), EXPECTED_FILE_CONTENT.to_vec())
+            .await?;
+    }
+
     Ok(())
 }
 
@@ -106,7 +116,9 @@ async fn activity_in_volume(fs: &OpenFxFilesystem, vol: &Arc<ObjectStore>) -> Re
 pub async fn create_image() -> Result<(), Error> {
     let path = golden_image_dir()?.join(latest_image_filename());
 
-    let crypt: Arc<dyn Crypt> = Arc::new(InsecureCrypt::new());
+    let insecure_crypt = InsecureCrypt::new();
+    insecure_crypt.add_wrapping_key(2, [1; 32].into());
+    let crypt: Arc<dyn Crypt> = Arc::new(insecure_crypt);
     {
         let device = mkfs_with_volume(
             DeviceHolder::new(FakeDevice::new(IMAGE_BLOCKS, IMAGE_BLOCK_SIZE)),
@@ -135,6 +147,7 @@ pub async fn create_image() -> Result<(), Error> {
         ops::unlink(&fs, &default_vol, &Path::new("some/repeat.txt")).await?;
         fs.sync(SyncOptions { flush_device: true, precondition: None }).await?;
     }
+
     // Ensure that we have reclaimed the journal at least once.
     assert_ne!(before_generation, fs.super_block_header().generation);
     fs.close().await?;
@@ -173,14 +186,19 @@ async fn check_volume(
     if ops::get(&vol, &Path::new("some/file.txt")).await? != EXPECTED_FILE_CONTENT.to_vec() {
         bail!("Expected file content incorrect.");
     }
-    if version.major >= FSVERITY_VERSION_START {
-        if ops::get(&vol, &Path::new("some/fsverity.txt")).await? != EXPECTED_FILE_CONTENT.to_vec()
-        {
-            bail!("Expected fsverity content incorrect.");
-        }
+    if ops::get(&vol, &Path::new("some/fsverity.txt")).await? != EXPECTED_FILE_CONTENT.to_vec() {
+        bail!("Expected fsverity content incorrect.");
     }
     if ops::get(&vol, &Path::new("some/deleted.txt")).await.is_ok() {
         bail!("Found deleted file.");
+    }
+
+    if version.major >= FSCRYPT_VERSION_START && vol.crypt().is_some() {
+        // Check fscrypt file read with a casefolded unicode filename.
+        assert_eq!(
+            ops::get(&vol, &Path::new("/fscrypt/Strasse.txt")).await?,
+            EXPECTED_FILE_CONTENT
+        );
     }
 
     // Make sure after writing a new file (using the latest format), the filesystem remains
@@ -193,7 +211,9 @@ async fn check_volume(
 
 /// Validates an image by looking for expected data and performing an fsck.
 async fn check_image(path: &Path) -> Result<(), Error> {
-    let crypt: Arc<dyn Crypt> = Arc::new(InsecureCrypt::new());
+    let insecure_crypt = InsecureCrypt::new();
+    insecure_crypt.add_wrapping_key(2, [1; 32].into());
+    let crypt: Arc<dyn Crypt> = Arc::new(insecure_crypt);
     let version = {
         let device = DeviceHolder::new(load_device(path)?);
         let fs = FxFilesystem::open(device).await?;

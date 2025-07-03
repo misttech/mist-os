@@ -15,7 +15,8 @@ use ebpf_api::{
 };
 use fidl_table_validation::ValidFidlTable;
 use log::{error, warn};
-use netstack3_core::device::DeviceId;
+use net_types::ip::IpVersion;
+use netstack3_core::device::{DeviceId, StrongDeviceIdentifier};
 use netstack3_core::device_socket::Frame;
 use netstack3_core::filter::{
     FilterIpExt, IpPacket, SocketEgressFilterResult, SocketIngressFilterResult, SocketOpsFilter,
@@ -25,6 +26,7 @@ use netstack3_core::socket::SocketCookie;
 use netstack3_core::sync::{Mutex, RwLock};
 use netstack3_core::trace::trace_duration;
 use packet::{FragmentedByteSlice, PacketConstraints, PartialSerializer};
+use packet_formats::ethernet::EtherType;
 use std::collections::{hash_map, HashMap};
 use std::mem::offset_of;
 use std::sync::{Arc, LazyLock, Weak};
@@ -349,6 +351,9 @@ impl CgroupSkbProgram {
     // Max value that can be returned from a `CGROUP_EGRESS` program.
     const EGRESS_MAX_RESULT: u64 = Self::RESULT_PASS_BIT | Self::RESULT_CONGESTION_BIT;
 
+    // Max value that can be returned from a `CGROUP_INGRESS` program.
+    const INGRESS_MAX_RESULT: u64 = Self::RESULT_PASS_BIT;
+
     pub fn new(
         program: ValidVerifiedProgram,
         map_cache: &Arc<EbpfMapCache>,
@@ -375,37 +380,34 @@ impl CgroupSkbProgram {
         Ok(Self { program })
     }
 
-    fn run<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
+    fn run(
         &self,
-        packet: &P,
+        ether_type: EtherType,
+        packet_len: usize,
+        packet_data: &[u8],
         ifindex: u32,
         socket_cookie: SocketCookie,
         marks: &Marks,
     ) -> u64 {
-        let mut data = [0u8; 128];
-        let serialize_result = packet
-            .partial_serialize(PacketConstraints::UNCONSTRAINED, &mut data)
-            .expect("Packet serialization failed");
-
         let mut skb = IpPacketForCgroupSkb {
             sk_buff: __sk_buff {
-                len: serialize_result.total_size.try_into().unwrap_or(0),
-                protocol: u16::from(I::ETHER_TYPE).to_be().into(),
+                len: packet_len.try_into().unwrap_or(0),
+                protocol: u16::from(ether_type).to_be().into(),
                 ifindex,
                 ..__sk_buff::default()
             },
-            data_ptr: data.as_ptr(),
+            data_ptr: packet_data.as_ptr(),
             // SAFETY: `data_end_ptr` points at the end of the data buffer, but it's never
             // dereferenced directly.
-            data_end_ptr: unsafe { data.as_ptr().add(serialize_result.bytes_written) },
+            data_end_ptr: unsafe { packet_data.as_ptr().add(packet_data.len()) },
             marks,
             socket_cookie: socket_cookie.export_value(),
-            data: &data,
+            data: packet_data,
         };
 
         trace_duration!(
             c"ebpf::cgroup_skb::run",
-            "len" => serialize_result.total_size,
+            "len" => packet_len,
             "protocol" => skb.sk_buff.protocol
         );
 
@@ -446,6 +448,10 @@ impl MapReference for CachedMapRef {
 
     fn as_bpf_value(&self) -> BpfValue {
         self.inner.map.as_bpf_value()
+    }
+
+    fn get_data_ptr(&self) -> Option<BpfValue> {
+        self.inner.map.get_data_ptr()
     }
 }
 
@@ -568,11 +574,26 @@ impl EbpfManager {
     }
 }
 
-impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
+trait DeviceIfIndex {
+    fn get_ifindex(&self) -> u32;
+}
+
+impl DeviceIfIndex for DeviceId<BindingsCtx> {
+    fn get_ifindex(&self) -> u32 {
+        self.bindings_id().id.get().try_into().unwrap_or(0)
+    }
+}
+
+// Max number of bytes serialized into the buffer passed to eBPF programs.
+// Normally eBPF programs need only IP and transport headers. These headers
+// should fit in 128 bytes.
+const SERIALIZED_HEAD_SIZE: usize = 128;
+
+impl<D: StrongDeviceIdentifier + DeviceIfIndex> SocketOpsFilter<D> for &EbpfManager {
     fn on_egress<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         packet: &P,
-        device: &DeviceId<BindingsCtx>,
+        device: &D,
         socket_cookie: SocketCookie,
         marks: &Marks,
     ) -> SocketEgressFilterResult {
@@ -581,11 +602,20 @@ impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
             return SocketEgressFilterResult::Pass { congestion: false };
         };
 
-        let ifindex = device.bindings_id().id.get().try_into().unwrap_or(0);
+        let ifindex = device.get_ifindex();
 
         trace_duration!(c"ebpf::egress");
 
-        let result = prog.run(packet, ifindex, socket_cookie, marks);
+        // TODO(https://fxbug.dev/424212358): Implement lazy packet serialization.
+        let mut data = [0u8; SERIALIZED_HEAD_SIZE];
+        let serialize_result = packet
+            .partial_serialize(PacketConstraints::UNCONSTRAINED, &mut data)
+            .expect("Packet serialization failed");
+        let packet_len = serialize_result.total_size;
+        let packet_data = &data[..serialize_result.bytes_written];
+
+        let result =
+            prog.run(I::ETHER_TYPE, packet_len, packet_data, ifindex, socket_cookie, marks);
         if result > CgroupSkbProgram::EGRESS_MAX_RESULT {
             // TODO(https://fxbug.dev/413490751): Change this to panic once
             // result validation is implemented in the verifier.
@@ -603,13 +633,43 @@ impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
 
     fn on_ingress(
         &self,
-        _packet: &FragmentedByteSlice<'_, &[u8]>,
-        _device: &DeviceId<BindingsCtx>,
-        _cookie: SocketCookie,
-        _marks: &Marks,
+        ip_version: IpVersion,
+        packet: FragmentedByteSlice<'_, &[u8]>,
+        device: &D,
+        socket_cookie: SocketCookie,
+        marks: &Marks,
     ) -> SocketIngressFilterResult {
-        // TODO(https://fxbug.dev/407809292): Execute attached program.
-        SocketIngressFilterResult::Accept
+        let state = self.state.read();
+        let Some(prog) = state.root_cgroup_ingress.as_ref() else {
+            return SocketIngressFilterResult::Accept;
+        };
+
+        let ifindex = device.get_ifindex();
+
+        trace_duration!(c"ebpf::ingress");
+
+        let ether_type = EtherType::from_ip_version(ip_version);
+        let packet_len = packet.len();
+
+        // TODO(https://fxbug.dev/424212358): Implement lazy packet serialization.
+        let mut data = [0u8; SERIALIZED_HEAD_SIZE];
+        let bytes = std::cmp::min(packet_len, data.len());
+        packet.slice(0..bytes).copy_into_slice(&mut data[0..bytes]);
+
+        let result =
+            prog.run(ether_type, packet_len, &data[0..bytes], ifindex, socket_cookie, marks);
+        if result > CgroupSkbProgram::INGRESS_MAX_RESULT {
+            // TODO(https://fxbug.dev/413490751): Change this to panic once
+            // result validation is implemented in the verifier.
+            error!("eBPF program returned invalid result: {}", result);
+            return SocketIngressFilterResult::Accept;
+        }
+
+        if result & CgroupSkbProgram::RESULT_PASS_BIT > 0 {
+            SocketIngressFilterResult::Accept
+        } else {
+            SocketIngressFilterResult::Drop
+        }
     }
 }
 
@@ -623,12 +683,15 @@ mod tests {
     use netstack3_core::device_socket::SentFrame;
     use netstack3_core::ip::Mark;
     use netstack3_core::sync::ResourceTokenValue;
-    use netstack3_core::testutil::{self, TestIpExt};
-    use packet::{InnerPacketBuilder, PacketBuilder, ParsablePacket};
+    use netstack3_core::testutil::{self, FakeDeviceId, TestIpExt};
+    use packet::{
+        InnerPacketBuilder, PacketBuilder, PacketConstraints, ParsablePacket, Serializer,
+    };
     use packet_formats::ethernet::EthernetFrameLengthCheck;
-    use packet_formats::ip::IpProto;
+    use packet_formats::ip::{IpPacketBuilder, IpProto};
     use packet_formats::udp::UdpPacketBuilder;
     use std::num::NonZeroU16;
+    use test_case::test_case;
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     struct TestData;
@@ -817,14 +880,24 @@ mod tests {
         assert_eq!(num_cached(), 0);
     }
 
+    const TEST_IFINDEX: u32 = 2;
+
+    impl DeviceIfIndex for FakeDeviceId {
+        fn get_ifindex(&self) -> u32 {
+            TEST_IFINDEX
+        }
+    }
+
     #[ip_test(I)]
-    fn run_egress_prog<I: TestIpExt + FilterIpExt>() {
+    #[test_case(AttachType::CgroupInetEgress; "Egress")]
+    #[test_case(AttachType::CgroupInetIngress; "Ingress")]
+    fn run_skb_prog<I: TestIpExt + FilterIpExt>(attach_type: AttachType) {
         let prog =
-            ebpf_loader::load_ebpf_program("/pkg/data/ebpf_test_progs.o", ".text", "egress_prog")
+            ebpf_loader::load_ebpf_program("/pkg/data/ebpf_test_progs.o", ".text", "skb_test_prog")
                 .expect("Failed to load test prog");
         let maps_schema = prog.maps.iter().map(|m| m.schema).collect();
         let calling_context = ProgramType::CgroupSkb
-            .create_calling_context(AttachType::CgroupInetEgress, maps_schema)
+            .create_calling_context(attach_type, maps_schema)
             .expect("Failed to create CallingContext");
         let verified =
             ebpf::verify_program(prog.code, calling_context, &mut ebpf::NullVerifierLogger)
@@ -857,6 +930,16 @@ mod tests {
         let program = CgroupSkbProgram::new(program, manager.maps_cache())
             .expect("Failed to initialize a program");
 
+        match attach_type {
+            AttachType::CgroupInetEgress => {
+                manager.set_egress_hook(Some(program), false).expect("Failed to set egress hook")
+            }
+            AttachType::CgroupInetIngress => {
+                manager.set_ingress_hook(Some(program), false).expect("Failed to set ingress hook")
+            }
+            attach_type => unreachable!("Unexpected attach_type: {:?}", attach_type),
+        }
+
         const SRC_PORT: NonZeroU16 = NonZeroU16::new(1234).unwrap();
         const DST_PORT: NonZeroU16 = NonZeroU16::new(5678).unwrap();
 
@@ -868,14 +951,7 @@ mod tests {
             DST_PORT,
         )
         .wrap_body(data.into_serializer());
-        let packet = testutil::new_filter_egress_ip_packet::<I, _>(
-            I::TEST_ADDRS.local_ip.get(),
-            I::TEST_ADDRS.remote_ip.get(),
-            IpProto::Udp.into(),
-            &mut udp_packet,
-        );
 
-        const IFINDEX: u32 = 2;
         const UID: u32 = 231;
 
         let socket_resource_token = ResourceTokenValue::default();
@@ -884,8 +960,45 @@ mod tests {
         let mut marks = Marks::default();
         *marks.get_mut(MarkDomain::Mark2) = Mark(Some(UID));
 
-        let r = program.run(&packet, IFINDEX, socket_cookie, &marks);
-        assert_eq!(r, 1);
+        let device = FakeDeviceId;
+
+        match attach_type {
+            AttachType::CgroupInetEgress => {
+                let packet = testutil::new_filter_egress_ip_packet::<I, _>(
+                    I::TEST_ADDRS.local_ip.get(),
+                    I::TEST_ADDRS.remote_ip.get(),
+                    IpProto::Udp.into(),
+                    &mut udp_packet,
+                );
+                let result = (&manager).on_egress(&packet, &device, socket_cookie, &marks);
+                assert!(result == SocketEgressFilterResult::Pass { congestion: false });
+            }
+            AttachType::CgroupInetIngress => {
+                let ip_packet = I::PacketBuilder::new(
+                    I::TEST_ADDRS.remote_ip.get(),
+                    I::TEST_ADDRS.local_ip.get(),
+                    0,
+                    IpProto::Udp.into(),
+                )
+                .wrap_body(udp_packet);
+                let serialized = ip_packet
+                    .serialize_new_buf(PacketConstraints::UNCONSTRAINED, packet::new_buf_vec)
+                    .expect("Failed to serialize test packet")
+                    .into_inner();
+                let mut parts = [&serialized[..]];
+
+                let result = (&manager).on_ingress(
+                    I::VERSION,
+                    FragmentedByteSlice::new(&mut parts),
+                    &device,
+                    socket_cookie,
+                    &marks,
+                );
+
+                assert!(result == SocketIngressFilterResult::Accept);
+            }
+            attach_type => unreachable!("Unexpected attach_type: {:?}", attach_type),
+        }
 
         // Results struct. Must match the `struct test_result` in
         // `ebpf_test_progs.c`.
@@ -908,7 +1021,7 @@ mod tests {
 
         assert_eq!(result.cookie, socket_resource_token.token().export_value());
         assert_eq!(result.uid, UID);
-        assert_eq!(result.ifindex, IFINDEX);
+        assert_eq!(result.ifindex, TEST_IFINDEX);
         assert_eq!(result.proto, u32::from(u16::from(I::ETHER_TYPE)));
         assert_eq!(result.ip_proto, u8::from(IpProto::Udp));
     }

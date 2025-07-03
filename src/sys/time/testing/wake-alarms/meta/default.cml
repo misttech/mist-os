@@ -13,7 +13,7 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.time.alarms.Wake" ],
+            protocol: [ "fuchsia.time.alarms.WakeAlarms" ],
         },
     ],
     use: [
@@ -33,7 +33,7 @@
     expose: [
         {
             // Exposed to clients needing hardware-agnostic wake alarms.
-            protocol: [ "fuchsia.time.alarms.Wake" ],
+            protocol: [ "fuchsia.time.alarms.WakeAlarms" ],
             from: "self",
             to: "parent",
         },

@@ -5,8 +5,18 @@
 #include "src/storage/memfs/mounted_memfs.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fdio/namespace.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include "src/storage/memfs/vnode_dir.h"
+#include <string_view>
+#include <utility>
+
+#include "src/storage/memfs/memfs.h"
+#include "src/storage/memfs/vnode_dir.h"  // IWYU pragma: keep
 
 zx::result<MountedMemfs> MountedMemfs::Create(async_dispatcher_t* dispatcher, const char* path) {
   zx::result result = memfs::Memfs::Create(dispatcher, "<tmp>");

@@ -182,7 +182,7 @@ fn get_config_base_path() -> Result<PathBuf> {
 }
 
 fn get_analytics_base_path() -> Result<PathBuf> {
-    let mut path = get_config_base()?;
+    let mut path = get_data_base()?;
     path.push("Fuchsia");
     path.push("metrics");
     create_dir_all(&path)?;

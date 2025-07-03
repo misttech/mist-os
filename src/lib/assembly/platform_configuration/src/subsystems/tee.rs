@@ -385,7 +385,7 @@ fn define_proprietary_tee_configuration(
         "proprietary_tee_manager.no_session.core_shard.cml.template"
     };
     util::add_platform_declared_product_provided_component(
-        proprietary_tee.tee_manager_url.as_str(),
+        proprietary_tee.tee_realm_url.as_str(),
         core_shard_template,
         context,
         builder,
@@ -858,7 +858,7 @@ mod tests {
 
     fn proprietary_tee() -> ProprietaryTee {
         ProprietaryTee {
-            tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/my_tee#my_tm.cm"),
+            tee_realm_url: String::from("fuchsia-pkg://test.fuchsia.com/my_tee#my_realm.cm"),
         }
     }
 

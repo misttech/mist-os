@@ -25,6 +25,8 @@
 
 #include <ktl/enforce.h>
 
+namespace {
+
 struct hpet_timer_registers {
   volatile uint64_t conf_caps;
   volatile uint64_t comparator_value;
@@ -46,10 +48,10 @@ struct hpet_registers {
 
 DECLARE_SINGLETON_SPINLOCK(hpet_lock);
 
-static bool hpet_present = false;
-static struct hpet_registers* hpet_regs;
+bool hpet_present = false;
+struct hpet_registers* hpet_regs;
 uint64_t _hpet_ticks_per_ms;
-static uint8_t num_timers;
+uint8_t num_timers;
 
 #define MAX_PERIOD_IN_FS 0x05F5E100ULL
 
@@ -59,7 +61,7 @@ static uint8_t num_timers;
 /* Bit masks for the per-time conf_caps register */
 #define TIMER_CONF_INT_EN (1ULL << 2)
 
-static void hpet_init(uint level) {
+void hpet_init(uint level) {
   // Look up the HPET table.
   const acpi_lite::AcpiHpetTable* hpet_desc =
       acpi_lite::GetTableByType<acpi_lite::AcpiHpetTable>(GlobalAcpiLiteParser());
@@ -75,11 +77,11 @@ static void hpet_init(uint level) {
   }
 
   zx_status_t res = VmAspace::kernel_aspace()->AllocPhysical(
-      "hpet", PAGE_SIZE,          /* size */
-      (void**)&hpet_regs,         /* returned virtual address */
-      PAGE_SIZE_SHIFT,            /* alignment log2 */
-      hpet_desc->address.address, /* physical address */
-      0,                          /* vmm flags */
+      "hpet", PAGE_SIZE,                    /* size */
+      reinterpret_cast<void**>(&hpet_regs), /* returned virtual address */
+      PAGE_SIZE_SHIFT,                      /* alignment log2 */
+      hpet_desc->address.address,           /* physical address */
+      0,                                    /* vmm flags */
       ARCH_MMU_FLAG_UNCACHED_DEVICE | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE);
   if (res != ZX_OK) {
     return;
@@ -160,7 +162,9 @@ static void hpet_init(uint level) {
 /* Begin running after ACPI tables are up */
 LK_INIT_HOOK(hpet, hpet_init, LK_INIT_LEVEL_VM + 2)
 
-uint64_t hpet_get_value(void) {
+}  // namespace
+
+uint64_t hpet_get_value() {
   uint64_t v = hpet_regs->main_counter_value;
   uint64_t v2 = hpet_regs->main_counter_value;
   /* Even though the specification says it should not be necessary to read
@@ -183,16 +187,16 @@ zx_status_t hpet_set_value(uint64_t v) {
   return ZX_OK;
 }
 
-bool hpet_is_present(void) { return hpet_present; }
+bool hpet_is_present() { return hpet_present; }
 
-void hpet_enable(void) {
+void hpet_enable() {
   DEBUG_ASSERT(hpet_is_present());
 
   Guard<SpinLock, NoIrqSave> guard{hpet_lock::Get()};
   hpet_regs->general_config = hpet_regs->general_config | GEN_CONF_EN;
 }
 
-void hpet_disable(void) {
+void hpet_disable() {
   DEBUG_ASSERT(hpet_is_present());
 
   Guard<SpinLock, NoIrqSave> guard{hpet_lock::Get()};
@@ -203,10 +207,12 @@ void hpet_disable(void) {
  * For use in calibration */
 void hpet_wait_ms(uint16_t ms) {
   uint64_t init_timer_value = hpet_regs->main_counter_value;
-  uint64_t target = (uint64_t)ms * _hpet_ticks_per_ms;
+  uint64_t target = static_cast<uint64_t>(ms) * _hpet_ticks_per_ms;
   while (hpet_regs->main_counter_value - init_timer_value <= target)
     ;
 }
+
+uint64_t hpet_ticks_per_ms() { return _hpet_ticks_per_ms; }
 
 namespace {
 

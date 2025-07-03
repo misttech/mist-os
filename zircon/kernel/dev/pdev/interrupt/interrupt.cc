@@ -229,6 +229,8 @@ void pdev_register_interrupts(const struct pdev_interrupt_ops* ops) {
   DEBUG_ASSERT(ops->handle_irq);
   DEBUG_ASSERT(ops->shutdown);
   DEBUG_ASSERT(ops->shutdown_cpu);
+  DEBUG_ASSERT(ops->suspend_cpu);
+  DEBUG_ASSERT(ops->resume_cpu);
   DEBUG_ASSERT(ops->msi_is_supported);
   DEBUG_ASSERT(ops->msi_supports_masking);
   DEBUG_ASSERT(ops->msi_mask_unmask);

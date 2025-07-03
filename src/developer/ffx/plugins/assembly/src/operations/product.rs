@@ -13,7 +13,7 @@ use assembly_util::read_config;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use fuchsia_pkg::PackageManifest;
-use image_assembly_config_builder::ProductAssembly;
+use image_assembly_config_builder::{ProductAssembly, ValidationMode};
 use log::info;
 
 pub fn assemble(args: ProductArgs) -> Result<()> {
@@ -82,20 +82,20 @@ Resulting product is not supported and may misbehave!
         pa.set_boot_shim_aib(path)?;
     }
     if package_validation == PackageValidationHandling::Warning {
-        pa.enable_validation();
+        pa.set_validation_mode(ValidationMode::WarnOnly);
     }
 
     //////////////////////
     //
     // Generate the output files.  All builder modifications must be complete by here.
 
-    // Strip the mutability of the builder.
-    let pa = pa;
-
     // Serialize the builder state for forensic use.
     let builder_forensics_file_path = outdir.join("assembly_builder_forensics.json");
     let board_forensics_file_path = outdir.join("board_configuration_forensics.json");
-    pa.write_forensics_files(builder_forensics_file_path, board_forensics_file_path)?;
+    pa.write_forensics_files(builder_forensics_file_path, board_forensics_file_path);
+
+    // Strip the mutability of the builder.
+    let pa = pa;
 
     // Do the actual building and validation of everything for the Image
     // Assembly config.

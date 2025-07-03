@@ -74,6 +74,7 @@ mod tests {
             vmos: vec![],
             buckets: None,
             total_undigested: None,
+            kmem_stats_compression: Default::default(),
         }
     }
 

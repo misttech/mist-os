@@ -35,6 +35,7 @@ class AdminTest : public TestBase {
   static constexpr zx_rights_t kRightsVmoOutgoing = kRightsVmoIncoming | ZX_RIGHT_WRITE;
 
   void TearDown() override;
+  void DropSignalProcessing();
   void DropRingBuffer();
 
   void ResetAndExpectResponse();

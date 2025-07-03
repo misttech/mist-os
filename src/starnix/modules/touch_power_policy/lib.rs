@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode,
 };
 use starnix_logging::{log_error, log_info};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -33,7 +32,7 @@ impl TouchPowerPolicyDevice {
 
     pub fn register<L>(self: Arc<Self>, locked: &mut Locked<L>, system_task: &CurrentTask)
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
@@ -43,7 +42,6 @@ impl TouchPowerPolicyDevice {
                 system_task,
                 "touch_standby".into(),
                 registry.objects.starnix_class(),
-                DeviceDirectory::new,
                 self,
             )
             .expect("can register touch_standby device");

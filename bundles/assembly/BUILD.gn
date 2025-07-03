@@ -187,6 +187,14 @@ assembly_input_bundle("component_manager_with_tracing") {
   ]
 }
 
+# This AIB contains Component Manager linked with with tracing and the Heapdump
+# instrumentation library for memory profiling. It should not be used in
+# production.
+assembly_input_bundle("component_manager_with_tracing_and_heapdump") {
+  bootfs_files_labels =
+      [ "//src/sys/component_manager:bootfs_with_tracing_and_heapdump" ]
+}
+
 # The most minimal AIB that is included in assembled systems that are meant to be
 # standalone, regardless of build-type.
 #
@@ -263,24 +271,12 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/block.core.cm" ]
     },
     {
-      package_target = "//src/devices/block/drivers/gpt:package"
-      driver_components = [ "meta/gpt.cm" ]
-    },
-    {
-      package_target = "//src/devices/block/drivers/ramdisk:package"
-      driver_components = [ "meta/ramdisk.cm" ]
-    },
-    {
       package_target = "//src/devices/block/drivers/sdmmc:package"
       driver_components = [ "meta/sdmmc.cm" ]
     },
     {
       package_target = "//src/devices/block/drivers/usb-mass-storage:package"
       driver_components = [ "meta/usb-mass-storage.cm" ]
-    },
-    {
-      package_target = "//src/devices/block/drivers/zxcrypt:package"
-      driver_components = [ "meta/zxcrypt.cm" ]
     },
     {
       package_target = "//src/devices/clock/drivers/clock:package"
@@ -337,10 +333,6 @@ assembly_input_bundle("bootstrap") {
     {
       package_target = "//src/media/audio/drivers/usb-audio:package"
       driver_components = [ "meta/usb-audio.cm" ]
-    },
-    {
-      package_target = "//src/storage/fvm/driver:package"
-      driver_components = [ "meta/fvm.cm" ]
     },
     {
       package_target = "//src/ui/input/drivers/hid:package"
@@ -1041,6 +1033,36 @@ assembly_input_bundle("core_realm") {
           component_name = "system-update-realm"
 
           shards = [ "//src/sys/pkg/meta/system-update-realm.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Global Heapdump collector instance for heap memory profiling
+#
+# This AIB adds an instance of the Heapdump collector `/core/heapdump-collector`
+# whose `fuchsia.memory.heapdump.process.Registry` capability is then routed to
+# `/`.
+assembly_input_bundle("heapdump_global_collector") {
+  base_packages = [ "//src/performance/memory/heapdump/collector" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [ "//src/sys/core/meta/heapdump.root_shard.cml" ]
+        },
+      ]
+    },
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/sys/core/meta/heapdump.core_shard.cml" ]
         },
       ]
     },
@@ -1756,7 +1778,7 @@ assembly_input_bundle("mdns_fuchsia_device_wired_service") {
 assembly_input_bundle("core_realm_development_access_rcs_usb") {
   base_driver_packages = [
     {
-      package_target = "//src/connectivity/overnet/usb:usb-vsock-package"
+      package_target = "//src/developer/remote-control/usb:usb-vsock-package"
       driver_components = [
         "meta/usb-vsock-service.cm",
         "meta/overnet-usb.cm",
@@ -2650,6 +2672,28 @@ assembly_input_bundle("nanohub_support") {
   ]
 }
 
+# Core FastRPC support. Does not include driver. Driver should be included separately.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: standard
+# valid build-types: all
+#
+assembly_input_bundle("fastrpc_support") {
+  base_packages = [ "//src/starnix/modules/fastrpc:google_fastrpc" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards =
+              [ "//src/starnix/modules/fastrpc/meta/fastrpc.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # hvdcp_opti support. Does not include driver. Driver should be included separately.
 #
 # optional: product must specify its inclusion
@@ -3002,6 +3046,48 @@ assembly_input_bundle("fshost_non_eng") {
   ]
 }
 
+# AIB adding recovery capabilities to fshost.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_recovery") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [ "//src/storage/fshost/meta/recovery_fshost.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# AIB that stubs out recovery capabilities for builds that don't require recovery capabilities.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_non_recovery") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [ "//src/storage/fshost/meta/non_recovery_fshost.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # AIB adding support for storage, needed by all fshost variants that use anything more than bootfs
 #
 # optional: product must specify its inclusion
@@ -3122,6 +3208,46 @@ assembly_input_bundle("fshost_storage_host_fvm_minfs") {
   ]
 }
 
+# AIB containing drivers and fshost shards needed for non-storage-host configurations.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_non_storage_host") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards =
+              [ "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml" ]
+        },
+      ]
+    },
+  ]
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/block/drivers/ramdisk:package"
+      driver_components = [ "meta/ramdisk.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/gpt:package"
+      driver_components = [ "meta/gpt.cm" ]
+    },
+    {
+      package_target = "//src/storage/fvm/driver:package"
+      driver_components = [ "meta/fvm.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/zxcrypt:package"
+      driver_components = [ "meta/zxcrypt.cm" ]
+    },
+  ]
+}
+
 # AIB containing the fshost with fxfs.
 #
 # optional: product must specify its inclusion
@@ -3139,7 +3265,6 @@ assembly_input_bundle("fshost_fxfs") {
           shards = [
             "//src/storage/fshost/meta/fxblob_fshost.cml",
             "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3196,7 +3321,6 @@ assembly_input_bundle("fshost_fvm_fxfs") {
           shards = [
             "//src/storage/fshost/meta/fvm_fxfs_fshost.cml",
             "//src/storage/fshost/meta/fvm_fxfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3226,7 +3350,6 @@ assembly_input_bundle("fshost_fvm_minfs") {
           shards = [
             "//src/storage/fshost/meta/fvm_minfs_fshost.cml",
             "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3258,7 +3381,6 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
             "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/fvm_fxfs_fshost.cml",
             "//src/storage/fshost/meta/fvm_fxfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3292,7 +3414,6 @@ assembly_input_bundle("fshost_fvm_f2fs") {
           shards = [
             "//src/storage/fshost/meta/fvm_f2fs_fshost.cml",
             "//src/storage/fshost/meta/fvm_f2fs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -4881,7 +5002,7 @@ assembly_resources_directory("resources") {
     "//src/sys/component_manager/configs/bootfs_config.json5",
 
     # Networking resources.
-    "//src/connectivity/policy/netcfg/config/netcfg_default.json",
+    "//src/connectivity/policy/netcfg/config/netcfg_default.json5",
 
     # ICU resources.
     "${icu_tzres_path}/metaZones.res",
@@ -4898,6 +5019,7 @@ assembly_resources_directory("resources") {
     "//src/lib/assembly/platform_configuration/src/subsystems/meta/tee-clients.core_shard.cml",
     "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
+    "//src/recovery/system/meta/bootfs_recovery.bootstrap_shard.cml.template",
     "//src/security/bin/tee_manager/meta/proprietary_tee_manager.no_session.core_shard.cml.template",
     "//src/security/bin/tee_manager/meta/proprietary_tee_manager.session.core_shard.cml.template",
     "//src/security/bin/tee_manager/meta/tee_manager.core_shard.cml",

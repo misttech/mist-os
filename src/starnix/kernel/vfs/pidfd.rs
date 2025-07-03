@@ -10,7 +10,7 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
     FileObject, FileOps,
 };
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
@@ -45,8 +45,17 @@ impl PidFdFileObject {
     }
 }
 
-pub fn new_pidfd(current_task: &CurrentTask, proc: &ThreadGroup, flags: OpenFlags) -> FileHandle {
+pub fn new_pidfd<L>(
+    locked: &mut Locked<L>,
+    current_task: &CurrentTask,
+    proc: &ThreadGroup,
+    flags: OpenFlags,
+) -> FileHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     Anon::new_private_file(
+        locked,
         current_task,
         Box::new(PidFdFileObject {
             tg: proc.into(),

@@ -4,7 +4,6 @@
 
 //! Shared code for implementing datagram sockets.
 
-use alloc::collections::{HashMap, HashSet};
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::convert::Infallible as Never;
@@ -35,10 +34,11 @@ use netstack3_base::{
     DeviceIdentifier, EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt,
     InspectorExt as _, IpDeviceAddr, LocalAddressError, Mark, MarkDomain, Marks, NotFoundError,
     OwnedOrRefsBidirectionalConverter, ReferenceNotifiers, ReferenceNotifiersExt,
-    RemoteAddressError, RemoveResourceResultWithContext, RngContext, SocketError,
+    RemoteAddressError, RemoveResourceResultWithContext, RngContext, SettingsContext, SocketError,
     StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
+use netstack3_hashmap::{HashMap, HashSet};
 use netstack3_ip::socket::{
     DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSock, IpSockCreateAndSendError,
     IpSockCreationError, IpSockSendError, IpSocketHandler, RouteResolutionOptions,
@@ -53,6 +53,7 @@ use packet_formats::ip::{DscpAndEcn, IpProtoExt};
 use ref_cast::RefCast;
 use thiserror::Error;
 
+use crate::internal::settings::DatagramSettings;
 use crate::internal::sndbuf::{SendBufferError, SendBufferTracking, TxMetadata};
 
 /// Datagram demultiplexing map.
@@ -1486,6 +1487,9 @@ pub trait DatagramSocketSpec: Sized + 'static {
     /// inside the socket references.
     type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 
+    /// Settings type offered by bindings for this datagram socket.
+    type Settings: AsRef<DatagramSettings> + Default;
+
     /// Per-socket counters tracked by datagram sockets.
     type Counters<I: Ip>: Debug + Default + Send + Sync + 'static;
 
@@ -1573,11 +1577,12 @@ pub struct InUseError;
 pub fn create_primary_id<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>(
     external_data: S::ExternalData<I>,
     writable_listener: S::SocketWritableListener,
+    settings: &DatagramSettings,
 ) -> PrimaryRc<I, D, S> {
     PrimaryRc::new(ReferenceState {
         state: RwLock::new(SocketState::Unbound(UnboundSocketState::default())),
         external_data,
-        send_buffer: SendBufferTracking::new(writable_listener),
+        send_buffer: SendBufferTracking::new(writable_listener, settings),
         counters: Default::default(),
     })
 }
@@ -4042,13 +4047,18 @@ impl<I, C, S> DatagramApi<I, C, S>
 where
     I: IpExt,
     C: ContextPair,
-    C::BindingsContext: DatagramBindingsContext,
+    C::BindingsContext: DatagramBindingsContext + SettingsContext<S::Settings>,
     C::CoreContext: DatagramStateContext<I, C::BindingsContext, S>,
     S: DatagramSocketSpec,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair, PhantomData) = self;
         pair.core_ctx()
+    }
+
+    fn bindings_ctx(&mut self) -> &mut C::BindingsContext {
+        let Self(pair, PhantomData) = self;
+        pair.bindings_ctx()
     }
 
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
@@ -4066,7 +4076,10 @@ where
         external_data: S::ExternalData<I>,
         writable_listener: S::SocketWritableListener,
     ) -> S::SocketId<I, DatagramApiWeakDeviceId<C>> {
-        let primary = create_primary_id(external_data, writable_listener);
+        let primary = {
+            let settings = self.bindings_ctx().settings();
+            create_primary_id(external_data, writable_listener, settings.as_ref())
+        };
         let strong = PrimaryRc::clone_strong(&primary);
         self.core_ctx().with_all_sockets_mut(move |socket_set| {
             let strong = PrimaryRc::clone_strong(&primary);
@@ -5333,7 +5346,8 @@ where
 
     /// Sets the send buffer maximum size to `size`.
     pub fn set_send_buffer(&mut self, id: &DatagramApiSocketId<I, C, S>, size: usize) {
-        id.borrow().send_buffer.set_capacity(size)
+        let settings = self.bindings_ctx().settings();
+        id.borrow().send_buffer.set_capacity(size, settings.as_ref())
     }
 
     /// Returns the current maximum send buffer size.
@@ -5554,6 +5568,7 @@ mod test {
         type Counters<I: Ip> = ();
         type ExternalData<I: Ip> = ();
         type SocketWritableListener = FakeSocketWritableListener;
+        type Settings = DatagramSettings;
 
         fn ip_proto<I: IpProtoExt>() -> I::Proto {
             I::map_ip((), |()| FAKE_DATAGRAM_IPV4_PROTOCOL, |()| FAKE_DATAGRAM_IPV6_PROTOCOL)

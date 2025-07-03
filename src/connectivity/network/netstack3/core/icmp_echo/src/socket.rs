@@ -29,7 +29,7 @@ use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
     AnyDevice, ContextPair, CoreTxMetadataContext, CounterContext, DeviceIdContext, IcmpIpExt,
     Inspector, InspectorDeviceExt, LocalAddressError, Mark, MarkDomain, PortAllocImpl,
-    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
+    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SettingsContext, SocketError,
     StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram::{
@@ -47,6 +47,8 @@ use netstack3_ip::{
 use packet::{BufferMut, PacketBuilder, ParsablePacket as _, ParseBuffer as _};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
 use packet_formats::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
+
+use crate::internal::settings::IcmpEchoSettings;
 
 /// A marker trait for all IP extensions required by ICMP sockets.
 pub trait IpExt: datagram::IpExt + IcmpIpExt {}
@@ -221,10 +223,16 @@ pub type IcmpSocketState<I, D, BT> = datagram::SocketState<I, D, Icmp<BT>>;
 /// The tx metadata for an ICMP echo socket.
 pub type IcmpSocketTxMetadata<I, D, BT> = datagram::TxMetadata<I, D, Icmp<BT>>;
 
+/// Errors that Bindings may encounter when receiving an ICMP Echo datagram.
+pub enum ReceiveIcmpEchoError {
+    /// The socket's receive queue is full and can't hold the datagram.
+    QueueFull,
+}
+
 /// The context required by the ICMP layer in order to deliver events related to
 /// ICMP sockets.
 pub trait IcmpEchoBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
-    IcmpEchoBindingsTypes + ReferenceNotifiers + RngContext
+    IcmpEchoBindingsTypes + ReferenceNotifiers + RngContext + SettingsContext<IcmpEchoSettings>
 {
     /// Receives an ICMP echo reply.
     fn receive_icmp_echo_reply<B: BufferMut>(
@@ -235,7 +243,7 @@ pub trait IcmpEchoBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
         dst_ip: I::Addr,
         id: u16,
         data: B,
-    );
+    ) -> Result<(), ReceiveIcmpEchoError>;
 }
 
 /// The bindings context providing external types to ICMP sockets.
@@ -382,6 +390,8 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type SerializeError = packet_formats::error::ParseError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    type Settings = IcmpEchoSettings;
+
     // NB: At present, there's no need to track per-socket ICMP counters.
     type Counters<I: Ip> = ();
     type SocketWritableListener = BT::SocketWritableListener;
@@ -1153,7 +1163,7 @@ impl<
             }
         };
 
-        core_ctx.with_icmp_ctx_and_sockets_mut(|_core_ctx, sockets| {
+        core_ctx.with_icmp_ctx_and_sockets_mut(|core_ctx, sockets| {
             let mut addrs_to_search = AddrVecIter::<I, CC::WeakDeviceId, IcmpAddrSpec>::with_device(
                 ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) }.into(),
                 device.downgrade(),
@@ -1178,14 +1188,19 @@ impl<
             };
             if let Some(socket) = socket {
                 trace!("receive_icmp_echo_reply: Received echo reply for local socket");
-                bindings_ctx.receive_icmp_echo_reply(
+                match bindings_ctx.receive_icmp_echo_reply(
                     socket,
                     device,
                     src_ip.addr(),
                     dst_ip.addr(),
                     id.get(),
                     buffer,
-                );
+                ) {
+                    Ok(()) => {}
+                    Err(ReceiveIcmpEchoError::QueueFull) => {
+                        core_ctx.counters().queue_full.increment();
+                    }
+                }
                 return;
             }
             // TODO(https://fxbug.dev/42124755): Neither the ICMPv4 or ICMPv6 RFCs
@@ -1287,9 +1302,13 @@ mod tests {
     type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>, ()>;
     type FakeIcmpCtx<I> = CtxPair<FakeIcmpCoreCtx<I>, FakeIcmpBindingsCtx<I>>;
 
-    #[derive(Default)]
+    #[derive(Derivative)]
+    #[derivative(Default)]
+
     struct FakeIcmpBindingsCtxState<I: IpExt> {
         received: Vec<ReceivedEchoPacket<I>>,
+        #[derivative(Default(value = "usize::MAX"))]
+        max_size: usize,
     }
 
     #[derive(Debug)]
@@ -1417,14 +1436,19 @@ mod tests {
             dst_ip: I::Addr,
             id: u16,
             data: B,
-        ) {
-            self.state.received.push(ReceivedEchoPacket {
-                src_ip,
-                dst_ip,
-                id,
-                data: data.to_flattened_vec(),
-                socket: socket.clone(),
-            })
+        ) -> Result<(), ReceiveIcmpEchoError> {
+            if self.state.received.len() < self.state.max_size {
+                self.state.received.push(ReceivedEchoPacket {
+                    src_ip,
+                    dst_ip,
+                    id,
+                    data: data.to_flattened_vec(),
+                    socket: socket.clone(),
+                });
+                Ok(())
+            } else {
+                Err(ReceiveIcmpEchoError::QueueFull)
+            }
         }
     }
 
@@ -1620,6 +1644,45 @@ mod tests {
         )
         .unwrap();
         assert_matches!(&bindings_ctx.state.received[..], []);
+    }
+
+    #[ip_test(I)]
+    fn receive_queue_full<I: TestIpExt + IpExt>() {
+        let mut ctx = FakeIcmpCtx::<I>::default();
+        let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
+        let sock = api.create();
+
+        api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(ICMP_ID)).unwrap();
+
+        // Simulate a full RX queue.
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
+        bindings_ctx.state.max_size = 0;
+
+        let reply = IcmpPacketBuilder::<I, _>::new(
+            // Use whatever here this is not validated by this module.
+            I::UNSPECIFIED_ADDRESS,
+            I::UNSPECIFIED_ADDRESS,
+            IcmpZeroCode,
+            IcmpEchoReply::new(ICMP_ID.get(), SEQ_NUM),
+        )
+        .wrap_body(Buf::new([1u8, 2, 3, 4], ..))
+        .serialize_vec_outer()
+        .unwrap();
+
+        let src_ip = I::TEST_ADDRS.remote_ip;
+        let dst_ip = I::TEST_ADDRS.local_ip;
+        <IcmpEchoIpTransportContext as IpTransportContext<I, _, _>>::receive_ip_packet(
+            core_ctx,
+            bindings_ctx,
+            &FakeDeviceId,
+            I::RecvSrcAddr::new(src_ip.get()).unwrap(),
+            dst_ip,
+            reply,
+            &LocalDeliveryPacketInfo::default(),
+        )
+        .unwrap();
+
+        assert_eq!(core_ctx.counters().queue_full.get(), 1);
     }
 
     #[ip_test(I)]

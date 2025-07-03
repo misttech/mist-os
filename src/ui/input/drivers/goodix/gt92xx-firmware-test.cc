@@ -11,11 +11,12 @@
 
 #include <array>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "gt92xx.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -243,7 +244,7 @@ class Gt92xxTestDevice : public Gt92xxDevice {
   thrd_t test_thread_;
 };
 
-class GoodixTest : public zxtest::Test {
+class GoodixTest : public ::testing::Test {
  public:
   void SetUp() override {
     ASSERT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
@@ -265,12 +266,12 @@ class GoodixTest : public zxtest::Test {
 
   void VerifyInitialReset() {
     std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
-    ASSERT_GE(reset_states.size(), 2);
+    ASSERT_GE(reset_states.size(), 2u);
     ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_states[0].sub_state);
     ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, reset_states[1].sub_state);
 
     std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
-    ASSERT_GE(intr_states.size(), 2);
+    ASSERT_GE(intr_states.size(), 2u);
     ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, intr_states[0].sub_state);
     ASSERT_EQ(fake_gpio::ReadSubState{}, intr_states[1].sub_state);
   }
@@ -369,7 +370,7 @@ TEST_F(GoodixTest, ForceFirmwareUpdate) {
 TEST_F(GoodixTest, BadFirmwareChecksum) {
   corrupt_firmware_checksum = true;
 
-  EXPECT_NOT_OK(device_->Init());
+  EXPECT_NE(device_->Init(), ZX_OK);
   VerifyInitialReset();
 
   EXPECT_FALSE(i2c_.FirmwareWritten());
@@ -379,7 +380,7 @@ TEST_F(GoodixTest, BadFirmwareChecksum) {
 TEST_F(GoodixTest, ReadbackCheckFail) {
   i2c_.SetCorruptSectionRead();
 
-  EXPECT_NOT_OK(device_->Init());
+  EXPECT_NE(device_->Init(), ZX_OK);
   VerifyInitialReset();
   VerifyEnteringUpdateMode(2, 2);
 

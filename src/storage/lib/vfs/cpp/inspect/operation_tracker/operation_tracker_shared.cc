@@ -3,14 +3,19 @@
 // found in the LICENSE file.
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/time.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <optional>
+#include <utility>
 
 #include "src/storage/lib/vfs/cpp/inspect/operation_tracker/operation_tracker_base.h"
+
 #ifdef __Fuchsia__
 #include <lib/zx/clock.h>
 #endif
-#include <zircon/assert.h>
-
-#include <utility>
 
 namespace {
 

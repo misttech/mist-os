@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "src/storage/lib/ftl/ftl.h"
@@ -323,6 +324,7 @@ static int wr_vol_page(FTLN ftl, ui32 vpn, void* buf, ui32 old_ppn) {
   // Increment block's used pages count.
   PfAssert(!IS_FREE(ftl->bdata[b]) && !IS_MAP_BLK(ftl->bdata[b]));
   INC_USED(ftl->bdata[b]);
+  FtlnSetBlockBitmap(ftl, ftl->written, b);
 
   // If page has an older copy, decrement used count on old block.
   if (old_ppn != (ui32)-1)
@@ -750,6 +752,7 @@ static int flush_pending_writes(FTLN ftl, StagedWr* staged) {
     // Increment number of used in new block.
     PfAssert(!IS_FREE(ftl->bdata[b]) && !IS_MAP_BLK(ftl->bdata[b]));
     INC_USED(ftl->bdata[b]);
+    FtlnSetBlockBitmap(ftl, ftl->written, b);
 
     // Update virtual page mapping. Return -1 if error.
     if (FtlnMapSetPpn(ftl, staged->vpn0, staged->ppn0))
@@ -1381,6 +1384,7 @@ int FtlnMapWr(void* vol, ui32 mpn, void* buf) {
     // Increment page used count in new block.
     PfAssert(IS_MAP_BLK(ftl->bdata[b]));
     INC_USED(ftl->bdata[b]);
+    FtlnSetBlockBitmap(ftl, ftl->written, b);
 
     // Set the MPN array entry with the new page number.
     ftl->mpns[mpn] = pn;
@@ -1449,6 +1453,86 @@ int FtlnGetWearHistogram(CFTLN ftl, int count, ui32* histogram) {
   }
 
   return 0;
+}
+
+#define BITMAP_BLOCKS_PER_MEMBER (sizeof(ui32) * 8)
+
+// FtlnOnBadBlock: Called when the ndm marks a block bad, clears worn status.
+//
+//       Input: ftl = Pointer to FTL control block.
+//                b = The block number marked bad.
+//
+void FtlnOnBadBlock(void* ftl, unsigned int b) {
+  FTLN ftl_ptr = (FTLN)ftl;
+  FtlnUnsetBlockBitmap(ftl_ptr, ftl_ptr->maybe_bad, b);
+}
+
+// FtlnAllocateBlockBitmap: Allocate a bitmap to cover the blocks of the FTL.
+//
+//       Input: ftl = Pointer to FTL control block.
+//
+//     Returns: A pointer to be assigned to the bitmap.
+//
+ui32* FtlnAllocateBlockBitmap(CFTLN ftl) {
+  // Must round up.
+  ui32 members = ((ftl->num_blks - 1) / BITMAP_BLOCKS_PER_MEMBER) + 1;
+  return FsCalloc(members, sizeof(ui32));
+}
+
+// FtlnSetBlockBitmap: Set the bit for the given block number.
+//
+//       Input: ftl = Pointer to FTL control block.
+//           bitmap = Pointer to the target bitmap.
+//            block = The block number to set.
+//
+void FtlnSetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block) {
+  PfAssert(block < ftl->num_blks);
+  div_t dv = div(block, BITMAP_BLOCKS_PER_MEMBER);
+  bitmap[dv.quot] |= 1u << dv.rem;
+}
+
+// FtlnUnsetBlockBitmap: Clear the bit for the given block number.
+//
+//       Input: ftl = Pointer to FTL control block.
+//           bitmap = Pointer to the target bitmap.
+//            block = The block number to clear.
+//
+void FtlnUnsetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block) {
+  PfAssert(block < ftl->num_blks);
+  div_t dv = div(block, BITMAP_BLOCKS_PER_MEMBER);
+  bitmap[dv.quot] &= ~(1u << dv.rem);
+}
+
+// FtlnSetBlockBitmap: Check the bit for the given block number.
+//
+//       Input: ftl = Pointer to FTL control block.
+//           bitmap = Pointer to the target bitmap.
+//            block = The block number to check.
+//
+//     Returns: 1 if the bit is set, 0 otherwise.
+//
+ui8 FtlnCheckBlockBitmap(CFTLN ftl, const ui32* bitmap, ui32 block) {
+  PfAssert(block < ftl->num_blks);
+  div_t dv = div(block, BITMAP_BLOCKS_PER_MEMBER);
+  return (bitmap[dv.quot] & (1u << dv.rem)) != 0;
+}
+
+// FtlnSetBlockBitmap: Count the number of set bits in the map.
+//
+//       Input: ftl = Pointer to FTL control block.
+//           bitmap = Pointer to the target bitmap.
+//
+//     Returns: Number of 1's found in the bitmap.
+//
+ui32 FtlnCountBlockBitmap(CFTLN ftl, const ui32* bitmap) {
+  PfAssert(ftl->num_blks > 0);
+  // Must round up.
+  ui32 members = ((ftl->num_blks - 1) / BITMAP_BLOCKS_PER_MEMBER) + 1;
+  ui32 sum = 0;
+  for (ui32 i = 0; i < members; ++i) {
+    sum += __builtin_popcount(bitmap[i]);
+  }
+  return sum;
 }
 
 #if FTLN_DEBUG_RECYCLES && FTLN_DEBUG_PTR

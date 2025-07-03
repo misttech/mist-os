@@ -11,7 +11,6 @@
 // NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
 // OF THIS SOFTWARE.
 
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
@@ -34,8 +33,7 @@ const uint8_t kShortGiIndex = 1;
 
 #define HT_INVALID_RATE 0
 // Where an HT MCS index is invalid, the lookup table will return this placeholder.
-#define HT_MCS_INVALID \
-  { HT_INVALID_RATE, HT_INVALID_RATE }
+#define HT_MCS_INVALID {HT_INVALID_RATE, HT_INVALID_RATE}
 
 // All HT tables have the same number of MCS indices, 0-76.
 const uint8_t kHtMaxMcs = 76;
@@ -238,8 +236,7 @@ using vht_mcs_entry_t = uint32_t[kVhtGuardIntervalCount];
 
 // Some MCS indices are invalid, so these entries are filled with a placeholder.
 #define VHT_INVALID_RATE 0
-#define VHT_MCS_INVALID \
-  { VHT_INVALID_RATE, VHT_INVALID_RATE }
+#define VHT_MCS_INVALID {VHT_INVALID_RATE, VHT_INVALID_RATE}
 
 // Valid MCS index range is 0-9.
 const uint8_t kVhtMaxMcs = 9;

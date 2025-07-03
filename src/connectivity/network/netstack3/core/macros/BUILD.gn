@@ -10,6 +10,7 @@ rustc_macro("netstack3-macros") {
   version = "0.1.0"
   edition = "2021"
   deps = [
+    "//third_party/rust_crates:proc-macro2",
     "//third_party/rust_crates:quote",
     "//third_party/rust_crates:syn",
   ]
@@ -28,6 +29,7 @@ if (is_host) {
     deps = [
       ":netstack3-macros",
       "//src/connectivity/lib/net-types",
+      "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
     ]
 
     sources = [ "src/test.rs" ]

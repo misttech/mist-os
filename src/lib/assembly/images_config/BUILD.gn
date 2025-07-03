@@ -15,6 +15,7 @@ rustc_library("images_config") {
   deps = [
     "//src/lib/assembly/container",
     "//src/lib/assembly/file_relative_path",
+    "//src/storage/fshost/config",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:schemars",

@@ -74,7 +74,17 @@ struct TestFilesystemOptions {
   // match the device size (if device_block_count is non-zero), including the extra required for
   // OOB.
   zx::unowned_vmo vmo;
+
+  // Mount an fvm partition to use for the resident filesystems. If use_existing_fvm is false this
+  // will try to create a new fvm partition.
   bool use_fvm = false;
+
+  // Look for an existing fvm and attach to that.
+  bool use_existing_fvm = false;
+
+  // Uses this vmo as an aside for storing actual nand erase counts for a ramn and. There should be
+  // enough space to store a uint32_t per physical block of the ram nand.
+  zx::unowned_vmo nand_wear_vmo;
 
   // If non-zero, create a dummy FVM partition which has the effect of moving the location of the
   // partition under test to be at a different offset on the underlying device.

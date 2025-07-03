@@ -282,7 +282,7 @@ impl Simple8bRleRingBuffer {
     /// Internally, this will push the value `k` times, where `0 <= k <= count`, until
     /// it detects that RLE blocks can be created and pushed, in which case it will create
     /// and push RLE blocks until the `count` has been exhausted.
-    pub fn push_multiple(&mut self, value: u64, count: NonZeroUsize) -> Vec<Simple8bRleBlock> {
+    pub fn fill(&mut self, value: u64, count: NonZeroUsize) -> Vec<Simple8bRleBlock> {
         self.num_samples += count.get();
         let mut evicted_blocks = vec![];
         self.push_back_multiple(value, count, &mut evicted_blocks);
@@ -1164,10 +1164,10 @@ mod tests {
     }
 
     #[test]
-    fn test_push_multiple_on_empty_ring_buffer() {
+    fn test_fill_on_empty_ring_buffer() {
         let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
-        ring_buffer.push_multiple(1, NonZeroUsize::new(10).unwrap());
+        ring_buffer.fill(1, NonZeroUsize::new(10).unwrap());
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -1183,10 +1183,10 @@ mod tests {
     }
 
     #[test]
-    fn test_push_multiple_with_len_exceeding_rle_max() {
+    fn test_fill_with_len_exceeding_rle_max() {
         let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
-        ring_buffer.push_multiple(1, NonZeroUsize::new(RLE_LEN_MAX as usize + 4).unwrap());
+        ring_buffer.fill(1, NonZeroUsize::new(RLE_LEN_MAX as usize + 4).unwrap());
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -1204,9 +1204,9 @@ mod tests {
     }
 
     // This test adopts the `test_chain_reencode_new_value_goes_with_excess_value` test
-    // but modifies the last step to `push_multiple`
+    // but modifies the last step to `fill`
     #[test]
-    fn test_push_multiple_that_reencodes_an_existing_simple8b_block() {
+    fn test_fill_that_reencodes_an_existing_simple8b_block() {
         let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         // Push 63 one-bit values
@@ -1227,7 +1227,7 @@ mod tests {
         ];
         assert_eq!(&buffer[..], expected_bytes);
 
-        ring_buffer.push_multiple(3, NonZeroUsize::new(50).unwrap());
+        ring_buffer.fill(3, NonZeroUsize::new(50).unwrap());
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -1250,7 +1250,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_multiple_that_reencodes_an_existing_rle_block() {
+    fn test_fill_that_reencodes_an_existing_rle_block() {
         let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         for _i in 0..8 {
             ring_buffer.push(0);
@@ -1268,7 +1268,7 @@ mod tests {
         ];
         assert_eq!(&buffer[..], expected_bytes);
 
-        ring_buffer.push_multiple(1, NonZeroUsize::new(80).unwrap());
+        ring_buffer.fill(1, NonZeroUsize::new(80).unwrap());
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -1287,7 +1287,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_multiple_eviction() {
+    fn test_fill_eviction() {
         let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         ring_buffer.push(u64::MAX);
         for _i in 0..40 {
@@ -1307,7 +1307,7 @@ mod tests {
         ];
         assert_eq!(&buffer[..], expected_bytes);
 
-        let evicted = ring_buffer.push_multiple(
+        let evicted = ring_buffer.fill(
             u32::MAX as u64,
             NonZeroUsize::new(RLE_LEN_MAX as usize + RLE_LEN_MAX as usize + MIN_SAMPLES).unwrap(),
         );

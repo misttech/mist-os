@@ -440,6 +440,10 @@ impl DirectoryEntry for BlobDirectory {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_dir(self)
     }
+
+    fn scope(&self) -> Option<ExecutionScope> {
+        Some(self.volume().scope().clone())
+    }
 }
 
 impl GetEntryInfo for BlobDirectory {
@@ -573,16 +577,9 @@ mod tests {
             hash = fuchsia_merkle::from_slice(&data).root();
             let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
 
-            let (blob_volume_outgoing_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
-            fixture
-                .volumes_directory()
-                .serve_volume(fixture.volume(), server_end, true)
-                .expect("failed to serve blob volume");
             let blob_proxy =
                 connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
-                    &blob_volume_outgoing_dir,
+                    fixture.volume_out_dir(),
                 )
                 .expect("failed to connect to the Blob service");
 
@@ -642,16 +639,10 @@ mod tests {
             filenames.push(filename.clone());
 
             let compressed_data: Vec<u8> = Type1Blob::generate(&datum, CompressionMode::Always);
-            let (blob_volume_outgoing_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
-            fixture
-                .volumes_directory()
-                .serve_volume(fixture.volume(), server_end, true)
-                .expect("failed to serve blob volume");
             let blob_proxy =
                 connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
-                    &blob_volume_outgoing_dir,
+                    fixture.volume_out_dir(),
                 )
                 .expect("failed to connect to the Blob service");
 

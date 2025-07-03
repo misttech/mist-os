@@ -19,11 +19,9 @@
 #error "Fuchsia-only header"
 #endif
 
-#include <lib/inspect/cpp/inspect.h>
-#include <lib/zx/result.h>
+#include <lib/inspect/cpp/vmo/types.h>
 
 #include <functional>
-#include <memory>
 
 #include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
 

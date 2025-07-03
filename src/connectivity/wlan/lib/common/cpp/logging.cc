@@ -2,20 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/common/c/banjo.h>
-
 #include <map>
 #include <string>
 
 #include <wlan/common/logging.h>
-
-static std::map<wlan_softmac_hardware_capability_t, std::string>
-    softmac_hardware_capability_flags_string_map = {
-        {WLAN_SOFTMAC_HARDWARE_CAPABILITY_BIT_SHORT_PREAMBLE, "Short Preamble"},
-        {WLAN_SOFTMAC_HARDWARE_CAPABILITY_BIT_SPECTRUM_MGMT, "Spectrum Management"},
-        {WLAN_SOFTMAC_HARDWARE_CAPABILITY_BIT_QOS, "QoS"},
-        {WLAN_SOFTMAC_HARDWARE_CAPABILITY_BIT_SHORT_SLOT_TIME, "Short Slot Time"},
-        {WLAN_SOFTMAC_HARDWARE_CAPABILITY_BIT_RADIO_MSMT, "Radio Measurement"}};
 
 template <typename flags_t>
 static void DebugFlags(flags_t flags, std::map<flags_t, std::string> flags_string_map,
@@ -33,9 +23,4 @@ static void DebugFlags(flags_t flags, std::map<flags_t, std::string> flags_strin
     }
     debugflags("  %s: %s\n", mask_name.c_str(), flag_status_display_string.c_str());
   }
-}
-
-void wlan::DebugSoftmacHardwareCapabilityFlags(wlan_softmac_hardware_capability_t flags) {
-  DebugFlags(flags, softmac_hardware_capability_flags_string_map, "Hardware Capabilities",
-             "Available", "NOT Available");
 }

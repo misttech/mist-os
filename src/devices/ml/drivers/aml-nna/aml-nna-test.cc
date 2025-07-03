@@ -4,101 +4,141 @@
 
 #include "aml-nna.h"
 
-#include <lib/async-loop/cpp/loop.h>
+#include <lib/ddk/platform-defs.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/mmio/mmio.h>
 
+#include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 
-#include "s905d3-nna-regs.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
-#include "t931-nna-regs.h"
-
-namespace {
-constexpr size_t kHiuRegSize = 0x2000 / sizeof(uint32_t);
-constexpr size_t kPowerRegSize = 0x1000 / sizeof(uint32_t);
-constexpr size_t kMemoryPDRegSize = 0x1000 / sizeof(uint32_t);
-}  // namespace
+#include "src/lib/testing/predicates/status.h"
 
 namespace aml_nna {
 
-class MockRegistersInternal {
+class AmlNnaTestEnvironment : public fdf_testing::Environment {
  public:
-  MockRegistersInternal()
-      : hiu_mock_(ddk_mock::MockMmioRegRegion(sizeof(uint32_t), kHiuRegSize)),
-        power_mock_(ddk_mock::MockMmioRegRegion(sizeof(uint32_t), kPowerRegSize)),
-        memory_pd_mock_(ddk_mock::MockMmioRegRegion(sizeof(uint32_t), kMemoryPDRegSize)) {
-    loop_.StartThread();
-    reset_mock_ = std::make_unique<mock_registers::MockRegisters>(loop_.dispatcher());
+  void Init(uint32_t pid) {
+    std::map<uint32_t, fdf_fake::Mmio> mmios;
+    mmios.insert({AmlNnaDriver::kHiuMmioIndex, hiu_mmio_.GetMmioBuffer()});
+    mmios.insert({AmlNnaDriver::kPowerDomainMmioIndex, power_mmio_.GetMmioBuffer()});
+    mmios.insert({AmlNnaDriver::kMemoryDomainMmioIndex, memory_pd_mmio_.GetMmioBuffer()});
+
+    pdev_.SetConfig({.mmios = std::move(mmios),
+                     .board_info{{
+                         .vid = PDEV_VID_AMLOGIC,
+                         .pid = pid,
+                     }}});
   }
 
-  // The caller should set the mock expectations before calling this.
-  void CreateDeviceAndVerify(AmlNnaDevice::NnaBlock nna_block) {
-    auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_registers::Device>::Create();
-    reset_mock_->Init(std::move(server_end));
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
-    fdf::PDev pdev;
-    zx::resource smc_monitor;
-    auto device = std::make_unique<AmlNnaDevice>(
-        fake_parent_.get(), hiu_mock_.GetMmioBuffer(), power_mock_.GetMmioBuffer(),
-        memory_pd_mock_.GetMmioBuffer(), std::move(client_end), std::move(pdev), nna_block,
-        std::move(smc_monitor));
-    ASSERT_NOT_NULL(device);
-    EXPECT_OK(device->Init());
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+          pdev_.GetInstanceHandler(dispatcher), AmlNnaDriver::kPlatformDeviceParentName);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
 
-    hiu_mock_.VerifyAll();
-    power_mock_.VerifyAll();
-    memory_pd_mock_.VerifyAll();
-    EXPECT_OK(reset()->VerifyAll());
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_registers::Service>(
+          reset_register_.GetInstanceHandler(), AmlNnaDriver::kResetRegisterParentName);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
 
-    loop_.Shutdown();
+    return zx::ok();
   }
 
-  mock_registers::MockRegisters* reset() { return reset_mock_.get(); }
+  ddk_mock::MockMmioRegRegion& hiu_mmio() { return hiu_mmio_; }
+  ddk_mock::MockMmioRegRegion& power_mmio() { return power_mmio_; }
+  ddk_mock::MockMmioRegRegion& memory_pd_mmio() { return memory_pd_mmio_; }
+  mock_registers::MockRegisters& reset_register() { return reset_register_; }
 
-  ddk_mock::MockMmioRegRegion hiu_mock_;
-  ddk_mock::MockMmioRegRegion power_mock_;
-  ddk_mock::MockMmioRegRegion memory_pd_mock_;
-
-  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  std::unique_ptr<mock_registers::MockRegisters> reset_mock_;
+ private:
+  fdf_fake::FakePDev pdev_;
+  ddk_mock::MockMmioRegRegion hiu_mmio_{sizeof(uint32_t), 0x2000 / sizeof(uint32_t)};
+  ddk_mock::MockMmioRegRegion power_mmio_{sizeof(uint32_t), 0x1000 / sizeof(uint32_t)};
+  ddk_mock::MockMmioRegRegion memory_pd_mmio_{sizeof(uint32_t), 0x1000 / sizeof(uint32_t)};
+  mock_registers::MockRegisters reset_register_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
 };
 
-TEST(AmlNnaTest, InitT931) {
-  MockRegistersInternal mock_regs;
+class FixtureConfig final {
+ public:
+  using DriverType = AmlNnaDriver;
+  using EnvironmentType = AmlNnaTestEnvironment;
+};
 
-  mock_regs.power_mock_[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFCFFFF);
-  mock_regs.power_mock_[0x3b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFCFFFF);
+class AmlNnaTest : public ::testing::Test {
+ public:
+  void StartDriver(uint32_t vid) {
+    driver_test_.RunInEnvironmentTypeContext([vid](auto& env) { env.Init(vid); });
+    ASSERT_OK(driver_test_.StartDriver());
+  }
 
-  mock_regs.memory_pd_mock_[0x43 * sizeof(uint32_t)].ExpectWrite(0);
-  mock_regs.memory_pd_mock_[0x44 * sizeof(uint32_t)].ExpectWrite(0);
+  void TearDown() override {
+    ASSERT_OK(driver_test_.StopDriver());
+    driver_test_.RunInEnvironmentTypeContext([](auto& env) {
+      env.hiu_mmio().VerifyAll();
+      env.power_mmio().VerifyAll();
+      env.memory_pd_mmio().VerifyAll();
+      EXPECT_OK(env.reset_register().VerifyAll());
+    });
+  }
 
-  mock_regs.reset()->ExpectWrite<uint32_t>(0x88, 1 << 12, 0);
-  mock_regs.reset()->ExpectWrite<uint32_t>(0x88, 1 << 12, 1 << 12);
+ protected:
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
-  mock_regs.hiu_mock_[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x700);
-  mock_regs.hiu_mock_[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x7000000);
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
+};
 
-  ASSERT_NO_FATAL_FAILURE(mock_regs.CreateDeviceAndVerify(T931NnaBlock));
+TEST_F(AmlNnaTest, InitT931) {
+  driver_test().RunInEnvironmentTypeContext([](auto& env) {
+    auto& power_mmio = env.power_mmio();
+    power_mmio[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFCFFFF);
+    power_mmio[0x3b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFCFFFF);
+
+    auto& memory_pd_mmio = env.memory_pd_mmio();
+    memory_pd_mmio[0x43 * sizeof(uint32_t)].ExpectWrite(0);
+    memory_pd_mmio[0x44 * sizeof(uint32_t)].ExpectWrite(0);
+
+    auto& reset_register = env.reset_register();
+    reset_register.template ExpectWrite<uint32_t>(0x88, 1 << 12, 0);
+    reset_register.template ExpectWrite<uint32_t>(0x88, 1 << 12, 1 << 12);
+
+    auto& hiu_mmio = env.hiu_mmio();
+    hiu_mmio[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x700);
+    hiu_mmio[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x7000000);
+  });
+
+  StartDriver(PDEV_PID_AMLOGIC_T931);
 }
 
-TEST(AmlNnaTest, InitS905d3) {
-  MockRegistersInternal mock_regs;
+TEST_F(AmlNnaTest, InitS905d3) {
+  driver_test().RunInEnvironmentTypeContext([](auto& env) {
+    auto& power_mmio = env.power_mmio();
+    power_mmio[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);
+    power_mmio[0x3b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);
 
-  mock_regs.power_mock_[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);
-  mock_regs.power_mock_[0x3b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);
+    auto& memory_pd_mmio = env.memory_pd_mmio();
+    memory_pd_mmio[0x46 * sizeof(uint32_t)].ExpectWrite(0);
+    memory_pd_mmio[0x47 * sizeof(uint32_t)].ExpectWrite(0);
 
-  mock_regs.memory_pd_mock_[0x46 * sizeof(uint32_t)].ExpectWrite(0);
-  mock_regs.memory_pd_mock_[0x47 * sizeof(uint32_t)].ExpectWrite(0);
+    auto& reset_register = env.reset_register();
+    reset_register.template ExpectWrite<uint32_t>(0x88, 1 << 12, 0);
+    reset_register.template ExpectWrite<uint32_t>(0x88, 1 << 12, 1 << 12);
 
-  mock_regs.reset()->ExpectWrite<uint32_t>(0x88, 1 << 12, 0);
-  mock_regs.reset()->ExpectWrite<uint32_t>(0x88, 1 << 12, 1 << 12);
+    auto& hiu_mmio = env.hiu_mmio();
+    hiu_mmio[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x700);
+    hiu_mmio[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x7000000);
+  });
 
-  mock_regs.hiu_mock_[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x700);
-  mock_regs.hiu_mock_[0x72 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x7000000);
-
-  ASSERT_NO_FATAL_FAILURE(mock_regs.CreateDeviceAndVerify(S905d3NnaBlock));
+  StartDriver(PDEV_PID_AMLOGIC_S905D3);
 }
 
 }  // namespace aml_nna

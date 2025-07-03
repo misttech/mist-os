@@ -17,30 +17,34 @@
 namespace flatland {
 
 const ImageSampleRegion kInvalidSampleRegion = {-1.f, -1.f, -1.f - 1.f};
-const TransformClipRegion kUnclippedRegion = {
-    -std::numeric_limits<int32_t>::max() / 2, -std::numeric_limits<int32_t>::max() / 2,
-    std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max()};
+constexpr TransformClipRegion kUnclippedRegion({-std::numeric_limits<int32_t>::max() / 2,
+                                                -std::numeric_limits<int32_t>::max() / 2,
+                                                std::numeric_limits<int32_t>::max(),
+                                                std::numeric_limits<int32_t>::max()});
 
 namespace {
 
-using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
 
+// TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it here.  Probably also a
+// standard `Overlap()` method.  Or: `Intersect(clip, RectangleF(origin, extent)).IsEmpty()`.
 bool Overlap(const TransformClipRegion& clip, const glm::vec2& origin, const glm::vec2& extent) {
-  if (clip.x == kUnclippedRegion.x && clip.y == kUnclippedRegion.y &&
-      clip.width == kUnclippedRegion.width && clip.height == kUnclippedRegion.height)
+  if (clip == kUnclippedRegion)
     return true;
-  if (origin.x > static_cast<float>(clip.x + clip.width))
+  const types::Point2 opposite = clip.opposite();
+  if (origin.x > static_cast<float>(opposite.x()))
     return false;
-  if (origin.x + static_cast<float>(extent.x) < static_cast<float>(clip.x))
+  if (origin.y > static_cast<float>(opposite.y()))
     return false;
-  if (origin.y > static_cast<float>(clip.y + clip.height))
+  if (origin.x + extent.x < static_cast<float>(clip.x()))
     return false;
-  if (origin.y + static_cast<float>(extent.y) < static_cast<float>(clip.y))
+  if (origin.y + extent.y < static_cast<float>(clip.y()))
     return false;
   return true;
 }
 
+// TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it here.  An `Intersect`
+// would be handy, too.
 std::pair<glm::vec2, glm::vec2> ClipRectangle(const TransformClipRegion& clip,
                                               const glm::vec2& origin, const glm::vec2& extent) {
   if (!Overlap(clip, origin, extent)) {
@@ -48,23 +52,25 @@ std::pair<glm::vec2, glm::vec2> ClipRectangle(const TransformClipRegion& clip,
   }
 
   glm::vec2 result_origin, result_extent;
-  result_origin.x = std::max(float(clip.x), origin.x);
-  result_extent.x = std::min(float(clip.x + clip.width), origin.x + extent.x) - result_origin.x;
+  result_origin.x = std::max(float(clip.x()), origin.x);
+  result_extent.x = std::min(float(clip.x() + clip.width()), origin.x + extent.x) - result_origin.x;
 
-  result_origin.y = std::max(float(clip.y), origin.y);
-  result_extent.y = std::min(float(clip.y + clip.height), origin.y + extent.y) - result_origin.y;
+  result_origin.y = std::max(float(clip.y()), origin.y);
+  result_extent.y =
+      std::min(float(clip.y() + clip.height()), origin.y + extent.y) - result_origin.y;
 
   return {result_origin, result_extent};
 }
 
-std::array<glm::vec3, 4> ConvertRectToVerts(fuchsia::math::Rect rect) {
-  return {glm::vec3(static_cast<float>(rect.x), static_cast<float>(rect.y), 1),
-          glm::vec3(static_cast<float>(rect.x + rect.width), static_cast<float>(rect.y), 1),
-          glm::vec3(static_cast<float>(rect.x + rect.width),
-                    static_cast<float>(rect.y + rect.height), 1),
-          glm::vec3(static_cast<float>(rect.x), static_cast<float>(rect.y + rect.height), 1)};
+std::array<glm::vec3, 4> ConvertRectToVerts(types::Rectangle rect) {
+  return {glm::vec3(static_cast<float>(rect.x()), static_cast<float>(rect.y()), 1),
+          glm::vec3(static_cast<float>(rect.x() + rect.width()), static_cast<float>(rect.y()), 1),
+          glm::vec3(static_cast<float>(rect.x() + rect.width()),
+                    static_cast<float>(rect.y() + rect.height()), 1),
+          glm::vec3(static_cast<float>(rect.x()), static_cast<float>(rect.y() + rect.height()), 1)};
 }
 
+// TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it here.
 std::array<glm::vec3, 4> ConvertRectFToVerts(fuchsia::math::RectF rect) {
   return {glm::vec3(rect.x, rect.y, 1), glm::vec3(rect.x + rect.width, rect.y, 1),
           glm::vec3(rect.x + rect.width, rect.y + rect.height, 1),
@@ -73,11 +79,11 @@ std::array<glm::vec3, 4> ConvertRectFToVerts(fuchsia::math::RectF rect) {
 
 // Template to handle both vec2 and vec3 inputs.
 template <typename T>
-fuchsia::math::Rect ConvertVertsToRect(const std::array<T, 4>& verts) {
-  return {.x = static_cast<int32_t>(verts[0].x),
-          .y = static_cast<int32_t>(verts[0].y),
-          .width = static_cast<int32_t>(fabs(verts[1].x - verts[0].x)),
-          .height = static_cast<int32_t>(fabs(verts[2].y - verts[1].y))};
+types::Rectangle ConvertVertsToRect(const std::array<T, 4>& verts) {
+  return types::Rectangle({.x = static_cast<int32_t>(verts[0].x),
+                           .y = static_cast<int32_t>(verts[0].y),
+                           .width = static_cast<int32_t>(fabs(verts[1].x - verts[0].x)),
+                           .height = static_cast<int32_t>(fabs(verts[2].y - verts[1].y))});
 }
 
 fuchsia::math::RectF ConvertVertsToRectF(const std::array<glm::vec2, 4>& verts) {
@@ -118,7 +124,7 @@ std::pair<std::array<glm::vec2, 4>, std::array<glm::vec2, 4>> MatrixMultiplyVert
           }};
 }
 
-fuchsia::math::Rect MatrixMultiplyRect(const glm::mat3& matrix, fuchsia::math::Rect rect) {
+types::Rectangle MatrixMultiplyRect(const glm::mat3& matrix, types::Rectangle rect) {
   return ConvertVertsToRect(std::get<1>(MatrixMultiplyVerts(matrix, ConvertRectToVerts(rect))));
 }
 
@@ -184,7 +190,8 @@ ImageRect CreateImageRect(const glm::mat3& matrix, const TransformClipRegion& cl
   if (origin == clipped_origin && extent == clipped_extent) {
     // If no clipping happened, we can leave the UVs as is and return.
     return ImageRect(clipped_origin, clipped_extent, texel_uvs, orientation);
-  } else if (clipped_origin == glm::vec2(0) && clipped_extent == glm::vec2(0)) {
+  }
+  if (clipped_origin == glm::vec2(0) && clipped_extent == glm::vec2(0)) {
     // The entire rectangle is outside of the clip region.
     return ImageRect(clipped_origin, clipped_extent,
                      {glm::vec2(0), glm::vec2(0), glm::vec2(0), glm::vec2(0)}, orientation);
@@ -269,7 +276,7 @@ ImageRect CreateImageRect(const glm::mat3& matrix, const TransformClipRegion& cl
   }
 
   // This construction will CHECK if the extent is negative.
-  return ImageRect(clipped_origin, clipped_extent, std::move(uvs), orientation);
+  return ImageRect(clipped_origin, clipped_extent, uvs, orientation);
 }
 
 }  // namespace
@@ -398,14 +405,16 @@ GlobalTransformClipRegionVector ComputeGlobalTransformClipRegions(
       auto curr_clip = MatrixMultiplyRect(matrix_vector[i], regions_kv->second);
 
       // Calculate the intersection of the current clip with its parent.
-      glm::vec2 curr_origin = {curr_clip.x, curr_clip.y};
-      glm::vec2 curr_extent = {curr_clip.width, curr_clip.height};
+      glm::vec2 curr_origin = {curr_clip.x(), curr_clip.y()};
+      glm::vec2 curr_extent = {curr_clip.width(), curr_clip.height()};
       auto [clipped_origin, clipped_extent] = ClipRectangle(parent_clip, curr_origin, curr_extent);
 
       // Add the intersection to the global clip vector.
-      clip_regions.emplace_back(TransformClipRegion{
-          static_cast<int>(clipped_origin.x), static_cast<int>(clipped_origin.y),
-          static_cast<int>(clipped_extent.x), static_cast<int>(clipped_extent.y)});
+      clip_regions.emplace_back(
+          TransformClipRegion({.x = static_cast<int>(clipped_origin.x),
+                               .y = static_cast<int>(clipped_origin.y),
+                               .width = static_cast<int>(clipped_extent.x),
+                               .height = static_cast<int>(clipped_extent.y)}));
     }
   }
 
@@ -496,9 +505,10 @@ GlobalRectangleVector ComputeGlobalRectangles(
   return rectangles;
 }
 
-void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector* images_in_out,
-                    uint64_t display_width, uint64_t display_height) {
-  TRACE_DURATION("gfx", "CullRectangles");
+void CullRectanglesInPlace(GlobalRectangleVector* rectangles_in_out,
+                           GlobalImageVector* images_in_out, uint64_t display_width,
+                           uint64_t display_height) {
+  TRACE_DURATION("gfx", "CullRectanglesInPlace");
   FX_DCHECK(rectangles_in_out && images_in_out);
   FX_DCHECK(rectangles_in_out->size() == images_in_out->size());
   auto is_occluder = [display_width, display_height](

@@ -75,6 +75,8 @@ class InterfaceProperties:
             port_class = PortClass.LOOPBACK
         elif fidl.port_class.device:
             port_class = PortClass(fidl.port_class.device)
+        elif fidl.port_class.blackhole:
+            port_class = PortClass.BLACKHOLE
         else:
             raise TypeError(f"Unknown port_class: {fidl.port_class}")
 
@@ -131,6 +133,10 @@ class InterfaceProperties:
             port_class = f_net_interfaces.PortClass(
                 loopback=f_net_interfaces.Empty()
             )
+        elif self.port_class is PortClass.BLACKHOLE:
+            port_class = f_net_interfaces.PortClass(
+                blackhole=f_net_interfaces.Empty()
+            )
         else:
             port_class = f_net_interfaces.PortClass(
                 device=self.port_class.value
@@ -162,3 +168,4 @@ class PortClass(enum.IntEnum):
     WLAN_AP = 5
     VIRTUAL = 6
     LOWPAN = 7
+    BLACKHOLE = 8  # not part of fuchsia.hardware.network/PortClass

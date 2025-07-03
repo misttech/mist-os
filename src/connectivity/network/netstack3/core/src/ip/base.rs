@@ -4,8 +4,6 @@
 
 //! The integrations for protocols built on top of IP.
 
-use alloc::collections::HashMap;
-
 use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
 use log::trace;
@@ -18,6 +16,7 @@ use netstack3_base::{
 };
 use netstack3_datagram as datagram;
 use netstack3_device::{for_any_device_id, BaseDeviceId, DeviceId, DeviceStateSpec, WeakDeviceId};
+use netstack3_hashmap::HashMap;
 use netstack3_icmp_echo::{
     self as icmp_echo, IcmpEchoBoundStateContext, IcmpEchoContextMarker,
     IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,

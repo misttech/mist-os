@@ -48,6 +48,7 @@ rustc_library("procfs") {
     "//sdk/fidl/fuchsia.starnix.psi:fuchsia.starnix.psi_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//sdk/rust/zx",
+    "//src/connectivity/network/netlink",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/starnix/kernel:starnix_core",

@@ -13,13 +13,13 @@ rustc_library_with_features("netstack3-icmp-echo") {
   check_cfgs = [ "test" ]
   sources = [
     "src/lib.rs",
+    "src/settings.rs",
     "src/socket.rs",
   ]
   deps = [
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",

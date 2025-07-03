@@ -3543,3 +3543,16 @@
   reviewers: ['etryzelaar@google.com', 'amituttam@google.com', 'awolter@google.com', 'markdittmer@google.com', 'gtsai@google.com']
   submitted: '2025-04-11'
   reviewed: '2025-06-02'
+
+- name: 'RFC-0272'
+  title: 'Wake Source Reporting'
+  short_description: 'Proposes an extension to zx_system_suspend_enter to provide more details about why the suspend operation finally ended'
+  authors: ['johngro@google.com']
+  file: '0272_wake_source_reporting.md'
+  area: ['Kernel']
+  issue: [ '374824168', '374827864' ]
+  gerrit_change_id: ['1283694']
+  status: 'Accepted'
+  reviewers: ['eieio@google.com', 'fmil@google.com', 'jmatt@google.com']
+  submitted: '2025-05-23'
+  reviewed: '2025-06-24'

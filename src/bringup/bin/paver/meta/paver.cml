@@ -41,7 +41,6 @@
 
                 // Storage services
                 "fuchsia.fshost.Admin",
-                "fuchsia.fshost.Recovery",
 
                 // Builtin service
                 "fuchsia.process.Launcher",
@@ -55,6 +54,7 @@
         },
         {
             protocol: [
+                "fuchsia.fshost.Recovery",
                 "fuchsia.storage.partitions.PartitionsAdmin",
                 "fuchsia.storage.partitions.PartitionsManager",
             ],

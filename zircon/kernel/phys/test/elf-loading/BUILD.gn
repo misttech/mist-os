@@ -99,7 +99,7 @@ physload_binary_test("virtual-address-loading-test") {
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/libc",
-    "//zircon/kernel/phys:address-space",
+    "//zircon/kernel/phys:address-space-map",
     "//zircon/kernel/phys:elf-image",
     "//zircon/kernel/phys:kernel-package",
     "//zircon/kernel/phys:symbolize",
@@ -119,11 +119,66 @@ get_int("get-int.virtual-address-loading-test") {
   deps = [ ":virtual-address-loading-test.interp" ]
 }
 
+physload_binary_test("zircon-info-test") {
+  visibility = [ ":*" ]
+
+  has_patches = false
+
+  sources = [ "zircon-info-test.cc" ]
+
+  deps = [
+    ":zircon-info-test.header",
+    "//src/lib/elfldltl",
+    "//src/lib/zbitl",
+    "//zircon/kernel/lib/arch",
+    "//zircon/kernel/lib/ktl",
+    "//zircon/kernel/lib/libc",
+    "//zircon/kernel/phys:address-space-map",
+    "//zircon/kernel/phys:elf-image",
+    "//zircon/kernel/phys:kernel-package",
+    "//zircon/kernel/phys:symbolize",
+  ]
+
+  data_deps = [ ":get-int.zircon-info-test($phys_toolchain)" ]
+}
+
+source_set("zircon-info-test.header") {
+  visibility = [ ":*" ]
+  testonly = true
+  public = [ "zircon-info-test.h" ]
+}
+
+kernel_elf_interp("zircon-info-test.interp") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  deps = [ ":zircon-info-test.binary" ]
+}
+
+source_set("zircon-info-note") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "zircon-info-note.cc" ]
+  deps = [
+    ":zircon-info-test.header",
+    "//zircon/kernel/phys:zircon-info-note",
+  ]
+}
+
+get_int("get-int.zircon-info-test") {
+  deps = [
+    ":zircon-info-note",
+    ":zircon-info-test.interp",
+  ]
+}
+
 group("elf-loading") {
   testonly = true
 
   deps = [
     ":virtual-address-loading-test",
     ":zbi-basic-elf-loading-test",
+    ":zircon-info-test",
   ]
 }

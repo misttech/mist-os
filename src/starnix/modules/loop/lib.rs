@@ -7,7 +7,7 @@
 use bitflags::bitflags;
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::DeviceMode;
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
 use starnix_core::task::CurrentTask;
@@ -18,7 +18,7 @@ use starnix_core::vfs::{
     InputBufferCallback, PeekBufferSegmentsCallback,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::device_type::{DeviceType, LOOP_MAJOR};
@@ -141,7 +141,7 @@ struct LoopDevice {
 impl LoopDevice {
     fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
@@ -159,7 +159,7 @@ impl LoopDevice {
                 DeviceMode::Block,
             ),
             virtual_block_class,
-            move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
+            |device, dir| build_block_device_directory(device, device_weak, dir),
         );
         {
             let mut state = device.state.lock();
@@ -607,7 +607,7 @@ impl LoopDeviceRegistry {
     /// Ensure initial loop devices.
     fn ensure_initial_devices<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask)
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         for minor in 0..8 {
             self.get_or_create(locked, current_task, minor);
@@ -628,7 +628,7 @@ impl LoopDeviceRegistry {
         minor: u32,
     ) -> Arc<LoopDevice>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices
             .lock()
@@ -639,7 +639,7 @@ impl LoopDeviceRegistry {
 
     fn find<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask) -> Result<u32, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut devices = self.devices.lock();
         for minor in 0..u32::MAX {
@@ -665,7 +665,7 @@ impl LoopDeviceRegistry {
         minor: u32,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(e) => {
@@ -686,7 +686,7 @@ impl LoopDeviceRegistry {
         minor: u32,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(_) => Ok(()),
@@ -818,10 +818,11 @@ mod tests {
         let backing_fd = current_task
             .task
             .files
-            .add_with_flags(&current_task, backing_file, FdFlags::empty())
+            .add_with_flags(locked, &current_task, backing_file, FdFlags::empty())
             .unwrap();
 
         let loop_file = anon_test_file(
+            locked,
             &current_task,
             Box::new(LoopDeviceFile { device: Arc::new(LoopDevice::default()) }),
             open_flags,
@@ -844,16 +845,14 @@ mod tests {
     #[::fuchsia::test]
     async fn basic_read() {
         spawn_kernel_and_run(|locked, current_task| {
-            let fs = create_testfs(&current_task.kernel());
+            let fs = create_testfs(locked, &current_task.kernel());
             let expected_contents = b"hello, world!";
 
             let ops = PassthroughTestFile::new_node(expected_contents);
             let backing_node = create_fs_node_for_testing(&fs, ops);
-            let backing_file = anon_test_file(
-                current_task,
-                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
-                OpenFlags::RDONLY,
-            );
+            let file_ops =
+                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap();
+            let backing_file = anon_test_file(locked, current_task, file_ops, OpenFlags::RDONLY);
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
@@ -867,14 +866,12 @@ mod tests {
     #[::fuchsia::test]
     async fn offset_works() {
         spawn_kernel_and_run(|locked, current_task| {
-            let fs = create_testfs(&current_task.kernel());
+            let fs = create_testfs(locked, &current_task.kernel());
             let ops = PassthroughTestFile::new_node(b"hello, world!");
             let backing_node = create_fs_node_for_testing(&fs, ops);
-            let backing_file = anon_test_file(
-                current_task,
-                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
-                OpenFlags::RDONLY,
-            );
+            let file_ops =
+                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap();
+            let backing_file = anon_test_file(locked, current_task, file_ops, OpenFlags::RDONLY);
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
@@ -907,7 +904,8 @@ mod tests {
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =
-                new_remote_file(current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+                new_remote_file(locked, current_task, txt_channel.into(), OpenFlags::RDONLY)
+                    .unwrap();
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
@@ -942,7 +940,8 @@ mod tests {
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =
-                new_remote_file(current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+                new_remote_file(locked, current_task, txt_channel.into(), OpenFlags::RDONLY)
+                    .unwrap();
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 

@@ -4,7 +4,6 @@
 
 #include "thermal-zones-visitor.h"
 
-#include <lib/ddk/metadata.h>
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 
@@ -104,16 +103,16 @@ zx::result<> ThermalZonesVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   ZX_ASSERT_MSG(sensor != thermal_sensors_.end(), "Thermal sensor should be found in the list.");
 
   if (sensor->second.trip_metadata) {
-    auto encoded_metadata = fidl::Persist(*sensor->second.trip_metadata);
-    if (encoded_metadata.is_error()) {
-      FDF_LOG(ERROR, "Failed to encode Trip Point Metadata: %s",
-              zx_status_get_string(encoded_metadata.error_value().status()));
-      return zx::error(encoded_metadata.error_value().status());
+    auto persisted_metadata = fidl::Persist(*sensor->second.trip_metadata);
+    if (persisted_metadata.is_error()) {
+      FDF_LOG(ERROR, "Failed to persist Trip Point Metadata: %s",
+              zx_status_get_string(persisted_metadata.error_value().status()));
+      return zx::error(persisted_metadata.error_value().status());
     }
 
     fuchsia_hardware_platform_bus::Metadata metadata{{
-        .id = std::to_string(DEVICE_METADATA_TRIP),
-        .data = encoded_metadata.value(),
+        .id = fuchsia_hardware_trippoint::TripDeviceMetadata::kSerializableName,
+        .data = std::move(persisted_metadata.value()),
     }};
 
     node.AddMetadata(std::move(metadata));

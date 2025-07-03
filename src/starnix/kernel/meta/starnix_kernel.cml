@@ -112,12 +112,14 @@
         // LINT.ThenChange(//src/starnix/containers/container_config.shard.cml)
         {
             protocol: [
+                "fuchsia.boot.Items",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.filter.Control",
@@ -149,7 +151,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.alarms.WakeAlarms",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

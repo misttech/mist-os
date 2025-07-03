@@ -55,6 +55,9 @@ type HealthStatus = strict enum {
     DEAD = 4;
     OVER_VOLTAGE = 5;
     UNSPECIFIED_FAILURE = 6;
+    COOL = 7;
+    WARM = 8;
+    OVERHEAT = 9;
 };
 
 /// The time remaining while actively charging or discharging.

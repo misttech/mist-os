@@ -212,7 +212,7 @@ struct Opt {
     min_severity: LogLevel,
 
     /// config file to use
-    #[argh(option, default = "\"/netcfg-config/netcfg_default.json\".to_string()")]
+    #[argh(option, default = "\"/netcfg-config/netcfg_default.json5\".to_string()")]
     config_data: String,
 }
 
@@ -401,7 +401,7 @@ impl Config {
         let path = path.as_ref();
         let file = fs::File::open(path)
             .with_context(|| format!("could not open the config file {}", path.display()))?;
-        let config = serde_json::from_reader(io::BufReader::new(file))
+        let config = serde_json5::from_reader(io::BufReader::new(file))
             .with_context(|| format!("could not deserialize the config file {}", path.display()))?;
         Ok(config)
     }
@@ -3723,6 +3723,7 @@ fn map_address_state_provider_error(
                 }
                 fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                 | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::DadFailed
+                | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::Forfeited
                 | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::InterfaceRemoved
                 | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::UserRemoved => {
                     errors::Error::NonFatal
@@ -3763,7 +3764,7 @@ mod tests {
 
     impl Config {
         pub fn load_str(s: &str) -> Result<Self, anyhow::Error> {
-            let config = serde_json::from_str(s)
+            let config = serde_json5::from_str(s)
                 .with_context(|| format!("could not deserialize the config data {}", s))?;
             Ok(config)
         }
@@ -5922,9 +5923,14 @@ mod tests {
         }"#;
 
         let err = Config::load_str(config_str).expect_err("config shouldn't accept unknown fields");
-        let err = err.downcast::<serde_json::Error>().expect("downcast error");
-        assert_eq!(err.classify(), serde_json::error::Category::Data);
-        assert_eq!(err.line(), 3);
+        let err = err.downcast::<serde_json5::Error>().expect("downcast error");
+        assert_matches!(
+            err,
+            serde_json5::Error::Message {
+                location: Some(serde_json5::Location { line: 3, .. }),
+                ..
+            }
+        );
         // Ensure the error is complaining about unknown field.
         assert!(format!("{:?}", err).contains("foobar"));
     }
@@ -6188,8 +6194,7 @@ mod tests {
         for config_str in bad_configs {
             let err =
                 Config::load_str(config_str).expect_err("config shouldn't accept unknown fields");
-            let err = err.downcast::<serde_json::Error>().expect("downcast error");
-            assert_eq!(err.classify(), serde_json::error::Category::Data);
+            let err = err.downcast::<serde_json5::Error>().expect("downcast error");
             // Ensure the error is complaining about unknown field.
             assert!(format!("{:?}", err).contains("speling"));
         }
@@ -6241,8 +6246,7 @@ mod tests {
         // Should fail on improper glob: square braces not closed.
         let err =
             Config::load_str(bad_config).expect_err("config shouldn't accept invalid pattern");
-        let err = err.downcast::<serde_json::Error>().expect("downcast error");
-        assert_eq!(err.classify(), serde_json::error::Category::Data);
+        let err = err.downcast::<serde_json5::Error>().expect("downcast error");
         // Ensure the error is complaining about invalid glob.
         assert!(format!("{:?}", err).contains(err_text));
     }
@@ -6271,5 +6275,21 @@ mod tests {
             AllowedDeviceClasses(HashSet::from([DeviceClass::WlanClient])),
             allowed_upstream_device_classes
         );
+    }
+
+    #[test]
+    fn test_config_supports_json5() {
+        let config_str = r#"{
+            "dns_config": { "servers": [] },
+            // A comment on the config
+            "filter_config": {
+                'rules': [], // Single quoted string
+                "nat_rules": [],
+                "rdr_rules": [], // Trailing comma
+            },
+            "filter_enabled_interface_types": [],
+            "allowed_upstream_device_classes": []
+        }"#;
+        let _ = Config::load_str(config_str).unwrap();
     }
 }

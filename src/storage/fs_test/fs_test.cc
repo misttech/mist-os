@@ -54,6 +54,7 @@
 #include "src/storage/lib/fs_management/cpp/options.h"
 #include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
+#include "zircon/rights.h"
 
 namespace fs_test {
 namespace {
@@ -98,12 +99,7 @@ zx::result<std::pair<storage::RamDisk, std::string>> CreateRamDisk(
 
   // Create a ram-disk.  The DFv2 driver doesn't support fail_after,
   // ram_disk_discard_random_after_last_flush or FVM.
-  auto ram_disk_or = storage::RamDisk::CreateWithVmo(
-      std::move(vmo), options.device_block_size,
-      storage::RamDisk::Options{
-          .use_v2 = !options.fail_after && !options.ram_disk_discard_random_after_last_flush &&
-                    !options.use_fvm,
-      });
+  auto ram_disk_or = storage::RamDisk::CreateWithVmo(std::move(vmo), options.device_block_size);
   if (ram_disk_or.is_error()) {
     return ram_disk_or.take_error();
   }
@@ -161,6 +157,14 @@ zx::result<std::pair<ramdevice_client::RamNand, std::string>> CreateRamNand(
                                         kPageSize / kPagesPerBlock);
   }
 
+  zx::vmo wear_vmo;
+  if (options.nand_wear_vmo->is_valid()) {
+    zx_status_t status = options.nand_wear_vmo->duplicate(ZX_DEFAULT_VMO_RIGHTS, &wear_vmo);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+  }
+
   if (zx::result channel = device_watcher::RecursiveWaitForFile(
           "/dev/sys/platform/ram-nand/nand-ctl", kDeviceWaitTime);
       channel.is_error()) {
@@ -182,6 +186,7 @@ zx::result<std::pair<ramdevice_client::RamNand, std::string>> CreateRamNand(
               .nand_class = fuchsia_hardware_nand::wire::Class::kFtl,
           },
       .fail_after = options.fail_after,
+      .wear_vmo = std::move(wear_vmo),
   };
   if (zx::result status =
           zx::make_result(ramdevice_client::RamNand::Create(std::move(config), &ram_nand));
@@ -243,7 +248,15 @@ zx::result<RamDevice> CreateRamDevice(const TestFilesystemOptions& options) {
   }
 
   // Create an FVM partition if requested.
-  if (options.use_fvm) {
+  if (options.use_existing_fvm) {
+    storage::FvmOptions fvm_options = {.initial_fvm_slice_count = options.initial_fvm_slice_count};
+    auto fvm_partition = storage::OpenFvmPartition(ram_device->path(), fvm_options.name);
+    if (fvm_partition.is_error()) {
+      return fvm_partition.take_error();
+    }
+
+    ram_device->set_fvm_partition(*std::move(fvm_partition));
+  } else if (options.use_fvm) {
     storage::FvmOptions fvm_options = {.initial_fvm_slice_count = options.initial_fvm_slice_count};
     auto fvm_partition = storage::CreateFvmPartition(
         ram_device->path(), static_cast<int>(options.fvm_slice_size), fvm_options);
@@ -371,18 +384,12 @@ zx::result<RamDevice> OpenRamDevice(const TestFilesystemOptions& options) {
 
   if (options.use_fvm) {
     // Now bind FVM to it.
-    std::string controller_path = ram_device->path() + "/device_controller";
-    zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
-    if (controller.is_error()) {
-      return controller.take_error();
+    zx::result fvm_partition = storage::OpenFvmPartition(ram_device->path());
+    if (fvm_partition.is_error()) {
+      std::cout << "Unable to bind FVM: " << fvm_partition.status_string() << std::endl;
+      return fvm_partition.take_error();
     }
-    auto status = storage::BindFvm(controller.value());
-    if (status.is_error()) {
-      std::cout << "Unable to bind FVM: " << status.status_string() << std::endl;
-      return status.take_error();
-    }
-
-    ram_device->set_path(ram_device->path() + "/fvm/fs-test-partition-p-1/block");
+    ram_device->set_fvm_partition(*std::move(fvm_partition));
   }
 
   if (zx::result channel =

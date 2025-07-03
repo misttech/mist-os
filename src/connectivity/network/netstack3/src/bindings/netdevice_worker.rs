@@ -19,11 +19,6 @@ use netstack3_core::device::{
     MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
     PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId, RecvEthernetFrameMeta,
 };
-use netstack3_core::ip::{
-    IidGenerationConfiguration, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-    Ipv6DeviceConfigurationUpdate, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
-    TemporarySlaacAddressConfiguration,
-};
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::trace::trace_duration;
@@ -36,8 +31,8 @@ use {
 use crate::bindings::devices::TxTask;
 use crate::bindings::util::{NeedsDataNotifier, ScopeExt as _};
 use crate::bindings::{
-    devices, interfaces_admin, routes, BindingId, BindingsCtx, Ctx, DeviceId,
-    Ipv4DeviceConfiguration, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    devices, interfaces_admin, routes, BindingId, BindingsCtx, Ctx, DeviceId, Netstack,
+    DEFAULT_INTERFACE_METRIC,
 };
 
 /// Like [`DeviceId`], but restricted to netdevice devices.
@@ -513,14 +508,6 @@ impl DeviceHandler {
             .active_guard()
             .ok_or(Error::ScopeFinished)?;
 
-        let iid_generation = if ctx.bindings_ctx().config.default_opaque_iids {
-            IidGenerationConfiguration::Opaque {
-                idgen_retries: StableSlaacAddressConfiguration::DEFAULT_IDGEN_RETRIES,
-            }
-        } else {
-            IidGenerationConfiguration::Eui64
-        };
-
         // Do the rest of the work in a closure so we don't accidentally add
         // errors after the binding ID is already allocated. This part of the
         // function should be infallible.
@@ -614,59 +601,7 @@ impl DeviceHandler {
             }
             add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
-            /// Construct the update to IpDeviceConfiguration to apply for a
-            /// given IP version
-            fn ip_device_config(version: IpVersion) -> IpDeviceConfigurationUpdate {
-                let dad_transmits = match version {
-                    IpVersion::V4 => {
-                        Ipv4DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS
-                    }
-                    IpVersion::V6 => {
-                        Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS
-                    }
-                };
-                IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(false),
-                    unicast_forwarding_enabled: Some(false),
-                    multicast_forwarding_enabled: Some(false),
-                    gmp_enabled: Some(true),
-                    dad_transmits: Some(Some(dad_transmits)),
-                }
-            }
-
-            let _: Ipv6DeviceConfigurationUpdate = ctx
-                .api()
-                .device_ip::<Ipv6>()
-                .update_configuration(
-                    &core_id,
-                    Ipv6DeviceConfigurationUpdate {
-                        max_router_solicitations: Some(Some(
-                            Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
-                        )),
-                        slaac_config: SlaacConfigurationUpdate {
-                            stable_address_configuration: Some(
-                                StableSlaacAddressConfiguration::Enabled { iid_generation },
-                            ),
-                            temporary_address_configuration: Some(
-                                TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults(),
-                            ),
-                        },
-                        ip_config: ip_device_config(IpVersion::V6),
-                        mld_mode: None,
-                    },
-                )
-                .unwrap();
-            let _: Ipv4DeviceConfigurationUpdate = ctx
-                .api()
-                .device_ip::<Ipv4>()
-                .update_configuration(
-                    &core_id,
-                    Ipv4DeviceConfigurationUpdate {
-                        ip_config: ip_device_config(IpVersion::V4),
-                        igmp_mode: None,
-                    },
-                )
-                .unwrap();
+            ctx.apply_interface_defaults(&core_id);
 
             info!("created interface {:?}", core_id);
             ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);

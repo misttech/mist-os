@@ -31,6 +31,9 @@ fuchsia_component("report_then_panic_on_start") {
   deps = [ ":report_then_panic_on_start_bin" ]
   component_name = "report_then_panic_on_start"
   manifest = "meta/report_then_panic_on_start.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 rustc_binary("panic_on_start_bin") {

@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/wire.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/stdcompat/span.h>
 
@@ -34,8 +35,22 @@ class PostInit : public fdf::DriverBase {
 
   zx::result<> InitBoardInfo();
   zx::result<> SetBoardInfo();
+
+  // Identifies the panel type and stores it to `panel_type_`.
+  // Must be called exactly once during driver `Start()`.
+  zx::result<> IdentifyPanel();
+
+  // Must be called after `IdentifyPanel()`.
   zx::result<> InitDisplay();
+
+  // Must be called after `IdentifyPanel()`.
   zx::result<> InitTouch();
+
+  // Must be called after `IdentifyPanel()`.
+  zx::result<> InitBacklight();
+
+  zx::result<> InitFocaltechTouch();
+  zx::result<> InitGoodixTouch();
 
   // Constructs a number using the value of each GPIO as one bit. The order of elements in
   // node_names determines the bits set in the result from LSB to MSB.
@@ -48,7 +63,9 @@ class PostInit : public fdf::DriverBase {
   fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> composite_manager_;
 
   AstroBoardBuild board_build_{};
-  uint8_t display_id_{};
+
+  // Initialized exactly once in `IdentifyPanel()`.
+  display::PanelType panel_type_ = display::PanelType::kUnknown;
 };
 
 }  // namespace astro

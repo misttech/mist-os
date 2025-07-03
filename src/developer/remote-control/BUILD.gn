@@ -22,6 +22,7 @@ group("tests") {
 
   deps = [
     ":remote-control-lib-tests",
+    "usb:tests",
     "//src/developer/remote-control/runner:tests",
     "//src/developer/remote-control/test:fdomain-connection-test",
   ]

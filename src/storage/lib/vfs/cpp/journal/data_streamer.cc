@@ -4,11 +4,22 @@
 
 #include "src/storage/lib/vfs/cpp/journal/data_streamer.h"
 
+#include <lib/fpromise/bridge.h>
+#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
+#include <zircon/assert.h>
+#include <zircon/types.h>
+
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
+#include <storage/operation/operation.h>
 #include <storage/operation/unbuffered_operation.h>
+
+#include "src/storage/lib/vfs/cpp/journal/journal.h"
 
 namespace fs {
 
@@ -26,7 +37,7 @@ void DataStreamer::StreamData(storage::UnbufferedOperation operation) {
 
     storage::UnbufferedOperation partial_operation = operation;
     partial_operation.op.length = delta_blocks;
-    operations_.Add(std::move(partial_operation));
+    operations_.Add(partial_operation);
 
     operation.op.vmo_offset += delta_blocks;
     operation.op.dev_offset += delta_blocks;
@@ -43,7 +54,7 @@ fs::Journal::Promise DataStreamer::Flush() {
   return fpromise::join_promise_vector(std::move(promises_))
       .then([](fpromise::context& context,
                fpromise::result<std::vector<fpromise::result<void, zx_status_t>>>& result) mutable
-            -> fpromise::result<void, zx_status_t> {
+                -> fpromise::result<void, zx_status_t> {
         ZX_ASSERT_MSG(result.is_ok(), "join_promise_vector should only return success type");
         // If any of the intermediate promises fail, return the first seen error status.
         for (const auto& intermediate_result : result.value()) {

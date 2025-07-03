@@ -15,8 +15,11 @@ using zx;
 @available(added=20)
 const MAX_TEST_CASES_PER_GET uint64 = 1024;
 
-@available(added=20)
+@available(added=20, replaced=NEXT)
 const MAX_ARGUMENT_LENGTH uint64 = 1024;
+
+@available(added=NEXT)
+const MAX_ARGUMENT_LENGTH uint64 = 16384;
 
 @available(added=20)
 const MAX_ARGUMENTS uint64 = fuchsia.io.MAX_PATH_LENGTH;

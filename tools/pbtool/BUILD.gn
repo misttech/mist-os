@@ -15,6 +15,7 @@ rustc_binary("pbtool") {
     "//build/sdk/meta:rust",
     "//src/lib/assembly/assembled_system",
     "//src/lib/assembly/product_bundle",
+    "//src/lib/assembly/release_info",
     "//src/lib/fuchsia",
     "//src/lib/product_description",
     "//src/lib/transfer_manifest",

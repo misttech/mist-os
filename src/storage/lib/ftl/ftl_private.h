@@ -120,6 +120,9 @@ typedef unsigned int uint;
 // Type Declarations.
 //
 
+// Callback type from NDM to FTL when bad blocks are found.
+typedef void (*OnMarkedBad)(void* callback_data, ui32 bn);
+
 // Circular Linked List Structure
 typedef struct circ_list {
   struct circ_list* next_fwd;
@@ -147,6 +150,7 @@ int ndmWritePages(uint32_t pn0, uint32_t cnt, const uint8_t* buf, uint8_t* spare
 int ndmWritePage(uint32_t vpn, const uint8_t* buf, uint8_t* spare, NDM ndm);
 int ndmTransferPage(uint32_t old_vpn, uint32_t new_vpn, uint8_t* buf, uint8_t* spare, NDM ndm);
 int ndmCheckPage(uint32_t pn, uint8_t* data, uint8_t* spare, NDM ndm);
+void ndmSetBadBlockCallback(OnMarkedBad cb, void* cb_data, NDM ndm);
 uint32_t ndmPairOffset(uint32_t page_offset, CNDM ndm);
 uint32_t ndmPastPrevPair(CNDM ndm, uint32_t pn);
 int FtlNdmDelVol(CircLink* vols, const char* name);

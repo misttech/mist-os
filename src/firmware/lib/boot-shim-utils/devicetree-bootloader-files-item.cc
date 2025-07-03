@@ -7,6 +7,12 @@
 #include <lib/boot-shim-utils/devicetree-bootloader-files-item.h>
 
 void DevicetreeBootloaderFilesItem::SetScratchBuffer(std::span<std::byte> buffer) {
+  if (reinterpret_cast<size_t>(buffer.data()) % ZBI_ALIGNMENT) {
+    fprintf(stdout,
+            "Bootloader file buffer is not aligned to ZBI_ALIGNMENT. Files will not append.\n");
+    return;
+  }
+
   files_ = zbitl::Image<std::span<std::byte>>(buffer);
   if (auto result = files_.clear(); result.is_error()) {
     fprintf(stdout, "Failed to initialize ZBI files container: %s\n",

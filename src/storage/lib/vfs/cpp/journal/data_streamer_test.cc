@@ -4,12 +4,32 @@
 
 #include "src/storage/lib/vfs/cpp/journal/data_streamer.h"
 
-#include <zircon/assert.h>
+#include <lib/fit/function.h>
+#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
+#include <storage/buffer/blocking_ring_buffer.h>
+#include <storage/buffer/vmo_buffer.h>
 #include <storage/buffer/vmoid_registry.h>
+#include <storage/operation/operation.h>
+#include <storage/operation/unbuffered_operation.h>
+#include <storage/operation/unbuffered_operations_builder.h>
 
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace fs {
 namespace {
@@ -59,7 +79,7 @@ constexpr uint64_t kBlockSize = kJournalBlockSize;
 constexpr uint64_t kVmoOffset = 0;
 constexpr uint64_t kDevOffset = 5;
 constexpr uint64_t kWritebackLength = 8;
-// This leaks an internal detail of the DataStreamer (the chunking size), but it's necssary to
+// This leaks an internal detail of the DataStreamer (the chunking size), but it's necessary to
 // emulate this externally to validate the issued operations are chunked correctly.
 constexpr uint64_t kMaxChunk = (3 * kWritebackLength) / 4;
 

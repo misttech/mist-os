@@ -62,18 +62,24 @@
 namespace {
 
 KCOUNTER(vm_vmo_high_priority, "vm.vmo.high_priority")
-KCOUNTER(vm_vmo_no_reclamation_strategy, "vm.vmo.no_reclamation_strategy")
 KCOUNTER(vm_vmo_dont_need, "vm.vmo.dont_need")
 KCOUNTER(vm_vmo_always_need, "vm.vmo.always_need")
-KCOUNTER(vm_vmo_always_need_skipped_reclaim, "vm.vmo.always_need_skipped_reclaim")
 KCOUNTER(vm_vmo_compression_zero_slot, "vm.vmo.compression.zero_empty_slot")
 KCOUNTER(vm_vmo_compression_marker, "vm.vmo.compression_zero_marker")
-KCOUNTER(vm_vmo_discardable_failed_reclaim, "vm.vmo.discardable_failed_reclaim")
 KCOUNTER(vm_vmo_range_update_from_parent_skipped, "vm.vmo.range_updated_from_parent.skipped")
 KCOUNTER(vm_vmo_range_update_from_parent_performed, "vm.vmo.range_updated_from_parent.performed")
 
-KCOUNTER(vm_vmo_evict_accessed, "vm.vmo.evict_accessed")
-KCOUNTER(vm_vmo_compress_accessed, "vm.vmo.compress_accessed")
+KCOUNTER(vm_reclaim_evict_accessed, "vm.reclaim.evict_accessed")
+KCOUNTER(vm_reclaim_compress_accessed, "vm.reclaim.compress_accessed")
+KCOUNTER(vm_reclaim_no_reclamation_strategy, "vm.reclaim.no_reclamation_strategy")
+KCOUNTER(vm_reclaim_always_need_skipped, "vm.reclaim.always_need_skipped")
+KCOUNTER(vm_reclaim_discardable_failed, "vm.reclaim.discardable_failed")
+KCOUNTER(vm_reclaim_incorrect_page, "vm.reclaim.incorrect_page")
+KCOUNTER(vm_reclaim_high_priority, "vm.reclaim.high_priority")
+KCOUNTER(vm_reclaim_pinned, "vm.reclaim.pinned")
+KCOUNTER(vm_reclaim_dirty, "vm.reclaim.dirty")
+KCOUNTER(vm_reclaim_not_pager_backed, "vm.reclaim.not_pager_backed")
+KCOUNTER(vm_reclaim_uncached, "vm.reclaim.uncached")
 
 template <typename T>
 uint32_t GetShareCount(T p) {
@@ -175,6 +181,21 @@ VmObjectPaged* paged_backlink_locked(VmCowPages* cow) TA_REQ(cow->lock())
 }
 
 }  // namespace
+
+// static
+void VmCowPages::DebugDumpReclaimCounters() {
+  printf("Failed reclaim evict_accessed %ld\n", vm_reclaim_evict_accessed.SumAcrossAllCpus());
+  printf("Failed reclaim compress_accessed %ld\n", vm_reclaim_compress_accessed.SumAcrossAllCpus());
+  printf("Failed reclaim no_strategy %ld\n", vm_reclaim_no_reclamation_strategy.SumAcrossAllCpus());
+  printf("Failed reclaim always_need %ld\n", vm_reclaim_always_need_skipped.SumAcrossAllCpus());
+  printf("Failed reclaim discardable %ld\n", vm_reclaim_discardable_failed.SumAcrossAllCpus());
+  printf("Failed reclaim incorrect_page %ld\n", vm_reclaim_incorrect_page.SumAcrossAllCpus());
+  printf("Failed reclaim high_priority %ld\n", vm_reclaim_high_priority.SumAcrossAllCpus());
+  printf("Failed reclaim pinned %ld\n", vm_reclaim_pinned.SumAcrossAllCpus());
+  printf("Failed reclaim dirty %ld\n", vm_reclaim_dirty.SumAcrossAllCpus());
+  printf("Failed reclaim not_pager_backed %ld\n", vm_reclaim_not_pager_backed.SumAcrossAllCpus());
+  printf("Failed reclaim uncached %ld\n", vm_reclaim_uncached.SumAcrossAllCpus());
+}
 
 // Helper for walking up a VmCowPages hierarchy where the start node is locked, and the immediate
 // parent may or may not be locked.
@@ -772,7 +793,10 @@ zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* allo
   DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
 
   vm_page_t* p_clone = nullptr;
-  if (alloc_list) {
+
+  if (request->has_page()) {
+    p_clone = request->take_page();
+  } else if (alloc_list) {
     p_clone = list_remove_head_type(alloc_list, vm_page, queue_node);
   }
 
@@ -807,6 +831,12 @@ zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* allo
 zx_status_t VmCowPages::AllocUninitializedPage(vm_page_t** page, AnonymousPageRequest* request) {
   paddr_t paddr = 0;
   DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
+  // Another layer has already allocated a page for us.
+  if (request->has_page()) {
+    *page = request->take_page();
+    return ZX_OK;
+  }
+
   zx_status_t status = CacheAllocPage(pmm_alloc_flags_, page, &paddr);
   if (status == ZX_ERR_SHOULD_WAIT) {
     request->MakeActive();
@@ -2835,7 +2865,8 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
   // If the page is Dirty or AwaitingClean, it should not be loaned.
   DEBUG_ASSERT(!(is_page_dirty(page) || is_page_awaiting_clean(page)) || !page->is_loaned());
 
-  // Perform state-specific checks and actions. We will finally update the state below.
+  // Perform state-specific checks. We will finally update the state below.
+  bool update_page_queues = false;
   switch (dirty_state) {
     case DirtyState::Clean:
       // If the page is not in the process of being added, we can only see a transition to Clean
@@ -2844,8 +2875,7 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
 
       // If we are expecting a pending Add[New]PageLocked, we can defer updating the page queue.
       if (!is_pending_add) {
-        // Move to evictable pager backed queue to start tracking age information.
-        pmm_page_queues()->MoveToReclaim(page);
+        update_page_queues = true;
       }
       break;
     case DirtyState::Dirty:
@@ -2859,13 +2889,7 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
 
       // If we are expecting a pending Add[New]PageLocked, we can defer updating the page queue.
       if (!is_pending_add) {
-        // Move the page to the Dirty queue, which does not track page age. While the page is in the
-        // Dirty queue, age information is not required (yet). It will be required when the page
-        // becomes Clean (and hence evictable) again, at which point it will get moved to the MRU
-        // pager backed queue and will age as normal.
-        // TODO(rashaeqbal): We might want age tracking for the Dirty queue in the future when the
-        // kernel generates writeback pager requests.
-        pmm_page_queues()->MoveToPagerBackedDirty(page);
+        update_page_queues = true;
       }
       break;
     case DirtyState::AwaitingClean:
@@ -2896,6 +2920,22 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
       ASSERT(false);
   }
   page->object.dirty_state = static_cast<uint8_t>(dirty_state) & VM_PAGE_OBJECT_DIRTY_STATES_MASK;
+  if (update_page_queues && page->object.pin_count == 0) {
+    // Move the page to the appropriate page queue, checking for global state such as high priority
+    // count etc.
+    //
+    // If Clean:
+    // Move to evictable pager backed queue to start tracking age information.
+    //
+    // If Dirty:
+    // Move the page to the Dirty queue, which does not track page age. While the page is in the
+    // Dirty queue, age information is not required (yet). It will be required when the page
+    // becomes Clean (and hence evictable) again, at which point it will get moved to the MRU
+    // pager backed queue and will age as normal.
+    // TODO(rashaeqbal): We might want age tracking for the Dirty queue in the future when the
+    // kernel generates writeback pager requests.
+    MoveToNotPinnedLocked(page, offset);
+  }
 }
 
 zx_status_t VmCowPages::PrepareForWriteLocked(VmCowRange range, LazyPageRequest* page_request,
@@ -4539,7 +4579,13 @@ void VmCowPages::MoveToNotPinnedLocked(vm_page_t* page, uint64_t offset) {
       } else if (is_discardable()) {
         pq->MoveToReclaim(page);
       } else {
-        pq->MoveToAnonymous(page);
+        // If the VMO is mapped uncached, it cannot be reclaimed. The reclamation code is tolerant
+        // to this and will skip the page anyway, but uncached memory is typically used by drivers
+        // and tends to back large buffers, so avoid wasted work.
+        pq->MoveToAnonymous(page,
+                            /*skip_reclaim=*/paged_ref_ &&
+                                (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
+                                 ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED);
       }
     } else {
       pq->MoveToWired(page);
@@ -4577,7 +4623,13 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
       } else if (is_discardable()) {
         pq->SetReclaim(page, this, offset);
       } else {
-        pq->SetAnonymous(page, this, offset);
+        // If the VMO is mapped uncached, it cannot be reclaimed. The reclamation code is tolerant
+        // to this and will skip the page anyway, but uncached memory is typically used by drivers
+        // and tends to back large buffers, so avoid wasted work.
+        pq->SetAnonymous(page, this, offset,
+                         /*skip_reclaim=*/paged_ref_ &&
+                             (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
+                              ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED);
       }
     } else {
       pq->SetWired(page, this, offset);
@@ -4822,7 +4874,8 @@ zx_status_t VmCowPages::DecompressInRange(VmCowRange range) {
       return ZX_OK;
     }
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
+      guard.CallUnlocked(
+          [&page_request, &status]() { status = page_request.Allocate().status_value(); });
     }
   } while (status == ZX_OK);
   return status;
@@ -5502,6 +5555,11 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
     return TakePagesWithParentLocked(range, pages, taken_len, deferred, page_request);
   }
 
+  // On the assumption of success, unamp the entire range we are going to process. This ensures that
+  // in the unlikely event of a failure mid way through the unmap of the portion that was modified
+  // is not lost.
+  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
+
   VmCompression* compression = Pmm::Node().GetPageCompression();
   bool found_page = false;
   page_list_.ForEveryPageInRangeMutable(
@@ -5541,17 +5599,24 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
   // VMO whose parent is concurrently closed. In this case, we have to append to the splice list
   // one VmPageOrMarker at a time.
   if (likely(pages->IsEmpty())) {
-    page_list_.TakePages(pages);
+    zx_status_t status = page_list_.TakePages(pages);
+    if (status != ZX_OK) {
+      DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+      return status;
+    }
   } else {
     for (uint64_t position = range.offset; position < range.end(); position += PAGE_SIZE) {
       VmPageOrMarker content = page_list_.RemoveContent(position);
-      pages->Append(ktl::move(content));
+      zx_status_t status = pages->Append(ktl::move(content));
+      if (status != ZX_OK) {
+        DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+        return status;
+      }
     }
     pages->Finalize();
   }
 
   *taken_len = range.len;
-  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -6645,11 +6710,32 @@ void VmCowPages::RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, 
   }
 }
 
+void VmCowPages::FinishTransitionToUncachedLocked() {
+  // No need to perform clean/invalidate if size is zero because there can be no pages.
+  if (size_ == 0) {
+    return;
+  }
+
+  page_list_.ForEveryPage([this](const VmPageOrMarker* p, uint64_t off) {
+    if (!p->IsPage()) {
+      return ZX_ERR_NEXT;
+    }
+    vm_page_t* page = p->Page();
+    DEBUG_ASSERT(page->object.pin_count == 0);
+    // Refreshing the page queue will move the page to an unreclaimable one if applicable.
+    AssertHeld(lock_ref());
+    MoveToNotPinnedLocked(page, off);
+    arch_clean_invalidate_cache_range((vaddr_t)paddr_to_physmap(page->paddr()), PAGE_SIZE);
+    return ZX_ERR_NEXT;
+  });
+}
+
 template <typename T>
 bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
   // Check this page is still a part of this VMO. After this any failures should mark the page as
   // accessed to prevent the page from remaining a reclamation candidate.
   if (!actual || !actual->IsPage() || actual->Page() != page) {
+    vm_reclaim_incorrect_page.Add(1);
     return false;
   }
   // Pinned pages could be in use by DMA so we cannot safely reclaim them.
@@ -6657,6 +6743,7 @@ bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
     // Loaned pages should never end up pinned.
     DEBUG_ASSERT(!page->is_loaned());
     pmm_page_queues()->MarkAccessed(page);
+    vm_reclaim_pinned.Add(1);
     return false;
   }
   return true;
@@ -6667,6 +6754,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   canary_.Assert();
   // Without a page source to bring the page back in we cannot even think about eviction.
   if (!can_evict()) {
+    vm_reclaim_not_pager_backed.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6677,10 +6765,14 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   if (!CanReclaimPageLocked(page, page_or_marker)) {
     return ReclaimCounts{};
   }
+  // Since CanReclaimPageLocked() succeeded, we know that this page is owned by us at the provided
+  // offset. So it should be safe to call MarkAccessed() on the page if reclamation fails, provided
+  // we don't drop the lock.
 
   // Now allowed to reclaim if high priority, unless being required to do so.
   if (high_priority_count_ != 0 && (eviction_action != EvictionAction::Require)) {
     pmm_page_queues()->MarkAccessed(page);
+    vm_reclaim_high_priority.Add(1);
     return ReclaimCounts{};
   }
   DEBUG_ASSERT(is_page_dirty_tracked(page));
@@ -6689,6 +6781,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   // moved to the dirty page queue.
   if (!is_page_clean(page)) {
     DEBUG_ASSERT(!page->is_loaned());
+    vm_reclaim_dirty.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6706,7 +6799,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
     // eviction. Pages move out of said queue when accessed, and continue aging as other pages.
     // Pages in the queue are considered for eviction pre-OOM, but ignored otherwise.
     pmm_page_queues()->MarkAccessed(page);
-    vm_vmo_always_need_skipped_reclaim.Add(1);
+    vm_reclaim_always_need_skipped.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6719,7 +6812,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking page
   // queues.
   if ((old_queue != new_queue) && (eviction_action != EvictionAction::Require)) {
-    vm_vmo_evict_accessed.Add(1);
+    vm_reclaim_evict_accessed.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6763,24 +6856,30 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
   {
     __UNINITIALIZED DeferredOps deferred(this);
     Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
-    // Not allowed to reclaim if uncached.
-    if ((paged_ref_ && (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
-                        ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
-      // To avoid this page remaining in the reclamation list we simulate an access.
-      pmm_page_queues()->MarkAccessed(page);
-      return ReclaimCounts{};
-    }
-
-    // Not allows to reclaim if high priority.
-    if (high_priority_count_ != 0) {
-      pmm_page_queues()->MarkAccessed(page);
-      return ReclaimCounts{};
-    }
 
     // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
     {
       VmPageOrMarkerRef page_or_marker = page_list_.LookupMutable(offset);
       if (!CanReclaimPageLocked(page, page_or_marker)) {
+        return ReclaimCounts{};
+      }
+      // Since CanReclaimPageLocked() succeeded, we know that this page is owned by us at the
+      // provided offset. So it should be safe to call MarkAccessed() on the page if reclamation
+      // fails, provided we don't drop the lock.
+
+      // Not allowed to reclaim if uncached.
+      if ((paged_ref_ && (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
+                          ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
+        // To avoid this page remaining in the reclamation list we simulate an access.
+        pmm_page_queues()->MarkAccessed(page);
+        vm_reclaim_uncached.Add(1);
+        return ReclaimCounts{};
+      }
+
+      // Not allowed to reclaim if high priority.
+      if (high_priority_count_ != 0) {
+        pmm_page_queues()->MarkAccessed(page);
+        vm_reclaim_high_priority.Add(1);
         return ReclaimCounts{};
       }
 
@@ -6799,7 +6898,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
       // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking
       // page queues.
       if (old_queue != new_queue) {
-        vm_vmo_compress_accessed.Add(1);
+        vm_reclaim_compress_accessed.Add(1);
         return ReclaimCounts{};
       }
 
@@ -6937,12 +7036,12 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
     if (result.is_ok()) {
       return ReclaimCounts{.discarded = *result};
     }
-    vm_vmo_discardable_failed_reclaim.Add(1);
+    vm_reclaim_discardable_failed.Add(1);
     return ReclaimCounts{};
   }
 
   // Keep a count as having no reclamation strategy is probably a sign of miss-configuration.
-  vm_vmo_no_reclamation_strategy.Add(1);
+  vm_reclaim_no_reclamation_strategy.Add(1);
 
   // Either no other strategies, or reclamation failed, so to avoid this page remaining in a
   // reclamation list we simulate an access. Do not want to place it in the ReclaimFailed queue
@@ -7627,15 +7726,6 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
   return counts;
 }
 
-uint64_t VmCowPages::DiscardPages() {
-  canary_.Assert();
-
-  __UNINITIALIZED DeferredOps deferred(this);
-  Guard<CriticalMutex> guard{lock()};
-  // Discard any errors and overlap a 0 return value for errors.
-  return DiscardPagesLocked(deferred).value_or(0);
-}
-
 zx::result<uint64_t> VmCowPages::DiscardPagesLocked(DeferredOps& deferred) {
   // Not a discardable VMO.
   if (!discardable_tracker_) {
@@ -7669,6 +7759,9 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
   if (!CanReclaimPageLocked(page, page_or_marker)) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
+  // Since CanReclaimPageLocked() succeeded, we know that this page is owned by us at the provided
+  // offset. So it should be safe to call MarkAccessed() on the page if reclamation fails, provided
+  // we don't drop the lock.
 
   // Check if this is the first page.
   bool first = false;
@@ -7679,14 +7772,14 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
     first = (p->Page() == page) && off == offset;
     return ZX_ERR_STOP;
   });
-  if (!first) {
+  zx::result<uint64_t> result =
+      first ? DiscardPagesLocked(deferred) : zx::error(ZX_ERR_INVALID_ARGS);
+  if (result.is_error()) {
     // Mark the page accessed so that it's no longer a reclamation candidate. The other error path
     // above already does this inside the CanReclaimPageLocked() helper.
     pmm_page_queues()->MarkAccessed(page);
-    return zx::error(ZX_ERR_INVALID_ARGS);
   }
-
-  return DiscardPagesLocked(deferred);
+  return result;
 }
 
 void VmCowPages::CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {
@@ -7748,6 +7841,11 @@ VmCowPages::DeferredOps::~DeferredOps() {
     LockedPtr self(self_);
     VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
   }
+  // The pages must be freed *after* any range update is performed, but *before* dropping the
+  // |page_source_lock_|. In the case where the page source is handling free this is still a logical
+  // operation involving the cow pages and must remain serialized, as demonstrated by FreePages
+  // itself taking a reference to the VmCowPages.
+  freed_list_.FreePages(self_);
   if (page_source_lock_.has_value()) {
     // When dropping the page_source_lock as we could be holding the last references to the object
     // the mutex must be released first, prior to potentially destroying the object by releasing the
@@ -7756,8 +7854,6 @@ VmCowPages::DeferredOps::~DeferredOps() {
     page_source_lock_->second.reset();
     page_source_lock_.reset();
   }
-  // The pages must be freed *after* any range update is performed.
-  freed_list_.FreePages(self_);
 }
 
 void VmCowPages::DeferredOps::AddRange(VmCowPages* self, VmCowRange range, RangeChangeOp op) {

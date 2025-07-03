@@ -113,6 +113,9 @@ TEST_F(TimeProviderTest, GetValuesCorrect) {
 
   ASSERT_TRUE(time_provider_->Get().at(kDeviceRuntimeKey).HasValue());
   EXPECT_EQ(time_provider_->Get().at(kDeviceRuntimeKey).Value(), kRuntimeStr);
+
+  ASSERT_TRUE(time_provider_->Get().at(kDeviceTotalSuspendedTimeKey).HasValue());
+  EXPECT_EQ(time_provider_->Get().at(kDeviceTotalSuspendedTimeKey).Value(), "000d01h00m00s");
 }
 
 }  // namespace

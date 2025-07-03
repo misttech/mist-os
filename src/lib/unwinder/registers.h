@@ -78,6 +78,12 @@ enum class RegisterID : uint8_t {
   // Alias.
   kArm64_lr = kArm64_x30,
 
+  // Aliases for ARM32.
+  kArm32_sp = kArm64_x13,
+  kArm32_lr = kArm64_x14,
+  kArm32_pc = kArm64_x15,
+  kArm32_last = kArm64_x16,
+
   // riscv64. https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-dwarf.adoc
   // The name is chosen to keep consistency with zx_riscv64_thread_state_general_regs_t.
   kRiscv64_zero = 0,
@@ -128,6 +134,7 @@ class Registers {
  public:
   enum class Arch {
     kX64,
+    kArm32,
     kArm64,
     kRiscv64,
   };
@@ -149,6 +156,12 @@ class Registers {
   Error SetSP(uint64_t sp);
   Error GetPC(uint64_t& pc) const;
   Error SetPC(uint64_t pc);
+
+  // These are not formally specified for all architectures, but we define aliases for them.
+  // It's RIP on x64, LR on Arm64, R14 on Arm, and RA on Riscv64. See the note above for why this
+  // doesn't necessarily always make sense for x64.
+  Error GetReturnAddress(uint64_t& ra) const;
+  Error SetReturnAddress(uint64_t ra);
 
   // Return a string describing the value of all registers. Should be useful in debugging.
   std::string Describe() const;

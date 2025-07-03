@@ -1364,10 +1364,7 @@ pub struct Protocol;
 
 pub mod protocol {
     pub mod prelude {
-        pub use crate::{
-            protocol, Protocol, ProtocolClientHandler, ProtocolClientSender, ProtocolServerHandler,
-            ProtocolServerSender,
-        };
+        pub use crate::{protocol, Protocol, ProtocolClientHandler, ProtocolServerHandler};
 
         pub use crate::ProtocolRequestFlexibleResponseStrictRequest;
 
@@ -1401,79 +1398,187 @@ pub mod protocol {
 
         type Response = crate::WireProtocolRequestFlexibleResponseStrictResponse<'static>;
     }
-}
 
-/// A helper trait for the `Protocol` client sender.
-pub trait ProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn request_strict_response_flexible<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestStrictResponseFlexible>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest<'static>,
-        >;
+        pub struct RequestStrictResponseFlexible<T0> {
+            s: T0,
+        }
 
-    fn request_flexible_response_strict<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestFlexibleResponseStrict>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest<'static>,
-        >;
-}
+        impl<T0> ::fidl_next::Encodable for RequestStrictResponseFlexible<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireStrictFoo<'static>>,
+        {
+            type Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest<'static>;
+        }
 
-impl<___T> ProtocolClientSender for ::fidl_next::ClientSender<___T, Protocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for RequestStrictResponseFlexible<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    fn request_strict_response_flexible<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestStrictResponseFlexible>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest<'static>,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(700529454616207123, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+            ___E: ::fidl_next::Encoder,
 
-    fn request_flexible_response_strict<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestFlexibleResponseStrict>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest<'static>,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(5191655763393883319, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireStrictFoo<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        s,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.s, encoder, s)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct RequestFlexibleResponseStrict<T0> {
+            s: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for RequestFlexibleResponseStrict<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireFlexibleFoo<'static>>,
+        {
+            type Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest<'static>;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for RequestFlexibleResponseStrict<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireFlexibleFoo<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        s,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.s, encoder, s)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Protocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ProtocolClientSender<___T>;
+            type ServerSender = ProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `Protocol` protocol.
+        pub struct ProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> ProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn request_strict_response_flexible(
+                &self,
+
+                s: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireStrictFoo<'static>,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::RequestStrictResponseFlexible, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.request_strict_response_flexible_with(RequestStrictResponseFlexible { s })
+            }
+
+            pub fn request_strict_response_flexible_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::RequestStrictResponseFlexible, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest<'static>,
+                >,
+            {
+                self.sender
+                    .send_two_way(700529454616207123, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn request_flexible_response_strict(
+                &self,
+
+                s: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireFlexibleFoo<'static>,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::RequestFlexibleResponseStrict, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.request_flexible_response_strict_with(RequestFlexibleResponseStrict { s })
+            }
+
+            pub fn request_flexible_response_strict_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::RequestFlexibleResponseStrict, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest<'static>,
+                >,
+            {
+                self.sender
+                    .send_two_way(5191655763393883319, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `Protocol` protocol.
+        #[repr(transparent)]
+        pub struct ProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -1482,10 +1587,10 @@ where
 /// See [`Protocol`] for more details.
 pub trait ProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Protocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Protocol
 where
+    ___H: ProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ProtocolClientHandler<___T>,
 
     <protocol::RequestStrictResponseFlexible as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -1493,9 +1598,9 @@ where
     <protocol::RequestFlexibleResponseStrict as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1505,18 +1610,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `Protocol` server sender.
-pub trait ProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ProtocolServerSender for ::fidl_next::ServerSender<___T, Protocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the Protocol protocol.
@@ -1525,27 +1618,27 @@ where
 pub trait ProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn request_strict_response_flexible(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Protocol>,
+        sender: &::fidl_next::ServerSender<Protocol, ___T>,
 
-        request: ::fidl_next::Request<___T, protocol::RequestStrictResponseFlexible>,
+        request: ::fidl_next::Request<protocol::RequestStrictResponseFlexible, ___T>,
 
         responder: ::fidl_next::Responder<protocol::RequestStrictResponseFlexible>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn request_flexible_response_strict(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Protocol>,
+        sender: &::fidl_next::ServerSender<Protocol, ___T>,
 
-        request: ::fidl_next::Request<___T, protocol::RequestFlexibleResponseStrict>,
+        request: ::fidl_next::Request<protocol::RequestFlexibleResponseStrict, ___T>,
 
         responder: ::fidl_next::Responder<protocol::RequestFlexibleResponseStrict>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Protocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Protocol
 where
+    ___H: ProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ProtocolServerHandler<___T>,
 
     <protocol::RequestStrictResponseFlexible as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -1553,9 +1646,9 @@ where
     <protocol::RequestFlexibleResponseStrict as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1566,9 +1659,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -1579,7 +1672,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.request_strict_response_flexible(sender, decoded, responder)
+                        handler.request_strict_response_flexible(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();
@@ -1592,7 +1685,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.request_flexible_response_strict(sender, decoded, responder)
+                        handler.request_flexible_response_strict(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();

@@ -17,10 +17,12 @@ rustc_binary("bin") {
   edition = "2021"
   output_name = "starnix_nanohub_module_test"
   sources = [
+    "src/fake_nanohub_server.rs",
     "src/fake_socket_tunnel.rs",
     "src/main.rs",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.google.nanohub:fuchsia.hardware.google.nanohub_rust",
     "//sdk/fidl/fuchsia.hardware.sockettunnel:fuchsia.hardware.sockettunnel_rust",
     "//sdk/rust/zx",
     "//src/lib/fuchsia",

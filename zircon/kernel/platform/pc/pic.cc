@@ -6,11 +6,12 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "platform/pc/pic.h"
+
 #include <sys/types.h>
 
 #include <arch/ops.h>
 #include <platform/pc.h>
-#include <platform/pic.h>
 
 #define PIC1 0x20
 #define PIC2 0xA0
@@ -43,7 +44,7 @@ void pic_map(uint8_t pic1, uint8_t pic2) {
   outp(PIC2 + 1, 0xff);
 }
 
-void pic_disable(void) {
+void pic_disable() {
   outp(PIC2 + 1, 0xff);
   outp(PIC1 + 1, 0xff);
 }

@@ -20,6 +20,7 @@
 #include <ktl/enforce.h>
 
 ArchPhysInfo* gArchPhysInfo;
+AddressSpace* gAddressSpace;  // address-space.cc is not linked in.
 
 // This transfers all the global state, so all of stdout, gLog, gSymbolize,
 // gBootOptions, and Allocation::GetPool(), are available just like in the main

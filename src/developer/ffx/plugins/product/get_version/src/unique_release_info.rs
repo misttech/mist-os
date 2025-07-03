@@ -25,7 +25,7 @@ pub struct UniqueReleaseInfo {
     pub version: String,
 
     /// Origin where this release artifact was created.
-    pub repository: Option<String>,
+    pub repository: String,
 
     /// System image location.
     pub slot: Vec<Slot>,
@@ -68,7 +68,7 @@ pub fn from_release_info(info: &ReleaseInfo, slot: &Slot) -> UniqueReleaseInfo {
     UniqueReleaseInfo {
         name: info.name.clone(),
         version: info.version.clone(),
-        repository: Some(info.repository.clone()),
+        repository: info.repository.clone(),
         slot: vec![slot.clone()],
     }
 }

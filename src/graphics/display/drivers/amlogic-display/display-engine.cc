@@ -1089,16 +1089,14 @@ zx_status_t DisplayEngine::InitializeHdmiVout() {
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::InitializeMipiDsiVout(display_panel_t panel_info) {
+zx_status_t DisplayEngine::InitializeMipiDsiVout(display::PanelType panel_type) {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
-  fdf::info("Provided Display Info: {} x {} with panel type {}", panel_info.width,
-            panel_info.height, panel_info.panel_type);
+  fdf::info("Provided panel type: {}", static_cast<uint32_t>(panel_type));
   {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
-        Vout::CreateDsiVout(*incoming_, panel_info.panel_type, panel_info.width, panel_info.height,
-                            root_node_.CreateChild("vout"));
+        Vout::CreateDsiVout(*incoming_, panel_type, root_node_.CreateChild("vout"));
     if (!create_dsi_vout_result.is_ok()) {
       fdf::error("Failed to initialize DSI Vout device: {}", create_dsi_vout_result);
       return create_dsi_vout_result.status_value();
@@ -1114,12 +1112,12 @@ zx_status_t DisplayEngine::InitializeMipiDsiVout(display_panel_t panel_info) {
 zx_status_t DisplayEngine::InitializeVout() {
   ZX_ASSERT(vout_ == nullptr);
 
-  zx::result<std::unique_ptr<display_panel_t>> metadata_result =
-      compat::GetMetadata<display_panel_t>(incoming_, DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
-                                           component::kDefaultInstance);
+  zx::result<std::unique_ptr<display::PanelType>> metadata_result =
+      compat::GetMetadata<display::PanelType>(incoming_, DEVICE_METADATA_DISPLAY_PANEL_TYPE,
+                                              component::kDefaultInstance);
   if (metadata_result.is_ok()) {
-    display_panel_t panel_info = *std::move(metadata_result).value();
-    return InitializeMipiDsiVout(panel_info);
+    display::PanelType panel_type = *std::move(metadata_result).value();
+    return InitializeMipiDsiVout(panel_type);
   }
 
   if (metadata_result.status_value() == ZX_ERR_NOT_FOUND) {

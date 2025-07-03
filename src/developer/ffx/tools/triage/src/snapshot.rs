@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use ffx_config::EnvironmentContext;
 use ffx_snapshot::snapshot_impl;
 use ffx_snapshot_args::SnapshotCommand;
 use fidl_fuchsia_feedback::DataProviderProxy;
@@ -19,8 +20,11 @@ pub async fn create_snapshot(
     let cmd = SnapshotCommand {
         dump_annotations: false,
         output_file: Some(directory.to_string_lossy().into()),
+        upload: false,
     };
-    snapshot_impl(data_provider_proxy, cmd).await.context("Unable to take snapshot of target.")?;
+    snapshot_impl(data_provider_proxy, cmd, EnvironmentContext::default())
+        .await
+        .context("Unable to take snapshot of target.")?;
 
     let snapshot_zip_path = directory.join("snapshot.zip");
 

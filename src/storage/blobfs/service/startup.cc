@@ -156,6 +156,7 @@ void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& compl
     }
     // Blobfs supports none of the check options.
     MountOptions options;
+    options.writability = Writability::ReadOnlyDisk;
     zx_status_t status = Fsck(std::move(device.value()), options);
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Consistency check failed for blobfs";

@@ -156,7 +156,9 @@ zx::result<> LaunchGbl(bool stop_in_fastboot) {
          GetPermanentAttributesHash().size());
 
   // Sets `stop-in-fastboot` value.
+  // This can be removed once infra GBL is updated.
   GblFdtStopInFastboot()[0] = stop_in_fastboot ? 1 : 0;
+  g_should_stop_in_fastboot = stop_in_fastboot;
 
   // Installs device tree.
   status =

@@ -99,6 +99,7 @@ impl ExtFilesystem {
         let fs = Self { parser, pager };
         let ops = ExtDirectory { inner: Arc::new(ExtNode::new(&fs, ROOT_INODE_NUM)?) };
         let fs = FileSystem::new(
+            locked,
             current_task.kernel(),
             CacheMode::Cached(CacheConfig::default()),
             fs,
@@ -118,18 +119,28 @@ impl ExtNode {
 }
 
 impl XattrStorage for ExtNode {
-    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
+    fn list_xattrs(&self, _locked: &mut Locked<FileOpsCore>) -> Result<Vec<FsString>, Errno> {
         Ok(self.xattrs.keys().map(|k| k.clone().into()).collect())
     }
 
-    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno> {
+    fn get_xattr(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        name: &FsStr,
+    ) -> Result<FsString, Errno> {
         self.xattrs.get(&**name).map(|a| a.clone().into()).ok_or_else(|| errno!(ENODATA))
     }
 
-    fn set_xattr(&self, _name: &FsStr, _value: &FsStr, _op: XattrOp) -> Result<(), Errno> {
+    fn set_xattr(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _name: &FsStr,
+        _value: &FsStr,
+        _op: XattrOp,
+    ) -> Result<(), Errno> {
         error!(ENOSYS)
     }
-    fn remove_xattr(&self, _name: &FsStr) -> Result<(), Errno> {
+    fn remove_xattr(&self, _locked: &mut Locked<FileOpsCore>, _name: &FsStr) -> Result<(), Errno> {
         error!(ENOSYS)
     }
 }

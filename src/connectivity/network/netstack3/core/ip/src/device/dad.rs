@@ -71,6 +71,19 @@ pub trait DadIpExt: Ip {
         state: &mut Self::TentativeState,
         dad_transmits_remaining: &mut Option<NonZeroU16>,
     ) -> Self::IncomingPacketResultMeta;
+
+    /// Handles an incoming DAD packet while in the assigned or announcing
+    /// state.
+    ///
+    /// `ran_dad`: indicates whether this address is assigned because DAD
+    /// completed successfully, or because DAD was disabled and skipped.
+    ///
+    /// Returns whether the address should be removed as a result of this
+    /// packet.
+    fn handle_incoming_packet_while_assigned<'a>(
+        data: Self::ReceivedPacketData<'a>,
+        ran_dad: bool,
+    ) -> bool;
 }
 
 impl DadIpExt for Ipv4 {
@@ -91,7 +104,7 @@ impl DadIpExt for Ipv4 {
     const DEFAULT_DAD_ENABLED: bool = false;
 
     type SendData = Ipv4DadSendData;
-    type ReceivedPacketData<'a> = ();
+    type ReceivedPacketData<'a> = Ipv4DadAddressInfo;
     type TentativeState = ();
     type AnnouncingState = Ipv4AnnouncingDadState;
     type IncomingPacketResultMeta = ();
@@ -119,13 +132,23 @@ impl DadIpExt for Ipv4 {
     }
 
     fn handle_incoming_packet_while_tentative<'a>(
-        _data: (),
+        _data: Ipv4DadAddressInfo,
         _state: &mut (),
         _dad_transmits_remaining: &mut Option<NonZeroU16>,
     ) -> () {
         // TODO(https://fxbug.dev/416523141): Once we support ratelimiting, this
         // would be an appropriate place to acknowledge that a conflict has
         // occurred.
+    }
+
+    fn handle_incoming_packet_while_assigned<'a>(data: Ipv4DadAddressInfo, ran_dad: bool) -> bool {
+        match IPV4_ADDRESS_DEFENSE_STRATEGY {
+            // Forfeit the address, only if 1) DAD was enabled on the address
+            // and 2) the conflict was for the source address of the ARP packet
+            AddressDefenseStrategy::ForfeitAddress => {
+                ran_dad && data == Ipv4DadAddressInfo::SourceAddr
+            }
+        }
     }
 }
 
@@ -190,6 +213,24 @@ impl DadIpExt for Ipv6 {
         }
         Ipv6PacketResultMetadata { matched_nonce }
     }
+
+    fn handle_incoming_packet_while_assigned<'a>(
+        _data: Option<NdpNonce<&'a [u8]>>,
+        _ran_dad: bool,
+    ) -> bool {
+        // IPv6 doesn't have a notion of ongoing address conflict detection.
+        // Once we've assigned an address, we refuse to forfeit it.
+        false
+    }
+}
+
+/// Additional data about a received IPv4 DAD packet.
+#[derive(Debug, PartialEq)]
+pub enum Ipv4DadAddressInfo {
+    /// The address in question was the source address of the ARP packet.
+    SourceAddr,
+    /// The address in question was the target address of the ARP packet.
+    TargetAddr,
 }
 
 /// The type of IPv4 DAD probe to send.
@@ -352,7 +393,11 @@ pub trait DadContext<I: IpDeviceIpExt, BC: DadBindingsTypes>:
 pub enum DadState<I: DadIpExt, BT: DadBindingsTypes> {
     /// The address is assigned to an interface and can be considered bound to
     /// it (all packets destined to the address will be accepted).
-    Assigned,
+    Assigned {
+        /// Indicates whether the address is assigned because DAD completed
+        /// successfully, or because DAD was disabled and skipped.
+        ran_dad: bool,
+    },
 
     /// Like [`Self::Assigned`], but the DAD engine is announcing to the network
     /// that we are using this address.
@@ -390,7 +435,7 @@ pub enum DadState<I: DadIpExt, BT: DadBindingsTypes> {
 impl<I: DadIpExt, BT: DadBindingsTypes> DadState<I, BT> {
     pub(crate) fn is_assigned(&self) -> bool {
         match self {
-            DadState::Assigned => true,
+            DadState::Assigned { .. } => true,
             // As per RFC 5227 section 2.3:
             //   The host may begin legitimately using the IP address
             //   immediately after sending the first of the two ARP
@@ -493,7 +538,10 @@ pub enum DadIncomingPacketResult<I: DadIpExt> {
     /// Includes IP specific `meta` related to handling this probe.
     Tentative { meta: I::IncomingPacketResultMeta },
     /// The probe's address is assigned to ourself.
-    Assigned,
+    ///
+    /// Includes `should_remove`, dictating whether the assigned address
+    /// should be removed as a result of this probe.
+    Assigned { should_remove: bool },
 }
 
 /// IPv6 specific metadata held by [`DadIncomingPacketResult`].
@@ -605,7 +653,7 @@ fn initialize_duplicate_address_detection<
                 //   2) the interface's `max_dad_transmits` is `None`.
                 // In either case, the address immediately enters `Assigned`.
                 (false, _) | (true, None) => {
-                    *dad_state = DadState::Assigned;
+                    *dad_state = DadState::Assigned { ran_dad: false };
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
                     NeedsDad::No
                 }
@@ -667,8 +715,13 @@ fn do_duplicate_address_detection<
         |DadStateRef { state, retrans_timer_data, max_dad_transmits: _ }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
             match dad_state {
-                DadState::Uninitialized | DadState::Assigned => {
-                    panic!("expected address to be tentative or announcing; addr={addr:?}")
+                DadState::Uninitialized => {
+                    // Note: Starting DAD must have raced with stopping DAD.
+                    // Short circuit DAD execution by returning `None`.
+                    return None;
+                }
+                DadState::Assigned { .. } => {
+                    panic!("cannot do DAD for an already assigned address; addr={addr:?}")
                 }
                 DadState::Tentative {
                     dad_transmits_remaining,
@@ -689,7 +742,9 @@ fn do_duplicate_address_detection<
                     );
                     match state_change {
                         DadStateChangeFromTentative::None => {}
-                        DadStateChangeFromTentative::ToAssigned => *dad_state = DadState::Assigned,
+                        DadStateChangeFromTentative::ToAssigned => {
+                            *dad_state = DadState::Assigned { ran_dad: true }
+                        }
                         DadStateChangeFromTentative::ToAnnouncing { ip_specific_state } => {
                             // Note: Because of Rust semantics, we cannot
                             // convert directly from tentative to announcing.
@@ -729,7 +784,9 @@ fn do_duplicate_address_detection<
                     );
                     match state_change {
                         DadStateChangeFromAnnouncing::None => {}
-                        DadStateChangeFromAnnouncing::ToAssigned => *dad_state = DadState::Assigned,
+                        DadStateChangeFromAnnouncing::ToAssigned => {
+                            *dad_state = DadState::Assigned { ran_dad: true }
+                        }
                     }
                     Some(send_data)
                 }
@@ -960,7 +1017,7 @@ fn stop_duplicate_address_detection<
             let DadAddressStateRef { dad_state, core_ctx } = state;
 
             match dad_state {
-                DadState::Assigned => {}
+                DadState::Assigned { .. } => {}
                 DadState::Announcing { timer, .. } | DadState::Tentative { timer, .. } => {
                     // Generally we should have a timer installed in the
                     // tentative/announcing state, but we could be racing with
@@ -1005,8 +1062,16 @@ fn handle_incoming_packet<
             let DadAddressStateRef { dad_state, core_ctx: _ } = state;
             match dad_state {
                 DadState::Uninitialized => DadIncomingPacketResult::Uninitialized,
-                DadState::Assigned | DadState::Announcing { .. } => {
-                    DadIncomingPacketResult::Assigned
+                DadState::Assigned { ran_dad } => DadIncomingPacketResult::Assigned {
+                    should_remove: I::handle_incoming_packet_while_assigned(data, *ran_dad),
+                },
+                DadState::Announcing { .. } => {
+                    // NB: If we're in the Announcing state, DAD must be enabled
+                    // for the address.
+                    let ran_dad = true;
+                    DadIncomingPacketResult::Assigned {
+                        should_remove: I::handle_incoming_packet_while_assigned(data, ran_dad),
+                    }
                 }
                 DadState::Tentative {
                     dad_transmits_remaining,
@@ -1080,7 +1145,7 @@ impl<BC: DadBindingsContext<Ipv4, Self::DeviceId>, CC: DadContext<Ipv4, BC>> Dad
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
-        data: (),
+        data: Ipv4DadAddressInfo,
     ) -> DadIncomingPacketResult<Ipv4> {
         handle_incoming_packet(self, bindings_ctx, device_id, addr, data)
     }
@@ -1239,9 +1304,61 @@ const IPV4_ANNOUNCE_INTERVAL: NonZeroDuration =
 ///   ANNOUNCE_NUM         2          (number of Announcement packets)
 pub const IPV4_DAD_ANNOUNCE_NUM: NonZeroU16 = NonZeroU16::new(2).unwrap();
 
+/// As per RFC 5227, section 2.4
+///   To resolve the address conflict, a host MUST respond to a
+///   conflicting ARP packet as described in either (a), (b), or
+///  (c) below:
+///
+///   (a) [...] a host MAY elect to immediately cease using the address [...]
+///   (b) [...] a host MAY elect to attempt to defend its address by recording
+///       the time that the conflicting ARP packet was received, and then
+///       broadcasting one single ARP Announcement. [...] Having done this, the
+///       host can then continue to use the address normally without any further
+///       special action.  However, if this is not the first conflicting ARP
+///       packet the host has seen, and the time recorded for the previous
+///       conflicting ARP packet is recent, within DEFEND_INTERVAL seconds, then
+///       the host MUST immediately cease using this address [...].
+///    (c) [...] a host may elect to defend its address indefinitely.  [...] If
+///       the host has not seen any other conflicting ARP packets recently,
+///       within the last DEFEND_INTERVAL seconds, then it MUST record the time
+///       that the conflicting ARP packet was received, and then broadcast one
+///       single ARP Announcement, giving its own IP and hardware addresses.
+///       Having done this, the host can then continue to use the address
+///       normally without any further special action.
+enum AddressDefenseStrategy {
+    /// Corresponds to Option A from RFC 5227, section 2.4.
+    ForfeitAddress,
+}
+
+/// As per RFC 5227, section 2.4:
+///   For most client machines that do not need a fixed IP address, immediately
+///   requesting the configuring agent (human user, DHCP client, etc.) to
+///   configure a new address as soon as the conflict is detected is the best
+///   way to restore useful communication as quickly as possible.
+///
+/// Here, we follow the RFC's guidance for "client machines" and
+/// implement option (a) by removing the address. One may be
+/// concerned about getting bullied by another node on the
+/// network into forfeiting our address, however, the RFC points
+/// out later in section 5 that:
+///
+///   A malicious host may send fraudulent ARP packets on the network,
+///   interfering with the correct operation of other hosts. For example, it is
+///   easy for a host to answer all ARP Requests with Replies giving its own
+///   hardware address, thereby claiming ownership of every address on the
+///   network.  This specification makes this existing ARP vulnerability no
+///   worse, and in some ways makes it better: instead of failing silently with
+///   no indication why, hosts implementing this specification either attempt to
+///   reconfigure automatically, or at least inform the human user of what is
+///   happening.
+// TODO(https://fxbug.dev/418220970): In the future "client machine" may not
+// accurately describe our use case. Allow configuring the address defense
+// strategy.
+const IPV4_ADDRESS_DEFENSE_STRATEGY: AddressDefenseStrategy =
+    AddressDefenseStrategy::ForfeitAddress;
+
 #[cfg(test)]
 mod tests {
-    use alloc::collections::hash_map::{Entry, HashMap};
     use core::ops::RangeBounds;
     use core::time::Duration;
 
@@ -1257,6 +1374,7 @@ mod tests {
         AssignedAddrIpExt, CtxPair, InstantContext as _, Ipv4DeviceAddr, Ipv6DeviceAddr,
         SendFrameContext as _, TimerHandler,
     };
+    use netstack3_hashmap::hash_map::{Entry, HashMap};
     use packet::EmptyBuf;
     use test_case::test_case;
 
@@ -1504,11 +1622,11 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[should_panic(expected = "expected address to be tentative")]
+    #[should_panic(expected = "cannot do DAD for an already assigned address")]
     fn panic_non_tentative_address_handle_timer<I: TestDadIpExt>() {
         let FakeCtx::<I> { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
-                state: DadState::Assigned,
+                state: DadState::Assigned { ran_dad: true },
                 max_dad_transmits: None,
                 address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
             }));
@@ -1539,7 +1657,7 @@ mod tests {
         });
         assert_matches!(start_dad, NeedsDad::No);
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
-        assert_matches!(*state, DadState::Assigned);
+        assert_matches!(*state, DadState::Assigned { ran_dad: false });
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
         check_multicast_groups(I::VERSION, groups);
@@ -1685,7 +1803,7 @@ mod tests {
         match announcements_remaining {
             // If we have no more outstanding announcements, we should have
             // entered `DadState::Assigned`.
-            None => assert_matches!(state, DadState::Assigned),
+            None => assert_matches!(state, DadState::Assigned { ran_dad: true }),
             // Otherwise, we should still be in `DadState::Announcing`.
             Some(announcements_remaining) => {
                 let state = assert_matches!(
@@ -1813,7 +1931,7 @@ mod tests {
 
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         let FakeDadAddressContext { assigned, .. } = &address_ctx.state;
-        assert_matches!(*state, DadState::Assigned);
+        assert_matches!(*state, DadState::Assigned { ran_dad: true });
         assert!(*assigned);
     }
 
@@ -1910,15 +2028,34 @@ mod tests {
         assert!(!*assigned);
     }
 
-    #[test_case(IpAddressState::Unavailable; "uninitialized")]
-    #[test_case(IpAddressState::Tentative; "tentative")]
-    #[test_case(IpAddressState::Assigned; "assigned")]
-    fn handle_incoming_arp_packet(state: IpAddressState) {
+    enum IncomingArpPacketCase {
+        Unavailable,
+        Assigned { ran_dad: bool, receive_data: Ipv4DadAddressInfo },
+        Tentative,
+    }
+
+    #[test_case(IncomingArpPacketCase::Unavailable; "uninitialized")]
+    #[test_case(IncomingArpPacketCase::Tentative; "tentative")]
+    #[test_case(IncomingArpPacketCase::Assigned{
+            ran_dad: true, receive_data: Ipv4DadAddressInfo::SourceAddr
+        }; "assigned_ran_dad_source_addr")]
+    #[test_case(IncomingArpPacketCase::Assigned {
+            ran_dad: true, receive_data: Ipv4DadAddressInfo::TargetAddr
+    }; "assigned_ran_dad_target_addr")]
+    #[test_case(IncomingArpPacketCase::Assigned {
+            ran_dad: false, receive_data: Ipv4DadAddressInfo::SourceAddr
+    }; "assigned_skipped_dad_source_addr")]
+    #[test_case(IncomingArpPacketCase::Assigned {
+            ran_dad: false, receive_data: Ipv4DadAddressInfo::TargetAddr
+    }; "assigned_skipped_dad_target_addr")]
+    fn handle_incoming_arp_packet(case: IncomingArpPacketCase) {
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
-            let dad_state = match state {
-                IpAddressState::Unavailable => DadState::Uninitialized,
-                IpAddressState::Assigned => DadState::Assigned,
-                IpAddressState::Tentative => DadState::Tentative {
+            let dad_state = match &case {
+                IncomingArpPacketCase::Unavailable => DadState::Uninitialized,
+                IncomingArpPacketCase::Assigned { ran_dad, receive_data: _ } => {
+                    DadState::Assigned { ran_dad: *ran_dad }
+                }
+                IncomingArpPacketCase::Tentative => DadState::Tentative {
                     dad_transmits_remaining: NonZeroU16::new(1),
                     timer: bindings_ctx.new_timer(dad_timer_id()),
                     ip_specific_state: Default::default(),
@@ -1933,21 +2070,30 @@ mod tests {
             })
         });
 
-        let want_lookup_result = match state {
-            IpAddressState::Unavailable => DadIncomingPacketResult::Uninitialized,
-            IpAddressState::Tentative => DadIncomingPacketResult::Tentative { meta: () },
-            IpAddressState::Assigned => DadIncomingPacketResult::Assigned,
+        let (want_lookup_result, optional_receive_data) = match case {
+            IncomingArpPacketCase::Unavailable => (DadIncomingPacketResult::Uninitialized, None),
+            IncomingArpPacketCase::Tentative => {
+                (DadIncomingPacketResult::Tentative { meta: () }, None)
+            }
+            IncomingArpPacketCase::Assigned { ran_dad, receive_data } => {
+                let should_remove = match (ran_dad, &receive_data) {
+                    (true, Ipv4DadAddressInfo::SourceAddr) => true,
+                    _ => false,
+                };
+                (DadIncomingPacketResult::Assigned { should_remove }, Some(receive_data))
+            }
         };
 
         let addr = get_address_id::<Ipv4>(Ipv4::DAD_ADDRESS);
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        const ARBITRARY_RECEIVE_DATA: Ipv4DadAddressInfo = Ipv4DadAddressInfo::SourceAddr;
         assert_eq!(
             DadHandler::<Ipv4, _>::handle_incoming_packet(
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
                 &addr,
-                (),
+                optional_receive_data.unwrap_or(ARBITRARY_RECEIVE_DATA),
             ),
             want_lookup_result
         );
@@ -1964,7 +2110,11 @@ mod tests {
         const MAX_DAD_TRANSMITS: u16 = 1;
 
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
-            state: if assigned { DadState::Assigned } else { DadState::Uninitialized },
+            state: if assigned {
+                DadState::Assigned { ran_dad: true }
+            } else {
+                DadState::Uninitialized
+            },
             max_dad_transmits: NonZeroU16::new(MAX_DAD_TRANSMITS),
             address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
         }));
@@ -1973,7 +2123,7 @@ mod tests {
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
         let want_lookup_result = if assigned {
-            DadIncomingPacketResult::Assigned
+            DadIncomingPacketResult::Assigned { should_remove: false }
         } else {
             DadIncomingPacketResult::Uninitialized
         };
@@ -2095,7 +2245,7 @@ mod tests {
             assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()));
         }
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
-        assert_matches!(*state, DadState::Assigned);
+        assert_matches!(*state, DadState::Assigned { ran_dad: true });
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
         assert_eq!(groups, &HashMap::from([(Ipv6::DAD_ADDRESS.to_solicited_node_address(), 1)]));

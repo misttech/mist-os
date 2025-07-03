@@ -9,13 +9,13 @@ use starnix_logging::track_stub;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 
 #[derive(Clone)]
 pub struct LoadavgFile(Weak<Kernel>);
 impl LoadavgFile {
-    pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(Arc::downgrade(kernel)))
+    pub fn new_node(kernel: &Kernel) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(kernel.weak_self.clone()))
     }
 }
 

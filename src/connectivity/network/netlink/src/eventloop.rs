@@ -29,7 +29,10 @@ use crate::multicast_groups::ModernGroup;
 use crate::netlink_packet::errno::Errno;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
-use crate::{interfaces, route_tables, routes, rules, FeatureFlags, NetlinkRouteNotifiedGroup};
+use crate::{
+    interfaces, route_tables, routes, rules, FeatureFlags, NetlinkRouteNotifiedGroup, SysctlError,
+    SysctlInterfaceSelector,
+};
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
@@ -574,6 +577,51 @@ impl<
             }
             async_work = async_work_receiver.select_next_some() => {
                 match async_work {
+                    AsyncWorkItem::SetAcceptRaRtTable { interface, value, responder } => {
+                        let interfaces = interfaces_worker.get_mut();
+                        let result = (|| Ok(match interface {
+                            SysctlInterfaceSelector::Default => {
+                                interfaces.default_accept_ra_rt_table = value;
+                            }
+                            SysctlInterfaceSelector::Id(id) => {
+                                interfaces
+                                    .interface_properties
+                                    .get_mut(&id.into())
+                                    .ok_or(SysctlError::NoInterface)?
+                                    .state
+                                    .accept_ra_rt_table = value;
+                            }
+                            SysctlInterfaceSelector::All => {
+                                // Note: It is intentional that we don't update
+                                // all interfaces to match Linux behavior. In
+                                // fact despite what the document says, setting
+                                // `all` has no effect for most of the sysctls
+                                // on Linux.
+                                interfaces.all_accept_ra_rt_table = value;
+                            }
+                        }))();
+                        responder.send(result)
+                    }
+                    AsyncWorkItem::GetAcceptRaRtTable { interface, responder } => {
+                        let interfaces = interfaces_worker.get_mut();
+                        let result = (|| Ok(match interface {
+                            SysctlInterfaceSelector::Default => {
+                                interfaces.default_accept_ra_rt_table
+                            }
+                            SysctlInterfaceSelector::Id(id) => {
+                                interfaces
+                                    .interface_properties
+                                    .get(&id.into())
+                                    .ok_or(SysctlError::NoInterface)?
+                                    .state
+                                    .accept_ra_rt_table
+                            }
+                            SysctlInterfaceSelector::All => {
+                                interfaces.all_accept_ra_rt_table
+                            }
+                        }))();
+                        responder.send(result)
+                    }
                     AsyncWorkItem::OnJoinMulticastGroup(
                             NetlinkRouteNotifiedGroup::Nduseropt, sender) => {
                         nduseropt_worker.get_mut().increment_clients_count().await;

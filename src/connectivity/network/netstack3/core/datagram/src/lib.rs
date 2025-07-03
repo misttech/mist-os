@@ -16,11 +16,12 @@
     clippy::precedence
 )]
 
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 #[path = "."]
 mod internal {
     pub(super) mod datagram;
+    pub(super) mod settings;
     pub(super) mod sndbuf;
     pub(super) mod spec_context;
     pub(super) mod uninstantiable;
@@ -38,6 +39,7 @@ pub use internal::datagram::{
     SetMulticastMembershipError, SocketInfo, SocketState, StrongRc, WeakRc,
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
+pub use internal::settings::DatagramSettings;
 pub use internal::sndbuf::TxMetadata;
 pub use internal::spec_context::{
     DatagramSpecBoundStateContext, DatagramSpecStateContext,

@@ -143,11 +143,12 @@ std::shared_ptr<RingBufferInspectInstance> RingBufferElement::RecordRingBufferIn
 // DeviceInspectInstance methods
 DeviceInspectInstance::DeviceInspectInstance(inspect::Node device_node, std::string device_name,
                                              fuchsia_audio_device::DeviceType device_type,
-                                             const zx::time& added_at)
+                                             const zx::time& added_at, const std::string& added_by)
     : device_node_(std::move(device_node)), name_(std::move(device_name)) {
   ADR_LOG_METHOD(kTraceInspector);
   std::stringstream device_type_ss;
   added_at_ = device_node_.CreateInt(kAddedAt, added_at.get());
+  added_by_ = device_node_.CreateString(kAddedBy, added_by);
 
   device_type_ss << device_type;
   type_ = device_node_.CreateString(kDeviceType, device_type_ss.str());
@@ -280,7 +281,7 @@ void ProviderInspectInstance::RecordAddedDevice(const std::string& device_name,
   ADR_LOG_METHOD(kTraceInspector);
   auto instance_node = provider_devices_root_node_.CreateChild(device_name);
   auto instance = std::make_shared<DeviceInspectInstance>(std::move(instance_node), device_name,
-                                                          device_type, added_at);
+                                                          device_type, added_at, "Provider");
   provider_devices_.push_back(instance);
 }
 
@@ -338,11 +339,11 @@ void Inspector::RecordDetectionFailureUnsupported() {
 
 std::shared_ptr<DeviceInspectInstance> Inspector::RecordDeviceInitializing(
     const std::string& device_name, fuchsia_audio_device::DeviceType device_type,
-    const zx::time& added_at) {
+    const zx::time& added_at, const std::string& added_by) {
   ADR_LOG_METHOD(kTraceInspector);
   auto instance_node = devices_root_.CreateChild(device_name);
   auto instance = std::make_shared<DeviceInspectInstance>(std::move(instance_node), device_name,
-                                                          device_type, added_at);
+                                                          device_type, added_at, added_by);
   device_instances_.push_back(instance);
   return instance;
 }

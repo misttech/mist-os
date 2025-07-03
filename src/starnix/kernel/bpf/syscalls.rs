@@ -28,13 +28,13 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::{
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
-    bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_9,
-    bpf_cmd, bpf_cmd_BPF_BTF_GET_FD_BY_ID, bpf_cmd_BPF_BTF_GET_NEXT_ID, bpf_cmd_BPF_BTF_LOAD,
-    bpf_cmd_BPF_ENABLE_STATS, bpf_cmd_BPF_ITER_CREATE, bpf_cmd_BPF_LINK_CREATE,
-    bpf_cmd_BPF_LINK_DETACH, bpf_cmd_BPF_LINK_GET_FD_BY_ID, bpf_cmd_BPF_LINK_GET_NEXT_ID,
-    bpf_cmd_BPF_LINK_UPDATE, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_DELETE_BATCH,
-    bpf_cmd_BPF_MAP_DELETE_ELEM, bpf_cmd_BPF_MAP_FREEZE, bpf_cmd_BPF_MAP_GET_FD_BY_ID,
-    bpf_cmd_BPF_MAP_GET_NEXT_ID, bpf_cmd_BPF_MAP_GET_NEXT_KEY,
+    bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_8,
+    bpf_attr__bindgen_ty_9, bpf_cmd, bpf_cmd_BPF_BTF_GET_FD_BY_ID, bpf_cmd_BPF_BTF_GET_NEXT_ID,
+    bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_ENABLE_STATS, bpf_cmd_BPF_ITER_CREATE,
+    bpf_cmd_BPF_LINK_CREATE, bpf_cmd_BPF_LINK_DETACH, bpf_cmd_BPF_LINK_GET_FD_BY_ID,
+    bpf_cmd_BPF_LINK_GET_NEXT_ID, bpf_cmd_BPF_LINK_UPDATE, bpf_cmd_BPF_MAP_CREATE,
+    bpf_cmd_BPF_MAP_DELETE_BATCH, bpf_cmd_BPF_MAP_DELETE_ELEM, bpf_cmd_BPF_MAP_FREEZE,
+    bpf_cmd_BPF_MAP_GET_FD_BY_ID, bpf_cmd_BPF_MAP_GET_NEXT_ID, bpf_cmd_BPF_MAP_GET_NEXT_KEY,
     bpf_cmd_BPF_MAP_LOOKUP_AND_DELETE_BATCH, bpf_cmd_BPF_MAP_LOOKUP_AND_DELETE_ELEM,
     bpf_cmd_BPF_MAP_LOOKUP_BATCH, bpf_cmd_BPF_MAP_LOOKUP_ELEM, bpf_cmd_BPF_MAP_UPDATE_BATCH,
     bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET, bpf_cmd_BPF_OBJ_GET_INFO_BY_FD,
@@ -45,7 +45,6 @@ use starnix_uapi::{
     bpf_map_info, bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH,
     bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
 };
-use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
 
 /// Read the arguments for a BPF command. The ABI works like this: If the arguments struct
@@ -77,6 +76,7 @@ fn read_attr<Attr: FromBytes>(
 }
 
 fn reopen_bpf_fd(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     node: NamespaceNode,
     obj: impl Into<BpfHandle>,
@@ -87,10 +87,11 @@ fn reopen_bpf_fd(
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file =
         FileObject::new(current_task, Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
-    Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
+    Ok(current_task.add_file(locked, file, FdFlags::CLOEXEC)?.into())
 }
 
 fn install_bpf_fd(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     obj: impl Into<BpfHandle>,
 ) -> Result<SyscallResult, Errno> {
@@ -100,12 +101,13 @@ fn install_bpf_fd(
 
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file = Anon::new_private_file(
+        locked,
         current_task,
         Box::new(handle),
         OpenFlags::RDWR | OpenFlags::CLOEXEC,
         name,
     );
-    Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
+    Ok(current_task.add_file(locked, file, FdFlags::CLOEXEC)?.into())
 }
 
 #[derive(Debug, Clone)]
@@ -177,10 +179,12 @@ pub fn sys_bpf(
             }
 
             let map = BpfMap::new(
+                locked,
+                current_task,
                 Map::new(schema, flags).map_err(map_error_to_errno)?,
                 security::bpf_map_alloc(current_task),
             );
-            install_bpf_fd(current_task, map)
+            install_bpf_fd(locked, current_task, map)
         }
 
         bpf_cmd_BPF_MAP_LOOKUP_ELEM => {
@@ -212,6 +216,13 @@ pub fn sys_bpf(
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
 
+            // Get the frozen state and keep the lock to prevent a race.
+            let frozen = map.frozen(locked);
+
+            if *frozen {
+                return error!(EPERM);
+            }
+
             let flags = elem_attr.flags;
             let key =
                 read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
@@ -233,6 +244,13 @@ pub fn sys_bpf(
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
+
+            // Get the frozen state and keep the lock to prevent a race.
+            let frozen = map.frozen(locked);
+
+            if *frozen {
+                return error!(EPERM);
+            }
 
             let key =
                 read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
@@ -293,9 +311,9 @@ pub fn sys_bpf(
                 UserBuffersOutputBuffer::unified_new(current_task, smallvec![])?
             };
             let program = ProgramInfo::try_from(&prog_attr)
-                .and_then(|info| Program::new(current_task, info, &mut log_buffer, code));
+                .and_then(|info| Program::new(locked, current_task, info, &mut log_buffer, code));
             let program_or_stub = match program {
-                Ok(program) => BpfHandle::Program(Arc::new(program)),
+                Ok(program) => BpfHandle::Program(program),
                 Err(e) => {
                     if current_task.kernel().features.bpf_v2 {
                         return Err(e.into());
@@ -308,7 +326,7 @@ pub fn sys_bpf(
             };
             // Ensures the log buffer ends with a 0.
             log_buffer.write(b"\0")?;
-            install_bpf_fd(current_task, program_or_stub)
+            install_bpf_fd(locked, current_task, program_or_stub)
         }
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
@@ -371,7 +389,7 @@ pub fn sys_bpf(
             let object =
                 node.entry.node.downcast_ops::<BpfFsObject>().ok_or_else(|| errno!(EINVAL))?;
             let handle = object.handle.clone();
-            reopen_bpf_fd(current_task, node, handle, open_flags)
+            reopen_bpf_fd(locked, current_task, node, handle, open_flags)
         }
 
         // Obtain information about the eBPF object corresponding to bpf_fd.
@@ -386,7 +404,7 @@ pub fn sys_bpf(
             let mut info = match object {
                 BpfHandle::Map(map) => bpf_map_info {
                     type_: map.schema.map_type,
-                    id: map.id,
+                    id: map.id(),
                     key_size: map.schema.key_size,
                     value_size: map.schema.value_size,
                     max_entries: map.schema.max_entries,
@@ -399,6 +417,7 @@ pub fn sys_bpf(
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
                     bpf_prog_info {
                         type_: prog.info.program_type.into(),
+                        id: prog.id(),
                         // TODO: https://fxbug.dev/397389704 - return actual length.
                         jited_prog_len: 1,
                         ..Default::default()
@@ -442,7 +461,7 @@ pub fn sys_bpf(
             security::check_bpf_access(current_task, cmd, &btf_attr, attr_size)?;
             let data = current_task
                 .read_memory_to_vec(UserAddress::from(btf_attr.btf), btf_attr.btf_size as usize)?;
-            install_bpf_fd(current_task, BpfTypeFormat { data })
+            install_bpf_fd(locked, current_task, BpfTypeFormat { data })
         }
         bpf_cmd_BPF_PROG_DETACH => {
             let attach_attr: BpfAttachAttr = read_attr(current_task, attr_addr, attr_size)?;
@@ -454,20 +473,54 @@ pub fn sys_bpf(
             error!(EINVAL)
         }
         bpf_cmd_BPF_PROG_GET_NEXT_ID => {
-            track_stub!(TODO("https://fxbug.dev/423965951"), "BPF_PROG_GET_NEXT_ID");
-            error!(ENOENT)
+            let mut get_next_attr: bpf_attr__bindgen_ty_8 =
+                read_attr(current_task, attr_addr, attr_size)?;
+            // SAFETY: Reading u32 value from a union is safe.
+            let start_id = unsafe { get_next_attr.__bindgen_anon_1.start_id };
+            get_next_attr.next_id = current_task
+                .kernel()
+                .ebpf_state
+                .get_next_program_id(locked, start_id)
+                .ok_or_else(|| errno!(ENOENT))?;
+            current_task.write_object(UserRef::new(attr_addr), &get_next_attr)?;
+            Ok(SUCCESS)
         }
         bpf_cmd_BPF_MAP_GET_NEXT_ID => {
-            track_stub!(TODO("https://fxbug.dev/423965951"), "BPF_MAP_GET_NEXT_ID");
-            error!(ENOENT)
+            let mut get_next_attr: bpf_attr__bindgen_ty_8 =
+                read_attr(current_task, attr_addr, attr_size)?;
+            // SAFETY: Reading u32 value from a union is safe.
+            let start_id = unsafe { get_next_attr.__bindgen_anon_1.start_id };
+            get_next_attr.next_id = current_task
+                .kernel()
+                .ebpf_state
+                .get_next_map_id(locked, start_id)
+                .ok_or_else(|| errno!(ENOENT))?;
+            current_task.write_object(UserRef::new(attr_addr), &get_next_attr)?;
+            Ok(SUCCESS)
         }
         bpf_cmd_BPF_PROG_GET_FD_BY_ID => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_GET_FD_BY_ID");
-            error!(EINVAL)
+            let get_by_id_attr: bpf_attr__bindgen_ty_8 =
+                read_attr(current_task, attr_addr, attr_size)?;
+            // SAFETY: Reading u32 value from a union is safe.
+            let prog_id = unsafe { get_by_id_attr.__bindgen_anon_1.prog_id };
+            let prog = current_task
+                .kernel()
+                .ebpf_state
+                .get_program_by_id(locked, prog_id)
+                .ok_or_else(|| errno!(ENOENT))?;
+            install_bpf_fd(locked, current_task, prog)
         }
         bpf_cmd_BPF_MAP_GET_FD_BY_ID => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_GET_FD_BY_ID");
-            error!(EINVAL)
+            let get_by_id_attr: bpf_attr__bindgen_ty_8 =
+                read_attr(current_task, attr_addr, attr_size)?;
+            // SAFETY: Reading u32 value from a union is safe.
+            let map_id = unsafe { get_by_id_attr.__bindgen_anon_1.map_id };
+            let map = current_task
+                .kernel()
+                .ebpf_state
+                .get_map_by_id(locked, map_id)
+                .ok_or_else(|| errno!(ENOENT))?;
+            install_bpf_fd(locked, current_task, map)
         }
         bpf_cmd_BPF_RAW_TRACEPOINT_OPEN => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_RAW_TRACEPOINT_OPEN");
@@ -486,8 +539,13 @@ pub fn sys_bpf(
             error!(EINVAL)
         }
         bpf_cmd_BPF_MAP_FREEZE => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_FREEZE");
-            error!(EINVAL)
+            let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
+            log_trace!("BPF_MAP_FREEZE");
+            let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
+            let map = get_bpf_object(current_task, map_fd)?;
+            let map = map.as_map()?;
+            map.freeze(locked)?;
+            Ok(SUCCESS)
         }
         bpf_cmd_BPF_BTF_GET_NEXT_ID => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_BTF_GET_NEXT_ID");

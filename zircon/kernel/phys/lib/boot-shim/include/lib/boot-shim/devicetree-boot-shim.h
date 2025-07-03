@@ -24,6 +24,8 @@
 
 namespace boot_shim {
 
+using uart::MmioRange;
+
 template <typename T, typename Shim>
 concept DevicetreeItem =
     devicetree::Matcher<T> && std::is_base_of_v<ItemBase, T> && requires(T& t, Shim shim) {
@@ -43,23 +45,15 @@ concept DevicetreeItem =
 using DevicetreeBootShimAllocator =
     fit::inline_function<void*(size_t, size_t, fbl::AllocChecker&), 32>;
 
-struct DevicetreeMmioRange {
-  static DevicetreeMmioRange From(const devicetree::RegPropertyElement& reg) {
-    return {.address = reg.address().value_or(0),
-            .size = static_cast<size_t>(reg.size().value_or(0))};
-  }
-
-  constexpr bool empty() const { return size == 0; }
-  constexpr uint64_t end() const { return address + size; }
-
-  uint64_t address = 0;
-  size_t size = 0;
-};
+constexpr MmioRange MmioRangeFrom(const devicetree::RegPropertyElement& reg) {
+  return {.address = reg.address().value_or(0),
+          .size = static_cast<size_t>(reg.size().value_or(0))};
+}
 
 // Provides an observer for MMIO Ranges. Devicetree Items that will provide configuration for
 // kernel drivers, that will be interacted through MMIO must notify through this observer.
 //
-using DevicetreeBootShimMmioObserver = fit::inline_function<void(const DevicetreeMmioRange&)>;
+using DevicetreeBootShimMmioObserver = fit::inline_function<void(const MmioRange&)>;
 
 // A DevicetreeBootShim represents a collection of items, which look into the devicetree itself
 // to gather information to produce ZBI items.
@@ -124,7 +118,7 @@ class DevicetreeBootShim : public BootShim<Items...> {
 
   devicetree::Devicetree dt_;
   DevicetreeBootShimAllocator allocator_ = nullptr;
-  DevicetreeBootShimMmioObserver mmio_observer_ = [](const DevicetreeMmioRange&) {};
+  DevicetreeBootShimMmioObserver mmio_observer_ = [](const MmioRange&) {};
 };
 
 }  // namespace boot_shim

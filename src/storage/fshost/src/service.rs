@@ -5,8 +5,7 @@
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
 use crate::debug_log;
 use crate::device::constants::{
-    self, BLOB_VOLUME_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
-    UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
+    self, BLOB_VOLUME_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
 };
 use crate::device::{BlockDevice, Device, DeviceTag};
 use crate::environment::{
@@ -96,6 +95,10 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
     zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
         .context("get_info failed")?;
 
+    find_data_partition_in(fvm_path).await
+}
+
+async fn find_data_partition_in(fvm_path: String) -> Result<ControllerProxy, Error> {
     let fvm_dir =
         fuchsia_fs::directory::open_in_namespace(&format!("{fvm_path}/fvm"), fio::PERM_READABLE)?;
 
@@ -141,11 +144,6 @@ async fn mount_main_starnix_volume(
     let mut env = environment.lock().await;
     if let Some(multi_vol_fs) = env.get_container() {
         let mounted_vol = if multi_vol_fs.has_volume(&starnix_volume_name).await? {
-            // Ensures that Starnix can remount its storage after an unclean container shutdown.
-            if let Some(_) = multi_vol_fs.volume(&starnix_volume_name) {
-                log::warn!("Unmounting the Starnix volume.");
-                multi_vol_fs.shutdown_volume(&starnix_volume_name).await?;
-            }
             multi_vol_fs
                 .open_volume(
                     &starnix_volume_name,
@@ -178,10 +176,6 @@ async fn create_starnix_volume_impl(
     if let Some(multi_vol_fs) = env.get_container() {
         // If the starnix volume already exists, unmount if mounted and then remove.
         if multi_vol_fs.has_volume(starnix_volume_name).await? {
-            if let Some(_) = multi_vol_fs.volume(starnix_volume_name) {
-                log::warn!("Unmounting the Starnix volume.");
-                multi_vol_fs.shutdown_volume(starnix_volume_name).await?;
-            }
             multi_vol_fs.remove_volume(starnix_volume_name).await?;
         }
         let mounted_vol = multi_vol_fs
@@ -230,23 +224,6 @@ async fn create_starnix_volume(
     };
 
     create_starnix_volume_impl(environment, volume_name, crypt, exposed_dir).await
-}
-
-async fn unmount_starnix_volume(
-    environment: &Arc<Mutex<dyn Environment>>,
-    config: &fshost_config::Config,
-) -> Result<(), Error> {
-    let starnix_volume_name = if !config.starnix_volume_name.is_empty() {
-        &config.starnix_volume_name
-    } else {
-        STARNIX_TEST_VOLUME_NAME
-    };
-    let mut env = environment.lock().await;
-    let fs = env.get_container().ok_or_else(|| {
-        log::error!("Tried to unmount starnix volume without container set");
-        zx::Status::NOT_FOUND
-    })?;
-    fs.shutdown_volume(starnix_volume_name).await
 }
 
 async fn wipe_storage(
@@ -313,7 +290,7 @@ async fn wipe_storage_fxblob(
         }
     };
 
-    let mut serving_fxfs = fxfs.serve_multi_volume().await.context("serving fxfs")?;
+    let serving_fxfs = fxfs.serve_multi_volume().await.context("serving fxfs")?;
     let blob_volume = serving_fxfs
         .create_volume(
             BLOB_VOLUME_LABEL,
@@ -332,7 +309,7 @@ async fn wipe_storage_fxblob(
     environment.lock().await.register_filesystem(environment::Filesystem::ServingMultiVolume(
         None,
         serving_fxfs,
-        String::new(),
+        None,
     ));
     Ok(())
 }
@@ -494,7 +471,7 @@ async fn write_data_file(
     let content_size =
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
-    let (mut filesystem, mut data) = if config.fxfs_blob || config.storage_host {
+    let (filesystem, mut data) = if config.fxfs_blob || config.storage_host {
         // Find the device via our own matcher.
         let registered_devices = environment.lock().await.registered_devices().clone();
         let block_connector = registered_devices
@@ -600,7 +577,7 @@ async fn write_data_file(
 
         (None, filesystem)
     };
-    let data_root = data.root(filesystem.as_mut()).context("Failed to get data root")?;
+    let data_root = data.root().context("Failed to get data root")?;
     let (directory_proxy, file_path) = match filename.rsplit_once("/") {
         Some((directory_path, relative_file_path)) => {
             let directory_proxy = fuchsia_fs::directory::create_directory_recursive(
@@ -627,7 +604,7 @@ async fn write_data_file(
     payload.read(&mut contents, 0).context("reading payload vmo")?;
     write(&file_proxy, &contents).await.context("writing file contents")?;
 
-    data.shutdown(filesystem.as_mut()).await.context("shutting down data")?;
+    data.shutdown().await.context("shutting down data")?;
     if let Some(fs) = filesystem {
         fs.shutdown().await.context("shutting down filesystem")?;
     }
@@ -637,13 +614,12 @@ async fn write_data_file(
 async fn shred_data_volume(
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
-    ramdisk_prefix: Option<String>,
-    launcher: &FilesystemLauncher,
 ) -> Result<(), zx::Status> {
-    if config.data_filesystem_format != "fxfs" {
+    if !(config.data_filesystem_format == "fxfs" || (config.storage_host && !config.no_zxcrypt)) {
         return Err(zx::Status::NOT_SUPPORTED);
     }
-    // If we expect Fxfs to be live, ask `environment` to shred the data volume.
+
+    // If we expect the filesystems to be live, ask `environment` to shred the data volume.
     if (config.data || config.fxfs_blob) && !config.ramdisk_image {
         log::info!("Filesystem is running; shredding online.");
         environment.lock().await.shred_data().await.map_err(|err| {
@@ -651,110 +627,109 @@ async fn shred_data_volume(
             zx::Status::INTERNAL
         })?;
     } else {
-        // Otherwise we need to find the Fxfs partition and shred it.
+        // Otherwise we need to find the system container and shred the encrypted volumes in it.
         log::info!("Filesystem is not running; shredding offline.");
 
-        let filesystem = if config.fxfs_blob {
-            // We find the device via our own matcher.
-            let registered_devices = environment.lock().await.registered_devices().clone();
-            let block_connector = registered_devices
-                .get_block_connector(DeviceTag::SystemContainerOnRecovery)
-                .map_err(|error| {
-                    log::error!(error:?; "shred_data_volume: unable to get block connector");
-                    zx::Status::NOT_FOUND
-                })
-                .on_timeout(FIND_PARTITION_DURATION, || {
-                    log::error!("Failed to find fxfs within timeout");
-                    Err(zx::Status::NOT_FOUND)
-                })
-                .await?;
-
-            // Check to see if the device needs formatting.
-            let format = detect_disk_format(
-                &block_connector
-                    .connect_block()
-                    .map_err(|error| {
-                        log::error!(error:?; "connect_block failed");
-                        zx::Status::INTERNAL
-                    })?
-                    .into_proxy(),
-            )
-            .await;
-            if format != DiskFormat::Fxfs {
-                ServeFilesystemStatus::FormatRequired
-            } else {
-                launcher
-                    .serve_data_from(fs_management::filesystem::Filesystem::from_boxed_config(
-                        block_connector,
-                        Box::new(Fxfs::dynamic_child()),
-                    ))
-                    .await
-                    .map_err(|error| {
-                        log::error!(error:?; "serving fxfs");
-                        zx::Status::INTERNAL
-                    })?
-            }
-        } else {
-            // TODO(https://fxbug.dev/339491886): Support storage-host based systems.
-            let partition_controller = find_data_partition(ramdisk_prefix).await.map_err(|e| {
-                log::error!("shred_data_volume: unable to find partition: {e:?}");
+        let registered_devices = environment.lock().await.registered_devices().clone();
+        // Get the block connector for all filesystem types. This blocks until the matchers find
+        // the system container, so even if we don't use it, we know after this the device exists.
+        let block_connector = registered_devices
+            .get_block_connector(DeviceTag::SystemContainerOnRecovery)
+            .map_err(|error| {
+                log::error!(error:?; "shred_data_volume: unable to get block connector");
                 zx::Status::NOT_FOUND
-            })?;
-            let partition_path = partition_controller
-                .get_topological_path()
-                .await
-                .map_err(|e| {
-                    log::error!("Failed to get topo path (fidl error): {e:?}");
+            })
+            .on_timeout(FIND_PARTITION_DURATION, || {
+                log::error!("Failed to find system container within timeout");
+                Err(zx::Status::NOT_FOUND)
+            })
+            .await?;
+        // Unwrap is fine here, if we got through get_block_connector without an error then the
+        // device with this tag is registered.
+        let device_path =
+            registered_devices.get_topological_path(DeviceTag::SystemContainerOnRecovery).unwrap();
+        let format = detect_disk_format(
+            &block_connector
+                .connect_block()
+                .map_err(|error| {
+                    log::error!(error:?; "connect_block failed");
                     zx::Status::INTERNAL
                 })?
-                .map_err(|e| {
-                    let status = zx::Status::from_raw(e);
-                    log::error!("Failed to get topo path: {}", status.to_string());
-                    status
-                })?;
-            let mut device = Box::new(
-                BlockDevice::from_proxy(partition_controller, &partition_path).await.map_err(
-                    |e| {
-                        log::error!("failed to make new device: {e:?}");
-                        zx::Status::NOT_FOUND
-                    },
-                )?,
-            );
-            launcher.serve_data(device.as_mut(), Fxfs::dynamic_child()).await.map_err(|e| {
-                log::error!("serving fxfs: {e:?}");
-                zx::Status::INTERNAL
-            })?
-        };
+                .into_proxy(),
+        )
+        .await;
 
-        let mut filesystem = match filesystem {
-            // If we already need to format for some reason, we don't need to worry about shredding
-            // the data volume.
-            ServeFilesystemStatus::FormatRequired => return Ok(()),
-            ServeFilesystemStatus::Serving(fs) => fs,
-        };
-        let unencrypted = filesystem.volume(UNENCRYPTED_VOLUME_LABEL).ok_or_else(|| {
-            log::error!("Failed to find unencrypted volume");
-            zx::Status::NOT_FOUND
-        })?;
-        let dir =
-            fuchsia_fs::directory::open_directory(unencrypted.root(), "keys", fio::PERM_WRITABLE)
-                .await
-                .map_err(|e| {
-                    log::error!("Failed to open keys dir: {e:?}");
-                    zx::Status::INTERNAL
-                })?;
-        dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
-            .await
-            .map_err(|e| {
-                log::error!("Failed to remove keybag (fidl error): {e:?}");
+        if config.fxfs_blob {
+            if format != DiskFormat::Fxfs {
+                return Ok(());
+            }
+
+            let mut fxfs = fs_management::filesystem::Filesystem::from_boxed_config(
+                block_connector,
+                Box::new(Fxfs::dynamic_child()),
+            );
+            let serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
+                log::error!(error:?; "Failed to serve fxfs");
                 zx::Status::INTERNAL
-            })?
-            .map_err(|e| {
-                let status = zx::Status::from_raw(e);
-                log::error!("Failed to remove keybag: {}", status.to_string());
-                status
             })?;
-        debug_log("Deleted fxfs-data keybag");
+            let mut fxfs_container = Box::new(FxfsContainer::new(serving_fxfs));
+            fxfs_container.shred_data().await.map_err(|error| {
+                log::error!(error:?; "Failed to shred fxfs keybag");
+                zx::Status::INTERNAL
+            })?;
+            fxfs_container.into_fs().shutdown().await.map_err(|error| {
+                log::error!(error:?; "Failed to unmount fxfs");
+                zx::Status::INTERNAL
+            })?;
+            debug_log("Deleted fxfs-data keybag");
+        } else if config.storage_host && config.data_filesystem_format == "minfs" {
+            if format != DiskFormat::Fvm {
+                return Ok(());
+            }
+
+            let mut fvm = fs_management::filesystem::Filesystem::from_boxed_config(
+                block_connector,
+                Box::new(Fvm::dynamic_child()),
+            );
+            let serving_fvm = fvm.serve_multi_volume().await.map_err(|error| {
+                log::error!(error:?; "Failed to serve fvm");
+                zx::Status::INTERNAL
+            })?;
+            let mut fvm_container = FvmContainer::new(serving_fvm, false);
+            fvm_container.shred_data().await.map_err(|error| {
+                log::error!(error:?; "Failed to call shred data on fvm component");
+                zx::Status::INTERNAL
+            })?;
+            debug_log("Shredded zxcrypt instances in fvm");
+        } else if !config.storage_host && config.data_filesystem_format == "fxfs" {
+            // fvm+fxfs, fxblob is handled above.
+            if format != DiskFormat::Fvm {
+                return Ok(());
+            }
+
+            let controller_proxy = find_data_partition_in(device_path).await.map_err(|error| {
+                log::error!(error:?; "Failed to find data partition");
+                zx::Status::NOT_FOUND
+            })?;
+            let mut fxfs = fs_management::filesystem::Filesystem::from_boxed_config(
+                Box::new(controller_proxy),
+                Box::new(Fxfs::dynamic_child()),
+            );
+            let serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
+                log::error!(error:?; "Failed to serve fxfs");
+                zx::Status::INTERNAL
+            })?;
+            let mut fxfs_container = Box::new(FxfsContainer::new(serving_fxfs));
+            fxfs_container.shred_data().await.map_err(|error| {
+                log::error!(error:?; "Failed to shred fxfs keybag");
+                zx::Status::INTERNAL
+            })?;
+            fxfs_container.into_fs().shutdown().await.map_err(|error| {
+                log::error!(error:?; "Failed to unmount fxfs");
+                zx::Status::INTERNAL
+            })?;
+            debug_log("Deleted fxfs-data keybag");
+        }
     }
     log::info!("Shredded the data volume.  Data will be lost!!");
     Ok(())
@@ -859,19 +834,6 @@ pub fn fshost_volume_provider(
                             log::error!("failed to send Create response. error: {:?}", e);
                         });
                     }
-                    Ok(fshost::StarnixVolumeProviderRequest::Unmount { responder }) => {
-                        log::info!("volume provider unmount called");
-                        let res = match unmount_starnix_volume(&env, &config).await {
-                            Ok(()) => Ok(()),
-                            Err(e) => {
-                                log::error!("volume provider service: unmount failed: {:?}", e);
-                                Err(zx::Status::INTERNAL.into_raw())
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            log::error!("failed to send Unmount response. error: {:?}", e);
-                        });
-                    }
                     Err(e) => {
                         log::error!("volume provider server failed: {:?}", e);
                         return;
@@ -899,33 +861,6 @@ pub fn fshost_admin(
         async move {
             while let Some(request) = stream.next().await {
                 match request {
-                    Ok(fshost::AdminRequest::Mount { responder, .. }) => {
-                        log::info!("admin mount called");
-                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
-                            |e| {
-                                log::error!("failed to send Mount response. error: {:?}", e);
-                            },
-                        );
-                    }
-                    Ok(fshost::AdminRequest::Unmount { responder, .. }) => {
-                        log::info!("admin unmount called");
-                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
-                            |e| {
-                                log::error!("failed to send Unmount response. error: {:?}", e);
-                            },
-                        );
-                    }
-                    Ok(fshost::AdminRequest::GetDevicePath { responder, .. }) => {
-                        log::info!("admin get device path called");
-                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
-                            |e| {
-                                log::error!(
-                                    "failed to send GetDevicePath response. error: {:?}",
-                                    e
-                                );
-                            },
-                        );
-                    }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         log::info!(filename:?; "admin write data file called");
                         let res = match write_data_file(
@@ -984,14 +919,7 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         log::info!("admin shred data volume called");
-                        let res = match shred_data_volume(
-                            &env,
-                            &config,
-                            ramdisk_prefix.clone(),
-                            &launcher,
-                        )
-                        .await
-                        {
+                        let res = match shred_data_volume(&env, &config).await {
                             Ok(()) => Ok(()),
                             Err(e) => {
                                 debug_log(&format!(

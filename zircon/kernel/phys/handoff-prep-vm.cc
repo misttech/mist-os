@@ -5,10 +5,12 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/paging.h>
+#include <lib/memalloc/range.h>
 
 #include <fbl/algorithm.h>
 #include <ktl/string_view.h>
 #include <phys/address-space.h>
+#include <phys/allocation.h>
 #include <phys/elf-image.h>
 
 #include "handoff-prep.h"
@@ -112,7 +114,7 @@ uintptr_t HandoffPrep::VirtualAddressAllocator::AllocatePages(size_t size) {
   __UNREACHABLE;
 }
 
-void* HandoffPrep::CreateMapping(const PhysMapping& mapping) {
+MappedMemoryRange HandoffPrep::CreateMapping(const PhysMapping& mapping) {
   // TODO(https://fxbug.dev/42164859): Debug assert that mapping.vaddr is >= to
   // the base of the high kernel address space.
   AddressSpace::MapSettings settings;
@@ -132,18 +134,41 @@ void* HandoffPrep::CreateMapping(const PhysMapping& mapping) {
   AddressSpace::PanicIfError(
       gAddressSpace->Map(mapping.vaddr, mapping.size, mapping.paddr, settings));
 
-  return reinterpret_cast<void*>(mapping.vaddr);
+  return {{reinterpret_cast<ktl::byte*>(mapping.vaddr), mapping.size}, mapping.paddr};
 }
 
-void* HandoffPrep::PublishSingleMappingVmar(PhysMapping mapping) {
+MappedMemoryRange HandoffPrep::PublishSingleMappingVmar(PhysMapping mapping) {
   PhysVmarPrep prep =
       PrepareVmarAt(ktl::string_view{mapping.name.data()}, mapping.vaddr, mapping.size);
-  void* addr = prep.PublishMapping(ktl::move(mapping));
+  MappedMemoryRange mapped = prep.PublishMapping(ktl::move(mapping));
   ktl::move(prep).Publish();
-  return addr;
+  return mapped;
 }
 
-void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
+MappedMemoryRange HandoffPrep::PublishSingleMappingVmar(ktl::string_view name,
+                                                        PhysMapping::Type type, uintptr_t addr,
+                                                        size_t size,
+                                                        PhysMapping::Permissions perms) {
+  uint64_t aligned_paddr = PageAlignDown(addr);
+  uint64_t aligned_size = PageAlignUp(size + (addr - aligned_paddr));
+
+  // TODO(https://fxbug.dev/379891035): Revisit if kasan_shadow = true is the
+  // right default for the mappings created with this utility.
+  PhysMapping mapping{
+      name,                                                        //
+      type,                                                        //
+      first_class_mapping_allocator_.AllocatePages(aligned_size),  //
+      aligned_size,                                                //
+      aligned_paddr,                                               //
+      perms,                                                       //
+  };
+  ktl::span aligned = PublishSingleMappingVmar(ktl::move(mapping));
+  return {aligned.subspan(addr - aligned_paddr, size), addr};
+}
+
+HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
+  ZirconAbi abi{};
+
   // Physmap.
   {  // Shadowing the entire physmap would be redundantly wasteful.
     PhysMapping mapping("physmap"sv, PhysMapping::Type::kNormal, kArchPhysmapVirtualBase,
@@ -177,19 +202,50 @@ void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
     ktl::move(prep).Publish();
   }
 
+  // Periphmap
+  {
+    memalloc::Pool& pool = Allocation::GetPool();
+
+    auto periph_filter = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
+      return type == memalloc::Type::kPeripheral ? ktl::make_optional(type) : ktl::nullopt;
+    };
+
+    // Count the number of peripheral ranges...
+    size_t count = 0;
+    {
+      auto count_ranges = [&count](const memalloc::Range& range) {
+        ZX_DEBUG_ASSERT(range.type == memalloc::Type::kPeripheral);
+        ++count;
+        return true;
+      };
+      memalloc::NormalizeRanges(pool, count_ranges, periph_filter);
+    }
+
+    // ...so that we can allocate the number of such mappings in the hand-off.
+    fbl::AllocChecker ac;
+    ktl::span periph_ranges = New(handoff_->periph_ranges, ac, count);
+    ZX_ASSERT(ac.check());
+
+    auto map = [this, &periph_ranges](const memalloc::Range& range) {
+      ZX_DEBUG_ASSERT(range.type == memalloc::Type::kPeripheral);
+      periph_ranges.front() = PublishSingleMmioMappingVmar("periphmap"sv, range.addr, range.size);
+      periph_ranges = periph_ranges.last(periph_ranges.size() - 1);
+      return true;
+    };
+    memalloc::NormalizeRanges(pool, map, periph_filter);
+  }
+
   // UART.
   uart.Visit([&]<typename KernelDriver>(const KernelDriver& driver) {
     if constexpr (uart::MmioDriver<typename KernelDriver::uart_type>) {
       uart::MmioRange mmio = driver.mmio_range();
-      uint64_t aligned_paddr = PageAlignDown(mmio.address);
-      uint64_t aligned_size = PageAlignUp(mmio.size + (mmio.address - aligned_paddr));
-      PhysMapping mapping("UART"sv, PhysMapping::Type::kMmio,
-                          first_class_mapping_allocator_.AllocatePages(aligned_size), aligned_size,
-                          aligned_paddr, PhysMapping::Permissions::Rw());
-      void* aligned_vaddr = PublishSingleMappingVmar(ktl::move(mapping));
-      handoff_->uart_mmio.base = reinterpret_cast<volatile void*>(
-          reinterpret_cast<uintptr_t>(aligned_vaddr) + (mmio.address - aligned_paddr));
-      handoff_->uart_mmio.size = mmio.size;
+      handoff_->uart_mmio = PublishSingleMmioMappingVmar("UART"sv, mmio.address, mmio.size);
     }
   });
+
+  // Construct the arch-specific bits at the end (to give the non-arch-specific
+  // placements in the address space a small amount of relative familiarity).
+  ArchConstructKernelAddressSpace();
+
+  return abi;
 }

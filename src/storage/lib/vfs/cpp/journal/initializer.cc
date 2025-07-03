@@ -7,7 +7,11 @@
 #include <lib/cksum.h>
 #include <sys/mman.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <span>
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"

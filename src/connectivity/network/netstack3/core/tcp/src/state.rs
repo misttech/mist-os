@@ -3655,7 +3655,9 @@ mod test {
     use net_types::ip::Ipv4;
     use netstack3_base::sync::ResourceTokenValue;
     use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
-    use netstack3_base::{FragmentedPayload, InstantContext as _, Options, SackBlock};
+    use netstack3_base::{
+        CounterCollection, FragmentedPayload, InstantContext as _, Options, SackBlock,
+    };
     use test_case::{test_case, test_matrix};
 
     use super::*;
@@ -3724,10 +3726,6 @@ mod test {
     struct NullBuffer;
 
     impl Buffer for NullBuffer {
-        fn capacity_range() -> (usize, usize) {
-            (usize::MIN, usize::MAX)
-        }
-
         fn limits(&self) -> BufferLimits {
             BufferLimits { len: 0, capacity: 0 }
         }
@@ -3964,8 +3962,8 @@ mod test {
     impl CounterExpectations {
         #[track_caller]
         fn assert_counters(&self, FakeTcpCounters { stack_wide, per_socket }: &FakeTcpCounters) {
-            assert_eq!(self, &CounterExpectations::from(stack_wide), "stack-wide counter mismatch");
-            assert_eq!(self, &CounterExpectations::from(per_socket), "per-socket counter mismatch");
+            assert_eq!(self, &stack_wide.cast(), "stack-wide counter mismatch");
+            assert_eq!(self, &per_socket.cast(), "per-socket counter mismatch");
         }
     }
 
@@ -6083,10 +6081,6 @@ mod test {
     }
 
     impl<B: Buffer> Buffer for ReservingBuffer<B> {
-        fn capacity_range() -> (usize, usize) {
-            B::capacity_range()
-        }
-
         fn limits(&self) -> BufferLimits {
             self.buffer.limits()
         }

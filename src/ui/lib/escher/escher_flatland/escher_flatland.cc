@@ -198,8 +198,8 @@ zx::eventpair escher::EscherFlatland::ConnectPowerResources() {
 }
 
 void escher::EscherFlatland::ConnectTimerResources() {
-  // Connect to fuchsia.time.alarms.Wake.
-  zx::result wake_client_end = component::Connect<fuchsia_time_alarms::Wake>();
+  // Connect to fuchsia.time.alarms.WakeAlarms.
+  zx::result wake_client_end = component::Connect<fuchsia_time_alarms::WakeAlarms>();
   FX_CHECK(wake_client_end.is_ok());
   wake_alarms_ = fidl::SyncClient(std::move(*wake_client_end));
 }
@@ -233,8 +233,8 @@ void escher::EscherFlatland::RenderLoopWithWakingDelay(RenderFrameFn render_fram
       kSuspendDelayForComposition);
 
   FX_CHECK(wake_lease.is_valid());
-  fidl::Result<fuchsia_time_alarms::Wake::SetAndWait> result = wake_alarms_->SetAndWait(
-      {next_render_time_, fuchsia_time_alarms::SetAndWaitMode::WithKeepAlive(std::move(wake_lease)),
+  fidl::Result<fuchsia_time_alarms::WakeAlarms::SetAndWait> result = wake_alarms_->SetAndWait(
+      {next_render_time_, fuchsia_time_alarms::SetMode::WithKeepAlive(std::move(wake_lease)),
        name_});
   if (result.is_ok()) {
     // We do not need to check `enable_wake_alarms_` before the recursive call

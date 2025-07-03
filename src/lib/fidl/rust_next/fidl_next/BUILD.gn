@@ -21,6 +21,7 @@ rustc_library("fidl_next") {
   # NOTE: this library is still experimental
   visibility = [
     "//:developer_universe_packages",
+    "//examples/*",
     "//sdk/fidl/*",
     "//sdk/lib/driver/*",
     "//src/lib/fidl/rust_next/*",

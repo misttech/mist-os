@@ -5,12 +5,16 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_INSPECT_OPERATION_TRACKER_OPERATION_TRACKER_FUCHSIA_H_
 #define SRC_STORAGE_LIB_VFS_CPP_INSPECT_OPERATION_TRACKER_OPERATION_TRACKER_FUCHSIA_H_
 
-#include <lib/inspect/cpp/inspect.h>
-#include <zircon/system/public/zircon/compiler.h>
+#include <lib/inspect/cpp/vmo/types.h>
+#include <lib/zx/time.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
-#include <memory>
 #include <mutex>
+#include <string_view>
 
 #include "src/storage/lib/vfs/cpp/inspect/operation_tracker/operation_tracker_base.h"
 
@@ -93,8 +97,8 @@ class OperationTrackerFuchsia final : public OperationTracker {
   zx::duration latency_base_unit_;
   inspect::ExponentialUintHistogram latency_histogram_;
   std::mutex error_mutex_;
-  inspect::Node error_node_ __TA_GUARDED(error_mutex_){};
-  std::map<zx_status_t, inspect::UintProperty> error_map_ __TA_GUARDED(error_mutex_){};
+  inspect::Node error_node_ __TA_GUARDED(error_mutex_);
+  std::map<zx_status_t, inspect::UintProperty> error_map_ __TA_GUARDED(error_mutex_);
 };
 
 }  // namespace fs_inspect

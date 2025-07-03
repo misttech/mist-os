@@ -7,26 +7,26 @@
 load("//build/bazel/bazel_idk:defs.bzl", "idk_atom", "idk_cc_source_library", "idk_molecule")
 
 idk_atom(
-    name = "test_atom_idk",
+    name = "test_atom",
     testonly = True,
     category = "partner",
     id = "sdk://pkg/test",
     idk_name = "test_atom",
     meta_dest = "/pkg/test",
     stable = True,
-    type = "prebuilt_library",
+    type = "data",
 )
 
 idk_cc_source_library(
     name = "test-source-set",
     testonly = True,
     srcs = ["some_library.cc"],
-    hdrs = ["different_include_base/lib/some_library/some_library.h"],
+    hdrs = ["test_header.h"],
     api_area = "Unknown",
     api_file_path = "different_file_name.api",
     category = "partner",
     idk_name = "test_source_set",
-    include_base = "different_include_base",
+    include_base = ".",
     stable = True,
     deps = [":test_source_set_dependency"],
 )
@@ -34,9 +34,10 @@ idk_cc_source_library(
 idk_cc_source_library(
     name = "test_source_set_dependency",
     testonly = True,
-    hdrs = ["include/lib/helper_library/helper_library.h"],
+    hdrs = ["test_header.h"],
     category = "partner",
     idk_name = "source_set_dependency",
+    include_base = ".",
     stable = True,
 )
 
@@ -54,6 +55,7 @@ idk_molecule(
     testonly = True,
     deps = [
         ":test_submolecule",
+        "//sdk/lib/magma_common:magma_common_idk",
         "//sdk/lib/memory_barriers:memory_barriers_idk",
     ],
 )

@@ -4,14 +4,32 @@
 
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/fit/function.h>
 #include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <span>
+#include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
+#include <storage/buffer/block_buffer_view.h>
+#include <storage/buffer/vmo_buffer.h>
+#include <storage/buffer/vmoid_registry.h>
+#include <storage/operation/operation.h>
 
-#include "entry_view.h"
+#include "src/storage/lib/vfs/cpp/journal/entry_view.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/header_view.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace fs {
 namespace {
@@ -108,7 +126,7 @@ void AddOperation(uint64_t dev_offset, uint64_t length,
   operation.op.type = storage::OperationType::kWrite;
   operation.op.dev_offset = dev_offset;
   operation.op.length = length;
-  operations->push_back(std::move(operation));
+  operations->push_back(operation);
 }
 
 void CheckWriteOperation(const storage::BufferedOperation& operation, uint64_t vmo_offset,

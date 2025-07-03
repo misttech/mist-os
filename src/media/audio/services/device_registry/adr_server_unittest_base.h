@@ -49,6 +49,8 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   }
 
  protected:
+  static inline const std::string kClassName = "AudioDeviceRegistryServerTestBase";
+
   // Create a FakeCodec that can mock a real device that has been detected, using default settings.
   // From here, the fake Codec can be customized before it is enabled.
   std::shared_ptr<FakeCodec> CreateFakeCodecInput() { return CreateFakeCodec(true); }
@@ -71,8 +73,8 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   void AddDeviceForDetection(std::string_view name, fuchsia_audio_device::DeviceType device_type,
                              fuchsia_audio_device::DriverClient driver_client) {
     ASSERT_TRUE(ClientIsValidForDeviceType(device_type, driver_client));
-    adr_service_->AddDevice(
-        Device::Create(adr_service_, dispatcher(), name, device_type, std::move(driver_client)));
+    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), name, device_type,
+                                           std::move(driver_client), kClassName));
   }
 
   static const std::unordered_map<TopologyId,

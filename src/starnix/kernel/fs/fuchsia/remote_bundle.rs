@@ -17,8 +17,11 @@ use crate::vfs::{
 use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Metadata, Node, NodeInfo};
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{
+    FileOpsCore, LockEqualOrBefore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::{Errno, SourceContext};
@@ -28,7 +31,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, from_status_like_fdio, off_t, statfs};
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
 use zx::{
     HandleBased, {self as zx},
@@ -48,12 +51,16 @@ pub struct RemoteBundle {
 
 impl RemoteBundle {
     /// Returns a new RemoteBundle filesystem that can be found at `path` relative to `base`.
-    pub fn new_fs(
-        kernel: &Arc<Kernel>,
+    pub fn new_fs<L>(
+        locked: &mut Locked<L>,
+        kernel: &Kernel,
         base: &fio::DirectorySynchronousProxy,
         mut options: FileSystemOptions,
         rights: fio::Flags,
-    ) -> Result<FileSystemHandle, Error> {
+    ) -> Result<FileSystemHandle, Error>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let (root, server_end) = fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
         let path =
             std::str::from_utf8(&options.source).map_err(|_| anyhow!("Source path is not utf8"))?;
@@ -88,6 +95,7 @@ impl RemoteBundle {
         }
 
         let fs = FileSystem::new(
+            locked,
             kernel,
             CacheMode::Cached(CacheConfig { capacity: REMOTE_BUNDLE_NODE_LRU_CAPACITY }),
             RemoteBundle { metadata, root, rights },
@@ -179,7 +187,7 @@ impl FsNodeOps for File {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let memory = self.inner.lock().unwrap().get_memory()?;
+        let memory = self.inner.lock().get_memory()?;
         let size = usize::try_from(memory.get_content_size()).unwrap();
         Ok(Box::new(MemoryFile { memory, size }))
     }
@@ -191,7 +199,7 @@ impl FsNodeOps for File {
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let memory = self.inner.lock().unwrap().get_memory()?;
+        let memory = self.inner.lock().get_memory()?;
         let content_size = memory.get_content_size();
         let attrs = zxio_node_attributes_t {
             content_size: content_size,
@@ -533,11 +541,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_read_image() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteBundle::new_fs(
+            locked,
             &kernel,
             &fio::DirectorySynchronousProxy::new(client),
             FileSystemOptions { source: "data/test-image".into(), ..Default::default() },
@@ -549,27 +558,24 @@ mod test {
         let mut context = LookupContext::default().with(SymlinkMode::NoFollow);
 
         let test_dir = root
-            .lookup_child(&mut locked, &current_task, &mut context, "foo".into())
+            .lookup_child(locked, &current_task, &mut context, "foo".into())
             .expect("lookup failed");
 
         let test_file = test_dir
-            .lookup_child(&mut locked, &current_task, &mut context, "file".into())
+            .lookup_child(locked, &current_task, &mut context, "file".into())
             .expect("lookup failed")
-            .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
+            .open(locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
             .expect("open failed");
 
         let mut buffer = VecOutputBuffer::new(64);
-        assert_eq!(
-            test_file.read(&mut locked, &current_task, &mut buffer).expect("read failed"),
-            6
-        );
+        assert_eq!(test_file.read(locked, &current_task, &mut buffer).expect("read failed"), 6);
         let buffer: Vec<u8> = buffer.into();
         assert_eq!(&buffer[..6], b"hello\n");
 
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.a".into(), usize::MAX)
+                .get_xattr(locked, &current_task, &test_dir.mount, "user.a".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "apple"
@@ -577,7 +583,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.b".into(), usize::MAX)
+                .get_xattr(locked, &current_task, &test_dir.mount, "user.b".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "ball"
@@ -585,7 +591,7 @@ mod test {
         assert_eq!(
             test_file
                 .node()
-                .list_xattrs(&mut locked, &current_task, usize::MAX)
+                .list_xattrs(locked, &current_task, usize::MAX)
                 .expect("list_xattr failed")
                 .unwrap()
                 .into_iter()
@@ -601,11 +607,11 @@ mod test {
         }
 
         let test_symlink = test_dir
-            .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
+            .lookup_child(locked, &current_task, &mut context, "symlink".into())
             .expect("lookup failed");
 
         if let SymlinkTarget::Path(target) =
-            test_symlink.readlink(&mut locked, &current_task).expect("readlink failed")
+            test_symlink.readlink(locked, &current_task).expect("readlink failed")
         {
             assert_eq!(&target, "file");
         } else {
@@ -613,7 +619,7 @@ mod test {
         }
 
         let opened_dir = test_dir
-            .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
+            .open(locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
             .expect("open failed");
 
         struct Sink {
@@ -641,7 +647,7 @@ mod test {
         }
 
         let mut sink = Sink { offset: 0, entries: HashMap::new() };
-        opened_dir.readdir(&mut locked, &current_task, &mut sink).expect("readdir failed");
+        opened_dir.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
         assert_eq!(
             sink.entries,

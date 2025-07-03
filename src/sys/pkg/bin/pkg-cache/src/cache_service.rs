@@ -143,6 +143,13 @@ pub(crate) async fn serve(
                     };
                     responder.send(res)?;
                 }
+                PackageCacheRequest::WriteBlobs { needed_blobs, control_handle: _  } => {
+                    let id = serve_id.fetch_add(1, Ordering::SeqCst);
+                    let node = get_node.create_child(id.to_string());
+                    if let Err(e) = write_blobs(needed_blobs.into_stream(), &blobfs, &node).await {
+                        error!("error while writing blobs: {:#}", anyhow!(e));
+                    }
+                }
                 PackageCacheRequest::_UnknownMethod { ordinal, .. } => {
                     warn!("unknown method called, ordinal: {ordinal}")
                 }
@@ -356,6 +363,66 @@ async fn get_impl(
     vfs::directory::serve_on(root_dir, flags, scope, dir);
 
     cobalt_sender.open_success();
+    Ok(())
+}
+
+async fn write_blobs(
+    mut stream: NeededBlobsRequestStream,
+    blobfs: &blobfs::Client,
+    node: &finspect::Node,
+) -> Result<(), ServeNeededBlobsError> {
+    let mut open_blobs = HashSet::new();
+    let open_counter = node.create_uint("open", 0);
+    let written_counter = node.create_uint("written", 0);
+
+    while let Some(request) =
+        stream.try_next().await.map_err(ServeNeededBlobsError::ReceiveRequest)?
+    {
+        match request {
+            NeededBlobsRequest::OpenBlob { blob_id, responder } => {
+                let blob_id = Hash::from(BlobId::from(blob_id));
+                match open_blob(responder, blobfs, blob_id).await {
+                    Ok(OpenBlobSuccess::AlreadyCached) => {
+                        // A prior call to OpenBlob may have added the blob to the set.
+                        open_blobs.remove(&blob_id);
+                        open_counter.set(open_blobs.len() as u64);
+                    }
+                    Ok(OpenBlobSuccess::Needed) => {
+                        open_blobs.insert(blob_id);
+                        open_counter.set(open_blobs.len() as u64);
+                    }
+                    Err(e) => {
+                        warn!("Error while opening individual blob: {} {:#}", blob_id, anyhow!(e))
+                    }
+                }
+            }
+            NeededBlobsRequest::BlobWritten { blob_id, responder } => {
+                let blob_id = Hash::from(BlobId::from(blob_id));
+                if !open_blobs.remove(&blob_id) {
+                    let _: Result<(), _> =
+                        responder.send(Err(fpkg::BlobWrittenError::UnopenedBlob));
+                    return Err(ServeNeededBlobsError::BlobWrittenBeforeOpened(blob_id.into()));
+                }
+                open_counter.set(open_blobs.len() as u64);
+                if !blobfs.has_blob(&blob_id).await {
+                    let _: Result<(), _> = responder.send(Err(fpkg::BlobWrittenError::NotWritten));
+                    return Err(ServeNeededBlobsError::BlobWrittenButMissing(blob_id.into()));
+                }
+                written_counter.add(1);
+                responder.send(Ok(())).map_err(ServeNeededBlobsError::SendResponse)?;
+            }
+            other => {
+                return Err(ServeNeededBlobsError::UnexpectedRequest {
+                    received: other.method_name(),
+                    expected: if open_blobs.is_empty() {
+                        "open_blob"
+                    } else {
+                        "open_blob or blob_written"
+                    },
+                })
+            }
+        }
+    }
     Ok(())
 }
 

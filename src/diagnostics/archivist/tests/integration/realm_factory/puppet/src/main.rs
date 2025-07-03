@@ -205,6 +205,12 @@ async fn handle_inspect_writer(
                     .expect("response succeeds");
                 std::process::exit(0);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fpuppet::InspectWriterRequest::RecordLazyValues { key, responder } => {
+                let (client, requests) = create_request_stream();
+                responder.send(client).expect("response succeeds");
+                record_lazy_values(key, requests, &inspector).await?;
+            }
             fpuppet::InspectWriterRequest::_UnknownMethod { .. } => unreachable!(),
         }
     }
@@ -255,7 +261,7 @@ async fn handle_puppet_request(
         fpuppet::PuppetRequest::RecordLazyValues { key, responder } => {
             let (client, requests) = create_request_stream();
             responder.send(client).expect("response succeeds");
-            record_lazy_values(key, requests).await?;
+            record_lazy_values(key, requests, component::inspector()).await?;
         }
         fpuppet::PuppetRequest::Println { message, responder } => {
             println!("{message}");
@@ -324,6 +330,7 @@ pub struct LogRequest {
 async fn record_lazy_values(
     key: String,
     mut stream: fpuppet::LazyInspectPuppetRequestStream,
+    inspector: &Inspector,
 ) -> Result<(), Error> {
     let mut properties = vec![];
     while let Ok(Some(request)) = stream.try_next().await {
@@ -337,7 +344,7 @@ async fn record_lazy_values(
                 responder.send().expect("response succeeds")
             }
             fpuppet::LazyInspectPuppetRequest::Commit { options, responder } => {
-                component::inspector().root().record_lazy_values(key, move || {
+                inspector.root().record_lazy_values(key, move || {
                     let properties = properties.clone();
                     async move {
                         if options.hang.unwrap_or_default() {
@@ -360,7 +367,13 @@ async fn record_lazy_values(
                 return Ok(()); // drop the connection.
             }
             fpuppet::LazyInspectPuppetRequest::_UnknownMethod { .. } => unreachable!(),
-            _ => unimplemented!(),
+            fpuppet::LazyInspectPuppetRequest::EmitExampleInspectData { .. }
+            | fpuppet::LazyInspectPuppetRequest::SetHealthOk { .. }
+            | fpuppet::LazyInspectPuppetRequest::EscrowAndExit { .. } => {
+                unimplemented!()
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fpuppet::LazyInspectPuppetRequest::RecordLazyValues { .. } => unimplemented!(),
         };
     }
 

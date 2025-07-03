@@ -6,4 +6,5 @@ mod compiled_package;
 mod image_assembly_config_builder;
 mod product_assembly;
 
+pub use image_assembly_config_builder::ValidationMode;
 pub use product_assembly::ProductAssembly;

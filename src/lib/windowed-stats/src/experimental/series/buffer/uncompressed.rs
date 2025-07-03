@@ -54,7 +54,7 @@ impl<T: Clone> UncompressedRingBuffer<T> {
     /// pushing the value individually. Additionally, for |count| larger
     /// than the buffer size, the ring buffer would only create enough
     /// values to fill the buffer as an optimization.
-    pub fn push_multiple(&mut self, value: T, count: NonZeroUsize) {
+    pub fn fill(&mut self, value: T, count: NonZeroUsize) {
         let num_samples_to_push = std::cmp::min(self.min_samples, count.get());
         let total_before_pop = self.buffer.len() + num_samples_to_push;
         if total_before_pop > self.min_samples {
@@ -137,12 +137,12 @@ mod tests {
     }
 
     #[test]
-    fn test_ring_buffer_push_multiple() {
+    fn test_ring_buffer_fill() {
         let mut ring_buffer: UncompressedRingBuffer<f32> =
             UncompressedRingBuffer::<f32>::with_min_samples(3);
         ring_buffer.push(f32::from_bits(1u32));
         ring_buffer.push(f32::from_bits(13u32));
-        ring_buffer.push_multiple(f32::from_bits(37u32), NonZeroUsize::new(2).unwrap());
+        ring_buffer.fill(f32::from_bits(37u32), NonZeroUsize::new(2).unwrap());
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -156,12 +156,12 @@ mod tests {
     }
 
     #[test]
-    fn test_ring_buffer_push_multiple_evicts_all_old_values() {
+    fn test_ring_buffer_fill_evicts_all_old_values() {
         let mut ring_buffer: UncompressedRingBuffer<f32> =
             UncompressedRingBuffer::<f32>::with_min_samples(3);
         ring_buffer.push(f32::from_bits(1u32));
         ring_buffer.push(f32::from_bits(13u32));
-        ring_buffer.push_multiple(f32::from_bits(37u32), NonZeroUsize::new(99999).unwrap());
+        ring_buffer.fill(f32::from_bits(37u32), NonZeroUsize::new(99999).unwrap());
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");

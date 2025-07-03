@@ -104,7 +104,10 @@ class PageQueues {
   // removing the page completely from the queues.
 
   void SetWired(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
-  void SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
+  // |skip_reclaim| controls whether reclaiming the page should be forcibly skipped regardless of
+  // whether anonymous pages are considered reclaimable in general.
+  void SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset,
+                    bool skip_reclaim = false);
   void SetReclaim(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetPagerBackedDirty(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
@@ -114,7 +117,9 @@ class PageQueues {
   // object or offset backlink information. The page must currently be in a valid page queue.
 
   void MoveToWired(vm_page_t* page);
-  void MoveToAnonymous(vm_page_t* page);
+  // |skip_reclaim| controls whether reclaiming the page should be forcibly skipped regardless of
+  // whether anonymous pages are considered reclaimable in general.
+  void MoveToAnonymous(vm_page_t* page, bool skip_reclaim = false);
   void MoveToReclaim(vm_page_t* page);
   void MoveToReclaimDontNeed(vm_page_t* page);
   void MoveToPagerBackedDirty(vm_page_t* page);
@@ -330,6 +335,12 @@ class PageQueues {
   // PageQueues object. A nullptr can be passed in to unregister an Event, otherwise it is an error
   // to attempt to register over the top of an existing event.
   void SetAgingEvent(Event* event);
+
+  // Debug methods to retrieve a reference to any lru and mru threads. These are intended for use
+  // during tests / debugging and hence bypass the lock normally needed to read these members. It is
+  // up to the caller to know if these objects are alive or not.
+  Thread* DebugGetLruThread() TA_NO_THREAD_SAFETY_ANALYSIS { return lru_thread_; }
+  Thread* DebugGetMruThread() TA_NO_THREAD_SAFETY_ANALYSIS { return mru_thread_; }
 
  private:
   // Specifies the indices for both the page_queues_ and the page_queue_counts_

@@ -4,31 +4,34 @@
 
 #include "src/storage/memfs/dnode.h"
 
-#include <stdlib.h>
+#include <dirent.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/memfs/vnode.h"
 
 namespace memfs {
 
 // Create a new dnode and attach it to a vnode
-std::unique_ptr<Dnode> Dnode::Create(std::string_view name, fbl::RefPtr<Vnode> vn) {
-  if ((name.length() > kDnodeNameMax) || (name.length() < 1)) {
-    return nullptr;
+zx::result<std::unique_ptr<Dnode>> Dnode::Create(std::string name, fbl::RefPtr<Vnode> vn) {
+  if ((name.length() > kDnodeNameMax) || name.empty()) {
+    return zx::error(ZX_ERR_BAD_PATH);
   }
 
-  fbl::AllocChecker ac;
-  std::unique_ptr<char[]> namebuffer(new (&ac) char[name.length() + 1]);
-  if (!ac.check()) {
-    return nullptr;
-  }
-  memcpy(namebuffer.get(), name.data(), name.length());
-  namebuffer[name.length()] = '\0';
-  auto dn = std::unique_ptr<Dnode>(
-      new Dnode(std::move(vn), std::move(namebuffer), static_cast<uint32_t>(name.length())));
-  return dn;
+  return zx::ok(std::unique_ptr<Dnode>(new Dnode(std::move(vn), std::move(name))));
 }
 
 std::unique_ptr<Dnode> Dnode::RemoveFromParent() {
@@ -86,16 +89,12 @@ void Dnode::AddChild(Dnode* parent, std::unique_ptr<Dnode> child) {
   parent->vnode_->UpdateModified();
 }
 
-zx_status_t Dnode::Lookup(std::string_view name, Dnode** out) {
-  auto dn = children_.find_if([&name](const Dnode& elem) -> bool { return elem.NameMatch(name); });
+Dnode* Dnode::Lookup(std::string_view name) {
+  auto dn = children_.find_if([&name](const Dnode& elem) -> bool { return elem.name_ == name; });
   if (dn == children_.end()) {
-    return ZX_ERR_NOT_FOUND;
+    return nullptr;
   }
-
-  if (out != nullptr) {
-    *out = &(*dn);
-  }
-  return ZX_OK;
+  return &(*dn);
 }
 
 fbl::RefPtr<Vnode> Dnode::AcquireVnode() const { return vnode_; }
@@ -106,7 +105,8 @@ zx_status_t Dnode::CanUnlink() const {
   if (!children_.is_empty()) {
     // Cannot unlink non-empty directory
     return ZX_ERR_NOT_EMPTY;
-  } else if (vnode_->IsRemote()) {
+  }
+  if (vnode_->IsRemote()) {
     // Cannot unlink mount points
     return ZX_ERR_UNAVAILABLE;
   }
@@ -120,40 +120,22 @@ struct dircookie_t {
 static_assert(sizeof(dircookie_t) <= sizeof(fs::VdirCookie),
               "MemFS dircookie too large to fit in IO state");
 
-// Read the canned "." and ".." entries that should
-// appear at the beginning of a directory.
-zx_status_t Dnode::ReaddirStart(fs::DirentFiller* df, void* cookie) {
+void Dnode::Readdir(fs::DirentFiller& df, void* cookie) const {
   dircookie_t* c = static_cast<dircookie_t*>(cookie);
-  zx_status_t r;
 
   if (c->order == 0) {
-    // TODO(smklein): Return the real ino.
-    uint64_t ino = fuchsia_io::wire::kInoUnknown;
-    if ((r = df->Next(".", VTYPE_TO_DTYPE(V_TYPE_DIR), ino)) != ZX_OK) {
-      return r;
-    }
-    c->order++;
-  }
-  return ZX_OK;
-}
-
-void Dnode::Readdir(fs::DirentFiller* df, void* cookie) const {
-  dircookie_t* c = static_cast<dircookie_t*>(cookie);
-  zx_status_t r = 0;
-
-  if (c->order < 1) {
-    if ((r = Dnode::ReaddirStart(df, cookie)) != ZX_OK) {
+    if (zx_status_t status = df.Next(".", DT_DIR, vnode_->ino()); status != ZX_OK) {
       return;
     }
+    c->order = 1;
   }
 
   for (const auto& dn : children_) {
     if (dn.ordering_token_ < c->order) {
       continue;
     }
-    uint32_t vtype = dn.IsDirectory() ? V_TYPE_DIR : V_TYPE_FILE;
-    if ((r = df->Next(std::string_view(dn.name_.get(), dn.NameLen()), VTYPE_TO_DTYPE(vtype),
-                      dn.AcquireVnode()->ino())) != ZX_OK) {
+    uint8_t dtype = dn.IsDirectory() ? DT_DIR : DT_REG;
+    if (zx_status_t status = df.Next(dn.name_, dtype, dn.AcquireVnode()->ino()); status != ZX_OK) {
       return;
     }
     c->order = dn.ordering_token_ + 1;
@@ -174,28 +156,19 @@ bool Dnode::IsSubdirectory(const Dnode* dn) const {
   return false;
 }
 
-std::unique_ptr<char[]> Dnode::TakeName() { return std::move(name_); }
-
-void Dnode::PutName(std::unique_ptr<char[]> name, size_t len) {
-  flags_ = static_cast<uint32_t>((flags_ & ~kDnodeNameMax) | len);
-  name_ = std::move(name);
+std::string Dnode::TakeName() {
+  std::string name = std::move(name_);
+  name_.clear();
+  return name;
 }
+
+void Dnode::PutName(std::string name) { name_ = std::move(name); }
 
 bool Dnode::IsDirectory() const { return vnode_->IsDirectory(); }
 
-Dnode::Dnode(fbl::RefPtr<Vnode> vn, std::unique_ptr<char[]> name, uint32_t flags)
-    : vnode_(std::move(vn)),
-      parent_(nullptr),
-      ordering_token_(0),
-      flags_(flags),
-      name_(std::move(name)) {}
+Dnode::Dnode(fbl::RefPtr<Vnode> vn, std::string name)
+    : vnode_(std::move(vn)), parent_(nullptr), ordering_token_(0), name_(std::move(name)) {}
 
 Dnode::~Dnode() = default;
-
-size_t Dnode::NameLen() const { return flags_ & kDnodeNameMax; }
-
-bool Dnode::NameMatch(std::string_view name) const {
-  return name == std::string_view(name_.get(), NameLen());
-}
 
 }  // namespace memfs

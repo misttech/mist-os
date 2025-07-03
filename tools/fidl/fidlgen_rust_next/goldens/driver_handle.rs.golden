@@ -5,15 +5,15 @@
 #[derive(Debug)]
 #[repr(C)]
 pub struct ClientEndWrapper {
-    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ClientEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireClientEndWrapper> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -77,10 +77,10 @@ impl ::fidl_next::FromWire<WireClientEndWrapper> for ClientEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireClientEndWrapper, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::FromWire<
-                ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+                ::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -96,7 +96,7 @@ impl ::fidl_next::FromWire<WireClientEndWrapper> for ClientEndWrapper {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireClientEndWrapper {
-    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireClientEndWrapper {
@@ -137,21 +137,36 @@ pub mod driver_protocol {
     pub mod prelude {
         pub use crate::{
             driver_protocol, DriverProtocol, DriverProtocolClientHandler,
-            DriverProtocolClientSender, DriverProtocolServerHandler, DriverProtocolServerSender,
+            DriverProtocolServerHandler,
         };
     }
-}
 
-/// A helper trait for the `DriverProtocol` client sender.
-pub trait DriverProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
 
-impl<___T> DriverProtocolClientSender for ::fidl_next::ClientSender<___T, DriverProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::DriverProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = DriverProtocolClientSender<___T>;
+            type ServerSender = DriverProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `DriverProtocol` protocol.
+        pub struct DriverProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> DriverProtocolClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `DriverProtocol` protocol.
+        #[repr(transparent)]
+        pub struct DriverProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> DriverProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the DriverProtocol protocol.
@@ -159,14 +174,14 @@ where
 /// See [`DriverProtocol`] for more details.
 pub trait DriverProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for DriverProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for DriverProtocol
 where
+    ___H: DriverProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DriverProtocolClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -176,18 +191,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `DriverProtocol` server sender.
-pub trait DriverProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> DriverProtocolServerSender for ::fidl_next::ServerSender<___T, DriverProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the DriverProtocol protocol.
@@ -195,14 +198,14 @@ where
 /// See [`DriverProtocol`] for more details.
 pub trait DriverProtocolServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for DriverProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for DriverProtocol
 where
+    ___H: DriverProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DriverProtocolServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -213,9 +216,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -233,7 +236,7 @@ pub struct T {
     pub zircon_handle: Option<::fidl_next::fuchsia::zx::Handle>,
 
     pub fdf_handle:
-        Option<::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>>,
+        Option<::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::zx::Channel>>,
 }
 
 impl T {
@@ -334,8 +337,8 @@ impl<'de> ::fidl_next::FromWire<WireT<'de>> for T {
             fdf_handle: fdf_handle.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::ClientEnd<
-                        ::fidl_next::fuchsia::WireChannel,
                         crate::DriverProtocol,
+                        ::fidl_next::fuchsia::WireChannel,
                     >>()
                 })
             }),
@@ -357,8 +360,7 @@ impl<'de> Drop for WireT<'de> {
 
         let _ = self.table.get(2)
                 .map(|envelope| unsafe {
-                    envelope.read_unchecked::<::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel,crate::DriverProtocol,
-        >>()
+                    envelope.read_unchecked::<::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>>()
                 });
     }
 }
@@ -402,8 +404,8 @@ where
                     ::fidl_next::WireEnvelope::decode_as::<
                         ___D,
                         ::fidl_next::ClientEnd<
-                            ::fidl_next::fuchsia::WireChannel,
                             crate::DriverProtocol,
+                            ::fidl_next::fuchsia::WireChannel,
                         >,
                     >(slot.as_mut(), decoder)?;
 
@@ -423,7 +425,7 @@ impl<'de> WireT<'de> {
 
     pub fn fdf_handle(
         &self,
-    ) -> Option<&::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>>
+    ) -> Option<&::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>>
     {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
@@ -557,8 +559,7 @@ pub mod handles_in_protocol {
     pub mod prelude {
         pub use crate::{
             handles_in_protocol, HandlesInProtocol, HandlesInProtocolClientHandler,
-            HandlesInProtocolClientSender, HandlesInProtocolServerHandler,
-            HandlesInProtocolServerSender,
+            HandlesInProtocolServerHandler,
         };
 
         pub use crate::HandlesInProtocolSendHandlesRequest;
@@ -575,40 +576,107 @@ pub mod handles_in_protocol {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `HandlesInProtocol` client sender.
-pub trait HandlesInProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn send_handles<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>,
-        >;
-}
+        pub struct SendHandles<T0> {
+            t: T0,
+        }
 
-impl<___T> HandlesInProtocolClientSender for ::fidl_next::ClientSender<___T, HandlesInProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<T0> ::fidl_next::Encodable for SendHandles<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireT<'static>>,
+        {
+            type Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>;
+        }
 
-    fn send_handles<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>,
-        >,
-    {
-        self.as_untyped().send_one_way(8904504160365833729, request)
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for SendHandles<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireT<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        t,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.t, encoder, t)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::HandlesInProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = HandlesInProtocolClientSender<___T>;
+            type ServerSender = HandlesInProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `HandlesInProtocol` protocol.
+        pub struct HandlesInProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> HandlesInProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn send_handles(
+                &self,
+
+                t: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireT<'static>,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.send_handles_with(SendHandles { t })
+            }
+
+            pub fn send_handles_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>,
+                >,
+            {
+                self.sender.send_one_way(8904504160365833729, request)
+            }
+        }
+
+        /// The server sender for the `HandlesInProtocol` protocol.
+        #[repr(transparent)]
+        pub struct HandlesInProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> HandlesInProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -617,14 +685,14 @@ where
 /// See [`HandlesInProtocol`] for more details.
 pub trait HandlesInProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for HandlesInProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for HandlesInProtocol
 where
+    ___H: HandlesInProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: HandlesInProtocolClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -636,47 +704,35 @@ where
     }
 }
 
-/// A helper trait for the `HandlesInProtocol` server sender.
-pub trait HandlesInProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> HandlesInProtocolServerSender for ::fidl_next::ServerSender<___T, HandlesInProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-}
-
 /// A server handler for the HandlesInProtocol protocol.
 ///
 /// See [`HandlesInProtocol`] for more details.
 pub trait HandlesInProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn send_handles(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, HandlesInProtocol>,
+        sender: &::fidl_next::ServerSender<HandlesInProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, handles_in_protocol::SendHandles>,
-    );
+        request: ::fidl_next::Request<handles_in_protocol::SendHandles, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for HandlesInProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for HandlesInProtocol
 where
+    ___H: HandlesInProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: HandlesInProtocolServerHandler<___T>,
 
     <handles_in_protocol::SendHandles as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             8904504160365833729 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.send_handles(sender, decoded),
+                Ok(decoded) => handler.send_handles(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -688,9 +744,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -706,15 +762,15 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ServerEndWrapper {
-    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ServerEnd<crate::DriverProtocol, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ServerEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireServerEndWrapper> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -778,10 +834,10 @@ impl ::fidl_next::FromWire<WireServerEndWrapper> for ServerEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireServerEndWrapper, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::FromWire<
-                ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+                ::fidl_next::ServerEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -797,7 +853,7 @@ impl ::fidl_next::FromWire<WireServerEndWrapper> for ServerEndWrapper {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireServerEndWrapper {
-    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ServerEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireServerEndWrapper {

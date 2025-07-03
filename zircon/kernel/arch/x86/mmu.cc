@@ -923,13 +923,12 @@ zx_status_t X86ArchVmAspace::Destroy() {
   return ZX_OK;
 }
 
-// TODO(https://fxbug.dev/412464435): Implement ArchUnmapOptions::Harvest for x86.
-zx_status_t X86ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge) {
+zx_status_t X86ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions unmap_options) {
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
     return ZX_ERR_INVALID_ARGS;
 
-  zx_status_t result = pt_->UnmapPages(vaddr, count, enlarge);
+  zx_status_t result = pt_->UnmapPages(vaddr, count, unmap_options);
   return result;
 }
 

@@ -1,0 +1,6 @@
+{
+  "fileFiltering": {
+    "respectGitIgnore": true,
+    "enableRecursiveFileSearch": false
+  }
+}

@@ -376,6 +376,7 @@ int FtlnReport(void* vol, ui32 msg, ...) {
       // Get bad block data.
       buf->initial_bad_blocks = ndmInitialBadBlocks(ftl->ndm);
       buf->running_bad_blocks = ndmRunningBadBlocks(ftl->ndm);
+      buf->worn_blocks_detected = FtlnCountBlockBitmap(ftl, ftl->maybe_bad);
 
       // Get TargetFTL-NDM RAM usage.
       ftl->stats.ram_used = sizeof(struct ftln) + ftl->num_map_pgs * sizeof(ui32) + ftl->page_size +
@@ -417,6 +418,7 @@ int FtlnReport(void* vol, ui32 msg, ...) {
       counters->wear_count = ftl->high_wc;
       counters->initial_bad_blocks = ndmInitialBadBlocks(ftl->ndm);
       counters->running_bad_blocks = ndmRunningBadBlocks(ftl->ndm);
+      counters->worn_blocks_detected = FtlnCountBlockBitmap(ftl, ftl->maybe_bad);
       return 0;
     }
 

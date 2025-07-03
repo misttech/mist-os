@@ -990,7 +990,7 @@ zx::result<Superblock> LoadSuperblock(Bcache* bc) {
   status = CheckSuperblock(info, bc->Maxblk());
 #endif
   if (status.is_error()) {
-    FX_LOGS(ERROR) << "Fsck: check_info failure: " << status.error_value();
+    FX_LOGS(ERROR) << "Fsck: check_info failure: " << status.status_value();
     return status.take_error();
   }
   return zx::ok(info);

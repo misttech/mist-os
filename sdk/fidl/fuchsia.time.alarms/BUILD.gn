@@ -6,9 +6,14 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.time.alarms") {
   sources = [
-    "doc.fidl",
-    "wake.fidl",
+    "overview.fidl",
+    "wake_alarms.fidl",
   ]
+
+  sdk_category = "partner"
+  stable = true
+  sdk_area = "UI"
+
   public_deps = [
     "//sdk/fidl/fuchsia.power.system",
     "//zircon/vdso/zx",

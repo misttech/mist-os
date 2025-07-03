@@ -10,7 +10,7 @@ use linux_uapi::DM_UUID_LEN;
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::DeviceMode;
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::CurrentTask;
@@ -20,7 +20,7 @@ use starnix_core::vfs::{
     fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
 };
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, DEVICE_MAPPER_MAJOR, LOOP_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -147,7 +147,7 @@ impl DeviceMapperRegistry {
         minor: u32,
     ) -> Arc<DmDevice>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices
             .lock()
@@ -164,7 +164,7 @@ impl DeviceMapperRegistry {
         current_task: &CurrentTask,
     ) -> Result<Arc<DmDevice>, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut devices = self.devices.lock();
         for minor in 0..u32::MAX {
@@ -190,7 +190,7 @@ impl DeviceMapperRegistry {
         k_device: &Option<Device>,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match devices.entry(minor) {
             Entry::Vacant(_) => error!(ENODEV),
@@ -217,7 +217,7 @@ pub struct DmDevice {
 impl DmDevice {
     fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
@@ -238,7 +238,7 @@ impl DmDevice {
                 DeviceMode::Block,
             ),
             virtual_block_class,
-            move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
+            |device, dir| build_block_device_directory(device, device_weak, dir),
         );
         {
             let mut state = device.state.lock();

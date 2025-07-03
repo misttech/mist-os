@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/sys/component_manager/tests/meta/elf_runner_and_environment_custom_logsink.shard.cml" ],
+    include: [ "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml" ],
     children: [
         {
             name: "routing-tests",
@@ -23,7 +23,8 @@
         },
     ],
     capabilities: [
-        { dictionary: "diagnostics" },
+        { dictionary: "outer_diagnostics" },
+        { dictionary: "inner_diagnostics" },
     ],
     offer: [
         {
@@ -31,22 +32,32 @@
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
-            from: "#archivist",
-            to: "self/diagnostics",
+            from: "parent",
+            to: "self/outer_diagnostics",
         },
         {
-            dictionary: "diagnostics",
-            from: "parent",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "self/inner_diagnostics",
+        },
+        {
+            dictionary: "inner_diagnostics",
+            from: "self",
+            as: "diagnostics",
+            to: [ "#routing-tests" ],
+        },
+        {
+            dictionary: "outer_diagnostics",
+            from: "self",
+            as: "diagnostics",
             to: [
                 "#archivist",
                 "#elf_runner",
                 "#reader",
             ],
-        },
-        {
-            dictionary: "diagnostics",
-            from: "self",
-            to: [ "#routing-tests" ],
         },
         {
             event_stream: "capability_requested",

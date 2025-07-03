@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 
@@ -177,143 +176,45 @@ void Dwc3::HandleEvent(uint32_t event) {
   }
 }
 
-zx::result<> Dwc3::SetIrqThreadSchedulerRole() {
-  const std::string_view kScheduleProfileRole = "fuchsia.devices.usb.drivers.dwc3.interrupt";
-  zx::unowned_thread thread{zx::thread::self()->get()};
-  zx::thread duplicate_thread;
-  zx_status_t status =
-      thread->duplicate(ZX_RIGHT_TRANSFER | ZX_RIGHT_MANAGE_THREAD, &duplicate_thread);
-  if (status != ZX_OK) {
-    FDF_LOG(WARNING, "Failed to duplicate thread: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  auto role_client = incoming()->Connect<fuchsia_scheduler::RoleManager>();
-  if (role_client.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to RoleManager: %s", role_client.status_string());
-    return role_client.take_error();
-  }
-
-  fidl::Arena arena;
-  auto request =
-      fuchsia_scheduler::wire::RoleManagerSetRoleRequest::Builder(arena)
-          .target(fuchsia_scheduler::wire::RoleTarget::WithThread(std::move(duplicate_thread)))
-          .role(fuchsia_scheduler::wire::RoleName{
-              fidl::StringView::FromExternal(kScheduleProfileRole)})
-          .Build();
-
-  fidl::WireResult result = fidl::WireCall(*role_client)->SetRole(request);
-  if (!result.ok()) {
-    FDF_LOG(WARNING, "Failed to apply role to dispatch thread: %s", result.status_string());
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  if (!result->is_ok()) {
-    FDF_LOG(WARNING, "Failed to apply role to dispatch thread: %s",
-            zx_status_get_string(result->error_value()));
-    return result->take_error();
-  }
-  return zx::ok();
-}
-
-int Dwc3::IrqThread() {
-  zx::result result = SetIrqThreadSchedulerRole();
-  if (result.is_error()) {
-    // This should be an error since we won't be able to guarantee we can meet deadlines.
-    // Failure to meet deadlines can result in undefined behavior on the bus.
-    zxlogf(ERROR, "Failed to apply role to IRQ thread: %s", result.status_string());
-  }
-
+void Dwc3::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                     const zx_packet_interrupt_t* interrupt) {
   auto* mmio = get_mmio();
-  const uint32_t* const ring_start = static_cast<const uint32_t*>(event_buffer_->virt());
-  const uint32_t* const ring_end = ring_start + (kEventBufferSize / sizeof(*ring_start));
-  const uint32_t* ring_cur = ring_start;
-  bool shutdown_now = false;
 
-  while (!shutdown_now) {
-    // Perform the callbacks for any requests which are pending completion.
-    while (!pending_completions_.empty()) {
-      std::optional<RequestInfo> info{pending_completions_.pop()};
-      info->uep->server->RequestComplete(info->status, info->actual, std::move(info->req));
+  uint32_t event_bytes;
+  while ((event_bytes = GEVNTCOUNT::Get(0).ReadFrom(mmio).EVNTCOUNT()) > 0) {
+    uint32_t event_count = event_bytes / sizeof(uint32_t);
+    for (uint32_t event : event_fifo_.Read(event_count)) {
+      HandleEvent(event);
     }
 
-    // Wait for a new interrupt.
-    zx_port_packet_t wakeup_pkt;
-    if (zx_status_t status = irq_port_.wait(zx::time::infinite(), &wakeup_pkt); status != ZX_OK) {
-      FDF_LOG(ERROR, "Dwc3::IrqThread: zx_port_wait returned %s", zx_status_get_string(status));
-      shutdown_now = true;
-      continue;
-    }
-
-    // Was this an actual HW interrupt?  If so, process any new events in the
-    // event buffer.
-    if (wakeup_pkt.type == ZX_PKT_TYPE_INTERRUPT) {
-      // Our interrupt should be edge triggered, so go ahead and ack and re-enable
-      // it now so that we don't accidentally miss any new interrupts while
-      // process these.
-      irq_.ack();
-
-      uint32_t event_bytes;
-      while ((event_bytes = GEVNTCOUNT::Get(0).ReadFrom(mmio).EVNTCOUNT()) > 0) {
-        uint32_t event_count = event_bytes / sizeof(uint32_t);
-        // invalidate cache so we can read fresh events
-        const zx_off_t offset = (ring_cur - ring_start) * sizeof(*ring_cur);
-        const size_t todo = std::min<size_t>(ring_end - ring_cur, event_count);
-        CacheFlushInvalidate(event_buffer_.get(), offset, todo * sizeof(*ring_cur));
-        if (event_count > todo) {
-          CacheFlushInvalidate(event_buffer_.get(), 0, (event_count - todo) * sizeof(*ring_cur));
-        }
-
-        for (uint32_t i = 0; i < event_count; i++) {
-          uint32_t event = *ring_cur++;
-          if (ring_cur == ring_end) {
-            ring_cur = ring_start;
-          }
-
-          HandleEvent(event);
-        }
-
-        // acknowledge the events we have processed
-        GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(event_bytes).WriteTo(mmio);
-      }
-    } else if (wakeup_pkt.type == ZX_PKT_TYPE_USER) {
-      const IrqSignal signal = GetIrqSignal(wakeup_pkt);
-      switch (signal) {
-        case IrqSignal::Wakeup:
-          // Nothing to do here, just loop around and process the pending
-          // completion queue.
-          break;
-        case IrqSignal::Exit:
-          FDF_LOG(INFO, "Dwc3::IrqThread: shutting down");
-          shutdown_now = true;
-          break;
-        default:
-          FDF_LOG(ERROR, "Dwc3::IrqThread: got invalid signal value %u",
-                  static_cast<std::underlying_type_t<decltype(signal)>>(signal));
-          shutdown_now = true;
-          break;
-      }
-      // TODO: b/377950112 - Determine whether a Wakeup user packet should lead to shutdown.
-      shutdown_now = true;
-      continue;
-    } else {
-      FDF_LOG(ERROR, "Dwc3::IrqThread: unrecognized packet type %u", wakeup_pkt.type);
-      shutdown_now = true;
-      continue;
-    }
+    event_fifo_.Advance(event_count);
+    // acknowledge the events we have processed
+    GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(event_bytes).WriteTo(mmio);
   }
-  return 0;
+
+  irq_.ack();
 }
 
 void Dwc3::StartEvents() {
+  zx::result result = event_fifo_.Init(bti_);
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to init event fifo %s", result.status_string());
+    return;
+  }
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  // Ack IRQ in case previous ack was hanging
+  irq_.ack();
+
   auto* mmio = get_mmio();
 
   // set event buffer pointer and size
   // keep interrupts masked until we are ready
-  zx_paddr_t paddr = event_buffer_->phys();
+  zx_paddr_t paddr = event_fifo_.GetPhys();
   ZX_DEBUG_ASSERT(paddr != 0);
 
   GEVNTADR::Get(0).FromValue(0).set_EVNTADR(paddr).WriteTo(mmio);
-  GEVNTSIZ::Get(0).FromValue(0).set_EVENTSIZ(kEventBufferSize).set_EVNTINTRPTMASK(0).WriteTo(mmio);
+  GEVNTSIZ::Get(0).FromValue(0).set_EVENTSIZ(kBufferSize).set_EVNTINTRPTMASK(0).WriteTo(mmio);
   GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(0).WriteTo(mmio);
 
   // enable events

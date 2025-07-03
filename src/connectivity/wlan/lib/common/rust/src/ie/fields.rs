@@ -6,14 +6,12 @@ use crate::buffer_reader::BufferReader;
 use crate::mac::ReasonCode;
 use crate::organization::Oui;
 use crate::UnalignedView;
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use ieee80211::MacAddr;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 use wlan_bitfield::bitfield;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
-use {
-    banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-};
 
 macro_rules! pub_const {
     ($name:ident, $val:expr) => {
@@ -221,25 +219,6 @@ pub struct HtCapabilities {
     pub ht_ext_cap: HtExtCapabilities, // u16
     pub txbf_cap: TxBfCapability,      // u32
     pub asel_cap: AselCapability,      // u8
-}
-
-impl From<banjo_ieee80211::HtCapabilities> for HtCapabilities {
-    fn from(cap: banjo_ieee80211::HtCapabilities) -> Self {
-        // Safe to unwrap, since cap.bytes is fixed length.
-        const_assert_eq!(
-            std::mem::size_of::<HtCapabilities>(),
-            banjo_ieee80211::HT_CAP_LEN as usize,
-        );
-        HtCapabilities::read_from_bytes(&cap.bytes[..]).unwrap()
-    }
-}
-
-impl From<HtCapabilities> for banjo_ieee80211::HtCapabilities {
-    fn from(cap: HtCapabilities) -> Self {
-        let mut banjo_cap = Self { bytes: Default::default() };
-        banjo_cap.bytes.copy_from_slice(&cap.as_bytes()[..]);
-        banjo_cap
-    }
 }
 
 impl From<fidl_ieee80211::HtCapabilities> for HtCapabilities {
@@ -1084,25 +1063,6 @@ pub struct VhtCapabilities {
     pub vht_mcs_nss: VhtMcsNssSet,         // u64
 }
 
-impl From<banjo_ieee80211::VhtCapabilities> for VhtCapabilities {
-    fn from(cap: banjo_ieee80211::VhtCapabilities) -> Self {
-        // Safe to unwrap, since cap.bytes is fixed length.
-        const_assert_eq!(
-            std::mem::size_of::<VhtCapabilities>(),
-            banjo_ieee80211::VHT_CAP_LEN as usize,
-        );
-        VhtCapabilities::read_from_bytes(&cap.bytes[..]).unwrap()
-    }
-}
-
-impl From<VhtCapabilities> for banjo_ieee80211::VhtCapabilities {
-    fn from(cap: VhtCapabilities) -> Self {
-        let mut banjo_cap = Self { bytes: Default::default() };
-        banjo_cap.bytes.copy_from_slice(&cap.as_bytes()[..]);
-        banjo_cap
-    }
-}
-
 // IEEE Std 802.11-2016, 9.4.2.158.2
 #[bitfield(
     0..=1   max_mpdu_len as MaxMpduLen(u8),
@@ -1259,9 +1219,9 @@ pub struct VhtOperation {
 
 impl From<VhtOperation> for fidl_ieee80211::VhtOperation {
     fn from(op: VhtOperation) -> Self {
-        let mut banjo_op = Self { bytes: Default::default() };
-        banjo_op.bytes.copy_from_slice(&op.as_bytes()[..]);
-        banjo_op
+        let mut fidl_op = Self { bytes: Default::default() };
+        fidl_op.bytes.copy_from_slice(&op.as_bytes()[..]);
+        fidl_op
     }
 }
 
@@ -1295,7 +1255,7 @@ mod tests {
 
     #[test]
     fn ht_cap_mcs_set_conversion() {
-        let from = banjo_ieee80211::HtCapabilities {
+        let from = fidl_ieee80211::HtCapabilities {
             bytes: [
                 0, 1, // ht_capability_info
                 2, // ampdu_params

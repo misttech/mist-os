@@ -437,7 +437,7 @@ TEST_F(InspectorTest, CreateRingBufferServer) {
   fake_driver->ReserveRingBufferSize(element_id, 8192);
   auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
                                fad::DeviceType::kComposite,
-                               fad::DriverClient::WithComposite(fake_driver->Enable()));
+                               fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName);
   adr_service()->AddDevice(device);
   RunLoopUntilIdle();
   auto registry = CreateTestRegistryServer();
@@ -646,7 +646,7 @@ TEST_F(InspectorTest, ProviderAddedDevice) {
 
   auto first_device = added_devices_node->children().cbegin();
   EXPECT_EQ(first_device->name(), "Test codec");
-  EXPECT_EQ(first_device->node().properties().size(), 4u);
+  EXPECT_EQ(first_device->node().properties().size(), 5u);
   EXPECT_GT(first_device->node().get_property<IntPropertyValue>(std::string(kAddedAt))->value(),
             before_add_codec.get());
   EXPECT_EQ(
@@ -656,7 +656,7 @@ TEST_F(InspectorTest, ProviderAddedDevice) {
 
   auto last_device = added_devices_node->children().crbegin();
   EXPECT_EQ(last_device->name(), "Test composite");
-  EXPECT_EQ(last_device->node().properties().size(), 4u);
+  EXPECT_EQ(last_device->node().properties().size(), 5u);
   EXPECT_EQ(
       last_device->node().get_property<StringPropertyValue>(std::string(kDeviceType))->value(),
       "COMPOSITE");
@@ -675,7 +675,7 @@ TEST_F(InspectorTest, StartStop) {
   fake_driver->ReserveRingBufferSize(element_id, 8192);
   auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
                                fad::DeviceType::kComposite,
-                               fad::DriverClient::WithComposite(fake_driver->Enable()));
+                               fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName);
   adr_service()->AddDevice(device);
   RunLoopUntilIdle();
   auto registry = CreateTestRegistryServer();
@@ -848,7 +848,7 @@ TEST_F(InspectorTest, SetActiveChannels) {
   fake_driver->ReserveRingBufferSize(element_id, 8192);
   auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
                                fad::DeviceType::kComposite,
-                               fad::DriverClient::WithComposite(fake_driver->Enable()));
+                               fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName);
   adr_service()->AddDevice(device);
   RunLoopUntilIdle();
   auto registry = CreateTestRegistryServer();

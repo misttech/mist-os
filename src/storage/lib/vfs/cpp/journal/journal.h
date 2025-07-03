@@ -5,21 +5,23 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_JOURNAL_JOURNAL_H_
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_JOURNAL_H_
 
+#include <lib/fit/function.h>
 #include <lib/fpromise/barrier.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/sequencer.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
-#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include <fbl/vector.h>
 #include <storage/buffer/blocking_ring_buffer.h>
-#include <storage/buffer/ring_buffer.h>
+#include <storage/operation/operation.h>
 #include <storage/operation/unbuffered_operation.h>
 
 #include "src/storage/lib/vfs/cpp/journal/background_executor.h"
-#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/journal_writer.h"
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
@@ -104,7 +106,7 @@ class Journal final : public fpromise::executor {
   // Commits a transaction.
   [[nodiscard]] zx_status_t CommitTransaction(Transaction transaction);
 
-  // Returns a promise which identifies that all previous committed transcations have completed
+  // Returns a promise which identifies that all previous committed transactions have completed
   // (regardless of success).  Additionally, prompt the internal journal writer to update the info
   // block, if it isn't already up-to-date.
   Promise Sync();

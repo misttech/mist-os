@@ -4,7 +4,7 @@
 use crate::file::FatFile;
 use crate::filesystem::{FatFilesystem, FatFilesystemInner};
 use crate::node::{Closer, FatNode, Node, WeakFatNode};
-use crate::refs::{FatfsDirRef, FatfsFileRef};
+use crate::refs::{FatfsDirRef, FatfsFileRef, Guard, GuardMut, Wrapper};
 use crate::types::{Dir, DirEntry, File};
 use crate::util::{
     dos_date_to_unix_time, dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time,
@@ -15,7 +15,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_sync::RwLock;
 use futures::future::BoxFuture;
 use std::borrow::Borrow;
-use std::cell::UnsafeCell;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -128,7 +128,7 @@ impl InsensitiveStringRef for InsensitiveString {
 /// This wraps a directory on the FAT volume.
 pub struct FatDirectory {
     /// The underlying directory.
-    dir: UnsafeCell<FatfsDirRef>,
+    dir: RefCell<FatfsDirRef>,
     /// We synchronise all accesses to directory on filesystem's lock().
     /// We always acquire the filesystem lock before the data lock, if the data lock is also going
     /// to be acquired.
@@ -160,7 +160,7 @@ impl FatDirectory {
         name: String,
     ) -> Arc<Self> {
         Arc::new(FatDirectory {
-            dir: UnsafeCell::new(dir),
+            dir: RefCell::new(dir),
             filesystem,
             data: RwLock::new(FatDirectoryData {
                 parent,
@@ -177,16 +177,29 @@ impl FatDirectory {
     }
 
     /// Borrow the underlying fatfs `Dir` that corresponds to this directory.
-    pub(crate) fn borrow_dir<'a>(&self, fs: &'a FatFilesystemInner) -> Result<&Dir<'a>, Status> {
-        unsafe { self.dir.get().as_ref() }.unwrap().borrow(fs).ok_or(Status::BAD_HANDLE)
+    pub(crate) fn borrow_dir<'a>(
+        &'a self,
+        fs: &'a FatFilesystemInner,
+    ) -> Result<Guard<'a, FatfsDirRef>, Status> {
+        let dir = self.dir.borrow();
+        if dir.get(fs).is_none() {
+            Err(Status::BAD_HANDLE)
+        } else {
+            Ok(Guard::new(fs, dir))
+        }
     }
 
     /// Borrow the underlying fatfs `Dir` that corresponds to this directory.
-    // TODO(https://fxbug.dev/414761492): document or remove this `#[allow]`
-    #[allow(clippy::mut_from_ref)]
-    pub(crate) fn borrow_dir_mut<'a>(&self, fs: &'a FatFilesystemInner) -> Option<&mut Dir<'a>> {
-        // TODO(https://fxbug.dev/414760817): document unsafe usage
-        unsafe { self.dir.get().as_mut() }.unwrap().borrow_mut(fs)
+    pub(crate) fn borrow_dir_mut<'a>(
+        &'a self,
+        fs: &'a FatFilesystemInner,
+    ) -> Option<GuardMut<'a, FatfsDirRef>> {
+        let dir = self.dir.borrow_mut();
+        if dir.get(fs).is_none() {
+            None
+        } else {
+            Some(GuardMut::new(fs, dir))
+        }
     }
 
     /// Gets a child directory entry from the underlying fatfs implementation.
@@ -543,9 +556,12 @@ impl FatDirectory {
             src_node.flush_dir_entry(filesystem)?;
         }
 
+        let mut existing_node = self.cache_get(dst_name);
+        let remove_from_cache = existing_node.is_some();
         let mut dir;
         let mut file;
-        let mut existing_node = self.cache_get(dst_name);
+        let mut borrowed_dir;
+        let mut borrowed_file;
         let existing = match existing_node {
             None => {
                 self.open_ref(filesystem)?;
@@ -568,10 +584,19 @@ impl FatDirectory {
                 closer.add(node.clone());
                 match node {
                     FatNode::Dir(ref mut node_dir) => {
-                        ExistingRef::Dir(node_dir.borrow_dir_mut(filesystem).unwrap())
+                        // Within `rename_internal` we will attempt to borrow the source and
+                        // destination directories. This can't be the destination directory, but we
+                        // must check that the directory here is not the same as the source
+                        // directory.
+                        if Arc::ptr_eq(node_dir, src_dir) {
+                            return Err(Status::INVALID_ARGS);
+                        }
+                        borrowed_dir = node_dir.borrow_dir_mut(filesystem).unwrap();
+                        ExistingRef::Dir(&mut *borrowed_dir)
                     }
                     FatNode::File(ref mut node_file) => {
-                        ExistingRef::File(node_file.borrow_file_mut(filesystem).unwrap())
+                        borrowed_file = node_file.borrow_file_mut(filesystem).unwrap();
+                        ExistingRef::File(&mut *borrowed_file)
                     }
                 }
             }
@@ -593,7 +618,7 @@ impl FatDirectory {
 
         self.rename_internal(&filesystem, src_dir, src_name, dst_name, existing)?;
 
-        if let Some(_) = existing_node {
+        if remove_from_cache {
             self.cache_remove(&filesystem, &dst_name).unwrap().did_delete();
         }
 
@@ -642,10 +667,8 @@ impl Node for FatDirectory {
     /// Flush to disk and invalidate the reference that's contained within this FatDir.
     /// Any operations on the directory will return Status::BAD_HANDLE until it is re-attached.
     fn detach(&self, fs: &FatFilesystemInner) {
-        // Safe because we hold the fs lock.
-        let dir = unsafe { self.dir.get().as_mut() }.unwrap();
         // This causes a flush to disk when the underlying fatfs Dir is dropped.
-        dir.take(fs);
+        self.dir.borrow_mut().take(fs);
     }
 
     /// Re-open the underlying `FatfsDirRef` this directory represents, and attach to the given
@@ -659,10 +682,8 @@ impl Node for FatDirectory {
         let mut data = self.data.write();
         data.name = name.to_owned();
 
-        // Safe because we hold the fs lock.
-        let dir = unsafe { self.dir.get().as_mut().unwrap() };
         // Safe because we have a reference to the FatFilesystem.
-        unsafe { dir.maybe_reopen(fs, Some(&new_parent), name)? };
+        unsafe { self.dir.borrow_mut().maybe_reopen(fs, Some(&new_parent), name)? };
 
         assert!(data.parent.replace(new_parent).is_some());
         Ok(())
@@ -677,13 +698,11 @@ impl Node for FatDirectory {
 
     fn open_ref(&self, fs: &FatFilesystemInner) -> Result<(), Status> {
         let data = self.data.read();
-        let dir_ref = unsafe { self.dir.get().as_mut() }.unwrap();
-
-        unsafe { dir_ref.open(&fs, data.parent.as_ref(), &data.name) }
+        unsafe { self.dir.borrow_mut().open(&fs, data.parent.as_ref(), &data.name) }
     }
 
     fn shut_down(&self, fs: &FatFilesystemInner) -> Result<(), Status> {
-        unsafe { self.dir.get().as_mut() }.unwrap().take(fs);
+        self.dir.borrow_mut().take(fs);
         let mut data = self.data.write();
         for (_, child) in data.children.drain() {
             if let Some(child) = child.upgrade() {
@@ -701,7 +720,7 @@ impl Node for FatDirectory {
     }
 
     fn close_ref(&self, fs: &FatFilesystemInner) {
-        unsafe { self.dir.get().as_mut() }.unwrap().close(fs);
+        self.dir.borrow_mut().close(fs);
     }
 }
 
@@ -722,14 +741,14 @@ impl MutableDirectory for FatDirectory {
                 if must_be_directory {
                     return Err(Status::NOT_DIR);
                 }
-                if let Some(file) = file.borrow_file_mut(&fs_lock) {
-                    parent.unlink_file(file).map_err(fatfs_error_to_status)?;
+                if let Some(mut file) = file.borrow_file_mut(&fs_lock) {
+                    parent.unlink_file(&mut *file).map_err(fatfs_error_to_status)?;
                     done = true;
                 }
             }
             Some(FatNode::Dir(ref mut dir)) => {
-                if let Some(dir) = dir.borrow_dir_mut(&fs_lock) {
-                    parent.unlink_dir(dir).map_err(fatfs_error_to_status)?;
+                if let Some(mut dir) = dir.borrow_dir_mut(&fs_lock) {
+                    parent.unlink_dir(&mut *dir).map_err(fatfs_error_to_status)?;
                     done = true;
                 }
             }
@@ -774,7 +793,7 @@ impl MutableDirectory for FatDirectory {
         }
 
         let fs_lock = self.filesystem.lock();
-        let dir = self.borrow_dir_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
+        let mut dir = self.borrow_dir_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
         if let Some(creation_time) = attributes.creation_time {
             dir.set_created(unix_to_dos_time(creation_time));
         }

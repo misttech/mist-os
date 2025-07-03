@@ -241,6 +241,9 @@ def main():
     modes.add_argument(
         "--boot", "-b", action="store_true", help="Run via bootserver"
     )
+    modes.add_argument(
+        "--fastboot", "-f", action="store_true", help="Run via fastboot boot"
+    )
     parser.add_argument(
         "--args",
         "-a",
@@ -363,6 +366,9 @@ def main():
         assert test.zbi
         bootserver = find_bootserver(build_dir)
         cmd = [bootserver, "--boot", test.zbi] + args.args
+    elif args.fastboot:
+        assert test.zbi
+        cmd = ["fastboot", "boot", test.zbi] + args.args
     elif args.crosvm:
         if not test.qemu_kernel:
             print(
@@ -386,9 +392,12 @@ def main():
             cmd += ["-D", test.efi_disk]
 
     for arg in args.cmdline:
-        cmd += ["-p" if args.crosvm else "-c", arg]
+        cmd += [
+            "-p" if args.crosvm else ("--cmdline" if args.fastboot else "-c"),
+            arg,
+        ]
 
-    if not args.boot and not args.crosvm:
+    if not args.boot and not args.fastboot and not args.crosvm:
         # Prevents QEMU from boot-looping, as most boot tests do not have a
         # means of gracefully shutting down.
         cmd += ["--", "-no-reboot"]

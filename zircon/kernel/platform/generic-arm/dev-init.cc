@@ -46,7 +46,7 @@ void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
   // Initialize psci before the other power drivers, as they may decide to
   // override the psci's power registration.
   if (arch_handoff.psci_driver) {
-    PsciInit(arch_handoff.psci_driver.value());
+    PsciInit(arch_handoff.psci_driver.value(), arch_handoff.psci_cpu_suspend_driver.get());
   }
 
   if (arch_handoff.motmot_power_driver) {

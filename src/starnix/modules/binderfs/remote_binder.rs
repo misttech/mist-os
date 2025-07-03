@@ -678,7 +678,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         server_end: ServerEnd<fbinder::LutexControllerMarker>,
     ) -> Result<(), Error> {
         async fn handle_request(
-            kernel: &Arc<Kernel>,
+            kernel: &Kernel,
             event: fbinder::LutexControllerRequest,
         ) -> Result<(), Error> {
             match event {
@@ -1222,9 +1222,9 @@ mod tests {
                 let starnix_thread = std::thread::Builder::new()
                     .name("user-thread".to_string())
                     .spawn(move || {
-                        let mut locked = unsafe { Unlocked::new() };
+                        let locked = unsafe { Unlocked::new() };
                         let builder = create_task(
-                            &mut locked,
+                            locked,
                             &kernel,
                             CString::new("kthreadd").unwrap(),
                             fs,
@@ -1253,7 +1253,7 @@ mod tests {
                             .fs()
                             .root()
                             .create_node(
-                                &mut locked,
+                                locked,
                                 &current_task,
                                 "dev".into(),
                                 mode!(IFDIR, 0o755),
@@ -1261,12 +1261,12 @@ mod tests {
                             )
                             .expect("mkdir dev");
                         let dev = current_task
-                            .lookup_path_from_root(&mut locked, "/dev".into())
+                            .lookup_path_from_root(locked, "/dev".into())
                             .expect("lookup_path_from_root");
                         dev.mount(
                             WhatToMount::Fs(
                                 BinderFs::new_fs(
-                                    &mut locked,
+                                    locked,
                                     &current_task,
                                     FileSystemOptions::default(),
                                 )
@@ -1284,7 +1284,7 @@ mod tests {
                         let service_name_bytes = service_name_string.as_bytes_with_nul();
                         let base_address = UserAddress::from(RESTRICTED_ASPACE_RANGE.start as u64);
                         let service_name_address = map_memory(
-                            &mut locked,
+                            locked,
                             &current_task,
                             (base_address + *PAGE_SIZE).expect("failed to compute address"),
                             service_name_bytes.len() as u64,
@@ -1294,7 +1294,7 @@ mod tests {
                             .expect("write_memory");
 
                         let start_command_address = map_memory(
-                            &mut locked,
+                            locked,
                             &current_task,
                             (base_address + (*PAGE_SIZE * 2)).expect("failed to compute address"),
                             std::mem::size_of::<u64>() as u64,
@@ -1304,14 +1304,14 @@ mod tests {
                             .expect("write_object");
 
                         let wait_command_address = map_memory(
-                            &mut locked,
+                            locked,
                             &current_task,
                             UserAddress::default(),
                             std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,
                         );
 
                         let start_result = remote_binder_handle.ioctl(
-                            &mut locked,
+                            locked,
                             &current_task,
                             uapi::REMOTE_BINDER_START,
                             start_command_address.into(),
@@ -1321,13 +1321,13 @@ mod tests {
                         }
                         loop {
                             let result = remote_binder_handle.ioctl(
-                                &mut locked,
+                                locked,
                                 &current_task,
                                 uapi::REMOTE_BINDER_WAIT,
                                 wait_command_address.into(),
                             );
                             if must_interrupt(&result).is_none() {
-                                current_task.release(&mut locked);
+                                current_task.release(locked);
                                 break result;
                             }
                         }

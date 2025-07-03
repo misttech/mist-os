@@ -15,14 +15,13 @@ use fidl_fuchsia_ui_test_input::{
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fileops_impl_seekless;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
 };
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::INPUT_MAJOR;
 use starnix_uapi::errors::Errno;
@@ -58,7 +57,6 @@ pub fn register_uinput_device(
         "uinput".into(),
         DeviceMetadata::new("uinput".into(), device_type::DeviceType::UINPUT, DeviceMode::Char),
         misc_class,
-        DeviceDirectory::new,
         device,
     );
 }
@@ -70,7 +68,7 @@ fn add_and_register_input_device<L>(
     device_id: u32,
 ) -> Device
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
@@ -87,7 +85,6 @@ where
             DeviceMode::Char,
         ),
         input_class,
-        DeviceDirectory::new,
         dev_ops,
     )
 }
@@ -215,7 +212,7 @@ impl UinputDeviceFile {
         current_task: &CurrentTask,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // Only eng and userdebug builds include the `fuchsia.ui.test.input` service.
         let registry = match fuchsia_component::client::connect_to_protocol_sync::<
@@ -240,7 +237,7 @@ impl UinputDeviceFile {
         registry: Option<futinput::RegistrySynchronousProxy>,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match registry {
             Some(proxy) => {
@@ -362,7 +359,7 @@ impl UinputDeviceFile {
         current_task: &CurrentTask,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut inner = self.inner.lock();
         match inner.device_id {
@@ -557,15 +554,15 @@ mod test {
 
     fn make_kernel_objects(
         file: Arc<UinputDeviceFile>,
-    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<Unlocked>) {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, &'static mut Locked<Unlocked>) {
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let file_object = FileObject::new(
             &current_task,
             Box::new(file),
             // The input node doesn't really live at the root of the filesystem.
             // But the test doesn't need to be 100% representative of production.
             current_task
-                .lookup_path_from_root(&mut locked, ".".into())
+                .lookup_path_from_root(locked, ".".into())
                 .expect("failed to get namespace node for root"),
             OpenFlags::empty(),
         )
@@ -579,10 +576,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_evbit(bit: u32, expected_evbits: Vec<usize>) -> Result<SyscallResult, Errno> {
         let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<Unlocked>();
+        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_EVBIT,
@@ -597,10 +594,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_evbit_call_multi() {
         let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<Unlocked>();
+        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_EVBIT,
@@ -608,7 +605,7 @@ mod test {
         );
         assert_eq!(r, Ok(SUCCESS));
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_EVBIT,
@@ -622,10 +619,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_keybit() {
         let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<Unlocked>();
+        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_KEYBIT,
@@ -635,7 +632,7 @@ mod test {
 
         // also test call multi times.
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_KEYBIT,
@@ -647,10 +644,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_absbit() {
         let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<Unlocked>();
+        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_ABSBIT,
@@ -660,7 +657,7 @@ mod test {
 
         // also test call multi times.
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_ABSBIT,
@@ -672,10 +669,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_propbit() {
         let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked = locked.cast_locked::<Unlocked>();
+        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_PROPBIT,
@@ -685,7 +682,7 @@ mod test {
 
         // also test call multi times.
         let r = dev.ioctl(
-            &mut locked,
+            locked,
             &file_object,
             &current_task,
             uapi::UI_SET_PROPBIT,

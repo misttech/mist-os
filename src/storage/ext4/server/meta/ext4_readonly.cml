@@ -9,20 +9,25 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.storage.ext4.Server" ],
+            directory: "root",
+            rights: [ "r*" ],
+            path: "/root",
         },
+    ],
+    use: [
         {
-            service: [ "fuchsia.storage.ext4.Service" ],
+            // A directory which must contain a "fuchsia.hardware.block.volume.Volume" service node.
+            directory: "block",
+            from: "parent",
+            rights: [ "r*" ],
+            path: "/block",
         },
     ],
     expose: [
         {
-            protocol: "fuchsia.storage.ext4.Server",
+            directory: "root",
             from: "self",
-        },
-        {
-            service: "fuchsia.storage.ext4.Service",
-            from: "self",
+            rights: [ "r*" ],
         },
     ],
 }

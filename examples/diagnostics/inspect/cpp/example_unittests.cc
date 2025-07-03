@@ -5,13 +5,16 @@
 #include <lib/fidl/cpp/binding.h>
 
 #include "echo_connection.h"
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 // [START test_imports]
+#include <fidl/fidl.examples.routing.echo/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 
 #include <gtest/gtest.h>
+#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
 using namespace inspect::testing;
 // [END test_imports]
@@ -26,23 +29,34 @@ class EchoConnectionTest : public gtest::RealLoopFixture {
             inspector_.GetRoot().CreateUint("bytes_processed", 0),
             inspector_.GetRoot().CreateUint("total_requests", 0),
         })},
-        connection_(stats_),
-        echo_(),
-        binding_(&connection_, echo_.NewRequest().TakeChannel()) {}
+        connection_(stats_) {}
+
+  void SetUp() override {
+    auto [client_end, server_end] =
+        fidl::CreateEndpoints<fidl_examples_routing_echo::Echo>().value();
+
+    fidl::BindServer(dispatcher(), std::move(server_end), &connection_);
+
+    echo_client_.emplace(
+        fidl::Client<fidl_examples_routing_echo::Echo>(std::move(client_end), dispatcher()));
+  }
 
  protected:
   inspect::Inspector inspector_;
   std::shared_ptr<EchoConnectionStats> stats_;
   EchoConnection connection_;
-  fidl::examples::routing::echo::EchoPtr echo_;
-  fidl::Binding<EchoConnection> binding_;
+  std::optional<fidl::Client<fidl_examples_routing_echo::Echo>> echo_client_;
 };
 
 TEST_F(EchoConnectionTest, EchoServerWritesStats) {
+  auto on_response = [&](fidl::Result<fidl_examples_routing_echo::Echo::EchoString>& result) {
+    ASSERT_TRUE(result.is_ok());
+  };
+
   // Invoke the echo server
-  ::fidl::StringPtr message;
-  echo_->EchoString("Hello World!", [&](::fidl::StringPtr retval) { message = retval; });
-  echo_->EchoString("Hello World!", [&](::fidl::StringPtr retval) { message = retval; });
+  echo_client_.value()->EchoString({"Hello World!"}).ThenExactlyOnce(on_response);
+  echo_client_.value()->EchoString({"Hello World!"}).ThenExactlyOnce(on_response);
+
   RunLoopUntilIdle();
 
   // [START inspect_test]

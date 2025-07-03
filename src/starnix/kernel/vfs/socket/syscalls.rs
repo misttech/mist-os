@@ -19,7 +19,7 @@ use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, MultiArc
 use starnix_uapi::user_value::UserValue;
 
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::time::duration_from_timespec;
 use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::auth::CAP_NET_BIND_SERVICE;
@@ -100,7 +100,7 @@ pub fn sys_socket(
     )?;
 
     let fd_flags = socket_flags_to_fd_flags(flags);
-    let fd = current_task.add_file(socket_file, fd_flags)?;
+    let fd = current_task.add_file(locked, socket_file, fd_flags)?;
     Ok(fd)
 }
 
@@ -308,13 +308,13 @@ pub fn sys_accept4(
     flags: u32,
 ) -> Result<FdNumber, Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = Socket::get_from_file(&file)?;
+    let listening_socket = Socket::get_from_file(&file)?;
     let accepted_socket = file.blocking_op(
         locked,
         current_task,
         FdEvents::POLLIN | FdEvents::POLLHUP,
         None,
-        |locked| socket.accept(locked),
+        |locked| listening_socket.accept(locked),
     )?;
 
     if !user_socket_address.is_null() {
@@ -329,13 +329,17 @@ pub fn sys_accept4(
 
     let open_flags = socket_flags_to_open_flags(flags);
     let accepted_socket_file = SocketFile::from_socket(
+        locked,
         current_task,
         accepted_socket,
         open_flags,
         /* kernel_private= */ false,
     )?;
+    let listening_socket = SocketFile::get_from_file(&file)?;
+    let accepted_socket = SocketFile::get_from_file(&accepted_socket_file)?;
+    security::socket_accept(current_task, listening_socket, accepted_socket)?;
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
+    let accepted_fd = current_task.add_file(locked, accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)
 }
 
@@ -480,8 +484,8 @@ pub fn sys_socketpair(
     // TODO: Eventually this will need to allocate two fd numbers (each of which could
     // potentially fail), and only populate the fd numbers (which can't fail) if both allocations
     // succeed.
-    let left_fd = current_task.add_file(left, fd_flags)?;
-    let right_fd = current_task.add_file(right, fd_flags)?;
+    let left_fd = current_task.add_file(locked, left, fd_flags)?;
+    let right_fd = current_task.add_file(locked, right, fd_flags)?;
 
     let fds = [left_fd, right_fd];
     log_trace!("socketpair -> [{:#x}, {:#x}]", fds[0].raw(), fds[1].raw());
@@ -515,7 +519,7 @@ fn recvmsg_internal<L>(
     deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let mut message_header = current_task.read_multi_arch_object(user_message_header)?;
     let result = recvmsg_internal_with_header(
@@ -539,7 +543,7 @@ fn recvmsg_internal_with_header<L>(
     deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
@@ -570,6 +574,7 @@ where
 
         let expected_size = header_size + ancillary_data.total_size(current_task);
         let message_bytes = ancillary_data.into_bytes(
+            locked,
             current_task,
             flags,
             cmsg_buffer_size - cmsg_bytes_written,
@@ -739,7 +744,7 @@ fn sendmsg_internal<L>(
     flags: u32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let message_header = current_task.read_multi_arch_object(user_message_header)?;
     sendmsg_internal_with_header(locked, current_task, file, &message_header, flags)
@@ -753,7 +758,7 @@ fn sendmsg_internal_with_header<L>(
     flags: u32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     if message_header.name_len > i32::MAX as u32 {
         return error!(EINVAL);
@@ -974,7 +979,8 @@ pub fn cmsg_align(current_task: &CurrentTask, value: usize) -> Result<usize, Err
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::vfs::{CurrentTask, FdNumber};
+    use crate::task::CurrentTask;
+    use crate::vfs::FdNumber;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::user_address::UserAddress;
@@ -1042,10 +1048,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_socketpair_invalid_arguments() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         assert_eq!(
             sys_socketpair(
-                &mut locked,
+                locked,
                 &current_task,
                 AF_INET as u32,
                 SOCK_STREAM,
@@ -1056,7 +1062,7 @@ mod tests {
         );
         assert_eq!(
             sys_socketpair(
-                &mut locked,
+                locked,
                 &current_task,
                 AF_UNIX as u32,
                 7,
@@ -1067,7 +1073,7 @@ mod tests {
         );
         assert_eq!(
             sys_socketpair(
-                &mut locked,
+                locked,
                 &current_task,
                 AF_UNIX as u32,
                 SOCK_STREAM,

@@ -8,13 +8,13 @@
 
 use core::hash::Hash;
 
-use fakealloc::collections::HashSet;
 use net_types::ip::{Ipv6Addr, Subnet};
 use net_types::LinkLocalUnicastAddr;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, InstantBindingsTypes,
     LocalTimerHeap, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
+use netstack3_hashmap::HashSet;
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 
 /// Route discovery state on a device.

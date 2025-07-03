@@ -1152,6 +1152,11 @@ class MultiVmoTestInstance : public TestInstance {
         });
 
       } else {
+        // Discardable VMOs are not very common, so skew away from them.
+        if (uniform_rand(10, rng) == 0) {
+          options |= ZX_VMO_DISCARDABLE;
+        }
+        // TODO: Also mix in some UNBOUNDED VMOs.
         zx_status_t result = zx::vmo::create(vmo_size, options, &vmo);
         ZX_ASSERT(result == ZX_OK);
       }
@@ -1628,13 +1633,14 @@ class MultiVmoTestInstance : public TestInstance {
           Printf("V");
           if (reliable_mappings) {
             if (!mapping.has_value() || uniform_rand(2, rng) == 0) {
+              // TODO: Also test FAULT_BEYOND_STREAM_SIZE mappings.
               uint32_t options = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
               if (uniform_rand(2, rng) == 0) {
                 options |= ZX_VM_MAP_RANGE;
               }
               zx_info_vmo_t info;
               ZX_ASSERT(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) == ZX_OK);
-              if (info.flags & ZX_INFO_VMO_PAGER_BACKED) {
+              if (info.flags & (ZX_INFO_VMO_PAGER_BACKED | ZX_INFO_VMO_DISCARDABLE)) {
                 options |= ZX_VM_ALLOW_FAULTS;
               }
               zx_vaddr_t addr;

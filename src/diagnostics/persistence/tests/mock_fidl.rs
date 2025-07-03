@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_update::{
-    ListenerRequest, ListenerRequestStream, ListenerWaitForFirstUpdateCheckToCompleteResponder,
-};
+use fidl_fuchsia_update::{ListenerRequest, ListenerRequestStream, NotifierProxy};
 use fidl_test_persistence_factory::{ControllerRequest, ControllerRequestStream};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder};
@@ -19,33 +17,29 @@ enum IncomingService {
 }
 
 enum ServerState {
-    Waiting(Vec<ListenerWaitForFirstUpdateCheckToCompleteResponder>),
+    Waiting { notifiers: Vec<NotifierProxy> },
     Satisfied,
 }
 
 impl ServerState {
     fn new() -> Self {
-        ServerState::Waiting(vec![])
+        ServerState::Waiting { notifiers: Vec::new() }
     }
 
     fn become_satisfied(&mut self) {
-        if let ServerState::Waiting(ref mut responders) = self {
-            for responder in responders.drain(..) {
-                let _ = responder.send();
+        if let ServerState::Waiting { ref mut notifiers } = self {
+            for notifier in notifiers {
+                notifier.notify().expect("Received FIDL error calling Notify()");
             }
             *self = ServerState::Satisfied;
         }
     }
 
-    fn respond_when_appropriate(
-        &mut self,
-        responder: ListenerWaitForFirstUpdateCheckToCompleteResponder,
-    ) {
+    fn add_notifier(&mut self, notifier: NotifierProxy) {
         match self {
-            ServerState::Waiting(ref mut responses) => responses.push(responder),
+            ServerState::Waiting { ref mut notifiers } => notifiers.push(notifier),
             ServerState::Satisfied => {
-                // If the client has closed the connection, that's not our concern.
-                let _ = responder.send();
+                notifier.notify().expect("Received FIDL error calling Notify()");
             }
         }
     }
@@ -115,8 +109,8 @@ async fn handle_listener_stream(stream: ListenerRequestStream, state: Arc<Mutex<
             let state = state.clone();
             async move {
                 match request {
-                    ListenerRequest::WaitForFirstUpdateCheckToComplete { responder } => {
-                        state.lock().respond_when_appropriate(responder);
+                    ListenerRequest::NotifyOnFirstUpdateCheck { payload, control_handle: _ } => {
+                        state.lock().add_notifier(payload.notifier.unwrap().into_proxy());
                     }
                     ListenerRequest::_UnknownMethod { .. } => {}
                 }

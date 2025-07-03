@@ -12,12 +12,17 @@
 
 #include <lib/arch/riscv64/feature.h>
 #include <lib/zbi-format/driver-config.h>
-#include <stdint.h>
 
+#include <cstdint>
 #include <optional>
-#include <variant>
+#include <span>
 
 struct ArchPatchInfo {};
+
+struct RiscvPlicDriverConfig {
+  zbi_dcfg_riscv_plic_driver_t zbi{};
+  std::span<volatile std::byte> mmio;
+};
 
 // This holds (or points to) all riscv64-specific data that is handed off from
 // physboot to the kernel proper at boot time.
@@ -29,7 +34,7 @@ struct ArchPhysHandoff {
   arch::RiscvFeatures cpu_features;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_RISCV_PLIC) payload.
-  std::optional<zbi_dcfg_riscv_plic_driver_t> plic_driver;
+  std::optional<RiscvPlicDriverConfig> plic_driver;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_GIC_V2) payload.
   std::optional<zbi_dcfg_arm_gic_v2_driver_t> gic_driver;
@@ -47,8 +52,5 @@ inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff00000000;  // -
 // for the physmap in the kernel.
 inline constexpr uint64_t kArchPhysmapVirtualBase = 0xffff'ffc0'0000'0000;
 inline constexpr uint64_t kArchPhysmapSize = 0x0000'0008'0000'0000;
-
-// Whether a peripheral range for the UART needs to be synthesized.
-inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = false;
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_

@@ -40,6 +40,7 @@ void VerifyReadOutOfBound(const std::string& path) {
 }
 
 bool attempt_suspend(const std::string& suspend_type) {
+  GTEST_LOG_(INFO) << "attempt_suspend: " << suspend_type;
   return files::WriteFile("/sys/power/state", suspend_type);
 }
 
@@ -233,11 +234,17 @@ TEST_F(SysfsPowerTest, SuspendStateFileWrite) {
   timer_t timer_id = start_interval_timer();
 
   ASSERT_TRUE(attempt_suspend("mem"));
+  GTEST_LOG_(INFO) << "wake: 1";
   ASSERT_TRUE(attempt_suspend("mem\n"));
+  GTEST_LOG_(INFO) << "wake: 2";
   ASSERT_TRUE(attempt_suspend("mem\nfoobar"));
+  GTEST_LOG_(INFO) << "wake: 3";
   ASSERT_TRUE(attempt_suspend("freeze"));
+  GTEST_LOG_(INFO) << "wake: 4";
   ASSERT_TRUE(attempt_suspend("freeze\n"));
+  GTEST_LOG_(INFO) << "wake: 5";
   ASSERT_TRUE(attempt_suspend("freeze\nfoobar"));
+  GTEST_LOG_(INFO) << "wake: 6";
 
   stop_interval_timer(timer_id);
 }

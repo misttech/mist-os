@@ -10,15 +10,17 @@
 #include <ktl/string_view.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 
 #include "test-main.h"
+
+#include <ktl/enforce.h>
 
 namespace {
 
 // LINT.IfChange
-constexpr std::string_view kSerialReady = "UartInputReady";
-constexpr std::string_view kSerialCommand = "RandomString1234!";
+constexpr ktl::string_view kSerialReady = "UartInputReady";
+constexpr ktl::string_view kSerialCommand = "RandomString1234!";
 // LINT.ThenChange(./uart_input_host_test.go)
 
 // Will write to the uart

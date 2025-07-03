@@ -15,7 +15,7 @@ use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
 use crate::device::constants::{
     BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
     DATA_VOLUME_LABEL, DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
-    UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
+    ZXCRYPT_DRIVER_PATH,
 };
 use crate::device::{BlockDevice, Device, RegisteredDevices};
 use crate::inspect::register_migration_status;
@@ -60,6 +60,10 @@ pub trait Environment: Send + Sync {
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error>;
 
     /// Binds an instance of the GPT component to the given device.
+    async fn launch_system_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+
+    /// Binds an instance of the GPT component to the given device. This is intended for devices
+    /// that are not the system GPT.
     async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error>;
 
     /// Returns a proxy for the exposed dir of the partition table manager.  This can be called
@@ -157,12 +161,12 @@ pub enum Filesystem {
         // when all channels are closed.
         #[allow(dead_code)] Option<CryptService>,
         ServingMultiVolumeFilesystem,
-        String,
+        Option<ServingVolume>,
     ),
     ServingVolumeInMultiVolume(
         // We hold onto crypt service here to avoid it prematurely shutting down.
         #[allow(dead_code)] Option<CryptService>,
-        String,
+        ServingVolume,
     ),
     ServingGpt(ServingMultiVolumeFilesystem),
     Shutdown,
@@ -177,50 +181,32 @@ impl Filesystem {
         }
     }
 
-    pub fn exposed_dir(
-        &mut self,
-        serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
-    ) -> Result<fio::DirectoryProxy, Error> {
+    pub fn exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
             Filesystem::Queue(queue) => queue.push(server),
             Filesystem::Serving(fs) => fs.exposed_dir().clone(server.into_channel().into())?,
-            Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
-                .volume(&data_volume_name)
-                .ok_or_else(|| anyhow!("data volume {} not found", data_volume_name))?
-                .exposed_dir()
-                .clone(server.into_channel().into())?,
-            Filesystem::ServingVolumeInMultiVolume(_, volume_name) => serving_fs
-                .unwrap()
-                .volume(&volume_name)
-                .ok_or_else(|| anyhow!("volume {volume_name} not found"))?
-                .exposed_dir()
-                .clone(server.into_channel().into())?,
+            Filesystem::ServingMultiVolume(_, _, Some(data_volume)) => {
+                data_volume.exposed_dir().clone(server.into_channel().into())?
+            }
+            Filesystem::ServingVolumeInMultiVolume(_, volume) => {
+                volume.exposed_dir().clone(server.into_channel().into())?
+            }
             Filesystem::ServingGpt(fs) => fs.exposed_dir().clone(server.into_channel().into())?,
             Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
+            _ => bail!("No data volume"),
         }
         Ok(proxy)
     }
 
-    pub fn root(
-        &mut self,
-        serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
-    ) -> Result<fio::DirectoryProxy, Error> {
+    pub fn root(&mut self) -> Result<fio::DirectoryProxy, Error> {
         let root = fuchsia_fs::directory::open_directory_async(
-            &self.exposed_dir(serving_fs).context("failed to get exposed dir")?,
+            &self.exposed_dir().context("failed to get exposed dir")?,
             "root",
             fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE,
         )
         .context("failed to open the root directory")?;
         Ok(root)
-    }
-
-    pub fn volume(&mut self, volume_name: &str) -> Option<&mut ServingVolume> {
-        match self {
-            Filesystem::ServingMultiVolume(_, fs, _) => fs.volume_mut(&volume_name),
-            Filesystem::ServingVolumeInMultiVolume(..) => unreachable!(),
-            _ => None,
-        }
     }
 
     fn queue(&mut self) -> Option<&mut Vec<ServerEnd<fio::DirectoryMarker>>> {
@@ -230,10 +216,7 @@ impl Filesystem {
         }
     }
 
-    pub async fn shutdown(
-        &mut self,
-        serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
-    ) -> Result<(), Error> {
+    pub async fn shutdown(&mut self) -> Result<(), Error> {
         let old = std::mem::replace(self, Filesystem::Shutdown);
         match old {
             Filesystem::Queue(_) => Ok(()),
@@ -241,8 +224,8 @@ impl Filesystem {
             Filesystem::ServingMultiVolume(_, fs, _) => {
                 fs.shutdown().await.context("shutdown failed")
             }
-            Filesystem::ServingVolumeInMultiVolume(_, volume_name) => {
-                serving_fs.unwrap().shutdown_volume(&volume_name).await.context("shutdown failed")
+            Filesystem::ServingVolumeInMultiVolume(_, volume) => {
+                volume.shutdown().await.context("shutdown failed")
             }
             Filesystem::ServingGpt(fs) => fs.shutdown().await.context("shutdown failed"),
             // Getting shut down when we are already shut down is fine. We are already in the
@@ -296,7 +279,8 @@ pub trait Container: Send + Sync {
     /// Recreates the data volume.
     async fn format_data(&mut self, launcher: &FilesystemLauncher) -> Result<Filesystem, Error>;
 
-    /// Typically called by `format_data` implementations to remove all the non-blob volumes.
+    /// Typically called by `format_data` implementations to remove all the non-blob volumes.  All
+    /// volumes must be unmounted.
     async fn remove_all_non_blob_volumes(&mut self) -> Result<(), Error> {
         let blobfs_volume_label = self.blobfs_volume_label();
         let fs = self.fs();
@@ -308,13 +292,6 @@ pub trait Container: Send + Sync {
         let volumes = fuchsia_fs::directory::readdir(&volumes_dir).await?;
         for volume in volumes {
             if &volume.name != blobfs_volume_label {
-                // Unmount mounted non-blob volumes.
-                if fs.volume(&volume.name).is_some() {
-                    fs.shutdown_volume(&volume.name).await.with_context(|| {
-                        format!("unable to shutdown volume \"{}\" for reformat", volume.name)
-                    })?;
-                }
-                // Remove any non-blob volumes.
                 fs.remove_volume(&volume.name)
                     .await
                     .with_context(|| format!("failed to remove volume: {}", volume.name))?;
@@ -367,6 +344,7 @@ impl FshostEnvironment {
         matcher_lock: Arc<Mutex<HashSet<String>>>,
         inspector: fuchsia_inspect::Inspector,
         watcher: Watcher,
+        registered_devices: Arc<RegisteredDevices>,
         device_publisher: DevicePublisher,
     ) -> Self {
         let corruption_events = inspector.root().create_child("corruption_events");
@@ -381,7 +359,7 @@ impl FshostEnvironment {
             matcher_lock,
             inspector,
             watcher,
-            registered_devices: Arc::new(RegisteredDevices::default()),
+            registered_devices,
             other_filesystems: Vec::new(),
             device_publisher,
         }
@@ -401,19 +379,19 @@ impl FshostEnvironment {
     /// Returns a proxy for the exposed dir of the Blobfs filesystem.  This can be called before
     /// Blobfs is mounted and it will get routed once Blobfs is mounted.
     pub fn blobfs_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.blobfs.exposed_dir(self.container.maybe_fs())
+        self.blobfs.exposed_dir()
     }
 
     /// Returns a proxy for the exposed dir of the data filesystem.  This can be called before
     /// "/data" is mounted and it will get routed once the data partition is mounted.
     pub fn data_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.data.exposed_dir(self.container.maybe_fs())
+        self.data.exposed_dir()
     }
 
     /// Returns a proxy for the root of the data filesystem.  This can be called before "/data" is
     /// mounted and it will get routed once the data partition is mounted.
     pub fn data_root(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.data.root(self.container.maybe_fs())
+        self.data.root()
     }
 
     pub fn launcher(&self) -> Arc<FilesystemLauncher> {
@@ -517,7 +495,7 @@ impl FshostEnvironment {
             }
         };
 
-        let root = filesystem.root(None)?;
+        let root = filesystem.root()?;
 
         // Read desired format from fs_switch, use config as default.
         let desired_format =
@@ -587,7 +565,7 @@ impl FshostEnvironment {
             let mut new_filesystem =
                 self.format_data_with_disk_format(desired_format, &mut new_device).await?;
 
-            recursive_copy(&filesystem.root(None)?, &new_filesystem.root(None)?)
+            recursive_copy(&filesystem.root()?, &new_filesystem.root()?)
                 .await
                 .context("copy data")?;
 
@@ -620,7 +598,7 @@ impl FshostEnvironment {
 
         let mut fs = self.launcher.serve_blobfs(device).await?;
 
-        let exposed_dir = fs.exposed_dir(None)?;
+        let exposed_dir = fs.exposed_dir()?;
         for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
@@ -723,7 +701,7 @@ impl Environment for FshostEnvironment {
         self.launcher.attach_driver(device, driver_path).await
     }
 
-    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+    async fn launch_system_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
         if self.gpt.is_serving() {
             // If we want to support multiple GPT devices, we'll need to change Environment to
             // separate the system GPT and other GPTs.
@@ -750,7 +728,7 @@ impl Environment for FshostEnvironment {
             .add_source(Box::new(DirSource::new(
                 partitions_dir,
                 filesystem.get_component_moniker().unwrap(),
-                /*is_managed=*/ true,
+                crate::device::Parent::SystemPartitionTable,
             )))
             .await
             .context("Failed to watch gpt partitions dir")?;
@@ -758,8 +736,34 @@ impl Environment for FshostEnvironment {
         Ok(())
     }
 
+    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+        let mut filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(fs_management::Gpt::dynamic_child()),
+        );
+        let serving = filesystem.serve_multi_volume().await.context("Failed to start GPT")?;
+        let exposed_dir = serving.exposed_dir();
+        let partitions_dir = fuchsia_fs::directory::open_directory(
+            &exposed_dir,
+            fpartitions::PartitionServiceMarker::SERVICE_NAME,
+            fuchsia_fs::PERM_READABLE,
+        )
+        .await
+        .context("Failed to open partitions dir")?;
+        self.watcher
+            .add_source(Box::new(DirSource::new(
+                partitions_dir,
+                filesystem.get_component_moniker().unwrap(),
+                crate::device::Parent::SystemPartitionTable,
+            )))
+            .await
+            .context("Failed to watch gpt partitions dir")?;
+        self.other_filesystems.push(Filesystem::ServingGpt(serving));
+        Ok(())
+    }
+
     fn partition_manager_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.gpt.exposed_dir(None)
+        self.gpt.exposed_dir()
     }
 
     async fn bind_and_enumerate_fvm(
@@ -813,7 +817,7 @@ impl Environment for FshostEnvironment {
             // rather than having a GPT.  Since clients might be blocking on the GPT appearing,
             // explicitly error them out.
             // This call won't fail because we just checked that the gpt is not serving.
-            self.gpt.shutdown(None).await.unwrap();
+            self.gpt.shutdown().await.unwrap();
         }
         Ok(())
     }
@@ -830,7 +834,7 @@ impl Environment for FshostEnvironment {
         self.container = Some(Box::new(FvmContainer::new(serving_fs, device.is_fshost_ramdisk())));
         if !self.gpt.is_serving() && !device.is_fshost_ramdisk() {
             // See comment in `mount_fxblob`.
-            self.gpt.shutdown(None).await.unwrap();
+            self.gpt.shutdown().await.unwrap();
         }
         Ok(())
     }
@@ -860,7 +864,7 @@ impl Environment for FshostEnvironment {
         for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
-        self.blobfs = Filesystem::ServingVolumeInMultiVolume(None, label.to_string());
+        self.blobfs = Filesystem::ServingVolumeInMultiVolume(None, blobfs);
         if let Err(e) = container.fs().set_byte_limit(label, self.config.blobfs_max_bytes).await {
             log::warn!("Failed to set byte limit for the blob volume: {:?}", e);
         }
@@ -878,7 +882,7 @@ impl Environment for FshostEnvironment {
             log::warn!("Failed to set byte limit for the data volume: {:?}", e);
         }
         let queue = self.data.queue().unwrap();
-        let exposed_dir = filesystem.exposed_dir(Some(container.fs()))?;
+        let exposed_dir = filesystem.exposed_dir()?;
         for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
@@ -943,7 +947,7 @@ impl Environment for FshostEnvironment {
                 match self.try_migrate_data(&mut device, &mut filesystem).await {
                     Ok(Some(new_filesystem)) => {
                         // Migration successful.
-                        filesystem.shutdown(None).await.unwrap_or_else(|error| {
+                        filesystem.shutdown().await.unwrap_or_else(|error| {
                             log::error!(
                                 error:?;
                                 "Failed to shutdown original filesystem after migration"
@@ -1037,7 +1041,7 @@ impl Environment for FshostEnvironment {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
         let queue = self.data.queue().unwrap();
-        let exposed_dir = filesystem.exposed_dir(None)?;
+        let exposed_dir = filesystem.exposed_dir()?;
         for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
@@ -1055,37 +1059,36 @@ impl Environment for FshostEnvironment {
             if self.config.data_filesystem_format != "fxfs" {
                 return Err(anyhow!("Can't shred data; not fxfs"));
             }
-            fxfs::shred_key_bag(
-                self.data
-                    .volume(UNENCRYPTED_VOLUME_LABEL)
-                    .context("Failed to find unencrypted volume")?,
-            )
-            .await
+            if let Filesystem::ServingMultiVolume(_, fs, _) = &self.data {
+                fxfs::shred_key_bag(fs).await
+            } else {
+                Err(anyhow!("No Fxfs serving multi volume filesystem"))
+            }
         }
     }
 
     async fn shutdown(&mut self) -> Result<(), Error> {
         // If we encounter an error, log it, but continue trying to shut down the remaining
         // filesystems.
-        self.blobfs.shutdown(self.container.maybe_fs()).await.unwrap_or_else(|error| {
+        self.blobfs.shutdown().await.unwrap_or_else(|error| {
             log::error!(error:?; "failed to shut down blobfs");
         });
-        self.data.shutdown(self.container.maybe_fs()).await.unwrap_or_else(|error| {
+        self.data.shutdown().await.unwrap_or_else(|error| {
             log::error!(error:?; "failed to shut down data");
         });
-        // Shut down any other dynamic filesystems we happen to know about before we shut down
-        // anything that could potentially be hosting them.
-        for mut fs in self.other_filesystems.drain(..) {
-            fs.shutdown(None).await.unwrap_or_else(|error| {
-                log::error!(error:?; "failed to shut down other filesystem");
-            })
-        }
         if let Some(container) = self.container.take() {
             container.into_fs().shutdown().await.unwrap_or_else(|error| {
                 log::error!(error:?; "failed to shut down container");
             })
         }
-        self.gpt.shutdown(None).await.unwrap_or_else(|error| {
+        // Shut down any other dynamic filesystems we happen to know about before we shut down
+        // anything that could potentially be hosting them.
+        for mut fs in self.other_filesystems.drain(..) {
+            fs.shutdown().await.unwrap_or_else(|error| {
+                log::error!(error:?; "failed to shut down other filesystem");
+            })
+        }
+        self.gpt.shutdown().await.unwrap_or_else(|error| {
             log::error!(error:?; "failed to shut down gpt");
         });
         Ok(())
@@ -1249,18 +1252,18 @@ impl FilesystemLauncher {
                 DiskFormat::Fxfs => {
                     let mut serving_multi_vol_fs = fs.serve_multi_volume().await?;
                     match fxfs::unlock_data_volume(&mut serving_multi_vol_fs, &self.config).await? {
-                        Some((crypt_service, volume_name, _)) => {
+                        Some((crypt_service, _, volume)) => {
                             Ok(ServeFilesystemStatus::Serving(Filesystem::ServingMultiVolume(
                                 Some(crypt_service),
                                 serving_multi_vol_fs,
-                                volume_name,
+                                Some(volume),
                             )))
                         }
                         // If unlocking returns none, the keybag got deleted by something.
                         None => {
                             log::warn!(
                                 "keybag not found. Perhaps the keys were shredded? \
-                                Reformatting the data volume."
+                                 Reformatting the data volume."
                             );
                             Ok(ServeFilesystemStatus::FormatRequired)
                         }
@@ -1431,11 +1434,11 @@ impl FilesystemLauncher {
         let filesystem = if let DiskFormat::Fxfs = format {
             let mut serving_multi_vol_fs =
                 fs.serve_multi_volume().await.context("serving multi volume data partition")?;
-            let (crypt_service, volume_name, _) =
+            let (crypt_service, _, volume) =
                 fxfs::init_data_volume(&mut serving_multi_vol_fs, &self.config)
                     .await
                     .context("initializing data volume encryption")?;
-            Filesystem::ServingMultiVolume(Some(crypt_service), serving_multi_vol_fs, volume_name)
+            Filesystem::ServingMultiVolume(Some(crypt_service), serving_multi_vol_fs, Some(volume))
         } else {
             Filesystem::Serving(fs.serve().await.context("serving single volume data partition")?)
         };

@@ -13,7 +13,7 @@
 #include "bpf_helpers.h"
 
 // Struct stored in the `result_array` in order to pass results to the test.
-// It must match `TestResult` struct  used by the `run_egress_prog` test in
+// It must match `TestResult` struct  used by the `skb_test_prog` test in
 // `src/connectivity/network/netstack3/src/bindings/bpf.rs` .
 // LINT.IfChange
 struct test_result {
@@ -36,7 +36,7 @@ struct bpf_map_def result_array = {
 
 #define BPF_HDR_START_NET 1
 
-int egress_prog(struct __sk_buff *skb) {
+int skb_test_prog(struct __sk_buff *skb) {
   struct test_result result = {};
 
   result.uid = bpf_get_socket_uid(skb);

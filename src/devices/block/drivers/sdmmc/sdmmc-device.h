@@ -115,6 +115,8 @@ class SdmmcDevice {
   zx_status_t UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
   zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]);
 
+  void ClearRca() { rca_ = 0; }
+
   // Visible for testing.
   zx_status_t RefreshHostInfo() { return HostInfo(&host_info_); }
 

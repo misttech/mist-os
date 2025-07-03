@@ -30,6 +30,7 @@ sdk_component_manifests("realm_builder_shard_sdk") {
   manifests = [
     "realm_builder_absolute.shard.cml",
     "realm_builder_base.shard.cml",
+    "realm_builder_base_no_diagnostics.shard.cml",
   ]
   category = "partner"
 }
@@ -42,6 +43,7 @@ sdk_component_manifests("realm_builder_shard") {
   # is exported with the SDK for subpackaging in OOT components.
   manifests = [
     "realm_builder.shard.cml",
+    "realm_builder_no_diagnostics.shard.cml",
     "realm_builder_subpackage.shard.cml",
   ]
   category = "internal"

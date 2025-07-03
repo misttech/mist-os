@@ -681,8 +681,13 @@ fn handle_window_manager_request(
                 .unbounded_send(MessageInternal::WindowManagerCycle { responder })
                 .expect("Failed to send MessageInternal");
         }
-        window::ManagerRequest::Focus { position: _position, responder: _responder } => {
-            unimplemented!()
+        window::ManagerRequest::Focus { position: _position, responder } => {
+            // TODO(https://fxbug.dev/426605973): Request focus on view at `position`. For now, do
+            // nothing. TilingWM already displays all views and focus shifts via user interaction
+            // with a window.
+            if let Err(e) = responder.send() {
+                error!("Failed to send response for fuchsia.session.window.Manager.Focus: {}", e);
+            }
         }
         _ => {
             unimplemented!()

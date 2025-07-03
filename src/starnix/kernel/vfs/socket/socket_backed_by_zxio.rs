@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::attachments::{SockAddrEbpfProgramResult, SockAddrOp};
+use crate::bpf::attachments::{SockAddrOp, SockAddrProgramResult, SockOp, SockProgramResult};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
 use crate::task::syscalls::SockFProgPtr;
@@ -13,6 +13,9 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use byteorder::ByteOrder;
+use ebpf::convert_and_verify_cbpf;
+use ebpf_api::SOCKET_FILTER_CBPF_CONFIG;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
 use linux_uapi::IP_MULTICAST_ALL;
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
@@ -21,12 +24,8 @@ use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, uapi, ucred,
-    AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
+    AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER, SO_COOKIE,
 };
-
-use ebpf::convert_and_verify_cbpf;
-use ebpf_api::SOCKET_FILTER_CBPF_CONFIG;
-use fidl::endpoints::DiscoverableProtocolMarker as _;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 use std::sync::OnceLock;
@@ -38,6 +37,7 @@ use syncio::{
     ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode,
     ZxioSocketCreationOptions, ZxioSocketMark,
 };
+use zerocopy::IntoBytes;
 use {
     fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
@@ -88,10 +88,14 @@ impl ServiceConnector for SocketProviderServiceConnector {
 pub struct ZxioBackedSocket {
     /// The underlying Zircon I/O object.
     zxio: syncio::Zxio,
+
+    // SO_COOKIE cache.
+    cookie: OnceLock<u64>,
 }
 
 impl ZxioBackedSocket {
     pub fn new(
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
@@ -102,6 +106,7 @@ impl ZxioBackedSocket {
         } else {
             &mut [][..]
         };
+
         let zxio = Zxio::new_socket::<SocketProviderServiceConnector>(
             domain.as_raw() as c_int,
             socket_type.as_raw() as c_int,
@@ -111,11 +116,28 @@ impl ZxioBackedSocket {
         .map_err(|status| from_status_like_fdio!(status))?
         .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
-        Ok(Self::new_with_zxio(zxio))
+        let socket = Self::new_with_zxio(zxio);
+
+        if matches!(domain, SocketDomain::Inet | SocketDomain::Inet6) {
+            match current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_prog(
+                locked,
+                current_task,
+                SockOp::Create,
+                domain,
+                socket_type,
+                protocol,
+                &socket,
+            ) {
+                SockProgramResult::Allow => (),
+                SockProgramResult::Block => return error!(EPERM),
+            }
+        }
+
+        Ok(socket)
     }
 
     pub fn new_with_zxio(zxio: syncio::Zxio) -> ZxioBackedSocket {
-        ZxioBackedSocket { zxio }
+        ZxioBackedSocket { zxio, cookie: Default::default() }
     }
 
     pub fn sendmsg(
@@ -280,18 +302,38 @@ impl ZxioBackedSocket {
         op: SockAddrOp,
         socket_address: &SocketAddress,
     ) -> Result<(), Errno> {
-        let ebpf_result = current_task.kernel().ebpf_attachments.root_cgroup().run_sock_addr_prog(
-            locked,
-            op,
-            socket.domain,
-            socket.socket_type,
-            socket.protocol,
-            socket_address,
-        )?;
+        let ebpf_result =
+            current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_addr_prog(
+                locked,
+                current_task,
+                op,
+                socket.domain,
+                socket.socket_type,
+                socket.protocol,
+                socket_address,
+            )?;
         match ebpf_result {
-            SockAddrEbpfProgramResult::Allow => Ok(()),
-            SockAddrEbpfProgramResult::Block => error!(EPERM),
+            SockAddrProgramResult::Allow => Ok(()),
+            SockAddrProgramResult::Block => error!(EPERM),
         }
+    }
+
+    pub fn get_socket_cookie(&self) -> Result<u64, Errno> {
+        if let Some(cookie) = self.cookie.get() {
+            return Ok(*cookie);
+        }
+
+        let cookie = u64::from_ne_bytes(
+            self.zxio
+                .getsockopt(SOL_SOCKET, SO_COOKIE, size_of::<u64>() as u32)
+                .map_err(|status| from_status_like_fdio!(status))?
+                .map_err(|out_code| errno_from_zxio_code!(out_code))?
+                .try_into()
+                .unwrap(),
+        );
+        let _: Result<(), u64> = self.cookie.set(cookie);
+
+        return Ok(cookie);
     }
 }
 
@@ -376,7 +418,7 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
         Ok(Socket::new_with_ops_and_info(
-            Box::new(ZxioBackedSocket { zxio }),
+            Box::new(Self::new_with_zxio(zxio)),
             socket.domain,
             socket.socket_type,
             socket.protocol,
@@ -492,7 +534,22 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
+    fn close(&self, locked: &mut Locked<FileOpsCore>, current_task: &CurrentTask, socket: &Socket) {
+        if matches!(socket.domain, SocketDomain::Inet | SocketDomain::Inet6) {
+            // Invoke eBPF release program (if any). Result is ignored since we cannot block
+            // socket release.
+            let _: SockProgramResult =
+                current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_prog(
+                    locked,
+                    current_task,
+                    SockOp::Release,
+                    socket.domain,
+                    socket.socket_type,
+                    socket.protocol,
+                    self,
+                );
+        }
+
         let _ = self.zxio.close();
     }
 
@@ -605,6 +662,9 @@ impl SocketOps for ZxioBackedSocket {
                 let mut result = vec![0; 4];
                 byteorder::NativeEndian::write_u32(&mut result, mark);
                 Ok(result)
+            }
+            (SOL_SOCKET, SO_COOKIE) => {
+                self.get_socket_cookie().map(|cookie| cookie.as_bytes().to_owned())
             }
             _ => self
                 .zxio

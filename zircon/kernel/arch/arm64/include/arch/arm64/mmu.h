@@ -460,17 +460,6 @@ const uint16_t MMU_ARM64_MAX_USER_ASID_16 = (1u << 16) - 1;
 extern paddr_t root_kernel_page_table_phys;
 extern paddr_t root_lower_page_table_phys;
 
-// boot time page mapping routines used in start.S and periphmap
-extern "C" void arm64_boot_map_init(uint64_t vaddr_paddr_delta);
-extern "C" zx_status_t arm64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr,
-                                      size_t len, pte_t pte_flags, bool allow_large_pages);
-zx_status_t arm64_boot_map_v(vaddr_t vaddr, paddr_t paddr, size_t len, pte_t pte_flags,
-                             bool allow_large_pages);
-void arm64_boot_mmu_unwire();
-
-// return a tuple of the total size reserved for boot page tables and how much was used
-std::tuple<size_t, size_t> arm64_boot_map_used_memory();
-
 // use built-in virtual to physical translation instructions to query
 // the physical address of a virtual address
 zx_status_t arm64_mmu_translate(vaddr_t va, paddr_t* pa, bool user, bool write);

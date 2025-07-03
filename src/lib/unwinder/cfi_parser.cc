@@ -75,6 +75,7 @@ CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
       preserved = x64_preserved;
       length = sizeof(x64_preserved) / sizeof(RegisterID);
       break;
+    case Registers::Arch::kArm32:
     case Registers::Arch::kArm64:
       preserved = arm64_preserved;
       length = sizeof(arm64_preserved) / sizeof(RegisterID);
@@ -547,7 +548,7 @@ void CfiParser::AsyncStep(AsyncMemory* stack, RegisterID return_address_register
     }
   }
 
-  stack->FetchMemoryRanges(ranges, [=, cb = std::move(cb)]() mutable {
+  stack->FetchMemoryRanges(ranges, [=, this, cb = std::move(cb)]() mutable {
     // Now we should have all the needed memory fetched from the target so we can call the
     // synchronous Step to do the evaluations.
     Registers next(current.arch());

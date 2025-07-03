@@ -5,6 +5,8 @@
 use crate::subsystems::prelude::*;
 use anyhow::{bail, ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
+use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
+use assembly_config_schema::platform_config::recovery_config::RecoveryConfig;
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 use assembly_images_config::{
@@ -12,12 +14,15 @@ use assembly_images_config::{
 };
 
 pub(crate) struct StorageSubsystemConfig;
-impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
+impl DefineSubsystemConfiguration<(&StorageConfig, &RecoveryConfig, &DevelopmentSupportConfig)>
+    for StorageSubsystemConfig
+{
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        storage_config: &StorageConfig,
+        configs: &(&StorageConfig, &RecoveryConfig, &DevelopmentSupportConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        let (storage_config, recovery_config, development_config) = *configs;
         if matches!(
             context.feature_set_level,
             FeatureSetLevel::Bootstrap | FeatureSetLevel::Embeddable
@@ -34,6 +39,14 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             && !context.board_info.provides_feature("fuchsia::paver")
         {
             builder.platform_bundle("paver_legacy");
+        }
+
+        // Include fuchsia.fshost/Recovery capabilities if this configuration supports recovery
+        // (flash super via userspace fastboot) or netboot (reprovision partition tables) workflows.
+        if recovery_config.system_recovery.is_some() || development_config.enable_netsvc_netboot {
+            builder.platform_bundle("fshost_recovery");
+        } else {
+            builder.platform_bundle("fshost_non_recovery");
         }
 
         // Fetch a custom gen directory for placing temporary files. We get this
@@ -53,6 +66,17 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
 
         let inline_crypto =
             Config::new_bool(context.board_info.provides_feature("fuchsia::storage_inline_crypto"));
+
+        let block_config_path = gendir.join("fshost_block_config.json");
+        let block_config_json =
+            serde_json::to_string(&context.board_info.filesystems.block_devices)
+                .context("Serializing devices config")?;
+        std::fs::write(&block_config_path, &block_config_json)
+            .context("Writing serialized devices config")?;
+        builder
+            .bootfs()
+            .file(FileEntry { source: block_config_path, destination: BootfsDestination::Fshost })
+            .context("Adding fshost config to bootfs")?;
 
         builder
             .bootfs()
@@ -141,6 +165,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             }
         } else {
             // TODO(https://fxbug.dev/339491886): Delete the non-storage-host branch.
+            builder.platform_bundle("fshost_non_storage_host");
             match &storage_config.filesystems.volume {
                 VolumeConfig::Fxfs => {
                     ensure!(gpt, "GPT required for Fxfs-based product assemblies");

@@ -9,6 +9,7 @@
 #include <zircon/assert.h>
 
 #include <atomic>
+#include <utility>
 
 #include <fbl/intrusive_double_list.h>
 #include <fbl/string_printf.h>
@@ -16,11 +17,19 @@
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 
 namespace display_coordinator {
 
-DisplayConfig::DisplayConfig(display::DisplayId display_id) : IdMappable(display_id) {
+DisplayConfig::DisplayConfig(display::DisplayId display_id,
+                             fbl::Vector<display::PixelFormat> pixel_formats,
+                             int engine_max_layer_count)
+    : IdMappable(display_id),
+      pixel_formats_(std::move(pixel_formats)),
+      engine_max_layer_count_(engine_max_layer_count) {
   ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
+  ZX_DEBUG_ASSERT(engine_max_layer_count > 0);
+  ZX_DEBUG_ASSERT(engine_max_layer_count <= display::EngineInfo::kMaxAllowedMaxLayerCount);
 }
 
 DisplayConfig::~DisplayConfig() = default;

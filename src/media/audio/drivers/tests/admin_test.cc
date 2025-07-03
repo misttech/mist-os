@@ -61,6 +61,7 @@ void DisplayTopologies(const std::vector<fhasp::Topology>& topologies) {
 }  // namespace
 
 void AdminTest::TearDown() {
+  DropSignalProcessing();
   DropRingBuffer();
 
   TestBase::TearDown();
@@ -622,6 +623,15 @@ void AdminTest::SignalProcessingConnect() {
   signal_processing() = sp_client.Bind();
 
   AddErrorHandler(signal_processing(), "SignalProcessing");
+}
+
+void AdminTest::DropSignalProcessing() {
+  if (signal_processing().is_bound()) {
+    signal_processing().Unbind();
+    signal_processing() = nullptr;
+
+    CooldownAfterSignalProcessingDisconnect();
+  }
 }
 
 // Element methods

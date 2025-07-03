@@ -46,7 +46,7 @@ source_set("qemu-test-main") {
   deps = [
     "..:exception",
     "..:stdio",
-    "..:uart",
+    "..:uart-console",
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/libc",
@@ -77,6 +77,7 @@ source_set("devicetree-test-main") {
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/phys:allocation",
     "//zircon/kernel/phys:allocation-init",
+    "//zircon/kernel/phys:uart-console",
     "//zircon/kernel/phys/lib/boot-shim",
     "//zircon/system/ulib/uart",
   ]
@@ -538,6 +539,8 @@ kernel_elf_binary("physboot-hello-world-test") {
 
   deps = [
     "..:physboot.kernel",
+    "..:zircon-abi-spec",
+    "..:zircon-info-note",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/code-patching:self-test",
     "//zircon/system/ulib/uart",

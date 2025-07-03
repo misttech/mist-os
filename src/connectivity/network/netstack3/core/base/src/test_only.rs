@@ -4,7 +4,7 @@
 
 //! Abstractions enabling test-only behavior.
 
-pub use inner::{TestOnlyFrom, TestOnlyPartialEq};
+pub use inner::TestOnlyPartialEq;
 
 // The implementation for test code.
 #[cfg(any(test, feature = "testutils"))]
@@ -23,11 +23,6 @@ mod inner {
             panic!("The `Counter` type shouldn't be checked for equality")
         }
     }
-
-    /// Applies `From` bounds, only in tests.
-    pub trait TestOnlyFrom<T>: From<T> {}
-
-    impl<T1, T2: From<T1>> TestOnlyFrom<T1> for T2 {}
 }
 
 // The implementation for non-test code
@@ -38,9 +33,4 @@ mod inner {
     pub trait TestOnlyPartialEq {}
 
     impl<T> TestOnlyPartialEq for T {}
-
-    /// Applies `From` bounds, only in tests.
-    pub trait TestOnlyFrom<T> {}
-
-    impl<T1, T2> TestOnlyFrom<T1> for T2 {}
 }

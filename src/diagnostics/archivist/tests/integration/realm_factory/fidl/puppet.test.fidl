@@ -20,6 +20,7 @@ open protocol Puppet {
     compose LogPuppet;
 
     /// Returns a LazyInspectPuppet client for recording lazy values.
+    @available(removed=NEXT)
     flexible RecordLazyValues(struct {
         key string:MAX;
     }) -> (resource struct {
@@ -110,6 +111,14 @@ open protocol InspectWriter {
         1: name string:fuchsia.inspect.MAX_NAME_LENGTH;
     }) -> (resource table {
         1: token fuchsia.inspect.EscrowToken;
+    });
+
+    /// Returns a LazyInspectPuppet client for recording lazy values.
+    @available(added=NEXT)
+    flexible RecordLazyValues(struct {
+        key string:MAX;
+    }) -> (resource struct {
+        client client_end:LazyInspectPuppet;
     });
 };
 

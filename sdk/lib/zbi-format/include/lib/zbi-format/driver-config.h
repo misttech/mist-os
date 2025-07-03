@@ -280,9 +280,14 @@ typedef struct {
 
 // for ZBI_KERNEL_DRIVER_RISCV_PLIC
 typedef struct {
+  // Physical address of the PLIC MMIO region.
   uint64_t mmio_phys;
+
+  // Size in bytes of the PLIC MMIO region.
+  uint32_t size_bytes;
+
+  // Number of supported IRQs.
   uint32_t num_irqs;
-  uint32_t reserved;
 } zbi_dcfg_riscv_plic_driver_t;
 
 // for ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER

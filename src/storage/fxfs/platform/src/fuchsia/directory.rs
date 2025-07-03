@@ -851,6 +851,10 @@ impl DirectoryEntry for FxDirectory {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_dir(self)
     }
+
+    fn scope(&self) -> Option<ExecutionScope> {
+        Some(self.volume().scope().clone())
+    }
 }
 
 impl GetEntryInfo for FxDirectory {
@@ -923,14 +927,11 @@ impl vfs::node::Node for FxDirectory {
 impl VfsDirectory for FxDirectory {
     fn deprecated_open(
         self: Arc<Self>,
-        _scope: ExecutionScope,
+        scope: ExecutionScope,
         flags: fio::OpenFlags,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        // Ignore the provided scope which might be for the parent pseudo filesystem and use the
-        // volume's scope instead.
-        let scope = self.volume().scope().clone();
         scope.clone().spawn(flags.to_object_request(server_end).handle_async(
             async move |object_request| {
                 let node =
@@ -991,14 +992,11 @@ impl VfsDirectory for FxDirectory {
 
     async fn open_async(
         self: Arc<Self>,
-        _scope: ExecutionScope,
+        scope: ExecutionScope,
         path: Path,
         flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        // Ignore the provided scope which might be for the parent pseudo filesystem and use the
-        // volume's scope instead.
-        let scope = self.volume().scope().clone();
         let node = self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
         if node.is::<FxDirectory>() {
             let directory =

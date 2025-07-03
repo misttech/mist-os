@@ -25,6 +25,7 @@ pub enum Feature {
     Magma,
     MagmaSupportedVendors,
     Nanohub,
+    Fastrpc,
     NetstackMark,
     NetworkManager,
     Gfxstream,

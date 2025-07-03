@@ -97,7 +97,10 @@ pub async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
             }
             Err(ParseSshConnectionError::Timeout) => {
                 time += wait_time;
-                log::debug!("No line after {time}, line so far: {:?}", lb.line());
+                log::debug!(
+                    "No new lines received from SSH cmd after {time}s, total lines received from SSH so far: {:?}",
+                    lb.line()
+                );
             }
             Err(e) => {
                 return Err(e);

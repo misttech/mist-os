@@ -29,6 +29,9 @@ const ZBI_FLAGS_STORAGE_COMPRESSED: u32 = 0x00000001;
 /// Magic number for the vboot structure which can encase a ZBI.
 const VBOOT_MAGIC: u64 = 0x534f454d4f524843;
 
+/// Magic number for the Android Boot Image which can encase a ZBI.
+const ANDROID_BOOT_IMAGE_MAGIC: u64 = 0x2144494f52444e41;
+
 /// Defines all of the known ZBI section types. These are used to partition
 /// the Zircon boot image into sections.
 #[repr(u32)]
@@ -127,13 +130,13 @@ impl ZbiReader {
     }
 
     pub fn parse(&mut self) -> Result<Vec<ZbiSection>> {
-        // The ZBI can be wrapped inside a vboot file. If this is the
-        // case before parsing the ZBI seek out the kernel partition holding
-        // the ZBI inside the VBoot image.
+        // The ZBI can be wrapped inside a vboot or android boot image file.
+        // If this is the case, before parsing the ZBI, seek out the partition
+        // holding the ZBI inside it.
         let magic = self.cursor.read_u64::<LittleEndian>()?;
         self.cursor.set_position(0);
-        if magic == VBOOT_MAGIC {
-            VBootSeeker::seek_to_partition(&mut self.cursor)?;
+        if magic == VBOOT_MAGIC || magic == ANDROID_BOOT_IMAGE_MAGIC {
+            ZbiSeeker::seek_to_partition(&mut self.cursor)?;
         }
 
         // Parse the header and validate it is a ZBI.
@@ -234,12 +237,12 @@ impl ZbiReader {
     }
 }
 
-struct VBootSeeker {}
+struct ZbiSeeker {}
 
-impl VBootSeeker {
-    /// Seeks from the start of a vboot image scanning for the ZBI header that
+impl ZbiSeeker {
+    /// Seeks from the start of an unknown image scanning for the ZBI header that
     /// is wrapped within it. This doesn't attempt to understand the underlying
-    /// VBoot format it just attempts to find the inner ZBI partition.
+    /// format it just attempts to find the inner ZBI partition.
     pub fn seek_to_partition(cursor: &mut Cursor<Vec<u8>>) -> Result<()> {
         const SEEK_ALIGNMENT: u64 = 4;
         let mut header = ZbiHeader::parse(cursor)?;
@@ -250,7 +253,7 @@ impl VBootSeeker {
             header = ZbiHeader::parse(cursor)?;
         }
         cursor.set_position(cursor.position() - ZBI_HEADER_SIZE);
-        info!(position:% = cursor.position(); "Found ZBI inside VBoot");
+        info!(position:% = cursor.position(); "Found ZBI inside another container");
         Ok(())
     }
 }

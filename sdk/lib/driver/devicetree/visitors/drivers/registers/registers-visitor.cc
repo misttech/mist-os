@@ -239,7 +239,7 @@ zx::result<> RegistersVisitor::DriverFinalizeNode(fdf_devicetree::Node& node) {
     }
 
     fuchsia_hardware_platform_bus::Metadata metadata = {{
-        .id = std::to_string(DEVICE_METADATA_REGISTERS),
+        .id = Metadata::kSerializableName,
         .data = encoded.value(),
     }};
 

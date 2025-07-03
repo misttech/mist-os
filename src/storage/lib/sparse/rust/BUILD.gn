@@ -32,6 +32,9 @@ rustc_library("lib") {
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:tempfile",
   ]
+  if (is_fuchsia) {
+    deps += [ "//sdk/rust/zx" ]
+  }
 
   test_deps = [ "//third_party/rust_crates:rand" ]
   if (is_linux) {

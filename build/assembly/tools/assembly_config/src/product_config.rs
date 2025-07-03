@@ -14,7 +14,7 @@ use fuchsia_pkg::{PackageBuilder, PackageManifest};
 pub fn new(args: &ProductArgs) -> Result<()> {
     let mut config = AssemblyConfig::from_config_path(&args.config)?;
 
-    config.product.release_info = Some(ProductReleaseInfo {
+    config.product.release_info = ProductReleaseInfo {
         info: ReleaseInfo {
             name: match config.product.build_info {
                 Some(ref value) => value.name.clone(),
@@ -29,7 +29,7 @@ pub fn new(args: &ProductArgs) -> Result<()> {
             )?,
         },
         pibs: vec![],
-    });
+    };
 
     // Build systems generally don't add package names to the config, so it
     // serializes index numbers in place of package names by default.
@@ -156,7 +156,7 @@ mod tests {
         let _ = new(&args);
         let config = AssemblyConfig::from_dir(product_path).unwrap();
         let expected = "fake_version".to_string();
-        assert_eq!(expected, config.product.release_info.unwrap().info.version);
+        assert_eq!(expected, config.product.release_info.info.version);
     }
 
     #[test]
@@ -187,7 +187,7 @@ mod tests {
         let _ = new(&args);
         let config = AssemblyConfig::from_dir(product_path).unwrap();
         let expected = "unversioned".to_string();
-        assert_eq!(expected, config.product.release_info.unwrap().info.version);
+        assert_eq!(expected, config.product.release_info.info.version);
     }
 
     #[test]

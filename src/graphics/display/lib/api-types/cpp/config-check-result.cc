@@ -10,6 +10,7 @@ namespace display {
 
 // Ensure that the Banjo constants match the FIDL constants.
 static_assert(ConfigCheckResult::kOk.ToBanjo() == CONFIG_CHECK_RESULT_OK);
+static_assert(ConfigCheckResult::kEmptyConfig.ToBanjo() == CONFIG_CHECK_RESULT_EMPTY_CONFIG);
 static_assert(ConfigCheckResult::kInvalidConfig.ToBanjo() == CONFIG_CHECK_RESULT_INVALID_CONFIG);
 static_assert(ConfigCheckResult::kUnsupportedConfig.ToBanjo() ==
               CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG);

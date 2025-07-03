@@ -18,6 +18,7 @@
 #include "diagnostics.h"
 #include "internal/no_unique_address.h"
 #include "internal/phdr-error.h"
+#include "memory.h"
 
 namespace elfldltl {
 
@@ -31,9 +32,13 @@ namespace elfldltl {
 //
 // All the template parameters are normally deduced, including the Elf layout
 // to use based on the Ehdr type used for the last argument.
-template <class Diagnostics, class File, typename Allocator, class Ehdr>
-constexpr auto ReadPhdrsFromFile(Diagnostics& diagnostics, File& file, Allocator&& allocator,
-                                 const Ehdr& ehdr) {
+template <class Diagnostics, class Ehdr,
+          ReadArrayFromFileAllocator<typename Ehdr::ElfLayout::Phdr, uint32_t> Allocator>
+constexpr auto ReadPhdrsFromFile(
+    Diagnostics& diagnostics,
+    CanReadArrayFromFile<typename Ehdr::ElfLayout::Phdr, Allocator,
+                         typename Ehdr::ElfLayout::size_type> auto& file,
+    Allocator&& allocator, const Ehdr& ehdr) {
   using namespace std::literals::string_view_literals;
 
   using Elf = typename Ehdr::ElfLayout;

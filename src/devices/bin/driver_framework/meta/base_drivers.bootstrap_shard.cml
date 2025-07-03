@@ -107,6 +107,15 @@
             // packages to provide fshost's (transitive) dependencies.
             dependency: "weak",
         },
+
+        // `VisualDebuggingLevel` to driver to change display configuration.
+        {
+            config: "fuchsia.ui.VisualDebuggingLevel",
+            from: "parent",
+            as: "fuchsia.display.VisualDebuggingLevel",
+            to: "#base-drivers",
+            availability: "optional",
+        },
     ],
     expose: [
         {
@@ -119,6 +128,7 @@
                 "fuchsia.hardware.nfc.Service",
                 "fuchsia.hardware.power.suspend.SuspendService",
                 "fuchsia.hardware.qcom.hvdcpopti.Service",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureService",
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",
                 "fuchsia.hardware.vsock.Service",
@@ -198,6 +208,7 @@
                 "fuchsia.services.test.Device",
                 "fuchsia.tpm.Service",
                 "fuchsia.wlan.device.Service",
+                "google.powerstats.Service",
             ],
             from: "#base-drivers",
         },

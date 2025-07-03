@@ -357,27 +357,25 @@ pub struct BlockGroupDesc32 {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(BlockGroupDesc32, [u8; 32]);
 
-// TODO(https://fxbug.dev/42073143): There are more fields in BlockGroupDesc if the filesystem is 64bit.
-// Uncomment this when we add support.
-// #[derive(FromZeros, FromBytes, Immutable, Unaligned)]
-// #[repr(C)]
-// pub struct BlockGroupDesc64 {
-//     pub base: BlockGroupDesc32,
-//     pub ext4bgd_b_bitmap_hi: LEU32,
-//     pub ext4bgd_i_bitmap_hi: LEU32,
-//     pub ext4bgd_i_tables_hi: LEU32,
-//     pub ext4bgd_nbfree_hi: LEU16,
-//     pub ext4bgd_nifree_hi: LEU16,
-//     pub ext4bgd_ndirs_hi: LEU16,
-//     pub ext4bgd_i_unused_hi: LEU16,
-//     pub ext4bgd_x_bitmap_hi: LEU32,
-//     pub ext4bgd_b_bmap_csum_hi: LEU16,
-//     pub ext4bgd_i_bmap_csum_hi: LEU16,
-//     pub ext4bgd_reserved: LEU32,
-// }
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
+#[repr(C)]
+pub struct BlockGroupDesc64 {
+    pub base: BlockGroupDesc32,
+    pub ext4bgd_b_bitmap_hi: LEU32,
+    pub ext4bgd_i_bitmap_hi: LEU32,
+    pub ext4bgd_i_tables_hi: LEU32,
+    pub ext4bgd_nbfree_hi: LEU16,
+    pub ext4bgd_nifree_hi: LEU16,
+    pub ext4bgd_ndirs_hi: LEU16,
+    pub ext4bgd_i_unused_hi: LEU16,
+    pub ext4bgd_x_bitmap_hi: LEU32,
+    pub ext4bgd_b_bmap_csum_hi: LEU16,
+    pub ext4bgd_i_bmap_csum_hi: LEU16,
+    pub ext4bgd_reserved: LEU32,
+}
 // Make sure our struct's size matches the Ext4 spec.
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
-// assert_eq_size!(BlockGroupDesc64, [u8; 64]);
+assert_eq_size!(BlockGroupDesc64, [u8; 64]);
 
 #[derive(KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
@@ -496,6 +494,8 @@ pub enum ParsingError {
     InvalidSuperBlockMagic(u16),
     #[error("Invalid Super Block inode size {} should be {}", _0, std::mem::size_of::<INode>())]
     InvalidInodeSize(u16),
+    #[error("Invalid Block Group Descriptor size {}", _0)]
+    InvalidBlockGroupDescSize(u16),
     #[error("Block number {} out of bounds.", _0)]
     BlockNumberOutOfBounds(u64),
     #[error("SuperBlock e2fs_log_bsize value invalid: {}", _0)]
@@ -640,14 +640,12 @@ pub const REQUIRED_FEATURE_INCOMPAT: u32 =
     FeatureIncompat::Extents as u32 | FeatureIncompat::EntryHasFileType as u32;
 
 /// Banned "feature incompatible" flags.
-pub const BANNED_FEATURE_INCOMPAT: u32 = FeatureIncompat::Compression as u32 |
-    // TODO(https://fxbug.dev/42073143): Possibly trivial to support.
-    FeatureIncompat::Is64Bit as u32 |
-    FeatureIncompat::MultiMountProtection as u32 |
-    FeatureIncompat::ExtendedAttributeINodes as u32 |
-    FeatureIncompat::ExtendedDirectoryEntry as u32 |
-    FeatureIncompat::SmallFilesInINode as u32 |
-    FeatureIncompat::EncryptedINodes as u32;
+pub const BANNED_FEATURE_INCOMPAT: u32 = FeatureIncompat::Compression as u32
+    | FeatureIncompat::MultiMountProtection as u32
+    | FeatureIncompat::ExtendedAttributeINodes as u32
+    | FeatureIncompat::ExtendedDirectoryEntry as u32
+    | FeatureIncompat::SmallFilesInINode as u32
+    | FeatureIncompat::EncryptedINodes as u32;
 
 // TODO(mbrunson): Update this trait to follow error conventions similar to ExtentTreeNode::parse.
 /// All functions to help parse data into respective structs.
@@ -705,6 +703,7 @@ impl SuperBlock {
         sb.check_magic()?;
         sb.feature_check()?;
         sb.check_inode_size()?;
+        sb.check_block_group_descriptor_size()?;
         Ok(sb)
     }
 
@@ -725,6 +724,20 @@ impl SuperBlock {
         }
     }
 
+    fn check_block_group_descriptor_size(&self) -> Result<(), ParsingError> {
+        let desc_size: usize = self.e3fs_desc_size.into();
+        let is_64bit = self.is_64bit();
+        // NB: Some images have a desc_size of 0.  Derive from is_64bit in that case.
+        if desc_size == 0
+            || is_64bit && desc_size == size_of::<BlockGroupDesc64>()
+            || !is_64bit && desc_size == size_of::<BlockGroupDesc32>()
+        {
+            Ok(())
+        } else {
+            Err(ParsingError::InvalidBlockGroupDescSize(self.e3fs_desc_size.get()))
+        }
+    }
+
     /// Gets file system block size.
     ///
     /// Per spec, the only valid block sizes are 1KiB, 2KiB, 4KiB, and 64KiB. We will only
@@ -738,6 +751,22 @@ impl SuperBlock {
         } else {
             Err(ParsingError::BlockSizeInvalid(self.e2fs_log_bsize.get()))
         }
+    }
+
+    /// Returns the size of the block group descriptors
+    pub fn block_group_descriptor_size(&self) -> usize {
+        // NB: We ignore the size recorded in the superblock, since we checked it already and it has
+        // to be either 4 or 8
+        if self.is_64bit() {
+            size_of::<BlockGroupDesc64>()
+        } else {
+            size_of::<BlockGroupDesc32>()
+        }
+    }
+
+    /// Returns whether the filesystem is 64bit enabled
+    pub fn is_64bit(&self) -> bool {
+        self.e2fs_features_incompat.get() & FeatureIncompat::Is64Bit as u32 != 0
     }
 
     fn feature_check(&self) -> Result<(), ParsingError> {
@@ -1089,14 +1118,14 @@ mod test {
         }
 
         // Test banned flag.
-        sb.e2fs_features_incompat = LEU32::new(FeatureIncompat::Is64Bit as u32);
+        sb.e2fs_features_incompat = LEU32::new(FeatureIncompat::Compression as u32);
         match sb.feature_check() {
             Ok(_) => assert!(false, "Feature flags should be incorrect."),
             Err(e) => assert_eq!(
                 format!("{}", e),
                 format!(
                     "Incompatible feature flags (feature_incompat): 0x{:X}",
-                    FeatureIncompat::Is64Bit as u32
+                    FeatureIncompat::Compression as u32
                 )
             ),
         }

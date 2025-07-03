@@ -21,6 +21,7 @@ rustc_library_with_features("netstack3-tcp") {
     "src/rtt.rs",
     "src/sack_scoreboard.rs",
     "src/seq_ranges.rs",
+    "src/settings.rs",
     "src/socket.rs",
     "src/socket/accept_queue.rs",
     "src/socket/demux.rs",
@@ -33,8 +34,8 @@ rustc_library_with_features("netstack3-tcp") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
+    "//src/connectivity/network/netstack3/core/hashmap",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//src/lib/replace-with",
     "//third_party/rust_crates:arrayvec",
@@ -47,7 +48,10 @@ rustc_library_with_features("netstack3-tcp") {
     "//third_party/rust_crates:thiserror",
   ]
 
-  _testutils_deps = [ "//third_party/rust_crates:either" ]
+  _testutils_deps = [
+    "//src/connectivity/network/netstack3/core/macros:netstack3-macros",
+    "//third_party/rust_crates:either",
+  ]
 
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
 

@@ -85,6 +85,8 @@ enumerable_enum! {
         // keep-sorted start
         /// The SELinux "anon_inode" object class.
         AnonFsNode,
+        /// The SELinux "binder" object class.
+        Binder,
         /// The SELinux "blk_file" object class.
         Block,
         /// The SELinux "bpf" object class.
@@ -159,6 +161,8 @@ enumerable_enum! {
         SockFile,
         /// The SELinux "socket" object class.
         Socket,
+        /// The SELinux "system" object class.
+        System,
         /// The SELinux "tcp_socket" object class.
         TcpSocket,
         /// The SELinux "udp_socket" object class.
@@ -179,6 +183,7 @@ impl KernelClass {
         match self {
             // keep-sorted start
             Self::AnonFsNode => "anon_inode",
+            Self::Binder => "binder",
             Self::Block => "blk_file",
             Self::Bpf => "bpf",
             Self::Capability => "capability",
@@ -216,6 +221,7 @@ impl KernelClass {
             Self::Security => "security",
             Self::SockFile => "sock_file",
             Self::Socket => "socket",
+            Self::System => "system",
             Self::TcpSocket => "tcp_socket",
             Self::UdpSocket => "udp_socket",
             Self::UnixDgramSocket => "unix_dgram_socket",
@@ -469,6 +475,8 @@ permission_enum! {
         // keep-sorted start
         /// Permissions for the well-known SELinux "anon_inode" file-like object class.
         AnonFsNode(AnonFsNodePermission),
+        /// Permissions for the well-known SELinux "binder" file-like object class.
+        Binder(BinderPermission),
         /// Permissions for the well-known SELinux "blk_file" file-like object class.
         Block(BlockFilePermission),
         /// Permissions for the well-known SELinux "bpf" file-like object class.
@@ -543,6 +551,8 @@ permission_enum! {
         SockFile(SockFilePermission),
         /// Permissions for the well-known SELinux "socket" object class.
         Socket(SocketPermission),
+        /// Permissions for the well-known SELinux "system" object class.
+        System(SystemPermission),
         /// Permissions for the well-known SELinux "tcp_socket" object class.
         TcpSocket(TcpSocketPermission),
         /// Permissions for the well-known SELinux "udp_socket" object class.
@@ -765,6 +775,8 @@ common_permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     CommonSocketPermission extends CommonFsNodePermission {
         // keep-sorted start
+        /// Permission to accept a connection.
+        Accept("accept"),
         /// Permission to bind to a name.
         Bind("bind"),
         /// Permission to initiate a connection.
@@ -1118,6 +1130,20 @@ class_permission_enum! {
 }
 
 class_permission_enum! {
+    /// A well-known "binder" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    BinderPermission {
+        // keep-sorted start
+        /// Permission to perform a binder IPC to a given target process.
+        Call("call"),
+        /// Permission to set oneself as a context manager.
+        SetContextMgr("set_context_mgr"),
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
     /// A well-known "blk_file" class permission in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -1333,6 +1359,22 @@ class_permission_enum! {
         SetCheckReqProt("setcheckreqprot"),
         /// Permission to switch the system between permissive and enforcing modes, via "enforce".
         SetEnforce("setenforce"),
+        // keep-sorted end
+     }
+}
+
+class_permission_enum! {
+    /// A well-known "system" class permission in SELinux policy, used to control access to
+    /// sensitive administrative and query API surfaces in the "selinuxfs".
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    SystemPermission {
+        // keep-sorted start
+        /// Permission to use the syslog(2) CONSOLE action types.
+        SyslogConsole("syslog_console"),
+        /// Permission to use other syslog(2) action types.
+        SyslogMod("syslog_mod"),
+        /// Permission to use the syslog(2) READ_ALL related action types.
+        SyslogRead("syslog_read"),
         // keep-sorted end
      }
 }

@@ -14,23 +14,36 @@ pub mod another_discoverable_protocol {
     pub mod prelude {
         pub use crate::{
             another_discoverable_protocol, AnotherDiscoverableProtocol,
-            AnotherDiscoverableProtocolClientHandler, AnotherDiscoverableProtocolClientSender,
-            AnotherDiscoverableProtocolServerHandler, AnotherDiscoverableProtocolServerSender,
+            AnotherDiscoverableProtocolClientHandler, AnotherDiscoverableProtocolServerHandler,
         };
     }
-}
 
-/// A helper trait for the `AnotherDiscoverableProtocol` client sender.
-pub trait AnotherDiscoverableProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
 
-impl<___T> AnotherDiscoverableProtocolClientSender
-    for ::fidl_next::ClientSender<___T, AnotherDiscoverableProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::AnotherDiscoverableProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = AnotherDiscoverableProtocolClientSender<___T>;
+            type ServerSender = AnotherDiscoverableProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `AnotherDiscoverableProtocol` protocol.
+        pub struct AnotherDiscoverableProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> AnotherDiscoverableProtocolClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `AnotherDiscoverableProtocol` protocol.
+        #[repr(transparent)]
+        pub struct AnotherDiscoverableProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> AnotherDiscoverableProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the AnotherDiscoverableProtocol protocol.
@@ -38,14 +51,14 @@ where
 /// See [`AnotherDiscoverableProtocol`] for more details.
 pub trait AnotherDiscoverableProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for AnotherDiscoverableProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for AnotherDiscoverableProtocol
 where
+    ___H: AnotherDiscoverableProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: AnotherDiscoverableProtocolClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -55,19 +68,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `AnotherDiscoverableProtocol` server sender.
-pub trait AnotherDiscoverableProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> AnotherDiscoverableProtocolServerSender
-    for ::fidl_next::ServerSender<___T, AnotherDiscoverableProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the AnotherDiscoverableProtocol protocol.
@@ -75,14 +75,14 @@ where
 /// See [`AnotherDiscoverableProtocol`] for more details.
 pub trait AnotherDiscoverableProtocolServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for AnotherDiscoverableProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for AnotherDiscoverableProtocol
 where
+    ___H: AnotherDiscoverableProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: AnotherDiscoverableProtocolServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -93,9 +93,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -1259,7 +1259,7 @@ pub mod channel_protocol {
     pub mod prelude {
         pub use crate::{
             channel_protocol, ChannelProtocol, ChannelProtocolClientHandler,
-            ChannelProtocolClientSender, ChannelProtocolServerHandler, ChannelProtocolServerSender,
+            ChannelProtocolServerHandler,
         };
 
         pub use crate::ChannelProtocolEventARequest;
@@ -1336,133 +1336,432 @@ pub mod channel_protocol {
 
         type Response = crate::WireChannelProtocolMutateSocketResponse;
     }
-}
 
-/// A helper trait for the `ChannelProtocol` client sender.
-pub trait ChannelProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn method_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodARequest,
-        >;
+        pub struct MethodA<T0, T1> {
+            a: T0,
 
-    fn method_b<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, channel_protocol::MethodB>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodBRequest,
-        >;
+            b: T1,
+        }
 
-    fn take_handle<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, channel_protocol::TakeHandle>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolTakeHandleRequest,
-        >;
+        impl<T0, T1> ::fidl_next::Encodable for MethodA<T0, T1>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI64>,
 
-    fn mutate_socket<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, channel_protocol::MutateSocket>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMutateSocketRequest,
-        >;
-}
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI64>,
+        {
+            type Encoded = crate::WireChannelProtocolMethodARequest;
+        }
 
-impl<___T> ChannelProtocolClientSender for ::fidl_next::ClientSender<___T, ChannelProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___E, T0, T1> ::fidl_next::Encode<___E> for MethodA<T0, T1>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    fn method_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodARequest,
-        >,
-    {
-        self.as_untyped().send_one_way(3155008840945527714, request)
-    }
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI64>,
 
-    fn method_b<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, channel_protocol::MethodB>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodBRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(8903004957800778182, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI64>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+                        b,
 
-    fn take_handle<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, channel_protocol::TakeHandle>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolTakeHandleRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(591935489944717925, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+                    } = out;
+                }
 
-    fn mutate_socket<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, channel_protocol::MutateSocket>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMutateSocketRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(7411742788430590287, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                ::fidl_next::Encode::encode(self.b, encoder, b)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct EventA<T0, T1> {
+            a: T0,
+
+            b: T1,
+        }
+
+        impl<T0, T1> ::fidl_next::Encodable for EventA<T0, T1>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI64>,
+
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI64>,
+        {
+            type Encoded = crate::WireChannelProtocolEventARequest;
+        }
+
+        unsafe impl<___E, T0, T1> ::fidl_next::Encode<___E> for EventA<T0, T1>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI64>,
+
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI64>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+                        b,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                ::fidl_next::Encode::encode(self.b, encoder, b)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct MethodB<T0, T1> {
+            a: T0,
+
+            b: T1,
+        }
+
+        impl<T0, T1> ::fidl_next::Encodable for MethodB<T0, T1>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI64>,
+
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI64>,
+        {
+            type Encoded = crate::WireChannelProtocolMethodBRequest;
+        }
+
+        unsafe impl<___E, T0, T1> ::fidl_next::Encode<___E> for MethodB<T0, T1>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI64>,
+
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI64>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+                        b,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                ::fidl_next::Encode::encode(self.b, encoder, b)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct TakeHandle<T0> {
+            h: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for TakeHandle<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            type Encoded = crate::WireChannelProtocolTakeHandleRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for TakeHandle<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        h,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.h, encoder, h)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct MutateSocket<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for MutateSocket<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            type Encoded = crate::WireChannelProtocolMutateSocketRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for MutateSocket<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ChannelProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ChannelProtocolClientSender<___T>;
+            type ServerSender = ChannelProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `ChannelProtocol` protocol.
+        pub struct ChannelProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> ChannelProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn method_a(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI64,
+                >,
+
+                b: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI64,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.method_a_with(MethodA { a, b })
+            }
+
+            pub fn method_a_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolMethodARequest,
+                >,
+            {
+                self.sender.send_one_way(3155008840945527714, request)
+            }
+
+            pub fn method_b(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI64,
+                >,
+
+                b: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI64,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::MethodB, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.method_b_with(MethodB { a, b })
+            }
+
+            pub fn method_b_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::MethodB, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolMethodBRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(8903004957800778182, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn take_handle(
+                &self,
+
+                h: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::TakeHandle, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.take_handle_with(TakeHandle { h })
+            }
+
+            pub fn take_handle_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::TakeHandle, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolTakeHandleRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(591935489944717925, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn mutate_socket(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::MutateSocket, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.mutate_socket_with(MutateSocket { a })
+            }
+
+            pub fn mutate_socket_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::MutateSocket, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolMutateSocketRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(7411742788430590287, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `ChannelProtocol` protocol.
+        #[repr(transparent)]
+        pub struct ChannelProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ChannelProtocolServerSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn event_a(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI64,
+                >,
+
+                b: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI64,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.event_a_with(EventA { a, b })
+            }
+
+            pub fn event_a_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = <super::EventA as ::fidl_next::Method>::Response,
+                >,
+            {
+                self.sender.send_event(2220452875311597006, request)
+            }
+        }
     }
 }
 
@@ -1472,16 +1771,16 @@ where
 pub trait ChannelProtocolClientHandler<___T: ::fidl_next::Transport> {
     fn event_a(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, ChannelProtocol>,
+        sender: &::fidl_next::ClientSender<ChannelProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, channel_protocol::EventA>,
-    );
+        event: ::fidl_next::Response<channel_protocol::EventA, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ChannelProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for ChannelProtocol
 where
+    ___H: ChannelProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ChannelProtocolClientHandler<___T>,
 
     <channel_protocol::EventA as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -1492,15 +1791,15 @@ where
     <channel_protocol::MutateSocket as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             2220452875311597006 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.event_a(sender, decoded),
+                Ok(decoded) => handler.event_a(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -1513,84 +1812,49 @@ where
     }
 }
 
-/// A helper trait for the `ChannelProtocol` server sender.
-pub trait ChannelProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-
-    fn event_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <channel_protocol::EventA as ::fidl_next::Method>::Response,
-        >;
-}
-
-impl<___T> ChannelProtocolServerSender for ::fidl_next::ServerSender<___T, ChannelProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-
-    fn event_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <channel_protocol::EventA as ::fidl_next::Method>::Response,
-        >,
-    {
-        self.as_untyped().send_event(2220452875311597006, request)
-    }
-}
-
 /// A server handler for the ChannelProtocol protocol.
 ///
 /// See [`ChannelProtocol`] for more details.
 pub trait ChannelProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn method_a(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ChannelProtocol>,
+        sender: &::fidl_next::ServerSender<ChannelProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, channel_protocol::MethodA>,
-    );
+        request: ::fidl_next::Request<channel_protocol::MethodA, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn method_b(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ChannelProtocol>,
+        sender: &::fidl_next::ServerSender<ChannelProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, channel_protocol::MethodB>,
+        request: ::fidl_next::Request<channel_protocol::MethodB, ___T>,
 
         responder: ::fidl_next::Responder<channel_protocol::MethodB>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn take_handle(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ChannelProtocol>,
+        sender: &::fidl_next::ServerSender<ChannelProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, channel_protocol::TakeHandle>,
+        request: ::fidl_next::Request<channel_protocol::TakeHandle, ___T>,
 
         responder: ::fidl_next::Responder<channel_protocol::TakeHandle>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn mutate_socket(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ChannelProtocol>,
+        sender: &::fidl_next::ServerSender<ChannelProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, channel_protocol::MutateSocket>,
+        request: ::fidl_next::Request<channel_protocol::MutateSocket, ___T>,
 
         responder: ::fidl_next::Responder<channel_protocol::MutateSocket>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ChannelProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for ChannelProtocol
 where
+    ___H: ChannelProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ChannelProtocolServerHandler<___T>,
 
     <channel_protocol::MethodA as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -1604,15 +1868,15 @@ where
     <channel_protocol::MutateSocket as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             3155008840945527714 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.method_a(sender, decoded),
+                Ok(decoded) => handler.method_a(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -1624,9 +1888,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -1636,7 +1900,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.method_b(sender, decoded, responder),
+                    Ok(decoded) => handler.method_b(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -1647,7 +1911,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.take_handle(sender, decoded, responder),
+                    Ok(decoded) => handler.take_handle(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -1658,7 +1922,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.mutate_socket(sender, decoded, responder),
+                    Ok(decoded) => handler.mutate_socket(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -1684,8 +1948,7 @@ pub mod discoverable_protocol {
     pub mod prelude {
         pub use crate::{
             discoverable_protocol, DiscoverableProtocol, DiscoverableProtocolClientHandler,
-            DiscoverableProtocolClientSender, DiscoverableProtocolServerHandler,
-            DiscoverableProtocolServerSender,
+            DiscoverableProtocolServerHandler,
         };
     }
 
@@ -1700,28 +1963,41 @@ pub mod discoverable_protocol {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `DiscoverableProtocol` client sender.
-pub trait DiscoverableProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn method(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-}
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::DiscoverableProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = DiscoverableProtocolClientSender<___T>;
+            type ServerSender = DiscoverableProtocolServerSender<___T>;
+        }
 
-impl<___T> DiscoverableProtocolClientSender
-    for ::fidl_next::ClientSender<___T, DiscoverableProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `DiscoverableProtocol` protocol.
+        pub struct DiscoverableProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn method(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(3455873048082739435, ())
+        impl<___T> DiscoverableProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn method(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_one_way(3455873048082739435, ())
+            }
+        }
+
+        /// The server sender for the `DiscoverableProtocol` protocol.
+        #[repr(transparent)]
+        pub struct DiscoverableProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> DiscoverableProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -1730,14 +2006,14 @@ where
 /// See [`DiscoverableProtocol`] for more details.
 pub trait DiscoverableProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for DiscoverableProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for DiscoverableProtocol
 where
+    ___H: DiscoverableProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DiscoverableProtocolClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1747,42 +2023,32 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `DiscoverableProtocol` server sender.
-pub trait DiscoverableProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> DiscoverableProtocolServerSender
-    for ::fidl_next::ServerSender<___T, DiscoverableProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the DiscoverableProtocol protocol.
 ///
 /// See [`DiscoverableProtocol`] for more details.
 pub trait DiscoverableProtocolServerHandler<___T: ::fidl_next::Transport> {
-    fn method(&mut self, sender: &::fidl_next::ServerSender<___T, DiscoverableProtocol>);
+    fn method(
+        &mut self,
+        sender: &::fidl_next::ServerSender<DiscoverableProtocol, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for DiscoverableProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for DiscoverableProtocol
 where
+    ___H: DiscoverableProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DiscoverableProtocolServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             3455873048082739435 => {
-                handler.method(sender);
+                handler.method(sender).await;
             }
 
             ordinal => {
@@ -1791,9 +2057,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -2467,8 +2733,7 @@ pub mod handle_rights_protocol {
     pub mod prelude {
         pub use crate::{
             handle_rights_protocol, HandleRightsProtocol, HandleRightsProtocolClientHandler,
-            HandleRightsProtocolClientSender, HandleRightsProtocolServerHandler,
-            HandleRightsProtocolServerSender,
+            HandleRightsProtocolServerHandler,
         };
 
         pub use crate::HandleRightsProtocolAnEventRequest;
@@ -2515,72 +2780,250 @@ pub mod handle_rights_protocol {
 
         type Response = crate::WireHandleRightsProtocolAnEventRequest;
     }
-}
 
-/// A helper trait for the `HandleRightsProtocol` client sender.
-pub trait HandleRightsProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn no_response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
-        >;
+        pub struct NoResponseMethod<T0> {
+            h: T0,
+        }
 
-    fn response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, handle_rights_protocol::ResponseMethod>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
-        >;
-}
+        impl<T0> ::fidl_next::Encodable for NoResponseMethod<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            type Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest;
+        }
 
-impl<___T> HandleRightsProtocolClientSender
-    for ::fidl_next::ClientSender<___T, HandleRightsProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for NoResponseMethod<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    fn no_response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(1155044649514904573, request)
-    }
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
 
-    fn response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, handle_rights_protocol::ResponseMethod>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(5956276128041940295, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        h,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.h, encoder, h)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct ResponseMethod<T0> {
+            h: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for ResponseMethod<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            type Encoded = crate::WireHandleRightsProtocolResponseMethodRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for ResponseMethod<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        h,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.h, encoder, h)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct AnEvent<T0> {
+            h: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for AnEvent<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            type Encoded = crate::WireHandleRightsProtocolAnEventRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for AnEvent<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        h,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.h, encoder, h)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::HandleRightsProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = HandleRightsProtocolClientSender<___T>;
+            type ServerSender = HandleRightsProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `HandleRightsProtocol` protocol.
+        pub struct HandleRightsProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> HandleRightsProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn no_response_method(
+                &self,
+
+                h: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.no_response_method_with(NoResponseMethod { h })
+            }
+
+            pub fn no_response_method_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
+                >,
+            {
+                self.sender.send_one_way(1155044649514904573, request)
+            }
+
+            pub fn response_method(
+                &self,
+
+                h: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ResponseMethod, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.response_method_with(ResponseMethod { h })
+            }
+
+            pub fn response_method_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ResponseMethod, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(5956276128041940295, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `HandleRightsProtocol` protocol.
+        #[repr(transparent)]
+        pub struct HandleRightsProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> HandleRightsProtocolServerSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn an_event(
+                &self,
+
+                h: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.an_event_with(AnEvent { h })
+            }
+
+            pub fn an_event_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = <super::AnEvent as ::fidl_next::Method>::Response,
+                >,
+            {
+                self.sender.send_event(476727631355490611, request)
+            }
+        }
     }
 }
 
@@ -2590,16 +3033,16 @@ where
 pub trait HandleRightsProtocolClientHandler<___T: ::fidl_next::Transport> {
     fn an_event(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, HandleRightsProtocol>,
+        sender: &::fidl_next::ClientSender<HandleRightsProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, handle_rights_protocol::AnEvent>,
-    );
+        event: ::fidl_next::Response<handle_rights_protocol::AnEvent, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for HandleRightsProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for HandleRightsProtocol
 where
+    ___H: HandleRightsProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: HandleRightsProtocolClientHandler<___T>,
 
     <handle_rights_protocol::ResponseMethod as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -2607,15 +3050,15 @@ where
     <handle_rights_protocol::AnEvent as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             476727631355490611 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.an_event(sender, decoded),
+                Ok(decoded) => handler.an_event(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -2625,42 +3068,6 @@ where
                 sender.close();
             }
         }
-    }
-}
-
-/// A helper trait for the `HandleRightsProtocol` server sender.
-pub trait HandleRightsProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-
-    fn an_event<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <handle_rights_protocol::AnEvent as ::fidl_next::Method>::Response,
-        >;
-}
-
-impl<___T> HandleRightsProtocolServerSender
-    for ::fidl_next::ServerSender<___T, HandleRightsProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-
-    fn an_event<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <handle_rights_protocol::AnEvent as ::fidl_next::Method>::Response,
-        >,
-    {
-        self.as_untyped().send_event(476727631355490611, request)
     }
 }
 
@@ -2670,25 +3077,25 @@ where
 pub trait HandleRightsProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn no_response_method(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, HandleRightsProtocol>,
+        sender: &::fidl_next::ServerSender<HandleRightsProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, handle_rights_protocol::NoResponseMethod>,
-    );
+        request: ::fidl_next::Request<handle_rights_protocol::NoResponseMethod, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn response_method(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, HandleRightsProtocol>,
+        sender: &::fidl_next::ServerSender<HandleRightsProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, handle_rights_protocol::ResponseMethod>,
+        request: ::fidl_next::Request<handle_rights_protocol::ResponseMethod, ___T>,
 
         responder: ::fidl_next::Responder<handle_rights_protocol::ResponseMethod>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for HandleRightsProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for HandleRightsProtocol
 where
+    ___H: HandleRightsProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: HandleRightsProtocolServerHandler<___T>,
 
     <handle_rights_protocol::NoResponseMethod as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -2696,15 +3103,15 @@ where
     <handle_rights_protocol::ResponseMethod as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             1155044649514904573 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.no_response_method(sender, decoded),
+                Ok(decoded) => handler.no_response_method(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -2716,9 +3123,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -2728,7 +3135,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.response_method(sender, decoded, responder),
+                    Ok(decoded) => handler.response_method(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -3185,7 +3592,7 @@ pub mod many_parameters {
     pub mod prelude {
         pub use crate::{
             many_parameters, ManyParameters, ManyParametersClientHandler,
-            ManyParametersClientSender, ManyParametersServerHandler, ManyParametersServerSender,
+            ManyParametersServerHandler,
         };
 
         pub use crate::ManyParametersFifteenRequest;
@@ -3202,40 +3609,328 @@ pub mod many_parameters {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `ManyParameters` client sender.
-pub trait ManyParametersClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn fifteen<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireManyParametersFifteenRequest,
-        >;
-}
+        pub struct Fifteen<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> {
+            p1: T0,
 
-impl<___T> ManyParametersClientSender for ::fidl_next::ClientSender<___T, ManyParameters>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            p2: T1,
 
-    fn fifteen<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireManyParametersFifteenRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(6423043252952467815, request)
+            p3: T2,
+
+            p4: T3,
+
+            p5: T4,
+
+            p6: T5,
+
+            p7: T6,
+
+            p8: T7,
+
+            p9: T8,
+
+            p10: T9,
+
+            p11: T10,
+
+            p12: T11,
+
+            p13: T12,
+
+            p14: T13,
+
+            p15: T14,
+        }
+
+        impl<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> ::fidl_next::Encodable
+            for Fifteen<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+
+            T1: ::fidl_next::Encodable<Encoded = bool>,
+
+            T2: ::fidl_next::Encodable<Encoded = bool>,
+
+            T3: ::fidl_next::Encodable<Encoded = bool>,
+
+            T4: ::fidl_next::Encodable<Encoded = bool>,
+
+            T5: ::fidl_next::Encodable<Encoded = bool>,
+
+            T6: ::fidl_next::Encodable<Encoded = bool>,
+
+            T7: ::fidl_next::Encodable<Encoded = bool>,
+
+            T8: ::fidl_next::Encodable<Encoded = bool>,
+
+            T9: ::fidl_next::Encodable<Encoded = bool>,
+
+            T10: ::fidl_next::Encodable<Encoded = bool>,
+
+            T11: ::fidl_next::Encodable<Encoded = bool>,
+
+            T12: ::fidl_next::Encodable<Encoded = bool>,
+
+            T13: ::fidl_next::Encodable<Encoded = bool>,
+
+            T14: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireManyParametersFifteenRequest;
+        }
+
+        unsafe impl<___E, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>
+            ::fidl_next::Encode<___E>
+            for Fifteen<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T1: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T2: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T3: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T4: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T5: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T6: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T7: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T8: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T9: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T10: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T11: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T12: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T13: ::fidl_next::Encode<___E, Encoded = bool>,
+
+            T14: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        p1,
+                        p2,
+                        p3,
+                        p4,
+                        p5,
+                        p6,
+                        p7,
+                        p8,
+                        p9,
+                        p10,
+                        p11,
+                        p12,
+                        p13,
+                        p14,
+                        p15,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.p1, encoder, p1)?;
+
+                ::fidl_next::Encode::encode(self.p2, encoder, p2)?;
+
+                ::fidl_next::Encode::encode(self.p3, encoder, p3)?;
+
+                ::fidl_next::Encode::encode(self.p4, encoder, p4)?;
+
+                ::fidl_next::Encode::encode(self.p5, encoder, p5)?;
+
+                ::fidl_next::Encode::encode(self.p6, encoder, p6)?;
+
+                ::fidl_next::Encode::encode(self.p7, encoder, p7)?;
+
+                ::fidl_next::Encode::encode(self.p8, encoder, p8)?;
+
+                ::fidl_next::Encode::encode(self.p9, encoder, p9)?;
+
+                ::fidl_next::Encode::encode(self.p10, encoder, p10)?;
+
+                ::fidl_next::Encode::encode(self.p11, encoder, p11)?;
+
+                ::fidl_next::Encode::encode(self.p12, encoder, p12)?;
+
+                ::fidl_next::Encode::encode(self.p13, encoder, p13)?;
+
+                ::fidl_next::Encode::encode(self.p14, encoder, p14)?;
+
+                ::fidl_next::Encode::encode(self.p15, encoder, p15)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ManyParameters
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ManyParametersClientSender<___T>;
+            type ServerSender = ManyParametersServerSender<___T>;
+        }
+
+        /// The client sender for the `ManyParameters` protocol.
+        pub struct ManyParametersClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> ManyParametersClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn fifteen(
+                &self,
+
+                p1: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p2: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p3: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p4: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p5: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p6: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p7: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p8: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p9: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p10: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p11: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p12: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p13: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p14: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+
+                p15: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.fifteen_with(Fifteen {
+                    p1,
+
+                    p2,
+
+                    p3,
+
+                    p4,
+
+                    p5,
+
+                    p6,
+
+                    p7,
+
+                    p8,
+
+                    p9,
+
+                    p10,
+
+                    p11,
+
+                    p12,
+
+                    p13,
+
+                    p14,
+
+                    p15,
+                })
+            }
+
+            pub fn fifteen_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireManyParametersFifteenRequest,
+                >,
+            {
+                self.sender.send_one_way(6423043252952467815, request)
+            }
+        }
+
+        /// The server sender for the `ManyParameters` protocol.
+        #[repr(transparent)]
+        pub struct ManyParametersServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ManyParametersServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -3244,14 +3939,14 @@ where
 /// See [`ManyParameters`] for more details.
 pub trait ManyParametersClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ManyParameters
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for ManyParameters
 where
+    ___H: ManyParametersClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ManyParametersClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -3263,47 +3958,35 @@ where
     }
 }
 
-/// A helper trait for the `ManyParameters` server sender.
-pub trait ManyParametersServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ManyParametersServerSender for ::fidl_next::ServerSender<___T, ManyParameters>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-}
-
 /// A server handler for the ManyParameters protocol.
 ///
 /// See [`ManyParameters`] for more details.
 pub trait ManyParametersServerHandler<___T: ::fidl_next::Transport> {
     fn fifteen(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ManyParameters>,
+        sender: &::fidl_next::ServerSender<ManyParameters, ___T>,
 
-        request: ::fidl_next::Request<___T, many_parameters::Fifteen>,
-    );
+        request: ::fidl_next::Request<many_parameters::Fifteen, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ManyParameters
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for ManyParameters
 where
+    ___H: ManyParametersServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ManyParametersServerHandler<___T>,
 
     <many_parameters::Fifteen as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             6423043252952467815 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.fifteen(sender, decoded),
+                Ok(decoded) => handler.fifteen(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -3315,9 +3998,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -4049,7 +4732,7 @@ pub mod method_with_union {
     pub mod prelude {
         pub use crate::{
             method_with_union, MethodWithUnion, MethodWithUnionClientHandler,
-            MethodWithUnionClientSender, MethodWithUnionServerHandler, MethodWithUnionServerSender,
+            MethodWithUnionServerHandler,
         };
 
         pub use crate::MethodWithUnionUnionMethodRequest;
@@ -4068,48 +4751,107 @@ pub mod method_with_union {
 
         type Response = crate::WireMethodWithUnionUnionMethodResponse;
     }
-}
 
-/// A helper trait for the `MethodWithUnion` client sender.
-pub trait MethodWithUnionClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn union_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, method_with_union::UnionMethod>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireMethodWithUnionUnionMethodRequest,
-        >;
-}
+        pub struct UnionMethod<T0> {
+            u: T0,
+        }
 
-impl<___T> MethodWithUnionClientSender for ::fidl_next::ClientSender<___T, MethodWithUnion>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<T0> ::fidl_next::Encodable for UnionMethod<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireTheUnion>,
+        {
+            type Encoded = crate::WireMethodWithUnionUnionMethodRequest;
+        }
 
-    fn union_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, method_with_union::UnionMethod>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireMethodWithUnionUnionMethodRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(4124874338266649112, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for UnionMethod<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireTheUnion>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        u,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.u, encoder, u)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::MethodWithUnion
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = MethodWithUnionClientSender<___T>;
+            type ServerSender = MethodWithUnionServerSender<___T>;
+        }
+
+        /// The client sender for the `MethodWithUnion` protocol.
+        pub struct MethodWithUnionClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> MethodWithUnionClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn union_method(
+                &self,
+
+                u: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireTheUnion,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::UnionMethod, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.union_method_with(UnionMethod { u })
+            }
+
+            pub fn union_method_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::UnionMethod, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireMethodWithUnionUnionMethodRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(4124874338266649112, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `MethodWithUnion` protocol.
+        #[repr(transparent)]
+        pub struct MethodWithUnionServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> MethodWithUnionServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -4118,17 +4860,17 @@ where
 /// See [`MethodWithUnion`] for more details.
 pub trait MethodWithUnionClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for MethodWithUnion
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for MethodWithUnion
 where
+    ___H: MethodWithUnionClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: MethodWithUnionClientHandler<___T>,
 
     <method_with_union::UnionMethod as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -4138,18 +4880,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `MethodWithUnion` server sender.
-pub trait MethodWithUnionServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> MethodWithUnionServerSender for ::fidl_next::ServerSender<___T, MethodWithUnion>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the MethodWithUnion protocol.
@@ -4158,25 +4888,25 @@ where
 pub trait MethodWithUnionServerHandler<___T: ::fidl_next::Transport> {
     fn union_method(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MethodWithUnion>,
+        sender: &::fidl_next::ServerSender<MethodWithUnion, ___T>,
 
-        request: ::fidl_next::Request<___T, method_with_union::UnionMethod>,
+        request: ::fidl_next::Request<method_with_union::UnionMethod, ___T>,
 
         responder: ::fidl_next::Responder<method_with_union::UnionMethod>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for MethodWithUnion
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for MethodWithUnion
 where
+    ___H: MethodWithUnionServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: MethodWithUnionServerHandler<___T>,
 
     <method_with_union::UnionMethod as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -4187,9 +4917,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -4199,7 +4929,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.union_method(sender, decoded, responder),
+                    Ok(decoded) => handler.union_method(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -4225,21 +4955,36 @@ pub mod platform_server {
     pub mod prelude {
         pub use crate::{
             platform_server, PlatformServer, PlatformServerClientHandler,
-            PlatformServerClientSender, PlatformServerServerHandler, PlatformServerServerSender,
+            PlatformServerServerHandler,
         };
     }
-}
 
-/// A helper trait for the `PlatformServer` client sender.
-pub trait PlatformServerClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
 
-impl<___T> PlatformServerClientSender for ::fidl_next::ClientSender<___T, PlatformServer>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::PlatformServer
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = PlatformServerClientSender<___T>;
+            type ServerSender = PlatformServerServerSender<___T>;
+        }
+
+        /// The client sender for the `PlatformServer` protocol.
+        pub struct PlatformServerClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> PlatformServerClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `PlatformServer` protocol.
+        #[repr(transparent)]
+        pub struct PlatformServerServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> PlatformServerServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the PlatformServer protocol.
@@ -4247,14 +4992,14 @@ where
 /// See [`PlatformServer`] for more details.
 pub trait PlatformServerClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for PlatformServer
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for PlatformServer
 where
+    ___H: PlatformServerClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: PlatformServerClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -4264,18 +5009,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `PlatformServer` server sender.
-pub trait PlatformServerServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> PlatformServerServerSender for ::fidl_next::ServerSender<___T, PlatformServer>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the PlatformServer protocol.
@@ -4283,14 +5016,14 @@ where
 /// See [`PlatformServer`] for more details.
 pub trait PlatformServerServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for PlatformServer
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for PlatformServer
 where
+    ___H: PlatformServerServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: PlatformServerServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -4301,9 +5034,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -4320,19 +5053,17 @@ where
 #[repr(C)]
 pub struct ProtocolEnds {
     pub client:
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
+        ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
 
     pub server:
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
+        ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
 
-    pub client_opt: ::fidl_next::ClientEnd<
-        Option<::fidl_next::fuchsia::zx::Channel>,
-        crate::DiscoverableProtocol,
+    pub client_opt: Option<
+        ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 
-    pub server_opt: ::fidl_next::ServerEnd<
-        Option<::fidl_next::fuchsia::zx::Channel>,
-        crate::DiscoverableProtocol,
+    pub server_opt: Option<
+        ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 }
 
@@ -4340,23 +5071,27 @@ impl ::fidl_next::Encodable for ProtocolEnds {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireProtocolEnds> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled()
                 && <::fidl_next::ServerEnd<
+                    crate::DiscoverableProtocol,
                     ::fidl_next::fuchsia::zx::Channel,
-                    crate::DiscoverableProtocol,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ClientEnd<
-                    Option<::fidl_next::fuchsia::zx::Channel>,
-                    crate::DiscoverableProtocol,
+                && <Option<
+                    ::fidl_next::ClientEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ServerEnd<
-                    Option<::fidl_next::fuchsia::zx::Channel>,
-                    crate::DiscoverableProtocol,
+                && <Option<
+                    ::fidl_next::ServerEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled(),
         )
@@ -4429,42 +5164,46 @@ impl ::fidl_next::FromWire<WireProtocolEnds> for ProtocolEnds {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireProtocolEnds, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ClientEnd<
-                    ::fidl_next::fuchsia::WireChannel,
                     crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireChannel,
                 >,
             >>::COPY_OPTIMIZATION
                 .is_enabled()
                 && <::fidl_next::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Channel,
                     crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
                 > as ::fidl_next::FromWire<
                     ::fidl_next::ServerEnd<
-                        ::fidl_next::fuchsia::WireChannel,
                         crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::WireChannel,
                     >,
                 >>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ClientEnd<
-                    Option<::fidl_next::fuchsia::zx::Channel>,
-                    crate::DiscoverableProtocol,
+                && <Option<
+                    ::fidl_next::ClientEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::FromWire<
                     ::fidl_next::ClientEnd<
-                        ::fidl_next::fuchsia::WireOptionalChannel,
                         crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::WireOptionalChannel,
                     >,
                 >>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ServerEnd<
-                    Option<::fidl_next::fuchsia::zx::Channel>,
-                    crate::DiscoverableProtocol,
+                && <Option<
+                    ::fidl_next::ServerEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::FromWire<
                     ::fidl_next::ServerEnd<
-                        ::fidl_next::fuchsia::WireOptionalChannel,
                         crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::WireOptionalChannel,
                     >,
                 >>::COPY_OPTIMIZATION
                     .is_enabled(),
@@ -4490,19 +5229,19 @@ impl ::fidl_next::FromWire<WireProtocolEnds> for ProtocolEnds {
 #[repr(C)]
 pub struct WireProtocolEnds {
     pub client:
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
+        ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::WireChannel>,
 
     pub server:
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
+        ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::WireChannel>,
 
     pub client_opt: ::fidl_next::ClientEnd<
-        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
+        ::fidl_next::fuchsia::WireOptionalChannel,
     >,
 
     pub server_opt: ::fidl_next::ServerEnd<
-        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
+        ::fidl_next::fuchsia::WireOptionalChannel,
     >,
 }
 
@@ -5608,8 +6347,7 @@ pub mod with_and_without_request_response {
     pub mod prelude {
         pub use crate::{
             with_and_without_request_response, WithAndWithoutRequestResponse,
-            WithAndWithoutRequestResponseClientHandler, WithAndWithoutRequestResponseClientSender,
-            WithAndWithoutRequestResponseServerHandler, WithAndWithoutRequestResponseServerSender,
+            WithAndWithoutRequestResponseClientHandler, WithAndWithoutRequestResponseServerHandler,
         };
 
         pub use crate::WithAndWithoutRequestResponseNoRequestWithResponseResponse;
@@ -5725,189 +6463,369 @@ pub mod with_and_without_request_response {
 
         type Response = crate::WireWithAndWithoutRequestResponseOnWithResponseRequest<'static>;
     }
-}
 
-/// A helper trait for the `WithAndWithoutRequestResponse` client sender.
-pub trait WithAndWithoutRequestResponseClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn no_request_no_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
+        pub struct WithRequestNoResponse<T0> {
+            arg: T0,
+        }
 
-    fn no_request_empty_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::NoRequestEmptyResponse,
-        >,
-        ::fidl_next::EncodeError,
-    >;
+        impl<T0> ::fidl_next::Encodable for WithRequestNoResponse<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireString<'static>>,
+        {
+            type Encoded =
+                crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'static>;
+        }
 
-    fn no_request_with_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::NoRequestWithResponse,
-        >,
-        ::fidl_next::EncodeError,
-    >;
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for WithRequestNoResponse<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    fn with_request_no_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'static>,
-        >;
+            ___E: ::fidl_next::Encoder,
 
-    fn with_request_empty_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::WithRequestEmptyResponse,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<
-                'static,
-            >,
-        >;
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireString<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        arg,
 
-    fn with_request_with_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::WithRequestWithResponse,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<
-                'static,
-            >,
-        >;
-}
+                    } = out;
+                }
 
-impl<___T> WithAndWithoutRequestResponseClientSender
-    for ::fidl_next::ClientSender<___T, WithAndWithoutRequestResponse>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+                ::fidl_next::Encode::encode(self.arg, encoder, arg)?;
 
-    fn no_request_no_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(5413654872775949227, ())
-    }
+                Ok(())
+            }
+        }
 
-    fn no_request_empty_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::NoRequestEmptyResponse,
-        >,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(1631193469798418024, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        pub struct WithRequestEmptyResponse<T0> {
+            arg: T0,
+        }
 
-    fn no_request_with_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::NoRequestWithResponse,
-        >,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(9037369643591427517, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        impl<T0> ::fidl_next::Encodable for WithRequestEmptyResponse<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireString<'static>>,
+        {
+            type Encoded =
+                crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<'static>;
+        }
 
-    fn with_request_no_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'static>,
-        >,
-    {
-        self.as_untyped().send_one_way(7326057319832554103, request)
-    }
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for WithRequestEmptyResponse<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    fn with_request_empty_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::WithRequestEmptyResponse,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<
-                'static,
-            >,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(2877322062572412767, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+            ___E: ::fidl_next::Encoder,
 
-    fn with_request_with_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            Self::Transport,
-            with_and_without_request_response::WithRequestWithResponse,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<
-                'static,
-            >,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(6417226585456833969, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireString<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        arg,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.arg, encoder, arg)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct WithRequestWithResponse<T0> {
+            arg: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for WithRequestWithResponse<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireString<'static>>,
+        {
+            type Encoded =
+                crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<'static>;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for WithRequestWithResponse<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireString<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        arg,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.arg, encoder, arg)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnWithResponse<T0> {
+            ret: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnWithResponse<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireString<'static>>,
+        {
+            type Encoded = crate::WireWithAndWithoutRequestResponseOnWithResponseRequest<'static>;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnWithResponse<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireString<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        ret,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.ret, encoder, ret)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::WithAndWithoutRequestResponse
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = WithAndWithoutRequestResponseClientSender<___T>;
+            type ServerSender = WithAndWithoutRequestResponseServerSender<___T>;
+        }
+
+        /// The client sender for the `WithAndWithoutRequestResponse` protocol.
+        pub struct WithAndWithoutRequestResponseClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> WithAndWithoutRequestResponseClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn no_request_no_response(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_one_way(5413654872775949227, ())
+            }
+
+            pub fn no_request_empty_response(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::NoRequestEmptyResponse, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(1631193469798418024, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn no_request_with_response(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::NoRequestWithResponse, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(9037369643591427517, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn with_request_no_response(
+                &self,
+
+                arg: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireString<'static>,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.with_request_no_response_with(WithRequestNoResponse { arg })
+            }
+
+            pub fn with_request_no_response_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<
+                        'static,
+                    >,
+                >,
+            {
+                self.sender.send_one_way(7326057319832554103, request)
+            }
+
+            pub fn with_request_empty_response(
+                &self,
+
+                arg: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireString<'static>,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::WithRequestEmptyResponse, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.with_request_empty_response_with(WithRequestEmptyResponse { arg })
+            }
+
+
+
+                            pub fn with_request_empty_response_with<___R>(
+                                &self,
+                                request: ___R,
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::WithRequestEmptyResponse, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                ___R: ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<'static>,
+                                >,
+                            {
+                self.sender
+                    .send_two_way(2877322062572412767, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn with_request_with_response(
+                &self,
+
+                arg: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireString<'static>,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::WithRequestWithResponse, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.with_request_with_response_with(WithRequestWithResponse { arg })
+            }
+
+
+
+                            pub fn with_request_with_response_with<___R>(
+                                &self,
+                                request: ___R,
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::WithRequestWithResponse, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                ___R: ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<'static>,
+                                >,
+                            {
+                self.sender
+                    .send_two_way(6417226585456833969, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `WithAndWithoutRequestResponse` protocol.
+        #[repr(transparent)]
+        pub struct WithAndWithoutRequestResponseServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> WithAndWithoutRequestResponseServerSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn on_empty_response(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_event(5397663296507358806, ())
+            }
+
+            pub fn on_with_response(
+                &self,
+
+                ret: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireString<'static>,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.on_with_response_with(OnWithResponse { ret })
+            }
+
+            pub fn on_with_response_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = <super::OnWithResponse as ::fidl_next::Method>::Response,
+                >,
+            {
+                self.sender.send_event(5811598563493228968, request)
+            }
+        }
     }
 }
 
@@ -5917,21 +6835,21 @@ where
 pub trait WithAndWithoutRequestResponseClientHandler<___T: ::fidl_next::Transport> {
     fn on_empty_response(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, WithAndWithoutRequestResponse>,
-    );
+        sender: &::fidl_next::ClientSender<WithAndWithoutRequestResponse, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn on_with_response(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, WithAndWithoutRequestResponse>,
+        sender: &::fidl_next::ClientSender<WithAndWithoutRequestResponse, ___T>,
 
-        event: ::fidl_next::Response<___T, with_and_without_request_response::OnWithResponse>,
-    );
+        event: ::fidl_next::Response<with_and_without_request_response::OnWithResponse, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for WithAndWithoutRequestResponse
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for WithAndWithoutRequestResponse
 where
+    ___H: WithAndWithoutRequestResponseClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: WithAndWithoutRequestResponseClientHandler<___T>,
 
     <with_and_without_request_response::NoRequestWithResponse as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -5942,19 +6860,19 @@ where
     <with_and_without_request_response::OnWithResponse as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             5397663296507358806 => {
-                handler.on_empty_response(sender);
+                handler.on_empty_response(sender).await;
             }
 
             5811598563493228968 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.on_with_response(sender, decoded),
+                Ok(decoded) => handler.on_with_response(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -5967,127 +6885,74 @@ where
     }
 }
 
-/// A helper trait for the `WithAndWithoutRequestResponse` server sender.
-pub trait WithAndWithoutRequestResponseServerSender {
-    type Transport: ::fidl_next::Transport;
-
-    fn on_empty_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-
-    fn on_with_response<___R>(
-                    &self,
-                    request: ___R,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                where
-                    ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                        Encoded = <with_and_without_request_response::OnWithResponse as ::fidl_next::Method>::Response,
-                    >;
-}
-
-impl<___T> WithAndWithoutRequestResponseServerSender
-    for ::fidl_next::ServerSender<___T, WithAndWithoutRequestResponse>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-
-    fn on_empty_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5397663296507358806, ())
-    }
-
-
-
-
-
-
-
-
-                fn on_with_response<___R>(
-                    &self,
-                    request: ___R,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                where
-                    ___R: ::fidl_next::Encode<
-                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                        Encoded = <with_and_without_request_response::OnWithResponse as ::fidl_next::Method>::Response,
-                    >,
-                {
-        self.as_untyped().send_event(5811598563493228968, request)
-    }
-}
-
 /// A server handler for the WithAndWithoutRequestResponse protocol.
 ///
 /// See [`WithAndWithoutRequestResponse`] for more details.
 pub trait WithAndWithoutRequestResponseServerHandler<___T: ::fidl_next::Transport> {
     fn no_request_no_response(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithAndWithoutRequestResponse>,
-    );
+        sender: &::fidl_next::ServerSender<WithAndWithoutRequestResponse, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn no_request_empty_response(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithAndWithoutRequestResponse>,
+        sender: &::fidl_next::ServerSender<WithAndWithoutRequestResponse, ___T>,
 
         responder: ::fidl_next::Responder<
             with_and_without_request_response::NoRequestEmptyResponse,
         >,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn no_request_with_response(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithAndWithoutRequestResponse>,
+        sender: &::fidl_next::ServerSender<WithAndWithoutRequestResponse, ___T>,
 
         responder: ::fidl_next::Responder<with_and_without_request_response::NoRequestWithResponse>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn with_request_no_response(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithAndWithoutRequestResponse>,
+        sender: &::fidl_next::ServerSender<WithAndWithoutRequestResponse, ___T>,
 
         request: ::fidl_next::Request<
-            ___T,
             with_and_without_request_response::WithRequestNoResponse,
+            ___T,
         >,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn with_request_empty_response(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithAndWithoutRequestResponse>,
+        sender: &::fidl_next::ServerSender<WithAndWithoutRequestResponse, ___T>,
 
         request: ::fidl_next::Request<
-            ___T,
             with_and_without_request_response::WithRequestEmptyResponse,
+            ___T,
         >,
 
         responder: ::fidl_next::Responder<
             with_and_without_request_response::WithRequestEmptyResponse,
         >,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn with_request_with_response(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithAndWithoutRequestResponse>,
+        sender: &::fidl_next::ServerSender<WithAndWithoutRequestResponse, ___T>,
 
         request: ::fidl_next::Request<
-            ___T,
             with_and_without_request_response::WithRequestWithResponse,
+            ___T,
         >,
 
         responder: ::fidl_next::Responder<
             with_and_without_request_response::WithRequestWithResponse,
         >,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for WithAndWithoutRequestResponse
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for WithAndWithoutRequestResponse
 where
+    ___H: WithAndWithoutRequestResponseServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: WithAndWithoutRequestResponseServerHandler<___T>,
 
     <with_and_without_request_response::WithRequestNoResponse as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -6098,19 +6963,19 @@ where
     <with_and_without_request_response::WithRequestWithResponse as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             5413654872775949227 => {
-                handler.no_request_no_response(sender);
+                handler.no_request_no_response(sender).await;
             }
 
             7326057319832554103 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.with_request_no_response(sender, decoded),
+                Ok(decoded) => handler.with_request_no_response(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -6122,9 +6987,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -6133,20 +6998,22 @@ where
             1631193469798418024 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.no_request_empty_response(sender, responder);
+                handler.no_request_empty_response(sender, responder).await;
             }
 
             9037369643591427517 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.no_request_with_response(sender, responder);
+                handler.no_request_with_response(sender, responder).await;
             }
 
             2877322062572412767 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.with_request_empty_response(sender, decoded, responder),
+                    Ok(decoded) => {
+                        handler.with_request_empty_response(sender, decoded, responder).await
+                    }
                     Err(e) => {
                         sender.close();
                     }
@@ -6157,7 +7024,9 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.with_request_with_response(sender, decoded, responder),
+                    Ok(decoded) => {
+                        handler.with_request_with_response(sender, decoded, responder).await
+                    }
                     Err(e) => {
                         sender.close();
                     }
@@ -6538,7 +7407,7 @@ pub mod with_error_syntax {
     pub mod prelude {
         pub use crate::{
             with_error_syntax, WithErrorSyntax, WithErrorSyntaxClientHandler,
-            WithErrorSyntaxClientSender, WithErrorSyntaxServerHandler, WithErrorSyntaxServerSender,
+            WithErrorSyntaxServerHandler,
         };
 
         pub use crate::ErrorEnum;
@@ -6615,89 +7484,79 @@ pub mod with_error_syntax {
             ::fidl_next::WireU32,
         >;
     }
-}
 
-/// A helper trait for the `WithErrorSyntax` client sender.
-pub trait WithErrorSyntaxClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn response_as_struct(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::ResponseAsStruct>,
-        ::fidl_next::EncodeError,
-    >;
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::WithErrorSyntax
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = WithErrorSyntaxClientSender<___T>;
+            type ServerSender = WithErrorSyntaxServerSender<___T>;
+        }
 
-    fn error_as_primitive(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::ErrorAsPrimitive>,
-        ::fidl_next::EncodeError,
-    >;
+        /// The client sender for the `WithErrorSyntax` protocol.
+        pub struct WithErrorSyntaxClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn error_as_enum(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::ErrorAsEnum>,
-        ::fidl_next::EncodeError,
-    >;
+        impl<___T> WithErrorSyntaxClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn response_as_struct(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ResponseAsStruct, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(268248568430741139, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn handle_in_result(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::HandleInResult>,
-        ::fidl_next::EncodeError,
-    >;
-}
+            pub fn error_as_primitive(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ErrorAsPrimitive, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(6930994461233198567, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-impl<___T> WithErrorSyntaxClientSender for ::fidl_next::ClientSender<___T, WithErrorSyntax>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            pub fn error_as_enum(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ErrorAsEnum, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(5491891352371277635, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn response_as_struct(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::ResponseAsStruct>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(268248568430741139, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+            pub fn handle_in_result(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::HandleInResult, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(1371676333068455103, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn error_as_primitive(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::ErrorAsPrimitive>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(6930994461233198567, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        /// The server sender for the `WithErrorSyntax` protocol.
+        #[repr(transparent)]
+        pub struct WithErrorSyntaxServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
 
-    fn error_as_enum(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::ErrorAsEnum>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(5491891352371277635, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
-
-    fn handle_in_result(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_error_syntax::HandleInResult>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(1371676333068455103, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<___T> WithErrorSyntaxServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -6706,10 +7565,10 @@ where
 /// See [`WithErrorSyntax`] for more details.
 pub trait WithErrorSyntaxClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for WithErrorSyntax
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for WithErrorSyntax
 where
+    ___H: WithErrorSyntaxClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: WithErrorSyntaxClientHandler<___T>,
 
     <with_error_syntax::ResponseAsStruct as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -6723,9 +7582,9 @@ where
     <with_error_syntax::HandleInResult as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -6735,18 +7594,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `WithErrorSyntax` server sender.
-pub trait WithErrorSyntaxServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> WithErrorSyntaxServerSender for ::fidl_next::ServerSender<___T, WithErrorSyntax>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the WithErrorSyntax protocol.
@@ -6755,41 +7602,41 @@ where
 pub trait WithErrorSyntaxServerHandler<___T: ::fidl_next::Transport> {
     fn response_as_struct(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithErrorSyntax>,
+        sender: &::fidl_next::ServerSender<WithErrorSyntax, ___T>,
 
         responder: ::fidl_next::Responder<with_error_syntax::ResponseAsStruct>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn error_as_primitive(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithErrorSyntax>,
+        sender: &::fidl_next::ServerSender<WithErrorSyntax, ___T>,
 
         responder: ::fidl_next::Responder<with_error_syntax::ErrorAsPrimitive>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn error_as_enum(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithErrorSyntax>,
+        sender: &::fidl_next::ServerSender<WithErrorSyntax, ___T>,
 
         responder: ::fidl_next::Responder<with_error_syntax::ErrorAsEnum>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn handle_in_result(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithErrorSyntax>,
+        sender: &::fidl_next::ServerSender<WithErrorSyntax, ___T>,
 
         responder: ::fidl_next::Responder<with_error_syntax::HandleInResult>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for WithErrorSyntax
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for WithErrorSyntax
 where
+    ___H: WithErrorSyntaxServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: WithErrorSyntaxServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -6800,9 +7647,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -6811,25 +7658,25 @@ where
             268248568430741139 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.response_as_struct(sender, responder);
+                handler.response_as_struct(sender, responder).await;
             }
 
             6930994461233198567 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.error_as_primitive(sender, responder);
+                handler.error_as_primitive(sender, responder).await;
             }
 
             5491891352371277635 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.error_as_enum(sender, responder);
+                handler.error_as_enum(sender, responder).await;
             }
 
             1371676333068455103 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.handle_in_result(sender, responder);
+                handler.handle_in_result(sender, responder).await;
             }
 
             ordinal => {
@@ -6842,7 +7689,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsClientEndsRequest {
-    pub in_: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
+    pub in_: ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsClientEndsRequest {
@@ -6852,8 +7699,8 @@ impl ::fidl_next::Encodable for WithProtocolEndsClientEndsRequest {
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -6922,12 +7769,12 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsClientEndsRequest>
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ClientEnd<
-                    ::fidl_next::fuchsia::WireChannel,
                     crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireChannel,
                 >,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6944,7 +7791,7 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsClientEndsRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsClientEndsRequest {
-    pub in_: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
+    pub in_: ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireWithProtocolEndsClientEndsRequest {
@@ -6980,9 +7827,8 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsClientEndsResponse {
-    pub out: ::fidl_next::ClientEnd<
-        Option<::fidl_next::fuchsia::zx::Channel>,
-        crate::DiscoverableProtocol,
+    pub out: Option<
+        ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 }
 
@@ -6992,9 +7838,11 @@ impl ::fidl_next::Encodable for WithProtocolEndsClientEndsResponse {
         WireWithProtocolEndsClientEndsResponse,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Channel>,
-                crate::DiscoverableProtocol,
+            true && <Option<
+                ::fidl_next::ClientEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -7062,13 +7910,15 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsClientEndsResponse>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Channel>,
-                crate::DiscoverableProtocol,
+            true && <Option<
+                ::fidl_next::ClientEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ClientEnd<
-                    ::fidl_next::fuchsia::WireOptionalChannel,
                     crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireOptionalChannel,
                 >,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -7086,8 +7936,8 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsClientEndsResponse>
 #[repr(C)]
 pub struct WireWithProtocolEndsClientEndsResponse {
     pub out: ::fidl_next::ClientEnd<
-        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
+        ::fidl_next::fuchsia::WireOptionalChannel,
     >,
 }
 
@@ -7124,9 +7974,8 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsServerEndsRequest {
-    pub in_: ::fidl_next::ServerEnd<
-        Option<::fidl_next::fuchsia::zx::Channel>,
-        crate::DiscoverableProtocol,
+    pub in_: Option<
+        ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 }
 
@@ -7136,9 +7985,11 @@ impl ::fidl_next::Encodable for WithProtocolEndsServerEndsRequest {
         WireWithProtocolEndsServerEndsRequest,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Channel>,
-                crate::DiscoverableProtocol,
+            true && <Option<
+                ::fidl_next::ServerEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -7206,13 +8057,15 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsServerEndsRequest>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Channel>,
-                crate::DiscoverableProtocol,
+            true && <Option<
+                ::fidl_next::ServerEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ServerEnd<
-                    ::fidl_next::fuchsia::WireOptionalChannel,
                     crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireOptionalChannel,
                 >,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -7230,8 +8083,8 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsServerEndsRequest>
 #[repr(C)]
 pub struct WireWithProtocolEndsServerEndsRequest {
     pub in_: ::fidl_next::ServerEnd<
-        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
+        ::fidl_next::fuchsia::WireOptionalChannel,
     >,
 }
 
@@ -7268,7 +8121,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsServerEndsResponse {
-    pub out: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
+    pub out: ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsServerEndsResponse {
@@ -7278,8 +8131,8 @@ impl ::fidl_next::Encodable for WithProtocolEndsServerEndsResponse {
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -7348,12 +8201,12 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsServerEndsResponse>
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ServerEnd<
-                    ::fidl_next::fuchsia::WireChannel,
                     crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireChannel,
                 >,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -7370,7 +8223,7 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsServerEndsResponse>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsServerEndsResponse {
-    pub out: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
+    pub out: ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireWithProtocolEndsServerEndsResponse {
@@ -7673,8 +8526,7 @@ pub mod with_protocol_ends {
     pub mod prelude {
         pub use crate::{
             with_protocol_ends, WithProtocolEnds, WithProtocolEndsClientHandler,
-            WithProtocolEndsClientSender, WithProtocolEndsServerHandler,
-            WithProtocolEndsServerSender,
+            WithProtocolEndsServerHandler,
         };
 
         pub use crate::WithProtocolEndsClientEndsRequest;
@@ -7725,110 +8577,291 @@ pub mod with_protocol_ends {
 
         type Response = crate::WireWithProtocolEndsStructContainingEndsResponse;
     }
-}
 
-/// A helper trait for the `WithProtocolEnds` client sender.
-pub trait WithProtocolEndsClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn client_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_protocol_ends::ClientEnds>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsClientEndsRequest,
-        >;
+        pub struct ClientEnds<T0> {
+            in_: T0,
+        }
 
-    fn server_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_protocol_ends::ServerEnds>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsServerEndsRequest,
-        >;
+        impl<T0> ::fidl_next::Encodable for ClientEnds<T0>
+        where
+            T0: ::fidl_next::Encodable<
+                Encoded = ::fidl_next::ClientEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireChannel,
+                >,
+            >,
+        {
+            type Encoded = crate::WireWithProtocolEndsClientEndsRequest;
+        }
 
-    fn struct_containing_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_protocol_ends::StructContainingEnds>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
-        >;
-}
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for ClientEnds<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-impl<___T> WithProtocolEndsClientSender for ::fidl_next::ClientSender<___T, WithProtocolEnds>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
 
-    fn client_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_protocol_ends::ClientEnds>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsClientEndsRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(5870448041025163330, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+            T0: ::fidl_next::Encode<
+                ___E,
+                Encoded = ::fidl_next::ClientEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireChannel,
+                >,
+            >,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        in_,
 
-    fn server_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_protocol_ends::ServerEnds>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsServerEndsRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(8115535094437022259, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+                    } = out;
+                }
 
-    fn struct_containing_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, with_protocol_ends::StructContainingEnds>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(4076866772260025813, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+                ::fidl_next::Encode::encode(self.in_, encoder, in_)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct ServerEnds<T0> {
+            in_: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for ServerEnds<T0>
+        where
+            T0: ::fidl_next::Encodable<
+                Encoded = ::fidl_next::ServerEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireOptionalChannel,
+                >,
+            >,
+        {
+            type Encoded = crate::WireWithProtocolEndsServerEndsRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for ServerEnds<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<
+                ___E,
+                Encoded = ::fidl_next::ServerEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::WireOptionalChannel,
+                >,
+            >,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        in_,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.in_, encoder, in_)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct StructContainingEnds<T0> {
+            in_: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StructContainingEnds<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireProtocolEnds>,
+        {
+            type Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StructContainingEnds<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireProtocolEnds>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        in_,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.in_, encoder, in_)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::WithProtocolEnds
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = WithProtocolEndsClientSender<___T>;
+            type ServerSender = WithProtocolEndsServerSender<___T>;
+        }
+
+        /// The client sender for the `WithProtocolEnds` protocol.
+        pub struct WithProtocolEndsClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> WithProtocolEndsClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn client_ends(
+                &self,
+
+                in_: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::ClientEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::WireChannel,
+                    >,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ClientEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.client_ends_with(ClientEnds { in_ })
+            }
+
+            pub fn client_ends_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ClientEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithProtocolEndsClientEndsRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(5870448041025163330, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn server_ends(
+                &self,
+
+                in_: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::ServerEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::WireOptionalChannel,
+                    >,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ServerEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.server_ends_with(ServerEnds { in_ })
+            }
+
+            pub fn server_ends_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ServerEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithProtocolEndsServerEndsRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(8115535094437022259, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn struct_containing_ends(
+                &self,
+
+                in_: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireProtocolEnds,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::StructContainingEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.struct_containing_ends_with(StructContainingEnds { in_ })
+            }
+
+            pub fn struct_containing_ends_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::StructContainingEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(4076866772260025813, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `WithProtocolEnds` protocol.
+        #[repr(transparent)]
+        pub struct WithProtocolEndsServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> WithProtocolEndsServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -7837,10 +8870,10 @@ where
 /// See [`WithProtocolEnds`] for more details.
 pub trait WithProtocolEndsClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for WithProtocolEnds
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for WithProtocolEnds
 where
+    ___H: WithProtocolEndsClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: WithProtocolEndsClientHandler<___T>,
 
     <with_protocol_ends::ClientEnds as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -7851,9 +8884,9 @@ where
     <with_protocol_ends::StructContainingEnds as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -7865,54 +8898,42 @@ where
     }
 }
 
-/// A helper trait for the `WithProtocolEnds` server sender.
-pub trait WithProtocolEndsServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> WithProtocolEndsServerSender for ::fidl_next::ServerSender<___T, WithProtocolEnds>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-}
-
 /// A server handler for the WithProtocolEnds protocol.
 ///
 /// See [`WithProtocolEnds`] for more details.
 pub trait WithProtocolEndsServerHandler<___T: ::fidl_next::Transport> {
     fn client_ends(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithProtocolEnds>,
+        sender: &::fidl_next::ServerSender<WithProtocolEnds, ___T>,
 
-        request: ::fidl_next::Request<___T, with_protocol_ends::ClientEnds>,
+        request: ::fidl_next::Request<with_protocol_ends::ClientEnds, ___T>,
 
         responder: ::fidl_next::Responder<with_protocol_ends::ClientEnds>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn server_ends(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithProtocolEnds>,
+        sender: &::fidl_next::ServerSender<WithProtocolEnds, ___T>,
 
-        request: ::fidl_next::Request<___T, with_protocol_ends::ServerEnds>,
+        request: ::fidl_next::Request<with_protocol_ends::ServerEnds, ___T>,
 
         responder: ::fidl_next::Responder<with_protocol_ends::ServerEnds>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn struct_containing_ends(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, WithProtocolEnds>,
+        sender: &::fidl_next::ServerSender<WithProtocolEnds, ___T>,
 
-        request: ::fidl_next::Request<___T, with_protocol_ends::StructContainingEnds>,
+        request: ::fidl_next::Request<with_protocol_ends::StructContainingEnds, ___T>,
 
         responder: ::fidl_next::Responder<with_protocol_ends::StructContainingEnds>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for WithProtocolEnds
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for WithProtocolEnds
 where
+    ___H: WithProtocolEndsServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: WithProtocolEndsServerHandler<___T>,
 
     <with_protocol_ends::ClientEnds as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -7923,9 +8944,9 @@ where
     <with_protocol_ends::StructContainingEnds as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -7936,9 +8957,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -7948,7 +8969,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.client_ends(sender, decoded, responder),
+                    Ok(decoded) => handler.client_ends(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -7959,7 +8980,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.server_ends(sender, decoded, responder),
+                    Ok(decoded) => handler.server_ends(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -7970,7 +8991,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.struct_containing_ends(sender, decoded, responder),
+                    Ok(decoded) => handler.struct_containing_ends(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }

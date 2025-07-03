@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 
+#include <lib/device-protocol/display-panel.h>
 #include <lib/stdcompat/span.h>
 
 #include <cstdint>
@@ -148,7 +149,7 @@ struct PanelConfig {
 
 // If the `panel_type` is supported, returns the panel configuration.
 // Otherwise returns nullptr.
-const PanelConfig* GetPanelConfig(uint32_t panel_type);
+const PanelConfig* GetPanelConfig(display::PanelType panel_type);
 
 }  // namespace amlogic_display
 

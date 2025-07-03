@@ -26,11 +26,12 @@ driver_manager
 ?f2fs
 ?fshost
 ftdi
-fvm
+?fvm
 ?fxfs
 ?fxfs-crypt
 gpio
-gpt
+?gpt
+?gpt2
 hid
 hid-input-report
 i2c
@@ -44,7 +45,7 @@ platform-bus
 power
 power-manager
 pwm
-ramdisk
+?ramdisk
 ?realtek-8211f
 registers
 rndis-function
@@ -73,4 +74,4 @@ usb-mass-storage
 usb-peripheral
 ?virtual-console
 ?xhci
-zxcrypt
+?zxcrypt

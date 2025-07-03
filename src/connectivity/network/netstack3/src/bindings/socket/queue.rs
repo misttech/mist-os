@@ -5,21 +5,11 @@
 //! Queue for datagram-like sockets.
 
 use std::collections::VecDeque;
+use std::num::NonZeroUsize;
 
 use log::{error, trace};
+use netstack3_core::types::BufferSizeSettings;
 use thiserror::Error;
-
-// These values were picked to match Linux behavior.
-
-/// Limits the total size of messages that can be queued for an application
-/// socket to be read before we start dropping packets.
-pub(crate) const MAX_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 4 * 1024 * 1024;
-/// The default value for the amount of data that can be queued for an
-/// application socket to be read before packets are dropped.
-pub(crate) const DEFAULT_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 208 * 1024;
-/// The minimum value for the amount of data that can be queued for an
-/// application socket to be read before packets are dropped.
-pub(crate) const MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 256;
 
 #[derive(Copy, Clone, Debug, Error, Eq, PartialEq)]
 #[error("application buffers are full")]
@@ -40,11 +30,8 @@ pub(crate) struct MessageQueue<M, L> {
 }
 
 impl<M, L: QueueReadableListener> MessageQueue<M, L> {
-    pub(crate) fn new(listener: L) -> Self {
-        Self {
-            listener,
-            queue: AvailableMessageQueue::new(DEFAULT_OUTSTANDING_APPLICATION_MESSAGES_SIZE),
-        }
+    pub(crate) fn new(listener: L, max_available_messages_size: NonZeroUsize) -> Self {
+        Self { listener, queue: AvailableMessageQueue::new(max_available_messages_size) }
     }
 
     pub(crate) fn peek(&self) -> Option<&M> {
@@ -66,7 +53,7 @@ impl<M, L: QueueReadableListener> MessageQueue<M, L> {
         message
     }
 
-    pub(crate) fn receive(&mut self, message: M)
+    pub(crate) fn receive(&mut self, message: M) -> Result<(), NoSpace>
     where
         M: BodyLen,
     {
@@ -75,7 +62,8 @@ impl<M, L: QueueReadableListener> MessageQueue<M, L> {
         let queue_was_empty = queue.is_empty();
         match queue.push(message) {
             Err(NoSpace) => {
-                trace!("dropping {}-byte packet because the receive queue is full", body_len)
+                trace!("dropping {}-byte packet because the receive queue is full", body_len);
+                Err(NoSpace)
             }
             Ok(()) => {
                 // NB: If the queue is non-empty, it would be redundant to
@@ -85,6 +73,7 @@ impl<M, L: QueueReadableListener> MessageQueue<M, L> {
                 if queue_was_empty {
                     listener.on_readable_changed(true);
                 }
+                Ok(())
             }
         }
     }
@@ -93,17 +82,19 @@ impl<M, L: QueueReadableListener> MessageQueue<M, L> {
         &mut self.listener
     }
 
-    pub(crate) fn max_available_messages_size(&self) -> usize {
+    pub(crate) fn max_available_messages_size(&self) -> NonZeroUsize {
         let Self { listener: _, queue } = self;
         queue.max_available_messages_size
     }
 
-    pub(crate) fn set_max_available_messages_size(&mut self, new_size: usize) {
+    pub(crate) fn set_max_available_messages_size(
+        &mut self,
+        new_size: usize,
+        settings: &BufferSizeSettings<NonZeroUsize>,
+    ) {
         let Self { listener: _, queue } = self;
-        queue.max_available_messages_size = usize::max(
-            usize::min(new_size, MAX_OUTSTANDING_APPLICATION_MESSAGES_SIZE),
-            MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE,
-        );
+        let new_size = NonZeroUsize::new(new_size).unwrap_or_else(|| settings.min());
+        queue.max_available_messages_size = settings.clamp(new_size);
     }
 
     #[cfg(test)]
@@ -127,7 +118,7 @@ struct AvailableMessageQueue<M> {
     /// The total size of the contents of `available_messages`.
     available_messages_size: usize,
     /// The maximum allowed value for `available_messages_size`.
-    max_available_messages_size: usize,
+    max_available_messages_size: NonZeroUsize,
 }
 
 pub(crate) trait BodyLen {
@@ -135,7 +126,7 @@ pub(crate) trait BodyLen {
 }
 
 impl<M> AvailableMessageQueue<M> {
-    pub(crate) fn new(max_available_messages_size: usize) -> Self {
+    pub(crate) fn new(max_available_messages_size: NonZeroUsize) -> Self {
         Self {
             available_messages: Default::default(),
             available_messages_size: 0,
@@ -153,7 +144,7 @@ impl<M> AvailableMessageQueue<M> {
         // Respect the configured limit except if this would be the only message
         // in the buffer. This is compatible with Linux behavior.
         let len = message.body_len();
-        if *available_messages_size + len > *max_available_messages_size
+        if *available_messages_size + len > max_available_messages_size.get()
             && !available_messages.is_empty()
         {
             return Err(NoSpace);

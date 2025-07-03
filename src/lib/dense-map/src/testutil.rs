@@ -4,8 +4,7 @@
 
 //! Testing-related utilities.
 
-use alloc::vec::Vec;
-use core::fmt::Debug;
+use std::fmt::Debug;
 
 use rand::SeedableRng as _;
 use rand_xorshift::XorShiftRng;

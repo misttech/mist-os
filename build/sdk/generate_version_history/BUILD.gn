@@ -16,6 +16,7 @@ if (is_host) {
   }
 
   python_library("lib") {
+    visibility += [ "//build/sdk/generate_prebuild_idk:*" ]
     library_name = "generate_version_history"
     sources = [ "__init__.py" ]
   }

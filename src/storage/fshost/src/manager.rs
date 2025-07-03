@@ -4,6 +4,7 @@
 
 use crate::device::Device;
 use crate::environment::Environment;
+use crate::matcher::Matcher;
 use crate::{matcher, service};
 use anyhow::{format_err, Error};
 use fs_management::format::DiskFormat;
@@ -27,8 +28,13 @@ impl Manager {
         config: &fshost_config::Config,
         environment: Arc<Mutex<dyn Environment>>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
+        extra_matchers: Vec<Box<dyn Matcher>>,
     ) -> Self {
-        Manager { matcher: matcher::Matchers::new(config), environment, matcher_lock }
+        Manager {
+            matcher: matcher::Matchers::new_with_extra_matchers(config, extra_matchers),
+            environment,
+            matcher_lock,
+        }
     }
 
     /// The main loop of fshost. Watch for new devices, match them against filesystems we expect,

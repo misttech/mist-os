@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
-#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
+#ifndef LIB_UART_UART_H_
+#define LIB_UART_UART_H_
 
 #include <lib/arch/intrin.h>
 #include <lib/devicetree/devicetree.h>
@@ -14,6 +14,9 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <bit>
+#include <cassert>
+#include <concepts>
 #include <cstdlib>
 #include <optional>
 #include <span>
@@ -149,10 +152,6 @@ enum class IoRegisterType {
 template <IoRegisterType IoRegType>
 using IoSlotType = std::conditional_t<IoRegType == IoRegisterType::kPio, uint16_t, size_t>;
 
-template <typename UartDriver>
-concept MmioDriver =
-    UartDriver::kIoType == IoRegisterType::kMmio32 || UartDriver::kIoType == IoRegisterType::kMmio8;
-
 // Constant indicating that the number of `io_slots()` is to be determined at
 // runtime.
 constexpr size_t kDynamicIoSlot = std::numeric_limits<size_t>::max();
@@ -162,9 +161,30 @@ constexpr size_t kDynamicIoSlot = std::numeric_limits<size_t>::max();
 // It may need to be translated if the addressing used for the configuration is different from
 // the one used for execution (e.g. physical and virtual addressing).
 struct MmioRange {
-  uint64_t address;
-  uint64_t size;
+  constexpr MmioRange AlignedTo(uint64_t alignment) const {
+    assert(alignment > 0);
+    assert(std::has_single_bit(alignment));
+    const uint64_t aligned_start = address & -alignment;
+    const uint64_t aligned_end = (address + size + alignment - 1) & -alignment;
+    return {.address = aligned_start, .size = aligned_end - aligned_start};
+  }
+
+  constexpr bool empty() const { return size == 0; }
+  constexpr uint64_t end() const { return address + size; }
+
+  uint64_t address = 0;
+  uint64_t size = 0;
 };
+
+// This matches either a Driver API object or a KernelDriver wrapper
+// instantiation for an MMIO-based driver.
+template <class Driver>
+concept MmioDriver = requires(const Driver& driver) {
+  { driver.mmio_range() } -> std::same_as<MmioRange>;
+};
+
+template <class Driver>
+concept NonMmioDriver = !MmioDriver<Driver>;
 
 // Specific hardware support is implemented in a class uart::xyz::Driver,
 // referred to here as UartDriver.  The uart::DriverBase template class
@@ -235,7 +255,6 @@ class DriverBase {
   }
 
   static std::optional<uart::Config<Driver>> TryMatch(std::string_view string) {
-    printf("TryMatch::BASE\n");
     const auto config_name = Driver::kConfigName;
     if (string.substr(0, config_name.size()) == config_name) {
       string.remove_prefix(config_name.size());
@@ -313,15 +332,16 @@ class DriverBase {
     return IoSlots;
   }
 
-  template <MmioDriver UartDriver = Driver>
-  constexpr MmioRange mmio_range() const {
-    if constexpr (Driver::kIoType == IoRegisterType::kMmio32) {
-      // Each IoSlot represent 4 bytes.
-      return {.address = config().mmio_phys, .size = io_slots() * sizeof(uint32_t)};
-    } else if constexpr (Driver::kIoType == IoRegisterType::kMmio8) {
-      return {.address = config().mmio_phys, .size = io_slots()};
-    }
-    __UNREACHABLE;
+  constexpr MmioRange mmio_range() const
+    requires(Driver::kIoType == IoRegisterType::kMmio32)
+  {
+    return GetMmioRange<uint32_t>();
+  }
+
+  constexpr MmioRange mmio_range() const
+    requires(Driver::kIoType == IoRegisterType::kMmio8)
+  {
+    return GetMmioRange<uint8_t>();
   }
 
  protected:
@@ -330,6 +350,14 @@ class DriverBase {
  private:
   template <typename T>
   static constexpr bool Uninstantiated = false;
+
+  template <typename MmioType>
+  constexpr MmioRange GetMmioRange() const {
+    return {
+        .address = config().mmio_phys,
+        .size = io_slots() * sizeof(MmioType),
+    };
+  }
 
   // uart::KernelDriver API
   //
@@ -523,7 +551,8 @@ class KernelDriver {
     }
   }
 
-  template <typename LockPolicy = DefaultLockPolicy, MmioDriver = UartDriver>
+  template <typename LockPolicy = DefaultLockPolicy>
+    requires(MmioDriver<UartDriver>)
   constexpr MmioRange mmio_range() const {
     Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     return uart_.mmio_range();
@@ -655,4 +684,4 @@ void UnparseConfig(const zbi_dcfg_simple_pio_t& config, FILE* out);
 
 }  // namespace uart
 
-#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
+#endif  // LIB_UART_UART_H_

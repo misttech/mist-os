@@ -53,13 +53,13 @@ class Bcache : public fs::DeviceTransactionHandler, public storage::VmoidRegistr
   // Destroys a "bcache" object, but take back ownership of the underlying block device.
   static std::unique_ptr<block_client::BlockDevice> Destroy(std::unique_ptr<Bcache> bcache);
 
+  // Set whether to die on mutation failures in transactions.
+  void DieOnMutationFailure(bool setting);
+
   ////////////////
   // fs::TransactionHandler interface.
 
-  zx_status_t RunRequests(const std::vector<storage::BufferedOperation>& operations) override {
-    std::shared_lock lock(mutex_);
-    return DeviceTransactionHandler::RunRequests(operations);
-  }
+  zx_status_t RunRequests(const std::vector<storage::BufferedOperation>& operations) override;
 
   uint64_t BlockNumberToDevice(uint64_t block_num) const final {
     return block_num * kMinfsBlockSize / info_.block_size;
@@ -123,6 +123,7 @@ class Bcache : public fs::DeviceTransactionHandler, public storage::VmoidRegistr
   // This buffer is used as internal scratch space for the "Readblk/Writeblk" methods.
   storage::VmoBuffer buffer_;
   std::shared_mutex mutex_;
+  std::atomic<bool> die_on_mutation_failure_ = true;
 };
 
 #else  // __Fuchsia__

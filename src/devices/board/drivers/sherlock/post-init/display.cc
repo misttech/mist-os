@@ -107,29 +107,12 @@ static const std::vector<fpbus::Bti> display_btis{
 }  // namespace
 
 zx::result<> PostInit::InitDisplay() {
-  display_panel_t display_panel_info[] = {
-      {
-          .width = 800,
-          .height = 1280,
-      },
-  };
-
-  if (display_vendor_) {
-    display_panel_info[0].panel_type = PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364;
-  } else {
-    if (ddic_version_) {
-      display_panel_info[0].panel_type = PANEL_BOE_TV101WXM_FITIPOWER_JD9364;
-    } else {
-      display_panel_info[0].panel_type = PANEL_BOE_TV101WXM_FITIPOWER_JD9365;
-    }
-  }
-
   std::vector<fpbus::Metadata> display_panel_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_CONFIG),
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
           .data = std::vector<uint8_t>(
-              reinterpret_cast<uint8_t*>(&display_panel_info),
-              reinterpret_cast<uint8_t*>(&display_panel_info) + sizeof(display_panel_info)),
+              reinterpret_cast<const uint8_t*>(&panel_type_),
+              reinterpret_cast<const uint8_t*>(&panel_type_) + sizeof(display::PanelType)),
       }},
   };
 

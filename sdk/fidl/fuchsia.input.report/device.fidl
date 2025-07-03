@@ -36,7 +36,7 @@ closed protocol InputReportsReader {
 /// reports for each client that connects. Reports are removed from the FIFO
 /// once they are read by the client. If the FIFO is full, it will drop the
 /// oldest report to make room for an incoming report.
-@discoverable
+@discoverable(client="platform", server="platform")
 open protocol InputDevice {
     /// Open a new InputReportsReader on this device. Each reader receives
     /// their own reports.

@@ -2,14 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(test)]
 use crate::{input_device, input_handler};
+#[cfg(test)]
 use async_trait::async_trait;
+#[cfg(test)]
 use futures::channel::mpsc::Sender;
+#[cfg(test)]
 use std::cell::RefCell;
+#[cfg(test)]
 use std::rc::Rc;
 
 /// A fake [`InputHandler`] used for testing.
 /// A [`ObserveFakeEventsInputHandler`] does not consume InputEvents.
+#[cfg(test)]
 pub struct ObserveFakeEventsInputHandler {
     /// Events received by [`handle_input_event()`] are sent to this channel.
     event_sender: RefCell<Sender<input_device::InputEvent>>,
@@ -23,6 +29,7 @@ impl ObserveFakeEventsInputHandler {
 }
 
 #[async_trait(?Send)]
+#[cfg(test)]
 impl input_handler::InputHandler for ObserveFakeEventsInputHandler {
     async fn handle_input_event(
         self: Rc<Self>,

@@ -6,7 +6,7 @@
 #define SRC_DEVICES_TEE_DRIVERS_OPTEE_OPTEE_CONTROLLER_H_
 
 #include <fidl/fuchsia.hardware.rpmb/cpp/wire.h>
-#include <fidl/fuchsia.hardware.tee/cpp/wire.h>
+#include <fidl/fuchsia.hardware.tee/cpp/fidl.h>
 #include <fidl/fuchsia.tee.manager/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>

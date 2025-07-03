@@ -30,6 +30,10 @@ do
 done
 
 echo "#!/bin/bash" > "$OUTFILE"
+# TODO(betramlalusha): revert this change once debugging is done.
+echo "set -e" >> "$OUTFILE"
 echo "" >> "$OUTFILE"
+echo "echo starting tool ${TOOL}" >> "$OUTFILE"
 echo "exec ${ENV_VARS[*]} ${TOOL} ${TOOL_ARGS[*]}" '"$@"' >> "$OUTFILE"
+echo "echo executing tool ${TOOL} failed" >> "$OUTFILE"
 chmod a+x "$OUTFILE"

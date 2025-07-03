@@ -239,6 +239,15 @@ void FakeWlanix::AddStaInterface(
   fidl::BindServer(dispatcher_, std::move(request->iface()), this);
 }
 
+void FakeWlanix::RemoveInterface(
+    fuchsia_wlan_wlanix::wire::SupplicantRemoveInterfaceRequest* request,
+    RemoveInterfaceCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantRemoveInterface});
+  if (!request->has_iface_name()) {
+    ZX_ASSERT_MSG(false, "expect `iface_name` to be present");
+  }
+}
+
 void FakeWlanix::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::Supplicant> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

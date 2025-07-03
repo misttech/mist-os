@@ -21,18 +21,13 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/chrometrace"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/clangtrace"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjagraph"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjacommand"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/rbetrace"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/readerwriters"
 )
 
 var (
 	ninjaBuildTracePath = flag.String("ninjabuildtrace", "", "path of ninja_build_trace.json")
-	ninjalogPath        = flag.String("ninjalog", "", "path of .ninja_log")
-	compdbPath          = flag.String("compdb", "", "path of JSON compilation database")
-	graphPath           = flag.String("graph", "", "path of graphviz dot file for ninja targets")
 	criticalPath        = flag.Bool("critical-path", false, "whether to highlight critical path in this build, --graph must be set for this to work")
 
 	// Flags for interleaving subtraces.
@@ -45,79 +40,6 @@ var (
 	traceJSON  = flag.String("trace-json", "trace.json", "output path of trace.json")
 	cpuprofile = flag.String("cpuprofile", "", "file to write cpu profile")
 )
-
-type artifacts struct {
-	steps    []ninjalog.Step
-	commands []compdb.Command
-	graph    ninjagraph.Graph
-}
-
-func join(as artifacts, criticalPath bool) ([]ninjalog.Step, error) {
-	steps := as.steps
-	if len(as.commands) > 0 {
-		steps = ninjalog.Populate(steps, as.commands)
-	}
-	if !criticalPath {
-		return steps, nil
-	}
-
-	if err := as.graph.PopulateEdges(steps); err != nil {
-		return nil, fmt.Errorf("populating edges: %v", err)
-	}
-	// To calculate critical path, we need a graph fully populated, that is a
-	// graph with steps on all non-phony edges. However this is not always
-	// possible on the full graph because the build can be partial, for example
-	// incremental builds and failed builds. To accommodate for these cases we
-	// extract a partial graph including only edges that are actually reached in
-	// the partial build.
-	g, err := ninjagraph.WithStepsOnly(as.graph)
-	if err != nil {
-		return nil, fmt.Errorf("extracting partial graph in case this build is incremental, or failed midway: %v", err)
-	}
-	return g.PopulatedSteps()
-}
-
-func readArtifacts(logPath, compdbPath, graphPath string) (artifacts, error) {
-	var ret artifacts
-
-	f, err := os.Open(logPath)
-	if err != nil {
-		return artifacts{}, fmt.Errorf("opening ninjalog file: %v", err)
-	}
-	defer f.Close()
-	njl, err := ninjalog.Parse(logPath, f)
-	if err != nil {
-		return artifacts{}, fmt.Errorf("parsing ninjalog: %v", err)
-	}
-	// TODO(jayzhuang): Dedup and Populate could be methods on NinjaLog.
-	ret.steps = ninjalog.Dedup(njl.Steps)
-
-	if compdbPath != "" {
-		f, err := os.Open(compdbPath)
-		if err != nil {
-			return artifacts{}, fmt.Errorf("opening compdb file: %v", err)
-		}
-		defer f.Close()
-		ret.commands, err = compdb.Parse(f)
-		if err != nil {
-			return artifacts{}, fmt.Errorf("parsing compdb: %v", err)
-		}
-	}
-
-	if graphPath != "" {
-		f, err := os.Open(graphPath)
-		if err != nil {
-			return artifacts{}, fmt.Errorf("opening ninja graph file: %v", err)
-		}
-		defer f.Close()
-		ret.graph, err = ninjagraph.FromDOT(f)
-		if err != nil {
-			return artifacts{}, fmt.Errorf("parsing ninja graph: %v", err)
-		}
-	}
-
-	return ret, nil
-}
 
 func readNinjaBuildTrace(tracePath string) (traces []chrometrace.Trace, err error) {
 	file, err := readerwriters.Open(tracePath)
@@ -146,7 +68,7 @@ func readNinjaBuildTrace(tracePath string) (traces []chrometrace.Trace, err erro
 		if !ok { // this event doesn't have any command'
 			continue
 		}
-		categories := ninjalog.ComputeCommandCategories(command)
+		categories := ninjacommand.ComputeCommandCategories(command)
 		if categories == "" {
 			continue
 		}
@@ -177,21 +99,7 @@ func main() {
 	ctx := context.Background()
 
 	if *ninjaBuildTracePath == "" {
-		if *ninjalogPath == "" {
-			log.Fatalf("--ninjalog is required")
-		}
-
-		if *criticalPath {
-			if *graphPath == "" {
-				log.Fatalf("--graph must be set when --critical-path is true")
-			}
-		}
-	} else if *ninjalogPath != "" {
-		log.Fatalf("-ninjabuildtrace and -ninjalog cannot be used together.")
-	} else if *compdbPath != "" {
-		log.Fatalf("-ninjabuildtrace and -compdbpath cannot be used together.")
-	} else if *graphPath != "" {
-		log.Fatalf("-ninjabuildtrace and -graph cannto be used together.")
+		log.Fatalf("--ninjabuildtrace is required")
 	}
 
 	if *cpuprofile != "" {
@@ -206,26 +114,10 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	var traces []chrometrace.Trace
-
-	if *ninjaBuildTracePath != "" {
-		// Read build trace directly.
-		ninja_traces, err := readNinjaBuildTrace(*ninjaBuildTracePath)
-		if err != nil {
-			log.Fatalf("Failed to read Ninja build trace: %v", err)
-		}
-		traces = ninja_traces
-	} else {
-		as, err := readArtifacts(*ninjalogPath, *compdbPath, *graphPath)
-		if err != nil {
-			log.Fatalf("Failed to read artifacts: %v", err)
-		}
-
-		steps, err := join(as, *criticalPath)
-		if err != nil {
-			log.Fatalf("Failed to join information from ninjalog, compdb and ninjagraph together: %v", err)
-		}
-		traces = ninjalog.ToTraces(ninjalog.Flow(steps), 1)
+	// Read build trace directly.
+	traces, err := readNinjaBuildTrace(*ninjaBuildTracePath)
+	if err != nil {
+		log.Fatalf("Failed to read Ninja build trace: %v", err)
 	}
 
 	if *buildDir != "" {

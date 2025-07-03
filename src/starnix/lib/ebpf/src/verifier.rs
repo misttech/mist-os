@@ -8,10 +8,11 @@ use crate::scalar_value::{ScalarValueData, U32Range, U32ScalarValueData, U64Rang
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
     DataWidth, EbpfError, EbpfInstruction, MapSchema, BPF_MAX_INSTS, BPF_PSEUDO_MAP_IDX,
-    BPF_STACK_SIZE, GENERAL_REGISTER_COUNT, REGISTER_COUNT,
+    BPF_PSEUDO_MAP_IDX_VALUE, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT, REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use fuchsia_sync::Mutex;
+use linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
@@ -86,6 +87,18 @@ impl MemoryId {
             Some(p) => p.as_ref() == parent,
         }
     }
+
+    /// Returns whether `self` and `other` represent the same type. This is true if both have the
+    /// same if and if they both have parent, parents must also match.
+    fn matches(&self, other: &MemoryId) -> bool {
+        if self.id != other.id {
+            return false;
+        };
+        match (&self.parent, &other.parent) {
+            (Some(p1), Some(p2)) => p1.matches(p2.as_ref()),
+            _ => true,
+        }
+    }
 }
 
 /// The type of a filed in a strcut pointed by `Type::PtrToStruct`.
@@ -99,6 +112,9 @@ pub enum FieldType {
 
     /// A pointer to the kernel memory. The full buffer is `buffer_size` bytes long.
     PtrToMemory { is_32_bit: bool, id: MemoryId, buffer_size: usize },
+
+    /// A nullable pointer to the kernel memory. The full buffer is `buffer_size` bytes long.
+    NullablePtrToMemory { is_32_bit: bool, id: MemoryId, buffer_size: usize },
 
     /// A pointer to the kernel memory. The full buffer size is determined by an instance of
     /// `PtrToEndArray` with the same `id`.
@@ -125,6 +141,7 @@ impl FieldDescriptor {
         match self.field_type {
             FieldType::Scalar { size } | FieldType::MutableScalar { size } => size,
             FieldType::PtrToMemory { is_32_bit, .. }
+            | FieldType::NullablePtrToMemory { is_32_bit, .. }
             | FieldType::PtrToArray { is_32_bit, .. }
             | FieldType::PtrToEndArray { is_32_bit, .. } => {
                 if is_32_bit {
@@ -182,6 +199,7 @@ impl StructDescriptor {
                 ((offset + field.width.bytes()).max() as usize) <= field_desc.offset + size
             }
             FieldType::PtrToMemory { is_32_bit, .. }
+            | FieldType::NullablePtrToMemory { is_32_bit, .. }
             | FieldType::PtrToArray { is_32_bit, .. }
             | FieldType::PtrToEndArray { is_32_bit, .. } => {
                 let expected_width = if is_32_bit { DataWidth::U32 } else { DataWidth::U64 };
@@ -626,7 +644,7 @@ impl Type {
                 Type::StructParameter { id: id1 },
                 Type::PtrToMemory { id: id2, offset, .. }
                 | Type::PtrToStruct { id: id2, offset, .. },
-            ) if offset.is_zero() && *id1 == *id2 => Ok(()),
+            ) if offset.is_zero() && id1.matches(id2) => Ok(()),
             (
                 Type::ReleasableParameter { id: id1, inner: inner1 },
                 Type::Releasable { id: id2, inner: inner2 },
@@ -1455,6 +1473,20 @@ impl ComputationContext {
                         },
                         *is_32_bit,
                     ),
+                    FieldType::NullablePtrToMemory { id: memory_id, buffer_size, is_32_bit } => {
+                        let id = memory_id.prepended(id.clone());
+                        (
+                            Type::NullOr {
+                                id: id.clone(),
+                                inner: Box::new(Type::PtrToMemory {
+                                    id,
+                                    offset: 0.into(),
+                                    buffer_size: *buffer_size as u64,
+                                }),
+                            },
+                            *is_32_bit,
+                        )
+                    }
                 };
 
                 context.register_struct_access(StructAccess {
@@ -4043,6 +4075,38 @@ impl BpfVisitor for ComputationContext {
                     .get(usize::try_from(map_index).unwrap())
                     .map(|schema| Type::ConstPtrToMap { id: map_index.into(), schema: *schema })
                     .ok_or_else(|| format!("lddw with invalid map index: {}", map_index))?
+            }
+            BPF_PSEUDO_MAP_IDX_VALUE => {
+                let map_index = lower;
+                let offset = next_instruction.imm();
+                bpf_log!(
+                    self,
+                    context,
+                    "lddw {}, map_value_by_index({:x})+{offset}",
+                    display_register(dst),
+                    map_index
+                );
+                let id = context.next_id();
+                let map_schema = context
+                    .calling_context
+                    .maps
+                    .get(usize::try_from(map_index).unwrap())
+                    .ok_or_else(|| format!("lddw with invalid map index: {}", map_index))?;
+
+                if map_schema.map_type != bpf_map_type_BPF_MAP_TYPE_ARRAY {
+                    return Err(format!(
+                        "Invalid map type at index {map_index} for lddw. Expecting array."
+                    ));
+                }
+                if map_schema.max_entries == 0 {
+                    return Err(format!("Array has no entry."));
+                }
+
+                Type::PtrToMemory {
+                    id: MemoryId::from(id),
+                    offset: offset.into(),
+                    buffer_size: map_schema.value_size.into(),
+                }
             }
             _ => {
                 return Err(format!("invalid lddw"));

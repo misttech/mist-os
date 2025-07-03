@@ -15,8 +15,6 @@ namespace display_panel_visitor_dt {
 class DisplayPanelVisitor : public fdf_devicetree::Visitor {
  public:
   static constexpr char kPanelType[] = "panel-type";
-  static constexpr char kDisplayWidth[] = "display-width";
-  static constexpr char kDisplayHeight[] = "display-height";
 
   DisplayPanelVisitor();
   DisplayPanelVisitor(const DisplayPanelVisitor&) = delete;

@@ -29,6 +29,7 @@ group("drivers") {
     "power-manager/testing/fake_root:root",
     "testing/fake-powersensor:fake_power_sensor_package",
     "testing/fake-powersource:fake_battery_component",
+    "testing/fake-trippoint:fake_trippoint_component",
     "testing/system-integration/example/test-driver:component",
   ]
 }

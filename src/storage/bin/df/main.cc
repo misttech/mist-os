@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 #include <dirent.h>
-#include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
@@ -18,12 +16,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <string>
 #include <utility>
 
 #include <fbl/unique_fd.h>
-
-#include "src/storage/fshost/admin-client.h"
 
 namespace fio = fuchsia_io;
 
@@ -70,11 +65,11 @@ int parse_args(int argc, const char** argv, df_options_t* options, const char***
 }
 
 // Format for the header
-const char* hfmt = "%-10s %10s %10s %10s %3s%%  %-10s  %-10s\n";
+const char* hfmt = "%-10s %10s %10s %10s %3s%%  %-10s\n";
 // Format for the human-readable header
-const char* hrfmt = "%-10s %5s %5s %5s %5s%%  %-10s  %-10s\n";
+const char* hrfmt = "%-10s %5s %5s %5s %5s%%  %-10s\n";
 // Format for the individual filesystems queried
-const char* ffmt = "%-10s %10zu %10zu %10zu %3zu%%  %-10s  %-10s\n";
+const char* ffmt = "%-10s %10zu %10zu %10zu %3zu%%  %-10s\n";
 
 #define KB (1lu << 10)
 #define MB (1lu << 20)
@@ -110,14 +105,14 @@ void print_human_readable(int padding, size_t size) {
 }
 
 void print_fs_type(const char* name, const df_options_t* options,
-                   const fuchsia_io::wire::FilesystemInfo* info, const char* device_path) {
+                   const fio::wire::FilesystemInfo* info) {
   if (options->node_usage) {
     size_t nodes_total = info ? info->total_nodes : 0;
     size_t nodes_used = info ? info->used_nodes : 0;
     size_t nodes_available = nodes_total - nodes_used;
     size_t use_percentage = nodes_total ? nodes_used * 100 / nodes_total : 0;
     printf(ffmt, info != nullptr ? reinterpret_cast<const char*>(info->name.data()) : "?",
-           nodes_total, nodes_used, nodes_available, use_percentage, name, device_path);
+           nodes_total, nodes_used, nodes_available, use_percentage, name);
   } else {
     // Block Usage
     if (options->human_readable) {
@@ -131,14 +126,13 @@ void print_fs_type(const char* name, const df_options_t* options,
       print_human_readable(5, bytes_available);
       printf("%5zu%%  ", use_percentage);
       printf("%-10s  ", name);
-      printf("%-10s\n", device_path);
     } else {
       size_t blocks_total = info ? info->total_bytes >> 10 : 0;
       size_t blocks_used = info ? info->used_bytes >> 10 : 0;
       size_t blocks_available = blocks_total - blocks_used;
       size_t use_percentage = blocks_total ? blocks_used * 100 / blocks_total : 0;
       printf(ffmt, info != nullptr ? reinterpret_cast<const char*>(info->name.data()) : "?",
-             blocks_total, blocks_used, blocks_available, use_percentage, name, device_path);
+             blocks_total, blocks_used, blocks_available, use_percentage, name);
     }
   }
 }
@@ -154,19 +148,13 @@ int main(int argc, const char** argv) {
   }
 
   if (options.node_usage) {
-    printf(hfmt, "Filesystem", "Inodes", "IUsed", "IFree", "IUse", "Path", "Device");
+    printf(hfmt, "Filesystem", "Inodes", "IUsed", "IFree", "IUse", "Path");
   } else {
     if (options.human_readable) {
-      printf(hrfmt, "Filesystem", "Size", "Used", "Avail", "Use", "Path", "Device");
+      printf(hrfmt, "Filesystem", "Size", "Used", "Avail", "Use", "Path");
     } else {
-      printf(hfmt, "Filesystem", "1K-Blocks", "Used", "Available", "Use", "Path", "Device");
+      printf(hfmt, "Filesystem", "1K-Blocks", "Used", "Available", "Use", "Path");
     }
-  }
-
-  auto fshost_or = fshost::ConnectToAdmin();
-  if (fshost_or.is_error()) {
-    fprintf(stderr, "Error connecting to fshost: %s\n", fshost_or.status_string());
-    // Continue...
   }
 
   for (size_t i = 0; i < dircount; i++) {
@@ -177,33 +165,17 @@ int main(int argc, const char** argv) {
       continue;
     }
 
-    fuchsia_io::wire::FilesystemInfo info;
+    fio::wire::FilesystemInfo info;
     fdio_cpp::FdioCaller caller(std::move(fd));
-    auto result =
-        fidl::WireCall(fidl::UnownedClientEnd<fuchsia_io::Directory>(caller.borrow_channel()))
-            ->QueryFilesystem();
+    auto result = fidl::WireCall(fidl::UnownedClientEnd<fio::Directory>(caller.borrow_channel()))
+                      ->QueryFilesystem();
     if (!result.ok() || result.value().s != ZX_OK) {
-      print_fs_type(dirs[i], &options, nullptr, "Unknown; cannot query filesystem");
+      print_fs_type(dirs[i], &options, nullptr);
       continue;
     }
     info = *result.value().info;
-    info.name[fuchsia_io::wire::kMaxFsNameBuffer - 1] = '\0';
-
-    std::string device_path;
-    if (fshost_or.is_ok()) {
-      auto result = fidl::WireCall(*fshost_or)->GetDevicePath(info.fs_id);
-      if (!result.ok()) {
-        fprintf(stderr, "Error getting device path, fidl error: %s\n",
-                result.FormatDescription().c_str());
-        return EXIT_FAILURE;
-      }
-      if (result->is_error())
-        device_path = zx_status_get_string(result->error_value());
-      else
-        device_path = std::string(result->value()->path.get());
-    }
-
-    print_fs_type(dirs[i], &options, &info, device_path.c_str());
+    info.name[fio::wire::kMaxFsNameBuffer - 1] = '\0';
+    print_fs_type(dirs[i], &options, &info);
   }
 
   return 0;

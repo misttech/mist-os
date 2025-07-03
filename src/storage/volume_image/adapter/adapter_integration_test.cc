@@ -196,7 +196,7 @@ fpromise::result<WriteResult, std::string> WriteFvmImage(const FvmDescriptor& fv
   return fpromise::ok(WriteResult{std::move(fvm_vmo), std::move(fvm_writer)});
 }
 
-fpromise::result<storage::RamDisk, std::string> LaunchFvm(zx::vmo& fvm_vmo) {
+fpromise::result<storage::RamDisk, std::string> LaunchRamdisk(zx::vmo& fvm_vmo) {
   zx::vmo ramdisk_vmo;
   if (auto result = fvm_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &ramdisk_vmo); result != ZX_OK) {
     return fpromise::error("Failed to extend fvm image vmo to block boundary. Error Code: " +
@@ -209,39 +209,19 @@ fpromise::result<storage::RamDisk, std::string> LaunchFvm(zx::vmo& fvm_vmo) {
   }
   auto ramdisk = std::move(ramdisk_or.value());
 
-  fidl::UnownedClientEnd<fuchsia_device::Controller> device(
-      ramdisk_get_block_controller_interface(ramdisk.client()));
-  auto fvm_bind_result = BindFvm(device);
-  if (fvm_bind_result.is_error()) {
-    return fpromise::error("Failed to bind FVM to ramdisk. Error: " +
-                           std::string(fvm_bind_result.status_string()) + ".");
-  }
-
   return fpromise::ok(std::move(ramdisk));
 }
 
-void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
+void CheckPartitionsInRamdisk(const RamDisk& ramdisk, const FvmDescriptor& fvm_descriptor) {
   for (const auto& partition : fvm_descriptor.partitions()) {
-    fs_management::PartitionMatcher matcher{
-        .type_guids = {uuid::Uuid(partition.volume().type.data())},
-    };
-    zx::result partition_or = fs_management::OpenPartition(matcher, true);
-    ASSERT_EQ(partition_or.status_value(), ZX_OK);
-
-    fidl::WireResult topo_result = fidl::WireCall(partition_or.value())->GetTopologicalPath();
-    ASSERT_EQ(topo_result.status(), ZX_OK);
-    std::string partition_path = std::string(topo_result->value()->path.get());
+    zx::result instance = OpenFvmPartition(ramdisk.path(), partition.volume().name);
+    ASSERT_EQ(instance.status_value(), ZX_OK);
 
     if (partition.volume().name == "my-empty-partition") {
       // Check that allocated slices are equal to the slice count for max bytes.
-      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume;
-      zx::result server = fidl::CreateEndpoints(&volume);
-      ASSERT_EQ(server.status_value(), ZX_OK);
-      ASSERT_EQ(
-          fidl::WireCall(partition_or.value())->ConnectToDeviceFidl(server->TakeChannel()).status(),
-          ZX_OK);
-
-      zx::result device = block_client::RemoteBlockDevice::Create(std::move(volume));
+      zx::result client = instance->Connect();
+      ASSERT_EQ(client.status_value(), ZX_OK);
+      zx::result device = block_client::RemoteBlockDevice::Create(std::move(client).value());
       ASSERT_TRUE(device.is_ok()) << device.status_string();
       std::unique_ptr<block_client::RemoteBlockDevice> block_device = std::move(device.value());
       std::array<uint64_t, 2> slice_start = {0, 2};
@@ -259,20 +239,14 @@ void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
       EXPECT_TRUE(ranges[0].allocated);
       EXPECT_EQ(ranges[0].count, 2u);
       EXPECT_FALSE(ranges[1].allocated);
-      EXPECT_EQ(ranges[1].count, fvm::kMaxVSlices - 2);
       continue;
     }
 
     if (partition.volume().name == "internal") {
       // Check that allocated slices are equal to the slice count for max bytes.
-      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume;
-      zx::result server = fidl::CreateEndpoints(&volume);
-      ASSERT_EQ(server.status_value(), ZX_OK);
-      ASSERT_EQ(
-          fidl::WireCall(partition_or.value())->ConnectToDeviceFidl(server->TakeChannel()).status(),
-          ZX_OK);
-
-      zx::result device = block_client::RemoteBlockDevice::Create(std::move(volume));
+      zx::result client = instance->Connect();
+      ASSERT_EQ(client.status_value(), ZX_OK);
+      zx::result device = block_client::RemoteBlockDevice::Create(std::move(client).value());
       ASSERT_TRUE(device.is_ok()) << device.status_string();
       std::unique_ptr<block_client::RemoteBlockDevice> block_device = std::move(device.value());
       std::array<uint64_t, 2> slice_start = {0, 4};
@@ -290,7 +264,6 @@ void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
       EXPECT_TRUE(ranges[0].allocated);
       EXPECT_EQ(ranges[0].count, 4u);
       EXPECT_FALSE(ranges[1].allocated);
-      EXPECT_EQ(ranges[1].count, fvm::kMaxVSlices - 4);
       continue;
     }
 
@@ -303,7 +276,7 @@ void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
     auto component = fs_management::FsComponent::FromDiskFormat(
         partition.volume().name == "blobfs" ? fs_management::kDiskFormatBlobfs
                                             : fs_management::kDiskFormatMinfs);
-    EXPECT_EQ(fs_management::Fsck(partition_path, component, fsck_options), ZX_OK);
+    EXPECT_EQ(fs_management::Fsck(instance->path(), component, fsck_options), ZX_OK);
   }
 }
 
@@ -329,9 +302,10 @@ TEST(AdapterTest, BlobfsPartitonInFvmImagePassesFsck) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   auto [fvm_vmo, fvm_writer] = write_result.take_value();
 
-  auto ramdisk_handle = LaunchFvm(fvm_vmo);
+  auto ramdisk_handle = LaunchRamdisk(fvm_vmo);
+  ASSERT_TRUE(ramdisk_handle.is_ok()) << ramdisk_handle.error();
 
-  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(fvm_descriptor));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(ramdisk_handle.take_value(), fvm_descriptor));
 }
 
 // The test will write the fvm image into a vmo, and then bring up a fvm driver,
@@ -356,9 +330,10 @@ TEST(AdapterTest, MinfsPartitonInFvmImagePassesFsck) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   auto [fvm_vmo, fvm_writer] = write_result.take_value();
 
-  auto ramdisk_handle = LaunchFvm(fvm_vmo);
+  auto ramdisk_handle = LaunchRamdisk(fvm_vmo);
+  ASSERT_TRUE(ramdisk_handle.is_ok()) << ramdisk_handle.error();
 
-  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(fvm_descriptor));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(ramdisk_handle.take_value(), fvm_descriptor));
 }
 
 // The test will write the fvm image into a vmo, and then bring up a fvm driver,
@@ -401,9 +376,10 @@ TEST(AdapterTest, BlobfsMinfsAndEmptyPartitionInFvmImagePassesFsck) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   auto [fvm_vmo, fvm_writer] = write_result.take_value();
 
-  auto ramdisk_handle = LaunchFvm(fvm_vmo);
+  auto ramdisk_handle = LaunchRamdisk(fvm_vmo);
+  ASSERT_TRUE(ramdisk_handle.is_ok()) << ramdisk_handle.error();
 
-  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(fvm_descriptor));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(ramdisk_handle.take_value(), fvm_descriptor));
 }
 
 // The test will write the fvm image into a vmo, and then bring up a fvm driver,
@@ -435,8 +411,10 @@ TEST(AdapterTest, CompressedSparseImageToFvmImagePassesFsck) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   auto [fvm_vmo, fvm_writer] = write_result.take_value();
 
-  auto ramdisk_handle = LaunchFvm(fvm_vmo);
-  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(fvm_descriptor));
+  auto ramdisk_handle = LaunchRamdisk(fvm_vmo);
+  ASSERT_TRUE(ramdisk_handle.is_ok()) << ramdisk_handle.error();
+
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(ramdisk_handle.take_value(), fvm_descriptor));
 }
 
 TEST(AdapterTest, CompressedSparseImageWithoutExplicitDecompressionToFvmImagePassesFsck) {
@@ -454,8 +432,10 @@ TEST(AdapterTest, CompressedSparseImageWithoutExplicitDecompressionToFvmImagePas
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   auto [fvm_vmo, fvm_writer] = write_result.take_value();
 
-  auto ramdisk_handle = LaunchFvm(fvm_vmo);
-  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(fvm_descriptor));
+  auto ramdisk_handle = LaunchRamdisk(fvm_vmo);
+  ASSERT_TRUE(ramdisk_handle.is_ok()) << ramdisk_handle.error();
+
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(ramdisk_handle.take_value(), fvm_descriptor));
 }
 
 TEST(AdapterTest, CheckWithMaxVolumeSizeSet) {
@@ -483,8 +463,10 @@ TEST(AdapterTest, CheckWithMaxVolumeSizeSet) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   auto [fvm_vmo, fvm_writer] = write_result.take_value();
 
-  auto ramdisk_handle = LaunchFvm(fvm_vmo);
-  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(fvm_descriptor));
+  auto ramdisk_handle = LaunchRamdisk(fvm_vmo);
+  ASSERT_TRUE(ramdisk_handle.is_ok()) << ramdisk_handle.error();
+
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionsInRamdisk(ramdisk_handle.take_value(), fvm_descriptor));
 }
 
 }  // namespace

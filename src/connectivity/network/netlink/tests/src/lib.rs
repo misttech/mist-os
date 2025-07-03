@@ -6,6 +6,7 @@
 //! netemul realm.
 
 use std::collections::HashSet;
+use std::num::NonZeroU64;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy as _;
@@ -22,7 +23,9 @@ use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netemul::{RealmUdpSocket as _, TestRealm};
 use netlink::multicast_groups::ModernGroup;
 use netlink::FeatureFlags;
-use netlink_packet_core::{NetlinkMessage, NetlinkPayload, NetlinkSerializable};
+use netlink_packet_core::{
+    ErrorMessage, NetlinkMessage, NetlinkPayload, NetlinkSerializable, NLM_F_ACK,
+};
 use netlink_packet_route::route::{
     RouteAttribute, RouteFlags, RouteHeader, RouteMessage, RouteProtocol, RouteScope, RouteType,
 };
@@ -106,7 +109,7 @@ fn connect_to_netlink_protocols_in_realm(
 struct NoopInterfacesHandler;
 
 impl netlink::interfaces::InterfacesHandler for NoopInterfacesHandler {
-    fn handle_new_link(&mut self, _name: &str) {}
+    fn handle_new_link(&mut self, _name: &str, _interface_id: NonZeroU64) {}
 
     fn handle_deleted_link(&mut self, _name: &str) {}
 }
@@ -444,11 +447,31 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
         .await;
     }
 
+    let mut add_route = async |header, attributes| {
+        let new_rule_message = RouteNetlinkMessage::NewRule({
+            let mut rule_message = RuleMessage::default();
+            rule_message.header = header;
+            rule_message.attributes.extend(attributes);
+            rule_message
+        });
+        let mut message: NetlinkMessage<RouteNetlinkMessage> = new_rule_message.into();
+        message.header.flags |= NLM_F_ACK;
+        message.finalize();
+        client.sender.0.unbounded_send(message).expect("should not be disconnected");
+
+        // Wait for the ACK.
+        let SentNetlinkMessage { message: received_msg, group: _ } =
+            client.receiver.next().await.expect("should not be disconnected");
+        assert_matches!(
+            received_msg.payload,
+            NetlinkPayload::Error(ErrorMessage { code: None, .. })
+        )
+    };
+
     // We install a default rule to drop all traffic, which helps us prove we only see traffic if
     // sockets are correctly marked.
-    let new_rule_message = RouteNetlinkMessage::NewRule({
-        let mut rule_message = RuleMessage::default();
-        rule_message.header = RuleHeader {
+    add_route(
+        RuleHeader {
             family: address_family::<I>(),
             dst_len: 0,
             src_len: 0,
@@ -456,22 +479,14 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
             table: 0,
             action: RuleAction::Unreachable,
             flags: RuleFlags::empty(),
-        };
-        rule_message.attributes.extend([
-            RuleAttribute::Priority(10),
-            RuleAttribute::FwMark(0),
-            RuleAttribute::FwMask(0),
-        ]);
-        rule_message
-    });
-    let mut message: NetlinkMessage<RouteNetlinkMessage> = new_rule_message.into();
-    message.finalize();
-    client.sender.0.unbounded_send(message).expect("should not be disconnected");
+        },
+        [RuleAttribute::Priority(10), RuleAttribute::FwMark(0), RuleAttribute::FwMask(0)],
+    )
+    .await;
 
     for &(test_subnet, ref _peer) in &test_peers {
-        let new_rule_message = RouteNetlinkMessage::NewRule({
-            let mut rule_message = RuleMessage::default();
-            rule_message.header = RuleHeader {
+        add_route(
+            RuleHeader {
                 family: address_family::<I>(),
                 dst_len: 0,
                 src_len: 0,
@@ -479,17 +494,14 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
                 table: test_subnet.table_index(),
                 action: RuleAction::ToTable,
                 flags: RuleFlags::empty(),
-            };
-            rule_message.attributes.extend([
+            },
+            [
                 RuleAttribute::Priority(9),
                 RuleAttribute::FwMark(test_subnet.mark()),
                 RuleAttribute::FwMask(u32::MAX),
-            ]);
-            rule_message
-        });
-        let mut message: NetlinkMessage<RouteNetlinkMessage> = new_rule_message.into();
-        message.finalize();
-        client.sender.0.unbounded_send(message).expect("should not be disconnected");
+            ],
+        )
+        .await;
     }
 
     let provider = main_realm

@@ -18,7 +18,6 @@ use routing::error::{ComponentInstanceError, RoutingError};
 use routing::{DictExt, GenericRouterResponse};
 use sandbox::{Dict, RemotableCapability, Request};
 use std::collections::HashMap;
-use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path as VfsPath;
 use vfs::remote::remote_dir;
@@ -159,25 +158,5 @@ impl CapabilityProvider for NamespaceCapabilityProvider {
             .map_err(|e| CapabilityProviderError::CmNamespaceError {
                 err: ClonableError::from(anyhow::Error::from(e)),
             })
-    }
-}
-
-/// A `CapabilityProvider` that serves a pseudo directory entry.
-#[derive(Clone)]
-pub struct DirectoryEntryCapabilityProvider {
-    /// The pseudo directory that backs this capability.
-    pub entry: Arc<vfs::directory::immutable::simple::Simple>,
-}
-
-#[async_trait]
-impl CapabilityProvider for DirectoryEntryCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        _task_group: TaskGroup,
-        open_request: OpenRequest<'_>,
-    ) -> Result<(), CapabilityProviderError> {
-        open_request
-            .open_dir(self.entry.clone())
-            .map_err(|e| CapabilityProviderError::VfsOpenError(e))
     }
 }

@@ -4,8 +4,7 @@
 
 use serde::Deserialize;
 
-use super::{Attributes, CompIdent, Constant, Ident, IntType};
-use crate::de::Index;
+use super::{Attributes, CompIdent, Constant, Decl, DeclType, Ident, IntType};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Enum {
@@ -20,11 +19,21 @@ pub struct Enum {
     pub ty: IntType,
 }
 
-impl Index for Enum {
-    type Key = CompIdent;
+impl Decl for Enum {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Enum
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn naming_context(&self) -> Option<&[String]> {
+        Some(&self.naming_context)
     }
 }
 

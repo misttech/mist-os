@@ -18,8 +18,6 @@
 
 namespace storage {
 
-zx::result<> WaitForRamctl(zx::duration time = zx::duration::infinite());
-
 // A thin wrapper around the ram-disk C API. Strictly speaking, this isn't specific to
 // isolated-devmgr.
 class RamDisk {
@@ -27,11 +25,8 @@ class RamDisk {
   struct Options {
     // If set, the ram-disk will report this type guid using the partition protocol.
     std::optional<std::array<uint8_t, GPT_GUID_LEN>> type_guid;
-
-    // If true, use the DFv2 driver.
-    bool use_v2 = false;
   };
-  static constexpr Options kDefaultOptions{.use_v2 = false};
+  static constexpr Options kDefaultOptions;
 
   // Creates a ram-disk with |block_count| blocks of |block_size| bytes.
   static zx::result<RamDisk> Create(int block_size, uint64_t block_count,

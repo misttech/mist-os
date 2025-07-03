@@ -55,6 +55,7 @@ rustc_library("assembled_system") {
   ]
   test_deps = [
     "//src/lib/assembly/file_relative_path",
+    "//src/lib/assembly/release_info",
     "//src/lib/assembly/test_keys",
     "//src/lib/fuchsia-async",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",

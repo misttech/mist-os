@@ -5,7 +5,16 @@
 #ifndef SRC_STORAGE_MEMFS_VNODE_FILE_H_
 #define SRC_STORAGE_MEMFS_VNODE_FILE_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/zx/result.h>
+#include <lib/zx/stream.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/memfs/memfs.h"

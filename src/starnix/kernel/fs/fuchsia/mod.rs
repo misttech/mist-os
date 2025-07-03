@@ -4,7 +4,7 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
-
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 
@@ -29,11 +29,15 @@ pub use syslog::*;
 pub use timer::*;
 
 /// Create a FileHandle from a zx::Handle.
-pub fn create_file_from_handle(
+pub fn create_file_from_handle<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     handle: zx::Handle,
-) -> Result<FileHandle, Errno> {
-    new_remote_file(current_task, handle, OpenFlags::RDWR)
+) -> Result<FileHandle, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
+    new_remote_file(locked, current_task, handle, OpenFlags::RDWR)
 }
 
 #[cfg(test)]
@@ -44,17 +48,17 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_create_from_invalid_handle() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        assert!(create_file_from_handle(&current_task, zx::Handle::invalid()).is_err());
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        assert!(create_file_from_handle(locked, &current_task, zx::Handle::invalid()).is_err());
     }
 
     #[::fuchsia::test]
     async fn test_create_pipe_from_handle() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (left_handle, right_handle) = zx::Socket::create_stream();
-        create_file_from_handle(&current_task, left_handle.into_handle())
+        create_file_from_handle(locked, &current_task, left_handle.into_handle())
             .expect("failed to create left FileHandle");
-        create_file_from_handle(&current_task, right_handle.into_handle())
+        create_file_from_handle(locked, &current_task, right_handle.into_handle())
             .expect("failed to create right FileHandle");
     }
 }

@@ -584,7 +584,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     ffx_invocation = get_ffx_product_args(fuchsia_toolchain) + [
         "--isolate-dir $FFX_ISOLATE_DIR",
         "product",
-        "create",
+        "create-old",
         "--product-name",
         product_bundle_name,
         "--product-version",

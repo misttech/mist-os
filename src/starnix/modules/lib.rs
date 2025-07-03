@@ -11,7 +11,7 @@ use starnix_core::fs::devpts::{dev_pts_fs, tty_device_init};
 use starnix_core::fs::devtmpfs::dev_tmp_fs;
 use starnix_core::fs::fuchsia::nmfs::fuchsia_network_monitor_fs;
 use starnix_core::fs::fuchsia::{new_remote_fs, new_remote_vol};
-use starnix_core::fs::sysfs::{sys_fs, DeviceDirectory};
+use starnix_core::fs::sysfs::sys_fs;
 use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
@@ -32,7 +32,6 @@ use starnix_modules_tun::DevTun;
 use starnix_modules_zram::zram_device_init;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
-use std::sync::Arc;
 
 fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     let kernel = current_task.kernel();
@@ -45,7 +44,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "hw_random".into(),
         DeviceMetadata::new("hwrng".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.register_device(
@@ -54,7 +52,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "fuse".into(),
         DeviceMetadata::new("fuse".into(), DeviceType::FUSE, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         open_fuse_device,
     );
     registry.register_device(
@@ -63,7 +60,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "device-mapper".into(),
         DeviceMetadata::new("mapper/control".into(), DeviceType::DEVICE_MAPPER, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         create_device_mapper,
     );
     registry.register_device(
@@ -72,7 +68,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "loop-control".into(),
         DeviceMetadata::new("loop-control".into(), DeviceType::LOOP_CONTROL, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         create_loop_control_device,
     );
     registry.register_device(
@@ -81,7 +76,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "tun".into(),
         DeviceMetadata::new("tun".into(), DeviceType::TUN, DeviceMode::Char),
         misc_class,
-        DeviceDirectory::new,
         simple_device_ops::<DevTun>,
     );
 }
@@ -100,7 +94,7 @@ pub fn init_common_devices(locked: &mut Locked<Unlocked>, system_task: &CurrentT
     zram_device_init(locked, system_task);
 }
 
-pub fn register_common_file_systems(_locked: &mut Locked<Unlocked>, kernel: &Arc<Kernel>) {
+pub fn register_common_file_systems(_locked: &mut Locked<Unlocked>, kernel: &Kernel) {
     let registry = kernel.expando.get::<FsRegistry>();
     #[cfg(not(feature = "starnix_lite"))]
     registry.register(b"binder".into(), BinderFs::new_fs);

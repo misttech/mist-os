@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/function.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
@@ -52,7 +53,7 @@ zx::result<std::unique_ptr<designware_dsi::DsiHostController>> CreateDesignwareD
 
 }  // namespace
 
-DsiHost::DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
+DsiHost::DsiHost(display::PanelType panel_type, const PanelConfig* panel_config,
                  fdf::MmioBuffer mipi_dsi_top_mmio, fdf::MmioBuffer hhi_mmio,
                  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
                  std::unique_ptr<designware_dsi::DsiHostController> designware_dsi_host_controller,
@@ -74,7 +75,8 @@ DsiHost::DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
 }
 
 // static
-zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, uint32_t panel_type,
+zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming,
+                                                     display::PanelType panel_type,
                                                      const PanelConfig* panel_config) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
 

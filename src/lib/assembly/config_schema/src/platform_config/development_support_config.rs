@@ -74,6 +74,10 @@ pub struct DevelopmentSupportConfig {
     /// Only valid on eng builds.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_userboot_next_component_manager: bool,
+
+    /// Configure Heapdump memory profiling.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub heapdump: HeapdumpConfig,
 }
 
 /// Platform-provided tools for development and debugging.
@@ -141,4 +145,18 @@ pub struct StorageToolsConfig {
     ///   - 'install-disk-image'
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_partitioning_tools: bool,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct HeapdumpConfig {
+    /// Whether component manager will be instrumented.
+    pub component_manager: bool,
+}
+
+impl HeapdumpConfig {
+    /// Tells if at least one program will be instrumented.
+    pub fn is_enabled(&self) -> bool {
+        self.component_manager
+    }
 }

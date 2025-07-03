@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -17,8 +16,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/chrometrace"
 )
 
 var testDataDir = flag.String("test_data_dir", "../test_data", "Path to ../test_data/; only used in GN build")
@@ -38,20 +36,64 @@ func readAndUnzip(t *testing.T, path string) *gzip.Reader {
 	return unzipped
 }
 
-func TestExtractAndSerializeBuildStats(t *testing.T) {
-	graph, err := constructGraph(inputs{
-		ninjalog: readAndUnzip(t, filepath.Join(*testDataDir, "ninja_log.gz")),
-		compdb:   readAndUnzip(t, filepath.Join(*testDataDir, "compdb.json.gz")),
-		graph:    readAndUnzip(t, filepath.Join(*testDataDir, "graph.dot.gz")),
-	})
-	if err != nil {
-		t.Fatalf("Failed to construct graph: %v", err)
+func getInputTraces(traces *[]chrometrace.Trace) []*chrometrace.Trace {
+	result := []*chrometrace.Trace{}
+	for i := 0; i < len(*traces); i++ {
+		result = append(result, &((*traces)[i]))
 	}
+	return result
+}
 
-	stats, err := extractBuildStats(&graph, 0)
-	if err != nil {
-		t.Fatalf("Failed to extract build stats: %v", err)
+func TestSlowestTraces(t *testing.T) {
+	for _, v := range []struct {
+		name           string
+		traces         []chrometrace.Trace
+		maxCount       int
+		wantTraceNames []string
+	}{
+		{
+			name: "three traces",
+			traces: []chrometrace.Trace{
+				{
+					Name:           "1",
+					DurationMicros: 100,
+				},
+				{
+					Name:           "2",
+					DurationMicros: 1000,
+				},
+				{
+					Name:           "3",
+					DurationMicros: 2000,
+				},
+			},
+			maxCount: 30,
+			wantTraceNames: []string{
+				"3", "2", "1",
+			},
+		},
+	} {
+		t.Run(v.name, func(t *testing.T) {
+			traces := getInputTraces(&v.traces)
+			slowTraces := slowestTraces(traces, v.maxCount)
+			var gotTraceNames []string
+			for _, slowTrace := range slowTraces {
+				gotTraceNames = append(gotTraceNames, slowTrace.Name)
+			}
+			if diff := cmp.Diff(v.wantTraceNames, gotTraceNames, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("slowestTraces(%v, %v) got diff (-want +got):\n%s", v.traces, v.maxCount, diff)
+			}
+		})
 	}
+}
+
+func TestExtractAndSerializeBuildStatsFromTrace(t *testing.T) {
+	tracePath := filepath.Join(*testDataDir, "ninja_trace.json.gz")
+	traces, err := readChromeTrace(tracePath)
+	if err != nil {
+		t.Fatalf("Failed to load traces from %q: %v", tracePath, err)
+	}
+	stats := extractBuildStatsFromTrace(traces, 0)
 	if len(stats.CriticalPath) == 0 {
 		t.Errorf("Critical path in stats is emtpy, expect non-empty")
 	}
@@ -78,20 +120,11 @@ func TestExtractAndSerializeBuildStats(t *testing.T) {
 	}
 }
 
-type stubGraph struct {
-	steps []ninjalog.Step
-	err   error
-}
-
-func (g *stubGraph) PopulatedSteps() ([]ninjalog.Step, error) {
-	return g.steps, g.err
-}
-
-func TestExtractStats(t *testing.T) {
+func TestExtractStatsFromTrace(t *testing.T) {
 	for _, v := range []struct {
 		name               string
 		minActionBuildTime time.Duration
-		g                  stubGraph
+		traces             []chrometrace.Trace
 		want               buildStats
 	}{
 		{
@@ -100,33 +133,43 @@ func TestExtractStats(t *testing.T) {
 		{
 			name:               "successfully extract stats",
 			minActionBuildTime: 0,
-			g: stubGraph{
-				steps: []ninjalog.Step{
-					{
-						CmdHash:        1,
-						Out:            "a.o",
-						Outs:           []string{"aa.o", "aaa.o"},
-						End:            3 * time.Second,
-						Command:        &compdb.Command{Command: "clang++ a.cc"},
-						OnCriticalPath: true,
-						Drag:           123 * time.Second,
+			traces: []chrometrace.Trace{
+				{
+					Name:            "a.o",
+					Category:        "clang++,critical_path",
+					EventType:       chrometrace.CompleteEvent,
+					TimestampMicros: 0,
+					DurationMicros:  3000000,
+					Args: map[string]any{
+						"command":     "clang++ a.cc",
+						"outputs":     []any{"a.o", "aa.o", "aaa.o"},
+						"drag":        "123s",
+						"total float": "0s",
 					},
-					{
-						CmdHash:        2,
-						Out:            "b.o",
-						Start:          3 * time.Second,
-						End:            5 * time.Second,
-						Command:        &compdb.Command{Command: "rustc b.rs"},
-						OnCriticalPath: true,
-						Drag:           321 * time.Second,
+				},
+				{
+					Name:            "b.o",
+					Category:        "rustc,critical_path",
+					EventType:       chrometrace.CompleteEvent,
+					TimestampMicros: 3000000,
+					DurationMicros:  2000000,
+					Args: map[string]any{
+						"command":     "rustc b.rs",
+						"outputs":     []any{"b.o"},
+						"drag":        "321s",
+						"total float": "0s",
 					},
-					{
-						CmdHash:    3,
-						Out:        "c.o",
-						Start:      9 * time.Second,
-						End:        10 * time.Second,
-						Command:    &compdb.Command{Command: "clang++ c.cc"},
-						TotalFloat: 789 * time.Second,
+				},
+				{
+					Name:            "c.o",
+					Category:        "clang++",
+					EventType:       chrometrace.CompleteEvent,
+					TimestampMicros: 9000000,
+					DurationMicros:  1000000,
+					Args: map[string]any{
+						"command":     "clang++ c.cc",
+						"outputs":     []any{"c.o"},
+						"total float": "789s",
 					},
 				},
 			},
@@ -134,10 +177,9 @@ func TestExtractStats(t *testing.T) {
 				CriticalPath: []action{
 					{
 						Command:  "clang++ a.cc",
-						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
+						Outputs:  []string{"a.o", "aa.o", "aaa.o"},
 						End:      3 * time.Second,
 						Category: "clang++",
-						Drag:     123 * time.Second,
 					},
 					{
 						Command:  "rustc b.rs",
@@ -145,16 +187,14 @@ func TestExtractStats(t *testing.T) {
 						Start:    3 * time.Second,
 						End:      5 * time.Second,
 						Category: "rustc",
-						Drag:     321 * time.Second,
 					},
 				},
 				Slowests: []action{
 					{
 						Command:  "clang++ a.cc",
-						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
+						Outputs:  []string{"a.o", "aa.o", "aaa.o"},
 						End:      3 * time.Second,
 						Category: "clang++",
-						Drag:     123 * time.Second,
 					},
 					{
 						Command:  "rustc b.rs",
@@ -162,15 +202,13 @@ func TestExtractStats(t *testing.T) {
 						Start:    3 * time.Second,
 						End:      5 * time.Second,
 						Category: "rustc",
-						Drag:     321 * time.Second,
 					},
 					{
-						Command:    "clang++ c.cc",
-						Outputs:    []string{"c.o"},
-						Start:      9 * time.Second,
-						End:        10 * time.Second,
-						Category:   "clang++",
-						TotalFloat: 789 * time.Second,
+						Command:  "clang++ c.cc",
+						Outputs:  []string{"c.o"},
+						Start:    9 * time.Second,
+						End:      10 * time.Second,
+						Category: "clang++",
 					},
 				},
 				CatBuildTimes: []catBuildTime{
@@ -192,10 +230,9 @@ func TestExtractStats(t *testing.T) {
 				All: []action{
 					{
 						Command:  "clang++ a.cc",
-						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
+						Outputs:  []string{"a.o", "aa.o", "aaa.o"},
 						End:      3 * time.Second,
 						Category: "clang++",
-						Drag:     123 * time.Second,
 					},
 					{
 						Command:  "rustc b.rs",
@@ -203,24 +240,21 @@ func TestExtractStats(t *testing.T) {
 						Start:    3 * time.Second,
 						End:      5 * time.Second,
 						Category: "rustc",
-						Drag:     321 * time.Second,
 					},
 					{
-						Command:    "clang++ c.cc",
-						Outputs:    []string{"c.o"},
-						Start:      9 * time.Second,
-						End:        10 * time.Second,
-						Category:   "clang++",
-						TotalFloat: 789 * time.Second,
+						Command:  "clang++ c.cc",
+						Outputs:  []string{"c.o"},
+						Start:    9 * time.Second,
+						End:      10 * time.Second,
+						Category: "clang++",
 					},
 				},
 				Actions: []action{
 					{
 						Command:  "clang++ a.cc",
-						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
+						Outputs:  []string{"a.o", "aa.o", "aaa.o"},
 						End:      3 * time.Second,
 						Category: "clang++",
-						Drag:     123 * time.Second,
 					},
 					{
 						Command:  "rustc b.rs",
@@ -228,15 +262,13 @@ func TestExtractStats(t *testing.T) {
 						Start:    3 * time.Second,
 						End:      5 * time.Second,
 						Category: "rustc",
-						Drag:     321 * time.Second,
 					},
 					{
-						Command:    "clang++ c.cc",
-						Outputs:    []string{"c.o"},
-						Start:      9 * time.Second,
-						End:        10 * time.Second,
-						Category:   "clang++",
-						TotalFloat: 789 * time.Second,
+						Command:  "clang++ c.cc",
+						Outputs:  []string{"c.o"},
+						Start:    9 * time.Second,
+						End:      10 * time.Second,
+						Category: "clang++",
 					},
 				},
 				TotalBuildTime: 6 * time.Second,
@@ -246,11 +278,33 @@ func TestExtractStats(t *testing.T) {
 		{
 			name:               "filter short actions",
 			minActionBuildTime: time.Minute,
-			g: stubGraph{
-				steps: []ninjalog.Step{
-					{CmdHash: 1, Out: "1", End: time.Second},
-					{CmdHash: 2, Out: "2", End: time.Minute},
-					{CmdHash: 3, Out: "3", End: 2 * time.Minute},
+			traces: []chrometrace.Trace{
+				{
+					Name:            "1",
+					Category:        "unknown",
+					TimestampMicros: 0,
+					DurationMicros:  1000000,
+					Args: map[string]any{
+						"outputs": []any{"1"},
+					},
+				},
+				{
+					Name:            "2",
+					Category:        "unknown",
+					TimestampMicros: 0,
+					DurationMicros:  60 * 1000000,
+					Args: map[string]any{
+						"outputs": []any{"2"},
+					},
+				},
+				{
+					Name:            "3",
+					Category:        "unknown",
+					TimestampMicros: 0,
+					DurationMicros:  2 * 60 * 1000000,
+					Args: map[string]any{
+						"outputs": []any{"3"},
+					},
 				},
 			},
 			want: buildStats{
@@ -282,20 +336,11 @@ func TestExtractStats(t *testing.T) {
 		},
 	} {
 		t.Run(v.name, func(t *testing.T) {
-			gotStats, err := extractBuildStats(&v.g, v.minActionBuildTime)
-			if err != nil {
-				t.Fatalf("extractBuildStats(%#v, %s) got error: %v", v.g, v.minActionBuildTime, err)
-			}
+			traces := getInputTraces(&v.traces)
+			gotStats := extractBuildStatsFromTrace(traces, v.minActionBuildTime)
 			if diff := cmp.Diff(v.want, gotStats, cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("extractBuildStats(%#v, %s) got stats diff (-want +got):\n%s", v.g, v.minActionBuildTime, diff)
+				t.Errorf("extractBuildStats(%#v, %s) got stats diff (-want +got):\n%s", v.traces, v.minActionBuildTime, diff)
 			}
 		})
-	}
-}
-
-func TestExtractStatsError(t *testing.T) {
-	g := stubGraph{err: errors.New("test critical path error")}
-	if _, err := extractBuildStats(&g, 0); err == nil {
-		t.Errorf("extractBuildStats(%#v, nil) got no error, want error", g)
 	}
 }

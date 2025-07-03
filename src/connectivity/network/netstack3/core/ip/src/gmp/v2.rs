@@ -11,13 +11,12 @@
 //! [RFC 3376]: https://datatracker.ietf.org/doc/html/rfc3376
 
 use core::num::NonZeroU8;
-
-use alloc::collections::hash_map::HashMap;
-use alloc::collections::HashSet;
 use core::time::Duration;
+
 use net_types::ip::{Ip, IpAddress};
 use net_types::{MulticastAddr, Witness as _};
 use netstack3_base::{Instant as _, LocalTimerHeap};
+use netstack3_hashmap::{HashMap, HashSet};
 use packet_formats::gmp::{GmpReportGroupRecord, GroupRecordType};
 use packet_formats::utils::NonZeroDuration;
 

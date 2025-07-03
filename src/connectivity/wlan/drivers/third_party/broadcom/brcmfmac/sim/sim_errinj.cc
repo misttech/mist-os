@@ -141,8 +141,8 @@ bool SimErrorInjector::CheckIfErrInjIovarEnabled(const char* iovar, zx_status_t*
 
 void SimErrorInjector::AddErrEventInjCmd(uint32_t cmd, brcmf_fweh_event_code event_code,
                                          brcmf_fweh_event_status_t ret_status,
-                                         status_code_t ret_reason, uint16_t flags,
-                                         std::optional<uint16_t> ifidx) {
+                                         fuchsia_wlan_ieee80211::wire::StatusCode ret_reason,
+                                         uint16_t flags, std::optional<uint16_t> ifidx) {
   for (auto& existing_cmd : event_cmds_) {
     if (existing_cmd.cmd == cmd) {
       // Entry already present, just replace with the new values
@@ -176,10 +176,10 @@ void SimErrorInjector::DelErrEventInjCmd(uint32_t cmd) {
   BRCMF_DBG(SIMERRINJ, "Cmd: %d not found", cmd);
 }
 
-bool SimErrorInjector::CheckIfErrEventInjCmdEnabled(uint32_t cmd, brcmf_fweh_event_code& event_code,
-                                                    brcmf_fweh_event_status_t& ret_status,
-                                                    status_code_t& ret_reason, uint16_t& flags,
-                                                    std::optional<uint16_t> ifidx) {
+bool SimErrorInjector::CheckIfErrEventInjCmdEnabled(
+    uint32_t cmd, brcmf_fweh_event_code& event_code, brcmf_fweh_event_status_t& ret_status,
+    fuchsia_wlan_ieee80211::wire::StatusCode& ret_reason, uint16_t& flags,
+    std::optional<uint16_t> ifidx) {
   for (auto& existing_cmd : event_cmds_) {
     if (existing_cmd.ifidx.has_value() && (existing_cmd.ifidx != ifidx)) {
       continue;

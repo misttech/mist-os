@@ -83,8 +83,9 @@ GlobalRectangleVector ComputeGlobalRectangles(const GlobalMatrixVector& matrices
 // according to depth, with the first entry being the furthest back, this has the effect of
 // eliminating all rectangles behind the full-screen one). Also culls any rectangle that has
 // no size (0,0).
-void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector* images_in_out,
-                    uint64_t display_width, uint64_t display_height);
+void CullRectanglesInPlace(GlobalRectangleVector* rectangles_in_out,
+                           GlobalImageVector* images_in_out, uint64_t display_width,
+                           uint64_t display_height);
 
 // Templatized function to retrieve a new vector containing a subset of the input vector values that
 // correspond to the provided indices.

@@ -24,6 +24,7 @@ TEST(AnnotationMap, SetsCorrectly) {
       .Set("false", false)
       .Set("error-or-value", ErrorOrString("value"))
       .Set("error-or-error", ErrorOrString(Error::kMissingValue))
+      .Set("error-or-not-available", ErrorOrString(Error::kNotAvailableInProduct))
       .Set("error", Error::kMissingValue)
       .Set(::fuchsia::feedback::Annotation{.key = "annotation", .value = "value"});
 

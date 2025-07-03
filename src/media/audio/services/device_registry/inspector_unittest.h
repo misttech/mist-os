@@ -40,6 +40,7 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
   }
 
  protected:
+  static inline const std::string kClassName = "InspectorTest";
   static inline const fuchsia_audio_device::RingBufferOptions kDefaultRingBufferOptions{{
       .format = fuchsia_audio::Format{{.sample_type = fuchsia_audio::SampleType::kInt16,
                                        .channel_count = 2,
@@ -55,10 +56,10 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
 
   std::shared_ptr<FakeComposite> CreateAndAddFakeComposite() {
     auto fake_driver = CreateFakeComposite();
-    adr_service()->AddDevice(
-        Device::Create(adr_service(), dispatcher(), "Test composite name",
-                       fuchsia_audio_device::DeviceType::kComposite,
-                       fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(
+        adr_service(), dispatcher(), "Test composite name",
+        fuchsia_audio_device::DeviceType::kComposite,
+        fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
     RunLoopUntilIdle();
     return fake_driver;
   }

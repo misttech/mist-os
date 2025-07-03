@@ -97,23 +97,8 @@
                 // TODO(https://fxbug.dev/333132302)
                 "Madvise.MadvRemoveZeroesMemory",
 
-                // TODO(https://fxbug.dev/397371605)
-                "SchedSetParamTest.NonRootCannotExceedRLimits",
-                "SuccessivePoliciesTest.UnusedNicenessIsStillSubjectToRLimit",
-                "SuccessivePoliciesTest.NicenessIsPreservedByPoliciesThatDoNotUseNiceness",
-                "SuccessivePoliciesTest.UnusedNicenessCanBeAccessed",
-                "SuccessivePoliciesTest.UnusedPositiveNicenessIsZeroedDuringResetOnFork",
-                "SuccessivePoliciesTest.UnusedNegativeNicenessIsStillZeroedByResetOnFork",
-                "SuccessivePoliciesTest.UnusedNicenessCanBeChanged",
-                "SuccessivePoliciesTest.ChangingPolicyWhenExceedingNicenessRLimitAllowedExceptOutOfIdle",
-                "SetPriorityTest.MaintainingAndIncreasingNicenessAllowedDespiteExceededRLimits",
-                "SetPriorityTest.NonRootCannotExceedRLimits",
-                "SchedSetSchedulerTest.NonRootCannotExceedRLimits",
-                "SchedSetSchedulerTest.RootCanExceedRLimits",
-                "SchedSetSchedulerTest.NonRootCannotClearResetOnFork",
-                "SchedSetSchedulerTest.ResetOnForkPreservesPositiveNiceness",
-                "SchedSetSchedulerTest.MaintainingAndDecreasingPriorityAllowedDespiteExceededRLimits",
-                "SchedSetParamTest.RootCanExceedRLimits",
+                // TODO(https://fxbug.dev/419882465)
+                "MMapProcTest.MremapDontUnmapKeepsFlags",
             ],
         },
         {
@@ -136,8 +121,8 @@
                 // TODO(https://fxbug.dev/418965139)
                 "ThreadGroupLifeCycleTest.EndMainThreadFirst",
 
-                // TODO(https://fxbug.dev/323172557): Re-enable after impl
-                "ProcessMemoryReleaseTest.*",
+                // TODO(https://fxbug.dev/399939974): Re-enable after one-big vmo is enabled
+                "ProcessMemoryReleaseTest.SuccessfulRelease",
             ],
         },
     ],

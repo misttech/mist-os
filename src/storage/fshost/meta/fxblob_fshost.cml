@@ -8,4 +8,11 @@
             url: "fuchsia-boot:///fxfs#meta/fxfs.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.feedback.CrashReporter",
+            from: "parent",
+            to: "#fxfs",
+        },
+    ],
 }

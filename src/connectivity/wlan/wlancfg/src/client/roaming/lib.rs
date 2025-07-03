@@ -120,6 +120,7 @@ pub enum RoamTriggerDataOutcome {
         scan_type: fidl_common::ScanType,
         network_identifier: types::NetworkIdentifier,
         credential: Credential,
+        current_security: types::SecurityTypeDetailed,
         reasons: Vec<RoamReason>,
     },
 }

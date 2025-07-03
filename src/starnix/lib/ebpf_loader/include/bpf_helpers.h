@@ -20,6 +20,10 @@ static void *(*const bpf_ringbuf_reserve)(void *ringbuf, __u64 size,
 static void (*const bpf_ringbuf_submit)(void *data, __u64 flags) = (void *)BPF_FUNC_ringbuf_submit;
 static void (*const bpf_ringbuf_discard)(void *data,
                                          __u64 flags) = (void *)BPF_FUNC_ringbuf_discard;
+static struct bpf_sock *(*const bpf_sk_fullsock)(struct bpf_sock *sock) = (void *)
+    BPF_FUNC_sk_fullsock;
+static __u64 (*const bpf_get_current_uid_gid)() = (void *)BPF_FUNC_get_current_uid_gid;
+static __u64 (*const bpf_get_current_pid_tgid)() = (void *)BPF_FUNC_get_current_pid_tgid;
 
 struct bpf_map_def {
   enum bpf_map_type type;

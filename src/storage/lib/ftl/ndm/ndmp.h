@@ -123,6 +123,12 @@ struct ndm {
   ui32 last_rd_vbn;      // last virtual block number read from
   ui32 last_rd_pbn;      // last physical block number read from
   ui32 flags;            // option flags
+  // Pointer data for calling back into the FTL on bad blocks. May be NULL.
+  void* on_marked_bad_cb_data;
+  // Callback to the FTL when marking blocks bad. The bn is the considered the
+  // physical block number in the FTL partition, or the virtual block number in
+  // the NDM. May be NULL.
+  OnMarkedBad on_marked_bad_cb;
 
   // Partition Information:
   // The first variable reflects the current status of the NDM, which means either
@@ -182,7 +188,7 @@ extern SEM NdmSem;
 int ndmInitBadBlock(CNDM ndm, ui32 b);
 int ndmWrCtrl(NDM ndm);
 void ndmCkMeta(NDM ndm);
-int ndmMarkBadBlock(NDM ndm, ui32 arg, ui32 action);
+int ndmMarkBadBlock(NDM ndm, ui32 arg, ui32 action, ui32 vbn);
 ui32 ndmReadControlCrc(CNDM ndm);
 ui32 ndmGetHeaderCurrentLocation(CNDM ndm);
 ui32 ndmGetHeaderLastLocation(CNDM ndm);

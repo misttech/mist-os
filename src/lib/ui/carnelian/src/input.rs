@@ -252,7 +252,7 @@ pub mod touch {
         pub contacts: Vec<Contact>,
         /// Buttons in this touch event, possible if the touch comes
         /// from a stylus with buttons.
-        pub buttons: ButtonSet,
+        pub buttons: HashSet<hid_input_report::TouchButton>,
     }
 }
 

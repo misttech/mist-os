@@ -2,67 +2,83 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::future::Future;
 use core::marker::PhantomData;
+use core::ops::Deref;
 
 use fidl_next_codec::{Encode, EncodeError};
 use fidl_next_protocol::{self as protocol, ProtocolError, SendFuture, Transport};
 
-use super::{Method, ServerEnd};
+use crate::{Method, Protocol, ServerEnd};
 
-/// A storngly typed server sender.
-pub struct ServerSender<T: Transport, P> {
+/// A strongly typed server sender.
+#[repr(transparent)]
+pub struct ServerSender<
+    P,
+    #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T: Transport,
+> {
     sender: protocol::ServerSender<T>,
     _protocol: PhantomData<P>,
 }
 
-unsafe impl<T, P> Send for ServerSender<T, P>
+unsafe impl<P, T> Send for ServerSender<P, T>
 where
-    T: Transport,
     protocol::ServerSender<T>: Send,
+    T: Transport,
 {
 }
 
-impl<T: Transport, P> ServerSender<T, P> {
+impl<P, T: Transport> ServerSender<P, T> {
     /// Wraps an untyped sender reference, returning a typed sender reference.
     pub fn wrap_untyped(client: &protocol::ServerSender<T>) -> &Self {
         unsafe { &*(client as *const protocol::ServerSender<T>).cast() }
     }
 
-    /// Returns the underlying untyped sender.
-    pub fn as_untyped(&self) -> &protocol::ServerSender<T> {
-        &self.sender
-    }
-
     /// Closes the channel from the server end.
     pub fn close(&self) {
-        self.as_untyped().close();
+        self.sender.close();
     }
 }
 
-impl<T: Transport, P> Clone for ServerSender<T, P> {
+impl<P, T: Transport> Clone for ServerSender<P, T> {
     fn clone(&self) -> Self {
         Self { sender: self.sender.clone(), _protocol: PhantomData }
     }
 }
 
+impl<P: Protocol<T>, T: Transport> Deref for ServerSender<P, T> {
+    type Target = P::ServerSender;
+
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: `P::ServerSender` is a `#[repr(transparent)]` wrapper around `ServerSender<T>`.
+        unsafe { &*(self as *const Self).cast::<P::ServerSender>() }
+    }
+}
+
 /// A protocol which supports servers.
-pub trait ServerProtocol<T: Transport, H>: Sized {
+pub trait ServerProtocol<
+    H,
+    #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T: Transport,
+>: Sized + 'static
+{
     /// Handles a received server one-way message with the given handler.
     fn on_one_way(
         handler: &mut H,
-        server: &ServerSender<T, Self>,
+        server: &ServerSender<Self, T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
-    );
+    ) -> impl Future<Output = ()> + Send;
 
     /// Handles a received server two-way message with the given handler.
     fn on_two_way(
         handler: &mut H,
-        server: &ServerSender<T, Self>,
+        server: &ServerSender<Self, T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
         responder: protocol::Responder,
-    );
+    ) -> impl Future<Output = ()> + Send;
 }
 
 /// An adapter for a server protocol handler.
@@ -80,17 +96,17 @@ impl<P, H> ServerAdapter<P, H> {
     }
 }
 
-impl<T, P, H> protocol::ServerHandler<T> for ServerAdapter<P, H>
+impl<P, H, T> protocol::ServerHandler<T> for ServerAdapter<P, H>
 where
+    P: ServerProtocol<H, T>,
     T: Transport,
-    P: ServerProtocol<T, H>,
 {
     fn on_one_way(
         &mut self,
         server: &protocol::ServerSender<T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
-    ) {
+    ) -> impl Future<Output = ()> + Send {
         P::on_one_way(&mut self.handler, ServerSender::wrap_untyped(server), ordinal, buffer)
     }
 
@@ -100,7 +116,7 @@ where
         ordinal: u64,
         buffer: <T as Transport>::RecvBuffer,
         responder: protocol::Responder,
-    ) {
+    ) -> impl Future<Output = ()> + Send {
         P::on_two_way(
             &mut self.handler,
             ServerSender::wrap_untyped(server),
@@ -112,26 +128,30 @@ where
 }
 
 /// A strongly typed server.
-pub struct Server<T: Transport, P> {
+pub struct Server<
+    P,
+    #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T: Transport,
+> {
     server: protocol::Server<T>,
     _protocol: PhantomData<P>,
 }
 
-unsafe impl<T, P> Send for Server<T, P>
+unsafe impl<P, T> Send for Server<P, T>
 where
-    T: Transport,
     protocol::Server<T>: Send,
+    T: Transport,
 {
 }
 
-impl<T: Transport, P> Server<T, P> {
+impl<P, T: Transport> Server<P, T> {
     /// Creates a new server from a server end.
-    pub fn new(server_end: ServerEnd<T, P>) -> Self {
+    pub fn new(server_end: ServerEnd<P, T>) -> Self {
         Self { server: protocol::Server::new(server_end.into_untyped()), _protocol: PhantomData }
     }
 
     /// Returns the sender for the server.
-    pub fn sender(&self) -> &ServerSender<T, P> {
+    pub fn sender(&self) -> &ServerSender<P, T> {
         ServerSender::wrap_untyped(self.server.sender())
     }
 
@@ -143,7 +163,8 @@ impl<T: Transport, P> Server<T, P> {
     /// Runs the server with the provided handler.
     pub async fn run<H>(&mut self, handler: H) -> Result<(), ProtocolError<T::Error>>
     where
-        P: ServerProtocol<T, H>,
+        P: ServerProtocol<H, T>,
+        H: Send,
     {
         self.server.run(ServerAdapter { handler, _protocol: PhantomData::<P> }).await
     }
@@ -163,9 +184,9 @@ impl<M> Responder<M> {
     }
 
     /// Responds to the client.
-    pub fn respond<'s, T, P, R>(
+    pub fn respond<'s, P, T, R>(
         self,
-        server: &'s ServerSender<T, P>,
+        server: &'s ServerSender<P, T>,
         response: R,
     ) -> Result<SendFuture<'s, T>, EncodeError>
     where
@@ -173,6 +194,6 @@ impl<M> Responder<M> {
         M: Method<Protocol = P>,
         R: Encode<T::SendBuffer, Encoded = M::Response>,
     {
-        server.as_untyped().send_response(self.responder, M::ORDINAL, response)
+        server.sender.send_response(self.responder, M::ORDINAL, response)
     }
 }

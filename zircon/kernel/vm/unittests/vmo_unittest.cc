@@ -2657,7 +2657,11 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
   // Cannot discard when locked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
+  vm_page_t* page;
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
 
   // Unlock.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
@@ -2666,7 +2670,10 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
   // Should be able to discard now.
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                .Total());
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsReclaimable());
@@ -2712,7 +2719,11 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                .Total());
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsReclaimable());
@@ -2743,11 +2754,9 @@ static bool vmo_discard_test() {
   EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
 
   // Cannot discard when locked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
-  EXPECT_EQ(vmo->DebugGetCowPages()
-                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
-                .Total(),
-            0u);
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
   EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
 
   // Unlock.
@@ -2795,11 +2804,9 @@ static bool vmo_discard_test() {
   reclamation_count = vmo->ReclamationEventCount();
 
   // Cannot discard a vmo with pinned pages.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
-  EXPECT_EQ(vmo->DebugGetCowPages()
-                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
-                .Total(),
-            0u);
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
@@ -2832,7 +2839,10 @@ static bool vmo_discard_test() {
   vmo.reset();
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, kSize, &vmo);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
+  ASSERT_OK(vmo->GetPageBlocking(0, VMM_PF_FLAG_SW_FAULT, nullptr, &page, nullptr));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
   EXPECT_EQ(0u, vmo->ReclamationEventCount());
 
   END_TEST;
@@ -2892,7 +2902,12 @@ static bool vmo_discard_failure_test() {
 
   // Unlock and discard.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  vm_page_t* page;
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                .Total());
   EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(kSize, vmo->size());
 
@@ -2977,7 +2992,13 @@ static bool vmo_discardable_counts_test() {
 
       if (rand() % 2) {
         // Discarded pages won't show up under locked or unlocked counts.
-        EXPECT_EQ(static_cast<uint64_t>(i + 1), vmos[i]->DebugGetCowPages()->DiscardPages());
+        vm_page_t* page;
+        ASSERT_OK(vmos[i]->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+        EXPECT_EQ(static_cast<uint64_t>(i + 1),
+                  vmos[i]
+                      ->DebugGetCowPages()
+                      ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                      .Total());
       } else {
         // Unlocked but not discarded.
         expected.unlocked += (i + 1);
@@ -3334,6 +3355,128 @@ static bool vmo_pinning_backlink_test() {
   EXPECT_EQ(0u, pages[0]->object.get_page_offset());
   EXPECT_EQ(cow, pages[1]->object.get_object());
   EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE), pages[1]->object.get_page_offset());
+
+  END_TEST;
+}
+
+// Tests updating dirty state of pages while they are pinned.
+static bool vmo_pinning_dirty_state_test() {
+  BEGIN_TEST;
+  // Disable the page scanner as this test would be flaky if our pages get evicted by someone else.
+  AutoVmScannerDisable scanner_disable;
+
+  // Create a pager-backed VMO with a single page.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  vm_page_t* page;
+  zx_status_t status =
+      make_committed_pager_vmo(1, /*trap_dirty=*/true, /*resizable=*/false, &page, &vmo);
+  ASSERT_EQ(ZX_OK, status);
+
+  // Page should be in the pager queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(page));
+
+  // Pin the page.
+  status = vmo->CommitRangePinned(0, PAGE_SIZE, false);
+  ASSERT_EQ(ZX_OK, status);
+
+  // Pages might get swapped out on pinning if they were loaned. Look up again.
+  page = vmo->DebugGetPage(0);
+
+  // Page should be in the wired queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsWired(page));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(page));
+
+  // Dirty the page while pinned. So this tests a transition to Dirty with pin count > 0. This
+  // should retain the page in the wired queue.
+  status = vmo->DirtyPages(0, PAGE_SIZE);
+  ASSERT_EQ(ZX_OK, status);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsWired(page));
+
+  // Unpin the page.
+  vmo->Unpin(0, PAGE_SIZE);
+
+  // Page should be back in the pager dirty queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
+
+  // Start writeback on the page so that its state changes to AwaitingClean. It should still be in
+  // the dirty queue.
+  status = vmo->WritebackBegin(0, PAGE_SIZE, false);
+  ASSERT_EQ(ZX_OK, status);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
+
+  // Pin for read, so that the dirty state is not changed. But since it is pinned, it should move to
+  // the wired queue.
+  status = vmo->CommitRangePinned(0, PAGE_SIZE, false);
+  ASSERT_EQ(ZX_OK, status);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsWired(page));
+
+  // Now end the writeback so that the page is cleaned. So this tests a transition to Clean with pin
+  // count > 0.
+  status = vmo->WritebackEnd(0, PAGE_SIZE);
+  ASSERT_EQ(ZX_OK, status);
+
+  // Page should still be in the wired queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsWired(page));
+
+  // Unpin the page.
+  vmo->Unpin(0, PAGE_SIZE);
+
+  // Pages should be back in the pager reclaim queue.
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsWired(page));
+
+  // The only remaining transition is to AwaitingClean with pin count > 0. This cannot happen
+  // because we can only move to AwaitingClean from Dirty, but if a page is Dirty with pin count >
+  // 0, it will never leave the Dirty state.
+
+  END_TEST;
+}
+
+// Tests updating dirty state of a high priority VMO.
+static bool vmo_high_priority_dirty_state_test() {
+  BEGIN_TEST;
+  // Disable the page scanner as this test would be flaky if our pages get evicted by someone else.
+  AutoVmScannerDisable scanner_disable;
+
+  // Create a pager-backed VMO with a single page.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  vm_page_t* page;
+  zx_status_t status =
+      make_committed_pager_vmo(1, /*trap_dirty=*/true, /*resizable=*/false, &page, &vmo);
+  ASSERT_EQ(ZX_OK, status);
+
+  // Page should be in the pager queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(page));
+
+  auto change_priority = [&vmo](int64_t delta) {
+    Guard<CriticalMutex> guard{vmo->lock()};
+    vmo->ChangeHighPriorityCountLocked(delta);
+  };
+
+  // Mark the VMO as high priority. This will move the page to the high priority queue.
+  change_priority(1);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsHighPriority(page));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(page));
+
+  // Dirty the page. The page moves to the dirty queue.
+  status = vmo->DirtyPages(0, PAGE_SIZE);
+  ASSERT_EQ(ZX_OK, status);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
+
+  // Begin writeback. Verify that the page remains in the dirty queue.
+  status = vmo->WritebackBegin(0, PAGE_SIZE, false);
+  ASSERT_EQ(ZX_OK, status);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
+
+  // End the writeback. Since the VMO is still high priority, the page will go to the high priority
+  // queue.
+  status = vmo->WritebackEnd(0, PAGE_SIZE);
+  ASSERT_EQ(ZX_OK, status);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsHighPriority(page));
+
+  // Remove high priority. The page should come back to the reclaim queue.
+  change_priority(-1);
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(page));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsHighPriority(page));
 
   END_TEST;
 }
@@ -4144,6 +4287,8 @@ VM_UNITTEST(vmo_dirty_pages_test)
 VM_UNITTEST(vmo_dirty_pages_writeback_test)
 VM_UNITTEST(vmo_dirty_pages_with_hints_test)
 VM_UNITTEST(vmo_pinning_backlink_test)
+VM_UNITTEST(vmo_pinning_dirty_state_test)
+VM_UNITTEST(vmo_high_priority_dirty_state_test)
 VM_UNITTEST(vmo_supply_compressed_pages_test)
 VM_UNITTEST(vmo_zero_pinned_test)
 VM_UNITTEST(vmo_pinned_wrapper_test)

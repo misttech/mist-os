@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::collections::HashSet;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::num::{NonZeroU16, NonZeroU8};
@@ -33,10 +32,11 @@ use netstack3_core::testutil::{
 use netstack3_core::{IpExt, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_device::WeakDeviceId;
+use netstack3_hashmap::HashSet;
 use netstack3_ip::device::{
     AddIpAddrSubnetError, AddressRemovedReason, CommonAddressConfig, CommonAddressProperties,
     DadTimerId, IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
-    IpDeviceFlags, IpDeviceHandler, IpDeviceStateContext, Ipv4AddrConfig,
+    IpDeviceFlags, IpDeviceHandler, IpDeviceStateContext, Ipv4AddrConfig, Ipv4DadAddressInfo,
     Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId, Ipv6DeviceConfigurationUpdate,
     Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6NetworkLearnedParameters,
     Lifetime, PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
@@ -878,6 +878,28 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
     // We shouldn't have sent any more events when exiting Announcing.
     assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
+    // Simulate, at a later point in time, receiving a conflicting ARP packet.
+    // The address should be removed.
+    let (mut core_ctx, bindings_ctx) = ctx.contexts();
+    assert_eq!(
+        IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
+            &mut core_ctx,
+            bindings_ctx,
+            &device_id,
+            ipv4_addr_subnet.addr(),
+            Ipv4DadAddressInfo::SourceAddr
+        ),
+        IpAddressState::Assigned,
+    );
+    assert_eq!(
+        bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressRemoved {
+            device: device_id.downgrade(),
+            addr: ipv4_addr_subnet.addr(),
+            reason: AddressRemovedReason::Forfeited,
+        })]
+    );
+
     // Disable device and take all events to cleanup references.
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
     let _ = ctx.bindings_ctx.take_events();
@@ -1235,6 +1257,73 @@ fn ipv4_ignores_tentative_addresses(case: Ipv4TentativeAddrTestCase) {
                 .expect("listen should succeed");
         }
     }
+
+    // Disable device and take all events to cleanup references.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
+    let _ = ctx.bindings_ctx.take_events();
+}
+
+// Adds an IPv4 address with DAD disabled, and then verifies that a conflicting
+// ARP packet does not cause the address to be removed.
+#[test]
+fn ipv4_dad_conflict_with_dad_disabled() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
+    // Install a device.
+    let local_mac = Ipv4::TEST_ADDRS.local_mac;
+    let device_id = ctx
+        .core_api()
+        .device::<EthernetLinkDevice>()
+        .add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: local_mac,
+                max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+
+    // Enable the device.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+            device: device_id.downgrade(),
+            ip_enabled: true,
+        })]
+    );
+
+    // Add the address, and assert that it immediately becomes assigned.
+    let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
+    ctx.core_api()
+        .device_ip::<Ipv4>()
+        .add_ip_addr_subnet(&device_id, ipv4_addr_subnet.clone())
+        .expect("failed to add IPv4 Address");
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
+            device: device_id.downgrade(),
+            addr: ipv4_addr_subnet.clone(),
+            state: IpAddressState::Assigned,
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        })]
+    );
+
+    // Simulate receiving a conflicting ARP packet. The address should not be
+    // removed.
+    let (mut core_ctx, bindings_ctx) = ctx.contexts();
+    assert_eq!(
+        IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
+            &mut core_ctx,
+            bindings_ctx,
+            &device_id,
+            ipv4_addr_subnet.addr(),
+            Ipv4DadAddressInfo::SourceAddr
+        ),
+        IpAddressState::Assigned,
+    );
+    assert_eq!(bindings_ctx.take_events()[..], []);
 
     // Disable device and take all events to cleanup references.
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);

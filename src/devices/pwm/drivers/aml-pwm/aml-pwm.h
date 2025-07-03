@@ -7,7 +7,9 @@
 
 #include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/types.h>
 
@@ -16,23 +18,21 @@
 #include <vector>
 
 #include <ddktl/device.h>
-#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
 #include "aml-pwm-regs.h"
 
 namespace pwm {
 
-class AmlPwm;
-class AmlPwmDevice;
-using AmlPwmDeviceType = ddk::Device<AmlPwmDevice>;
 constexpr uint32_t kPwmPairCount = 2;
 
 class AmlPwm {
  public:
   explicit AmlPwm(fdf::MmioBuffer mmio, fuchsia_hardware_pwm::PwmChannelInfo channel1,
                   fuchsia_hardware_pwm::PwmChannelInfo channel2)
-      : channels_{channel1, channel2}, enabled_{false, false}, mmio_(std::move(mmio)) {}
+      : channels_{std::move(channel1), std::move(channel2)},
+        enabled_{false, false},
+        mmio_(std::move(mmio)) {}
 
   void Init() {
     for (uint32_t i = 0; i < kPwmPairCount; i++) {
@@ -56,7 +56,7 @@ class AmlPwm {
   zx_status_t PwmImplDisable(uint32_t idx);
 
  private:
-  friend class AmlPwmDevice;
+  friend class AmlPwmDriver;
 
   // Register fine control.
 
@@ -90,32 +90,32 @@ class AmlPwm {
   fdf::MmioBuffer mmio_;
 };
 
-class AmlPwmDevice : public AmlPwmDeviceType,
-                     public ddk::PwmImplProtocol<AmlPwmDevice, ddk::base_protocol> {
+class AmlPwmDriver : public fdf::DriverBase, public ddk::PwmImplProtocol<AmlPwmDriver> {
  public:
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  static constexpr std::string_view kDriverName = "pwm";
+  static constexpr std::string_view kChildNodeName = "aml-pwm-device";
 
-  void DdkRelease() { delete this; }
+  AmlPwmDriver(fdf::DriverStartArgs start_args,
+               fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
+
+  // fdf::DriverBase implementation.
+  zx::result<> Start() override;
 
   zx_status_t PwmImplGetConfig(uint32_t idx, pwm_config_t* out_config);
   zx_status_t PwmImplSetConfig(uint32_t idx, const pwm_config_t* config);
   zx_status_t PwmImplEnable(uint32_t idx);
   zx_status_t PwmImplDisable(uint32_t idx);
 
- protected:
-  // For unit testing
-  explicit AmlPwmDevice() : AmlPwmDeviceType(nullptr) {}
-  zx_status_t Init(std::vector<fdf::MmioBuffer> mmios,
-                   fuchsia_hardware_pwm::PwmChannelsMetadata metadata);
-
  private:
-  explicit AmlPwmDevice(zx_device_t* parent) : AmlPwmDeviceType(parent) {}
-
-  zx_status_t Init(zx_device_t* parent);
-
   std::vector<std::unique_ptr<AmlPwm>> pwms_;
 
   size_t max_pwm_id_ = 0;
+
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  compat::SyncInitializedDeviceServer compat_server_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_PWM_IMPL, this, &pwm_impl_protocol_ops_};
+  fdf_metadata::MetadataServer<fuchsia_hardware_pwm::PwmChannelsMetadata> metadata_server_;
 };
 
 }  // namespace pwm

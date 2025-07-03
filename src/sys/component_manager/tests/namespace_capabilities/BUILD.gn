@@ -91,6 +91,9 @@ fuchsia_component("integration-test-root") {
   testonly = true
   deps = [ ":integration_test_root_bin" ]
   manifest = "meta/integration_test_root.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("integration-test") {

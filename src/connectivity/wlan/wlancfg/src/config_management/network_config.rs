@@ -563,11 +563,15 @@ impl SecurityType {
             SecurityType::Wpa => {
                 scanned_type == &client_types::SecurityTypeDetailed::Wpa1
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa1Wpa2Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa1Wpa2PersonalTkipOnly
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa2PersonalTkipOnly
             }
             SecurityType::Wpa2 => {
                 scanned_type == &client_types::SecurityTypeDetailed::Wpa1Wpa2Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa1Wpa2PersonalTkipOnly
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa2PersonalTkipOnly
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Wpa3Personal
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa3Personal
             }

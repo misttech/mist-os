@@ -48,7 +48,7 @@ class DeviceDetector {
   virtual ~DeviceDetector() = default;
 
  private:
-  static inline const std::string_view kClassName = "DeviceDetector";
+  static inline const std::string kClassName = "DeviceDetector";
 
   DeviceDetector(DeviceDetectionHandler handler, DeviceDetectionIdleHandler idle_handler,
                  async_dispatcher_t* dispatcher)

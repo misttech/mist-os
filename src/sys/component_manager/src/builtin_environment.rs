@@ -39,7 +39,7 @@ use crate::framework::realm_query::RealmQuery;
 use crate::framework::route_validator::RouteValidatorFrameworkCapability;
 use crate::inspect_sink_provider::InspectSinkProvider;
 use crate::model::component::manager::ComponentManagerInstance;
-use crate::model::component::WeakComponentInstance;
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::environment::Environment;
 use crate::model::event_logger::EventLogger;
 use crate::model::events::registry::{EventRegistry, EventSubscription};
@@ -53,16 +53,19 @@ use crate::root_stop_notifier::RootStopNotifier;
 use crate::sandbox_util::{take_handle_as_stream, LaunchTaskOnReceive};
 use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
+use ::router_error::RouterError;
 use ::routing::bedrock::dict_ext::DictExt;
 use ::routing::bedrock::structured_dict::ComponentInput;
-use ::routing::bedrock::with_porcelain_type::WithPorcelainType;
+use ::routing::bedrock::with_porcelain::WithPorcelain;
 use ::routing::capability_source::{
     BuiltinSource, CapabilitySource, ComponentCapability, InternalCapability, NamespaceSource,
 };
 use ::routing::component_instance::{ComponentInstanceInterface, TopInstanceInterface};
 use ::routing::environment::{DebugRegistry, RunnerRegistry};
+use ::routing::error::{ErrorReporter, RouteRequestErrorInfo};
 use ::routing::policy::{GlobalPolicyChecker, ScopedPolicyChecker};
 use anyhow::{format_err, Context as _, Error};
+use async_trait::async_trait;
 use builtins::arguments::Arguments as BootArguments;
 use builtins::cpu_resource::CpuResource;
 use builtins::debug_resource::DebugResource;
@@ -106,7 +109,6 @@ use futures::future::{self, BoxFuture};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
 use log::{error, info, warn};
-use moniker::ExtendedMoniker;
 use routing::resolving::ComponentAddress;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
@@ -477,13 +479,18 @@ pub struct RootComponentInputBuilder {
     security_policy: Arc<SecurityPolicy>,
     policy_checker: GlobalPolicyChecker,
     builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
+    top_instance: Arc<ComponentManagerInstance>,
 }
 
 impl RootComponentInputBuilder {
-    pub fn new(task_group: WeakTaskGroup, runtime_config: &Arc<RuntimeConfig>) -> Self {
+    pub fn new(
+        top_instance: &Arc<ComponentManagerInstance>,
+        runtime_config: &Arc<RuntimeConfig>,
+    ) -> Self {
         Self {
             input: ComponentInput::default(),
-            task_group,
+            top_instance: top_instance.clone(),
+            task_group: top_instance.task_group().as_weak(),
             security_policy: runtime_config.security_policy.clone(),
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             builtin_capabilities: runtime_config.builtin_capabilities.clone(),
@@ -545,15 +552,19 @@ impl RootComponentInputBuilder {
             }),
         );
 
+        let router = launch.into_router();
         match self.input.insert_capability(
             &name,
-            launch
-                .into_router()
-                .with_porcelain_type(
-                    CapabilityTypeName::Protocol,
-                    ExtendedMoniker::ComponentManager,
-                )
-                .into(),
+            WithPorcelain::<_, _, ComponentInstance>::with_porcelain_no_default(
+                router,
+                CapabilityTypeName::Protocol,
+            )
+            .availability(Availability::Required)
+            .target_above_root(&self.top_instance)
+            .error_info(RouteRequestErrorInfo::for_builtin(CapabilityTypeName::Protocol, &name))
+            .error_reporter(NullErrorReporter {})
+            .build()
+            .into(),
         ) {
             Ok(()) => (),
             Err(e) => warn!("failed to add {name} to root component input: {e:?}"),
@@ -589,15 +600,22 @@ impl RootComponentInputBuilder {
                 fut.boxed()
             }),
         );
+        let router = launch.into_router();
         match self.input.insert_capability(
             &protocol.name,
-            launch
-                .into_router()
-                .with_porcelain_type(
-                    CapabilityTypeName::Protocol,
-                    ExtendedMoniker::ComponentManager,
-                )
-                .into(),
+            WithPorcelain::<_, _, ComponentInstance>::with_porcelain_no_default(
+                router,
+                CapabilityTypeName::Protocol,
+            )
+            .availability(Availability::Required)
+            .target_above_root(&self.top_instance)
+            .error_info(RouteRequestErrorInfo::for_builtin(
+                CapabilityTypeName::Protocol,
+                &protocol.name,
+            ))
+            .error_reporter(NullErrorReporter {})
+            .build()
+            .into(),
         ) {
             Ok(()) => (),
             Err(e) => warn!("failed to add {} to root component input: {e:?}", protocol.name),
@@ -690,9 +708,19 @@ impl RootComponentInputBuilder {
         let resolver_name = Name::new(resolver_name_str)
             .expect("invalid resolver name, this should be prevented by manifest_validation");
 
-        let r = launch
-            .into_router()
-            .with_porcelain_type(CapabilityTypeName::Resolver, ExtendedMoniker::ComponentManager);
+        let r = launch.into_router();
+        let r = WithPorcelain::<_, _, ComponentInstance>::with_porcelain_no_default(
+            r,
+            CapabilityTypeName::Resolver,
+        )
+        .availability(Availability::Required)
+        .target_above_root(&self.top_instance)
+        .error_info(RouteRequestErrorInfo::for_builtin(
+            CapabilityTypeName::Resolver,
+            &resolver_name,
+        ))
+        .error_reporter(NullErrorReporter {})
+        .build();
         if let Err(e) =
             self.input.capabilities().insert_capability(&resolver_name, r.clone().into())
         {
@@ -749,24 +777,22 @@ impl RootComponentInputBuilder {
                 future::ready(Ok(())).boxed()
             }),
         );
+
         let r = launch.into_router();
-        if let Err(e) = self.input.capabilities().insert_capability(
-            &name,
-            r.clone()
-                .with_porcelain_type(CapabilityTypeName::Runner, ExtendedMoniker::ComponentManager)
-                .into(),
-        ) {
+        let r = WithPorcelain::<_, _, ComponentInstance>::with_porcelain_no_default(
+            r,
+            CapabilityTypeName::Runner,
+        )
+        .availability(Availability::Required)
+        .target_above_root(&self.top_instance)
+        .error_info(RouteRequestErrorInfo::for_builtin(CapabilityTypeName::Runner, &name))
+        .error_reporter(NullErrorReporter {})
+        .build();
+        if let Err(e) = self.input.capabilities().insert_capability(&name, r.clone().into()) {
             warn!("failed to add runner {} to root component offered capabilities: {e:?}", name);
         }
         if add_to_env {
-            if let Err(e) = self.input.environment().runners().insert_capability(
-                &name,
-                r.with_porcelain_type(
-                    CapabilityTypeName::Runner,
-                    ExtendedMoniker::ComponentManager,
-                )
-                .into(),
-            ) {
+            if let Err(e) = self.input.environment().runners().insert_capability(&name, r.into()) {
                 warn!("failed to add runner {} to root component environment: {e:?}", name)
             }
         }
@@ -774,6 +800,19 @@ impl RootComponentInputBuilder {
 
     pub fn build(self) -> ComponentInput {
         self.input
+    }
+}
+
+#[derive(Clone)]
+struct NullErrorReporter {}
+#[async_trait]
+impl ErrorReporter for NullErrorReporter {
+    async fn report(
+        &self,
+        _: &RouteRequestErrorInfo,
+        _: &RouterError,
+        _: sandbox::WeakInstanceToken,
+    ) {
     }
 }
 
@@ -849,7 +888,7 @@ impl BuiltinEnvironment {
         let top_instance = params.top_instance.clone();
 
         let mut root_input_builder =
-            RootComponentInputBuilder::new(top_instance.task_group().as_weak(), &runtime_config);
+            RootComponentInputBuilder::new(&params.top_instance, &runtime_config);
 
         for (resolver_schema, resolver) in params.root_environment.drain_resolvers() {
             root_input_builder.add_resolver(resolver_schema, resolver);
@@ -1571,6 +1610,12 @@ impl BuiltinEnvironment {
             inspector.root().create_child("escrow"),
         ));
         model.root().hooks.install(component_escrow_duration_status.hooks()).await;
+
+        let component_id_index_node = inspector.root().create_child("component_id_index");
+        for (moniker, instance_id) in model.component_id_index().iter() {
+            component_id_index_node.record_string(moniker.to_string(), instance_id.to_string());
+        }
+        inspector.root().record(component_id_index_node);
 
         // Serve stats about inspect in a lazy node.
         inspector.record_lazy_stats();

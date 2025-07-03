@@ -163,11 +163,14 @@ class MsdArmDevice : public msd::Device,
     // Only mutated during device initialization.
     return cache_coherency_status_;
   }
-  magma::PlatformBusMapper* GetBusMapper() override { return bus_mapper_.get(); }
+  magma::PlatformBusMapper* NdtGetBusMapper() override {
+    // bus mapper is thread safe
+    return bus_mapper_.get();
+  }
   bool NdtIsProtectedModeSupported() override;
   void NdtDeregisterConnection() override;
   void NdtSetCurrentThreadToDefaultPriority() override;
-  PerformanceCounters* performance_counters() override { return perf_counters_.get(); }
+  PerformanceCounters* performance_counters() { return perf_counters_.get(); }
   std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) override;
   std::thread::id NdtGetDeviceThreadId() override {
     // Only mutated during device init and shutdown.
@@ -350,7 +353,6 @@ class MsdArmDevice : public msd::Device,
   // The following are mutated only during device init.
   MaliProperties mali_properties_{};
   ArmMaliCacheCoherencyStatus cache_coherency_status_ = kArmMaliCacheCoherencyNone;
-  // TODO(b/417848695) - refactor, currently this is written by device thread and read from Ndt
   GpuFeatures gpu_features_;
 
   std::unique_ptr<magma::PlatformBuffer> device_properties_buffer_;

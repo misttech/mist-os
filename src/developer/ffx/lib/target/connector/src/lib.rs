@@ -8,14 +8,12 @@ use ffx_command_error::{return_bug, Error, Result};
 use ffx_target::fho::{
     target_interface, DirectConnector, FhoConnectionBehavior, FhoTargetEnvironment,
 };
-use ffx_target::ssh_connector::SshConnector;
 use fho::{FhoEnvironment, TryFromEnv};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::sync::Arc;
 use std::time::Duration;
 use target_holders::{init_connection_behavior, DaemonProxyHolder};
-use target_network_connector::NetworkConnector;
 
 /// A connector lets a tool make multiple attempts to connect to an object. It
 /// retains the environment in the tool body to allow this.
@@ -71,54 +69,6 @@ impl<T: TryFromEnv> TryFromEnv for Connector<T> {
             target_env: target_env.clone(),
             _connects_to: Default::default(),
         })
-    }
-}
-
-pub struct DirectTargetConnector<T: TryFromEnv> {
-    pub inner: Connector<T>,
-    connector: Arc<NetworkConnector<SshConnector>>,
-}
-
-#[async_trait(?Send)]
-impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        // Configure the environment to use a direct connector
-        let connector: Arc<NetworkConnector<SshConnector>> = Arc::new(
-            NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(
-                &env.environment_context(),
-            )
-            .await?,
-        );
-
-        let target_env = target_interface(env);
-        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone()));
-        Ok(DirectTargetConnector {
-            connector,
-            inner: Connector { env: env.clone(), target_env, _connects_to: Default::default() },
-        })
-    }
-}
-
-/// This is prototype code for the daemonless direct-non-strict connection.
-impl<T: TryFromEnv> DirectTargetConnector<T> {
-    /// Try to get a `T` from the environment. Will wait for the target to
-    /// appear if it is non-responsive. If that occurs, `log_target_wait` will
-    /// be called prior to waiting.
-    #[allow(dead_code)]
-    pub async fn try_connect(
-        &self,
-        log_target_wait: impl FnMut(&Option<String>, &Option<Error>) -> Result<()>,
-    ) -> Result<T> {
-        self.inner.try_connect(log_target_wait).await
-    }
-
-    #[allow(dead_code)]
-    pub async fn get_address(&self) -> Option<std::net::SocketAddr> {
-        self.connector.device_address().await
-    }
-    #[allow(dead_code)]
-    pub async fn get_ssh_host_address(&self) -> Option<String> {
-        self.connector.host_ssh_address().await
     }
 }
 
@@ -240,7 +190,7 @@ mod tests {
     use super::*;
     use ffx_command_error::{bug, NonFatalError};
     use ffx_config::{EnvironmentContext, TryFromEnvContext};
-    use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
+    use ffx_target::connection::testing::FakeOvernet;
     use ffx_target::fho::connector::MockDirectConnector;
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
     use futures::future::LocalBoxFuture;
@@ -323,36 +273,13 @@ mod tests {
     async fn test_connection_fails_when_overnet_connector_cannot_be_allocated() {
         let test_env = ffx_config::test_init().await.unwrap();
         let env = &test_env.context;
-        let connector = NetworkConnector::<FromContextFailer>::new(env).await.unwrap();
+        let connector = target_network_connector::NetworkConnector::<FromContextFailer>::new(env)
+            .await
+            .unwrap();
         assert!(connector.connect().await.is_err());
         assert!(connector.connect().await.is_err());
         let err = bug!("foo");
         assert_eq!(err.to_string(), connector.wrap_connection_errors(err).to_string());
-    }
-
-    // This is a bit of a hack, but there needs to be a way to set the behavior that also doesn't
-    // require locking every test sequentially.
-    #[derive(Debug)]
-    pub(crate) struct RegularFakeOvernet(FakeOvernet);
-
-    impl TargetConnector for RegularFakeOvernet {
-        const CONNECTION_TYPE: &'static str = "fake";
-
-        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
-            self.0.connect().await
-        }
-    }
-
-    impl TryFromEnvContext for RegularFakeOvernet {
-        fn try_from_env_context<'a>(
-            _env: &'a EnvironmentContext,
-        ) -> LocalBoxFuture<'a, Result<Self>> {
-            let (_sender, receiver) = async_channel::unbounded();
-            let circuit_node = overnet_core::Router::new(None).unwrap();
-            Box::pin(async {
-                Ok(Self(FakeOvernet::new(circuit_node, receiver, FakeOvernetBehavior::KeepRcsOpen)))
-            })
-        }
     }
 
     #[derive(Debug)]

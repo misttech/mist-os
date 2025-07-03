@@ -7,6 +7,7 @@
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load(
     "//common:transition_utils.bzl",
+    "normalize_features_list",
     "remove_command_line_option_values",
     "set_command_line_option_value",
 )
@@ -30,8 +31,25 @@ def _test_remove_command_line_option_values(env):
     for input, expected in cases:
         asserts.equals(env, expected, remove_command_line_option_values(input, "--arg="))
 
+def _test_normalize_features_list(env):
+    cases = [
+        (["foo"], ["foo"]),
+        (["foo", "bar"], ["foo", "bar"]),
+        (["foo", "foo"], ["foo"]),
+        (["-foo", "-foo"], ["-foo"]),
+        (["foo", "-foo"], ["-foo"]),
+        (["foo", "-foo", "foo"], ["foo"]),
+        (["foo", "-foo", "foo", "-foo"], ["-foo"]),
+        (["foo", "bar", "-foo"], ["bar", "-foo"]),
+        (["-foo", "bar", "foo", "-bar"], ["foo", "-bar"]),
+        (["-foo", "bar", "-bar", "foo"], ["-bar", "foo"]),
+    ]
+    for input, expected in cases:
+        asserts.equals(env, expected, normalize_features_list(input))
+
 def _transition_utils_test(ctx):
     env = unittest.begin(ctx)
+    _test_normalize_features_list(env)
     _test_set_command_line_option_value(env)
     _test_remove_command_line_option_values(env)
     return unittest.end(env)

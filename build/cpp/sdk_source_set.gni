@@ -169,12 +169,10 @@ template("sdk_source_set") {
     configs += [ "//build/config:sdk_extra_warnings" ]
   }
 
-  # Walk over dependencies (deps and public_deps) and collect their names (dep_names), labels (all_deps), labels of corresponding
-  # sdk elements (sdk_deps) and location of their metadata files (sdk_metas)
-  sdk_metas = []
+  # Walk over dependencies (deps and public_deps) and collect labels (all_deps)
+  # and sdk elements (sdk_deps).
   sdk_deps = []
   all_deps = []
-  dep_names = []
   if (defined(invoker.deps)) {
     all_deps += invoker.deps
   }
@@ -185,11 +183,6 @@ template("sdk_source_set") {
     dep_full_label = get_label_info(dep, "label_no_toolchain")
     sdk_dep = "${dep_full_label}_sdk"
     sdk_deps += [ sdk_dep ]
-
-    gen_dir = get_label_info(sdk_dep, "target_gen_dir")
-    name = get_label_info(sdk_dep, "name")
-    sdk_metas += [ "${gen_dir}/${name}.meta.json" ]
-    dep_names += [ get_label_info(dep, "name") ]
   }
 
   # Split invoker.sources into sources and headers.
@@ -286,42 +279,6 @@ template("sdk_source_set") {
     not_needed(invoker, [ "sdk_headers_for_internal_use" ])
   }
 
-  metadata_target_name = "${target_name}_sdk_metadata"
-  metadata_file = "$target_gen_dir/$target_name.sdk_meta.json"
-
-  action(metadata_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
-    script = "//build/cpp/gen_sdk_sources_meta_file.py"
-
-    inputs = sdk_metas
-
-    outputs = [ metadata_file ]
-
-    args = [
-      "--out",
-      rebase_path(metadata_file, root_build_dir),
-      "--name",
-      sdk_name,
-      "--root",
-      sdk_root_path,
-      "--include-dir",
-      include_dest,
-    ]
-    args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
-    args += [ "--dep_names" ] + dep_names
-    args += [ "--sources" ] + sdk_metadata_sources
-    args += [ "--headers" ] + sdk_metadata_headers
-
-    if (is_stable) {
-      args += [ "--stable" ]
-    }
-
-    # Unlike the other C++ library templates, the main target
-    # (`main_target_name`) is not required for the metadata and is not
-    # built with the atom.
-    deps = sdk_deps
-  }
-
   # LINT.IfChange
   _prebuild_info = {
     include_dir = include_dest
@@ -378,7 +335,6 @@ template("sdk_source_set") {
     }
 
     meta = {
-      source = metadata_file
       source_prebuild_info = _prebuild_info
       dest = "$sdk_root_path/meta.json"
       type = "cc_source_library"
@@ -389,10 +345,7 @@ template("sdk_source_set") {
 
     deps = sdk_deps
 
-    non_sdk_deps = [
-      ":${metadata_target_name}",
-      ":${verify_public_headers_target}",
-    ]
+    non_sdk_deps = [ ":${verify_public_headers_target}" ]
     if (should_verify_pragma) {
       non_sdk_deps += [ ":${verify_pragma_target_name}" ]
     }
@@ -402,11 +355,18 @@ template("sdk_source_set") {
 
     # Explicitly add non-public dependencies, in case some of the source files
     # are generated.
+    # There is only one legitimate use case for these in the IDK, so assert that
+    # all others are in the "internal IDK."
     if (defined(invoker.non_sdk_deps)) {
+      assert(is_internal ||
+                 invoker.non_sdk_deps == [ "//sdk/fidl/zbi:zbi.c.checked-in" ],
+             "`non_sdk_deps` should not be used with atoms in the IDK.")
       non_sdk_deps += invoker.non_sdk_deps
     }
 
     if (defined(invoker.non_sdk_public_deps)) {
+      assert(is_internal,
+             "`non_sdk_public_deps` should not be used with atoms in the IDK.")
       non_sdk_deps += invoker.non_sdk_public_deps
     }
 

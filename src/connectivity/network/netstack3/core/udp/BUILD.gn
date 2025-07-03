@@ -15,12 +15,13 @@ rustc_library_with_features("netstack3-udp") {
     "src/base.rs",
     "src/counters.rs",
     "src/lib.rs",
+    "src/settings.rs",
   ]
   deps = [
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/netstack3/core/hashmap",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",
@@ -28,6 +29,9 @@ rustc_library_with_features("netstack3-udp") {
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
   ]
+
+  _testutils_deps =
+      [ "//src/connectivity/network/netstack3/core/macros:netstack3-macros" ]
 
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
 
@@ -50,6 +54,7 @@ rustc_library_with_features("netstack3-udp") {
         "testutils",
         "instrumented",
       ]
+      deps += _testutils_deps
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-testutils",
@@ -62,6 +67,7 @@ rustc_library_with_features("netstack3-udp") {
       target_name = "netstack3-udp-benchmarks"
       testonly = true
       features = [ "testutils" ]
+      deps += _testutils_deps
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-benchmarks",
@@ -94,6 +100,7 @@ rustc_library_with_features("netstack3-udp") {
         "//third_party/rust_crates:itertools",
         "//third_party/rust_crates:test-case",
       ]
+      test_deps += _testutils_deps
     },
   ]
   if (is_host) {
@@ -105,6 +112,7 @@ rustc_library_with_features("netstack3-udp") {
           "instrumented",
         ]
         testonly = true
+        deps += _testutils_deps
         deps += [
           "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
           "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-loom",

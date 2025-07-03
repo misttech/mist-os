@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
-        "inspect/offer.shard.cml",
-        "sys/component/realm_builder.shard.cml",
-        "syslog/client.shard.cml",
+        "sys/component/realm_builder_no_diagnostics.shard.cml",
     ],
     program: {
         binary: "bin/async_reporter",

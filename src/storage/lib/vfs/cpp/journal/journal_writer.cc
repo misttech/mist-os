@@ -5,22 +5,28 @@
 #include "src/storage/lib/vfs/cpp/journal/journal_writer.h"
 
 #include <lib/fit/defer.h>
-#include <lib/sync/completion.h>
+#include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
-#include <cstdio>
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <utility>
+#include <vector>
+
+#include <range/range.h>
+#include <storage/buffer/block_buffer_view.h>
+#include <storage/operation/operation.h>
 
 #include "src/storage/lib/vfs/cpp/journal/entry_view.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
-namespace fs {
-namespace {
-
-using storage::OperationType;
-
-}  // namespace
-
-namespace internal {
+namespace fs::internal {
 
 JournalWriter::JournalWriter(TransactionHandler* transaction_handler,
                              JournalSuperblock journal_superblock, uint64_t journal_start_block,
@@ -83,7 +89,7 @@ fpromise::result<void, zx_status_t> JournalWriter::WriteMetadata(
   for (const auto& operation : work.operations) {
     range::Range<uint64_t> range(operation.op.dev_offset,
                                  operation.op.dev_offset + operation.op.length);
-    live_metadata_operations_.insert(std::move(range));
+    live_metadata_operations_.insert(range);
   }
 
   // Write metadata to the journal itself.
@@ -324,5 +330,4 @@ fpromise::result<void, zx_status_t> JournalWriter::Flush() {
   return fpromise::ok();
 }
 
-}  // namespace internal
-}  // namespace fs
+}  // namespace fs::internal

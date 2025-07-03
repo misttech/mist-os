@@ -1345,7 +1345,7 @@ function fx-get-ui-mode() {
         echo "$mode"
         return 1
     else
-      override_mode="$(jq --arg cmd "$command" -r '.[$cmd] //empty' <<< "$overrides")"
+      override_mode="$(fx jq --arg cmd "$command" -r '.[$cmd] //empty' <<< "$overrides")"
       exit_status=$?
       if [[ "$exit_status" -ne 0 ]]; then
         fx-warn "Error parsing overrides in fx-get-ui-mode, using $mode"

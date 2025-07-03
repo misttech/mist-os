@@ -84,7 +84,7 @@ fit::result<Error, Buffer<>> DumpFile::Zstd::ReadMemory(FileRange where) {
   Buffer<> buffer;
   auto copy = std::make_unique<BufferImplVector>(std::move(keepalive_.front()));
   keepalive_.pop_front();
-  buffer.data_ = cpp20::span<std::byte>(*copy);
+  buffer.data_ = std::span<std::byte>(*copy);
   buffer.impl_ = std::move(copy);
   return fit::ok(std::move(buffer));
 }

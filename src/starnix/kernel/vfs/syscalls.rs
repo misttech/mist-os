@@ -20,11 +20,10 @@ use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
 use crate::vfs::{
     checked_add_offset_and_length, new_memfd, splice, CheckAccessReason, DirentSink64,
-    EpollFileObject, EpollKey, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle,
-    FileSystemOptions, FlockOperation, FsStr, FsString, LookupContext, NamespaceNode,
-    PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode,
-    SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
-    XattrOp,
+    EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions,
+    FlockOperation, FsStr, FsString, LookupContext, NamespaceNode, PathWithReachability,
+    RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
+    TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
 };
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -262,6 +261,7 @@ pub fn sys_fcntl(
             let fd_number = arg as i32;
             let flags = if cmd == F_DUPFD_CLOEXEC { FdFlags::CLOEXEC } else { FdFlags::empty() };
             let newfd = current_task.files.duplicate(
+                locked,
                 current_task,
                 fd,
                 TargetFdNumber::Minimum(FdNumber::from_raw(fd_number)),
@@ -802,7 +802,7 @@ fn do_openat(
 ) -> Result<FdNumber, Errno> {
     let file = open_file_at(locked, current_task, dir_fd, user_path, flags, mode, resolve_flags)?;
     let fd_flags = get_fd_flags(flags);
-    current_task.add_file(file, fd_flags)
+    current_task.add_file(locked, file, fd_flags)
 }
 
 pub fn sys_openat(
@@ -1637,8 +1637,8 @@ pub fn sys_pipe2(
     write.update_file_flags(file_flags, supported_file_flags);
 
     let fd_flags = get_fd_flags(flags);
-    let fd_read = current_task.add_file(read, fd_flags)?;
-    let fd_write = current_task.add_file(write, fd_flags)?;
+    let fd_read = current_task.add_file(locked, read, fd_flags)?;
+    let fd_write = current_task.add_file(locked, write, fd_flags)?;
     log_trace!("pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
 
     current_task.write_object(user_pipe, &fd_read)?;
@@ -1710,15 +1710,21 @@ pub fn sys_symlinkat(
 }
 
 pub fn sys_dup(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     oldfd: FdNumber,
 ) -> Result<FdNumber, Errno> {
-    current_task.files.duplicate(current_task, oldfd, TargetFdNumber::Default, FdFlags::empty())
+    current_task.files.duplicate(
+        locked,
+        current_task,
+        oldfd,
+        TargetFdNumber::Default,
+        FdFlags::empty(),
+    )
 }
 
 pub fn sys_dup3(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     oldfd: FdNumber,
     newfd: FdNumber,
@@ -1731,7 +1737,13 @@ pub fn sys_dup3(
         return error!(EINVAL);
     }
     let fd_flags = get_fd_flags(flags);
-    current_task.files.duplicate(current_task, oldfd, TargetFdNumber::Specific(newfd), fd_flags)?;
+    current_task.files.duplicate(
+        locked,
+        current_task,
+        oldfd,
+        TargetFdNumber::Specific(newfd),
+        fd_flags,
+    )?;
     Ok(newfd)
 }
 
@@ -1791,7 +1803,7 @@ pub fn sys_memfd_create(
     if flags & MFD_CLOEXEC != 0 {
         fd_flags |= FdFlags::CLOEXEC;
     }
-    let fd = current_task.add_file(file, fd_flags)?;
+    let fd = current_task.add_file(locked, file, fd_flags)?;
     Ok(fd)
 }
 
@@ -1997,7 +2009,7 @@ pub fn sys_umount2(
 }
 
 pub fn sys_eventfd2(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     value: u32,
     flags: u32,
@@ -2008,14 +2020,14 @@ pub fn sys_eventfd2(
     let blocking = (flags & EFD_NONBLOCK) == 0;
     let eventfd_type =
         if (flags & EFD_SEMAPHORE) == 0 { EventFdType::Counter } else { EventFdType::Semaphore };
-    let file = new_eventfd(current_task, value, eventfd_type, blocking);
+    let file = new_eventfd(locked, current_task, value, eventfd_type, blocking);
     let fd_flags = if flags & EFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.add_file(file, fd_flags)?;
+    let fd = current_task.add_file(locked, file, fd_flags)?;
     Ok(fd)
 }
 
 pub fn sys_pidfd_open(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     flags: u32,
@@ -2036,8 +2048,8 @@ pub fn sys_pidfd_open(
 
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
-    let file = new_pidfd(current_task, task.thread_group(), open_flags);
-    current_task.add_file(file, FdFlags::CLOEXEC)
+    let file = new_pidfd(locked, current_task, task.thread_group(), open_flags);
+    current_task.add_file(locked, file, FdFlags::CLOEXEC)
 }
 
 pub fn sys_pidfd_getfd(
@@ -2059,11 +2071,11 @@ pub fn sys_pidfd_getfd(
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &task)?;
 
     let target_file = task.files.get(targetfd)?;
-    current_task.add_file(target_file, FdFlags::CLOEXEC)
+    current_task.add_file(locked, target_file, FdFlags::CLOEXEC)
 }
 
 pub fn sys_timerfd_create(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     clock_id: u32,
     flags: u32,
@@ -2098,8 +2110,8 @@ pub fn sys_timerfd_create(
         fd_flags |= FdFlags::CLOEXEC;
     };
 
-    let timer = TimerFile::new_file(current_task, timer_type, timeline, open_flags)?;
-    let fd = current_task.add_file(timer, fd_flags)?;
+    let timer = TimerFile::new_file(locked, current_task, timer_type, timeline, open_flags)?;
+    let fd = current_task.add_file(locked, timer, fd_flags)?;
     Ok(fd)
 }
 
@@ -2374,16 +2386,16 @@ pub fn sys_select(
 }
 
 pub fn sys_epoll_create1(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
     if flags & !EPOLL_CLOEXEC != 0 {
         return error!(EINVAL);
     }
-    let ep_file = EpollFileObject::new_file(current_task);
+    let ep_file = EpollFileObject::new_file(locked, current_task);
     let fd_flags = if flags & EPOLL_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.add_file(ep_file, fd_flags)?;
+    let fd = current_task.add_file(locked, ep_file, fd_flags)?;
     Ok(fd)
 }
 
@@ -2421,7 +2433,7 @@ pub fn sys_epoll_ctl(
     match op {
         EPOLL_CTL_ADD => {
             epoll_file.add(locked, current_task, &operand_file, &file, epoll_event?)?;
-            operand_file.register_epfd(epfd);
+            operand_file.register_epfd(&file);
         }
         EPOLL_CTL_MOD => {
             epoll_file.modify(locked, current_task, &operand_file, epoll_event?)?;
@@ -2431,8 +2443,8 @@ pub fn sys_epoll_ctl(
             current_task
                 .kernel()
                 .suspend_resume_manager
-                .remove_epoll(operand_file.weak_handle.as_ptr() as EpollKey);
-            operand_file.unregister_epfd(epfd);
+                .remove_epoll(operand_file.id.as_epoll_key());
+            operand_file.unregister_epfd(&file);
         }
         _ => return error!(EINVAL),
     }
@@ -2596,7 +2608,9 @@ pub fn poll(
     mask: Option<SigSet>,
     deadline: zx::MonotonicInstant,
 ) -> Result<usize, Errno> {
-    if num_fds < 0 || num_fds as u64 > current_task.thread_group().get_rlimit(Resource::NOFILE) {
+    if num_fds < 0
+        || num_fds as u64 > current_task.thread_group().get_rlimit(locked, Resource::NOFILE)
+    {
         return error!(EINVAL);
     }
 
@@ -2858,7 +2872,7 @@ pub fn sys_fallocate(
 }
 
 pub fn sys_inotify_init1(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -2867,9 +2881,9 @@ pub fn sys_inotify_init1(
     }
     let non_blocking = flags & IN_NONBLOCK != 0;
     let close_on_exec = flags & IN_CLOEXEC != 0;
-    let inotify_file = InotifyFileObject::new_file(current_task, non_blocking);
+    let inotify_file = InotifyFileObject::new_file(locked, current_task, non_blocking);
     let fd_flags = if close_on_exec { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    current_task.add_file(inotify_file, fd_flags)
+    current_task.add_file(locked, inotify_file, fd_flags)
 }
 
 pub fn sys_inotify_add_watch(
@@ -3152,7 +3166,7 @@ pub fn sys_io_destroy(
 }
 
 pub fn sys_io_uring_setup(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_entries: UserValue<u32>,
     user_params: UserRef<io_uring_params>,
@@ -3198,10 +3212,10 @@ pub fn sys_io_uring_setup(
         return error!(EINVAL);
     }
 
-    let file = IoUringFileObject::new_file(current_task, entries, &mut params)?;
+    let file = IoUringFileObject::new_file(locked, current_task, entries, &mut params)?;
 
     // io_uring file descriptors are always created with CLOEXEC.
-    let fd = current_task.add_file(file, FdFlags::CLOEXEC)?;
+    let fd = current_task.add_file(locked, file, FdFlags::CLOEXEC)?;
     current_task.write_object(user_params, &params)?;
     Ok(fd)
 }
@@ -3259,11 +3273,12 @@ pub fn sys_io_uring_register(
 #[cfg(feature = "arch32")]
 mod arch32 {
     use crate::mm::MemoryAccessorExt;
+    use crate::task::CurrentTask;
     use crate::vfs::syscalls::{
-        lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
-        sys_unlinkat, LookupFlags, OpenFlags,
+        lookup_at, sys_dup3, sys_faccessat, sys_fallocate, sys_lseek, sys_mkdirat, sys_openat,
+        sys_readlinkat, sys_unlinkat, LookupFlags, OpenFlags,
     };
-    use crate::vfs::{CurrentTask, FdNumber, FsNode};
+    use crate::vfs::{FdNumber, FsNode};
     use linux_uapi::off_t;
     use starnix_sync::{Locked, Unlocked};
     use starnix_syscalls::SyscallArg;
@@ -3276,6 +3291,10 @@ mod arch32 {
     use starnix_uapi::{errno, error, uapi, AT_REMOVEDIR};
 
     type StatFs64Ptr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs64>;
+
+    fn merge_low_and_high(low: u32, high: u32) -> off_t {
+        ((high as off_t) << 32) | (low as off_t)
+    }
 
     pub fn sys_arch32_open(
         locked: &mut Locked<Unlocked>,
@@ -3317,6 +3336,22 @@ mod arch32 {
         let file = current_task.files.get_allowing_opath(fd)?;
         stat64(locked, current_task, file.node(), arch32_stat_buf)
     }
+
+    pub fn sys_arch32_fallocate(
+        locked: &mut Locked<Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        mode: u32,
+        offset_low: u32,
+        offset_high: u32,
+        len_low: u32,
+        len_high: u32,
+    ) -> Result<(), Errno> {
+        let offset = merge_low_and_high(offset_low, offset_high);
+        let len = merge_low_and_high(len_low, len_high);
+        sys_fallocate(locked, current_task, fd, mode, offset, len)
+    }
+
     pub fn sys_arch32_stat64(
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
@@ -3365,7 +3400,7 @@ mod arch32 {
         result: UserRef<off_t>,
         whence: u32,
     ) -> Result<(), Errno> {
-        let offset = ((offset_high as off_t) << 32) | (offset_low as off_t);
+        let offset = merge_low_and_high(offset_low, offset_high);
         let result_value = sys_lseek(locked, current_task, fd, offset, whence)?;
         current_task.write_object(result, &result_value).map(|_| ())
     }
@@ -3404,8 +3439,8 @@ mod arch32 {
         address: UserAddress,
         length: usize,
         _: SyscallArg,
-        offset_low: off_t,
-        offset_high: off_t,
+        offset_low: u32,
+        offset_high: u32,
     ) -> Result<usize, Errno> {
         super::sys_pread64(
             locked,
@@ -3413,7 +3448,7 @@ mod arch32 {
             fd,
             address,
             length,
-            offset_low | (offset_high << 32),
+            merge_low_and_high(offset_low, offset_high),
         )
     }
 
@@ -3424,8 +3459,8 @@ mod arch32 {
         address: UserAddress,
         length: usize,
         _: SyscallArg,
-        offset_low: off_t,
-        offset_high: off_t,
+        offset_low: u32,
+        offset_high: u32,
     ) -> Result<usize, Errno> {
         super::sys_pwrite64(
             locked,
@@ -3433,7 +3468,7 @@ mod arch32 {
             fd,
             address,
             length,
-            offset_low | (offset_high << 32),
+            merge_low_and_high(offset_low, offset_high),
         )
     }
 
@@ -3442,10 +3477,10 @@ mod arch32 {
         current_task: &CurrentTask,
         fd: FdNumber,
         _: SyscallArg,
-        length_low: off_t,
-        length_high: off_t,
+        length_low: u32,
+        length_high: u32,
     ) -> Result<(), Errno> {
-        super::sys_ftruncate(locked, current_task, fd, length_low | (length_high << 32))
+        super::sys_ftruncate(locked, current_task, fd, merge_low_and_high(length_low, length_high))
     }
 
     pub fn sys_arch32_chmod(
@@ -3616,14 +3651,13 @@ mod arch32 {
         current_task: &CurrentTask,
         fd: FdNumber,
         advice: u32,
-        offset_low: u64,
-        offset_high: u64,
-        len_low: u64,
-        len_high: u64,
+        offset_low: u32,
+        offset_high: u32,
+        len_low: u32,
+        len_high: u32,
     ) -> Result<(), Errno> {
-        let offset =
-            off_t::try_from(offset_low | (offset_high << 32)).map_err(|_| errno!(EINVAL))?;
-        let len = off_t::try_from(len_low | (len_high << 32)).map_err(|_| errno!(EINVAL))?;
+        let offset = merge_low_and_high(offset_low, offset_high);
+        let len = merge_low_and_high(len_low, len_high);
         super::sys_fadvise64(locked, current_task, fd, offset, len, advice)
     }
 
@@ -3643,13 +3677,13 @@ mod arch32 {
         sys_copy_file_range as sys_arch32_copy_file_range, sys_dup3 as sys_arch32_dup3,
         sys_epoll_create1 as sys_arch32_epoll_create1, sys_epoll_ctl as sys_arch32_epoll_ctl,
         sys_epoll_pwait as sys_arch32_epoll_pwait, sys_epoll_pwait2 as sys_arch32_epoll_pwait2,
-        sys_eventfd2 as sys_arch32_eventfd2, sys_fallocate as sys_arch32_fallocate,
-        sys_fchmod as sys_arch32_fchmod, sys_fchmodat as sys_arch32_fchmodat,
-        sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
-        sys_fchownat as sys_arch32_fchownat, sys_fdatasync as sys_arch32_fdatasync,
-        sys_flock as sys_arch32_flock, sys_fsetxattr as sys_arch32_fsetxattr,
-        sys_fstatat64 as sys_arch32_fstatat64, sys_fstatfs as sys_arch32_fstatfs,
-        sys_fsync as sys_arch32_fsync, sys_ftruncate as sys_arch32_ftruncate,
+        sys_eventfd2 as sys_arch32_eventfd2, sys_fchmod as sys_arch32_fchmod,
+        sys_fchmodat as sys_arch32_fchmodat, sys_fchown as sys_arch32_fchown32,
+        sys_fchown as sys_arch32_fchown, sys_fchownat as sys_arch32_fchownat,
+        sys_fdatasync as sys_arch32_fdatasync, sys_flock as sys_arch32_flock,
+        sys_fsetxattr as sys_arch32_fsetxattr, sys_fstatat64 as sys_arch32_fstatat64,
+        sys_fstatfs as sys_arch32_fstatfs, sys_fsync as sys_arch32_fsync,
+        sys_ftruncate as sys_arch32_ftruncate,
         sys_inotify_add_watch as sys_arch32_inotify_add_watch,
         sys_inotify_init1 as sys_arch32_inotify_init1,
         sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_io_cancel as sys_arch32_io_cancel,
@@ -3687,57 +3721,57 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_sys_lseek() -> Result<(), Errno> {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let fd = FdNumber::from_raw(10);
         let file_handle =
-            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let file_size = file_handle.node().stat(&mut locked, &current_task).unwrap().st_size;
-        current_task.files.insert(&current_task, fd, file_handle).unwrap();
+            current_task.open_file(locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
+        let file_size = file_handle.node().stat(locked, &current_task).unwrap().st_size;
+        current_task.files.insert(locked, &current_task, fd, file_handle).unwrap();
 
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, 0, SEEK_CUR)?, 0);
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, 1, SEEK_CUR)?, 1);
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, 3, SEEK_SET)?, 3);
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, -3, SEEK_CUR)?, 0);
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, 0, SEEK_END)?, file_size);
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, -5, SEEK_SET), error!(EINVAL));
+        assert_eq!(sys_lseek(locked, &current_task, fd, 0, SEEK_CUR)?, 0);
+        assert_eq!(sys_lseek(locked, &current_task, fd, 1, SEEK_CUR)?, 1);
+        assert_eq!(sys_lseek(locked, &current_task, fd, 3, SEEK_SET)?, 3);
+        assert_eq!(sys_lseek(locked, &current_task, fd, -3, SEEK_CUR)?, 0);
+        assert_eq!(sys_lseek(locked, &current_task, fd, 0, SEEK_END)?, file_size);
+        assert_eq!(sys_lseek(locked, &current_task, fd, -5, SEEK_SET), error!(EINVAL));
 
         // Make sure that the failed call above did not change the offset.
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, 0, SEEK_CUR)?, file_size);
+        assert_eq!(sys_lseek(locked, &current_task, fd, 0, SEEK_CUR)?, file_size);
 
         // Prepare for an overflow.
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, 3, SEEK_SET)?, 3);
+        assert_eq!(sys_lseek(locked, &current_task, fd, 3, SEEK_SET)?, 3);
 
         // Check for overflow.
-        assert_eq!(sys_lseek(&mut locked, &current_task, fd, i64::MAX, SEEK_CUR), error!(EINVAL));
+        assert_eq!(sys_lseek(locked, &current_task, fd, i64::MAX, SEEK_CUR), error!(EINVAL));
 
         Ok(())
     }
 
     #[::fuchsia::test]
     async fn test_sys_dup() -> Result<(), Errno> {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let file_handle =
-            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
-        let newfd = sys_dup(&mut locked, &current_task, oldfd)?;
+            current_task.open_file(locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
+        let oldfd = current_task.add_file(locked, file_handle, FdFlags::empty())?;
+        let newfd = sys_dup(locked, &current_task, oldfd)?;
 
         assert_ne!(oldfd, newfd);
         let files = &current_task.files;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(newfd).unwrap()));
 
-        assert_eq!(sys_dup(&mut locked, &current_task, FdNumber::from_raw(3)), error!(EBADF));
+        assert_eq!(sys_dup(locked, &current_task, FdNumber::from_raw(3)), error!(EBADF));
 
         Ok(())
     }
 
     #[::fuchsia::test]
     async fn test_sys_dup3() -> Result<(), Errno> {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let file_handle =
-            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
+            current_task.open_file(locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
+        let oldfd = current_task.add_file(locked, file_handle, FdFlags::empty())?;
         let newfd = FdNumber::from_raw(2);
-        sys_dup3(&mut locked, &current_task, oldfd, newfd, O_CLOEXEC)?;
+        sys_dup3(locked, &current_task, oldfd, newfd, O_CLOEXEC)?;
 
         assert_ne!(oldfd, newfd);
         let files = &current_task.files;
@@ -3745,22 +3779,20 @@ mod tests {
         assert_eq!(files.get_fd_flags_allowing_opath(oldfd).unwrap(), FdFlags::empty());
         assert_eq!(files.get_fd_flags_allowing_opath(newfd).unwrap(), FdFlags::CLOEXEC);
 
-        assert_eq!(sys_dup3(&mut locked, &current_task, oldfd, oldfd, O_CLOEXEC), error!(EINVAL));
+        assert_eq!(sys_dup3(locked, &current_task, oldfd, oldfd, O_CLOEXEC), error!(EINVAL));
 
         // Pass invalid flags.
         let invalid_flags = 1234;
-        assert_eq!(
-            sys_dup3(&mut locked, &current_task, oldfd, newfd, invalid_flags),
-            error!(EINVAL)
-        );
+        assert_eq!(sys_dup3(locked, &current_task, oldfd, newfd, invalid_flags), error!(EINVAL));
 
         // Makes sure that dup closes the old file handle before the fd points
         // to the new file handle.
         let second_file_handle =
-            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let different_file_fd = current_task.add_file(second_file_handle, FdFlags::empty())?;
+            current_task.open_file(locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
+        let different_file_fd =
+            current_task.add_file(locked, second_file_handle, FdFlags::empty())?;
         assert!(!Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
-        sys_dup3(&mut locked, &current_task, oldfd, different_file_fd, O_CLOEXEC)?;
+        sys_dup3(locked, &current_task, oldfd, different_file_fd, O_CLOEXEC)?;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
 
         Ok(())
@@ -3768,12 +3800,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_sys_open_cloexec() -> Result<(), Errno> {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let path_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let path = b"data/testfile.txt\0";
         current_task.write_memory(path_addr, path)?;
         let fd = sys_openat(
-            &mut locked,
+            locked,
             &current_task,
             FdNumber::AT_FDCWD,
             UserCString::new(&current_task, path_addr),
@@ -3786,26 +3818,26 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_sys_epoll() -> Result<(), Errno> {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
         let epoll_fd =
-            sys_epoll_create1(&mut locked, &current_task, 0).expect("sys_epoll_create1 failed");
-        sys_close(&mut locked, &current_task, epoll_fd).expect("sys_close failed");
+            sys_epoll_create1(locked, &current_task, 0).expect("sys_epoll_create1 failed");
+        sys_close(locked, &current_task, epoll_fd).expect("sys_close failed");
 
         Ok(())
     }
 
     #[::fuchsia::test]
     async fn test_fstat_tmp_file() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
         // Create the file that will be used to stat.
         let file_path = "data/testfile.txt";
         let _file_handle =
-            current_task.open_file(&mut locked, file_path.into(), OpenFlags::RDONLY).unwrap();
+            current_task.open_file(locked, file_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let path_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
         let memory_len = (path_addr + file_path.len()).expect("OOB memory allocation!");
@@ -3814,7 +3846,7 @@ mod tests {
 
         let user_path = UserCString::new(&current_task, path_addr);
 
-        assert_eq!(sys_statfs(&mut locked, &current_task, user_path, user_stat.into()), Ok(()));
+        assert_eq!(sys_statfs(locked, &current_task, user_path, user_stat.into()), Ok(()));
 
         let returned_stat = current_task.read_object(user_stat).expect("failed to read struct");
         assert_eq!(
@@ -3825,16 +3857,16 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_unlinkat_dir() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         // Create the dir that we will attempt to unlink later.
         let no_slash_path = b"testdir";
         let no_slash_path_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(no_slash_path_addr, no_slash_path).expect("failed to write path");
         let no_slash_user_path = UserCString::new(&current_task, no_slash_path_addr);
         sys_mkdirat(
-            &mut locked,
+            locked,
             &current_task,
             FdNumber::AT_FDCWD,
             no_slash_user_path,
@@ -3843,39 +3875,35 @@ mod tests {
         .unwrap();
 
         let slash_path = b"testdir/";
-        let slash_path_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let slash_path_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(slash_path_addr, slash_path).expect("failed to write path");
         let slash_user_path = UserCString::new(&current_task, slash_path_addr);
 
         // Try to remove a directory without specifying AT_REMOVEDIR.
         // This should fail with EISDIR, irrespective of the terminating slash.
-        let error =
-            sys_unlinkat(&mut locked, &current_task, FdNumber::AT_FDCWD, slash_user_path, 0)
-                .unwrap_err();
+        let error = sys_unlinkat(locked, &current_task, FdNumber::AT_FDCWD, slash_user_path, 0)
+            .unwrap_err();
         assert_eq!(error, errno!(EISDIR));
-        let error =
-            sys_unlinkat(&mut locked, &current_task, FdNumber::AT_FDCWD, no_slash_user_path, 0)
-                .unwrap_err();
+        let error = sys_unlinkat(locked, &current_task, FdNumber::AT_FDCWD, no_slash_user_path, 0)
+            .unwrap_err();
         assert_eq!(error, errno!(EISDIR));
 
         // Success with AT_REMOVEDIR.
-        sys_unlinkat(&mut locked, &current_task, FdNumber::AT_FDCWD, slash_user_path, AT_REMOVEDIR)
+        sys_unlinkat(locked, &current_task, FdNumber::AT_FDCWD, slash_user_path, AT_REMOVEDIR)
             .unwrap();
     }
 
     #[::fuchsia::test]
     async fn test_rename_noreplace() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
         // Create the file that will be renamed.
         let old_user_path = "data/testfile.txt";
         let _old_file_handle =
-            current_task.open_file(&mut locked, old_user_path.into(), OpenFlags::RDONLY).unwrap();
+            current_task.open_file(locked, old_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let old_path_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let old_path_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(old_path_addr, old_user_path.as_bytes())
             .expect("failed to clear struct");
@@ -3883,11 +3911,10 @@ mod tests {
         // Create a second file that we will attempt to rename to.
         let new_user_path = "data/testfile2.txt";
         let _new_file_handle =
-            current_task.open_file(&mut locked, new_user_path.into(), OpenFlags::RDONLY).unwrap();
+            current_task.open_file(locked, new_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let new_path_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let new_path_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(new_path_addr, new_user_path.as_bytes())
             .expect("failed to clear struct");
@@ -3895,7 +3922,7 @@ mod tests {
         // Try to rename first file to second file's name with RENAME_NOREPLACE flag.
         // This should fail with EEXIST.
         let error = sys_renameat2(
-            &mut locked,
+            locked,
             &current_task,
             FdNumber::AT_FDCWD,
             UserCString::new(&current_task, old_path_addr),

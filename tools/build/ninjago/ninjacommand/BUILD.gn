@@ -1,0 +1,24 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/go/go_library.gni")
+import("//build/go/go_test.gni")
+
+go_library("ninjacommand") {
+  sources = [
+    "ninjacommand.go",
+    "ninjacommand_test.go",
+  ]
+  deps = [
+    "//third_party/golibs:github.com/google/shlex",
+    "//tools/build/ninjago/chrometrace",
+  ]
+}
+
+if (is_host) {
+  go_test("ninjacommand_tests") {
+    library = ":ninjacommand"
+    deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
+  }
+}

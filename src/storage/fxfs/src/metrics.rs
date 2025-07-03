@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::object_store::ObjectStore;
-use fuchsia_inspect::Node;
+use anyhow::Error;
+use fuchsia_inspect::{Inspector, LazyNode, Node};
 use fuchsia_sync::Mutex;
-use futures::FutureExt;
+use futures::future::BoxFuture;
 use once_cell::sync::Lazy;
-use rustc_hash::FxHashMap as HashMap;
-use std::sync::Weak;
 
 /// Root node to which the filesystem Inspect tree will be attached.
 fn root() -> Node {
@@ -29,46 +27,11 @@ pub fn detail() -> Node {
     DETAIL_NODE.lock().clone_weak()
 }
 
-/// This is held to support unmounting and remounting of an object store. Nodes cannot be recreated,
-/// so hold onto them and simply replace what they point at instead.
-pub struct ObjectStoresTracker {
-    stores: Mutex<HashMap<String, Weak<ObjectStore>>>,
-}
-
-impl ObjectStoresTracker {
-    /// Add a store to be tracked in inspect.
-    pub fn register_store(&self, name: &str, store: Weak<ObjectStore>) {
-        self.stores.lock().insert(name.to_owned(), store);
-    }
-
-    /// Stop tracking a store in inspect.
-    pub fn unregister_store(&self, name: &str) {
-        self.stores.lock().remove(name);
-    }
-}
-
-/// Holder of lazy nodes for the object stores list.
-pub fn object_stores_tracker() -> &'static ObjectStoresTracker {
-    static OBJECT_STORES_TRACKER: Lazy<ObjectStoresTracker> = Lazy::new(|| {
-        let root = root();
-        let node = root.create_lazy_child("stores", || {
-            async {
-                let inspector = fuchsia_inspect::Inspector::default();
-                let root = inspector.root();
-                for (name, store) in object_stores_tracker().stores.lock().iter() {
-                    let store_arc = match store.upgrade() {
-                        Some(store) => store,
-                        None => continue,
-                    };
-                    root.record_child(name.clone(), move |n| store_arc.record_data(n));
-                }
-                Ok(inspector)
-            }
-            .boxed()
-        });
-        root.record(node);
-        ObjectStoresTracker { stores: Mutex::new(HashMap::default()) }
-    });
-
-    &OBJECT_STORES_TRACKER
+pub fn register_fs(
+    populate_stores_fn: impl Fn() -> BoxFuture<'static, Result<Inspector, Error>>
+        + Sync
+        + Send
+        + 'static,
+) -> LazyNode {
+    root().create_lazy_child("stores", populate_stores_fn)
 }

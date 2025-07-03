@@ -40,9 +40,9 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     if (tokens.is_error()) {
       MAGMA_LOG(
           ERROR,
-          "Failed to get power dependency tokens: %u. Perhaps the product does not have Power "
+          "Failed to get power dependency tokens: %s. Perhaps the product does not have Power "
           "Framework?",
-          static_cast<uint8_t>(tokens.error_value()));
+          fdf_power::ErrorToString(tokens.error_value()));
       return false;
     }
 

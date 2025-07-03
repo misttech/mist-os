@@ -141,18 +141,6 @@
   xor %edi, %edi
   call x86_init_percpu
 
-  // Fill the stack canary with a random value as early as possible.
-  // This isn't done in x86_init_percpu because the hw_rng_get_entropy
-  // call would make it eligible for stack-guard checking itself.  But
-  // %gs is not set up yet in the prologue of the function, so it would
-  // crash if it tried to use the stack-guard.
-  call choose_stack_guard
-
-  // Move it into place.
-  mov %rax, %gs:ZX_TLS_STACK_GUARD_OFFSET
-  // Don't leak that value to other code.
-  xor %eax, %eax
-
   // Collect the time stamp of entering "normal" C++ code in virtual space.
   sample_ticks kernel_virtual_entry_ticks(%rip)
 

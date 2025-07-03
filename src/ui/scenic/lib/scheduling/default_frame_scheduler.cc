@@ -110,7 +110,8 @@ void DefaultFrameScheduler::RequestFrame(zx::time requested_presentation_time) {
                  requested_presentation_time.get() / 1'000'000, "target_presentation_time",
                  new_target_presentation_time.get() / 1'000'000, "candidate wakeup time",
                  new_wakeup_time.get() / 1'000'000, "current wakeup time",
-                 wakeup_time_.get() / 1'000'000);
+                 wakeup_time_.get() / 1'000'000, "now",
+                 zx::time(async_now(dispatcher_)).get() / 1'000'000);
 
   // Output requested presentation time in milliseconds.
   // Logging the first few frames to find common startup bugs.

@@ -62,7 +62,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
   zx_status_t InitPhy3();
   zx_status_t InitOtg();
 
-  void ChangeMode(UsbPhyBase& phy, fuchsia_hardware_usb_phy::Mode new_mode);
+  zx::result<> ChangeMode(UsbPhyBase& phy, fuchsia_hardware_usb_phy::Mode new_mode);
 
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);

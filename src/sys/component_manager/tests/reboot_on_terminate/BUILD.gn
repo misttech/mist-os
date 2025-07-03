@@ -88,12 +88,18 @@ fuchsia_component("reboot_on_terminate_success") {
   testonly = true
   manifest = "meta/reboot_on_terminate_success.cml"
   deps = [ ":reboot_on_terminate_success_bin" ]
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("reboot_on_terminate_policy") {
   testonly = true
   manifest = "meta/reboot_on_terminate_policy.cml"
   deps = [ ":reboot_on_terminate_policy_bin" ]
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("crash") {

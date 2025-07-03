@@ -22,8 +22,10 @@ driver_bind_rules("post-init-bind") {
 fuchsia_cc_driver("post-init-driver") {
   output_name = "post-init"
   sources = [
+    "backlight.cc",
     "display.cc",
     "post-init.cc",
+    "touch.cc",
   ]
   deps = [
     ":post-init-bind",
@@ -31,6 +33,7 @@ fuchsia_cc_driver("post-init-driver") {
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.pin:fuchsia.hardware.pin_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
@@ -42,13 +45,16 @@ fuchsia_cc_driver("post-init-driver") {
     "//sdk/lib/stdcompat",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
+    "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
+    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
     "//src/devices/bind/fuchsia.infineon.platform:fuchsia.infineon.platform_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
     "//src/graphics/display/lib/device-protocol-display",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
+    "//src/ui/backlight/drivers/ti-lp8556:metadata",
     "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/inspect",
   ]

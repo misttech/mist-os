@@ -3,19 +3,28 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/aml-pwm.so",
         bind: "meta/bind/aml-pwm.bindbc",
         colocate: "false",
-        compat: "driver/aml-pwm.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.pwm.PwmChannelsMetadata" },
+    ],
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.pwm.PwmChannelsMetadata",
+            from: "self",
+        },
     ],
 }

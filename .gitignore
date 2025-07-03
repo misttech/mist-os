@@ -262,3 +262,6 @@ lcov.info
 # Nix shell
 /shell.nix
 /default.nix
+
+# gemini-cli logs
+.gemini/logs.json

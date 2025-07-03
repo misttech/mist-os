@@ -426,7 +426,7 @@ pub mod example_protocol {
     pub mod prelude {
         pub use crate::{
             example_protocol, ExampleProtocol, ExampleProtocolClientHandler,
-            ExampleProtocolClientSender, ExampleProtocolServerHandler, ExampleProtocolServerSender,
+            ExampleProtocolServerHandler,
         };
 
         pub use crate::ExampleProtocolMethodRequest;
@@ -443,40 +443,99 @@ pub mod example_protocol {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `ExampleProtocol` client sender.
-pub trait ExampleProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleProtocolMethodRequest,
-        >;
-}
+        pub struct Method<T0> {
+            arg: T0,
+        }
 
-impl<___T> ExampleProtocolClientSender for ::fidl_next::ClientSender<___T, ExampleProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<T0> ::fidl_next::Encodable for Method<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next_test_exampleusing::WireEmpty>,
+        {
+            type Encoded = crate::WireExampleProtocolMethodRequest;
+        }
 
-    fn method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleProtocolMethodRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(6023439637367187273, request)
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for Method<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next_test_exampleusing::WireEmpty>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        arg,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.arg, encoder, arg)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ExampleProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ExampleProtocolClientSender<___T>;
+            type ServerSender = ExampleProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `ExampleProtocol` protocol.
+        pub struct ExampleProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> ExampleProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn method(
+                &self,
+
+                arg: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next_test_exampleusing::WireEmpty,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.method_with(Method { arg })
+            }
+
+            pub fn method_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireExampleProtocolMethodRequest,
+                >,
+            {
+                self.sender.send_one_way(6023439637367187273, request)
+            }
+        }
+
+        /// The server sender for the `ExampleProtocol` protocol.
+        #[repr(transparent)]
+        pub struct ExampleProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ExampleProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -485,14 +544,14 @@ where
 /// See [`ExampleProtocol`] for more details.
 pub trait ExampleProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ExampleProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for ExampleProtocol
 where
+    ___H: ExampleProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ExampleProtocolClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -504,47 +563,35 @@ where
     }
 }
 
-/// A helper trait for the `ExampleProtocol` server sender.
-pub trait ExampleProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ExampleProtocolServerSender for ::fidl_next::ServerSender<___T, ExampleProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-}
-
 /// A server handler for the ExampleProtocol protocol.
 ///
 /// See [`ExampleProtocol`] for more details.
 pub trait ExampleProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn method(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ExampleProtocol>,
+        sender: &::fidl_next::ServerSender<ExampleProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, example_protocol::Method>,
-    );
+        request: ::fidl_next::Request<example_protocol::Method, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ExampleProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for ExampleProtocol
 where
+    ___H: ExampleProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ExampleProtocolServerHandler<___T>,
 
     <example_protocol::Method as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             6023439637367187273 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.method(sender, decoded),
+                Ok(decoded) => handler.method(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -556,9 +603,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

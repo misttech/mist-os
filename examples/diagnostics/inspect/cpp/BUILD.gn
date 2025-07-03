@@ -28,8 +28,10 @@ source_set("lib") {
   ]
 
   public_deps = [
-    "//examples/components/routing/fidl:echo_hlcpp",
+    "//examples/components/routing/fidl:echo_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/hlcpp",
+    "//sdk/lib/syslog/cpp",
 
     # [START inspect_libs]
     "//sdk/lib/inspect/component/cpp",
@@ -72,6 +74,7 @@ executable("test_bin") {
   sources = [ "example_unittests.cc" ]
   deps = [
     ":lib",
+    "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/inspect/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

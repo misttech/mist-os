@@ -26,7 +26,10 @@ use uuid::Uuid;
 use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt as _};
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
-use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
+    fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
+};
 
 pub const TEST_DISK_BLOCK_SIZE: u32 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
@@ -214,6 +217,7 @@ pub struct DiskBuilder {
     corrupt_data: bool,
     gpt: bool,
     extra_volumes: Vec<&'static str>,
+    extra_gpt_partitions: Vec<&'static str>,
     // Note: fvm also means fxfs acting as the volume manager when using fxblob.
     format_volume_manager: bool,
     legacy_data_label: bool,
@@ -240,6 +244,7 @@ impl DiskBuilder {
             corrupt_data: false,
             gpt: false,
             extra_volumes: Vec::new(),
+            extra_gpt_partitions: Vec::new(),
             format_volume_manager: true,
             legacy_data_label: false,
             fs_switch: None,
@@ -305,6 +310,11 @@ impl DiskBuilder {
         self
     }
 
+    pub fn with_extra_gpt_partition(&mut self, volume_name: &'static str) -> &mut Self {
+        self.extra_gpt_partitions.push(volume_name);
+        self
+    }
+
     pub fn with_extra_volume(&mut self, volume_name: &'static str) -> &mut Self {
         self.extra_volumes.push(volume_name);
         self
@@ -347,20 +357,33 @@ impl DiskBuilder {
 
         if self.gpt {
             // Format the disk with gpt, with a single empty partition named "fvm".
-            let client = Arc::new(RemoteBlockClient::new(server.block_proxy()).await.unwrap());
-            let _ = gpt::Gpt::format(
-                client,
-                vec![gpt::PartitionInfo {
-                    label: "fvm".to_string(),
-                    type_guid: gpt::Guid::from_bytes(FVM_TYPE_GUID),
+            let client = Arc::new(
+                RemoteBlockClient::new(server.connect::<fvolume::VolumeProxy>()).await.unwrap(),
+            );
+            assert!(self.extra_gpt_partitions.len() < 10);
+            let fvm_num_blocks = self.size / TEST_DISK_BLOCK_SIZE as u64 - 138;
+            let mut partitions = Vec::new();
+            let mut start_block = 64;
+            for extra_partition in &self.extra_gpt_partitions {
+                partitions.push(gpt::PartitionInfo {
+                    label: extra_partition.to_string(),
+                    type_guid: gpt::Guid::from_bytes(DEFAULT_TEST_TYPE_GUID),
                     instance_guid: gpt::Guid::from_bytes(FVM_PART_INSTANCE_GUID),
-                    start_block: 64,
-                    num_blocks: self.size / TEST_DISK_BLOCK_SIZE as u64 - 128,
+                    start_block,
+                    num_blocks: 1,
                     flags: 0,
-                }],
-            )
-            .await
-            .expect("gpt format failed");
+                });
+                start_block += 1;
+            }
+            partitions.push(gpt::PartitionInfo {
+                label: "fvm".to_string(),
+                type_guid: gpt::Guid::from_bytes(FVM_TYPE_GUID),
+                instance_guid: gpt::Guid::from_bytes(FVM_PART_INSTANCE_GUID),
+                start_block,
+                num_blocks: fvm_num_blocks,
+                flags: 0,
+            });
+            let _ = gpt::Gpt::format(client, partitions).await.expect("gpt format failed");
         }
 
         if !self.format_volume_manager {
@@ -371,15 +394,17 @@ impl DiskBuilder {
         let connector: Box<dyn BlockConnector> = if self.gpt {
             // Format the volume manager in the gpt partition named "fvm".
             let partitions_dir = vfs::directory::immutable::simple();
-            let manager =
-                GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
+            let manager = GptManager::new(server.connect(), partitions_dir.clone()).await.unwrap();
             let dir =
                 vfs::directory::serve(partitions_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
             gpt = Some(manager);
-            Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
+            Box::new(DirBasedBlockConnector::new(
+                dir,
+                format!("part-00{}/volume", self.extra_gpt_partitions.len()),
+            ))
         } else {
             // Format the volume manager onto the disk directly.
-            Box::new(move |server_end| Ok(server.connect(server_end)))
+            Box::new(move |server_end| Ok(server.connect_server(server_end)))
         };
 
         if self.volumes_spec.fxfs_blob {
@@ -398,7 +423,7 @@ impl DiskBuilder {
         let mut fxfs = Filesystem::from_boxed_config(connector, Box::new(Fxfs::default()));
         // Wipes the device
         fxfs.format().await.expect("format failed");
-        let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
+        let fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
         let blob_volume = fs
             .create_volume(
                 "blob",
@@ -433,7 +458,7 @@ impl DiskBuilder {
             .await
             .unwrap();
         let mut fvm_fs = Filesystem::from_boxed_config(connector, Box::new(Fvm::dynamic_child()));
-        let mut fvm = fvm_fs.serve_multi_volume().await.unwrap();
+        let fvm = fvm_fs.serve_multi_volume().await.unwrap();
 
         {
             let blob_volume = fvm
@@ -457,8 +482,9 @@ impl DiskBuilder {
                 )
                 .expect("failed to connect to the Blob service");
             self.blob_hash = Some(write_test_blob(blob_creator, &BLOB_CONTENTS).await);
+
+            blob_volume.shutdown().await.unwrap();
         }
-        fvm.shutdown_volume("blobfs").await.unwrap();
 
         if self.volumes_spec.create_data_partition {
             let data_label = if self.legacy_data_label { "minfs" } else { "data" };
@@ -517,7 +543,7 @@ impl DiskBuilder {
                 .await
             } else if self.data_spec.format.is_some() {
                 self.write_test_data(data_volume.root()).await;
-                fvm.shutdown_volume(data_label).await.unwrap();
+                data_volume.shutdown().await.unwrap();
             }
         }
 
@@ -540,7 +566,7 @@ impl DiskBuilder {
 
     async fn init_data_fxfs(&self, fxfs: FxfsType) {
         let mut fxblob = false;
-        let (mut fs, crypt_realm) = match fxfs {
+        let (fs, crypt_realm) = match fxfs {
             FxfsType::Fxfs(connector) => {
                 let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
                 let mut fxfs =

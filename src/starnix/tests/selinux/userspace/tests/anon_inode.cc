@@ -144,7 +144,7 @@ extern std::string DoPrePolicyLoadWork() {
   g_before_policy_userfaultfd = static_cast<int>(syscall(SYS_userfaultfd, O_CLOEXEC));
   EXPECT_NE(g_before_policy_userfaultfd, -1)
       << "Failed pre-policy userfaultfd: " << strerror(errno);
-  EXPECT_EQ(GetLabel(g_before_policy_userfaultfd), fit::error(EINVAL));
+  EXPECT_EQ(GetLabel(g_before_policy_userfaultfd), fit::error(ENOTSUP));
 
   return "anon_inode_policy.pp";
 }

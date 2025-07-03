@@ -973,10 +973,7 @@ pub struct Allowed;
 
 pub mod allowed {
     pub mod prelude {
-        pub use crate::{
-            allowed, Allowed, AllowedClientHandler, AllowedClientSender, AllowedServerHandler,
-            AllowedServerSender,
-        };
+        pub use crate::{allowed, Allowed, AllowedClientHandler, AllowedServerHandler};
 
         pub use crate::AllowedDeniedResponse;
     }
@@ -996,35 +993,46 @@ pub mod allowed {
             ::fidl_next::WireU32,
         >;
     }
-}
 
-/// A helper trait for the `Allowed` client sender.
-pub trait AllowedClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn denied(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, allowed::Denied>,
-        ::fidl_next::EncodeError,
-    >;
-}
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Allowed
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = AllowedClientSender<___T>;
+            type ServerSender = AllowedServerSender<___T>;
+        }
 
-impl<___T> AllowedClientSender for ::fidl_next::ClientSender<___T, Allowed>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `Allowed` protocol.
+        pub struct AllowedClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn denied(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, allowed::Denied>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(3826178105137551123, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<___T> AllowedClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn denied(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::Denied, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(3826178105137551123, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `Allowed` protocol.
+        #[repr(transparent)]
+        pub struct AllowedServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> AllowedServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -1033,17 +1041,17 @@ where
 /// See [`Allowed`] for more details.
 pub trait AllowedClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Allowed
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Allowed
 where
+    ___H: AllowedClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: AllowedClientHandler<___T>,
 
     <allowed::Denied as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1053,18 +1061,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `Allowed` server sender.
-pub trait AllowedServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> AllowedServerSender for ::fidl_next::ServerSender<___T, Allowed>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the Allowed protocol.
@@ -1073,20 +1069,20 @@ where
 pub trait AllowedServerHandler<___T: ::fidl_next::Transport> {
     fn denied(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Allowed>,
+        sender: &::fidl_next::ServerSender<Allowed, ___T>,
 
         responder: ::fidl_next::Responder<allowed::Denied>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Allowed
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Allowed
 where
+    ___H: AllowedServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: AllowedServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1097,9 +1093,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -1108,7 +1104,7 @@ where
             3826178105137551123 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.denied(sender, responder);
+                handler.denied(sender, responder).await;
             }
 
             ordinal => {
@@ -1126,21 +1122,36 @@ pub mod contains_allowed {
     pub mod prelude {
         pub use crate::{
             contains_allowed, ContainsAllowed, ContainsAllowedClientHandler,
-            ContainsAllowedClientSender, ContainsAllowedServerHandler, ContainsAllowedServerSender,
+            ContainsAllowedServerHandler,
         };
     }
-}
 
-/// A helper trait for the `ContainsAllowed` client sender.
-pub trait ContainsAllowedClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
 
-impl<___T> ContainsAllowedClientSender for ::fidl_next::ClientSender<___T, ContainsAllowed>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ContainsAllowed
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ContainsAllowedClientSender<___T>;
+            type ServerSender = ContainsAllowedServerSender<___T>;
+        }
+
+        /// The client sender for the `ContainsAllowed` protocol.
+        pub struct ContainsAllowedClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> ContainsAllowedClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `ContainsAllowed` protocol.
+        #[repr(transparent)]
+        pub struct ContainsAllowedServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ContainsAllowedServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the ContainsAllowed protocol.
@@ -1148,14 +1159,14 @@ where
 /// See [`ContainsAllowed`] for more details.
 pub trait ContainsAllowedClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ContainsAllowed
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for ContainsAllowed
 where
+    ___H: ContainsAllowedClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ContainsAllowedClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1165,18 +1176,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `ContainsAllowed` server sender.
-pub trait ContainsAllowedServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ContainsAllowedServerSender for ::fidl_next::ServerSender<___T, ContainsAllowed>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the ContainsAllowed protocol.
@@ -1184,14 +1183,14 @@ where
 /// See [`ContainsAllowed`] for more details.
 pub trait ContainsAllowedServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ContainsAllowed
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for ContainsAllowed
 where
+    ___H: ContainsAllowedServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ContainsAllowedServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1202,9 +1201,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -2192,10 +2191,7 @@ pub struct Denied;
 
 pub mod denied {
     pub mod prelude {
-        pub use crate::{
-            denied, Denied, DeniedClientHandler, DeniedClientSender, DeniedServerHandler,
-            DeniedServerSender,
-        };
+        pub use crate::{denied, Denied, DeniedClientHandler, DeniedServerHandler};
 
         pub use crate::DeniedShouldNeverAppearInAnyBindingRequest;
     }
@@ -2211,40 +2207,155 @@ pub mod denied {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `Denied` client sender.
-pub trait DeniedClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn should_never_appear_in_any_binding<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDeniedShouldNeverAppearInAnyBindingRequest<'static>,
-        >;
-}
+        pub struct ShouldNeverAppearInAnyBinding<T0, T1, T2> {
+            should_never_appear_in_any_binding_1: T0,
 
-impl<___T> DeniedClientSender for ::fidl_next::ClientSender<___T, Denied>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            should_never_appear_in_any_binding_2: T1,
 
-    fn should_never_appear_in_any_binding<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDeniedShouldNeverAppearInAnyBindingRequest<'static>,
-        >,
-    {
-        self.as_untyped().send_one_way(5338181991150205725, request)
+            should_never_appear_in_any_binding_3: T2,
+        }
+
+        impl<T0, T1, T2> ::fidl_next::Encodable for ShouldNeverAppearInAnyBinding<T0, T1, T2>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireShouldNeverAppearInAnyBinding1>,
+
+            T1: ::fidl_next::Encodable<
+                Encoded = crate::WireShouldNeverAppearInAnyBinding2<'static>,
+            >,
+
+            T2: ::fidl_next::Encodable<Encoded = crate::WireShouldNeverAppearInAnyBinding3>,
+        {
+            type Encoded = crate::WireDeniedShouldNeverAppearInAnyBindingRequest<'static>;
+        }
+
+        unsafe impl<___E, T0, T1, T2> ::fidl_next::Encode<___E>
+            for ShouldNeverAppearInAnyBinding<T0, T1, T2>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireShouldNeverAppearInAnyBinding1>,
+
+            T1: ::fidl_next::Encode<
+                ___E,
+                Encoded = crate::WireShouldNeverAppearInAnyBinding2<'static>,
+            >,
+
+            T2: ::fidl_next::Encode<___E, Encoded = crate::WireShouldNeverAppearInAnyBinding3>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        should_never_appear_in_any_binding_1,
+                        should_never_appear_in_any_binding_2,
+                        should_never_appear_in_any_binding_3,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(
+                    self.should_never_appear_in_any_binding_1,
+                    encoder,
+                    should_never_appear_in_any_binding_1,
+                )?;
+
+                ::fidl_next::Encode::encode(
+                    self.should_never_appear_in_any_binding_2,
+                    encoder,
+                    should_never_appear_in_any_binding_2,
+                )?;
+
+                ::fidl_next::Encode::encode(
+                    self.should_never_appear_in_any_binding_3,
+                    encoder,
+                    should_never_appear_in_any_binding_3,
+                )?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Denied
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = DeniedClientSender<___T>;
+            type ServerSender = DeniedServerSender<___T>;
+        }
+
+        /// The client sender for the `Denied` protocol.
+        pub struct DeniedClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> DeniedClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn should_never_appear_in_any_binding(
+                &self,
+
+                should_never_appear_in_any_binding_1: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireShouldNeverAppearInAnyBinding1,
+                >,
+
+                should_never_appear_in_any_binding_2: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireShouldNeverAppearInAnyBinding2<'static>,
+                >,
+
+                should_never_appear_in_any_binding_3: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireShouldNeverAppearInAnyBinding3,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.should_never_appear_in_any_binding_with(ShouldNeverAppearInAnyBinding {
+                    should_never_appear_in_any_binding_1,
+
+                    should_never_appear_in_any_binding_2,
+
+                    should_never_appear_in_any_binding_3,
+                })
+            }
+
+            pub fn should_never_appear_in_any_binding_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireDeniedShouldNeverAppearInAnyBindingRequest<'static>,
+                >,
+            {
+                self.sender.send_one_way(5338181991150205725, request)
+            }
+        }
+
+        /// The server sender for the `Denied` protocol.
+        #[repr(transparent)]
+        pub struct DeniedServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> DeniedServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -2253,14 +2364,14 @@ where
 /// See [`Denied`] for more details.
 pub trait DeniedClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Denied
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Denied
 where
+    ___H: DeniedClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DeniedClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -2272,47 +2383,35 @@ where
     }
 }
 
-/// A helper trait for the `Denied` server sender.
-pub trait DeniedServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> DeniedServerSender for ::fidl_next::ServerSender<___T, Denied>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-}
-
 /// A server handler for the Denied protocol.
 ///
 /// See [`Denied`] for more details.
 pub trait DeniedServerHandler<___T: ::fidl_next::Transport> {
     fn should_never_appear_in_any_binding(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Denied>,
+        sender: &::fidl_next::ServerSender<Denied, ___T>,
 
-        request: ::fidl_next::Request<___T, denied::ShouldNeverAppearInAnyBinding>,
-    );
+        request: ::fidl_next::Request<denied::ShouldNeverAppearInAnyBinding, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Denied
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Denied
 where
+    ___H: DeniedServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DeniedServerHandler<___T>,
 
     <denied::ShouldNeverAppearInAnyBinding as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             5338181991150205725 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.should_never_appear_in_any_binding(sender, decoded),
+                Ok(decoded) => handler.should_never_appear_in_any_binding(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -2324,9 +2423,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -5417,7 +5516,7 @@ pub mod deny_each_binding {
     pub mod prelude {
         pub use crate::{
             deny_each_binding, DenyEachBinding, DenyEachBindingClientHandler,
-            DenyEachBindingClientSender, DenyEachBindingServerHandler, DenyEachBindingServerSender,
+            DenyEachBindingServerHandler,
         };
 
         pub use crate::DenyEachBindingOnlyDenyCppRequest;
@@ -5540,203 +5639,467 @@ pub mod deny_each_binding {
             ::fidl_next::WireU32,
         >;
     }
-}
 
-/// A helper trait for the `DenyEachBinding` client sender.
-pub trait DenyEachBindingClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn only_deny_cpp<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyCpp>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyCppRequest,
-        >;
+        pub struct OnlyDenyCpp<T0> {
+            a: T0,
+        }
 
-    fn only_deny_dart<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyDart>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyDartRequest,
-        >;
+        impl<T0> ::fidl_next::Encodable for OnlyDenyCpp<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyCppRequest;
+        }
 
-    fn only_deny_go<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyGo>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyGoRequest,
-        >;
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyCpp<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    fn only_deny_python<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyPython>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyPythonRequest,
-        >;
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
 
-    fn only_deny_rust<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyRust>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyRustRequest,
-        >;
+                    } = out;
+                }
 
-    fn only_deny_syzkaller<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenySyzkaller>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenySyzkallerRequest,
-        >;
-}
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
 
-impl<___T> DenyEachBindingClientSender for ::fidl_next::ClientSender<___T, DenyEachBinding>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+                Ok(())
+            }
+        }
 
-    fn only_deny_cpp<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyCpp>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyCppRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(2957648440141224850, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        pub struct OnlyDenyDart<T0> {
+            a: T0,
+        }
 
-    fn only_deny_dart<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyDart>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyDartRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(8446571910689294295, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        impl<T0> ::fidl_next::Encodable for OnlyDenyDart<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyDartRequest;
+        }
 
-    fn only_deny_go<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyGo>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyGoRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(7311125300308839833, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyDart<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    fn only_deny_python<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyPython>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyPythonRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(3010747198252652930, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
 
-    fn only_deny_rust<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyRust>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenyRustRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(3719805222870932662, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+                    } = out;
+                }
 
-    fn only_deny_syzkaller<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenySyzkaller>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireDenyEachBindingOnlyDenySyzkallerRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(2319043834522757514, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenyGo<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyGo<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyGoRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyGo<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenyPython<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyPython<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyPythonRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyPython<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenyRust<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyRust<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyRustRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyRust<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenySyzkaller<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenySyzkaller<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenySyzkallerRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenySyzkaller<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::DenyEachBinding
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = DenyEachBindingClientSender<___T>;
+            type ServerSender = DenyEachBindingServerSender<___T>;
+        }
+
+        /// The client sender for the `DenyEachBinding` protocol.
+        pub struct DenyEachBindingClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> DenyEachBindingClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn only_deny_cpp(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyCpp, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_cpp_with(OnlyDenyCpp { a })
+            }
+
+            pub fn only_deny_cpp_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyCpp, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireDenyEachBindingOnlyDenyCppRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(2957648440141224850, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn only_deny_dart(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyDart, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_dart_with(OnlyDenyDart { a })
+            }
+
+            pub fn only_deny_dart_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyDart, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireDenyEachBindingOnlyDenyDartRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(8446571910689294295, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn only_deny_go(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyGo, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_go_with(OnlyDenyGo { a })
+            }
+
+            pub fn only_deny_go_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyGo, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireDenyEachBindingOnlyDenyGoRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(7311125300308839833, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn only_deny_python(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyPython, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_python_with(OnlyDenyPython { a })
+            }
+
+            pub fn only_deny_python_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyPython, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireDenyEachBindingOnlyDenyPythonRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(3010747198252652930, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn only_deny_rust(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyRust, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_rust_with(OnlyDenyRust { a })
+            }
+
+            pub fn only_deny_rust_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyRust, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireDenyEachBindingOnlyDenyRustRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(3719805222870932662, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+            pub fn only_deny_syzkaller(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenySyzkaller, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_syzkaller_with(OnlyDenySyzkaller { a })
+            }
+
+            pub fn only_deny_syzkaller_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenySyzkaller, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireDenyEachBindingOnlyDenySyzkallerRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(2319043834522757514, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `DenyEachBinding` protocol.
+        #[repr(transparent)]
+        pub struct DenyEachBindingServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> DenyEachBindingServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -5745,10 +6108,10 @@ where
 /// See [`DenyEachBinding`] for more details.
 pub trait DenyEachBindingClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for DenyEachBinding
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for DenyEachBinding
 where
+    ___H: DenyEachBindingClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DenyEachBindingClientHandler<___T>,
 
     <deny_each_binding::OnlyDenyCpp as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -5768,9 +6131,9 @@ where
     <deny_each_binding::OnlyDenySyzkaller as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -5782,81 +6145,69 @@ where
     }
 }
 
-/// A helper trait for the `DenyEachBinding` server sender.
-pub trait DenyEachBindingServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> DenyEachBindingServerSender for ::fidl_next::ServerSender<___T, DenyEachBinding>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-}
-
 /// A server handler for the DenyEachBinding protocol.
 ///
 /// See [`DenyEachBinding`] for more details.
 pub trait DenyEachBindingServerHandler<___T: ::fidl_next::Transport> {
     fn only_deny_cpp(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
+        sender: &::fidl_next::ServerSender<DenyEachBinding, ___T>,
 
-        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyCpp>,
+        request: ::fidl_next::Request<deny_each_binding::OnlyDenyCpp, ___T>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyCpp>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn only_deny_dart(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
+        sender: &::fidl_next::ServerSender<DenyEachBinding, ___T>,
 
-        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyDart>,
+        request: ::fidl_next::Request<deny_each_binding::OnlyDenyDart, ___T>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyDart>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn only_deny_go(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
+        sender: &::fidl_next::ServerSender<DenyEachBinding, ___T>,
 
-        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyGo>,
+        request: ::fidl_next::Request<deny_each_binding::OnlyDenyGo, ___T>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyGo>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn only_deny_python(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
+        sender: &::fidl_next::ServerSender<DenyEachBinding, ___T>,
 
-        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyPython>,
+        request: ::fidl_next::Request<deny_each_binding::OnlyDenyPython, ___T>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyPython>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn only_deny_rust(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
+        sender: &::fidl_next::ServerSender<DenyEachBinding, ___T>,
 
-        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyRust>,
+        request: ::fidl_next::Request<deny_each_binding::OnlyDenyRust, ___T>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyRust>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn only_deny_syzkaller(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
+        sender: &::fidl_next::ServerSender<DenyEachBinding, ___T>,
 
-        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenySyzkaller>,
+        request: ::fidl_next::Request<deny_each_binding::OnlyDenySyzkaller, ___T>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenySyzkaller>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for DenyEachBinding
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for DenyEachBinding
 where
+    ___H: DenyEachBindingServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: DenyEachBindingServerHandler<___T>,
 
     <deny_each_binding::OnlyDenyCpp as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -5876,9 +6227,9 @@ where
     <deny_each_binding::OnlyDenySyzkaller as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -5889,9 +6240,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -5901,7 +6252,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.only_deny_cpp(sender, decoded, responder),
+                    Ok(decoded) => handler.only_deny_cpp(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5912,7 +6263,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.only_deny_dart(sender, decoded, responder),
+                    Ok(decoded) => handler.only_deny_dart(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5923,7 +6274,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.only_deny_go(sender, decoded, responder),
+                    Ok(decoded) => handler.only_deny_go(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5934,7 +6285,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.only_deny_python(sender, decoded, responder),
+                    Ok(decoded) => handler.only_deny_python(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5945,7 +6296,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.only_deny_rust(sender, decoded, responder),
+                    Ok(decoded) => handler.only_deny_rust(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5956,7 +6307,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.only_deny_syzkaller(sender, decoded, responder),
+                    Ok(decoded) => handler.only_deny_syzkaller(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5978,8 +6329,7 @@ pub mod imports_same_name_context {
     pub mod prelude {
         pub use crate::{
             imports_same_name_context, ImportsSameNameContext, ImportsSameNameContextClientHandler,
-            ImportsSameNameContextClientSender, ImportsSameNameContextServerHandler,
-            ImportsSameNameContextServerSender,
+            ImportsSameNameContextServerHandler,
         };
 
         pub use ::fidl_next_test_dependent::ContainsDeniedAlwaysDeniedRequest;
@@ -6020,61 +6370,116 @@ pub mod imports_same_name_context {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `ImportsSameNameContext` client sender.
-pub trait ImportsSameNameContextClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn always_denied<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = ::fidl_next_test_dependent::WireContainsDeniedAlwaysDeniedRequest,
-        >;
+        pub struct AlwaysDenied<T0> {
+            arg: T0,
+        }
 
-    fn unattributed(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
+        impl<T0> ::fidl_next::Encodable for AlwaysDenied<T0>
+        where
+            T0: ::fidl_next::Encodable<
+                Encoded = ::fidl_next_test_dependent::WireOnlyAppearsInImportingLibrary,
+            >,
+        {
+            type Encoded = ::fidl_next_test_dependent::WireContainsDeniedAlwaysDeniedRequest;
+        }
 
-    fn always_appears_in_importing_library(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-}
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for AlwaysDenied<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-impl<___T> ImportsSameNameContextClientSender
-    for ::fidl_next::ClientSender<___T, ImportsSameNameContext>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            T0: ::fidl_next::Encode<
+                ___E,
+                Encoded = ::fidl_next_test_dependent::WireOnlyAppearsInImportingLibrary,
+            >,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        arg,
 
-    fn always_denied<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = ::fidl_next_test_dependent::WireContainsDeniedAlwaysDeniedRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(6808317417318106526, request)
-    }
+                    } = out;
+                }
 
-    fn unattributed(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(475191379775102607, ())
-    }
+                ::fidl_next::Encode::encode(self.arg, encoder, arg)?;
 
-    fn always_appears_in_importing_library(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(2914965219653596920, ())
+                Ok(())
+            }
+        }
+
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ImportsSameNameContext
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ImportsSameNameContextClientSender<___T>;
+            type ServerSender = ImportsSameNameContextServerSender<___T>;
+        }
+
+        /// The client sender for the `ImportsSameNameContext` protocol.
+        pub struct ImportsSameNameContextClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> ImportsSameNameContextClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn always_denied(
+                &self,
+
+                arg: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next_test_dependent::WireOnlyAppearsInImportingLibrary,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.always_denied_with(AlwaysDenied { arg })
+            }
+
+            pub fn always_denied_with<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next_test_dependent::WireContainsDeniedAlwaysDeniedRequest,
+                >,
+            {
+                self.sender.send_one_way(6808317417318106526, request)
+            }
+
+            pub fn unattributed(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_one_way(475191379775102607, ())
+            }
+
+            pub fn always_appears_in_importing_library(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_one_way(2914965219653596920, ())
+            }
+        }
+
+        /// The server sender for the `ImportsSameNameContext` protocol.
+        #[repr(transparent)]
+        pub struct ImportsSameNameContextServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ImportsSameNameContextServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -6083,14 +6488,14 @@ where
 /// See [`ImportsSameNameContext`] for more details.
 pub trait ImportsSameNameContextClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ImportsSameNameContext
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for ImportsSameNameContext
 where
+    ___H: ImportsSameNameContextClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ImportsSameNameContextClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -6100,19 +6505,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `ImportsSameNameContext` server sender.
-pub trait ImportsSameNameContextServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ImportsSameNameContextServerSender
-    for ::fidl_next::ServerSender<___T, ImportsSameNameContext>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the ImportsSameNameContext protocol.
@@ -6121,47 +6513,50 @@ where
 pub trait ImportsSameNameContextServerHandler<___T: ::fidl_next::Transport> {
     fn always_denied(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ImportsSameNameContext>,
+        sender: &::fidl_next::ServerSender<ImportsSameNameContext, ___T>,
 
-        request: ::fidl_next::Request<___T, imports_same_name_context::AlwaysDenied>,
-    );
+        request: ::fidl_next::Request<imports_same_name_context::AlwaysDenied, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
-    fn unattributed(&mut self, sender: &::fidl_next::ServerSender<___T, ImportsSameNameContext>);
+    fn unattributed(
+        &mut self,
+        sender: &::fidl_next::ServerSender<ImportsSameNameContext, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn always_appears_in_importing_library(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ImportsSameNameContext>,
-    );
+        sender: &::fidl_next::ServerSender<ImportsSameNameContext, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ImportsSameNameContext
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for ImportsSameNameContext
 where
+    ___H: ImportsSameNameContextServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ImportsSameNameContextServerHandler<___T>,
 
     <imports_same_name_context::AlwaysDenied as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             6808317417318106526 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.always_denied(sender, decoded),
+                Ok(decoded) => handler.always_denied(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             475191379775102607 => {
-                handler.unattributed(sender);
+                handler.unattributed(sender).await;
             }
 
             2914965219653596920 => {
-                handler.always_appears_in_importing_library(sender);
+                handler.always_appears_in_importing_library(sender).await;
             }
 
             ordinal => {
@@ -6170,9 +6565,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -6563,21 +6958,36 @@ pub mod only_cpp_and_deps {
     pub mod prelude {
         pub use crate::{
             only_cpp_and_deps, OnlyCppAndDeps, OnlyCppAndDepsClientHandler,
-            OnlyCppAndDepsClientSender, OnlyCppAndDepsServerHandler, OnlyCppAndDepsServerSender,
+            OnlyCppAndDepsServerHandler,
         };
     }
-}
 
-/// A helper trait for the `OnlyCppAndDeps` client sender.
-pub trait OnlyCppAndDepsClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
 
-impl<___T> OnlyCppAndDepsClientSender for ::fidl_next::ClientSender<___T, OnlyCppAndDeps>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::OnlyCppAndDeps
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = OnlyCppAndDepsClientSender<___T>;
+            type ServerSender = OnlyCppAndDepsServerSender<___T>;
+        }
+
+        /// The client sender for the `OnlyCppAndDeps` protocol.
+        pub struct OnlyCppAndDepsClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> OnlyCppAndDepsClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `OnlyCppAndDeps` protocol.
+        #[repr(transparent)]
+        pub struct OnlyCppAndDepsServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> OnlyCppAndDepsServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the OnlyCppAndDeps protocol.
@@ -6585,14 +6995,14 @@ where
 /// See [`OnlyCppAndDeps`] for more details.
 pub trait OnlyCppAndDepsClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for OnlyCppAndDeps
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for OnlyCppAndDeps
 where
+    ___H: OnlyCppAndDepsClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: OnlyCppAndDepsClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -6602,18 +7012,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `OnlyCppAndDeps` server sender.
-pub trait OnlyCppAndDepsServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> OnlyCppAndDepsServerSender for ::fidl_next::ServerSender<___T, OnlyCppAndDeps>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the OnlyCppAndDeps protocol.
@@ -6621,14 +7019,14 @@ where
 /// See [`OnlyCppAndDeps`] for more details.
 pub trait OnlyCppAndDepsServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for OnlyCppAndDeps
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for OnlyCppAndDeps
 where
+    ___H: OnlyCppAndDepsServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: OnlyCppAndDepsServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -6639,9 +7037,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

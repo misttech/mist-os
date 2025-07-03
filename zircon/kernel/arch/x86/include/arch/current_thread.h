@@ -5,13 +5,21 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <arch/x86/mp.h>
-
 #ifndef ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_CURRENT_THREAD_H_
 #define ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_CURRENT_THREAD_H_
 
+#include <arch/x86/mp.h>
+#include <ktl/byte.h>
+
 // Routines to directly access the current thread pointer out of the current
 // cpu structure pointed to by gs.
+
+// Recall that this meaningfully differs from the "pointer to the current
+// thread": in the eyes of our compiler thread pointer ABI, the thread pointer
+// is our percpu pointer.
+static inline ktl::byte* arch_get_current_compiler_thread_pointer() {
+  return reinterpret_cast<ktl::byte*>(x86_get_percpu());
+}
 
 static inline Thread* arch_get_current_thread() {
   // Read directly from gs, rather than via x86_get_percpu()->current_thread,

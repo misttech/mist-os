@@ -165,9 +165,10 @@ zx_status_t platform_suspend_cpu() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // TODO(https://fxbug.dev/414456459): Plumb in the available PSCI power_state
-  // values to this point using the recently added ZBI item.
-  const uint32_t psci_power_state = 0;
+  // TODO(https://fxbug.dev/414456459): Rejigger |platform_suspend_cpu| to track how many CPUs in
+  // this power domain (or cluster?) are still running and use that to decide what scope to request
+  // of psci_cpu_suspend.  The idea being that the last CPU to suspend can+should request that the
+  // domain/cluster be powered down rather than just the calling CPU.
 
   // TODO(https://fxbug.dev/414456459): Expose a PSCI function that looks at the
   // power_state value and determines if it's considered a "power down state" in
@@ -185,7 +186,7 @@ zx_status_t platform_suspend_cpu() {
           arch_curr_cpu_num(), current_boot_time());
 
   // The following call may not return for an arbitrartily long time.
-  const PsciCpuSuspendResult result = psci_cpu_suspend(psci_power_state);
+  const PsciCpuSuspendResult result = psci_cpu_suspend();
   LTRACEF("psci_cpu_suspend for cpu-%u, status %d\n", arch_curr_cpu_num(), result.status_value());
 
   DEBUG_ASSERT(arch_ints_disabled());
@@ -414,17 +415,6 @@ void platform_early_init(void) {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
-  arm64_boot_map_init(reinterpret_cast<uintptr_t>(__executable_start) -
-                      reinterpret_cast<uintptr_t>(KernelPhysicalLoadAddress()));
-  for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
-    if (range.type == memalloc::Type::kPeripheral) {
-      dprintf(INFO, "ZBI: peripheral range [%#" PRIx64 ", %#" PRIx64 ")\n", range.addr,
-              range.end());
-      auto status = add_periph_range(range.addr, range.size);
-      ASSERT(status == ZX_OK);
-    }
-  }
-
   ASSERT(pmm_init(gPhysHandoff->memory.get()) == ZX_OK);
 
   // give the mmu code a chance to do some bookkeeping
@@ -446,8 +436,8 @@ void platform_init(void) {
         panic("psci_set_suspend_mode failed with unexpected value %d", status);
       }
     }
-    // TODO(https://fxbug.dev/414456459): Enable based on ZBI and/or detection
-    // of emulator.
+
+    // TODO(https://fxbug.dev/414456459): Flip this flag to enable based on presence of ZBI config.
     cpu_suspend_supported = false;
   }
   dprintf(INFO, "platform_suspend_cpu support %s\n",
@@ -455,11 +445,6 @@ void platform_init(void) {
 
   topology_cpu_init();
 }
-
-// after the fact create a region to reserve the peripheral map(s)
-static void platform_init_postvm(uint level) { reserve_periph_ranges(); }
-
-LK_INIT_HOOK(platform_postvm, platform_init_postvm, LK_INIT_LEVEL_VM)
 
 zx_status_t platform_mp_prep_cpu_unplug(cpu_num_t cpu_id) {
   return arch_mp_prep_cpu_unplug(cpu_id);

@@ -80,14 +80,12 @@ impl GptPartition {
 
     pub fn open_passthrough_session(&self, session: ServerEnd<fblock::SessionMarker>) {
         if let Some(gpt) = self.gpt.upgrade() {
-            let mappings = [fblock::BlockOffsetMapping {
+            let mapping = fblock::BlockOffsetMapping {
                 source_block_offset: 0,
                 target_block_offset: self.block_range.start,
                 length: self.block_count(),
-            }];
-            if let Err(err) =
-                gpt.block_proxy.open_session_with_offset_map(session, None, Some(&mappings[..]))
-            {
+            };
+            if let Err(err) = gpt.block_proxy.open_session_with_offset_map(session, &mapping) {
                 // Client errors normally come back on `session` but that was already consumed.  The
                 // client will get a PEER_CLOSED without an epitaph.
                 log::warn!(err:?; "Failed to open passthrough session");
@@ -569,7 +567,7 @@ mod tests {
         let vmo = zx::Vmo::create(4096).unwrap();
         let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
 
-        GptManager::new(server.block_proxy(), vfs::directory::immutable::simple())
+        GptManager::new(server.connect(), vfs::directory::immutable::simple())
             .await
             .expect_err("load should fail");
     }
@@ -578,7 +576,7 @@ mod tests {
     async fn load_formatted_empty_gpt() {
         let (block_device, partitions_dir) = setup(512, 8, vec![]).await;
 
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir)
+        let runner = GptManager::new(block_device.connect(), partitions_dir)
             .await
             .expect("load should succeed");
         runner.shutdown().await;
@@ -605,7 +603,7 @@ mod tests {
         .await;
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.connect(), partitions_dir_clone)
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-000").expect("No entry found");
@@ -646,7 +644,7 @@ mod tests {
         .await;
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.connect(), partitions_dir_clone)
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-000").expect("No entry found");
@@ -676,7 +674,7 @@ mod tests {
         .await;
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.connect(), partitions_dir_clone)
             .await
             .expect("load should succeed");
 
@@ -713,7 +711,8 @@ mod tests {
 
         // Ensure writes persisted to the partition.
         let mut buf = vec![0u8; 512];
-        let client = RemoteBlockClient::new(block_device.block_proxy()).await.unwrap();
+        let client =
+            RemoteBlockClient::new(block_device.connect::<fblock::BlockProxy>()).await.unwrap();
         client.read_at(MutableBufferSlice::Memory(&mut buf[..]), 2048).await.unwrap();
         assert_eq!(&buf[..], &[0xabu8; 512]);
     }
@@ -758,7 +757,7 @@ mod tests {
             client.write_at(BufferSlice::Memory(&[0xffu8; 512]), 512).await.unwrap();
         }
 
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-000").expect("No entry found");
@@ -806,7 +805,7 @@ mod tests {
             client.write_at(BufferSlice::Memory(&[0xffu8; 512]), 1024).await.unwrap();
         }
 
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-000").expect("No entry found");
@@ -857,7 +856,7 @@ mod tests {
         )
         .await;
 
-        let manager = GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
+        let manager = GptManager::new(server.connect(), partitions_dir.clone()).await.unwrap();
 
         let proxy = vfs::serve_directory(
             partitions_dir.clone(),
@@ -914,7 +913,7 @@ mod tests {
         )
         .await;
 
-        let manager = GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
+        let manager = GptManager::new(server.connect(), partitions_dir.clone()).await.unwrap();
 
         let proxy = vfs::serve_directory(
             partitions_dir.clone(),
@@ -968,7 +967,7 @@ mod tests {
             ],
         )
         .await;
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
 
@@ -1069,7 +1068,7 @@ mod tests {
             ],
         )
         .await;
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         let nil_entry = PartitionInfo {
@@ -1120,7 +1119,7 @@ mod tests {
     #[fuchsia::test]
     async fn reset_partition_tables_fails_if_too_many_partitions() {
         let (block_device, partitions_dir) = setup(512, 8, vec![]).await;
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         let nil_entry = PartitionInfo {
@@ -1143,7 +1142,7 @@ mod tests {
     #[fuchsia::test]
     async fn reset_partition_tables_fails_if_too_large_partitions() {
         let (block_device, partitions_dir) = setup(512, 64, vec![]).await;
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         let new_partitions = vec![
@@ -1175,7 +1174,7 @@ mod tests {
     #[fuchsia::test]
     async fn reset_partition_tables_fails_if_partition_overlaps_metadata() {
         let (block_device, partitions_dir) = setup(512, 64, vec![]).await;
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         let new_partitions = vec![PartitionInfo {
@@ -1197,7 +1196,7 @@ mod tests {
     #[fuchsia::test]
     async fn reset_partition_tables_fails_if_partitions_overlap() {
         let (block_device, partitions_dir) = setup(512, 64, vec![]).await;
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         let new_partitions = vec![
@@ -1229,7 +1228,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_partition() {
         let (block_device, partitions_dir) = setup(512, 64, vec![PartitionInfo::nil(); 64]).await;
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.connect(), partitions_dir.clone())
             .await
             .expect("load should succeed");
 
@@ -1289,7 +1288,7 @@ mod tests {
         .await;
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.connect(), partitions_dir_clone)
             .await
             .expect("load should succeed");
 
@@ -1350,7 +1349,7 @@ mod tests {
 
         let outer_partitions_dir_clone = outer_partitions_dir.clone();
         let outer_runner =
-            GptManager::new(outer_block_device.block_proxy(), outer_partitions_dir_clone)
+            GptManager::new(outer_block_device.connect(), outer_partitions_dir_clone)
                 .await
                 .expect("load should succeed");
 
@@ -1440,7 +1439,7 @@ mod tests {
         .await;
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.connect(), partitions_dir_clone)
             .await
             .expect("load should succeed");
 
@@ -1460,12 +1459,11 @@ mod tests {
         part_block
             .open_session_with_offset_map(
                 server_end,
-                None,
-                Some(&[fblock::BlockOffsetMapping {
+                &fblock::BlockOffsetMapping {
                     source_block_offset: 0,
                     target_block_offset: 1,
                     length: 2,
-                }]),
+                },
             )
             .expect("FIDL error");
         session.get_fifo().await.expect_err("Session should be closed");
@@ -1474,12 +1472,11 @@ mod tests {
         part_block
             .open_session_with_offset_map(
                 server_end,
-                None,
-                Some(&[fblock::BlockOffsetMapping {
+                &fblock::BlockOffsetMapping {
                     source_block_offset: 0,
                     target_block_offset: 0,
                     length: 3,
-                }]),
+                },
             )
             .expect("FIDL error");
         session.get_fifo().await.expect_err("Session should be closed");

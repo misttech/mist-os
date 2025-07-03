@@ -22,7 +22,7 @@ group("tests") {
     "sanitizer:tests",
 
     # TODO(https://fxbug.dev/407804528): This should be replaced in
-    # //sdk/lib/dl.
+    # dlfcn/dl/test.
     "dlsym-circular-deps",
   ]
 }
@@ -53,7 +53,7 @@ boot_test_specs = {
   environments += kernel_test_environments
 }
 
-libc_component_tests = []
+libc_component_tests = [ "../dlfcn:dlfcn-abi-tests" ]
 libc_test_manifests = []
 
 source_set("safe-zero-construction") {
@@ -70,7 +70,7 @@ source_set("safe-zero-construction") {
 #
 # This is particularly useful to verify that a variant works correctly
 # (i.e. all runtime dependencies are installed and loaded properly).
-libc_component_tests += [ "noop-test" ]
+libc_component_tests += [ ":noop-test" ]
 test("noop-test") {
   sources = [ "noop-test.cc" ]
   deps = [ "//src/sys/testing/elftest" ]
@@ -90,7 +90,7 @@ default_stack_size_cases = [
 ]
 
 foreach(case, default_stack_size_cases) {
-  libc_component_tests += [ "default-stack-size-${case.name}" ]
+  libc_component_tests += [ ":default-stack-size-${case.name}" ]
   test("default-stack-size-${case.name}") {
     if (is_fuchsia) {
       fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -129,7 +129,7 @@ executable("debugdata-test-helper") {
   }
 }
 
-libc_component_tests += [ "cdebugdata-test" ]
+libc_component_tests += [ ":cdebugdata-test" ]
 libc_test_manifests += [ "cdebugdata-test" ]
 test("cdebugdata-test") {
   sources = [ "debugdata.cc" ]
@@ -142,7 +142,7 @@ test("cdebugdata-test") {
   ]
 }
 
-libc_component_tests += [ "posix-clocks-test" ]
+libc_component_tests += [ ":posix-clocks-test" ]
 test("posix-clocks-test") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -159,7 +159,7 @@ test("posix-clocks-test") {
   ]
 }
 
-libc_component_tests += [ "pthread-detach-idempotent-test" ]
+libc_component_tests += [ ":pthread-detach-idempotent-test" ]
 test("pthread-detach-idempotent-test") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -176,7 +176,7 @@ test("pthread-detach-idempotent-test") {
   ]
 }
 
-libc_component_tests += [ "atexit-test" ]
+libc_component_tests += [ ":atexit-test" ]
 test("atexit-test") {
   if (is_fuchsia) {
     configs += [ "//build/config:all_source" ]
@@ -194,7 +194,7 @@ test("atexit-test") {
   ]
 }
 
-libc_component_tests += [ "gwp-asan-test" ]
+libc_component_tests += [ ":gwp-asan-test" ]
 libc_test_manifests += [ "gwp-asan-test" ]
 test("gwp-asan-test") {
   # Whether GWP-ASan is enabled.
@@ -214,7 +214,7 @@ test("gwp-asan-test") {
 }
 
 if (current_cpu == "arm64") {
-  libc_component_tests += [ "ldso-xom-test" ]
+  libc_component_tests += [ ":ldso-xom-test" ]
   test("ldso-xom-test") {
     sources = [ "ldso-xom-test.c" ]
     deps = [
@@ -266,10 +266,11 @@ fuchsia_unittest_component("libc-unittests-test") {
   deps = [ ":libc-unittests" ]
 }
 
-foreach(test, libc_component_tests) {
+foreach(test_label, libc_component_tests) {
+  test = get_label_info(test_label, "name")
   libc_test_components += [ ":libc-$test" ]
   fuchsia_unittest_component("libc-$test") {
-    deps = [ ":$test" ]
+    deps = [ test_label ]
     if (libc_test_manifests + [ test ] - [ test ] != libc_test_manifests) {
       manifest = "$test.cml"
     }

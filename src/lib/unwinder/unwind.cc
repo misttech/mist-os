@@ -4,12 +4,9 @@
 
 #include "src/lib/unwinder/unwind.h"
 
-#include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
-#include <set>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -21,6 +18,7 @@
 #include "src/lib/unwinder/plt_unwinder.h"
 #include "src/lib/unwinder/registers.h"
 #include "src/lib/unwinder/scs_unwinder.h"
+#include "src/lib/unwinder/sigreturn_unwinder.h"
 #include "src/lib/unwinder/unwinder_base.h"
 
 namespace unwinder {
@@ -34,6 +32,9 @@ bool PcIsReturnAddress(const Registers& regs) {
   switch (regs.arch()) {
     case Registers::Arch::kX64:
       reg_id = RegisterID::kX64_rax;
+      break;
+    case Registers::Arch::kArm32:
+      reg_id = RegisterID::kArm32_lr;
       break;
     case Registers::Arch::kArm64:
       reg_id = RegisterID::kArm64_lr;
@@ -57,6 +58,8 @@ Error TryUnwinder(UnwinderBase* unwinder, Frame::Trust trust, Memory* stack, con
   next.trust = trust;
   if (trust == Frame::Trust::kCFI) {
     next.pc_is_return_address = PcIsReturnAddress(next.regs);
+  } else if (trust == Frame::Trust::kSigReturn) {
+    next.pc_is_return_address = false;
   } else {
     next.pc_is_return_address = true;
   }
@@ -71,6 +74,9 @@ std::string Frame::Describe() const {
   switch (trust) {
     case Trust::kScan:
       res += "Scan";
+      break;
+    case Trust::kSigReturn:
+      res += "SigReturn";
       break;
     case Trust::kSCS:
       res += "SCS";
@@ -131,6 +137,7 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
 }
 
 void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
+  SigReturnUnwinder sigreturn_unwinder(&cfi_unwinder_);
   FramePointerUnwinder fp_unwinder(&cfi_unwinder_);
   PltUnwinder plt_unwinder(&cfi_unwinder_);
   ShadowCallStackUnwinder scs_unwinder(&cfi_unwinder_);
@@ -164,6 +171,16 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
       success = true;
     } else {
       err_msg += "; FP: " + err.msg();
+    }
+  }
+
+  // Try sigreturn before SCS, since it can recover more than SCS.
+  if (!success && current.regs.arch() == Registers::Arch::kArm64) {
+    if (auto err = TryUnwinder(&sigreturn_unwinder, Frame::Trust::kSigReturn, stack, current, next);
+        err.ok()) {
+      success = true;
+    } else {
+      err_msg += "; SIGRETURN: " + err.msg();
     }
   }
 
@@ -241,7 +258,19 @@ void AsyncUnwinder::Step(Frame& current) {
               err.ok()) {
             success = true;
           } else {
-            err_msg += ";FP:" + err.msg();
+            err_msg += "; FP:" + err.msg();
+          }
+        }
+
+        // Try sigreturn before SCS, since it can recover more than SCS.
+        if (!success && current.regs.arch() == Registers::Arch::kArm64) {
+          SigReturnUnwinder sigreturn_unwinder(&cfi_unwinder_);
+          if (auto err = TryUnwinder(&sigreturn_unwinder, Frame::Trust::kSigReturn, stack_.get(),
+                                     current, next);
+              err.ok()) {
+            success = true;
+          } else {
+            err_msg += "; SIGRETURN: " + err.msg();
           }
         }
 
@@ -254,7 +283,7 @@ void AsyncUnwinder::Step(Frame& current) {
               err.ok()) {
             success = true;
           } else {
-            err_msg += ";SCS:" + err.msg();
+            err_msg += "; SCS:" + err.msg();
           }
         }
 

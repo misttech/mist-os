@@ -7,9 +7,9 @@ use bind_fuchsia_google_platform_usb::{
 };
 use bind_fuchsia_usb::BIND_USB_CLASS_VENDOR_SPECIFIC;
 use fuchsia_async as fasync;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use futures::future::{select, AbortHandle, Abortable, Either};
-use futures::{FutureExt, SinkExt, Stream, StreamExt};
+use futures::{AsyncRead, AsyncWrite, FutureExt, SinkExt, Stream, StreamExt};
 use rand::Rng;
 use std::collections::HashMap;
 use std::iter::IntoIterator;
@@ -38,7 +38,9 @@ const RANDOM_PORT_RANGE: std::ops::Range<u32> = 32768..u32::MAX;
 const URB_POOL_SIZE: usize = 32;
 
 /// Watches the usb devfs for new devices.
-async fn listen_for_usb_devices(host: Weak<UsbVsockHost>) -> Result<(), usb_rs::Error> {
+async fn listen_for_usb_devices<S: AsyncRead + AsyncWrite + Send + 'static>(
+    host: Weak<UsbVsockHost<S>>,
+) -> Result<(), usb_rs::Error> {
     log::info!("Listening for USB devices");
     let mut stream = usb_rs::wait_for_devices(true, false)?;
     while let Some(device) = stream.next().await.transpose()? {
@@ -209,8 +211,8 @@ enum LinkError {
 
 /// Handles sending packets from `usb_vsock::Connection` over the USB device,
 /// and giving received packets from the USB device to the same connection.
-async fn run_usb_link(
-    host: Weak<UsbVsockHost>,
+async fn run_usb_link<S: AsyncRead + AsyncWrite + Send + 'static>(
+    host: Weak<UsbVsockHost<S>>,
     debug_name: String,
     interface: usb_rs::Interface,
     cid_out: &mut Option<u32>,
@@ -357,12 +359,12 @@ async fn run_usb_link(
 
 /// Contains senders for routing incoming connections when listening on a port.
 #[derive(Clone)]
-enum PortListening {
-    AnyCid(mpsc::Sender<(fasync::Socket, usb_vsock::ConnectionState)>),
-    ByCid(HashMap<u32, mpsc::Sender<(fasync::Socket, usb_vsock::ConnectionState)>>),
+enum PortListening<S> {
+    AnyCid(mpsc::Sender<IncomingConnection<S>>),
+    ByCid(HashMap<u32, mpsc::Sender<IncomingConnection<S>>>),
 }
 
-impl PortListening {
+impl<S: AsyncRead + AsyncWrite + Send + 'static> PortListening<S> {
     /// Try to add an additional port to listen on to this listener. This also
     /// accounts for the case where the listener that's already registered is
     /// dead, so if the sender for new connections we have is hung up already
@@ -374,7 +376,7 @@ impl PortListening {
         &mut self,
         cid: Option<u32>,
         port: u32,
-        sender: mpsc::Sender<(fasync::Socket, usb_vsock::ConnectionState)>,
+        sender: mpsc::Sender<IncomingConnection<S>>,
     ) -> Result<(), UsbVsockError> {
         match self {
             PortListening::AnyCid(old) if old.is_closed() => {
@@ -415,17 +417,17 @@ impl PortListening {
 
 /// State of a local port.
 #[derive(Clone)]
-enum PortState {
+enum PortState<S> {
     /// This port is reserved. Usually means this is the near side of a
     /// connection that was established to some device via `connect()`.
     Reserved,
 
     /// We are listening on this port. Incoming connections are delivered via
     /// the sender.
-    Listening(PortListening),
+    Listening(PortListening<S>),
 }
 
-impl PortState {
+impl<S: AsyncRead + AsyncWrite + Send + 'static> PortState<S> {
     /// Tries to listen on this port at the given CID. The `port` argument is
     /// for error reporting and should name the port this `PortState` is
     /// associated with.
@@ -433,7 +435,7 @@ impl PortState {
         &mut self,
         cid: Option<u32>,
         port: u32,
-        sender: mpsc::Sender<(fasync::Socket, usb_vsock::ConnectionState)>,
+        sender: mpsc::Sender<IncomingConnection<S>>,
     ) -> Result<(), UsbVsockError> {
         match self {
             PortState::Reserved => Err(UsbVsockError::PortInUse(port)),
@@ -443,30 +445,20 @@ impl PortState {
 }
 
 /// Holds a connection to a single USB device.
-struct ConnectionState {
-    connection: Arc<usb_vsock::Connection<Vec<u8>>>,
-    _control_socket: fuchsia_async::Socket,
+struct ConnectionState<S> {
+    connection: Arc<usb_vsock::Connection<Vec<u8>, S>>,
 }
 
-impl ConnectionState {
+impl<S: AsyncRead + AsyncWrite + Send + 'static> ConnectionState<S> {
     /// Create a new connection state.
     fn new(
         protocol_version: ProtocolVersion,
     ) -> (Self, mpsc::Receiver<usb_vsock::ConnectionRequest>) {
         let (incoming_requests_tx, incoming_requests) = mpsc::channel(1);
-        let (control_socket, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
-        let control_socket = fuchsia_async::Socket::from_socket(control_socket);
-        let other_end = fuchsia_async::Socket::from_socket(other_end);
         let connection =
-            Arc::new(usb_vsock::Connection::new(protocol_version, other_end, incoming_requests_tx));
+            Arc::new(usb_vsock::Connection::new(protocol_version, None, incoming_requests_tx));
 
-        (
-            ConnectionState {
-                connection: Arc::clone(&connection),
-                _control_socket: control_socket,
-            },
-            incoming_requests,
-        )
+        (ConnectionState { connection: Arc::clone(&connection) }, incoming_requests)
     }
 }
 
@@ -479,14 +471,16 @@ pub enum UsbVsockError {
     PortInUse(u32),
     #[error("Connection failed")]
     ConnectFailed(std::io::Error),
+    #[error("Accepting connection failed")]
+    AcceptFailed(std::io::Error),
     #[error("Port number was too large")]
     PortOutOfRange,
 }
 
 /// Lock-protected fields of `UsbVsockHost`.
-struct UsbVsockHostInner {
-    conns: HashMap<u32, ConnectionState>,
-    port_states: HashMap<u32, PortState>,
+struct UsbVsockHostInner<S> {
+    conns: HashMap<u32, ConnectionState<S>>,
+    port_states: HashMap<u32, PortState<S>>,
 }
 
 /// Events coming from the `UsbVsockHost` indicating the appearance and
@@ -497,22 +491,41 @@ pub enum UsbVsockHostEvent {
     RemovedCid(u32),
 }
 
+/// Represents an incoming connection on a port we are listening on.
+pub struct IncomingConnection<S> {
+    acceptor: oneshot::Sender<(S, oneshot::Sender<std::io::Result<usb_vsock::ConnectionState>>)>,
+}
+
+impl<S: AsyncRead + AsyncWrite + Send + 'static> IncomingConnection<S> {
+    /// Accept the connection. Data will be sent over the provided socket.
+    pub async fn accept(self, socket: S) -> Result<usb_vsock::ConnectionState, UsbVsockError> {
+        let (sender, receiver) = futures::channel::oneshot::channel();
+        self.acceptor
+            .send((socket, sender))
+            .map_err(|_| UsbVsockError::AcceptFailed(std::io::Error::other("Driver gone")))?;
+        receiver
+            .await
+            .map_err(|_| UsbVsockError::AcceptFailed(std::io::Error::other("Driver gone")))?
+            .map_err(UsbVsockError::AcceptFailed)
+    }
+}
+
 /// A container for connections to USB devices that is responsible for assigning
 /// them CIDs and routing connections based on those CIDs.
-pub struct UsbVsockHost {
+pub struct UsbVsockHost<S> {
     scope: fasync::Scope,
-    inner: Mutex<UsbVsockHostInner>,
+    inner: Mutex<UsbVsockHostInner<S>>,
     next_cid: AtomicU32,
     event_sender: mpsc::Sender<UsbVsockHostEvent>,
 }
 
-impl std::fmt::Debug for UsbVsockHost {
+impl<S> std::fmt::Debug for UsbVsockHost<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UsbVsockHost").finish()
     }
 }
 
-impl UsbVsockHost {
+impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
     /// Create a new USB VSOCK host.
     pub fn new(
         paths: impl IntoIterator<Item: AsRef<Path>>,
@@ -553,44 +566,6 @@ impl UsbVsockHost {
         ret
     }
 
-    /// Create a new USB VSOCK host for testing. Guaranteed not to try to touch
-    /// the machine's actual USB devices.
-    pub fn new_for_test(event_sender: mpsc::Sender<UsbVsockHostEvent>) -> Arc<Self> {
-        Arc::new(UsbVsockHost {
-            scope: fasync::Scope::new(),
-            inner: Mutex::new(UsbVsockHostInner {
-                conns: HashMap::new(),
-                port_states: HashMap::new(),
-            }),
-            next_cid: AtomicU32::new(3),
-            event_sender,
-        })
-    }
-
-    /// Add a new test connection to this host.
-    pub fn add_connection_for_test(
-        self: &Arc<Self>,
-        connection: Arc<usb_vsock::Connection<Vec<u8>>>,
-        control_socket: fuchsia_async::Socket,
-        incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
-    ) -> u32 {
-        let cid = self.next_cid.fetch_add(1, Ordering::Relaxed);
-        let success = self
-            .inner
-            .lock()
-            .unwrap()
-            .conns
-            .insert(cid, ConnectionState { connection, _control_socket: control_socket })
-            .is_none();
-        assert!(success);
-        self.add_incoming_request_handler(cid, incoming_requests);
-        let mut sender = self.event_sender.clone();
-        self.scope.spawn(async move {
-            let _ = sender.send(UsbVsockHostEvent::AddedCid(cid)).await;
-        });
-        cid
-    }
-
     /// Connect to a new USB device by device path and assign it a CID. Returns
     /// `true` if the device was added successfully. `false` could just indicate
     /// the device wasn't a USB VSOCK device, so it's a normal event, not an
@@ -619,7 +594,7 @@ impl UsbVsockHost {
         &self,
         cid: NonZero<u32>,
         port: u32,
-        socket: fasync::Socket,
+        socket: S,
     ) -> Result<usb_vsock::ConnectionState, UsbVsockError> {
         if port == u32::MAX {
             return Err(UsbVsockError::PortOutOfRange);
@@ -656,8 +631,7 @@ impl UsbVsockHost {
         &self,
         port: u32,
         cid: Option<NonZero<u32>>,
-    ) -> Result<impl Stream<Item = (fasync::Socket, usb_vsock::ConnectionState)>, UsbVsockError>
-    {
+    ) -> Result<impl Stream<Item = IncomingConnection<S>>, UsbVsockError> {
         let cid = cid.map(|x| x.get()).map(|x| if x == CID_LOOPBACK { CID_HOST } else { x });
         let mut inner = self.inner.lock().unwrap();
 
@@ -805,36 +779,66 @@ impl UsbVsockHost {
                 };
 
                 if let Some(mut accept_channel) = accept_channel {
-                    let (socket, other_end) = fasync::emulated_handle::Socket::create_stream();
-                    let socket = fasync::Socket::from_socket(socket);
-                    let other_end = fasync::Socket::from_socket(other_end);
+                    let (sender, receiver) = futures::channel::oneshot::channel();
+                    if let Err(_) = accept_channel.send(IncomingConnection {acceptor: sender}).await {
+                        log::warn!(cid; "Listener disappeared while accepting connection");
+                    } else if let Ok((sock, responder)) = receiver.await {
+                        if let Err(_) = responder.send(connection.accept(incoming, sock).await) {
+                            log::warn!(cid; "Accepting connection request failed");
+                        }
+                        return;
+                    } else {
+                        log::warn!(cid; "Listener did not respond to incoming connection");
+                    }
+                }
 
-                    match connection.accept(incoming, other_end).await {
-                        Ok(state) => {
-                            if let Err(e) = accept_channel.send((socket, state)).await {
-                                log::warn!(cid, error:? = e; "Listener disappeared while accepting connection");
-                            }
-                        }
-                        Err(e) => {
-                            log::warn!(cid, error:? = e; "Accepting connection request failed")
-                        }
-                    }
-                } else {
-                    if let Err(e) = connection.reject(incoming).await {
-                        log::warn!(cid, error:? = e; "Rejecting connection request failed");
-                    }
+                if let Err(e) = connection.reject(incoming).await {
+                    log::warn!(cid, error:? = e; "Rejecting connection request failed");
                 }
             }
         });
     }
 }
 
+impl UsbVsockHost<fasync::Socket> {
+    /// Create a new USB VSOCK host for testing. Guaranteed not to try to touch
+    /// the machine's actual USB devices.
+    pub fn new_for_test(event_sender: mpsc::Sender<UsbVsockHostEvent>) -> Arc<Self> {
+        Arc::new(UsbVsockHost {
+            scope: fasync::Scope::new(),
+            inner: Mutex::new(UsbVsockHostInner {
+                conns: HashMap::new(),
+                port_states: HashMap::new(),
+            }),
+            next_cid: AtomicU32::new(3),
+            event_sender,
+        })
+    }
+
+    /// Add a new test connection to this host.
+    pub fn add_connection_for_test(
+        self: &Arc<Self>,
+        connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
+        incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
+    ) -> u32 {
+        let cid = self.next_cid.fetch_add(1, Ordering::Relaxed);
+        let success =
+            self.inner.lock().unwrap().conns.insert(cid, ConnectionState { connection }).is_none();
+        assert!(success);
+        self.add_incoming_request_handler(cid, incoming_requests);
+        let mut sender = self.event_sender.clone();
+        self.scope.spawn(async move {
+            let _ = sender.send(UsbVsockHostEvent::AddedCid(cid)).await;
+        });
+        cid
+    }
+}
+
 /// Collection of values related to a test connection.
 pub struct TestConnection {
     pub cid: u32,
-    pub host: Arc<UsbVsockHost>,
-    pub connection: Arc<usb_vsock::Connection<Vec<u8>>>,
-    pub _control_socket: fasync::Socket,
+    pub host: Arc<UsbVsockHost<fasync::Socket>>,
+    pub connection: Arc<usb_vsock::Connection<Vec<u8>, fasync::Socket>>,
     pub incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     pub abort_transfer: (AbortHandle, AbortHandle),
     pub event_receiver: mpsc::Receiver<UsbVsockHostEvent>,
@@ -847,22 +851,16 @@ impl TestConnection {
     /// (representing the target perspective).
     pub fn new() -> TestConnection {
         let (a_incoming_requests_tx, a_incoming_requests) = mpsc::channel(1);
-        let (a_control_socket_other_end, a_control_socket) =
-            fasync::emulated_handle::Socket::create_stream();
-        let a_control_socket_other_end = fasync::Socket::from_socket(a_control_socket_other_end);
         let a = Arc::new(usb_vsock::Connection::new(
             ProtocolVersion::LATEST,
-            a_control_socket_other_end,
+            None,
             a_incoming_requests_tx,
         ));
 
         let (b_incoming_requests_tx, b_incoming_requests) = mpsc::channel(1);
-        let (b_control_socket_other_end, b_control_socket) =
-            fasync::emulated_handle::Socket::create_stream();
-        let b_control_socket_other_end = fasync::Socket::from_socket(b_control_socket_other_end);
         let b = Arc::new(usb_vsock::Connection::new(
             ProtocolVersion::LATEST,
-            b_control_socket_other_end,
+            None,
             b_incoming_requests_tx,
         ));
 
@@ -894,17 +892,12 @@ impl TestConnection {
 
         let (event_sender, event_receiver) = mpsc::channel(1);
         let host = UsbVsockHost::new_for_test(event_sender);
-        let cid = host.add_connection_for_test(
-            a,
-            fasync::Socket::from_socket(a_control_socket),
-            a_incoming_requests,
-        );
+        let cid = host.add_connection_for_test(a, a_incoming_requests);
 
         TestConnection {
             cid,
             host,
             connection: b,
-            _control_socket: fasync::Socket::from_socket(b_control_socket),
             incoming_requests: b_incoming_requests,
             abort_transfer: (abort_a, abort_b),
             event_receiver,
@@ -926,7 +919,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: _,
             event_receiver: _,
@@ -981,7 +973,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1005,10 +996,13 @@ mod test {
                 .await
         });
 
-        let (mut b, _state) = listener.next().await.unwrap();
+        let (b, other_end) = fasync::emulated_handle::Socket::create_stream();
+        let other_end = fasync::Socket::from_socket(other_end);
+        let _state = listener.next().await.unwrap().accept(other_end).await.unwrap();
         let _remote_state = connect_task.await.unwrap();
 
         let mut a = fasync::Socket::from_socket(a);
+        let mut b = fasync::Socket::from_socket(b);
 
         const TEST_STR_1: &[u8] = b"Y'all seem disenchanted with my whimsical diversions.";
         const TEST_STR_2: &[u8] = b"Why were we programmed to get bored anyway?";
@@ -1031,7 +1025,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1055,10 +1048,13 @@ mod test {
                 .await
         });
 
-        let (mut b, _state) = listener.next().await.unwrap();
+        let (b, other_end) = fasync::emulated_handle::Socket::create_stream();
+        let other_end = fasync::Socket::from_socket(other_end);
+        let _state = listener.next().await.unwrap().accept(other_end).await.unwrap();
         let _remote_state = connect_task.await.unwrap();
 
         let mut a = fasync::Socket::from_socket(a);
+        let mut b = fasync::Socket::from_socket(b);
 
         const TEST_STR_1: &[u8] = b"Y'all seem disenchanted with my whimsical diversions.";
         const TEST_STR_2: &[u8] = b"Why were we programmed to get bored anyway?";
@@ -1096,7 +1092,6 @@ mod test {
             cid,
             host,
             connection: _c,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1117,7 +1112,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: _,
             event_receiver: _,
@@ -1144,7 +1138,6 @@ mod test {
             cid,
             host: _host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1174,7 +1167,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1206,7 +1198,6 @@ mod test {
             cid: _,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1238,7 +1229,6 @@ mod test {
             cid: _,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1258,7 +1248,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: _,
             event_receiver: _,
@@ -1293,7 +1282,6 @@ mod test {
             cid,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1314,7 +1302,6 @@ mod test {
             cid,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1334,7 +1321,6 @@ mod test {
             cid: _,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1354,7 +1340,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1382,7 +1367,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: (abort_a, abort_b),
             event_receiver: _,
@@ -1456,7 +1440,6 @@ mod test {
             cid: _,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1474,7 +1457,6 @@ mod test {
             cid,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             mut event_receiver,

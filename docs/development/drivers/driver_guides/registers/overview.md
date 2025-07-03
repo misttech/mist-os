@@ -98,20 +98,24 @@ as an example on how to use the registers driver.
       function can be used to declare bitfields:
 
       ```c++ {:.devsite-disable-click-to-copy}
-      auto metadata_bytes = fidl_metadata::registers::RegistersMetadataToFidl<uint32_t>(kRegisters);
-      if (metadata_bytes.is_error()) {
-        zxlogf(ERROR, "%s: Failed to FIDL encode registers metadata %s\n", __func__,
-               metadata_bytes.status_string());
-        return metadata_bytes.error_value();
+      zx::result metadata = fidl_metadata::registers::RegistersMetadataToFidl<uint32_t>(kRegisters);
+      if (!metadata.is_ok()) {
+        zxlogf(ERROR, "Failed to convert registers to metadata %s", metadata.status_string());
+        return metadata.error_value();
       }
 
-      const std::vector<fpbus::Metadata> registers_metadata{
-          {
-            {
-              .type = DEVICE_METADATA_REGISTERS,
-              .data = metadata_bytes.value(),
-            },
-          },
+      fit::result persisted_metadata = fidl::Persist(metadata.value());
+      if (!persisted_metadata.is_ok()) {
+        zxlogf(ERROR, "Failed to persist registers metadata: %s",
+              persisted_metadata.error_value().FormatDescription().c_str());
+        return persisted_metadata.error_value().status();
+      }
+
+      std::vector<fpbus::Metadata> registers_metadata{
+          {{
+              .id = fuchsia_hardware_registers::Metadata::kSerializableName,
+              .data = std::move(persisted_metadata.value()),
+          }},
       };
       ```
 

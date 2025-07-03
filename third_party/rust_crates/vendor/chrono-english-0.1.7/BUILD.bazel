@@ -71,7 +71,7 @@ rust_library(
     }),
     version = "0.1.7",
     deps = [
-        "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+        "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
         "//third_party/rust_crates/vendor/scanlex-0.1.4:scanlex",
     ],
 )

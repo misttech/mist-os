@@ -32,6 +32,7 @@ syscall_tests = [
   "custom_artifact_test",
   "epoll_test",
   "extended_pstate_test",
+  "fallocate_test",
   "fcntl_test",
   "fs_test",
   "fsverity_test",
@@ -66,7 +67,9 @@ syscall_tests = [
   "suid_test",
   "sw_breakpoint_test",
   "symlink_test",
+  "sysctl_test",
   "sysfs_kernel_test",
+  "sysfs_power_test",
   "syslog_test",
   "task_test",
   "terminal_test",
@@ -87,10 +90,6 @@ syscall_tests = [
 
   # go/keep-sorted end
 ]
-
-# TODO: https://fxbug.dev/373731551 - try to get more flake debug data from
-# this test.
-syscall_tests_flaky = [ "sysfs_power_test" ]
 
 syscall_tests_etc = [
   {
@@ -172,17 +171,14 @@ foreach(onfault_behavior, mlock_onfault_behaviors) {
   }
 }
 
-all_test_names = syscall_tests + syscall_tests_flaky
+all_test_names = syscall_tests
 foreach(test_def, syscall_tests_etc) {
   all_test_names += [ test_def.name ]
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    ":starnix_syscalls_cpp_tests",
-    ":starnix_syscalls_cpp_tests_flaky",
-  ]
+  deps = [ ":starnix_syscalls_cpp_tests" ]
   if (starnix_enable_arch32) {
     deps += [ ":starnix_arch32_syscalls_cpp_tests" ]
   }
@@ -446,12 +442,6 @@ foreach(test_name, syscall_tests) {
   }
 }
 
-foreach(test_name, syscall_tests_flaky) {
-  syscall_test(test_name) {
-    test_name = test_name
-  }
-}
-
 foreach(test_def, syscall_tests_etc) {
   syscall_test(test_def.name) {
     test_name = test_def.name
@@ -463,16 +453,6 @@ test("crash") {
   # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
   exclude_toolchain_tags = [ "asan" ]
   sources = [ "crash.cc" ]
-  deps = [
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gtest",
-  ]
-}
-
-test("syslog_non_root") {
-  # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
-  exclude_toolchain_tags = [ "asan" ]
-  sources = [ "syslog_non_root_test.cc" ]
   deps = [
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
@@ -588,67 +568,40 @@ starnix_linux_test_component("crash_test") {
   test_type = "starnix"
 }
 
-starnix_linux_test_component("syslog_non_root_test") {
-  test_label = ":syslog_non_root"
-  test_binary = "syslog_non_root"
-  test_type = "starnix"
-}
-
-template("starnix_syscalls_cpp_tests_package") {
-  fuchsia_test_package(target_name) {
-    test_components = [
-      ":syslog_non_root_test",
-      ":crash_test",
-    ]
-    deps = []
-    foreach(test_name, invoker.test_names) {
-      test_components += [ ":${test_name}" ]
-      deps += [ ":${test_name}_config" ]
-    }
-
-    subpackages = starnix_test_subpackages
-    subpackages += [ "//src/starnix/containers/debian:debian_package" ]
-
-    if (target_cpu == "x64") {
-      # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
-      # Without Vulkan, test-ui-stack will stuck on Scenic startup.
-      subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
-    }
-
-    deps += [
-      ":extended_pstate_initial_state_child_resource($target_linux_toolchain)",
-      "//src/lib/testing/expectation:expectation_comparer",
-    ]
-
-    test_specs = {
-      # TODO(https://fxbug.dev/319150842): GCE doesn't support Vulkan, so, for now, just disable all
-      # of these tests on GCE.
-      _env = basic_envs
-      _env += [ gce_env ]
-      _env -= [ gce_env ]
-      environments = _env
-
-      log_settings = invoker.log_settings
-    }
+fuchsia_test_package("starnix_syscalls_cpp_tests") {
+  test_components = [ ":crash_test" ]
+  deps = []
+  foreach(test_name, all_test_names) {
+    test_components += [ ":${test_name}" ]
+    deps += [ ":${test_name}_config" ]
   }
-}
 
-starnix_syscalls_cpp_tests_package("starnix_syscalls_cpp_tests") {
-  test_names = syscall_tests
-  log_settings = {
-    max_severity = "ERROR"
+  subpackages = starnix_test_subpackages
+  subpackages += [ "//src/starnix/containers/debian:debian_package" ]
+
+  if (target_cpu == "x64") {
+    # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
+    # Without Vulkan, test-ui-stack will stuck on Scenic startup.
+    subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
   }
-}
 
-starnix_syscalls_cpp_tests_package("starnix_syscalls_cpp_tests_flaky") {
-  test_names = syscall_tests_flaky
-  log_settings = {
-    # Tests exercise failure cases, so ERROR logs are expected.
-    max_severity = "ERROR"
+  deps += [
+    ":extended_pstate_initial_state_child_resource($target_linux_toolchain)",
+    "//src/lib/testing/expectation:expectation_comparer",
+  ]
 
-    # Run in sequence, and log a lot.
-    parallel = 1
-    min_log_severity = "DEBUG"
+  test_specs = {
+    # TODO(https://fxbug.dev/319150842): GCE doesn't support Vulkan, so, for now, just disable all
+    # of these tests on GCE.
+    _env = basic_envs
+    _env += [ gce_env ]
+    _env -= [ gce_env ]
+    environments = _env
+
+    log_settings = {
+      # Tests exercise failure cases, so ERROR logs are expected.
+      max_severity = "ERROR"
+    }
   }
 }
 

@@ -63,6 +63,11 @@ type RamNandInfo = resource struct {
 
     /// If non-zero, fail after `fail_after` writes.
     fail_after uint32;
+
+    /// The vmo to store block erase counts in. If this vmo is present then it must be at least
+    /// large enough to hold a uint32_t per Info.num_blocks. The values will not be zeroed when the
+    /// nand starts up, they will just be incremented in place.
+    wear_vmo zx.Handle:<VMO, optional>;
 };
 
 closed protocol RamNandCtl {

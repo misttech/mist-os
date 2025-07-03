@@ -93,6 +93,9 @@ class Metrics {
 
   inspect::UintProperty& initial_bad_blocks() { return initial_bad_blocks_; }
   inspect::UintProperty& running_bad_blocks() { return running_bad_blocks_; }
+  inspect::UintProperty& total_bad_blocks() { return total_bad_blocks_; }
+  inspect::UintProperty& worn_blocks_detected() { return worn_blocks_detected_; }
+  inspect::UintProperty& projected_bad_blocks() { return projected_bad_blocks_; }
 
   BlockOperationProperties& read() { return read_; }
   BlockOperationProperties& write() { return write_; }
@@ -120,6 +123,13 @@ class Metrics {
   // Bad block information.
   inspect::UintProperty initial_bad_blocks_;
   inspect::UintProperty running_bad_blocks_;
+  inspect::UintProperty total_bad_blocks_;
+
+  // Worn out block info
+  inspect::UintProperty worn_blocks_detected_;
+
+  // A total of detected worn blocks and total bad blocks.
+  inspect::UintProperty projected_bad_blocks_;
 
   // Properties for each block operation type.
   BlockOperationProperties read_;

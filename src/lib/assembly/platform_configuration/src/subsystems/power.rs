@@ -152,7 +152,13 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
         builder.set_config_capability(
             "fuchsia.power.StoragePowerManagementEnabled",
-            Config::new(ConfigValueType::Bool, config.storage_power_management_enabled.into()),
+            Config::new(
+                ConfigValueType::Bool,
+                serde_json::Value::Bool(
+                    config.storage_power_management_enabled
+                        && context.board_info.provides_feature("fuchsia::suspending_token"),
+                ),
+            ),
         )?;
 
         if let (Some(config), FeatureSetLevel::Standard) =

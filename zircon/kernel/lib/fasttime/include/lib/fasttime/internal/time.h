@@ -11,6 +11,11 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <atomic>
+#include <bit>
+#include <concepts>
+#include <type_traits>
+
 namespace fasttime::internal {
 
 struct SequentialReadResult {
@@ -21,29 +26,63 @@ struct SequentialReadResult {
 
 #if defined(__aarch64__)
 
-#define TIMER_REG_CNTVCT "cntvct_el0"
-#define TIMER_REG_CNTPCT "cntpct_el0"
+inline uint64_t get_raw_ticks_arm_vct() { return __arm_rsr64("cntvct_el0"); }
+inline uint64_t get_raw_ticks_arm_pct() { return __arm_rsr64("cntpct_el0"); }
 
-inline zx_ticks_t get_raw_ticks_arm_a73_vct() {
-  zx_ticks_t ticks1 = __arm_rsr64(TIMER_REG_CNTVCT);
-  zx_ticks_t ticks2 = __arm_rsr64(TIMER_REG_CNTVCT);
-  return (((ticks1 ^ ticks2) >> 32) & 1) ? ticks1 : ticks2;
-}
-
-inline zx_ticks_t get_raw_ticks_arm_a73_pct() {
-  zx_ticks_t ticks1 = __arm_rsr64(TIMER_REG_CNTPCT);
-  zx_ticks_t ticks2 = __arm_rsr64(TIMER_REG_CNTPCT);
+template <uint64_t (*Get)()>
+inline uint64_t get_raw_ticks_arm_a73() {
+  uint64_t ticks1 = Get();
+  uint64_t ticks2 = Get();
   return (((ticks1 ^ ticks2) >> 32) & 1) ? ticks1 : ticks2;
 }
 
 inline zx_ticks_t get_raw_ticks(const TimeValues& tvalues) {
-  if (tvalues.use_a73_errata_mitigation) {
-    return tvalues.use_pct_instead_of_vct ? get_raw_ticks_arm_a73_pct()
-                                          : get_raw_ticks_arm_a73_vct();
-  } else {
-    return tvalues.use_pct_instead_of_vct ? __arm_rsr64(TIMER_REG_CNTPCT)
-                                          : __arm_rsr64(TIMER_REG_CNTVCT);
-  }
+  return std::bit_cast<zx_ticks_t>(
+      tvalues.use_a73_errata_mitigation
+          ? (tvalues.use_pct_instead_of_vct ? get_raw_ticks_arm_a73<get_raw_ticks_arm_pct>()
+                                            : get_raw_ticks_arm_a73<get_raw_ticks_arm_vct>())
+          : (tvalues.use_pct_instead_of_vct ? get_raw_ticks_arm_pct() : get_raw_ticks_arm_vct()));
+}
+
+// This always returns zero in a register at runtime.  But both the compiler
+// and the CPU consider that register's value to be data-dependent on the
+// argument register.  So whatever load or system register read produced the
+// argument value will be a data dependency of whatever uses the returned zero.
+template <std::integral T>
+inline uintptr_t DataDependentZero(T dep) {
+  using UnsignedT = std::make_unsigned_t<T>;
+  uintptr_t zero;
+  // This doesn't use volatile because its whole purpose is to precisely
+  // express the data dependency between its input operand and its output
+  // operand, both to the compiler and to the CPU.  Using asm volatile says
+  // that the asm does something whose pruning or reordering is prohibited for
+  // some reason _other_ than data dependencies or side effects the compiler
+  // understands.  Here we'd be failing entirely to do what we need to do if
+  // the compiler doesn't understand everything that matters and will only move
+  // this around in ways that preserve the data-dependency-based ordering, so
+  // we wouldn't want to influence the compiler except by expressing in the
+  // operands everything it needs to know.
+  __asm__("eor %0, %1, %1"
+          : "=r"(zero)
+          : "r"(static_cast<uintptr_t>(std::bit_cast<UnsignedT>(dep))));
+  return zero;
+}
+
+// This just returns the reference it's given in the first argument, but such
+// that the address is computed as data-dependent on the second argument value.
+// So whatever load or system register read produced that second argument will
+// be a data dependency of any memory accesses done via the returned reference.
+template <typename T>
+inline T& DataDependentRef(T& ref, std::integral auto dep) {
+  return *reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(&ref) + DataDependentZero(dep));
+}
+
+// This is just a plain `ldr` instruction, in fact.  It's wrapped here in
+// preparation for AArch32 where the compiler would use an `ldrexd` instruction
+// instead of the `ldrd` instruction, which is already guaranteed sufficiently
+// atomic in ARMv8 for an aligned 64-bit value.
+inline zx_ticks_t AtomicLoadRelaxed(const std::atomic<zx_ticks_t>& value_ref) {
+  return value_ref.load(std::memory_order_relaxed);
 }
 
 // Reads the raw ticks value in between two observations of the given atomic value.
@@ -54,55 +93,41 @@ inline SequentialReadResult read_raw_ticks_sequentially(const TimeValues& tvalue
   // of the virtual ticks counter below. The method is derived from Example D12-3 in the 'Arm
   // Architecture Reference Manual for A-profile architecture' revision 'ARM DDI 0487K.a'. It works
   // by establishing a data dependency between the offset and the counter read to ensure that the
-  // processor cannot reorder these instructions. It does so by:
-  // 1. Loading the value into result.obs1.
-  // 2. EOR'ing obs1 with itself to generate a zero.
-  // 3. Using a CBZ to branch on the generated zero. We as humans know that this is an
-  //    unconditional branch because the input register will always be zero, but the CPU does not
-  //    know that and therefore cannot reorder the load w.r.t to the CBZ.
-  // 4. Issuing an ISB after the branch. This isb prevents the CBZ from being reordered down.
-  uint64_t data_dependent_zero;
-  __asm__ volatile(
-      R"""(
-      ldr %[obs1], %[value_ref]
-      eor %[data_dependent_zero], %[obs1], %[obs1]
-      cbz %[data_dependent_zero], 1f
-      1: isb
-      )"""
-      : [data_dependent_zero] "=r"(data_dependent_zero),
-        [obs1] "=r"(result.obs1)  // Outputs: obs1 stores value, and the results of the EOR are
-                                  // written into data_dependent_zero.
-      : [value_ref] "m"(value)    // Inputs: value is read from memory into obs1.
-  );
+  // processor cannot reorder these instructions.
 
-  // This ticks must not be reordered with the assembly blocks before or after it.
-  // We achieve this by using the __arm_rsr64 intrinsics in get_raw_ticks, which use the volatile
-  // qualifier. This should ensure that the blocks are not reordered. Furthermore, the block below
-  // establishes a data dependency on result.raw_ticks.
+  // First, load the value into result.obs1.
+  result.obs1 = AtomicLoadRelaxed(value);
+
+  // Now produce a data-dependent zero and conditionally branch on it. We know
+  // that this is an unconditional branch because the input register will
+  // always be zero, but the CPU does not know that and therefore cannot
+  // reorder the load to be after the test and branch.
+  if (DataDependentZero(result.obs1) != 0) {
+    // The branch target is just the next instruction as there aren't really
+    // two paths here.  The empty asm forces the compiler to produce the
+    // comparison and conditional branch anyway.
+    __asm__ volatile("");
+  }
+
+  // This ISB prevents the test and branch from being reordered down.
+  __isb(ARM_MB_SY);
+
+  // This ticks must not be reordered with the steps before or after it. We
+  // achieve this by using the intrinsics in get_raw_ticks that have `volatile`
+  // semantics. This should ensure that things are not reordered. Furthermore,
+  // the read below establishes a data dependency on result.raw_ticks.
   result.raw_ticks = get_raw_ticks(tvalues);
 
-  // This assembly block reads the offset a second time, ensuring that this read cannot begin until
-  // the previous ticks counter read(s) complete. The method used comes from Example D12-4 in the
-  // 'Arm Architecture Reference Manual for A-profile architecture' revision 'ARM DDI 0487K.a'.
-  // It works by:
-  // 1. EOR'ing result.raw_ticks with itself to generate a zero.
-  // 2. Loading the value but doing so by adding the generated zero offset to the load address.
-  //    Once again, this will just always load value, but the CPU does not know that and therefore
-  //    cannot reorder the ticks read with the ldr.
-  __asm__ volatile(
-      R"""(
-      eor %[data_dependent_zero], %[ticks], %[ticks]
-      ldr %[obs2], [%[value_ptr], %[data_dependent_zero]] // Same as %[value_ref]
-      )"""
-      : [data_dependent_zero] "=&r"(data_dependent_zero),
-        [obs2] "=r"(result.obs2)  // Outputs:  obs2 stores value, and the results of the EOR are
-                                  // writing into data_dependent_zero. We use the early clobber
-                                  // here to ensure that the same register is not used for it and
-                                  // value_ptr.
-      : [ticks] "r"(result.raw_ticks), [value_ref] "m"(value),
-        [value_ptr] "r"(&value)  // Inputs: raw_ticks is used as input to to EOR. value_ptr is read
-                                 // into obs2. value is used in the comment.
-  );
+  // Read the offset a second time, ensuring that this read cannot begin until
+  // the previous ticks counter read(s) complete. The method used comes from
+  // Example D12-4 in the 'Arm Architecture Reference Manual for A-profile
+  // architecture' revision 'ARM DDI 0487K.a'.
+  //
+  // A data-dependent zero is generated as above, but instead of using it to
+  // control a branch, we use it to control an address computation so that the
+  // load is transitively data-dependent on the counter read.
+  result.obs2 = AtomicLoadRelaxed(DataDependentRef(value, result.raw_ticks));
+
   return result;
 }
 

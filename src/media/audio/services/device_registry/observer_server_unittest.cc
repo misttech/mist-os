@@ -100,15 +100,16 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
 
 class ObserverServerCodecTest : public ObserverServerTest {
  protected:
+  static inline const std::string kClassName = "ObserverServerCodecTest";
   std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
     auto codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
     auto fake_driver = std::make_shared<FakeCodec>(
         codec_endpoints.server.TakeChannel(), codec_endpoints.client.TakeChannel(), dispatcher());
 
-    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                            fad::DeviceType::kCodec,
-                                            fad::DriverClient::WithCodec(fake_driver->Enable())));
+    adr_service()->AddDevice(
+        Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                       fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
     RunLoopUntilIdle();
     return fake_driver;
@@ -117,12 +118,13 @@ class ObserverServerCodecTest : public ObserverServerTest {
 
 class ObserverServerCompositeTest : public ObserverServerTest {
  protected:
+  static inline const std::string kClassName = "ObserverServerCompositeTest";
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
     adr_service()->AddDevice(Device::Create(
         adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
-        fad::DriverClient::WithComposite(fake_driver->Enable())));
+        fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -226,9 +228,9 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
   fake_driver->InjectUnpluggedAt(initial_plug_time);
 
   RunLoopUntilIdle();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);

@@ -23,7 +23,7 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
 
-use crate::device::kobject::{Device, KObjectBased, UEventAction, UEventContext};
+use crate::device::kobject::{Device, UEventAction, UEventContext};
 use crate::device::{DeviceListener, DeviceListenerKey};
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
@@ -59,7 +59,7 @@ pub const SOCKET_MAX_SIZE: usize = 4 << 20;
 const SOL_NETLINK: u32 = 270;
 
 pub fn new_netlink_socket(
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     socket_type: SocketType,
     family: NetlinkFamily,
 ) -> Result<Box<dyn SocketOps>, Errno> {
@@ -69,10 +69,10 @@ pub fn new_netlink_socket(
     }
 
     let ops: Box<dyn SocketOps> = match family {
-        NetlinkFamily::KobjectUevent => Box::new(UEventNetlinkSocket::new(kernel)),
+        NetlinkFamily::KobjectUevent => Box::new(UEventNetlinkSocket::default()),
         NetlinkFamily::Route => Box::new(RouteNetlinkSocket::new(kernel)?),
         NetlinkFamily::Generic => Box::new(GenericNetlinkSocket::new(kernel)?),
-        NetlinkFamily::SockDiag => Box::new(DiagnosticNetlinkSocket::new(kernel)?),
+        NetlinkFamily::SockDiag => Box::new(DiagnosticNetlinkSocket::default()),
         NetlinkFamily::Audit => {
             track_stub!(TODO("https://fxbug.dev/403540244"), "NETLINK_AUDIT");
             return error!(EPROTONOSUPPORT);
@@ -191,6 +191,17 @@ struct NetlinkSocketInner {
 }
 
 impl NetlinkSocketInner {
+    fn new(family: NetlinkFamily) -> Self {
+        Self {
+            family,
+            messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
+            waiters: WaitQueue::default(),
+            address: None,
+            passcred: false,
+            timestamp: false,
+        }
+    }
+
     fn bind(
         &mut self,
         current_task: &CurrentTask,
@@ -380,16 +391,7 @@ struct BaseNetlinkSocket {
 
 impl BaseNetlinkSocket {
     pub fn new(family: NetlinkFamily) -> Self {
-        BaseNetlinkSocket {
-            inner: Mutex::new(NetlinkSocketInner {
-                family,
-                messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
-                waiters: WaitQueue::default(),
-                address: None,
-                passcred: false,
-                timestamp: false,
-            }),
-        }
+        BaseNetlinkSocket { inner: Mutex::new(NetlinkSocketInner::new(family)) }
     }
 
     /// Locks and returns the inner state of the Socket.
@@ -526,7 +528,13 @@ impl SocketOps for BaseNetlinkSocket {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {}
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
+    }
 
     fn getsockname(
         &self,
@@ -571,24 +579,15 @@ impl SocketOps for BaseNetlinkSocket {
 
 /// Socket implementation for the NETLINK_KOBJECT_UEVENT family of netlink sockets.
 struct UEventNetlinkSocket {
-    kernel: Arc<Kernel>,
     inner: Arc<Mutex<NetlinkSocketInner>>,
     device_listener_key: Mutex<Option<DeviceListenerKey>>,
 }
 
-impl UEventNetlinkSocket {
+impl Default for UEventNetlinkSocket {
     #[allow(clippy::let_and_return)]
-    pub fn new(kernel: &Arc<Kernel>) -> Self {
+    fn default() -> Self {
         let result = Self {
-            kernel: Arc::clone(kernel),
-            inner: Arc::new(Mutex::new(NetlinkSocketInner {
-                family: NetlinkFamily::KobjectUevent,
-                messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
-                waiters: WaitQueue::default(),
-                address: None,
-                passcred: false,
-                timestamp: false,
-            })),
+            inner: Arc::new(Mutex::new(NetlinkSocketInner::new(NetlinkFamily::KobjectUevent))),
             device_listener_key: Default::default(),
         };
         #[cfg(any(test, debug_assertions))]
@@ -598,20 +597,27 @@ impl UEventNetlinkSocket {
         }
         result
     }
+}
 
+impl UEventNetlinkSocket {
     /// Locks and returns the inner state of the Socket.
     fn lock(&self) -> starnix_sync::MutexGuard<'_, NetlinkSocketInner> {
         self.inner.lock()
     }
 
-    fn register_listener(&self, state: starnix_sync::MutexGuard<'_, NetlinkSocketInner>) {
+    fn register_listener(
+        &self,
+        current_task: &CurrentTask,
+        state: starnix_sync::MutexGuard<'_, NetlinkSocketInner>,
+    ) {
         if state.address.is_none() {
             return;
         }
         std::mem::drop(state);
         let mut key_state = self.device_listener_key.lock();
         if key_state.is_none() {
-            *key_state = Some(self.kernel.device_registry.register_listener(self.inner.clone()));
+            *key_state =
+                Some(current_task.kernel().device_registry.register_listener(self.inner.clone()));
         }
     }
 }
@@ -626,7 +632,7 @@ impl SocketOps for UEventNetlinkSocket {
     ) -> Result<(), Errno> {
         let mut state = self.lock();
         state.connect(current_task, peer)?;
-        self.register_listener(state);
+        self.register_listener(current_task, state);
         Ok(())
     }
 
@@ -657,7 +663,7 @@ impl SocketOps for UEventNetlinkSocket {
     ) -> Result<(), Errno> {
         let mut state = self.lock();
         state.bind(current_task, socket_address)?;
-        self.register_listener(state);
+        self.register_listener(current_task, state);
         Ok(())
     }
 
@@ -715,10 +721,15 @@ impl SocketOps for UEventNetlinkSocket {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
         let id = self.device_listener_key.lock().take();
         if let Some(id) = id {
-            self.kernel.device_registry.unregister_listener(&id);
+            current_task.kernel().device_registry.unregister_listener(&id);
         }
     }
 
@@ -768,9 +779,8 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
         let Some(metadata) = &device.metadata else {
             return;
         };
-        let kobject = device.kobject();
-        let subsystem = kobject.parent().unwrap();
-        let subsystem = subsystem.name();
+        let path = device.path_from_depth(0);
+        let subsystem = &device.class.name;
         // TODO(https://fxbug.dev/42078277): Pass the synthetic UUID when available.
         // Otherwise, default as "0".
         let message = format!(
@@ -783,7 +793,7 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                             MAJOR={major}\0\
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
-            path = kobject.path(),
+            path = path,
             name = metadata.devname,
             subsystem = subsystem,
             major = metadata.device_type.major(),
@@ -853,7 +863,7 @@ impl<M: Clone + NetlinkSerializable + Send + Sync + 'static> Sender<M>
 }
 
 /// Provide Starnix implementations of `Sender` and `Receiver to [`Netlink`].
-pub(crate) struct NetlinkSenderReceiverProvider;
+pub struct NetlinkSenderReceiverProvider;
 
 impl SenderReceiverProvider for NetlinkSenderReceiverProvider {
     type Sender<M: Clone + NetlinkSerializable + Send + Sync + 'static> = NetlinkToClientSender<M>;
@@ -873,15 +883,8 @@ struct RouteNetlinkSocket {
 }
 
 impl RouteNetlinkSocket {
-    pub fn new(kernel: &Arc<Kernel>) -> Result<Self, Errno> {
-        let inner = Arc::new(Mutex::new(NetlinkSocketInner {
-            family: NetlinkFamily::Route,
-            messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
-            waiters: WaitQueue::default(),
-            address: None,
-            passcred: false,
-            timestamp: false,
-        }));
+    pub fn new(kernel: &Kernel) -> Result<Self, Errno> {
+        let inner = Arc::new(Mutex::new(NetlinkSocketInner::new(NetlinkFamily::Route)));
         let (message_sender, message_receiver) = mpsc::unbounded();
         let client = match kernel
             .network_netlink()
@@ -1050,7 +1053,12 @@ impl SocketOps for RouteNetlinkSocket {
         error!(EOPNOTSUPP)
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
         // Close the underlying channel to the Netlink worker.
         self.message_sender.close_channel();
     }
@@ -1126,18 +1134,9 @@ struct DiagnosticNetlinkSocket {
     inner: Arc<Mutex<NetlinkSocketInner>>,
 }
 
-impl DiagnosticNetlinkSocket {
-    pub fn new(_kernel: &Arc<Kernel>) -> Result<Self, Errno> {
-        Ok(Self {
-            inner: Arc::new(Mutex::new(NetlinkSocketInner {
-                family: NetlinkFamily::SockDiag,
-                messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
-                waiters: WaitQueue::default(),
-                address: None,
-                passcred: false,
-                timestamp: false,
-            })),
-        })
+impl Default for DiagnosticNetlinkSocket {
+    fn default() -> Self {
+        Self { inner: Arc::new(Mutex::new(NetlinkSocketInner::new(NetlinkFamily::SockDiag))) }
     }
 }
 
@@ -1236,7 +1235,13 @@ impl SocketOps for DiagnosticNetlinkSocket {
         error!(EOPNOTSUPP)
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {}
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
+    }
 
     fn getsockname(
         &self,
@@ -1287,15 +1292,8 @@ struct GenericNetlinkSocket {
 }
 
 impl GenericNetlinkSocket {
-    pub fn new(kernel: &Arc<Kernel>) -> Result<Self, Errno> {
-        let inner = Arc::new(Mutex::new(NetlinkSocketInner {
-            family: NetlinkFamily::Generic,
-            messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
-            waiters: WaitQueue::default(),
-            address: None,
-            passcred: false,
-            timestamp: false,
-        }));
+    pub fn new(kernel: &Kernel) -> Result<Self, Errno> {
+        let inner = Arc::new(Mutex::new(NetlinkSocketInner::new(NetlinkFamily::Generic)));
         let (message_sender, message_receiver) = mpsc::unbounded();
         match kernel
             .generic_netlink()
@@ -1427,7 +1425,13 @@ impl SocketOps for GenericNetlinkSocket {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {}
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
+    }
 
     fn getsockname(
         &self,
@@ -1505,12 +1509,8 @@ mod tests {
         };
 
         let socket_inner = Arc::new(Mutex::new(NetlinkSocketInner {
-            family: NetlinkFamily::Route,
             messages: MessageQueue::new(queue_size),
-            waiters: WaitQueue::default(),
-            address: None,
-            passcred: false,
-            timestamp: false,
+            ..NetlinkSocketInner::new(NetlinkFamily::Route)
         }));
 
         let mut sender = NetlinkToClientSender::<RouteNetlinkMessage>::new(socket_inner.clone());

@@ -633,7 +633,13 @@ fn process_touchpad_reports(
         .unwrap_or_default();
 
     let buttons: HashSet<mouse_binding::MouseButton> = match &touch_report.pressed_buttons {
-        Some(buttons) => HashSet::from_iter(buttons.iter().cloned()),
+        Some(buttons) => HashSet::from_iter(buttons.iter().filter_map(|button| match button {
+            fidl_fuchsia_input_report::TouchButton::Palm => Some(1),
+            fidl_fuchsia_input_report::TouchButton::__SourceBreaking { unknown_ordinal } => {
+                log::warn!("unknown TouchButton ordinal {unknown_ordinal:?}");
+                None
+            }
+        })),
         None => HashSet::new(),
     };
 
@@ -1270,13 +1276,19 @@ mod tests {
         };
         let reports = vec![create_touch_input_report(
             vec![contact],
-            Some(vec![PRIMARY_BUTTON]),
+            Some(vec![fidl_fuchsia_input_report::TouchButton::__SourceBreaking {
+                unknown_ordinal: PRIMARY_BUTTON,
+            }]),
             event_time_i64,
         )];
 
         let expected_events = vec![create_touchpad_event(
             vec![create_touch_contact(TOUCH_ID, Position { x: 0.0, y: 0.0 })],
-            vec![PRIMARY_BUTTON].into_iter().collect(),
+            vec![fidl_fuchsia_input_report::TouchButton::__SourceBreaking {
+                unknown_ordinal: PRIMARY_BUTTON,
+            }]
+            .into_iter()
+            .collect(),
             event_time_u64,
             &descriptor,
         )];

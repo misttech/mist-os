@@ -5,6 +5,9 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_INSPECT_OPERATION_TRACKER_OPERATION_TRACKER_STUB_H_
 #define SRC_STORAGE_LIB_VFS_CPP_INSPECT_OPERATION_TRACKER_OPERATION_TRACKER_STUB_H_
 
+#include <lib/zx/time.h>
+#include <zircon/types.h>
+
 #include "src/storage/lib/vfs/cpp/inspect/operation_tracker/operation_tracker_base.h"
 
 namespace fs_inspect {

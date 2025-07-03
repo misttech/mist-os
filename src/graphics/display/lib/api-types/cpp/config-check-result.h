@@ -51,6 +51,7 @@ class ConfigCheckResult {
   constexpr uint32_t ValueForLogging() const;
 
   static const ConfigCheckResult kOk;
+  static const ConfigCheckResult kEmptyConfig;
   static const ConfigCheckResult kInvalidConfig;
   static const ConfigCheckResult kUnsupportedConfig;
   static const ConfigCheckResult kTooManyDisplays;
@@ -68,6 +69,7 @@ constexpr bool ConfigCheckResult::IsValid(
     fuchsia_hardware_display_types::wire::ConfigResult fidl_result) {
   switch (fidl_result) {
     case fuchsia_hardware_display_types::wire::ConfigResult::kOk:
+    case fuchsia_hardware_display_types::wire::ConfigResult::kEmptyConfig:
     case fuchsia_hardware_display_types::wire::ConfigResult::kInvalidConfig:
     case fuchsia_hardware_display_types::wire::ConfigResult::kUnsupportedConfig:
     case fuchsia_hardware_display_types::wire::ConfigResult::kTooManyDisplays:
@@ -123,6 +125,8 @@ constexpr uint32_t ConfigCheckResult::ValueForLogging() const {
 
 inline constexpr const ConfigCheckResult ConfigCheckResult::kOk(
     fuchsia_hardware_display_types::wire::ConfigResult::kOk);
+inline constexpr const ConfigCheckResult ConfigCheckResult::kEmptyConfig(
+    fuchsia_hardware_display_types::wire::ConfigResult::kEmptyConfig);
 inline constexpr const ConfigCheckResult ConfigCheckResult::kInvalidConfig(
     fuchsia_hardware_display_types::wire::ConfigResult::kInvalidConfig);
 inline constexpr const ConfigCheckResult ConfigCheckResult::kUnsupportedConfig(

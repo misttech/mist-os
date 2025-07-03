@@ -217,10 +217,6 @@ int Sherlock::Start() {
     zxlogf(ERROR, "SecureMbemInit failed");
   }
 
-  if (BacklightInit() != ZX_OK) {
-    zxlogf(ERROR, "BacklightInit() failed");
-  }
-
   if (RamCtlInit() != ZX_OK) {
     zxlogf(ERROR, "RamCtlInit failed");
   }

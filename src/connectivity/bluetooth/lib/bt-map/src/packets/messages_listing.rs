@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use chrono::naive::NaiveDateTime;
+use chrono::DateTime;
 use objects::{Builder, ObexObjectError as Error, Parser};
 use std::collections::HashSet;
 use std::fmt;
@@ -369,7 +370,7 @@ impl AttributeV1_0 {
         let required_attrs = vec![
             AttributeV1_0::Handle(0),
             AttributeV1_0::Subject(String::new()),
-            AttributeV1_0::Datetime(NaiveDateTime::from_timestamp_opt(0, 0).unwrap()),
+            AttributeV1_0::Datetime(DateTime::from_timestamp(0, 0).unwrap().naive_utc()),
             AttributeV1_0::RecipientAddressing(Vec::new()),
             AttributeV1_0::Type(MessageType::Email),
         ];

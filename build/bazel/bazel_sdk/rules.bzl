@@ -14,14 +14,88 @@ def _find_root_directory(files, suffix):
     return None
 
 # genrule() cannot deal with TreeArtifacts inputs or outputs
-# so a custom rule is needed to invoke the idk_to_bazel_sdk
+# so a custom rule is needed to invoke the validate_idk
+# py_binary() target.
+def _validate_idk(ctx):
+    output_file = ctx.actions.declare_file(ctx.label.name)
+
+    if len(ctx.files._schema_files) == 0:
+        fail("No schema files specified.")
+    schema_dir_path = ctx.files._schema_files[0].dirname
+
+    inputs = depset(
+        [ctx.file.json_validator, ctx.file.idk_directory_hash] + ctx.files._schema_files,
+    )
+
+    args = [
+        "--idk-directory",
+        ctx.attr.idk_directory,
+        "--schema-directory",
+        schema_dir_path,
+        "--json-validator-path",
+        ctx.file.json_validator.path,
+        "--stamp-file",
+        output_file.path,
+    ]
+
+    ctx.actions.run(
+        mnemonic = "IDKVerify",
+        executable = ctx.executable._validate_idk_script,
+        arguments = args,
+        inputs = inputs,
+        outputs = [output_file],
+        execution_requirements = {
+            # We want the generated IDK to persist.
+            "no-sandbox": "1",
+
+            # A full IDK is currently about 4.7 GiB, and this
+            # action runs in a few seconds, so avoid remoting it.
+            "no-remote": "1",
+            "no-cache": "1",
+        },
+    )
+
+    return DefaultInfo(files = depset([output_file]))
+
+validate_idk = rule(
+    doc = """Generate a merged IDK at build time from `ninja_root_build_dir`.""",
+    implementation = _validate_idk,
+    attrs = {
+        "idk_directory": attr.string(
+            doc = "Path to the IDK to validate.",
+            mandatory = True,
+        ),
+        "idk_directory_hash": attr.label(
+            doc = "The hash file corresponding to `idk_directory`.",
+            mandatory = True,
+            allow_single_file = True,
+        ),
+        "json_validator": attr.label(
+            doc = "The JSON validator executable for schema validation",
+            default = "//build/tools/json_validator:json_validator_valico",
+            allow_single_file = True,
+            cfg = "exec",
+        ),
+        "_schema_files": attr.label(
+            doc = "The IDK schema files. They must all be in the same directory.",
+            default = "//build/sdk/meta:idk_schema_files",
+        ),
+        "_validate_idk_script": attr.label(
+            default = "//build/sdk/generate_idk:validate_idk",
+            executable = True,
+            cfg = "exec",
+        ),
+    },
+)
+
+# genrule() cannot deal with TreeArtifacts inputs or outputs
+# so a custom rule is needed to invoke the generate_idk_bazel
 # py_binary() target.
 def _generate_merged_idk(ctx):
     output_dir = ctx.actions.declare_directory(ctx.label.name)
 
     if len(ctx.files._schema_files) == 0:
         fail("No schema files specified.")
-    inputs = ctx.files._schema_files
     schema_dir_path = ctx.files._schema_files[0].dirname
 
     _collection_relative_path = "sdk/exported/%s" % ctx.attr.collection_name
@@ -40,6 +114,10 @@ def _generate_merged_idk(ctx):
         "--release-version",
         sdk_id,
     ]
+
+    inputs = depset(
+        [ctx.file.json_validator] + ctx.files._schema_files,
+    )
 
     for cpu in ctx.attr.buildable_cpus:
         args += [
@@ -115,6 +193,7 @@ generate_merged_idk = rule(
             doc = "The JSON validator executable for schema validation",
             default = "//build/tools/json_validator:json_validator_valico",
             allow_single_file = True,
+            cfg = "exec",
         ),
         "_schema_files": attr.label(
             doc = "The IDK schema files. They must all be in the same directory.",

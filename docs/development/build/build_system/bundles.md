@@ -19,12 +19,16 @@ More information on the currently available bundles can be found in
   changing audio volume, and so on.
 * `tests` causes all test programs to be built. Most test programs can be
   invoked using `run-test-suite` on the device, or via `fx test`.
-* `kitchen_sink` is a target that causes all other build targets to be
-  included. It is useful when testing the impact of core changes, or when
-  making large scale changes in the code base. It also may be a fun
-  configuration for enthusiasts to play with, as it includes all software
-  available in the source tree. Note that kitchen sink will produce more than
-  20GB of build artifacts and requires at least 2GB of storage on the target
-  device (size estimates from Q1/2019).
+* `buildbot/*` are the bundles of software included in Fuchsia's infrastructure
+  bot runs. These are useful to include in build configuration if you're trying
+  to reproduce how Fuchsia's infrastructure builds or runs tests.
+* `kitchen_sink` is a target that causes many (not all) other build targets to
+  be included. It was created when Fuchsia had many fewer build configurations
+  and supported boards, and was intended to be *all* software available in the
+  source tree. This is no longer feasible, and so its usefulness as a
+  catch-all is limited. It should not be considered maintained, but is being
+  left in the tree for now to avoid breaking existing workflows. Note that
+  kitchen sink will produce more than 20GB of build artifacts and requires at
+  least 2GB of storage on the target device (size estimates from Q1/2019).
 
 [fx-build-config]: /docs/development/build/fx.md#configure-a-build

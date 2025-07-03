@@ -15,6 +15,7 @@ mod product_config;
 
 use anyhow::Result;
 use argh::FromArgs;
+use assembly_config_schema::IncludeInBuildType;
 use camino::Utf8PathBuf;
 
 /// Arguments to construct an assembly config.
@@ -138,6 +139,10 @@ struct BoardInputBundleArgs {
     /// the name of the board input bundle.
     #[argh(option)]
     name: String,
+
+    /// which build types to include this BIB.
+    #[argh(option)]
+    include_in: IncludeInBuildType,
 
     /// the directory to write the board input bundle to.
     #[argh(option)]

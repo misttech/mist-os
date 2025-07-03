@@ -168,7 +168,10 @@ rustc_library("cobalt") {
     "//third_party/rust_crates:log",
   ]
 
-  test_deps = [ "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust" ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
+    "//third_party/rust_crates:regex",
+  ]
 }
 
 fuchsia_component_manifest("memory-monitor2-manifest") {

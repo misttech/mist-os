@@ -11,6 +11,7 @@ source_set("magma_system_tests") {
 
   sources = [
     "test_magma_driver.cc",
+    "test_magma_power_manager.cc",
     "test_magma_system_buffer.cc",
     "test_magma_system_connection.cc",
     "test_magma_system_context.cc",
@@ -20,6 +21,9 @@ source_set("magma_system_tests") {
   ]
 
   deps = [
+    "//sdk/lib/driver/fake-platform-device/cpp",
+    "//sdk/lib/driver/power/cpp/testing",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fit",
     "//src/graphics/magma/lib/magma/platform:connection_client",
     "//src/graphics/magma/lib/magma/platform:event",
@@ -28,6 +32,7 @@ source_set("magma_system_tests") {
     "//src/graphics/magma/lib/magma/util:short_macros",
     "//src/graphics/magma/lib/magma_service/mock:msd_cpp",
     "//src/graphics/magma/lib/magma_service/sys_driver",
+    "//src/graphics/magma/lib/magma_service/sys_driver:magma_power_manager",
     "//src/graphics/magma/lib/magma_service/test_util:command_buffer_helper_cpp",
     "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper",
     "//third_party/googletest:gtest",

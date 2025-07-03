@@ -92,11 +92,12 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
                                   FilterByIndices(global_sample_regions, image_indices),
                                   FilterByIndices(global_clip_regions, image_indices), images);
 
-      link_system_->UpdateLinks(topology_data.topology_vector, topology_data.live_handles,
-                                global_matrices, /*device_pixel_ratio*/ glm::vec2(1.0), snapshot);
+      link_system_->UpdateLinkWatchers(topology_data.topology_vector, topology_data.live_handles,
+                                       global_matrices, snapshot);
+      link_system_->UpdateDevicePixelRatio(glm::vec2(1.0));
 
-      CullRectangles(&image_rectangles, &images, display_data.first.dimensions.x,
-                     display_data.first.dimensions.y);
+      CullRectanglesInPlace(&image_rectangles, &images, display_data.first.dimensions.x,
+                            display_data.first.dimensions.y);
       FX_DCHECK(image_rectangles.size() == images.size());
 
       image_list_per_display.push_back({

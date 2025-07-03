@@ -15,7 +15,7 @@
     clippy::precedence
 )]
 
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 #[path = "."]
 mod internal {
@@ -53,8 +53,8 @@ pub mod device {
     };
     pub use crate::internal::device::dad::{
         DadAddressContext, DadAddressStateRef, DadContext, DadHandler, DadState, DadStateRef,
-        DadTimerId, Ipv4DadSendData, Ipv6DadAddressContext, Ipv6DadSendData, OwnedNdpNonce,
-        IPV4_DAD_ANNOUNCE_NUM,
+        DadTimerId, Ipv4DadAddressInfo, Ipv4DadSendData, Ipv6DadAddressContext, Ipv6DadSendData,
+        OwnedNdpNonce, IPV4_DAD_ANNOUNCE_NUM,
     };
     pub use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
     pub use crate::internal::device::route_discovery::{
@@ -225,7 +225,8 @@ pub mod raw {
     pub use crate::internal::raw::{
         RawIpSocketApi, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketMap,
         RawIpSocketMapContext, RawIpSocketSendToError, RawIpSocketStateContext,
-        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, WeakRawIpSocketId,
+        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, ReceivePacketError,
+        WeakRawIpSocketId,
     };
 }
 

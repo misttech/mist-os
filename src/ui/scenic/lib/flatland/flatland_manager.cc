@@ -230,7 +230,7 @@ void FlatlandManager::CreateFlatlandDisplay(
 
   // Don't set DPR on the link system right away. Provide the display with a callback to set
   // the DPR once it receives it.
-  auto dpr_callback = [this](const glm::vec2& dpr) { link_system_->set_device_pixel_ratio(dpr); };
+  auto dpr_callback = [this](const glm::vec2& dpr) { link_system_->UpdateDevicePixelRatio(dpr); };
   hw_display->SetDPRCallback(std::move(dpr_callback));
 
   const std::string name = "Flatland Display ID=" + std::to_string(id);

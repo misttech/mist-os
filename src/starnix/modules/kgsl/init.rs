@@ -4,10 +4,9 @@
 
 use crate::KgslFile;
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -30,20 +29,14 @@ impl DeviceOps for KgslDeviceBuilder {
 
 pub fn kgsl_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
+    let class = registry.objects.get_or_create_class("kgsl".into(), registry.objects.virtual_bus());
     let builder = KgslDeviceBuilder {};
 
     registry
-        .register_dyn_device(
-            locked,
-            current_task,
-            "kgsl-3d0".into(),
-            registry.objects.graphics_class(),
-            DeviceDirectory::new,
-            builder,
-        )
+        .register_dyn_device(locked, current_task, "kgsl-3d0".into(), class, builder)
         .expect("can register kgsl-3d0");
 }

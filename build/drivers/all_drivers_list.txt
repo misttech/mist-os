@@ -58,8 +58,6 @@
 //src/connectivity/openthread/drivers/ot-radio:ot-radio-sherlock-mfg_driver
 //src/connectivity/openthread/drivers/ot-radio:ot-radio-sherlock_driver
 //src/connectivity/openthread/tests/fake-drivers/fake-ot-radio:fake-ot-radio-driver-driver
-//src/connectivity/overnet/usb/overnet-usb:overnet-usb-driver
-//src/connectivity/overnet/usb/usb-vsock-service:usb-vsock-service-driver
 //src/connectivity/telephony/drivers/qmi-fake-transport:fake_qmi_driver-driver
 //src/connectivity/telephony/drivers/qmi-usb-transport:qmi_driver-driver
 //src/connectivity/telephony/tests/fake-drivers/at-fake-transport:fake_at_driver-driver
@@ -71,6 +69,8 @@
 //src/connectivity/wlan/testing/wlantap-driver:wlantap_driver-driver
 //src/connectivity/wlan/tests/helpers/testcontroller-driver:testcontroller_driver-driver
 //src/developer/adb/drivers/usb-adb-function:usb-adb-function-driver
+//src/developer/remote-control/usb/overnet-usb:overnet-usb-driver
+//src/developer/remote-control/usb/usb-vsock-service:usb-vsock-service-driver
 //src/devices/acpi/drivers/acpi-battery:driver
 //src/devices/acpi/drivers/intel-thermal:driver
 //src/devices/adc/drivers/adc:adc-driver
@@ -350,6 +350,7 @@
 //src/power/power-manager/testing/fake_driver:nelson-fake-driver
 //src/power/power-manager/testing/fake_root:root_driver
 //src/power/testing/fake-powersource:fake_battery_driver
+//src/power/testing/fake-trippoint:driver
 //src/power/testing/system-integration/example/test-driver:driver
 //src/storage/fvm/driver:fuchsia_driver
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver

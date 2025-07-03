@@ -6,9 +6,7 @@
 #define SRC_DEVICES_POWER_DRIVERS_AML_PWM_REGULATOR_AML_PWM_REGULATOR_H_
 
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
-#include <fidl/fuchsia.hardware.vreg/cpp/wire.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/compat/cpp/device_server.h>
+#include <fidl/fuchsia.hardware.vreg/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 
 #include <fbl/alloc_checker.h>
@@ -16,17 +14,16 @@
 
 namespace aml_pwm_regulator {
 
-using fuchsia_hardware_vreg::wire::VregMetadata;
+using fuchsia_hardware_vreg::VregMetadata;
 
 class AmlPwmRegulatorDriver;
 
 class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
  public:
-  explicit AmlPwmRegulator(const VregMetadata& vreg_range,
-                           fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client,
-                           AmlPwmRegulatorDriver* driver);
+  explicit AmlPwmRegulator(const VregMetadata& metadata,
+                           fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client);
   static zx::result<std::unique_ptr<AmlPwmRegulator>> Create(const VregMetadata& metadata,
-                                                             AmlPwmRegulatorDriver* driver);
+                                                             AmlPwmRegulatorDriver& driver);
 
   // Vreg Implementation.
   void SetVoltageStep(SetVoltageStepRequestView request,
@@ -46,7 +43,6 @@ class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
   uint32_t current_step_;
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client_;
-  compat::SyncInitializedDeviceServer compat_server_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   fidl::ServerBindingGroup<fuchsia_hardware_vreg::Vreg> bindings_;
@@ -54,8 +50,11 @@ class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
 
 class AmlPwmRegulatorDriver : public fdf::DriverBase {
  public:
+  static constexpr std::string_view kDriverName = "aml-pwm-regulator";
+
   AmlPwmRegulatorDriver(fdf::DriverStartArgs start_args,
-                        fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+                        fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override;
 

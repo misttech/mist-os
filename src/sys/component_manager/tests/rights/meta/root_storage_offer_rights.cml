@@ -5,9 +5,8 @@
 // into the child process as it is expecting read write.
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
     ],
     children: [
         {

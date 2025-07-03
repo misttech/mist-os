@@ -8,6 +8,7 @@ using fuchsia.hardware.temperature;
 using zx;
 
 @available(added=18)
+@serializable
 type TripDeviceMetadata = struct {
     /// Critical temperature in degrees Celsius.
     critical_temp_celsius float32;

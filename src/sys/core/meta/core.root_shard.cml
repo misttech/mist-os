@@ -148,6 +148,7 @@
             directory: [
                 "base-bin",
                 "blob",
+                "block",
                 "boot-bin",
                 "build-info",
                 "config-data",
@@ -336,6 +337,7 @@
                 "fuchsia.hardware.power.sensor.Service",
                 "fuchsia.hardware.powersource.Service",
                 "fuchsia.hardware.pty.Service",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureService",
                 "fuchsia.hardware.radar.Service",
                 "fuchsia.hardware.ram.metrics.Service",
                 "fuchsia.hardware.registers.Service",
@@ -358,6 +360,7 @@
                 "fuchsia.services.test.Device",
                 "fuchsia.tpm.Service",
                 "fuchsia.wlan.device.Service",
+                "google.powerstats.Service",
             ],
             from: "#bootstrap",
             to: "#core",

@@ -23,6 +23,9 @@ fuchsia_component("async_reporter") {
   testonly = true
   deps = [ "components:async_reporter_bin" ]
   manifest = "components/async/meta/reporter.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("capability_requested_child") {
@@ -35,6 +38,9 @@ fuchsia_component("capability_requested_root") {
   testonly = true
   deps = [ "components:capability_requested_root_bin" ]
   manifest = "components/capability_requested/meta/root.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("echo_realm") {
@@ -58,6 +64,9 @@ fuchsia_component("nested_reporter") {
   testonly = true
   deps = [ "components:nested_reporter_bin" ]
   manifest = "components/nested/meta/reporter.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("event_dispatch_order_root") {

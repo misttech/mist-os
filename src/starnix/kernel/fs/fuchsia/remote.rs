@@ -30,7 +30,8 @@ use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
+    FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_types::vfs::default_statfs;
@@ -64,7 +65,7 @@ use {
 };
 
 pub fn new_remote_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -73,27 +74,35 @@ pub fn new_remote_fs(
     // validate the requested_path is a non-empty, non-root path.
     let requested_path = std::str::from_utf8(&options.source)
         .map_err(|_| errno!(EINVAL, "source path is not utf8"))?;
-    let create_flags = fio::PERM_READABLE
-        | fio::PERM_WRITABLE
-        | fio::Flags::FLAG_MAYBE_CREATE
-        | fio::Flags::PROTOCOL_DIRECTORY;
+    let mut create_flags =
+        fio::PERM_READABLE | fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY;
+    if !options.flags.contains(MountFlags::RDONLY) {
+        create_flags |= fio::PERM_WRITABLE;
+    }
     let (root_proxy, subdir) = kernel.open_ns_dir(requested_path, create_flags)?;
 
     let subdir = if subdir.is_empty() { ".".to_string() } else { subdir };
-    let open_rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
+    let mut open_rights = fio::PERM_READABLE;
+    if !options.flags.contains(MountFlags::RDONLY) {
+        open_rights |= fio::PERM_WRITABLE;
+    }
     let mut subdir_options = options;
     subdir_options.source = BString::from(subdir);
-    create_remotefs_filesystem(kernel, &root_proxy, subdir_options, open_rights)
+    create_remotefs_filesystem(locked, kernel, &root_proxy, subdir_options, open_rights)
 }
 
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
 /// `pkg`.
-pub fn create_remotefs_filesystem(
-    kernel: &Arc<Kernel>,
+pub fn create_remotefs_filesystem<L>(
+    locked: &mut Locked<L>,
+    kernel: &Kernel,
     root: &fio::DirectorySynchronousProxy,
     options: FileSystemOptions,
     rights: fio::Flags,
-) -> Result<FileSystemHandle, Errno> {
+) -> Result<FileSystemHandle, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let root = syncio::directory_open_directory_async(
         root,
         std::str::from_utf8(&options.source)
@@ -101,7 +110,7 @@ pub fn create_remotefs_filesystem(
         rights,
     )
     .map_err(|e| errno!(EIO, format!("Failed to open root: {e}")))?;
-    RemoteFs::new_fs(kernel, root.into_channel(), options, rights)
+    RemoteFs::new_fs(locked, kernel, root.into_channel(), options, rights)
 }
 
 pub struct RemoteFs {
@@ -266,12 +275,16 @@ impl RemoteFs {
         Ok(RemoteFs { use_remote_ids, root_proxy })
     }
 
-    pub fn new_fs(
-        kernel: &Arc<Kernel>,
+    pub fn new_fs<L>(
+        locked: &mut Locked<L>,
+        kernel: &Kernel,
         root: zx::Channel,
         mut options: FileSystemOptions,
         rights: fio::Flags,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let (client_end, server_end) = zx::Channel::create();
         let remotefs = RemoteFs::new(root, server_end)?;
         let mut attrs = zxio_node_attributes_t {
@@ -288,8 +301,13 @@ impl RemoteFs {
             options.flags |= MountFlags::RDONLY;
         }
         let use_remote_ids = remotefs.use_remote_ids;
-        let fs =
-            FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotefs, options)?;
+        let fs = FileSystem::new(
+            locked,
+            kernel,
+            CacheMode::Cached(CacheConfig::default()),
+            remotefs,
+            options,
+        )?;
         if use_remote_ids {
             fs.create_root(node_id, remote_node);
         } else {
@@ -332,11 +350,15 @@ impl RemoteNode {
 /// underlying abilities (which is not the same as the the permissions that are set if the object
 /// was created using Starnix).  This is fine, since this should mostly be used when interfacing
 /// with objects created outside of Starnix.
-pub fn new_remote_file(
+pub fn new_remote_file<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     handle: zx::Handle,
     flags: OpenFlags,
-) -> Result<FileHandle, Errno> {
+) -> Result<FileHandle, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let (attrs, ops) = remote_file_attrs_and_ops(handle)?;
     let mut mode = get_mode(&attrs);
     if ops.as_any().is::<SocketFile>() {
@@ -346,7 +368,7 @@ pub fn new_remote_file(
     // TODO: https://fxbug.dev/407611229 - Give these nodes valid labels.
     let mut info = FsNodeInfo::new(mode, FsCred::root());
     update_info_from_attrs(&mut info, &attrs);
-    Ok(Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", info))
+    Ok(Anon::new_private_file_extended(locked, current_task, ops, flags, "[fuchsia:remote]", info))
 }
 
 // Create a FileOps from a zx::Handle.
@@ -423,12 +445,16 @@ fn remote_file_attrs_and_ops(
     Ok((attrs, ops))
 }
 
-pub fn create_fuchsia_pipe(
+pub fn create_fuchsia_pipe<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     socket: zx::Socket,
     flags: OpenFlags,
-) -> Result<FileHandle, Errno> {
-    new_remote_file(current_task, socket.into(), flags)
+) -> Result<FileHandle, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
+    new_remote_file(locked, current_task, socket.into(), flags)
 }
 
 fn fetch_and_refresh_info_impl<'a>(
@@ -512,7 +538,11 @@ fn get_name_str<'a>(name_bytes: &'a FsStr) -> Result<&'a str, Errno> {
 }
 
 impl XattrStorage for syncio::Zxio {
-    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno> {
+    fn get_xattr(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        name: &FsStr,
+    ) -> Result<FsString, Errno> {
         Ok(self
             .xattr_get(name)
             .map_err(|status| match status {
@@ -522,7 +552,13 @@ impl XattrStorage for syncio::Zxio {
             .into())
     }
 
-    fn set_xattr(&self, name: &FsStr, value: &FsStr, op: XattrOp) -> Result<(), Errno> {
+    fn set_xattr(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
         let mode = match op {
             XattrOp::Set => XattrSetMode::Set,
             XattrOp::Create => XattrSetMode::Create,
@@ -535,14 +571,14 @@ impl XattrStorage for syncio::Zxio {
         })
     }
 
-    fn remove_xattr(&self, name: &FsStr) -> Result<(), Errno> {
+    fn remove_xattr(&self, _locked: &mut Locked<FileOpsCore>, name: &FsStr) -> Result<(), Errno> {
         self.xattr_remove(name).map_err(|status| match status {
             zx::Status::NOT_FOUND => errno!(ENODATA),
             _ => from_status_like_fdio!(status),
         })
     }
 
-    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
+    fn list_xattrs(&self, _locked: &mut Locked<FileOpsCore>) -> Result<Vec<FsString>, Errno> {
         self.xattr_list()
             .map(|attrs| attrs.into_iter().map(FsString::new).collect::<Vec<_>>())
             .map_err(|status| from_status_like_fdio!(status))
@@ -1693,11 +1729,11 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_remote_uds() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (s1, s2) = zx::Socket::create_datagram();
         s2.write(&vec![0]).expect("write");
-        let file =
-            new_remote_file(&current_task, s1.into(), OpenFlags::RDWR).expect("new_remote_file");
+        let file = new_remote_file(locked, &current_task, s1.into(), OpenFlags::RDWR)
+            .expect("new_remote_file");
         assert!(file.node().is_sock());
         let socket_ops = file.downcast_file::<SocketFile>().unwrap();
         let flags = SocketMessageFlags::CTRUNC
@@ -1706,7 +1742,7 @@ mod test {
             | SocketMessageFlags::CMSG_CLOEXEC;
         let mut buffer = VecOutputBuffer::new(1024);
         let info = socket_ops
-            .recvmsg(&mut locked, &current_task, &file, &mut buffer, flags, None)
+            .recvmsg(locked, &current_task, &file, &mut buffer, flags, None)
             .expect("recvmsg");
         assert!(info.ancillary_data.is_empty());
         assert_eq!(info.message_length, 1);
@@ -1714,11 +1750,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteFs::new_fs(
+            locked,
             &kernel,
             client,
             FileSystemOptions { source: b"/pkg".into(), ..Default::default() },
@@ -1728,30 +1765,25 @@ mod test {
         let root = ns.root();
         let mut context = LookupContext::default();
         assert_eq!(
-            root.lookup_child(&mut locked, &current_task, &mut context, "nib".into()).err(),
+            root.lookup_child(locked, &current_task, &mut context, "nib".into()).err(),
             Some(errno!(ENOENT))
         );
         let mut context = LookupContext::default();
-        root.lookup_child(&mut locked, &current_task, &mut context, "lib".into()).unwrap();
+        root.lookup_child(locked, &current_task, &mut context, "lib".into()).unwrap();
 
         let mut context = LookupContext::default();
         let _test_file = root
-            .lookup_child(
-                &mut locked,
-                &current_task,
-                &mut context,
-                "data/tests/hello_starnix".into(),
-            )?
-            .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())?;
+            .lookup_child(locked, &current_task, &mut context, "data/tests/hello_starnix".into())?
+            .open(locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())?;
         Ok(())
     }
 
     #[::fuchsia::test]
     async fn test_blocking_io() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let (client, server) = zx::Socket::create_stream();
-        let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR).unwrap();
+        let pipe = create_fuchsia_pipe(locked, &current_task, client, OpenFlags::RDWR).unwrap();
 
         let bytes = [0u8; 64];
         assert_eq!(bytes.len(), server.write(&bytes).unwrap());
@@ -1770,59 +1802,54 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_poll() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let (client, server) = zx::Socket::create_stream();
-        let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
+        let pipe = create_fuchsia_pipe(locked, &current_task, client, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
 
         assert_eq!(
-            pipe.query_events(&mut locked, &current_task),
+            pipe.query_events(locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
 
-        let epoll_object = EpollFileObject::new_file(&current_task);
+        let epoll_object = EpollFileObject::new_file(locked, &current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
         let event = EpollEvent::new(FdEvents::POLLIN, 0);
-        epoll_file
-            .add(&mut locked, &current_task, &pipe, &epoll_object, event)
-            .expect("poll_file.add");
+        epoll_file.add(locked, &current_task, &pipe, &epoll_object, event).expect("poll_file.add");
 
-        let fds = epoll_file
-            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
-            .expect("wait");
+        let fds =
+            epoll_file.wait(locked, &current_task, 1, zx::MonotonicInstant::ZERO).expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
 
         assert_eq!(
-            pipe.query_events(&mut locked, &current_task),
+            pipe.query_events(locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
-        let fds = epoll_file
-            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
-            .expect("wait");
+        let fds =
+            epoll_file.wait(locked, &current_task, 1, zx::MonotonicInstant::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(
-            pipe.read(&mut locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
+            pipe.read(locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
             1
         );
 
         assert_eq!(
-            pipe.query_events(&mut locked, &current_task),
+            pipe.query_events(locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
-        let fds = epoll_file
-            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
-            .expect("wait");
+        let fds =
+            epoll_file.wait(locked, &current_task, 1, zx::MonotonicInstant::ZERO).expect("wait");
         assert!(fds.is_empty());
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_directory() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let pkg_channel: zx::Channel =
             directory::open_in_namespace("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE)
                 .expect("failed to open /pkg")
@@ -1830,7 +1857,7 @@ mod test {
                 .expect("into_channel")
                 .into();
 
-        let fd = new_remote_file(&current_task, pkg_channel.into(), OpenFlags::RDWR)
+        let fd = new_remote_file(locked, &current_task, pkg_channel.into(), OpenFlags::RDWR)
             .expect("new_remote_file");
         assert!(fd.node().is_dir());
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
@@ -1838,7 +1865,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_file() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let content_channel: zx::Channel =
             file::open_in_namespace("/pkg/meta/contents", fio::PERM_READABLE)
                 .expect("failed to open /pkg/meta/contents")
@@ -1846,7 +1873,7 @@ mod test {
                 .expect("into_channel")
                 .into();
 
-        let fd = new_remote_file(&current_task, content_channel.into(), OpenFlags::RDONLY)
+        let fd = new_remote_file(locked, &current_task, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(!fd.node().is_dir());
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
@@ -1854,20 +1881,20 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_counter() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let counter = zx::Counter::create();
 
-        let fd = new_remote_file(&current_task, counter.into(), OpenFlags::RDONLY)
+        let fd = new_remote_file(locked, &current_task, counter.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[::fuchsia::test]
     async fn test_new_remote_vmo() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
-        let fd =
-            new_remote_file(&current_task, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
+        let fd = new_remote_file(locked, &current_task, vmo.into(), OpenFlags::RDWR)
+            .expect("new_remote_file");
         assert!(!fd.node().is_dir());
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
@@ -1884,10 +1911,11 @@ mod test {
         assert_eq!(LINK_SIZE, LINK_TARGET.len());
 
         {
-            let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+            let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
             fixture.root().clone(server.into()).expect("clone failed");
             let fs = RemoteFs::new_fs(
+                locked,
                 &kernel,
                 client,
                 FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -1897,22 +1925,21 @@ mod test {
             let ns = Namespace::new(fs);
             let root = ns.root();
             let symlink_node = root
-                .create_symlink(&mut locked, &current_task, LINK_PATH.into(), LINK_TARGET.into())
+                .create_symlink(locked, &current_task, LINK_PATH.into(), LINK_TARGET.into())
                 .expect("symlink failed");
             assert_matches!(&*symlink_node.entry.node.info(), FsNodeInfo { size: LINK_SIZE, .. });
 
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
             let child = root
-                .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
+                .lookup_child(locked, &current_task, &mut context, "symlink".into())
                 .expect("lookup_child failed");
 
-            match child.readlink(&mut locked, &current_task).expect("readlink failed") {
+            match child.readlink(locked, &current_task).expect("readlink failed") {
                 SymlinkTarget::Path(path) => assert_eq!(path, LINK_TARGET),
                 SymlinkTarget::Node(_) => panic!("readlink returned SymlinkTarget::Node"),
             }
             // Ensure the size stat reports matches what is expected.
-            let stat_result =
-                child.entry.node.stat(&mut locked, &current_task).expect("stat failed");
+            let stat_result = child.entry.node.stat(locked, &current_task).expect("stat failed");
             assert_eq!(stat_result.st_size as usize, LINK_SIZE);
         }
 
@@ -1924,10 +1951,11 @@ mod test {
         .await;
 
         {
-            let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+            let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
             fixture.root().clone(server.into()).expect("clone failed after remount");
             let fs = RemoteFs::new_fs(
+                locked,
                 &kernel,
                 client,
                 FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -1938,22 +1966,18 @@ mod test {
             let root = ns.root();
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
             let child = root
-                .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
+                .lookup_child(locked, &current_task, &mut context, "symlink".into())
                 .expect("lookup_child failed after remount");
 
-            match child.readlink(&mut locked, &current_task).expect("readlink failed after remount")
-            {
+            match child.readlink(locked, &current_task).expect("readlink failed after remount") {
                 SymlinkTarget::Path(path) => assert_eq!(path, LINK_TARGET),
                 SymlinkTarget::Node(_) => {
                     panic!("readlink returned SymlinkTarget::Node after remount")
                 }
             }
             // Ensure the size stat reports matches what is expected.
-            let stat_result = child
-                .entry
-                .node
-                .stat(&mut locked, &current_task)
-                .expect("stat failed after remount");
+            let stat_result =
+                child.entry.node.stat(locked, &current_task).expect("stat failed after remount");
             assert_eq!(stat_result.st_size as usize, LINK_SIZE);
         }
 
@@ -1990,6 +2014,7 @@ mod test {
                         });
                         let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                         let fs = RemoteFs::new_fs(
+                            locked,
                             &kernel,
                             client,
                             FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2050,6 +2075,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2108,6 +2134,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2205,6 +2232,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2281,6 +2309,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2333,6 +2362,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2376,6 +2406,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2421,6 +2452,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2459,6 +2491,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2499,6 +2532,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2526,7 +2560,7 @@ mod test {
         let (server, client) = zx::Channel::create();
         fixture.root().clone(server.into()).expect("clone failed");
 
-        let (kernel, _init_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, _init_task, locked) = create_kernel_task_and_unlocked();
         kernel
             .kthreads
             .spawner()
@@ -2535,6 +2569,7 @@ mod test {
                 move |_, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2542,7 +2577,7 @@ mod test {
                     )
                     .expect("new_fs failed");
 
-                    let statfs = fs.statfs(&mut locked, &current_task).expect("statfs failed");
+                    let statfs = fs.statfs(locked, &current_task).expect("statfs failed");
                     assert!(statfs.f_type != 0);
                     assert!(statfs.f_bsize > 0);
                     assert!(statfs.f_blocks > 0);
@@ -2575,6 +2610,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2633,6 +2669,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2694,6 +2731,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2754,6 +2792,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2799,6 +2838,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2883,6 +2923,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -2962,6 +3003,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -3009,6 +3051,7 @@ mod test {
                 move |locked, current_task| {
                     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions { source: b"/".into(), ..Default::default() },
@@ -3056,6 +3099,7 @@ mod test {
                     let kernel = Arc::clone(&kernel);
                     move |locked, current_task| {
                         let fs = RemoteFs::new_fs(
+                            locked,
                             &kernel,
                             client,
                             FileSystemOptions {
@@ -3123,6 +3167,7 @@ mod test {
                     let kernel = Arc::clone(&kernel);
                     move |locked, current_task| {
                         let fs = RemoteFs::new_fs(
+                            locked,
                             &kernel,
                             client,
                             FileSystemOptions {
@@ -3175,6 +3220,7 @@ mod test {
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
                     let fs = RemoteFs::new_fs(
+                        locked,
                         &kernel,
                         client,
                         FileSystemOptions {

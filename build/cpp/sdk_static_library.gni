@@ -112,7 +112,6 @@ template("sdk_static_library") {
   sdk_id = "sdk://${sdk_root_path}"
 
   main_target_name = target_name
-  metadata_target_name = "${main_target_name}_sdk_metadata"
   manifest_target_name = "${main_target_name}_sdk_manifest"
   sdk_target_name = "${main_target_name}_sdk"
 
@@ -195,9 +194,8 @@ template("sdk_static_library") {
     }
   }
 
-  # Identify dependencies and their metadata files.
+  # Identify dependencies.
   sdk_deps = []
-  sdk_metas = []
   build_deps = []
   if (defined(invoker.deps)) {
     build_deps += invoker.deps
@@ -215,12 +213,6 @@ template("sdk_static_library") {
   # Runtime deps are already SDK targets.
   if (defined(invoker.runtime_deps)) {
     sdk_deps += invoker.runtime_deps
-  }
-
-  foreach(sdk_dep, sdk_deps) {
-    gen_dir = get_label_info(sdk_dep, "target_gen_dir")
-    name = get_label_info(sdk_dep, "name")
-    sdk_metas += [ "$gen_dir/$name.meta.json" ]
   }
 
   sdk_header_files = []
@@ -311,57 +303,15 @@ template("sdk_static_library") {
     not_needed(invoker, [ "sdk_headers_for_internal_use" ])
   }
 
-  metadata_file = "${target_gen_dir}/${metadata_target_name}.sdk_meta.json"
-
-  action(metadata_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
-    script = "//build/cpp/gen_sdk_prebuilt_meta_file.py"
-
-    inputs = sdk_metas
-
-    outputs = [ metadata_file ]
-
-    args = [
-      "--out",
-      rebase_path(metadata_file, root_build_dir),
-      "--name",
-      sdk_name,
-      "--format",
-      "static",
-      "--root",
-      sdk_root_path,
-      "--include-dir",
-      include_dest,
-      "--arch",
-      target_cpu,
-      "--lib-link",
-      link_lib,
-    ]
-    args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
-    args += [ "--headers" ] + sdk_metadata_headers
-    if (current_build_target_api_level != "PLATFORM") {
-      args += [
-        "--api-level",
-        "${current_build_target_api_level}",
-      ]
-    }
-
-    deps = sdk_deps + [ static_lib_target ]
-  }
-
   # LINT.IfChange
   _prebuild_info = {
-    atom_label =
-        get_label_info(":${manifest_target_name}", "label_no_toolchain")
     format = "static"
     include_dir = include_dest
     library_name = sdk_name
     file_base = sdk_root_path
     headers = sdk_metadata_headers
-    generator_label =
-        get_label_info(":${main_target_name}", "label_with_toolchain")
     binaries = {
-      api_level = current_build_target_api_level
+      api_level = "$current_build_target_api_level"
       arch = target_cpu
       link_lib = link_lib
     }
@@ -413,7 +363,6 @@ template("sdk_static_library") {
     }
 
     meta = {
-      source = metadata_file
       source_prebuild_info = _prebuild_info
       dest = "${sdk_root_path}/meta.json"
       type = "cc_prebuilt_library"
@@ -422,10 +371,7 @@ template("sdk_static_library") {
     files = sdk_files
     deps = sdk_deps
 
-    non_sdk_deps = [
-      ":${metadata_target_name}",
-      static_lib_target,
-    ]
+    non_sdk_deps = [ static_lib_target ]
     if (should_verify_pragma) {
       non_sdk_deps += [ ":${verify_pragma_target_name}" ]
     }

@@ -216,6 +216,8 @@ struct ftln {
   ui8 copy_end_found;     // Vblk resume copy-end mark found.
   ui8 deferment;          // # of recycles before applying wear limit.
   ui8 new_wear_leveling;  // 1 to use new wear leveling.
+  ui32* written;          // bit map of blocks written during this mount.
+  ui32* maybe_bad;        // bit map of blocks with poor read back.
 #if FS_ASSERT
   ui8 assert_no_recycle;  // Test no recycle changes physical page #.
 #endif
@@ -280,6 +282,14 @@ void FtlnBlkStats(CFTLN ftl);
 void FtlnStats(FTLN ftl);
 void FtlnShowBlks(void);
 void FtlnCheckBlank(FTLN ftl, ui32 b);
+void FtlnOnBadBlock(void* ftl, ui32 b);
+
+// Managing bitmaps for blocks
+ui32* FtlnAllocateBlockBitmap(CFTLN ftl);
+void FtlnSetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block);
+void FtlnUnsetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block);
+ui8 FtlnCheckBlockBitmap(CFTLN ftl, const ui32* bitmap, ui32 block);
+ui32 FtlnCountBlockBitmap(CFTLN ftl, const ui32* bitmap);
 
 __END_CDECLS
 

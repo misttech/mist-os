@@ -3,43 +3,41 @@
 // found in the LICENSE file.
 #include "src/devices/lib/fidl-metadata/tee.h"
 
-#include <fidl/fuchsia.hardware.tee/cpp/wire.h>
+#include <fidl/fuchsia.hardware.tee/cpp/fidl.h>
 
 namespace fidl_metadata::tee {
+
 zx::result<std::vector<uint8_t>> TeeMetadataToFidl(
     uint32_t default_thread_count, cpp20::span<const CustomThreadConfig> thread_config) {
-  fidl::Arena allocator;
+  std::vector<fuchsia_hardware_tee::CustomThreadConfig> thr_config;
+  thr_config.reserve(thread_config.size());
 
-  fuchsia_hardware_tee::wire::TeeMetadata metadata(allocator);
-  metadata.set_default_thread_count(default_thread_count);
-
-  fidl::VectorView<fuchsia_hardware_tee::wire::CustomThreadConfig> thr_config(allocator,
-                                                                              thread_config.size());
-
-  for (size_t i = 0; i < thread_config.size(); i++) {
-    auto& thr = thr_config[i];
-    auto& src_thr = thread_config[i];
-    thr.Allocate(allocator);
-
-    thr.set_role(allocator, fidl::StringView(allocator, src_thr.role));
-    thr.set_count(src_thr.count);
-    fidl::VectorView<::fuchsia_tee::wire::Uuid> apps(allocator, src_thr.trusted_apps.size());
-    for (size_t j = 0; j < src_thr.trusted_apps.size(); j++) {
-      auto& app = apps[j];
-      auto& src_app = src_thr.trusted_apps[j];
-
-      app.time_low = src_app.time_low;
-      app.time_mid = src_app.time_mid;
-      app.time_hi_and_version = src_app.time_hi_and_version;
-      ::memcpy(app.clock_seq_and_node.data(), src_app.clock_seq_and_node, 8);
+  for (const auto& src_thr : thread_config) {
+    std::vector<fuchsia_tee::Uuid> apps;
+    apps.reserve(src_thr.trusted_apps.size());
+    for (const auto& src_app : src_thr.trusted_apps) {
+      std::array<uint8_t, 8> clock_seq_and_node;
+      for (size_t i = 0; i < clock_seq_and_node.size(); ++i) {
+        clock_seq_and_node[i] = src_app.clock_seq_and_node[i];
+      }
+      apps.emplace_back(src_app.time_low, src_app.time_mid, src_app.time_hi_and_version,
+                        clock_seq_and_node);
     }
 
-    thr.set_trusted_apps(allocator, apps);
+    thr_config.emplace_back(fuchsia_hardware_tee::CustomThreadConfig{{
+        .role{src_thr.role},
+        .count = src_thr.count,
+        .trusted_apps = std::move(apps),
+    }});
   }
 
-  metadata.set_custom_threads(allocator, thr_config);
+  fuchsia_hardware_tee::TeeMetadata metadata{{
+      .default_thread_count = default_thread_count,
+      .custom_threads = thr_config,
+  }};
 
   return zx::result<std::vector<uint8_t>>{
       fidl::Persist(metadata).map_error(std::mem_fn(&fidl::Error::status))};
 }
+
 }  // namespace fidl_metadata::tee

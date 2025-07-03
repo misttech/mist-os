@@ -37,7 +37,7 @@ class PhysicalPageProvider : public PageProvider {
 
  private:
   // PageProvider methods.
-  const PageSourceProperties& properties() const final;
+  PageSourceProperties properties() const final;
   void SendAsyncRequest(PageRequest* request) final;
   void ClearAsyncRequest(PageRequest* request) final;
   void SwapAsyncRequest(PageRequest* old, PageRequest* new_req) final;
@@ -51,8 +51,6 @@ class PhysicalPageProvider : public PageProvider {
   zx_status_t WaitOnEvent(Event* event, bool suspendable) final;
 
   void Dump(uint depth, uint32_t max_items) final;
-
-  bool SupportsPageRequestType(page_request_type type) const final;
 
   // If there are no more requests in pending_requests_, returns false and doesn't modify the out
   // parameters.

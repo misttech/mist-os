@@ -4,20 +4,24 @@
 
 use async_trait::async_trait;
 use either::Either;
-use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
+use fs_management::filesystem::{
+    ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume,
+};
 use storage_stress_test_utils::fvm::FvmInstance;
 use stress_test::actor::{Actor, ActorError};
 
 /// An actor that kills the fs instance and destroys the ramdisk
 pub struct InstanceActor {
-    pub instance:
-        Option<(FvmInstance, Either<ServingSingleVolumeFilesystem, ServingMultiVolumeFilesystem>)>,
+    pub instance: Option<(
+        FvmInstance,
+        Either<ServingSingleVolumeFilesystem, (ServingMultiVolumeFilesystem, ServingVolume)>,
+    )>,
 }
 
 impl InstanceActor {
     pub fn new(
         fvm: FvmInstance,
-        fs: Either<ServingSingleVolumeFilesystem, ServingMultiVolumeFilesystem>,
+        fs: Either<ServingSingleVolumeFilesystem, (ServingMultiVolumeFilesystem, ServingVolume)>,
     ) -> Self {
         Self { instance: Some((fvm, fs)) }
     }
@@ -40,7 +44,7 @@ impl Actor for InstanceActor {
                     let _ = fs.kill().await;
                 }
                 // TODO(https://fxbug.dev/42057166): Make termination more abrupt.
-                Either::Right(fs) => {
+                Either::Right((fs, _)) => {
                     let _ = fs.shutdown().await;
                 }
             };

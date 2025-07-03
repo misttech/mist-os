@@ -16,9 +16,7 @@ if (is_host) {
     deps = [
       "//tools/build/ninjago/chrometrace",
       "//tools/build/ninjago/clangtrace",
-      "//tools/build/ninjago/compdb",
-      "//tools/build/ninjago/ninjagraph",
-      "//tools/build/ninjago/ninjalog",
+      "//tools/build/ninjago/ninjacommand",
       "//tools/build/ninjago/rbetrace",
       "//tools/build/ninjago/readerwriters",
     ]
@@ -26,14 +24,5 @@ if (is_host) {
 
   go_binary("ninjatrace") {
     library = ":main"
-  }
-
-  go_test("ninjatrace_tests") {
-    library = ":main"
-    output_name = "ninjatrace_tests"
-    deps = [
-      "//third_party/golibs:github.com/google/go-cmp",
-      "//tools/build/ninjago/ninjalog",
-    ]
   }
 }

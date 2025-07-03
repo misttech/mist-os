@@ -7,9 +7,12 @@ mod fho_env;
 mod from_env;
 mod try_from_env;
 
+pub mod null_writer;
 pub mod subtool;
+pub mod subtool_suite;
 
 pub use subtool::{FfxMain, FfxTool};
+pub use subtool_suite::{Subtool, SubtoolBox};
 
 // Re-export TryFromEnv related symbols
 pub use fho_env::{EnvironmentInterface, FhoEnvironment};

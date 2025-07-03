@@ -4,11 +4,9 @@
 
 #include "pwm.h"
 
-#include <lib/ddk/metadata.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
-#include <fbl/alloc_checker.h>
-#include <fbl/array.h>
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/predicates/status.h"
@@ -97,17 +95,18 @@ class PwmTestEnvironment : public fdf_testing::Environment {
   void Init(const fuchsia_hardware_pwm::PwmChannelsMetadata& metadata) {
     device_server_.Initialize("default", std::nullopt, pwm_impl_.GetBanjoConfig());
 
-    fit::result persisted_metadata = fidl::Persist(metadata);
-    ASSERT_TRUE(persisted_metadata.is_ok());
-    device_server_.AddMetadata(DEVICE_METADATA_PWM_CHANNELS, persisted_metadata.value().data(),
-                               persisted_metadata.value().size());
+    ASSERT_OK(metadata_server_.SetMetadata(metadata));
   }
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    if (zx_status_t status =
-            device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
-        status != ZX_OK) {
+    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+    if (zx_status_t status = device_server_.Serve(dispatcher, &to_driver_vfs); status != ZX_OK) {
       return zx::error(status);
+    }
+
+    if (zx::result result = metadata_server_.Serve(to_driver_vfs, dispatcher); result.is_error()) {
+      return result.take_error();
     }
 
     return zx::ok();
@@ -118,6 +117,7 @@ class PwmTestEnvironment : public fdf_testing::Environment {
  private:
   FakePwmImpl pwm_impl_;
   compat::DeviceServer device_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_pwm::PwmChannelsMetadata> metadata_server_;
 };
 
 class FixtureConfig final {

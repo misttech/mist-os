@@ -18,9 +18,7 @@ use crate::vfs::{
     FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNodeInfo, FsStr, SpecialNode,
 };
-use starnix_sync::{
-    FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked,
-};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_types::vfs::default_statfs;
@@ -238,6 +236,7 @@ impl Pipe {
 
     pub fn write(
         &mut self,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -246,7 +245,7 @@ impl Pipe {
         }
 
         if self.reader_count == 0 {
-            send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
+            send_standard_signal(locked, current_task, SignalInfo::default(SIGPIPE));
             return error!(EPIPE);
         }
 
@@ -431,7 +430,7 @@ impl FileSystemOps for PipeFs {
 }
 
 fn pipe_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -442,8 +441,14 @@ fn pipe_fs(
         .expando
         .get_or_init(|| {
             PipeFsHandle(
-                FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
-                    .expect("pipefs constructed with valid options"),
+                FileSystem::new(
+                    locked,
+                    kernel,
+                    CacheMode::Uncached,
+                    PipeFs,
+                    FileSystemOptions::default(),
+                )
+                .expect("pipefs constructed with valid options"),
             )
         })
         .0
@@ -501,11 +506,11 @@ impl FileOps for PipeFileObject {
         debug_assert!(offset == 0);
         debug_assert!(data.bytes_read() == 0);
 
-        let result = file.blocking_op(locked, current_task, FdEvents::POLLOUT, None, |_| {
+        let result = file.blocking_op(locked, current_task, FdEvents::POLLOUT, None, |locked| {
             let mut pipe = self.pipe.lock();
             let was_empty = pipe.is_empty();
             let offset_before = data.bytes_read();
-            let bytes_written = pipe.write(current_task, data)?;
+            let bytes_written = pipe.write(locked, current_task, data)?;
             debug_assert!(data.bytes_read() - offset_before == bytes_written);
             if bytes_written > 0 && was_empty {
                 pipe.notify_fd_events(FdEvents::POLLIN);
@@ -738,7 +743,7 @@ impl PipeFileObject {
             assert!(pipe.reader_count > 0);
             pipe.reader_count -= 1;
             if pipe.reader_count == 0 {
-                events |= FdEvents::POLLOUT;
+                events |= FdEvents::POLLOUT | FdEvents::POLLERR;
             }
         }
         if flags.can_write() {
@@ -898,7 +903,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(from.downcast_file::<PipeFileObject>().is_none());
@@ -929,7 +934,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(to.downcast_file::<PipeFileObject>().is_none());
@@ -958,6 +963,8 @@ impl PipeFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        let locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked;
         let available = UserBuffer::cap_buffers_to_max_rw_count(
             current_task.maximum_valid_address().ok_or_else(|| errno!(EINVAL))?,
             &mut iovec,
@@ -969,7 +976,7 @@ impl PipeFileObject {
             self.lock_pipe_for_writing(locked, current_task, self_file, non_blocking, available)?;
 
         if pipe.reader_count == 0 {
-            send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
+            send_standard_signal(locked, current_task, SignalInfo::default(SIGPIPE));
             return error!(EPIPE);
         }
 

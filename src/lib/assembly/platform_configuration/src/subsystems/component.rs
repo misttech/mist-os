@@ -30,6 +30,31 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
     ) -> anyhow::Result<()> {
         let gendir = context.get_gendir().context("Getting gendir for component subsystem")?;
 
+        // If heapdump has been enabled on at least one program, verify that it's allowed and
+        // include the bundle containing heapdump's collector package.
+        let heapdump_config = &config.development_support.heapdump;
+        if heapdump_config.is_enabled() {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng],
+                &[FeatureSetLevel::Standard],
+                "heapdump",
+            )?;
+            builder.platform_bundle("heapdump_global_collector");
+        }
+
+        // Select the component manager bundle to use.
+        if context.build_type == &BuildType::Eng
+            && context.feature_set_level == &FeatureSetLevel::Standard
+        {
+            if heapdump_config.component_manager {
+                builder.platform_bundle("component_manager_with_tracing_and_heapdump");
+            } else {
+                builder.platform_bundle("component_manager_with_tracing");
+            }
+        } else {
+            builder.platform_bundle("component_manager");
+        }
+
         // Add base policies.
         let mut input = vec![
             context.get_resource("component_manager_policy_base.json5"),

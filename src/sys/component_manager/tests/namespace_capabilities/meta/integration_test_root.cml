@@ -5,9 +5,8 @@
 // manager's namespace.
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/namespace_capabilities_integration_test_root",

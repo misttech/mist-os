@@ -17,17 +17,17 @@ use starnix_core::mm::{
 };
 use starnix_core::mutable_state::Guard;
 use starnix_core::task::{
-    CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, ThreadGroupKey,
-    WaitCanceler, WaitQueue, Waiter,
+    CurrentTask, CurrentTaskAndLocked, EventHandler, Kernel, SchedulerState, SimpleWaiter, Task,
+    ThreadGroupKey, WaitCanceler, WaitQueue, Waiter,
 };
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use starnix_core::vfs::pseudo::simple_file::BytesFile;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly, CacheMode,
-    CurrentTaskAndLocked, DirEntry, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
-    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
+    DirEntry, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
 };
 use starnix_core::{fileops_impl_dataless, security};
 use starnix_lifecycle::AtomicU64Counter;
@@ -36,8 +36,8 @@ use starnix_logging::{
     track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
-    ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex,
-    MutexGuard, ResourceAccessorAddFile, RwLock, Unlocked,
+    ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockEqualOrBefore, Locked,
+    Mutex, MutexGuard, ResourceAccessorLevel, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::convert::IntoFidl as _;
@@ -553,9 +553,9 @@ struct ActiveTransaction {
 }
 
 impl Releasable for ActiveTransaction {
-    type Context<'a: 'b, 'b> = ();
+    type Context<'a> = ();
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(self, context: Self::Context<'a>) {
         self.state.release(context);
     }
 }
@@ -581,9 +581,9 @@ struct TransactionState {
 }
 
 impl Releasable for TransactionState {
-    type Context<'a: 'b, 'b> = ();
+    type Context<'a> = ();
 
-    fn release<'a: 'b, 'b>(self, _: Self::Context<'a, 'b>) {
+    fn release<'a>(self, _: Self::Context<'a>) {
         log_trace!("Releasing binder TransactionState");
         let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
@@ -643,8 +643,8 @@ struct TransientTransactionState<'a> {
 }
 
 impl<'a> Releasable for TransientTransactionState<'a> {
-    type Context<'b: 'c, 'c> = ();
-    fn release<'b: 'c, 'c>(self, _: Self::Context<'b, 'c>) {
+    type Context<'b> = ();
+    fn release<'b>(self, _: ()) {
         let _ = self.accessor.close_files(self.transient_fds);
         self.state.release(());
         self.drop_guard.disarm();
@@ -1237,9 +1237,9 @@ impl<'a> BinderProcessGuard<'a> {
 }
 
 impl Releasable for BinderProcess {
-    type Context<'a: 'b, 'b> = &'a Kernel;
+    type Context<'a> = &'a Kernel;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(self, context: Self::Context<'a>) {
         log_trace!("Releasing BinderProcess id={}", self.identifier);
         let state = self.state.into_inner();
         // Notify any subscribers that the objects this process owned are now dead.
@@ -1626,8 +1626,8 @@ struct HandleTable {
 /// The HandleTable is released at the time the BinderProcess is released. At this moment, any
 /// reference to object owned by another BinderProcess need to be clean.
 impl Releasable for HandleTable {
-    type Context<'a: 'b, 'b> = ();
-    fn release<'a: 'b, 'b>(self, _: ()) {
+    type Context<'a> = ();
+    fn release<'a>(self, _: ()) {
         for (_, r) in self.table.into_iter() {
             let mut actions = RefCountActions::default();
             r.clean_refs(&mut actions);
@@ -1817,9 +1817,9 @@ impl DerefMut for RefCountActions {
 }
 
 impl Releasable for RefCountActions {
-    type Context<'a: 'b, 'b> = ();
+    type Context<'a> = ();
 
-    fn release<'a: 'b, 'b>(self, _context: ()) {
+    fn release<'a>(self, _context: ()) {
         for object in self.objects.into_iter() {
             object.apply_deferred_refcounts();
         }
@@ -1962,9 +1962,9 @@ impl BinderThread {
 }
 
 impl Releasable for BinderThread {
-    type Context<'a: 'b, 'b> = &'a Kernel;
+    type Context<'a> = &'a Kernel;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(self, context: Self::Context<'a>) {
         self.state.into_inner().release(context);
     }
 }
@@ -2067,16 +2067,16 @@ impl BinderThreadState {
     > {
         let transaction = self.transactions.pop().ok_or_else(|| errno!(EINVAL))?;
         match transaction {
-            TransactionRole::Receiver(peer, policy) => {
+            TransactionRole::Receiver(peer, scheduler_state) => {
                 log_trace!(
                     "binder transaction popped from thread {} for peer {:?}",
                     self.tid,
                     peer
                 );
-                let (process, thread) = release_on_error!(policy, current_task, {
+                let (process, thread) = release_on_error!(scheduler_state, current_task, {
                     peer.upgrade().ok_or(TransactionError::Dead)
                 });
-                Ok((process, thread, policy))
+                Ok((process, thread, scheduler_state))
             }
             TransactionRole::Sender(_) => {
                 log_warn!("caller got confused, nothing to reply to!");
@@ -2091,9 +2091,9 @@ impl BinderThreadState {
 }
 
 impl Releasable for BinderThreadState {
-    type Context<'a: 'b, 'b> = &'a Kernel;
+    type Context<'a> = &'a Kernel;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(self, context: Self::Context<'a>) {
         log_trace!("Dropping BinderThreadState id={}", self.tid);
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
@@ -2102,14 +2102,14 @@ impl Releasable for BinderThreadState {
         // If there are any transactions that this thread was processing, we need to tell the caller
         // that this thread is now dead and to not expect a reply.
 
-        // The policy need to be restored to the initial one.
-        let mut updated_scheduler_policy = false;
+        // The scheduler state need to be restored to the initial one.
+        let mut updated_scheduler_state = false;
         for transaction in self.transactions {
-            if let TransactionRole::Receiver(peer, policy) = transaction {
-                if !updated_scheduler_policy {
-                    updated_scheduler_policy = policy.release_for_task(context, self.tid);
+            if let TransactionRole::Receiver(peer, scheduler_state) = transaction {
+                if !updated_scheduler_state {
+                    updated_scheduler_state = scheduler_state.release_for_task(context, self.tid);
                 } else {
-                    policy.disarm();
+                    scheduler_state.disarm();
                 }
                 if let Some(peer_thread) = peer.thread.upgrade() {
                     let sender_thread = &mut peer_thread.lock();
@@ -2194,8 +2194,8 @@ enum Command {
         sender: WeakBinderPeer,
         /// The transaction payload.
         data: TransactionData,
-        /// The eventual policy to use when the transaction is running.
-        scheduler_policy: Option<SchedulerPolicy>,
+        /// The eventual scheduler state to use when the transaction is running.
+        scheduler_state: Option<SchedulerState>,
     },
     /// Commands a binder thread to process an incoming reply to its transaction.
     /// Sent from the server to the client.
@@ -2630,21 +2630,20 @@ impl BinderObjectFlags {
         })
     }
 
-    fn get_scheduler_policy(&self) -> Option<SchedulerPolicy> {
+    fn get_scheduler_state(&self) -> Option<SchedulerState> {
         let bits = self.bits();
         let priority = bits & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_PRIORITY_MASK;
-        let sched_policy = (bits
-            & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK)
+        let policy = (bits & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK)
             >> uapi::flat_binder_object_shifts_FLAT_BINDER_FLAG_SCHED_POLICY_SHIFT;
         let priority = u8::try_from(priority).expect("priority should fit in a u8");
-        let sched_policy = u8::try_from(sched_policy).expect("sched_policy should fit in a u8");
-        if priority == 0 && sched_policy == 0 {
+        let policy = u8::try_from(policy).expect("policy should fit in a u8");
+        if priority == 0 && policy == 0 {
             None
         } else {
-            match SchedulerPolicy::from_binder(sched_policy, priority) {
-                Ok(policy) => Some(policy),
+            match SchedulerState::from_binder(policy, priority) {
+                Ok(scheduler_state) => Some(scheduler_state),
                 Err(e) => {
-                    log_warn!("Unable to parse policy {sched_policy}:{priority}: {e:?}");
+                    log_warn!("Unable to parse scheduler state {policy}:{priority}: {e:?}");
                     None
                 }
             }
@@ -2717,9 +2716,9 @@ struct RefGuardInner<R: RefReleaser> {
 }
 
 impl<R: RefReleaser> Releasable for RefGuardInner<R> {
-    type Context<'a: 'b, 'b> = &'a mut RefCountActions;
+    type Context<'a> = &'a mut RefCountActions;
 
-    fn release<'a: 'b, 'b>(self, context: &mut RefCountActions) {
+    fn release<'a>(self, context: &mut RefCountActions) {
         R::dec_ref(&self.binder_object, context);
     }
 }
@@ -2750,9 +2749,9 @@ impl<R: RefReleaser> RefGuard<R> {
 }
 
 impl<R: RefReleaser> Releasable for RefGuard<R> {
-    type Context<'a: 'b, 'b> = &'a mut RefCountActions;
+    type Context<'a> = &'a mut RefCountActions;
 
-    fn release<'a: 'b, 'b>(self, context: &mut RefCountActions) {
+    fn release<'a>(self, context: &mut RefCountActions) {
         self.0.release(context);
     }
 }
@@ -2984,7 +2983,7 @@ impl TransactionRole {
                 // bound. This means that the transaction should be marked dead if the
                 // `target_proc` matches `process`, regardless of whether or not a `thread` was
                 // provided to `mark_dead`.
-                _any_thread,
+                _,
                 TransactionRole::Sender(TransactionSender {
                     target_thread: None,
                     target_proc,
@@ -3003,7 +3002,7 @@ impl TransactionRole {
 }
 
 #[derive(Debug, Default)]
-struct SchedulerGuard(Option<ReleaseGuard<SchedulerPolicy>>);
+struct SchedulerGuard(Option<ReleaseGuard<SchedulerState>>);
 
 impl SchedulerGuard {
     fn release_for_task(self, kernel: &Kernel, tid: pid_t) -> bool {
@@ -3012,33 +3011,36 @@ impl SchedulerGuard {
             self.release(&task);
             return true;
         } else {
-            // The task has been killed. There is no policy to update.
+            // The task has been killed. There is no scheduler state to update.
             self.disarm();
             return false;
         };
     }
 
     fn disarm(self) {
-        if let Some(policy) = self.0 {
-            ReleaseGuard::take(policy);
+        if let Some(scheduler_state) = self.0 {
+            ReleaseGuard::take(scheduler_state);
         }
     }
 }
 
-impl From<SchedulerPolicy> for SchedulerGuard {
-    fn from(policy: SchedulerPolicy) -> Self {
-        Self(Some(policy.into()))
+impl From<SchedulerState> for SchedulerGuard {
+    fn from(scheduler_state: SchedulerState) -> Self {
+        Self(Some(scheduler_state.into()))
     }
 }
 
 impl Releasable for SchedulerGuard {
-    type Context<'a: 'b, 'b> = &'a Task;
+    type Context<'a> = &'a Task;
 
-    fn release<'a: 'b, 'b>(self, task: Self::Context<'a, 'b>) {
-        if let Some(policy) = self.0 {
-            let policy = ReleaseGuard::take(policy);
-            if let Err(e) = task.set_scheduler_policy(policy) {
-                log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", task.tid);
+    fn release<'a>(self, task: &'a Task) {
+        if let Some(scheduler_state) = self.0 {
+            let scheduler_state = ReleaseGuard::take(scheduler_state);
+            if let Err(e) = task.set_scheduler_state(scheduler_state) {
+                log_warn!(
+                    "Unable to update scheduler state of task {} to {scheduler_state:?}: {e:?}",
+                    task.tid
+                );
             }
         }
     }
@@ -3177,12 +3179,13 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno>;
     fn get_files_with_flags(
         &self,
+        locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno>;
     fn add_files_with_flags(
         &self,
-        locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3348,6 +3351,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn get_files_with_flags(
         &self,
+        locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
@@ -3368,9 +3372,9 @@ impl ResourceAccessor for RemoteResourceAccessor {
                     return error!(ENOENT);
                 };
                 let file = if let Some(file) = file {
-                    new_remote_file(current_task, file, flags.into_fidl())?
+                    new_remote_file(locked, current_task, file, flags.into_fidl())?
                 } else {
-                    new_null_file(current_task, flags.into_fidl())
+                    new_null_file(locked, current_task, flags.into_fidl())
                 };
                 files.push((file, FdFlags::empty()));
             }
@@ -3385,7 +3389,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<ResourceAccessorAddFile>,
+        _locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3438,6 +3442,7 @@ impl ResourceAccessor for CurrentTask {
 
     fn get_files_with_flags(
         &self,
+        _locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
@@ -3452,7 +3457,7 @@ impl ResourceAccessor for CurrentTask {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3460,7 +3465,7 @@ impl ResourceAccessor for CurrentTask {
         let mut fds = Vec::with_capacity(files.len());
         for (file, flags) in files {
             log_trace!("Adding file {:?} with flags {:?}", file, flags);
-            let fd = self.add_file(file, flags)?;
+            let fd = self.add_file(locked, file, flags)?;
             add_action(fd);
             fds.push(fd);
         }
@@ -3484,6 +3489,7 @@ impl ResourceAccessor for Task {
 
     fn get_files_with_flags(
         &self,
+        _locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
@@ -3498,7 +3504,7 @@ impl ResourceAccessor for Task {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3506,7 +3512,7 @@ impl ResourceAccessor for Task {
         let mut fds = Vec::with_capacity(files.len());
         for (file, flags) in files {
             log_trace!("Adding file {:?} with flags {:?}", file, flags);
-            let fd = self.add_file(file, flags)?;
+            let fd = self.add_file(locked, file, flags)?;
             add_action(fd);
             fds.push(fd);
         }
@@ -3536,9 +3542,9 @@ pub struct BinderDriver {
 }
 
 impl Releasable for BinderDriver {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
+    type Context<'a> = CurrentTaskAndLocked<'a>;
 
-    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(mut self, context: CurrentTaskAndLocked<'a>) {
         let (_locked, current_task) = context;
         for binder_process in std::mem::take(self.procs.get_mut()).into_values() {
             binder_process.release(current_task.kernel());
@@ -3695,7 +3701,7 @@ impl BinderDriver {
                 }
                 uapi::BINDER_SET_CONTEXT_MGR | uapi::BINDER_SET_CONTEXT_MGR_EXT => {
                     // A process is registering itself as the context manager.
-
+                    security::binder_set_context_mgr(current_task)?;
                     let flags = if request == uapi::BINDER_SET_CONTEXT_MGR_EXT {
                         if user_arg.is_null() {
                             return error!(EINVAL);
@@ -3941,7 +3947,7 @@ impl BinderDriver {
         cursor: &mut UserMemoryCursor,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         profile_duration!("ThreadWrite");
         let command = cursor.read_object::<binder_driver_command_protocol>()?;
@@ -4077,7 +4083,7 @@ impl BinderDriver {
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         // SAFETY: Transactions can only refer to handles.
         let handle = unsafe { data.transaction_data.target.handle }.into();
@@ -4115,6 +4121,11 @@ impl BinderDriver {
                     return Err(TransactionError::Frozen);
                 }
                 let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
+
+                if security::binder_transaction(current_task, &target_task).is_err() {
+                    return Err(TransactionError::Failure);
+                }
+
                 let security_context: Option<FsString> =
                     if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
                         let mut security_context = FsString::from(
@@ -4232,23 +4243,25 @@ impl BinderDriver {
                         .into(),
                     );
 
-                    // There are 2 ways to declare a scheduler policy for the transaction.
-                    // 1. The object might contain a specific minimal policy to use.
+                    // There are 2 ways to declare a scheduler state for the transaction.
+                    // 1. The object might contain a specific minimal scheduler state to use.
                     // 2. The current task has a non-realtime priority[0] or the object has been
                     //    configured to inherit realtime priorities from callers.
                     //
-                    // The results must always be the best policy according to these rules.
+                    // The results must always be the best scheduler state according to these rules.
                     //
                     // [0]: "The binder driver has always supported nice priority inheritance." from
                     // https://source.android.com/docs/core/architecture/hidl/binder-ipc#rt-priority
-                    let mut scheduler_policy = object.flags.get_scheduler_policy();
-                    let current_policy = current_task.read().scheduler_policy;
-                    if !current_policy.kind().is_realtime()
+                    let mut scheduler_state = object.flags.get_scheduler_state();
+                    let current_scheduler_state = current_task.read().scheduler_state;
+                    if !current_scheduler_state.is_realtime()
                         || object.flags.contains(BinderObjectFlags::INHERIT_RT)
                     {
-                        // Only supercede the policy from the object if this task's is higher.
-                        if scheduler_policy.map(|p| current_policy > p).unwrap_or(true) {
-                            scheduler_policy = Some(current_policy);
+                        // Only supercede the scheduler state from the object if this task's is higher.
+                        if scheduler_state
+                            .is_none_or(|p| p.is_less_than_for_binder(current_scheduler_state))
+                        {
+                            scheduler_state = Some(current_scheduler_state);
                         }
                     }
 
@@ -4257,7 +4270,7 @@ impl BinderDriver {
                         Command::Transaction {
                             sender: WeakBinderPeer::new(binder_proc, binder_thread),
                             data: transaction,
-                            scheduler_policy,
+                            scheduler_state,
                         },
                     )
                 };
@@ -4284,55 +4297,57 @@ impl BinderDriver {
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         // Find the process and thread that initiated the transaction. This reply is for them.
-        let (target_proc, target_thread, policy) =
+        let (target_proc, target_thread, scheduler_state) =
             binder_thread.lock().pop_transaction_caller(current_task)?;
-        if let Err(e) = release_after!(policy, current_task, || -> Result<(), TransactionError> {
-            let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
+        if let Err(e) =
+            release_after!(scheduler_state, current_task, || -> Result<(), TransactionError> {
+                let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
 
-            // Copy the transaction data to the target process.
-            let (buffers, transaction_state) = self.copy_transaction_buffers(
-                locked,
-                current_task,
-                binder_proc.get_resource_accessor(current_task),
-                binder_proc,
-                binder_thread,
-                target_proc.get_resource_accessor(target_task.deref()),
-                &target_proc,
-                &data,
-                None,
-            )?;
+                // Copy the transaction data to the target process.
+                let (buffers, transaction_state) = self.copy_transaction_buffers(
+                    locked,
+                    current_task,
+                    binder_proc.get_resource_accessor(current_task),
+                    binder_proc,
+                    binder_thread,
+                    target_proc.get_resource_accessor(target_task.deref()),
+                    &target_proc,
+                    &data,
+                    None,
+                )?;
 
-            // Register the transaction buffer.
-            target_proc.lock().active_transactions.insert(
-                buffers.data.address,
-                ActiveTransaction {
-                    request_type: RequestType::RequestResponse,
-                    state: transaction_state.into_state(),
-                }
-                .into(),
-            );
+                // Register the transaction buffer.
+                target_proc.lock().active_transactions.insert(
+                    buffers.data.address,
+                    ActiveTransaction {
+                        request_type: RequestType::RequestResponse,
+                        state: transaction_state.into_state(),
+                    }
+                    .into(),
+                );
 
-            // Schedule the transaction on the target process' command queue.
-            target_thread.lock().enqueue_command(Command::Reply(TransactionData {
-                peer_pid: binder_proc.key.pid(),
-                peer_tid: binder_thread.tid,
-                peer_euid: current_task.creds().euid,
+                // Schedule the transaction on the target process' command queue.
+                target_thread.lock().enqueue_command(Command::Reply(TransactionData {
+                    peer_pid: binder_proc.key.pid(),
+                    peer_tid: binder_thread.tid,
+                    peer_euid: current_task.creds().euid,
 
-                object: FlatBinderObject::Remote { handle: Handle::ContextManager },
-                code: data.transaction_data.code,
-                flags: data.transaction_data.flags,
+                    object: FlatBinderObject::Remote { handle: Handle::ContextManager },
+                    code: data.transaction_data.code,
+                    flags: data.transaction_data.flags,
 
-                buffers,
-            }));
+                    buffers,
+                }));
 
-            // Schedule the transaction complete command on the caller's command queue.
-            binder_thread.lock().enqueue_command(Command::TransactionComplete);
+                // Schedule the transaction complete command on the caller's command queue.
+                binder_thread.lock().enqueue_command(Command::TransactionComplete);
 
-            Ok(())
-        }) {
+                Ok(())
+            })
+        {
             // Sending to the target process failed, notify of the transaction failure.
             let _ = e.dispatch(&target_thread);
             return Err(e);
@@ -4389,11 +4404,11 @@ impl BinderDriver {
             // Select which command queue to read from, preferring the thread-local one.
             // If a transaction is pending, deadlocks can happen if reading from the process queue.
             let command_queue = Self::get_active_queue(&mut thread_state, &mut proc_command_queue);
-            let command = match command_queue.pop_front() {
-                Some(command) => Some(command),
+
+            let command = command_queue.pop_front().or_else(|| {
                 // If there is no pending command, but the current transaction is marked as dead,
                 // pop the transaction and dispatch a `DeadReply`.
-                None => match thread_state.transactions.last() {
+                match thread_state.transactions.last() {
                     Some(TransactionRole::Sender(TransactionSender {
                         is_alive: false, ..
                     })) => {
@@ -4401,35 +4416,35 @@ impl BinderDriver {
                         Some(Command::DeadReply)
                     }
                     _ => None,
-                },
-            };
+                }
+            });
 
             if let Some(command) = command {
                 profile_duration!("ThreadReadCommand");
                 // Attempt to write the command to the thread's buffer.
                 let bytes_written = command.write_to_memory(resource_accessor, read_buffer)?;
                 match command {
-                    Command::Transaction { sender, scheduler_policy, .. } => {
+                    Command::Transaction { sender, scheduler_state, .. } => {
                         // The transaction is synchronous and we're expected to give a reply, so
                         // push the transaction onto the transaction stack.
 
-                        // If the transaction must inherit the sender policy, let update the
-                        // scheduler policy, and keep track of the previous one.
-                        let scheduler_policy = (|| {
-                            if let Some(policy) = scheduler_policy {
-                                let old_policy = current_task.read().scheduler_policy;
-                                if old_policy < policy {
-                                    match current_task.set_scheduler_policy(policy) {
-                                        Ok(()) => return SchedulerGuard::from(old_policy),
+                        // If the transaction must inherit the sender scheduler state, let update the
+                        // scheduler state, and keep track of the previous one.
+                        let scheduler_state = (|| {
+                            if let Some(scheduler_state) = scheduler_state {
+                                let old_scheduler_state = current_task.read().scheduler_state;
+                                if old_scheduler_state.is_less_than_for_binder(scheduler_state) {
+                                    match current_task.set_scheduler_state(scheduler_state) {
+                                        Ok(()) => return SchedulerGuard::from(old_scheduler_state),
                                         Err(e) => {
-                                            log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", current_task.tid);
+                                            log_warn!("Unable to update scheduler state of task {} to {scheduler_state:?}: {e:?}", current_task.tid);
                                         }
                                     }
                                 }
                             }
                             SchedulerGuard::default()
                         })();
-                        let tx = TransactionRole::Receiver(sender, scheduler_policy);
+                        let tx = TransactionRole::Receiver(sender, scheduler_state);
                         thread_state.transactions.push(tx);
                     }
                     Command::Reply(..) => {
@@ -4518,7 +4533,7 @@ impl BinderDriver {
         security_context: Option<&FsStr>,
     ) -> Result<(TransactionBuffers, TransientTransactionState<'a>), TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         profile_duration!("CopyTransactionBuffers");
 
@@ -4585,12 +4600,13 @@ impl BinderDriver {
         add_action: &mut dyn FnMut(FdNumber),
     ) -> Result<Vec<FdNumber>, Errno>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
-        let source_files = source_resource_accessor.get_files_with_flags(current_task, fds)?;
-        let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
+        let locked = locked.cast_locked::<ResourceAccessorLevel>();
+        let source_files =
+            source_resource_accessor.get_files_with_flags(locked, current_task, fds)?;
         target_resource_accessor.add_files_with_flags(
-            &mut locked,
+            locked,
             current_task,
             source_files,
             add_action,
@@ -4628,7 +4644,7 @@ impl BinderDriver {
         sg_buffer: &mut SharedBuffer<'_, u8>,
     ) -> Result<TransientTransactionState<'a>, TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         profile_duration!("TranslateObjects");
 
@@ -5319,12 +5335,12 @@ impl FsNodeOps for BinderFsDir {
 
 impl BinderFs {
     pub fn new_fs(
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
+        let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, BinderFs, options)?;
         let ops = BinderFsDir::new(current_task)?;
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, ops);
@@ -5494,14 +5510,15 @@ pub mod tests {
         }
         fn get_files_with_flags(
             &self,
+            locked: &mut Locked<ResourceAccessorLevel>,
             current_task: &CurrentTask,
             fds: Vec<FdNumber>,
         ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
-            self.deref().get_files_with_flags(current_task, fds)
+            self.deref().get_files_with_flags(locked, current_task, fds)
         }
         fn add_files_with_flags(
             &self,
-            locked: &mut Locked<ResourceAccessorAddFile>,
+            locked: &mut Locked<ResourceAccessorLevel>,
             current_task: &CurrentTask,
             files: Vec<(FileHandle, FdFlags)>,
             add_action: &mut dyn FnMut(FdNumber),
@@ -5530,7 +5547,7 @@ pub mod tests {
             let task = create_task(locked, current_task.kernel(), "task");
             let (proc, thread) = device.create_process_and_thread(task.thread_group_key.clone());
 
-            mmap_shared_memory(&device, &task, &proc);
+            mmap_shared_memory(locked, &device, &task, &proc);
             Self {
                 device: Arc::downgrade(device),
                 proc,
@@ -5541,14 +5558,14 @@ pub mod tests {
         }
 
         fn new_current(
-            _locked: &mut Locked<Unlocked>,
+            locked: &mut Locked<Unlocked>,
             current_task: &CurrentTask,
             device: &BinderDevice,
         ) -> Self {
             let (proc, thread) =
                 device.create_process_and_thread(current_task.thread_group_key.clone());
 
-            mmap_shared_memory(&device, current_task, &proc);
+            mmap_shared_memory(locked, &device, current_task, &proc);
             Self {
                 device: Arc::downgrade(device),
                 proc,
@@ -5597,8 +5614,13 @@ pub mod tests {
 
     /// Simulates an mmap call on the binder driver, setting up shared memory between the driver and
     /// `proc`.
-    fn mmap_shared_memory(driver: &BinderDriver, current_task: &CurrentTask, proc: &BinderProcess) {
-        let fs = create_testfs(&current_task.kernel());
+    fn mmap_shared_memory(
+        locked: &mut Locked<Unlocked>,
+        driver: &BinderDriver,
+        current_task: &CurrentTask,
+        proc: &BinderProcess,
+    ) {
+        let fs = create_testfs(locked, &current_task.kernel());
         let node = create_fs_node_for_testing(&fs, PanickingFsNode);
         let prot_flags = ProtectionFlags::READ;
         driver
@@ -5658,9 +5680,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_0_succeeds_when_context_manager_is_set() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
             let context_manager =
                 BinderObject::new_context_manager_marker(&sender.proc, BinderObjectFlags::empty());
             *device.context_manager.lock() = Some(context_manager.clone());
@@ -5673,19 +5695,19 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn fail_to_retrieve_non_existing_handle() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
             assert!(&sender.proc.lock().handles.get(3).is_none());
         });
     }
 
     #[fuchsia::test]
     async fn handle_is_not_dropped_after_transaction_finishes_if_it_already_existed() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let proc_1 = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let proc_2 = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc_1 = BinderProcessFixture::new(locked, current_task, &device);
+            let proc_2 = BinderProcessFixture::new(locked, current_task, &device);
 
             let (transaction_ref, guard) = register_binder_object(
                 &proc_1.proc,
@@ -5736,10 +5758,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_is_dropped_after_transaction_finishes() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let proc_1 = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let proc_2 = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc_1 = BinderProcessFixture::new(locked, current_task, &device);
+            let proc_2 = BinderProcessFixture::new(locked, current_task, &device);
 
             let (transaction_ref, guard) = register_binder_object(
                 &proc_1.proc,
@@ -5779,10 +5801,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_is_dropped_after_last_weak_ref_released() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let proc_1 = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let proc_2 = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc_1 = BinderProcessFixture::new(locked, current_task, &device);
+            let proc_2 = BinderProcessFixture::new(locked, current_task, &device);
 
             let (transaction_ref, guard) = register_binder_object(
                 &proc_1.proc,
@@ -6192,9 +6214,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn binder_object_enqueues_release_command_when_dropped() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let proc = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc = BinderProcessFixture::new(locked, current_task, &device);
 
             const LOCAL_BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
                 weak_ref_addr: UserAddress::const_from(0x0000000000000010),
@@ -6221,9 +6243,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_table_refs() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let proc = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc = BinderProcessFixture::new(locked, current_task, &device);
 
             let (object, guard) = register_binder_object(
                 &proc.proc,
@@ -6570,10 +6592,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn copy_transaction_data_between_processes() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Explicitly install a VMO that we can read from later.
             let memory = MemoryObject::from(
@@ -6585,8 +6607,7 @@ pub mod tests {
             );
 
             // Map some memory for process 1.
-            let data_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let data_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
             // Write transaction data in process 1.
             const BINDER_DATA: &[u8; 8] = b"binder!!";
@@ -6637,7 +6658,7 @@ pub mod tests {
             let security_context = "hello\0".into();
             let (buffers, transaction_state) = device
                 .copy_transaction_buffers(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -6683,10 +6704,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_leaving_process() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -6712,7 +6733,7 @@ pub mod tests {
 
             let transaction_state = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -6763,10 +6784,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handle_entering_owning_process() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -6806,7 +6827,7 @@ pub mod tests {
 
             device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -6835,11 +6856,11 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handle_passed_between_non_owning_processes() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
+            let owner = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -6889,7 +6910,7 @@ pub mod tests {
 
             let transaction_state = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -6933,11 +6954,11 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handles_with_same_address() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let other_proc = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
+            let other_proc = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -7009,7 +7030,7 @@ pub mod tests {
 
             let transaction_state = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7076,15 +7097,14 @@ pub mod tests {
     /// Tests that hwbinder's scatter-gather buffer-fix-up implementation is correct.
     #[fuchsia::test]
     async fn transaction_translate_buffers() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new_current(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new_current(locked, current_task, &device);
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&current_task, sender_addr);
 
             // Serialize a string into memory.
@@ -7165,7 +7185,7 @@ pub mod tests {
             // Perform the translation and copying.
             let (buffers, transaction_state) = device
                 .copy_transaction_buffers(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7201,15 +7221,14 @@ pub mod tests {
     /// processing and fail, instead of skipping a buffer object that doesn't fit.
     #[fuchsia::test]
     async fn transaction_fails_when_sg_buffer_size_is_too_small() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&current_task, sender_addr);
 
             // Serialize a series of buffers that point to empty data. Each successive buffer is smaller
@@ -7271,7 +7290,7 @@ pub mod tests {
             // Perform the translation and copying.
             device
                 .copy_transaction_buffers(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7289,15 +7308,14 @@ pub mod tests {
     /// object list, the transaction fails.
     #[fuchsia::test]
     async fn transaction_fails_when_sg_buffer_parent_is_out_of_order() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&current_task, sender_addr);
 
             // Write the data for two buffer objects.
@@ -7356,7 +7374,7 @@ pub mod tests {
             // Perform the translation and copying.
             device
                 .copy_transaction_buffers(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7372,10 +7390,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_fd_array() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -7390,17 +7408,17 @@ pub mod tests {
             // Open a file in the sender process that we won't be using. It is there to occupy a file
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
-            current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::empty())
-                .unwrap();
+            let file = PanickingFile::new_file(locked, &current_task);
+            current_task.add_file(locked, file, FdFlags::empty()).unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
-            let files =
-                [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            let file2 = PanickingFile::new_file(locked, &current_task);
+            let files = [file1, file2];
             let sender_fds = files
                 .iter()
                 .map(|file| {
-                    current_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file")
+                    current_task.add_file(locked, file.clone(), FdFlags::CLOEXEC).expect("add file")
                 })
                 .collect::<Vec<_>>();
 
@@ -7409,8 +7427,7 @@ pub mod tests {
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&current_task, sender_addr);
 
             // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -7489,7 +7506,7 @@ pub mod tests {
 
             // Perform the translation and copying.
             device
-                .handle_transaction(&mut locked, &current_task, &sender.proc, &sender.thread, input)
+                .handle_transaction(locked, &current_task, &sender.proc, &sender.thread, input)
                 .expect("transaction queued");
 
             // Get the data buffer out of the receiver's queue.
@@ -7571,10 +7588,10 @@ pub mod tests {
     }
     #[fuchsia::test]
     async fn transaction_receiver_exits_after_getting_fd_array() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -7589,16 +7606,18 @@ pub mod tests {
             // Open a file in the sender process that we won't be using. It is there to occupy a file
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
-            current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::empty())
-                .unwrap();
+            let file = PanickingFile::new_file(locked, &current_task);
+            current_task.add_file(locked, file, FdFlags::empty()).unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
-            let files =
-                [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            let file2 = PanickingFile::new_file(locked, &current_task);
+            let files = [file1, file2];
             let sender_fds = files
                 .into_iter()
-                .map(|file| current_task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
+                .map(|file| {
+                    current_task.add_file(locked, file, FdFlags::CLOEXEC).expect("add file")
+                })
                 .collect::<Vec<_>>();
 
             // Ensure that the receiver.task() has no file descriptors.
@@ -7606,8 +7625,7 @@ pub mod tests {
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&current_task, sender_addr);
 
             // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -7686,17 +7704,17 @@ pub mod tests {
 
             // Perform the translation and copying.
             device
-                .handle_transaction(&mut locked, &current_task, &sender.proc, &sender.thread, input)
+                .handle_transaction(locked, &current_task, &sender.proc, &sender.thread, input)
                 .expect("transaction queued");
         });
     }
 
     #[fuchsia::test]
     async fn transaction_fd_array_sender_cancels() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -7711,16 +7729,18 @@ pub mod tests {
             // Open a file in the sender process that we won't be using. It is there to occupy a file
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
-            current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::empty())
-                .unwrap();
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            current_task.add_file(locked, file1, FdFlags::empty()).unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
-            let files =
-                [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            let file2 = PanickingFile::new_file(locked, &current_task);
+            let files = [file1, file2];
             let sender_fds = files
                 .into_iter()
-                .map(|file| current_task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
+                .map(|file| {
+                    current_task.add_file(locked, file, FdFlags::CLOEXEC).expect("add file")
+                })
                 .collect::<Vec<_>>();
 
             // Ensure that the receiver.task() has no file descriptors.
@@ -7728,8 +7748,7 @@ pub mod tests {
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&current_task, sender_addr);
 
             // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -7809,7 +7828,7 @@ pub mod tests {
             // Perform the translation and copying.
             let (_, transient_state) = device
                 .copy_transaction_buffers(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7839,10 +7858,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translation_fails_on_invalid_handle() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -7857,7 +7876,7 @@ pub mod tests {
 
             let transaction_ref_error = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7876,10 +7895,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translation_fails_on_invalid_object_type() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -7894,7 +7913,7 @@ pub mod tests {
 
             let transaction_ref_error = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7913,10 +7932,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_drop_references_on_failed_transaction() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -7942,7 +7961,7 @@ pub mod tests {
 
             device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -7974,17 +7993,17 @@ pub mod tests {
         binder_driver: &BinderDevice,
     ) -> FileHandle {
         // `open()` requires an `FsNode` so create one in `AnonFs`.
-        let fs = anon_fs(current_task.kernel());
+        let fs = anon_fs(locked, current_task.kernel());
         let node = fs.create_node_and_allocate_node_id(
             Anon::new_for_binder_device(),
             FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
 
-        let mut locked = locked.cast_locked::<DeviceOpen>();
+        let locked = locked.cast_locked::<DeviceOpen>();
         FileObject::new_anonymous(
             current_task,
             binder_driver
-                .open(&mut locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
+                .open(locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),
             node,
             OpenFlags::RDWR,
@@ -7993,10 +8012,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn close_binder() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let binder_driver = BinderDevice::default();
 
-            let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
+            let binder_fd = open_binder_fd(locked, &current_task, &binder_driver);
             let binder_connection =
                 binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
             let identifier = binder_connection.identifier;
@@ -8009,7 +8028,7 @@ pub mod tests {
 
             // Close the file descriptor.
             std::mem::drop(binder_fd);
-            current_task.trigger_delayed_releaser(&mut locked);
+            current_task.trigger_delayed_releaser(locked);
 
             // Verify that the process state no longer exists.
             binder_driver.find_process(identifier).expect_err("process was not cleaned up");
@@ -8018,12 +8037,12 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn flush_kicks_threads() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let binder_driver = BinderDevice::default();
 
             // Open the binder device, which creates an instance of the binder device associated with
             // the process.
-            let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
+            let binder_fd = open_binder_fd(locked, &current_task, &binder_driver);
             let binder_connection =
                 binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
             let binder_proc = binder_connection.proc(&current_task).unwrap();
@@ -8053,7 +8072,7 @@ pub mod tests {
             });
 
             let read_buffer_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+                map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             let bytes_read = binder_driver
                 .handle_thread_read(
                     &current_task,
@@ -8071,10 +8090,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn decrementing_refs_on_dead_binder_succeeds() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let owner = BinderProcessFixture::new(locked, current_task, &device);
+            let client = BinderProcessFixture::new(locked, current_task, &device);
 
             // Register an object with the owner.
             let guard = owner.proc.lock().find_or_register_object(
@@ -8148,10 +8167,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn death_notification_fires_when_process_dies() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Register an object with the owner.
             let guard = sender.proc.lock().find_or_register_object(
@@ -8191,10 +8210,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn death_notification_fires_when_request_for_death_notification_is_made_on_dead_binder() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Register an object with the sender.
             let guard = sender.proc.lock().find_or_register_object(
@@ -8236,10 +8255,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn death_notification_is_cleared_before_process_dies() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let owner = BinderProcessFixture::new(locked, current_task, &device);
+            let client = BinderProcessFixture::new(locked, current_task, &device);
 
             // Register an object with the owner.
             let guard = owner.proc.lock().find_or_register_object(
@@ -8303,18 +8322,18 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn send_fd_in_transaction() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
             // Open a file in the sender process.
-            let file = PanickingFile::new_file(&current_task);
+            let file = PanickingFile::new_file(locked, &current_task);
             let sender_fd =
-                current_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file");
+                current_task.add_file(locked, file.clone(), FdFlags::CLOEXEC).expect("add file");
 
             // Send the fd in a transaction. `flags` and `cookie` are set so that we can ensure binder
             // driver doesn't touch them/passes them through.
@@ -8328,7 +8347,7 @@ pub mod tests {
 
             let transient_transaction_state = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -8386,18 +8405,18 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn cleanup_fd_in_failed_transaction() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
             // Open a file in the sender process.
-            let sender_fd = current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::CLOEXEC)
-                .expect("add file");
+            let file = PanickingFile::new_file(locked, &current_task);
+            let sender_fd =
+                current_task.add_file(locked, file, FdFlags::CLOEXEC).expect("add file");
 
             // Send the fd in a transaction.
             let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
@@ -8410,7 +8429,7 @@ pub mod tests {
 
             let transaction_state = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -8437,10 +8456,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn cleanup_refs_in_successful_transaction() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
             let mut receiver_shared_memory = receiver.lock_shared_memory();
             let mut allocations =
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -8466,7 +8485,7 @@ pub mod tests {
 
             let transaction_state = device
                 .translate_objects(
-                    &mut locked,
+                    locked,
                     &current_task,
                     current_task,
                     &sender.proc,
@@ -8510,9 +8529,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_error_dispatch() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let proc = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc = BinderProcessFixture::new(locked, current_task, &device);
 
             TransactionError::Malformed(errno!(EINVAL)).dispatch(&proc.thread).expect("no error");
             assert_matches!(
@@ -8533,10 +8552,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn next_oneway_transaction_scheduled_after_buffer_freed() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -8563,7 +8582,7 @@ pub mod tests {
             // Submit the transaction.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8603,7 +8622,7 @@ pub mod tests {
             };
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8675,10 +8694,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn synchronous_transactions_bypass_oneway_transaction_queue() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -8705,7 +8724,7 @@ pub mod tests {
             // Submit the transaction twice so that the queue is populated.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8714,7 +8733,7 @@ pub mod tests {
                 .expect("failed to handle the transaction");
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8758,7 +8777,7 @@ pub mod tests {
             };
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8788,10 +8807,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_proc_dies() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -8817,7 +8836,7 @@ pub mod tests {
             // Submit the transaction.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8849,11 +8868,11 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_proc_dies_not_top_transaction() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let second_receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
+            let second_receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Create the first transaction, which will be sent from `sender` to `receiver`.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -8901,7 +8920,7 @@ pub mod tests {
             // targeting `second_receiver` is on top.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8910,7 +8929,7 @@ pub mod tests {
                 .expect("failed to handle the transaction");
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -8950,7 +8969,7 @@ pub mod tests {
             // Read out the first dead reply and verify that there is still one pending transaction
             // left (the bottom one, targeting `receiver`).
             let read_buffer_addr =
-                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+                map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             device
                 .handle_thread_read(
                     &current_task,
@@ -8980,10 +8999,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_thread_dies() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -9009,7 +9028,7 @@ pub mod tests {
             // Submit the transaction.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -9040,10 +9059,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_thread_dies_while_processing_reply() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new_current(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new_current(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -9078,7 +9097,7 @@ pub mod tests {
             // Submit the transaction.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -9098,7 +9117,7 @@ pub mod tests {
 
             // Have the thread dequeue the command.
             let read_buffer_addr =
-                map_memory(&mut locked, current_task, UserAddress::default(), *PAGE_SIZE);
+                map_memory(locked, current_task, UserAddress::default(), *PAGE_SIZE);
             device
                 .handle_thread_read(
                     current_task,
@@ -9126,10 +9145,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn failed_reply_when_transaction_reply_is_too_big() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new_current(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new_current(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -9164,7 +9183,7 @@ pub mod tests {
             // Submit the transaction.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -9183,7 +9202,7 @@ pub mod tests {
 
             // Have the thread dequeue the command.
             let read_buffer_addr =
-                map_memory(&mut locked, current_task, UserAddress::default(), *PAGE_SIZE);
+                map_memory(locked, current_task, UserAddress::default(), *PAGE_SIZE);
             device
                 .handle_thread_read(
                     current_task,
@@ -9209,13 +9228,7 @@ pub mod tests {
             // Submit the reply.
             assert_eq!(
                 device
-                    .handle_reply(
-                        &mut locked,
-                        current_task,
-                        &receiver.proc,
-                        &receiver.thread,
-                        reply
-                    )
+                    .handle_reply(locked, current_task, &receiver.proc, &receiver.thread, reply)
                     .expect_err("transaction should have failed"),
                 TransactionError::Failure
             );
@@ -9230,12 +9243,12 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn connect_to_multiple_binder() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let driver = BinderDevice::default();
 
             // Opening the driver twice from the same task must succeed.
-            let _d1 = open_binder_fd(&mut locked, &current_task, &driver);
-            let _d2 = open_binder_fd(&mut locked, &current_task, &driver);
+            let _d1 = open_binder_fd(locked, &current_task, &driver);
+            let _d2 = open_binder_fd(locked, &current_task, &driver);
         });
     }
 
@@ -9362,18 +9375,18 @@ pub mod tests {
             assert_eq!(vector[1], 1);
             assert_eq!(vector[..small_size], other_vector[..small_size]);
 
-            let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
+            let locked = locked.cast_locked::<ResourceAccessorLevel>();
 
             let mut files = vec![
-                (new_null_file(&task, OpenFlags::RDONLY), FdFlags::empty()),
-                (new_null_file(&task, OpenFlags::WRONLY), FdFlags::empty()),
+                (new_null_file(locked, &task, OpenFlags::RDONLY), FdFlags::empty()),
+                (new_null_file(locked, &task, OpenFlags::WRONLY), FdFlags::empty()),
             ];
             // Add more files to force chunking of requests.
             for _ in 0..fbinder::MAX_REQUEST_COUNT {
-                files.push((new_null_file(&task, OpenFlags::RDWR), FdFlags::empty()));
+                files.push((new_null_file(locked, &task, OpenFlags::RDWR), FdFlags::empty()));
             }
             let fds = remote_binder_task
-                .add_files_with_flags(&mut locked, &task, files, &mut |_| {})
+                .add_files_with_flags(locked, &task, files, &mut |_| {})
                 .expect("add_files_with_flags");
             for (i, fd) in fds.iter().enumerate() {
                 assert_eq!(fd.raw(), i as i32);
@@ -9381,7 +9394,7 @@ pub mod tests {
 
             assert_eq!(remote_binder_task.close_files(vec![fds[1]]), Ok(()));
             let (handle, flags) = remote_binder_task
-                .get_files_with_flags(&task, vec![fds[0]])
+                .get_files_with_flags(locked, &task, vec![fds[0]])
                 .expect("get_files_with_flags")
                 .pop()
                 .expect("pop");
@@ -9390,7 +9403,7 @@ pub mod tests {
 
             assert_eq!(
                 remote_binder_task
-                    .get_files_with_flags(&task, vec![FdNumber::from_raw(1000)])
+                    .get_files_with_flags(locked, &task, vec![FdNumber::from_raw(1000)])
                     .expect_err("bad fd"),
                 errno!(EBADF)
             );
@@ -9404,10 +9417,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn no_reply_when_transaction_before_process_frozen() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -9443,7 +9456,7 @@ pub mod tests {
             // Submit the transaction.
             device
                 .handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -9474,10 +9487,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn frozen_reply_when_process_frozen() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let sender = BinderProcessFixture::new_current(&mut locked, current_task, &device);
-            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let sender = BinderProcessFixture::new_current(locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -9523,7 +9536,7 @@ pub mod tests {
             // Submit the transaction.
             assert_matches!(
                 device.handle_transaction(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &sender.proc,
                     &sender.thread,
@@ -9567,10 +9580,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn freeze_notification_fires_when_process_frozen() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let owner = BinderProcessFixture::new(locked, current_task, &device);
+            let client = BinderProcessFixture::new(locked, current_task, &device);
 
             // Register an object with the owner.
             let guard = owner.proc.lock().find_or_register_object(
@@ -9615,10 +9628,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn freeze_notification_is_cleared_before_process_frozen() {
-        spawn_kernel_and_run(|mut locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             let device = BinderDevice::default();
-            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
-            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let owner = BinderProcessFixture::new(locked, current_task, &device);
+            let client = BinderProcessFixture::new(locked, current_task, &device);
 
             // Register an object with the owner.
             let guard = owner.proc.lock().find_or_register_object(

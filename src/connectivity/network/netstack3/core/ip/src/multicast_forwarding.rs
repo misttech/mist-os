@@ -291,7 +291,6 @@ where
 mod testutil {
     use super::*;
 
-    use alloc::collections::HashSet;
     use alloc::rc::Rc;
     use alloc::vec::Vec;
     use core::cell::RefCell;
@@ -304,6 +303,7 @@ mod testutil {
         CoreTimerContext, CounterContext, CtxPair, FrameDestination, Marks, ResourceCounterContext,
     };
     use netstack3_filter::ProofOfEgressCheck;
+    use netstack3_hashmap::HashSet;
     use packet::{BufferMut, InnerPacketBuilder, PacketBuilder, Serializer};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
 

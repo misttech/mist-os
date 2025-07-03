@@ -124,11 +124,8 @@ class Nelson : public NelsonType {
   zx_status_t Spi1Init();
   zx_status_t TeeInit();
   zx_status_t ThermalInit();
-  zx_status_t TouchInit();
-  zx_status_t TouchInitP1();
   zx_status_t UsbInit();
   zx_status_t VideoInit();
-  zx_status_t BacklightInit();
   zx_status_t CpuInit();
   zx_status_t NnaInit();
   zx_status_t RamCtlInit();

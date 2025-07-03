@@ -32,6 +32,7 @@ _common_deps = [
   "//src/starnix/lib/ebpf",
   "//src/starnix/lib/ebpf_loader",
   "//src/starnix/lib/linux_uapi",
+  "//third_party/rust_crates:bstr",
   "//third_party/rust_crates:hex",
   "//third_party/rust_crates:libc",
   "//third_party/rust_crates:rand",

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/stdcompat/span.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <cstring>
+#include <span>
 #include <string_view>
 
 #include "core.h"
@@ -173,7 +173,7 @@ TEST(ZxdumpTests, ReadMemoryMisaligned) {
   static_assert(sizeof(MisalignedHeader) % sizeof(int) == 2);
 
   constexpr auto fill_header = [](zxdump::ar_hdr& hdr, std::string_view name, size_t size) {
-    constexpr auto fill = [](cpp20::span<char> chars, std::string_view pfx) {
+    constexpr auto fill = [](std::span<char> chars, std::string_view pfx) {
       memset(chars.data(), ' ', chars.size());
       pfx.copy(chars.data(), chars.size());
     };

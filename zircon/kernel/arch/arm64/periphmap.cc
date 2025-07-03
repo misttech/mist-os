@@ -5,61 +5,64 @@
 // https://opensource.org/licenses/MIT
 #include "arch/arm64/periphmap.h"
 
-#include <align.h>
+#include <debug.h>
 #include <lib/console.h>
-#include <lib/instrumentation/asan.h>
 #include <stdint.h>
 
-#include <arch/arm64/mmu.h>
 #include <arch/defines.h>
+#include <ktl/algorithm.h>
 #include <ktl/bit.h>
 #include <ktl/optional.h>
+#include <lk/init.h>
 #include <phys/handoff.h>
-#include <vm/vm.h>
-#include <vm/vm_address_region.h>
-#include <vm/vm_aspace.h>
 
 #include <ktl/enforce.h>
 
-#define PERIPH_RANGE_MAX 4
-
-typedef struct {
-  uint64_t base_phys;
-  uint64_t base_virt;
-  uint64_t length;
-} periph_range_t;
-
-static periph_range_t periph_ranges[PERIPH_RANGE_MAX] = {};
-
 namespace {
+
+// Backed by permanent hand-off memory.
+ktl::span<const MappedMmioRange> gPeriphRanges;
+
+void RecordPeriphRanges(uint level) {
+  constexpr size_t kExpectedMax = 4;
+
+  gPeriphRanges = gPhysHandoff->periph_ranges.get();
+  if (gPeriphRanges.size() > kExpectedMax) {
+    dprintf(INFO, "Warning: unexpected large number of PERIPHERAL ranges: %zu",
+            gPeriphRanges.size());
+  }
+}
+
+LK_INIT_HOOK(record_periph_ranges, RecordPeriphRanges, LK_INIT_LEVEL_EARLIEST)
+
 struct Phys2VirtTrait {
-  static uint64_t src(const periph_range_t& r) { return r.base_phys; }
-  static uint64_t dst(const periph_range_t& r) { return r.base_virt; }
+  static uint64_t src(const MappedMmioRange& r) { return r.paddr; }
+  static uint64_t dst(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.data()); }
 };
 
 struct Virt2PhysTrait {
-  static uint64_t src(const periph_range_t& r) { return r.base_virt; }
-  static uint64_t dst(const periph_range_t& r) { return r.base_phys; }
+  static uint64_t src(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.data()); }
+  static uint64_t dst(const MappedMmioRange& r) { return r.paddr; }
 };
 
 template <typename Fetch>
 struct PeriphUtil {
   // Translate (without range checking) the (virt|phys) peripheral provided to
   // its (phys|virt) counterpart using the provided range.
-  static uint64_t Translate(const periph_range_t& range, uint64_t addr) {
+  static uint64_t Translate(const MappedMmioRange& range, uint64_t addr) {
     return addr - Fetch::src(range) + Fetch::dst(range);
   }
 
   // Find the index (if any) of the peripheral range which contains the
   // (virt|phys) address <addr>
   static ktl::optional<uint32_t> LookupNdx(uint64_t addr) {
-    for (uint32_t i = 0; i < ktl::size(periph_ranges); ++i) {
-      const auto& range = periph_ranges[i];
-      if (range.length == 0) {
+    for (uint32_t i = 0; i < ktl::size(gPeriphRanges); ++i) {
+      const auto& range = gPeriphRanges[i];
+      if (range.size_bytes() == 0) {
         break;
       } else if (addr >= Fetch::src(range)) {
         uint64_t offset = addr - Fetch::src(range);
-        if (offset < range.length) {
+        if (offset < range.size_bytes()) {
           return {i};
         }
       }
@@ -72,7 +75,7 @@ struct PeriphUtil {
   static ktl::optional<uint64_t> Map(uint64_t addr) {
     auto ndx = LookupNdx(addr);
     if (ndx.has_value()) {
-      return Translate(periph_ranges[ndx.value()], addr);
+      return Translate(gPeriphRanges[ndx.value()], addr);
     }
     return {};
   }
@@ -166,7 +169,7 @@ zx_status_t dump_periph(paddr_t phys, uint64_t count, AccessWidth width) {
   // OK, all of our sanity checks are complete.  Time to start dumping data.
   constexpr uint32_t bytes_per_line = 16;
   const uint64_t count_per_line = bytes_per_line / opt.byte_width;
-  vaddr_t virt = Phys2Virt::Translate(periph_ranges[start_ndx.value()], phys);
+  vaddr_t virt = Phys2Virt::Translate(gPeriphRanges[start_ndx.value()], phys);
   vaddr_t virt_end_addr = virt + byte_amt;
 
   printf("Dumping %lu %s%s starting at phys 0x%016lx\n", count, opt.tag, count == 1 ? "" : "s",
@@ -235,16 +238,13 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   if (!strcmp(argv[1].str, "dump")) {
-    uint32_t i = 0;
-    for (const auto& range : periph_ranges) {
-      if (range.length) {
-        printf("Phys [%016lx, %016lx] ==> Virt [%016lx, %016lx] (len 0x%08lx)\n", range.base_phys,
-               range.base_phys + range.length - 1, range.base_virt,
-               range.base_virt + range.length - 1, range.length);
-        ++i;
-      }
+    for (const auto& range : gPeriphRanges) {
+      DEBUG_ASSERT(range.size_bytes() > 0);
+      printf("Phys [%016lx, %016lx) ==> Virt [%16p, %016lx) (len 0x%08lx)\n", range.paddr,
+             range.paddr + range.size_bytes(), range.data(),
+             reinterpret_cast<uintptr_t>(range.data()) + range.size_bytes(), range.size_bytes());
     }
-    printf("Dumped %u defined peripheral map ranges\n", i);
+    printf("Dumped %zu defined peripheral map ranges\n", gPeriphRanges.size());
   } else if (!strcmp(argv[1].str, "phys2virt") || !strcmp(argv[1].str, "virt2phys")) {
     if (argc < 3) {
       return usage(true);
@@ -301,81 +301,6 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
 }
 
 }  // namespace
-
-zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
-  // peripheral ranges are allocated below the temporary hand-off data, which
-  // is itself located below the kernel image.
-  //
-  // TODO(https://fxbug.dev/42164859): This dependency on the location of the
-  // temporary hand-off VMAR will soon go away once periphmap mappings are made
-  // in physboot.
-  uintptr_t base_virt = gPhysHandoff->temporary_vmar.get()->base;
-
-  // give ourselves an extra gap of space to try to catch overruns
-  base_virt -= 0x10000;
-
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(base_phys));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(length));
-
-  // Periph ranges is fixed size stack, where the first non allocated range
-  // is represented by having 0 length.
-  for (auto& range : periph_ranges) {
-    // Finihsed iterating all allocated ranges, with no range already
-    // containing this range.
-    if (range.length == 0) {  // No range containing.
-      base_virt -= length;
-
-      // Round down to try to align the mappings to maximize usage of large pages
-      uint64_t phys_log = ktl::countr_zero(base_phys);
-      uint64_t len_log = log2_floor(length);
-
-      // This is clamped to the minimal supported page size.
-      uint64_t log2_align = ktl::min(ktl::min(phys_log, len_log), 30UL);  // No point aligning > 1GB
-      if (log2_align < PAGE_SIZE_SHIFT) {
-        log2_align = PAGE_SIZE_SHIFT;
-      }
-      base_virt = ROUNDDOWN(base_virt, 1UL << log2_align);
-
-      auto status = arm64_boot_map_v(base_virt, base_phys, length, MMU_INITIAL_MAP_DEVICE, true);
-      if (status == ZX_OK) {
-        range.base_phys = base_phys;
-        range.base_virt = base_virt;
-        range.length = length;
-      }
-      return status;
-    }
-
-    // Mapping already covered.
-    if (range.base_phys <= base_phys && range.length >= base_phys - range.base_phys + length) {
-      return ZX_OK;
-    }
-
-    base_virt = range.base_virt;
-  }
-  return ZX_ERR_OUT_OF_RANGE;
-}
-
-void reserve_periph_ranges() {
-  fbl::RefPtr<VmAddressRegion> vmar = VmAspace::kernel_aspace()->RootVmar();
-  // Peripheral ranges are read/write device mappings.
-  const uint arch_mmu_flags =
-      ARCH_MMU_FLAG_UNCACHED_DEVICE | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE;
-  for (auto& range : periph_ranges) {
-    if (range.length == 0) {
-      break;
-    }
-
-    dprintf(INFO, "Periphmap: reserving physical %#lx virtual [%#lx, %#lx) flags %#x\n",
-            range.base_phys, range.base_virt, range.base_virt + range.length, arch_mmu_flags);
-    zx_status_t status =
-        vmar->ReserveSpace("periph", range.base_virt, range.length, arch_mmu_flags);
-    ASSERT_MSG(status == ZX_OK, "status %d\n", status);
-
-#if __has_feature(address_sanitizer)
-    asan_map_shadow_for(range.base_virt, range.length);
-#endif  // __has_feature(address_sanitizer)
-  }
-}
 
 vaddr_t periph_paddr_to_vaddr(paddr_t paddr) {
   auto ret = Phys2Virt::Map(paddr);

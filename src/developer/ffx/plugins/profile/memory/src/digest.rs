@@ -8,7 +8,6 @@
 /// `MemoryMonitor`.
 pub mod raw {
     use serde::{Deserialize, Serialize};
-
     /// Slightly modified copy of the structure returned by the
     /// `zx_object_get_info` syscall when invoked with the
     /// `ZX_INFO_KMEM_STATS_EXTENDED` topic. Refer to this syscall's
@@ -184,6 +183,12 @@ pub mod raw {
         /// A monotonic time (in ns).
         pub time: u64,
         pub kernel: Kernel,
+        #[serde(
+            rename = "kmem_stats_compression",  // Override PascalCase.
+            default,
+            with = "attribution_processing::fkernel_serde::MemoryStatsCompressionDef"
+        )]
+        pub kmem_stats_compression: fidl_fuchsia_kernel::MemoryStatsCompression,
         pub processes: Vec<Process>,
         /// Names of the VMOs mentioned in the `Capture`.
         pub vmo_names: Vec<String>,
@@ -336,6 +341,8 @@ pub mod processed {
         pub total_committed_bytes_in_vmos: u64,
         /// Kernel data.
         pub kernel: Kernel,
+        #[serde(with = "attribution_processing::fkernel_serde::MemoryStatsCompressionDef")]
+        pub kmem_stats_compression: fidl_fuchsia_kernel::MemoryStatsCompression,
         /// Process data.
         pub processes: Vec<Process>,
         /// Details about VMOs.
@@ -521,6 +528,7 @@ pub mod processed {
             time: capture.time,
             total_committed_bytes_in_vmos: total_committed_vmo,
             kernel: raw::Kernel { vmo: kernel_vmo, ..capture.kernel },
+            kmem_stats_compression: capture.kmem_stats_compression,
             processes,
             vmos: koid_to_vmo.into_values().collect(),
             buckets,
@@ -551,9 +559,27 @@ mod tests {
 
     #[test]
     fn raw_to_processed_test() {
+        let kmem_stats_compression = fidl_fuchsia_kernel::MemoryStatsCompression {
+            uncompressed_storage_bytes: Some(1),
+            compressed_storage_bytes: Some(2),
+            compressed_fragmentation_bytes: Some(3),
+            compression_time: Some(4),
+            decompression_time: Some(5),
+            total_page_compression_attempts: Some(6),
+            failed_page_compression_attempts: Some(7),
+            total_page_decompressions: Some(8),
+            compressed_page_evictions: Some(9),
+            eager_page_compressions: Some(10),
+            memory_pressure_page_compressions: Some(11),
+            critical_memory_page_compressions: Some(12),
+            pages_decompressed_unit_ns: Some(13),
+            pages_decompressed_within_log_time: None,
+            ..Default::default()
+        };
         let capture = raw::Capture {
             time: 1234567,
             kernel: raw::Kernel::default(),
+            kmem_stats_compression: kmem_stats_compression.clone(),
             processes: vec![
                 raw::Process::Headers(raw::ProcessHeaders::default()),
                 // Process with one shared, root VMO
@@ -863,6 +889,8 @@ mod tests {
             }
         }
 
+        pretty_assertions::assert_eq!(&processed.kmem_stats_compression, &kmem_stats_compression);
+
         pretty_assertions::assert_eq!(
             sorted_by_koid(&processed.processes),
             sorted_by_koid(&expected_processes)
@@ -986,6 +1014,7 @@ mod tests {
                     populated_bytes: Some(50),
                 }),
             ],
+            kmem_stats_compression: Default::default(),
         };
         let expected_processes = vec![
             processed::Process {

@@ -2,70 +2,44 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::{
-    Bus, Class, Collection, Device, DeviceMetadata, KObject, KObjectBased, KObjectHandle,
-};
+use crate::device::kobject::{Bus, Class, Device, DeviceMetadata};
 use crate::device::DeviceMode;
-use crate::fs::sysfs::{
-    BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK, SYSFS_BUS,
-    SYSFS_CLASS, SYSFS_DEV, SYSFS_DEVICES,
-};
-use crate::vfs::fs_node_cache::FsNodeCache;
-use crate::vfs::{FsNodeOps, FsStr, FsString};
-use std::sync::{Arc, Weak};
+use crate::fs::sysfs::get_sysfs;
+use crate::task::Kernel;
+use crate::vfs::pseudo::simple_directory::{SimpleDirectory, SimpleDirectoryMutator};
+use crate::vfs::{FileSystemHandle, FsStr, FsString};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
+use std::sync::{Arc, OnceLock};
 
 /// The owner of all the KObjects in sysfs.
 ///
 /// This structure holds strong references to the KObjects that are visible in sysfs. These
 /// objects are organized into hierarchies that make it easier to implement sysfs.
 pub struct KObjectStore {
-    /// The node cache used to allocate inode numbers for the kobjects in this store.
-    pub node_cache: Arc<FsNodeCache>,
+    /// The root of the sysfs hierarchy.
+    pub root: Arc<SimpleDirectory>,
 
-    /// All of the devices added to the system.
-    ///
-    /// Used to populate the /sys/devices directory.
-    pub devices: KObjectHandle,
-
-    /// All of the device classes known to the system.
-    ///
-    /// Used to populate the /sys/class directory.
-    pub class: KObjectHandle,
-
-    /// All of the block devices known to the system.
-    ///
-    /// Used to populate the /ssy/block directory.
-    pub block: KObjectHandle,
-
-    /// All of the buses known to the system.
-    ///
-    /// Devices are organized first by bus and then by class. The more relevant bus for our
-    /// purposes is the "virtual" bus, which is accessible via the `virtial_bus` method.
-    pub bus: KObjectHandle,
-
-    /// The devices in the system, organized by `DeviceMode` and `DeviceType`.
-    ///
-    /// Used to populate the /sys/dev directory. The KObjects descended from this KObject are
-    /// the same objects referenced through the `devices` KObject. They are just organized in
-    /// a different hierarchy. When populated in /sys/dev, they appear as symlinks to the
-    /// canonical names in /sys/devices.
-    pub dev: KObjectHandle,
-
-    /// The block devices, organized by `DeviceType`.
-    ///
-    /// Used to populate the /sys/dev/block directory.
-    dev_block: KObjectHandle,
-
-    /// The char devices, organized by `DeviceType`.
-    ///
-    /// Used to populate the /sys/dev/char directory.
-    dev_char: KObjectHandle,
+    /// The sysfs filesystem in which the KObjects are stored.
+    fs: OnceLock<FileSystemHandle>,
 }
 
 impl KObjectStore {
+    pub fn init<L>(&self, locked: &mut Locked<L>, kernel: &Kernel)
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.fs.set(get_sysfs(locked, kernel)).unwrap();
+    }
+
+    fn fs(&self) -> &FileSystemHandle {
+        self.fs.get().expect("sysfs should be initialized")
+    }
+
     /// The virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> Bus {
-        Bus::new(self.devices.get_or_create_child("virtual".into(), KObjectDirectory::new), None)
+        let name: FsString = b"virtual".into();
+        let dir = self.ensure_dir(&[b"devices".into(), name.as_ref()]);
+        Bus::new(name, dir, None)
     }
 
     /// The device class used for virtual block devices.
@@ -108,6 +82,11 @@ impl KObjectStore {
         self.get_or_create_class("tty".into(), self.virtual_bus())
     }
 
+    /// The device class used for virtual dma_heap devices.
+    pub fn dma_heap_class(&self) -> Class {
+        self.get_or_create_class("dma_heap".into(), self.virtual_bus())
+    }
+
     /// An incorrect device class.
     ///
     /// This class exposes the name "starnix" to userspace, which is incorrect. Instead, devices
@@ -119,40 +98,63 @@ impl KObjectStore {
         self.get_or_create_class("starnix".into(), self.virtual_bus())
     }
 
+    fn ensure_dir(&self, path: &[&FsStr]) -> Arc<SimpleDirectory> {
+        let fs = self.fs();
+        let mut dir = self.root.clone();
+        for component in path {
+            dir = dir.subdir(fs, component, 0o755);
+        }
+        dir
+    }
+
+    fn edit_dir(&self, path: &[&FsStr], callback: impl FnOnce(&SimpleDirectoryMutator)) {
+        let dir = self.ensure_dir(path);
+        let mutator = SimpleDirectoryMutator::new(self.fs().clone(), dir);
+        callback(&mutator);
+    }
+
     /// Get a bus by name.
     ///
     /// If the bus does not exist, this function will create it.
     pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
-        let collection =
-            Collection::new(self.bus.get_or_create_child(name, BusCollectionDirectory::new));
-        Bus::new(self.devices.get_or_create_child(name, KObjectDirectory::new), Some(collection))
+        let name = name.to_owned();
+        let dir = self.ensure_dir(&[b"devices".into(), name.as_ref()]);
+        let collection = self.ensure_dir(&[b"bus".into(), name.as_ref(), b"devices".into()]);
+        Bus::new(name, dir, Some(collection))
     }
 
     /// Get a class by name.
     ///
     /// If the bus does not exist, this function will create it.
     pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
-        let collection =
-            Collection::new(self.class.get_or_create_child(name, KObjectSymlinkDirectory::new));
-        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
+        let name = name.to_owned();
+        let dir = bus.dir.subdir(self.fs(), name.as_ref(), 0o755);
+        let collection = self.ensure_dir(&[b"class".into(), name.as_ref()]);
+        Class::new(name, dir, bus, collection)
     }
 
-    /// Get a class by name.
-    ///
-    /// If the bus does not exist, this function will create it.
-    pub fn get_or_create_class_with_ops<F, N>(
+    pub fn class_with_dir(
         &self,
         name: &FsStr,
         bus: Bus,
-        create_class_sysfs_ops: F,
-    ) -> Class
-    where
-        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let collection =
-            Collection::new(self.class.get_or_create_child(name, create_class_sysfs_ops));
-        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
+        build_collection: impl FnOnce(&SimpleDirectoryMutator),
+    ) -> Class {
+        let class = self.get_or_create_class(name, bus);
+        let mutator = SimpleDirectoryMutator::new(self.fs().clone(), class.collection.clone());
+        build_collection(&mutator);
+        class
+    }
+
+    fn block(&self, callback: impl FnOnce(&SimpleDirectoryMutator)) {
+        self.edit_dir(&[b"block".into()], callback);
+    }
+
+    fn dev_block(&self, callback: impl FnOnce(&SimpleDirectoryMutator)) {
+        self.edit_dir(&[b"dev".into(), b"block".into()], callback);
+    }
+
+    fn dev_char(&self, callback: impl FnOnce(&SimpleDirectoryMutator)) {
+        self.edit_dir(&[b"dev".into(), b"char".into()], callback);
     }
 
     /// Create a device and add that device to the store.
@@ -163,48 +165,57 @@ impl KObjectStore {
     ///
     /// If you create the device yourself, userspace will not be able to instantiate the
     /// device because the `DeviceType` will not be registered with the `DeviceRegistry`.
-    pub(super) fn create_device<F, N>(
+    pub(super) fn create_device(
         &self,
         name: &FsStr,
         metadata: Option<DeviceMetadata>,
         class: Class,
-        create_device_sysfs_ops: F,
-    ) -> Device
-    where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let class_cloned = class.clone();
-        let metadata_cloned = metadata.clone();
-        let device_kobject = class.kobject().get_or_create_child(name, move |kobject| {
-            create_device_sysfs_ops(Device::new(
-                kobject.upgrade().unwrap(),
-                class_cloned.clone(),
-                metadata_cloned.clone(),
-            ))
+        build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
+    ) -> Device {
+        let device = Device::new(name.to_owned(), class, metadata);
+        device.class.dir.edit(self.fs(), |dir| {
+            dir.subdir2(name, 0o755, |dir| {
+                build_directory(&device, dir);
+            });
         });
+        self.add(&device);
+        device
+    }
+
+    fn add(&self, device: &Device) {
+        let class = &device.class;
+        let name = device.name.as_ref();
+
+        let up_device = device.path_from_depth(1);
+        let up_up_device = device.path_from_depth(2);
 
         // Insert the newly created device into various views.
-        class.collection.kobject().insert_child(device_kobject.clone());
+        class.collection.edit(self.fs(), |dir| {
+            dir.symlink(name, up_up_device.as_ref());
+        });
 
-        if let Some(metadata) = &metadata {
-            let device_number = metadata.device_type.to_string().into();
+        if let Some(metadata) = &device.metadata {
+            let device_number = FsString::from(metadata.device_type.to_string());
             match metadata.mode {
                 DeviceMode::Block => {
-                    self.block.insert_child(device_kobject.clone());
-                    self.dev_block.insert_child_with_name(device_number, device_kobject.clone())
+                    self.block(|dir| dir.symlink(name, up_device.as_ref()));
+                    self.dev_block(|dir| {
+                        dir.symlink(device_number.as_ref(), up_up_device.as_ref());
+                    });
                 }
                 DeviceMode::Char => {
-                    self.dev_char.insert_child_with_name(device_number, device_kobject.clone())
+                    self.dev_char(|dir| {
+                        dir.symlink(device_number.as_ref(), up_up_device.as_ref());
+                    });
                 }
             }
         }
 
         if let Some(bus_collection) = &class.bus.collection {
-            bus_collection.kobject().insert_child(device_kobject.clone());
+            bus_collection.edit(self.fs(), |dir| {
+                dir.symlink(name, device.path_from_depth(3).as_ref());
+            });
         }
-
-        Device::new(device_kobject, class, metadata)
     }
 
     /// Destroy a device.
@@ -213,47 +224,32 @@ impl KObjectStore {
     ///
     /// Most clients hold weak references to KObjects, which means those references will become
     /// invalid shortly after this function is called.
-    pub(super) fn destroy_device(&self, device: &Device) {
-        let kobject = device.kobject();
-        let name = kobject.name();
+    pub(super) fn remove(&self, device: &Device) {
+        let name = device.name.as_ref();
         // Remove the device from its views in the reverse order in which it was added.
         if let Some(bus_collection) = &device.class.bus.collection {
-            bus_collection.kobject().remove_child(name);
+            bus_collection.remove(name);
         }
         if let Some(metadata) = &device.metadata {
             let device_number: FsString = metadata.device_type.to_string().into();
             match metadata.mode {
                 DeviceMode::Block => {
-                    self.dev_block.remove_child(device_number.as_ref());
-                    self.block.remove_child(name);
+                    self.dev_block(|dir| dir.remove(device_number.as_ref()));
+                    self.block(|dir| dir.remove(name));
                 }
                 DeviceMode::Char => {
-                    self.dev_char.remove_child(device_number.as_ref());
+                    self.dev_char(|dir| dir.remove(device_number.as_ref()));
                 }
             }
         }
-        device.class.collection.kobject().remove_child(name);
+        device.class.collection.remove(name);
         // Finally, remove the device from the object store.
-        kobject.remove();
+        device.class.dir.remove(name);
     }
 }
 
 impl Default for KObjectStore {
     fn default() -> Self {
-        let node_cache = Arc::new(FsNodeCache::default());
-        let devices = KObject::new_root(SYSFS_DEVICES.into(), node_cache.clone());
-        let class = KObject::new_root(SYSFS_CLASS.into(), node_cache.clone());
-        let block = KObject::new_root_with_dir(
-            SYSFS_BLOCK.into(),
-            node_cache.clone(),
-            KObjectSymlinkDirectory::new,
-        );
-        let bus = KObject::new_root(SYSFS_BUS.into(), node_cache.clone());
-        let dev = KObject::new_root(SYSFS_DEV.into(), node_cache.clone());
-
-        let dev_block = dev.get_or_create_child("block".into(), KObjectSymlinkDirectory::new);
-        let dev_char = dev.get_or_create_child("char".into(), KObjectSymlinkDirectory::new);
-
-        Self { node_cache, devices, class, block, bus, dev, dev_block, dev_char }
+        Self { root: SimpleDirectory::new(), fs: OnceLock::new() }
     }
 }

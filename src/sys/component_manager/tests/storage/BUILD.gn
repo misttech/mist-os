@@ -139,11 +139,17 @@ fuchsia_component("storage_realm") {
 fuchsia_component("storage_realm_admin") {
   deps = [ ":storage_realm_admin_bin" ]
   manifest = "meta/storage_realm_admin.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("storage_realm_coll") {
   deps = [ ":storage_realm_coll_bin" ]
   manifest = "meta/storage_realm_coll.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("storage_realm_coll_invalid_route") {

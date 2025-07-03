@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
+#include <fidl/fuchsia.hardware.thermal/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -14,161 +14,189 @@
 
 #include "astro.h"
 
-namespace astro {
+namespace {
+
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-static const std::vector<fpbus::Mmio> thermal_mmios_pll{
-    {{
-        .base = S905D2_TEMP_SENSOR_PLL_BASE,
-        .length = S905D2_TEMP_SENSOR_PLL_LENGTH,
-    }},
-    {{
-        .base = S905D2_TEMP_SENSOR_PLL_TRIM,
-        .length = S905D2_TEMP_SENSOR_TRIM_LENGTH,
-    }},
-    {{
-        .base = S905D2_HIU_BASE,
-        .length = S905D2_HIU_LENGTH,
-    }},
-};
-
-static const std::vector<fpbus::Mmio> thermal_mmios_ddr{
-    {{
-        .base = S905D2_TEMP_SENSOR_DDR_BASE,
-        .length = S905D2_TEMP_SENSOR_DDR_LENGTH,
-    }},
-    {{
-        .base = S905D2_TEMP_SENSOR_DDR_TRIM,
-        .length = S905D2_TEMP_SENSOR_TRIM_LENGTH,
-    }},
-    {{
-        .base = S905D2_HIU_BASE,
-        .length = S905D2_HIU_LENGTH,
-    }},
-};
-
-static const std::vector<fpbus::Irq> thermal_irqs_pll{
-    {{
-        .irq = S905D2_TS_PLL_IRQ,
-        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
-    }},
-};
-
-static const std::vector<fpbus::Irq> thermal_irqs_ddr{
-    {{
-        .irq = S905D2_TS_DDR_IRQ,
-        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
-    }},
-};
-
-constexpr fuchsia_hardware_thermal::wire::ThermalTemperatureInfo TripPoint(float temp_c,
-                                                                           uint16_t cpu_opp,
-                                                                           uint16_t gpu_opp) {
+fuchsia_hardware_thermal::ThermalTemperatureInfo TripPoint(float temp_c, uint16_t cpu_opp,
+                                                           uint16_t gpu_opp) {
   constexpr float kHysteresis = 2.0f;
 
-  return {
+  return {{
       .up_temp_celsius = temp_c + kHysteresis,
       .down_temp_celsius = temp_c - kHysteresis,
       .fan_level = 0,
       .big_cluster_dvfs_opp = cpu_opp,
       .little_cluster_dvfs_opp = 0,
       .gpu_clk_freq_source = gpu_opp,
-  };
+  }};
 }
 
-fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config_pll = {
-    .active_cooling = false,
-    .passive_cooling = false,
-    .gpu_throttling = false,
-    .num_trip_points = 0,
-    .big_little = false,
-    .critical_temp_celsius = 101.0,
-    .trip_point_info =
-        {
-            TripPoint(-273.15f, 0, 0),  // 0 Kelvin is impossible, marks end of TripPoints
-        },
-    .opps = {}};
+zx::result<> CreateThermalPllNode(
+    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  static const std::vector<fpbus::Mmio> kMmios{
+      {{
+          .base = S905D2_TEMP_SENSOR_PLL_BASE,
+          .length = S905D2_TEMP_SENSOR_PLL_LENGTH,
+      }},
+      {{
+          .base = S905D2_TEMP_SENSOR_PLL_TRIM,
+          .length = S905D2_TEMP_SENSOR_TRIM_LENGTH,
+      }},
+      {{
+          .base = S905D2_HIU_BASE,
+          .length = S905D2_HIU_LENGTH,
+      }},
+  };
 
-fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config_ddr = {
-    .active_cooling = false,
-    .passive_cooling = false,
-    .gpu_throttling = false,
-    .num_trip_points = 0,
-    .big_little = false,
-    .critical_temp_celsius = 110.0,
-    .trip_point_info =
-        {
-            TripPoint(-273.15f, 0, 0),  // 0 Kelvin is impossible, marks end of TripPoints
-        },
-    .opps = {}};
+  static const std::vector<fpbus::Irq> kIrqs{
+      {{
+          .irq = S905D2_TS_PLL_IRQ,
+          .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+      }},
+  };
 
-static const std::vector<fpbus::Metadata> thermal_metadata_pll{
-    {{
-        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&thermal_config_pll),
-            reinterpret_cast<const uint8_t*>(&thermal_config_pll) + sizeof(thermal_config_pll)),
-    }},
-};
+  fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config{
+      {.active_cooling = false,
+       .passive_cooling = false,
+       .gpu_throttling = false,
+       .num_trip_points = 0,
+       .big_little = false,
+       .critical_temp_celsius = 101.0,
+       .trip_point_info =
+           {
+               TripPoint(-273.15f, 0, 0),  // 0 Kelvin is impossible, marks end of TripPoints
+           },
+       .opps = {}}};
 
-static const std::vector<fpbus::Metadata> thermal_metadata_ddr{
-    {{
-        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&thermal_config_ddr),
-            reinterpret_cast<const uint8_t*>(&thermal_config_ddr) + sizeof(thermal_config_ddr)),
-    }},
-};
+  fit::result persisted_metadata = fidl::Persist(thermal_config);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist thermal config: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return zx::error(persisted_metadata.error_value().status());
+  }
 
-static const fpbus::Node thermal_dev_pll = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-thermal-pll";
-  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
-  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL;
-  dev.mmio() = thermal_mmios_pll;
-  dev.irq() = thermal_irqs_pll;
-  dev.metadata() = thermal_metadata_pll;
-  return dev;
-}();
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = fuchsia_hardware_thermal::ThermalDeviceInfo::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
+      }},
+  };
 
-static const fpbus::Node thermal_dev_ddr = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-thermal-ddr";
-  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
-  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_DDR;
-  dev.mmio() = thermal_mmios_ddr;
-  dev.irq() = thermal_irqs_ddr;
-  dev.metadata() = thermal_metadata_ddr;
-  return dev;
-}();
+  static const fpbus::Node node{{
+      .name = "aml-thermal-pll",
+      .vid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC,
+      .pid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2,
+      .did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL,
+      .mmio = kMmios,
+      .irq = kIrqs,
+      .metadata = std::move(metadata),
+  }};
 
-zx_status_t Astro::ThermalInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('THER');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermal_dev_pll));
+  fdf::WireUnownedResult result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, node));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Thermal(thermal_dev_pll) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+    zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Thermal(thermal_dev_pll) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    zxlogf(ERROR, "Failed to add node: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
-  result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermal_dev_ddr));
+  return zx::ok();
+}
+
+zx::result<> CreateThermalDdrNode(
+    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  static const std::vector<fpbus::Mmio> kMmios{
+      {{
+          .base = S905D2_TEMP_SENSOR_DDR_BASE,
+          .length = S905D2_TEMP_SENSOR_DDR_LENGTH,
+      }},
+      {{
+          .base = S905D2_TEMP_SENSOR_DDR_TRIM,
+          .length = S905D2_TEMP_SENSOR_TRIM_LENGTH,
+      }},
+      {{
+          .base = S905D2_HIU_BASE,
+          .length = S905D2_HIU_LENGTH,
+      }},
+  };
+
+  static const std::vector<fpbus::Irq> kIrqs{
+      {{
+          .irq = S905D2_TS_DDR_IRQ,
+          .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+      }},
+  };
+
+  fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config{
+      {.active_cooling = false,
+       .passive_cooling = false,
+       .gpu_throttling = false,
+       .num_trip_points = 0,
+       .big_little = false,
+       .critical_temp_celsius = 110.0,
+       .trip_point_info =
+           {
+               TripPoint(-273.15f, 0, 0),  // 0 Kelvin is impossible, marks end of TripPoints
+           },
+       .opps = {}}};
+
+  fit::result persisted_metadata = fidl::Persist(thermal_config);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist thermal config: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return zx::error(persisted_metadata.error_value().status());
+  }
+
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = fuchsia_hardware_thermal::ThermalDeviceInfo::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
+      }},
+  };
+
+  fpbus::Node node{{
+      .name = "aml-thermal-ddr",
+      .vid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC,
+      .pid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2,
+      .did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_DDR,
+      .mmio = kMmios,
+      .irq = kIrqs,
+      .metadata = std::move(metadata),
+  }};
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('THER');
+  fdf::WireUnownedResult result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, node));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Thermal(thermal_dev_ddr) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+    zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Thermal(thermal_dev_ddr) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    zxlogf(ERROR, "Failed to add node: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+
+  return zx::ok();
+}
+
+}  // namespace
+
+namespace astro {
+
+zx_status_t Astro::ThermalInit() {
+  if (zx::result result = CreateThermalPllNode(pbus_); result.is_error()) {
+    zxlogf(ERROR, "Failed to create thermal pll platform node: %s", result.status_string());
+    return result.status_value();
+  }
+
+  if (zx::result result = CreateThermalDdrNode(pbus_); result.is_error()) {
+    zxlogf(ERROR, "Failed to create thermal ddr platform node: %s", result.status_string());
+    return result.status_value();
   }
 
   return ZX_OK;

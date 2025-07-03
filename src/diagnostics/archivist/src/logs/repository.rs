@@ -65,6 +65,8 @@ pub enum UrlOrMoniker {
     Url(FlyStr),
     /// The absolute moniker for a component.
     Moniker(ExtendedMoniker),
+    /// A partial string to match against url or moniker.
+    Partial(FlyStr),
 }
 
 impl FromStr for UrlOrMoniker {
@@ -72,10 +74,14 @@ impl FromStr for UrlOrMoniker {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if AbsoluteComponentUrl::from_str(s).is_ok() || BootUrl::parse(s).is_ok() {
             Ok(UrlOrMoniker::Url(s.into()))
-        } else if let Ok(moniker) = Moniker::from_str(s) {
-            Ok(UrlOrMoniker::Moniker(ExtendedMoniker::ComponentInstance(moniker)))
+        } else if s.starts_with("/") {
+            if let Ok(moniker) = Moniker::from_str(s) {
+                Ok(UrlOrMoniker::Moniker(ExtendedMoniker::ComponentInstance(moniker)))
+            } else {
+                Err(())
+            }
         } else {
-            Err(())
+            Ok(UrlOrMoniker::Partial(s.into()))
         }
     }
 }
@@ -370,14 +376,33 @@ impl LogsRepositoryState {
     }
 
     fn get_initial_interest(&self, identity: &ComponentIdentity) -> Option<FidlSeverity> {
-        match (
-            self.initial_interests.get(&UrlOrMoniker::Url(identity.url.clone())),
-            self.initial_interests.get(&UrlOrMoniker::Moniker(identity.moniker.clone())),
-        ) {
-            (None, None) => None,
-            (Some(severity), None) | (None, Some(severity)) => Some(FidlSeverity::from(*severity)),
-            (Some(s1), Some(s2)) => Some(FidlSeverity::from(std::cmp::min(*s1, *s2))),
-        }
+        let exact_url_severity =
+            self.initial_interests.get(&UrlOrMoniker::Url(identity.url.clone())).copied();
+        let exact_moniker_severity =
+            self.initial_interests.get(&UrlOrMoniker::Moniker(identity.moniker.clone())).copied();
+
+        let partial_severity = self
+            .initial_interests
+            .iter()
+            .filter_map(|(uom, severity)| match uom {
+                UrlOrMoniker::Partial(p) => {
+                    if identity.url.contains(p.as_str())
+                        || identity.moniker.to_string().contains(p.as_str())
+                    {
+                        Some(*severity)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .min();
+
+        [exact_url_severity, exact_moniker_severity, partial_severity]
+            .into_iter()
+            .flatten()
+            .min()
+            .map(FidlSeverity::from)
     }
 
     fn is_live(&self, identity: &ComponentIdentity) -> bool {
@@ -579,11 +604,11 @@ mod tests {
                     log_severity: Severity::Warn,
                 },
                 ComponentInitialInterest {
-                    component: UrlOrMoniker::Moniker("core/bar".try_into().unwrap()),
+                    component: UrlOrMoniker::Moniker("/core/bar".try_into().unwrap()),
                     log_severity: Severity::Error,
                 },
                 ComponentInitialInterest {
-                    component: UrlOrMoniker::Moniker("core/foo".try_into().unwrap()),
+                    component: UrlOrMoniker::Moniker("/core/foo".try_into().unwrap()),
                     log_severity: Severity::Debug,
                 },
             ]
@@ -622,6 +647,81 @@ mod tests {
         let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
             ExtendedMoniker::parse_str("core/quux").unwrap(),
             "fuchsia-pkg://quux",
+        )));
+        expect_initial_interest(None, container, repo.scope_handle.clone()).await;
+    }
+
+    #[fuchsia::test]
+    async fn data_repo_correctly_handles_partial_matching() {
+        let repo = LogsRepository::new(
+            100000,
+            [
+                "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm:INFO".parse(),
+                "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm:WARN".parse(),
+                "/core/bust:DEBUG".parse(),
+                "core/bar:ERROR".parse(),
+                "foo:DEBUG".parse(),
+                "both:TRACE".parse(),
+            ]
+            .into_iter()
+            .map(Result::unwrap),
+            &fuchsia_inspect::Node::default(),
+            fasync::Scope::new(),
+        );
+
+        // We have a partial moniker configured, use the associated severity.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/foo").unwrap(),
+            "fuchsia-pkg://fuchsia.com/not-foo#meta/not-foo.cm",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Debug), container, repo.scope_handle.clone())
+            .await;
+
+        // We have a partial url configured, use the associated severity.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/not-foo").unwrap(),
+            "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Debug), container, repo.scope_handle.clone())
+            .await;
+
+        // We have the URL configure, use the associated severity.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/baz").unwrap(),
+            "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Warn), container, repo.scope_handle.clone())
+            .await;
+
+        // We have both a URL and a moniker in the config. Pick the minimum one, in this case Info
+        // for the URL over Error for the moniker.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/bar").unwrap(),
+            "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Info), container, repo.scope_handle.clone())
+            .await;
+
+        // Neither the moniker nor the URL have an associated severity, therefore, the minimum
+        // severity isn't set.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/quux").unwrap(),
+            "fuchsia-pkg://fuchsia.com/quux#meta/quux.cm",
+        )));
+        expect_initial_interest(None, container, repo.scope_handle.clone()).await;
+
+        // We have a partial match for both moniker and url, should still work.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/both").unwrap(),
+            "fuchsia-pkg://fuchsia.com/both#meta/both.cm",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Trace), container, repo.scope_handle.clone())
+            .await;
+
+        // Exact moniker match should not match sub-monikers.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/bust/testing").unwrap(),
+            "fuchsia-pkg://fuchsia.com/busted#meta/busted.cm",
         )));
         expect_initial_interest(None, container, repo.scope_handle.clone()).await;
     }

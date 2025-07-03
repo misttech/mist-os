@@ -4,17 +4,23 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#if 0
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/pci/kpci.h>
 #include <lib/uart/all.h>
 #include <trace.h>
+#endif
 
 #include <dev/init.h>
+#if 0
 #include <dev/pcie_bus_driver.h>
 #include <dev/pcie_platform.h>
 #include <dev/pcie_root.h>
+#endif
 #include <phys/arch/arch-handoff.h>
+#if 0
 #include <platform/pc/debug.h>
+#endif
 
 namespace {
 
@@ -38,14 +44,17 @@ class PcPciePlatformSupport : public PciePlatformInterface {
 };
 #endif
 
+#if 0
 lazy_init::LazyInit<NoMsiPciePlatformInterface, lazy_init::CheckType::None,
                     lazy_init::Destructor::Disabled>
     g_platform_pcie_support;
+#endif
 }  // namespace
 
 void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {}
 
 void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff) {
+#if 0
   // Initialize the PCI platform, claiming no MSI support
   g_platform_pcie_support.Initialize();
 
@@ -56,4 +65,5 @@ void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff) {
         "PCI will be non-functional.\n",
         res);
   }
+#endif
 }

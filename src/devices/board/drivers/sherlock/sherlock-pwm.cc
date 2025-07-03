@@ -106,17 +106,17 @@ zx_status_t Sherlock::PwmInit() {
       {{.id = T931_PWM_AO_D}},
   }}}};
 
-  fit::result encoded_metadata = fidl::Persist(metadata);
-  if (encoded_metadata.is_error()) {
-    zxlogf(ERROR, "Failed to encode pwm channels metadata: %s",
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
+  fit::result persisted_metadata = fidl::Persist(metadata);
+  if (persisted_metadata.is_error()) {
+    zxlogf(ERROR, "Failed to persist pwm channels metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
   }
 
   const std::vector<fpbus::Metadata> pwm_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_PWM_CHANNELS),
-          .data = encoded_metadata.value(),
+          .id = fuchsia_hardware_pwm::PwmChannelsMetadata::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
       }},
   };
   pwm_dev.metadata() = pwm_metadata;

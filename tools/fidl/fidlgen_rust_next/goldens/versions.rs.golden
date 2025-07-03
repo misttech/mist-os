@@ -244,22 +244,36 @@ pub struct OtherProtocol;
 pub mod other_protocol {
     pub mod prelude {
         pub use crate::{
-            other_protocol, OtherProtocol, OtherProtocolClientHandler, OtherProtocolClientSender,
-            OtherProtocolServerHandler, OtherProtocolServerSender,
+            other_protocol, OtherProtocol, OtherProtocolClientHandler, OtherProtocolServerHandler,
         };
     }
-}
 
-/// A helper trait for the `OtherProtocol` client sender.
-pub trait OtherProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
 
-impl<___T> OtherProtocolClientSender for ::fidl_next::ClientSender<___T, OtherProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::OtherProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = OtherProtocolClientSender<___T>;
+            type ServerSender = OtherProtocolServerSender<___T>;
+        }
+
+        /// The client sender for the `OtherProtocol` protocol.
+        pub struct OtherProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> OtherProtocolClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `OtherProtocol` protocol.
+        #[repr(transparent)]
+        pub struct OtherProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> OtherProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the OtherProtocol protocol.
@@ -267,14 +281,14 @@ where
 /// See [`OtherProtocol`] for more details.
 pub trait OtherProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for OtherProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for OtherProtocol
 where
+    ___H: OtherProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: OtherProtocolClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -284,18 +298,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `OtherProtocol` server sender.
-pub trait OtherProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> OtherProtocolServerSender for ::fidl_next::ServerSender<___T, OtherProtocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the OtherProtocol protocol.
@@ -303,14 +305,14 @@ where
 /// See [`OtherProtocol`] for more details.
 pub trait OtherProtocolServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for OtherProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for OtherProtocol
 where
+    ___H: OtherProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: OtherProtocolServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -321,9 +323,9 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -342,10 +344,7 @@ pub struct Protocol;
 
 pub mod protocol {
     pub mod prelude {
-        pub use crate::{
-            protocol, Protocol, ProtocolClientHandler, ProtocolClientSender, ProtocolServerHandler,
-            ProtocolServerSender,
-        };
+        pub use crate::{protocol, Protocol, ProtocolClientHandler, ProtocolServerHandler};
     }
 
     pub struct Foo;
@@ -359,26 +358,41 @@ pub mod protocol {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `Protocol` client sender.
-pub trait ProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
 
-    fn foo(&self)
-        -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-}
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Protocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ProtocolClientSender<___T>;
+            type ServerSender = ProtocolServerSender<___T>;
+        }
 
-impl<___T> ProtocolClientSender for ::fidl_next::ClientSender<___T, Protocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `Protocol` protocol.
+        pub struct ProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn foo(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(6231434419097198905, ())
+        impl<___T> ProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn foo(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_one_way(6231434419097198905, ())
+            }
+        }
+
+        /// The server sender for the `Protocol` protocol.
+        #[repr(transparent)]
+        pub struct ProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -388,86 +402,79 @@ where
 pub trait ProtocolClientHandler<___T: ::fidl_next::Transport> {
     fn on_unknown_interaction(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, Protocol>,
+        sender: &::fidl_next::ClientSender<Protocol, ___T>,
         ordinal: u64,
-    ) {
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send {
         sender.close();
+        ::core::future::ready(())
     }
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Protocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Protocol
 where
+    ___H: ProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ProtocolClientHandler<___T>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            ordinal => handler.on_unknown_interaction(sender, ordinal),
+            ordinal => handler.on_unknown_interaction(sender, ordinal).await,
         }
     }
-}
-
-/// A helper trait for the `Protocol` server sender.
-pub trait ProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ProtocolServerSender for ::fidl_next::ServerSender<___T, Protocol>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the Protocol protocol.
 ///
 /// See [`Protocol`] for more details.
 pub trait ProtocolServerHandler<___T: ::fidl_next::Transport> {
-    fn foo(&mut self, sender: &::fidl_next::ServerSender<___T, Protocol>);
+    fn foo(
+        &mut self,
+        sender: &::fidl_next::ServerSender<Protocol, ___T>,
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn on_unknown_interaction(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Protocol>,
+        sender: &::fidl_next::ServerSender<Protocol, ___T>,
         ordinal: u64,
-    ) {
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send {
         sender.close();
+        ::core::future::ready(())
     }
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Protocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Protocol
 where
+    ___H: ProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
-    ___H: ProtocolServerHandler<___T>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             6231434419097198905 => {
-                handler.foo(sender);
+                handler.foo(sender).await;
             }
 
-            ordinal => handler.on_unknown_interaction(sender, ordinal),
+            ordinal => handler.on_unknown_interaction(sender, ordinal).await,
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
-            ordinal => handler.on_unknown_interaction(sender, ordinal),
+            ordinal => handler.on_unknown_interaction(sender, ordinal).await,
         }
     }
 }
@@ -493,8 +500,8 @@ pub trait ServiceInstance {
     fn connect_to_p(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
         >,
     ) -> Result<(), Self::Error>;
 }
@@ -509,8 +516,8 @@ where
     fn connect_to_p(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
         >,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("p", server_end.into_untyped())

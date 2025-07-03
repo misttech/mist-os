@@ -63,7 +63,7 @@ class FakeConnectionOwner : public FakeConnectionOwnerBase {
   }
   AddressSpaceObserver* NdtGetAddressSpaceObserver() override { return &observer_; }
   TestAddressSpaceObserver* GetTestAddressSpaceObserver() { return &observer_; }
-  magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
+  magma::PlatformBusMapper* NdtGetBusMapper() override { return &bus_mapper_; }
   ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() override {
     return kArmMaliCacheCoherencyAce;
   }
@@ -114,7 +114,7 @@ class FailBusMapper : public magma::PlatformBusMapper {
 
 class FailAllocateConnectionOwner : public FakeConnectionOwner {
  public:
-  magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
+  magma::PlatformBusMapper* NdtGetBusMapper() override { return &bus_mapper_; }
 
  private:
   FailBusMapper bus_mapper_;
@@ -669,7 +669,7 @@ class TestConnection {
     EXPECT_TRUE(connection->AddMapping(std::move(mapping)));
     EXPECT_TRUE(connection->CommitMemoryForBuffer(buffer.get(), kMappingOffsetInPages, 2));
 
-    auto bus_mapping = owner.GetBusMapper()->MapPageRangeBus(buffer->platform_buffer(), 0, 100);
+    auto bus_mapping = owner.NdtGetBusMapper()->MapPageRangeBus(buffer->platform_buffer(), 0, 100);
     constexpr uint32_t kPageOffsetIntoBuffer = 2;
     uint64_t physical = bus_mapping->Get()[kPageOffsetIntoBuffer] + 300;
     uint64_t virtual_address;

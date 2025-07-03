@@ -26,6 +26,7 @@ use fxfs_crypto::Cipher;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use zerocopy::IntoBytes;
 
 use super::FSCRYPT_KEY_ID;
 
@@ -86,7 +87,7 @@ fn decrypt_filename(
 
 /// Returns an ObjectKey that is guaranteed to be equal to or less than the file that this
 /// ProxyFilename represents. The only case it is less is if a file has the same
-/// casefold_hash and also the same 48 byte filename prefix. In this rare case, we lean on
+/// hash_code and also the same 48 byte filename prefix. In this rare case, we lean on
 /// sha256 to disambiguate, which may lead to the prefix pointing to records before the
 /// desired file.
 fn proxy_filename_to_query_key(proxy: &ProxyFilename, object_id: u64) -> ObjectKey {
@@ -252,6 +253,13 @@ impl<S: HandleOwner> Directory<S> {
         Ok(Directory::new(owner.clone(), object_id, wrapping_key_id, casefold))
     }
 
+    /// Sets the file-based-encryption (FBE) wrapping key for this directory.
+    ///
+    /// This can only be done on empty directories and must NOT be done as part of a transaction
+    /// that creates entries in the same directory. The reason for this is that local state
+    /// (self.wrapping_key_id) is used to control the type of child record written out. If children
+    /// are written to a directory as part of the same transaction that enables FBE, they will be
+    /// written as the wrong child record type.
     pub async fn set_wrapping_key(
         &self,
         transaction: &mut Transaction<'_>,
@@ -261,47 +269,37 @@ impl<S: HandleOwner> Directory<S> {
         let store = self.store();
         if let Some(crypt) = store.crypt() {
             let (key, unwrapped_key) = crypt.create_key_with_id(object_id, id).await?;
-            match store
-                .tree
-                .find(&ObjectKey::object(object_id))
-                .await?
-                .ok_or(FxfsError::NotFound)?
+            let mut mutation = store.txn_get_object_mutation(transaction, object_id).await?;
+            if let ObjectValue::Object {
+                kind: ObjectKind::Directory { wrapping_key_id, .. }, ..
+            } = &mut mutation.item.value
             {
-                ObjectItem {
-                    value:
-                        ObjectValue::Object {
-                            kind: ObjectKind::Directory { sub_dirs, wrapping_key_id, casefold },
-                            attributes,
-                        },
-                    ..
-                } => {
-                    if wrapping_key_id.is_some() {
-                        return Err(anyhow!("wrapping key id is already set"));
-                    }
-                    if self.has_children().await? {
-                        return Err(FxfsError::NotEmpty.into());
-                    }
-                    transaction.add(
-                        store.store_object_id(),
-                        Mutation::replace_or_insert_object(
-                            ObjectKey::object(self.object_id()),
-                            ObjectValue::Object {
-                                kind: ObjectKind::Directory {
-                                    sub_dirs,
-                                    wrapping_key_id: Some(id),
-                                    casefold,
-                                },
-                                attributes,
-                            },
-                        ),
-                    );
+                if wrapping_key_id.is_some() {
+                    return Err(anyhow!("wrapping key id is already set"));
                 }
-                ObjectItem { value: ObjectValue::None, .. } => bail!(FxfsError::NotFound),
-                _ => bail!(FxfsError::NotDir),
+                if self.has_children().await? {
+                    return Err(FxfsError::NotEmpty.into());
+                }
+                *wrapping_key_id = Some(id);
+            } else {
+                match mutation.item.value {
+                    ObjectValue::None => bail!(FxfsError::NotFound),
+                    _ => bail!(FxfsError::NotDir),
+                }
             }
+            transaction.add(store.store_object_id(), Mutation::ObjectStore(mutation));
 
-            match store.tree.find(&ObjectKey::keys(object_id)).await? {
-                None => {
+            let keys_key = ObjectKey::keys(object_id);
+            let item = if let Some(mutation) =
+                transaction.get_object_mutation(store.store_object_id(), keys_key.clone())
+            {
+                Some(mutation.item.clone())
+            } else {
+                store.tree.find(&keys_key).await?
+            };
+
+            match item {
+                None | Some(Item { value: ObjectValue::None, .. }) => {
                     transaction.add(
                         store.store_object_id(),
                         Mutation::insert_object(
@@ -483,21 +481,22 @@ impl<S: HandleOwner> Directory<S> {
         }
         let res = if self.wrapping_key_id.lock().is_some() {
             if let Some(fscrypt_key) = self.get_fscrypt_key().await? {
-                let target_casefold_hash = fscrypt_key.hash_code(name.as_bytes(), self.casefold());
                 if !self.casefold() {
                     let encrypted_name = encrypt_filename(&fscrypt_key, self.object_id(), name)?;
+                    let target_hash_code = fscrypt_key.hash_code(encrypted_name.as_bytes(), name);
                     self.store()
                         .tree()
                         .find(&ObjectKey::encrypted_child(
                             self.object_id(),
                             encrypted_name,
-                            target_casefold_hash,
+                            target_hash_code,
                         ))
                         .await?
                         .map(|x| (x, false))
                 } else {
+                    let target_hash_code = fscrypt_key.hash_code_casefold(name);
                     let key =
-                        ObjectKey::encrypted_child(self.object_id(), vec![], target_casefold_hash);
+                        ObjectKey::encrypted_child(self.object_id(), vec![], target_hash_code);
                     let layer_set = self.store().tree().layer_set();
                     let mut merger = layer_set.merger();
                     let mut iter = merger.query(Query::FullRange(&key)).await?;
@@ -511,14 +510,14 @@ impl<S: HandleOwner> Directory<S> {
                                         object_id,
                                         data:
                                             ObjectKeyData::EncryptedChild {
-                                                casefold_hash,
+                                                hash_code,
                                                 name: encrypted_name,
                                             },
                                     },
                                 value,
                                 sequence,
                             }) if *object_id == self.object_id()
-                                && *casefold_hash == target_casefold_hash =>
+                                && *hash_code == target_hash_code =>
                             {
                                 let decrypted_name = decrypt_filename(
                                     &fscrypt_key,
@@ -554,14 +553,14 @@ impl<S: HandleOwner> Directory<S> {
                             key:
                                 key @ ObjectKey {
                                     object_id,
-                                    data: ObjectKeyData::EncryptedChild { casefold_hash, name },
+                                    data: ObjectKeyData::EncryptedChild { hash_code, name },
                                 },
                             value,
                             sequence,
                         }) if *object_id == self.object_id()
-                            && *casefold_hash == target_filename.hash_code as u32 =>
+                            && *hash_code == target_filename.hash_code as u32 =>
                         {
-                            let filename = ProxyFilename::new(*casefold_hash as u64, name);
+                            let filename = ProxyFilename::new(*hash_code as u64, name);
                             if filename == target_filename {
                                 break Some((
                                     Item { key: key.clone(), value: value.clone(), sequence },
@@ -611,13 +610,17 @@ impl<S: HandleOwner> Directory<S> {
         .await?;
         if self.wrapping_key_id.lock().is_some() {
             let fscrypt_key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
-            let casefold_hash = fscrypt_key.hash_code(name.as_bytes(), self.casefold());
             let encrypted_name =
                 encrypt_filename(&fscrypt_key, self.object_id(), name).expect("encrypt_filename");
+            let hash_code = if self.casefold() {
+                fscrypt_key.hash_code_casefold(name)
+            } else {
+                fscrypt_key.hash_code(encrypted_name.as_bytes(), name)
+            };
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
-                    ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash),
+                    ObjectKey::encrypted_child(self.object_id(), encrypted_name, hash_code),
                     ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
                 ),
             );
@@ -655,13 +658,17 @@ impl<S: HandleOwner> Directory<S> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         if self.wrapping_key_id.lock().is_some() {
             let fscrypt_key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
-            let casefold_hash = fscrypt_key.hash_code(name.as_bytes(), self.casefold());
             let encrypted_name =
                 encrypt_filename(&fscrypt_key, self.object_id(), name).expect("encrypt_filename");
+            let hash_code = if self.casefold() {
+                fscrypt_key.hash_code_casefold(name)
+            } else {
+                fscrypt_key.hash_code(encrypted_name.as_bytes(), name)
+            };
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
-                    ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash),
+                    ObjectKey::encrypted_child(self.object_id(), encrypted_name, hash_code),
                     ObjectValue::child(handle.object_id(), ObjectDescriptor::File),
                 ),
             );
@@ -844,8 +851,12 @@ impl<S: HandleOwner> Directory<S> {
                 );
 
                 let dir_key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
-                let casefold_hash = dir_key.hash_code(name.as_bytes(), self.casefold());
                 let encrypted_name = encrypt_filename(&dir_key, self.object_id(), name)?;
+                let hash_code = if self.casefold() {
+                    dir_key.hash_code_casefold(name)
+                } else {
+                    dir_key.hash_code(encrypted_name.as_bytes(), name)
+                };
                 cipher.encrypt_filename(symlink_id, &mut link)?;
 
                 transaction.add(
@@ -867,7 +878,7 @@ impl<S: HandleOwner> Directory<S> {
                 transaction.add(
                     self.store().store_object_id(),
                     Mutation::replace_or_insert_object(
-                        ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash),
+                        ObjectKey::encrypted_child(self.object_id(), encrypted_name, hash_code),
                         ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
                     ),
                 );
@@ -967,13 +978,17 @@ impl<S: HandleOwner> Directory<S> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
         if self.wrapping_key_id.lock().is_some() {
-            let key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
-            let casefold_hash = key.hash_code(name.as_bytes(), self.casefold());
-            let encrypted_name = encrypt_filename(&key, self.object_id(), name)?;
+            let fscrypt_key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
+            let encrypted_name = encrypt_filename(&fscrypt_key, self.object_id(), name)?;
+            let hash_code = if self.casefold() {
+                fscrypt_key.hash_code_casefold(name)
+            } else {
+                fscrypt_key.hash_code(encrypted_name.as_bytes(), name)
+            };
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
-                    ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash),
+                    ObjectKey::encrypted_child(self.object_id(), encrypted_name, hash_code),
                     ObjectValue::child(object_id, descriptor),
                 ),
             );
@@ -1209,11 +1224,15 @@ impl<S: HandleOwner> Directory<S> {
         // CasefoldChild, EncryptedChild). EncryptedChild can be casefolded or not. To avoid leaking
         // complexity, we try to keep this implementation detail internal to this struct.
         let (query_key, requested_filename) = if self.wrapping_key_id.lock().is_some() {
-            if let Some(key) = self.get_fscrypt_key().await? {
+            if let Some(fscrypt_key) = self.get_fscrypt_key().await? {
                 // Unlocked EncryptedChild case.
-                let casefold_hash = key.hash_code(from.as_bytes(), self.casefold());
-                let encrypted_name = encrypt_filename(&key, self.object_id(), from)?;
-                (ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash), None)
+                let encrypted_name = encrypt_filename(&fscrypt_key, self.object_id(), from)?;
+                let hash_code = if self.casefold() {
+                    fscrypt_key.hash_code_casefold(from)
+                } else {
+                    fscrypt_key.hash_code(encrypted_name.as_bytes(), from)
+                };
+                (ObjectKey::encrypted_child(self.object_id(), encrypted_name, hash_code), None)
             } else {
                 // Locked EncryptedChild case.
                 let filename: ProxyFilename =
@@ -1245,14 +1264,14 @@ impl<S: HandleOwner> Directory<S> {
                     key:
                         ObjectKey {
                             object_id,
-                            data: ObjectKeyData::EncryptedChild { casefold_hash, name },
+                            data: ObjectKeyData::EncryptedChild { hash_code, name },
                             ..
                         },
                     ..
                 }) if *object_id == self.object_id() => {
                     // If using proxy file names, skip ahead until we find the one we're after.
                     if let Some(requested_filename) = &requested_filename {
-                        let filename = ProxyFilename::new(*casefold_hash as u64, name);
+                        let filename = ProxyFilename::new(*hash_code as u64, name);
                         if &filename == requested_filename {
                             break;
                         }
@@ -1282,16 +1301,14 @@ impl<S: HandleOwner> Directory<S> {
         // need to calculate it here for the first entry.
         if let Some(ItemRef {
             key:
-                ObjectKey {
-                    object_id, data: ObjectKeyData::EncryptedChild { casefold_hash, name }, ..
-                },
+                ObjectKey { object_id, data: ObjectKeyData::EncryptedChild { hash_code, name }, .. },
             ..
         }) = dir_iter.iter.get()
         {
             let object_id = *object_id;
-            let casefold_hash = *casefold_hash;
+            let hash_code = *hash_code;
             let name = name.clone();
-            dir_iter.update_encrypted_filename(object_id, casefold_hash, name)?;
+            dir_iter.update_encrypted_filename(object_id, hash_code, name)?;
         }
         Ok(dir_iter)
     }
@@ -1343,7 +1360,7 @@ impl DirectoryIterator<'_, '_> {
     pub(super) fn update_encrypted_filename(
         &mut self,
         object_id: u64,
-        casefold_hash: u32,
+        hash_code: u32,
         mut name: Vec<u8>,
     ) -> Result<(), Error> {
         if let Some(key) = &self.key {
@@ -1352,7 +1369,7 @@ impl DirectoryIterator<'_, '_> {
                 anyhow!(FxfsError::Internal).context("Bad UTF-8 encrypted filename")
             })?);
         } else {
-            self.filename = Some(ProxyFilename::new(casefold_hash as u64, &name).into());
+            self.filename = Some(ProxyFilename::new(hash_code as u64, &name).into());
         }
         Ok(())
     }
@@ -1369,16 +1386,13 @@ impl DirectoryIterator<'_, '_> {
                 }) if *object_id == self.object_id => {}
                 Some(ItemRef {
                     key:
-                        ObjectKey {
-                            object_id,
-                            data: ObjectKeyData::EncryptedChild { casefold_hash, name },
-                        },
+                        ObjectKey { object_id, data: ObjectKeyData::EncryptedChild { hash_code, name } },
                     value: ObjectValue::Child(_),
                     ..
                 }) if *object_id == self.object_id => {
                     // We decrypt filenames on advance. This allows us to return errors on bad data
                     // and avoids repeated work if the user calls get() more than once.
-                    self.update_encrypted_filename(*object_id, *casefold_hash, name.clone())?;
+                    self.update_encrypted_filename(*object_id, *hash_code, name.clone())?;
                     return Ok(());
                 }
                 _ => return Ok(()),
@@ -1422,15 +1436,19 @@ pub async fn replace_child<'a, S: HandleOwner>(
                 // Renames only work on unlocked encrypted directories. Fail rename if src is
                 // locked.
                 let key = src_dir.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
-                let src_casefold_hash = key.hash_code(src_name.as_bytes(), src_dir.casefold());
                 let encrypted_src_name = encrypt_filename(&key, src_dir.object_id(), src_name)?;
+                let src_hash_code = if src_dir.casefold() {
+                    key.hash_code_casefold(src_name)
+                } else {
+                    key.hash_code(encrypted_src_name.as_bytes(), src_name)
+                };
                 transaction.add(
                     store_id,
                     Mutation::replace_or_insert_object(
                         ObjectKey::encrypted_child(
                             src_dir.object_id(),
                             encrypted_src_name,
-                            src_casefold_hash,
+                            src_hash_code,
                         ),
                         ObjectValue::None,
                     ),
@@ -1530,15 +1548,19 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
     };
     if dst.0.wrapping_key_id().is_some() {
         if let Some(key) = dst.0.get_fscrypt_key().await? {
-            let dst_casefold_hash = key.hash_code(dst.1.as_bytes(), dst.0.casefold());
             let encrypted_dst_name = encrypt_filename(&key, dst.0.object_id(), dst.1)?;
+            let dst_hash_code = if dst.0.casefold() {
+                key.hash_code_casefold(dst.1)
+            } else {
+                key.hash_code(encrypted_dst_name.as_bytes(), dst.1)
+            };
             transaction.add(
                 store_id,
                 Mutation::replace_or_insert_object(
                     ObjectKey::encrypted_child(
                         dst.0.object_id(),
                         encrypted_dst_name,
-                        dst_casefold_hash,
+                        dst_hash_code,
                     ),
                     new_value,
                 ),
@@ -1558,14 +1580,11 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             let mut merger = layer_set.merger();
             let iter = dst.0.iter_from(&mut merger, dst.1).await.context("iter_from")?;
             if let Some(ItemRef {
-                key:
-                    key @ ObjectKey {
-                        data: ObjectKeyData::EncryptedChild { casefold_hash, name }, ..
-                    },
+                key: key @ ObjectKey { data: ObjectKeyData::EncryptedChild { hash_code, name }, .. },
                 ..
             }) = iter.iter.get()
             {
-                let filename = ProxyFilename::new(*casefold_hash as u64, name);
+                let filename = ProxyFilename::new(*hash_code as u64, name);
                 if filename == proxy_filename {
                     transaction
                         .add(store_id, Mutation::replace_or_insert_object(key.clone(), new_value));
@@ -1620,7 +1639,7 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use fxfs_crypto::{Cipher, Crypt};
     use fxfs_insecure_crypto::InsecureCrypt;
-    use std::collections::HashSet;
+    use std::collections::{BTreeMap, HashSet};
     use std::future::poll_fn;
     use std::sync::Arc;
     use std::task::Poll;
@@ -3817,16 +3836,16 @@ mod tests {
             // Derive the proxy filename now, for use later when operating on the locked volume
             // as we won't have the key then.
             let key = dir.get_fscrypt_key().await.expect("key").unwrap();
-            let casefold_hash = key.hash_code(b"bAr", true);
             let encrypted_name =
                 encrypt_filename(&key, dir.object_id(), "bAr").expect("encrypt_filename");
-            proxy_filename = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
+            let hash_code = key.hash_code_casefold("bAr");
+            proxy_filename = ProxyFilename::new(hash_code as u64, &encrypted_name);
 
             // Check that we can lookup via a case insensitive name.
             assert!(dir.lookup("BAR").await.expect("casefold lookup failed").is_some());
 
             // Check hash values generated are stable across case.
-            assert_eq!(key.hash_code(b"bar", true), key.hash_code(b"BaR", true));
+            assert_eq!(key.hash_code_casefold("bar"), key.hash_code_casefold("BaR"));
 
             // We can't easily check iteration from here as we only get encrypted entries so
             // we just count instead.
@@ -3902,18 +3921,18 @@ mod tests {
             std::collections::HashMap::new();
         for i in 0..(1usize << 32) {
             let filename = format!("{:0>160}_{i}", 0);
-            let casefold_hash = key.hash_code(filename.as_bytes(), true);
             let encrypted_name =
                 encrypt_filename(&key, object_id, &filename).expect("encrypt_filename");
-            let a = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
-            let casefold_hash = a.hash_code as u32;
-            if let Some((j, b, b_encrypted_name)) = collision_map.get(&casefold_hash) {
+            let hash_code = key.hash_code_casefold(&filename);
+            let a = ProxyFilename::new(hash_code as u64, &encrypted_name);
+            let hash_code = a.hash_code as u32;
+            if let Some((j, b, b_encrypted_name)) = collision_map.get(&hash_code) {
                 assert_eq!(a.filename, b.filename);
                 if encrypted_name.cmp(b_encrypted_name) != a.sha256.cmp(&b.sha256) {
                     return Some([format!("{:0>160}_{i}", 0), format!("{:0>160}_{j}", 0)]);
                 }
             } else {
-                collision_map.insert(casefold_hash, (i, a, encrypted_name));
+                collision_map.insert(hash_code, (i, a, encrypted_name));
             }
         }
         None
@@ -3969,7 +3988,7 @@ mod tests {
             let key = dir.get_fscrypt_key().await.expect("key").unwrap();
 
             // Nb: We use a rather expensive brute force search to find two filenames that:
-            //   1. Have the same casefold_hash.
+            //   1. Have the same hash_code.
             //   2. Have the same prefix.
             //   3. Have an encrypted names and sha256 that sort differently.
             // This is to exercise iter_from and lookup() handling scanning of locked directories.
@@ -3986,10 +4005,10 @@ mod tests {
                 .map(|i| format!("{:0>160}_{i}", 0))
                 .chain(collision_pair.into_iter())
             {
-                let casefold_hash = key.hash_code(filename.as_bytes(), true);
+                let hash_code = key.hash_code_casefold(&filename);
                 let encrypted_name =
                     encrypt_filename(&key, dir.object_id(), &filename).expect("encrypt_filename");
-                let proxy_filename = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
+                let proxy_filename = ProxyFilename::new(hash_code as u64, &encrypted_name);
                 let file = dir
                     .create_child_file(&mut transaction, &filename)
                     .await
@@ -4131,6 +4150,218 @@ mod tests {
         // Allow the graveyard to run.
         yield_to_executor().await;
 
+        fs.close().await.expect("close failed");
+    }
+
+    // This test ensures that the hash function doesn't inadvertently change on us.
+    // We have seen this happen with FxHasher when we have bumped the version in the past.
+    // This test is to catch any future regressions due to unstable hashing.
+    #[fuchsia::test]
+    async fn test_hash_code_casefold() {
+        use crate::lsm_tree::types::LayerIterator;
+        use crate::object_store::{ItemRef, ObjectKey, ObjectKeyData, Query};
+
+        const CASEFOLD_NAMES: [(&str, &str, u32); 3] = [
+            ("Straße", "strasse", 3602031996),
+            ("FooBar", "foobar", 1029040300),
+            ("Ǆ", "ǅ", 1717486654),
+        ];
+
+        let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
+        let store = root_volume
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
+            .await
+            .expect("new_volume failed");
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        // Create an fscrypt encrypted directory.
+        crypt.add_wrapping_key(2, [1; 32].into());
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let directory = root_directory
+            .create_child_dir(&mut transaction, "foo")
+            .await
+            .expect("create_child_dir failed");
+        directory.set_wrapping_key(&mut transaction, 2).await.expect("set wrapping_key");
+        transaction.commit().await.expect("commit failed");
+
+        // Enable casefold.
+        let directory = Directory::open(&store, directory.object_id()).await.expect("open failed");
+        directory.set_casefold(true).await.expect("enable_casefold");
+
+        // Write some test entries.
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let directory = Directory::open(&store, directory.object_id()).await.expect("open failed");
+        for &(name, _, _) in &CASEFOLD_NAMES {
+            let _ = directory
+                .create_child_dir(&mut transaction, name)
+                .await
+                .expect("create_child_dir failed");
+        }
+        transaction.commit().await.expect("commit failed");
+
+        // Fetch the casefold hashes for these directly
+        let layer_set = directory.store().tree().layer_set();
+        let mut merger = layer_set.merger();
+        let key = ObjectKey::encrypted_child(directory.object_id(), vec![], 0);
+        let mut iter = merger.query(Query::FullRange(&key)).await.expect("query");
+        let mut object_id_to_hash_code = BTreeMap::new();
+        loop {
+            match iter.get() {
+                Some(ItemRef {
+                    key: ObjectKey { data: ObjectKeyData::EncryptedChild { hash_code, .. }, .. },
+                    value:
+                        crate::object_store::ObjectValue::Child(
+                            crate::object_store::object_record::ChildValue { object_id, .. },
+                        ),
+                    ..
+                }) => {
+                    object_id_to_hash_code.insert(*object_id, *hash_code);
+                }
+                _ => {
+                    break;
+                }
+            };
+            iter.advance().await.expect("advance");
+        }
+
+        // Walk the directory tree, decrypting names, and compare hashes to known constants.
+        for &(name, casefolded_name, hash_code) in &CASEFOLD_NAMES {
+            if let Some((object_id, _descriptor, _parent_dir_is_locked)) =
+                directory.lookup(casefolded_name).await.expect("lookup")
+            {
+                let actual_hash = object_id_to_hash_code.get(&object_id);
+                assert_eq!(
+                    actual_hash,
+                    Some(&hash_code),
+                    "Hash for {name} is actually {actual_hash:?}"
+                );
+            } else {
+                panic!("File not found for {casefolded_name} ({name})");
+            }
+        }
+        fs.close().await.expect("close failed");
+    }
+
+    // FBE uses hash code for non-casefold filenames as well.
+    // We need to ensure that these hashes also don't change unexpectedly.
+    #[fuchsia::test]
+    async fn test_hash_code() {
+        use crate::lsm_tree::types::LayerIterator;
+        use crate::object_store::{ItemRef, ObjectKey, ObjectKeyData, Query};
+
+        const CASEFOLD_NAMES: [(&str, u32); 3] =
+            [("Straße", 433651741), ("FooBar", 3915573179), ("Ǆ", 3078551122)];
+
+        let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
+        let store = root_volume
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
+            .await
+            .expect("new_volume failed");
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        // Create an fscrypt encrypted directory.
+        crypt.add_wrapping_key(2, [1; 32].into());
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let directory = root_directory
+            .create_child_dir(&mut transaction, "foo")
+            .await
+            .expect("create_child_dir failed");
+        directory.set_wrapping_key(&mut transaction, 2).await.expect("set wrapping_key");
+        transaction.commit().await.expect("commit failed");
+
+        // Write some test entries.
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let directory = Directory::open(&store, directory.object_id()).await.expect("open failed");
+        for &(name, _) in &CASEFOLD_NAMES {
+            let _ = directory
+                .create_child_dir(&mut transaction, name)
+                .await
+                .expect("create_child_dir failed");
+        }
+        transaction.commit().await.expect("commit failed");
+
+        // Fetch the casefold hashes for these directly
+        let layer_set = directory.store().tree().layer_set();
+        let mut merger = layer_set.merger();
+        let key = ObjectKey::encrypted_child(directory.object_id(), vec![], 0);
+        let mut iter = merger.query(Query::FullRange(&key)).await.expect("query");
+        let mut object_id_to_hash_code = BTreeMap::new();
+        loop {
+            match iter.get() {
+                Some(ItemRef {
+                    key: ObjectKey { data: ObjectKeyData::EncryptedChild { hash_code, .. }, .. },
+                    value:
+                        crate::object_store::ObjectValue::Child(
+                            crate::object_store::object_record::ChildValue { object_id, .. },
+                        ),
+                    ..
+                }) => {
+                    object_id_to_hash_code.insert(*object_id, *hash_code);
+                }
+                _ => {
+                    break;
+                }
+            };
+            iter.advance().await.expect("advance");
+        }
+
+        // Walk the directory tree, decrypting names, and compare hashes to known constants.
+        for &(name, hash_code) in &CASEFOLD_NAMES {
+            if let Some((object_id, _descriptor, _parent_dir_is_locked)) =
+                directory.lookup(name).await.expect("lookup")
+            {
+                let actual_hash = object_id_to_hash_code.get(&object_id);
+                assert_eq!(
+                    actual_hash,
+                    Some(&hash_code),
+                    "Hash for {name} is actually {actual_hash:?}"
+                );
+            } else {
+                panic!("File not found for {name}");
+            }
+        }
         fs.close().await.expect("close failed");
     }
 }

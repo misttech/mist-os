@@ -22,17 +22,18 @@ const indentPrefix = "  "
 // This map is also used to check known Bazel rules that can be converted to GN.
 // i.e. Bazel rules not found in this map is not supported by bazel2gn yet.
 var bazelRuleToGNTemplate = map[string]string{
-	"go_binary":          "go_binary",
-	"go_library":         "go_library",
-	"go_test":            "go_test",
-	"install_host_tools": "install_host_tools",
-	"package":            "package",
-	"rust_binary":        "rustc_binary",
-	"rust_library":       "rustc_library",
-	"rustc_binary":       "rustc_binary",
-	"rustc_library":      "rustc_library",
-	"rust_proc_macro":    "rustc_macro",
-	"sdk_host_tool":      "sdk_host_tool",
+	"go_binary":             "go_binary",
+	"go_library":            "go_library",
+	"go_test":               "go_test",
+	"idk_cc_source_library": "sdk_source_set",
+	"install_host_tools":    "install_host_tools",
+	"package":               "package",
+	"rust_binary":           "rustc_binary",
+	"rust_library":          "rustc_library",
+	"rustc_binary":          "rustc_binary",
+	"rustc_library":         "rustc_library",
+	"rust_proc_macro":       "rustc_macro",
+	"sdk_host_tool":         "sdk_host_tool",
 }
 
 // attrsToOmitByRules stores a mapping from known Bazel rules to attributes to
@@ -46,14 +47,39 @@ var attrsToOmitByRules = map[string]map[string]bool{
 	},
 }
 
+// Common Bazel attributes that use different names in GN.
+var commonAttrMap = map[string]string{
+	"srcs": "sources",
+	"hdrs": "public",
+}
+
+// Rust specific attributes that use different names in GN.
+var rustAttrMap = map[string]string{
+	"crate_features": "features",
+}
+
+// IDK specific attributes that use different names in GN.
+var idkAttrMap = map[string]string{
+	"idk_name": "sdk_name",
+}
+
+// A mapping from Bazel rule names to attribute mappings.
+// Attribute mappings map from Bazel rule attributes that use different names in GN.
+var attrMapsByRules = map[string]map[string]string{
+	"rust_binary":           rustAttrMap,
+	"rust_library":          rustAttrMap,
+	"rust_proc_macro":       rustAttrMap,
+	"rustc_binary":          rustAttrMap,
+	"rustc_library":         rustAttrMap,
+	"idk_cc_source_library": idkAttrMap,
+}
+
 // These identifiers with the same meanings are represented differently in Bazel
 // and GN. specialIdentifiers maps from their Bazel representations to GN
 // representations.
 var specialIdentifiers = map[string]string{
-	"True":           "true",
-	"False":          "false",
-	"srcs":           "sources",
-	"crate_features": "features",
+	"True":  "true",
+	"False": "false",
 }
 
 // specialTokens maps from special tokens in Bazel to their GN equivalents.
@@ -264,7 +290,7 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 
 	// Loop through all args again to actually build the content of this target.
 	for _, arg := range remainingArgs {
-		lines, err := attrAssignmentToGN(arg)
+		lines, err := attrAssignmentToGN(arg, bazelRule)
 		if err != nil {
 			return nil, fmt.Errorf("converting Bazel attribute to GN: %v", err)
 		}
@@ -281,6 +307,25 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 	return ret, nil
 }
 
+// convertAttrName converts input Bazel attrName to the corresponding parameter name in GN.
+//
+// This function takes the current Bazel rule being converted into consideration.
+func convertAttrName(attrName, bazelRule string) string {
+	ret, ok := commonAttrMap[attrName]
+	if ok {
+		return ret
+	}
+	ruleAttrMap, ok := attrMapsByRules[bazelRule]
+	if !ok {
+		return attrName
+	}
+	ret, ok = ruleAttrMap[attrName]
+	if ok {
+		return ret
+	}
+	return attrName
+}
+
 // attrAssignmentToGN converts a Bazel assignment [0] to GN. These assignments
 // are used to assign values to fields during target definitions in Bazel.
 //
@@ -291,15 +336,12 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 // NOTE: Assignment is a special binary expression with operator =.
 //
 // [0] https://github.com/bazelbuild/starlark/blob/master/spec.md#assignments
-func attrAssignmentToGN(expr *syntax.BinaryExpr) ([]string, error) {
+func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, error) {
 	lhs, ok := expr.X.(*syntax.Ident)
 	if !ok {
 		return nil, fmt.Errorf("expecting an identifier on the left hand side of attribute assignment, got %T", expr.X)
 	}
-	attrName, ok := specialIdentifiers[lhs.Name]
-	if !ok {
-		attrName = lhs.Name
-	}
+	attrName := convertAttrName(lhs.Name, bazelRule)
 
 	var transformers []transformer
 	switch attrName {
@@ -329,9 +371,17 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr) ([]string, error) {
 		return append([]string{fmt.Sprintf("%s = []", attrName)}, lc...), nil
 	}
 
-	// No selects found, convert this assignment as a normal binary expression to
-	// reuse logic there.
-	return binaryExprToGN(expr, transformers)
+	rhs, err := exprToGN(expr.Y, transformers)
+	if err != nil {
+		return nil, fmt.Errorf("converting rhs of binary expression: %v", err)
+	}
+	if len(rhs) == 0 {
+		return nil, errors.New("rhs hand side of binary expression is unexpectedly empty")
+	}
+
+	ret := []string{fmt.Sprintf("%s = %s", attrName, rhs[0])}
+	ret = append(ret, rhs[1:]...)
+	return ret, nil
 }
 
 // binaryExprToGN converts a general Bazel binary expression [0] to GN.

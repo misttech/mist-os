@@ -21,7 +21,6 @@ pub(crate) mod accept_queue;
 pub(crate) mod demux;
 pub(crate) mod isn;
 
-use alloc::collections::{hash_map, HashMap};
 use core::convert::Infallible as Never;
 use core::fmt::{self, Debug};
 use core::marker::PhantomData;
@@ -58,10 +57,11 @@ use netstack3_base::{
     InspectorExt, InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mark, MarkDomain,
     Mss, OwnedOrRefsBidirectionalConverter, PayloadLen as _, PortAllocImpl,
     ReferenceNotifiersExt as _, RemoveResourceResult, ResourceCounterContext as _, RngContext,
-    Segment, SeqNum, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
+    Segment, SeqNum, SettingsContext, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
     TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::{FilterIpExt, SocketOpsFilterBindingContext, Tuple};
+use netstack3_hashmap::{hash_map, HashMap};
 use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };
@@ -79,6 +79,7 @@ use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::counters::{
     self, CombinedTcpCounters, TcpCounterContext, TcpCountersRefs, TcpCountersWithSocket,
 };
+use crate::internal::settings::TcpSettings;
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
@@ -478,9 +479,6 @@ pub trait TcpBindingsTypes:
         + Send
         + Sync;
 
-    /// The buffer sizes to use when creating new sockets.
-    fn default_buffer_sizes() -> BufferSizes;
-
     /// Creates new buffers and returns the object that Bindings need to
     /// read/write from/into the created buffers.
     fn new_passive_open_buffers(
@@ -498,6 +496,7 @@ pub trait TcpBindingsContext<D: StrongDeviceIdentifier>:
     + RngContext
     + TcpBindingsTypes
     + SocketOpsFilterBindingContext<D>
+    + SettingsContext<TcpSettings>
 {
 }
 
@@ -509,7 +508,8 @@ where
         + TimerContext
         + RngContext
         + TcpBindingsTypes
-        + SocketOpsFilterBindingContext<D>,
+        + SocketOpsFilterBindingContext<D>
+        + SettingsContext<TcpSettings>,
 {
 }
 
@@ -2069,6 +2069,14 @@ where
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(LocalAddressError::Zone)?;
 
+            // TCP sockets cannot bind to multicast addresses.
+            // TODO(https://fxbug.dev/424874749): Put this check in a witness type.
+            if addr.addr().is_multicast()
+                || I::map_ip_in(addr.addr(), |ip| ip.is_limited_broadcast(), |_| false)
+            {
+                return Err(LocalAddressError::CannotBindToAddress);
+            }
+
             core_ctx.with_devices_with_assigned_addr(addr.clone().into(), |mut assigned_to| {
                 if !assigned_to.any(|d| {
                     required_device
@@ -2270,11 +2278,17 @@ where
         &mut self,
         socket_extra: <C::BindingsContext as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
     ) -> TcpApiSocketId<I, C> {
-        self.core_ctx().with_all_sockets_mut(|all_sockets| {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let settings = bindings_ctx.settings();
+        let buffer_sizes = BufferSizes {
+            send: settings.send_buffer.default().get(),
+            receive: settings.receive_buffer.default().get(),
+        };
+        core_ctx.with_all_sockets_mut(|all_sockets| {
             let (sock, primary) = TcpSocketId::new(
                 TcpSocketStateInner::Unbound(Unbound {
                     bound_device: Default::default(),
-                    buffer_sizes: C::BindingsContext::default_buffer_sizes(),
+                    buffer_sizes,
                     sharing: Default::default(),
                     socket_extra: Takeable::new(socket_extra),
                 }),
@@ -2333,7 +2347,6 @@ where
             },
         };
 
-        // TODO(https://fxbug.dev/42055442): Check if local_ip is a unicast address.
         let (core_ctx, bindings_ctx) = self.contexts();
         let result = core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let TcpSocketState { socket_state, ip_options, socket_options: _ } = socket_state;
@@ -3935,7 +3948,8 @@ where
     /// Set the size of the send buffer for this socket and future derived
     /// sockets.
     pub fn set_send_buffer_size(&mut self, id: &TcpApiSocketId<I, C>, size: usize) {
-        set_buffer_size::<SendBufferSize, I, _, _>(self.core_ctx(), id, size)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        set_buffer_size::<SendBufferSize, I, _, _>(core_ctx, bindings_ctx, id, size)
     }
 
     /// Get the size of the send buffer for this socket and future derived
@@ -3947,7 +3961,8 @@ where
     /// Set the size of the send buffer for this socket and future derived
     /// sockets.
     pub fn set_receive_buffer_size(&mut self, id: &TcpApiSocketId<I, C>, size: usize) {
-        set_buffer_size::<ReceiveBufferSize, I, _, _>(self.core_ctx(), id, size)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        set_buffer_size::<ReceiveBufferSize, I, _, _>(core_ctx, bindings_ctx, id, size)
     }
 
     /// Get the size of the receive buffer for this socket and future derived
@@ -4840,7 +4855,7 @@ enum ReceiveBufferSize {}
 trait AccessBufferSize<R, S> {
     fn set_buffer_size(buffers: BuffersRefMut<'_, R, S>, new_size: usize);
     fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize>;
-    fn allowed_range() -> (usize, usize);
+    fn allowed_range(settings: &TcpSettings) -> (usize, usize);
 }
 
 impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for SendBufferSize {
@@ -4854,8 +4869,8 @@ impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for SendBufferSize {
         }
     }
 
-    fn allowed_range() -> (usize, usize) {
-        S::capacity_range()
+    fn allowed_range(settings: &TcpSettings) -> (usize, usize) {
+        (settings.send_buffer.min().get(), settings.send_buffer.max().get())
     }
 
     fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize> {
@@ -4880,8 +4895,8 @@ impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for ReceiveBufferSize {
         }
     }
 
-    fn allowed_range() -> (usize, usize) {
-        R::capacity_range()
+    fn allowed_range(settings: &TcpSettings) -> (usize, usize) {
+        (settings.receive_buffer.min().get(), settings.receive_buffer.max().get())
     }
 
     fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize> {
@@ -4939,10 +4954,11 @@ fn set_buffer_size<
     CC: TcpContext<I, BC>,
 >(
     core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
     size: usize,
 ) {
-    let (min, max) = Which::allowed_range();
+    let (min, max) = Which::allowed_range(&*bindings_ctx.settings());
     let size = size.clamp(min, max);
     core_ctx.with_socket_mut_and_converter(id, |state, converter| {
         Which::set_buffer_size(get_buffers_mut::<I, CC, BC>(state, converter), size)
@@ -5600,16 +5616,16 @@ mod tests {
     use net_types::{LinkLocalAddr, Witness};
     use netstack3_base::sync::{DynDebugReferences, Mutex};
     use netstack3_base::testutil::{
-        new_rng, run_with_many_seeds, set_logger_for_test, FakeAtomicInstant, FakeCoreCtx,
-        FakeCryptoRng, FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId,
-        FakeTimerCtx, FakeTimerId, FakeTxMetadata, FakeWeakDeviceId, InstantAndData,
-        MultipleDevicesId, PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext,
-        WithFakeTimerContext,
+        new_rng, run_with_many_seeds, set_logger_for_test, AlwaysDefaultsSettingsContext,
+        FakeAtomicInstant, FakeCoreCtx, FakeCryptoRng, FakeDeviceId, FakeInstant, FakeNetwork,
+        FakeNetworkSpec, FakeStrongDeviceId, FakeTimerCtx, FakeTimerId, FakeTxMetadata,
+        FakeWeakDeviceId, InstantAndData, MultipleDevicesId, PendingFrameData, StepResult,
+        TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
     };
     use netstack3_base::{
-        ContextProvider, CounterContext, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _,
-        InstantContext, LinkDevice, Mms, ReferenceNotifiers, ResourceCounterContext,
-        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
+        ContextProvider, CounterCollection, CounterContext, IcmpIpExt, Icmpv4ErrorCode,
+        Icmpv6ErrorCode, Instant as _, InstantContext, LinkDevice, Mms, ReferenceNotifiers,
+        ResourceCounterContext, StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
     };
     use netstack3_filter::testutil::NoOpSocketOpsFilter;
     use netstack3_filter::{SocketOpsFilter, TransportPacketSerializer, Tuple};
@@ -5957,11 +5973,9 @@ mod tests {
                 client,
             )
         }
-
-        fn default_buffer_sizes() -> BufferSizes {
-            BufferSizes::default()
-        }
     }
+
+    impl<D: FakeStrongDeviceId> AlwaysDefaultsSettingsContext for TcpBindingsCtx<D> {}
 
     const LINK_MTU: Mtu = Mtu::new(1500);
 
@@ -6770,15 +6784,15 @@ mod tests {
                     let counters_without_socket =
                         CounterContext::<TcpCountersWithoutSocket<I>>::counters(&ctx.core_ctx);
                     let counters_per_socket = ctx.core_ctx.per_resource_counters(socket);
-                    assert_eq!(expected, counters.as_ref().into(), "{context_name}");
+                    assert_eq!(expected, counters.as_ref().cast(), "{context_name}");
                     assert_eq!(
                         expected_without_socket,
-                        counters_without_socket.as_ref().into(),
+                        counters_without_socket.as_ref().cast(),
                         "{context_name}"
                     );
                     assert_eq!(
                         expected_per_socket,
-                        counters_per_socket.as_ref().into(),
+                        counters_per_socket.as_ref().cast(),
                         "{context_name}"
                     )
                 })
@@ -7464,6 +7478,28 @@ mod tests {
     #[test_case(Ipv6::get_multicast_addr(1).into(), PhantomData::<Ipv6>)]
     #[test_case(Ipv4::get_multicast_addr(1).into(), PhantomData::<Ipv4>)]
     #[test_case(Ipv4::LIMITED_BROADCAST_ADDRESS, PhantomData::<Ipv4>)]
+    fn non_unicast_ip_bind<I>(local_ip: SpecifiedAddr<I::Addr>, _ip: PhantomData<I>)
+    where
+        I: TcpTestIpExt + Ip,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        let mut ctx =
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(local_ip, I::TEST_ADDRS.remote_ip));
+        let mut api = ctx.tcp_api::<I>();
+        let local = SocketAddr { ip: ZonedAddr::Unzoned(local_ip), port: PORT_1 };
+        let socket = api.create(Default::default());
+
+        assert_eq!(
+            api.bind(&socket, Some(local.ip), Some(local.port))
+                .expect_err("bind should fail for non-unicast address"),
+            BindError::LocalAddressError(LocalAddressError::CannotBindToAddress)
+        );
+    }
+
+    #[test_case(Ipv6::get_multicast_addr(1).into(), PhantomData::<Ipv6>)]
+    #[test_case(Ipv4::get_multicast_addr(1).into(), PhantomData::<Ipv4>)]
+    #[test_case(Ipv4::LIMITED_BROADCAST_ADDRESS, PhantomData::<Ipv4>)]
     fn non_unicast_ip_peer<I>(remote_ip: SpecifiedAddr<I::Addr>, _ip: PhantomData<I>)
     where
         I: TcpTestIpExt + Ip,
@@ -8001,21 +8037,21 @@ mod tests {
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
 
-        let (min, max) = <
-            <TcpBindingsCtx<FakeDeviceId> as TcpBindingsTypes>::SendBuffer as crate::Buffer
-        >::capacity_range();
-        api.set_send_buffer_size(&socket, min - 1);
-        assert_eq!(api.send_buffer_size(&socket), Some(min));
-        api.set_send_buffer_size(&socket, max + 1);
-        assert_eq!(api.send_buffer_size(&socket), Some(max));
+        let (min, max) =
+            SettingsContext::<TcpSettings>::settings(&ctx.bindings_ctx).send_buffer.min_max();
+        let mut api = ctx.tcp_api::<I>();
+        api.set_send_buffer_size(&socket, min.get() - 1);
+        assert_eq!(api.send_buffer_size(&socket), Some(min.get()));
+        api.set_send_buffer_size(&socket, max.get() + 1);
+        assert_eq!(api.send_buffer_size(&socket), Some(max.get()));
 
-        let (min, max) = <
-            <TcpBindingsCtx<FakeDeviceId> as TcpBindingsTypes>::ReceiveBuffer as crate::Buffer
-        >::capacity_range();
-        api.set_receive_buffer_size(&socket, min - 1);
-        assert_eq!(api.receive_buffer_size(&socket), Some(min));
-        api.set_receive_buffer_size(&socket, max + 1);
-        assert_eq!(api.receive_buffer_size(&socket), Some(max));
+        let (min, max) =
+            SettingsContext::<TcpSettings>::settings(&ctx.bindings_ctx).receive_buffer.min_max();
+        let mut api = ctx.tcp_api::<I>();
+        api.set_receive_buffer_size(&socket, min.get() - 1);
+        assert_eq!(api.receive_buffer_size(&socket), Some(min.get()));
+        api.set_receive_buffer_size(&socket, max.get() + 1);
+        assert_eq!(api.receive_buffer_size(&socket), Some(max.get()));
     }
 
     #[ip_test(I)]

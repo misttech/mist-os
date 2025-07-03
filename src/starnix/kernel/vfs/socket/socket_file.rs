@@ -14,7 +14,7 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, DowncastedFile, FileHandle, FileObject,
     FileOps, FsNodeInfo,
 };
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::{errno, Errno};
@@ -23,7 +23,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use zx::HandleBased;
 
-use super::{socket_fs, SocketPeer};
+use super::socket_fs;
 
 pub struct SocketFile {
     pub(super) socket: SocketHandle,
@@ -38,13 +38,17 @@ impl SocketFile {
     /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
     /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
     ///   therefore not be security labeled nor access-checked.
-    pub fn from_socket(
+    pub fn from_socket<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         socket: SocketHandle,
         open_flags: OpenFlags,
         kernel_private: bool,
-    ) -> Result<FileHandle, Errno> {
-        let fs = socket_fs(current_task.kernel());
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let fs = socket_fs(locked, current_task.kernel());
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node_and_allocate_node_id(
             Anon::new_for_socket(kernel_private),
@@ -66,18 +70,21 @@ impl SocketFile {
         kernel_private: bool,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
-        SocketFile::from_socket(
-            current_task,
-            Socket::new(locked, current_task, domain, socket_type, protocol, kernel_private)?,
-            open_flags,
-            kernel_private,
-        )
+        {
+            let socket =
+                Socket::new(locked, current_task, domain, socket_type, protocol, kernel_private)?;
+            SocketFile::from_socket(locked, current_task, socket, open_flags, kernel_private)
+        }
     }
 
     pub fn get_from_file(file: &FileHandle) -> Result<DowncastedFile<'_, Self>, Errno> {
         file.downcast_file::<SocketFile>().ok_or_else(|| errno!(ENOTSOCK))
+    }
+
+    pub fn socket(&self) -> &SocketHandle {
+        &self.socket
     }
 }
 
@@ -152,9 +159,9 @@ impl FileOps for SocketFile {
         &self,
         locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
     ) {
-        self.socket.close(locked);
+        self.socket.close(locked, current_task);
     }
 
     /// Return a handle that allows access to this file descritor through the zxio protocols.
@@ -200,7 +207,7 @@ impl SocketFile {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        debug_assert!(data.bytes_read() == 0);
+        let bytes_read_before = data.bytes_read();
 
         // TODO: Implement more `flags`.
         let mut op = |locked: &mut Locked<L>| {
@@ -232,7 +239,7 @@ impl SocketFile {
             )
         };
 
-        let bytes_written = data.bytes_read();
+        let bytes_written = data.bytes_read() - bytes_read_before;
         if bytes_written == 0 {
             // We can only return an error if no data was actually sent. If partial data was
             // sent, swallow the error and return how much was sent.
@@ -300,20 +307,5 @@ impl SocketFile {
             result?;
         }
         Ok(read_info)
-    }
-}
-
-impl DowncastedFile<'_, SocketFile> {
-    pub fn connect<L>(
-        self,
-        locked: &mut Locked<L>,
-        current_task: &CurrentTask,
-        peer: SocketPeer,
-    ) -> Result<(), Errno>
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
-        security::check_socket_connect_access(current_task, self, &peer)?;
-        self.socket.ops.connect(&mut locked.cast_locked(), &self.socket, current_task, peer)
     }
 }

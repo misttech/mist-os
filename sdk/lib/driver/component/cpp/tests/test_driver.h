@@ -37,8 +37,10 @@ class TestDriver : public fdf::DriverBase,
   zx::result<> ServeDriverService();
   zx::result<> ServeZirconService();
 
-  zx::result<> ValidateIncomingDriverService();
-  zx::result<> ValidateIncomingZirconService();
+  zx::result<> ValidateIncomingDriverService(
+      std::string_view instance = component::kDefaultInstance);
+  zx::result<> ValidateIncomingZirconService(
+      std::string_view instance = component::kDefaultInstance);
 
   void CreateChildNodeSync();
 

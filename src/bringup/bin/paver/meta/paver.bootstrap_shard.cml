@@ -48,15 +48,13 @@
             to: "#paver",
         },
         {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.Recovery",
-            ],
+            protocol: [ "fuchsia.fshost.Admin" ],
             from: "#fshost",
             to: "#paver",
         },
         {
             protocol: [
+                "fuchsia.fshost.Recovery",
                 "fuchsia.storage.partitions.PartitionsAdmin",
                 "fuchsia.storage.partitions.PartitionsManager",
             ],

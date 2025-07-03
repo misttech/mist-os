@@ -236,6 +236,29 @@ pub async fn enable_verity(vol: &Arc<ObjectStore>, dst: &Path) -> Result<(), Err
         .await
 }
 
+pub async fn enable_casefold(vol: &Arc<ObjectStore>, dst: &Path) -> Result<(), Error> {
+    walk_dir(vol, dst).await?.set_casefold(true).await
+}
+
+pub async fn enable_fscrypt(
+    fs: &OpenFxFilesystem,
+    vol: &Arc<ObjectStore>,
+    dst: &Path,
+    wrapping_key_id: u128,
+) -> Result<(), Error> {
+    let dir = walk_dir(vol, dst).await?;
+    let mut transaction = (*fs)
+        .clone()
+        .new_transaction(
+            lock_keys![LockKey::object(dir.store().store_object_id(), dir.object_id())],
+            Options::default(),
+        )
+        .await?;
+    dir.set_wrapping_key(&mut transaction, wrapping_key_id).await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
 /// Create a directory.
 pub async fn mkdir(
     fs: &OpenFxFilesystem,

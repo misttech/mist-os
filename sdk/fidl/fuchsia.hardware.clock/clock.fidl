@@ -45,6 +45,7 @@ open protocol Clock {
     /// exceed hz_in.
     /// `QuerySupportedRate` shall not alter the state of the clock tree in any way.
     /// Returns `ZX_ERR_NOT_SUPPORTED` if this clock type does not support `QuerySupportedRate`.
+    /// Returns `ZX_ERR_OUT_OF_RANGE` if a suitable rate could not be found.
     flexible QuerySupportedRate(struct {
         hz_in uint64;
     }) -> (struct {

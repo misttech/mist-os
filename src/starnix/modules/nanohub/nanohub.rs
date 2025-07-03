@@ -5,12 +5,12 @@
 use std::ops::DerefMut;
 use std::sync::Arc;
 
-use crate::nanohub_comms_directory::NanohubCommsDirectory;
+use crate::nanohub_comms_directory::build_nanohub_comms_directory;
 use crate::socket_tunnel_file::register_socket_tunnel_device;
 use fidl_fuchsia_hardware_serial as fserial;
 use futures::TryStreamExt;
 use starnix_core::device::serial::SerialDevice;
-use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::fs::sysfs::build_device_directory;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::pseudo::simple_file::BytesFile;
 use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
@@ -22,10 +22,7 @@ use starnix_uapi::mode;
 const SERIAL_DIRECTORY: &str = "/dev/class/serial";
 
 /// Function to be invoked by ProcDirectory while constructing /proc/device-tree
-pub fn nanohub_procfs_builder(
-    builder: &'_ mut StaticDirectoryBuilder<'_>,
-    _current_task: &CurrentTask,
-) {
+pub fn nanohub_procfs_builder(builder: &'_ mut StaticDirectoryBuilder<'_>) {
     builder.subdir("mcu", 0o555, |dir| {
         dir.entry("board_type", BytesFile::new_node(b"starnix".to_vec()), mode!(IFREG, 0o444));
     });
@@ -97,19 +94,19 @@ pub fn nanohub_device_init(locked: &mut Locked<Unlocked>, current_task: &Current
             descriptor.socket_label.as_ref(),
             descriptor.dev_node_name.as_ref(),
             b"nanohub".into(),
-            DeviceDirectory::new,
+            build_device_directory,
         );
     }
 
     // /dev/nanohub_comms requires a set of additional sysfs nodes, so create this route
-    // with a specialized NanohubCommsDirectory implementation.
+    // with a specialized directory.
     register_socket_tunnel_device(
         locked,
         current_task,
         "/dev/nanohub_comms".into(),
         "nanohub_comms".into(),
         "nanohub".into(),
-        NanohubCommsDirectory::new,
+        build_nanohub_comms_directory,
     );
 
     // Spawn future to bind and configure serial device
@@ -195,7 +192,6 @@ async fn register_serial_device(kernel: Arc<Kernel>) {
                                 current_task,
                                 "ttyHS1".into(),
                                 registry.objects.tty_class(),
-                                DeviceDirectory::new,
                                 serial_device,
                             )
                             .expect("Can register serial device");

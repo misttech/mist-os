@@ -27,7 +27,7 @@ TEST(BootloaderFilesItemTest, ParsesAll) {
   devicetree::ByteView fdt_blob(kChosenBootloaderFilesDtbStart, -1);
   devicetree::Devicetree fdt(fdt_blob);
   boot_shim::DevicetreeBootShim<DevicetreeBootloaderFilesItem> shim("test", fdt);
-  std::array<std::byte, 1024> scratch_buffer;
+  __attribute__((aligned(ZBI_ALIGNMENT))) std::byte scratch_buffer[1024];
   shim.Get<DevicetreeBootloaderFilesItem>().SetScratchBuffer(scratch_buffer);
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
@@ -65,6 +65,26 @@ TEST(BootloaderFilesItemTest, NoBootloaderFiles) {
   devicetree::ByteView fdt_blob(kChosenNoBootloaderFilesDtbStart, -1);
   devicetree::Devicetree fdt(fdt_blob);
   boot_shim::DevicetreeBootShim<DevicetreeBootloaderFilesItem> shim("test", fdt);
+  __attribute__((aligned(ZBI_ALIGNMENT))) std::byte scratch_buffer[1024];
+  shim.Get<DevicetreeBootloaderFilesItem>().SetScratchBuffer(scratch_buffer);
+  ASSERT_TRUE(shim.Init());
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  for (auto [header, payload] : image) {
+    ASSERT_NE(header->type, ZBI_TYPE_BOOTLOADER_FILE);
+  }
+}
+
+TEST(BootloaderFilesItemTest, UnalignedBuffer) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+  devicetree::ByteView fdt_blob(kChosenBootloaderFilesDtbStart, -1);
+  devicetree::Devicetree fdt(fdt_blob);
+  boot_shim::DevicetreeBootShim<DevicetreeBootloaderFilesItem> shim("test", fdt);
+  __attribute__((aligned(ZBI_ALIGNMENT))) std::byte scratch_buffer[1024];
+  shim.Get<DevicetreeBootloaderFilesItem>().SetScratchBuffer({scratch_buffer + 1, 1023});
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());

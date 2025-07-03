@@ -16,17 +16,19 @@ use anyhow::{Context, Result};
 use fidl_fuchsia_time_alarms as ffta;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use log::warn;
 use std::rc::Rc;
 
 // This is the production alarms crate.
 use alarms;
 
 enum Services {
-    Wake(ffta::WakeRequestStream),
+    Wake(ffta::WakeAlarmsRequestStream),
 }
 
-#[fuchsia::main(logging_tags = ["test"])]
+#[fuchsia::main(
+    logging_tags = ["test"],
+    logging_minimum_severity = "DEBUG",
+)]
 async fn main() -> Result<()> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     log::debug!("starting fake wake alarms service");
@@ -42,10 +44,8 @@ async fn main() -> Result<()> {
         .context("while trying to serve fuchsia.time.alarms/Wake")?;
 
     let timer_loop = alarms::connect_to_hrtimer_async()
-        .map_err(|e| {
-            warn!("could not connect to hrtimer: {}", &e);
-            e
-        })
+        .await
+        .inspect_err(|e| log::error!("could not connect to hrtimer: {}", &e))
         .map(|proxy| {
             Rc::new(alarms::Loop::new(proxy, inspector.root().create_child("wake_alarms")))
         })?;

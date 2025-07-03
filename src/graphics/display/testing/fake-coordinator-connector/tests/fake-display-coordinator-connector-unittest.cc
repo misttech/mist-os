@@ -13,7 +13,8 @@
 
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/drivers/fake/fake-display-device-config.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
@@ -30,8 +31,12 @@ class FakeDisplayCoordinatorConnectorTest : public gtest::TestLoopFixture {
     TestLoopFixture::SetUp();
 
     constexpr fake_display::FakeDisplayDeviceConfig kFakeDisplayDeviceConfig = {
+        .engine_info = display::EngineInfo({
+            .max_layer_count = 1,
+            .max_connected_display_count = 1,
+            .is_capture_supported = true,
+        }),
         .periodic_vsync = false,
-        .no_buffer_access = false,
     };
     coordinator_connector_ = std::make_unique<display::FakeDisplayCoordinatorConnector>(
         dispatcher(), kFakeDisplayDeviceConfig);

@@ -1,32 +1,29 @@
-{% let compat_crate_name = context.compat_crate_name() %}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
-    {% for ident in context.schema.declaration_order %}
-        {% let base_name = ident.decl_name() %}
-        {% let name = filters::ident(base_name.camel())? %}
+    {% for ident in self.schema().declaration_order %}
+        {% let name = filters::camel(ident.decl_name())? %}
+        {% let compat_name = filters::compat_camel(ident.decl_name())? %}
 
-        {% let restriction = context.bindings_compat_restriction(ident) %}
-        {% if !matches!(restriction, BindingsRestriction::Never) %}
-            {% match context.schema.declarations[ident] %}
+        {% let restriction = self.rust_or_rust_next_denylist(ident) %}
+        {% if !matches!(restriction, Denylist::Denied) %}
+            {% match self.schema().declarations[ident] %}
                 {% when DeclType::Bits %}
-                    {% let bits = context.schema.bits_declarations[ident] %}
                     {{ restriction }}
-                    impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                    impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                         #[inline]
                         fn from(from: crate::{{ name }}) -> Self {
                             Self::from_bits_retain(from.bits())
                         }
                     }
                 {% when DeclType::Enum %}
-                    {% let enm = context.schema.enum_declarations[ident] %}
+                    {% let enm = self.schema().enum_declarations[ident] %}
                     {{ restriction }}
-                    impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                    impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                         #[inline]
                         fn from(from: crate::{{ name }}) -> Self {
                             match crate::{{ name }}::from(from) {
                                 {% for member in enm.members %}
-                                    crate::{{ name }}::{{ member.name.camel()|ident }} =>
+                                    crate::{{ name }}::{{ member.name|camel }} =>
                                         Self::{{ member.name|compat_camel }},
                                 {% endfor %}
                                 {% if !enm.is_strict %}
@@ -37,8 +34,8 @@ pub mod compat {
                         }
                     }
                 {% when DeclType::Protocol %}
-                    {% let protocol = context.schema.protocol_declarations[ident] %}
-                    {% let protocol_name = filters::ident(protocol.name.decl_name().camel())? %}
+                    {% let protocol = self.schema().protocol_declarations[ident] %}
+                    {% let protocol_name = filters::camel(protocol.name.decl_name())? %}
                     {% let proxy_name = format!("{}Proxy", protocol.name.decl_name().camel()) %}
 
                     #[cfg(target_os = "fuchsia")]
@@ -58,15 +55,15 @@ pub mod compat {
                     }
                 {% when DeclType::Struct %}
                     {#
-                    {% let strct = context.schema.struct_declarations[ident] %}
+                    {% let strct = self.schema().struct_declarations[ident] %}
                     {% if !strct.is_empty_success_struct %}
                         {{ restriction }}
-                        impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                        impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                             #[inline]
                             fn from(from: crate::{{ name }}) -> Self {
                                 Self {
                                     {% for member in strct.members %}
-                                        {{ member.name|compat_snake }}: from.{{ member.name.snake()|ident }}.into(),
+                                        {{ member.name|compat_snake }}: from.{{ member.name|snake }}.into(),
                                     {% endfor %}
                                 }
                             }
@@ -75,14 +72,14 @@ pub mod compat {
                     #}
                 {% when DeclType::Table %}
                     {#
-                    {% let table = context.schema.table_declarations[ident] %}
+                    {% let table = self.schema().table_declarations[ident] %}
                     {{ restriction }}
-                    impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                    impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                         #[inline]
                         fn from(from: crate::{{ name }}) -> Self {
                             Self {
                                 {% for member in table.members %}
-                                    {{ member.name|compat_snake }}: {{ member.name.snake()|ident }}.map(::core::convert::From::from),
+                                    {{ member.name|compat_snake }}: {{ member.name|snake }}.map(::core::convert::From::from),
                                 {% endfor %}
                                 __source_breaking: ::fidl::marker::SourceBreaking,
                             }
@@ -90,16 +87,16 @@ pub mod compat {
                     }
                     #}
                 {% when DeclType::Union %}
-                    {% let union = context.schema.union_declarations[ident] %}
+                    {% let union = self.schema().union_declarations[ident] %}
                     {% if !union.is_result %}
                         {#
                         {{ restriction }}
-                        impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                        impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                             #[inline]
                             fn from(from: crate::{{ name }}) -> Self {
                                 match from {
                                     {% for member in union.members %}
-                                        crate::{{ name }}::{{ member.name.camel()|ident }}(value) => Self::{{ member.name|compat_camel }}(value.into()),
+                                        crate::{{ name }}::{{ member.name|camel }}(value) => Self::{{ member.name|compat_camel }}(value.into()),
                                     {% endfor %}
                                     {% if !union.is_strict %}
                                         crate::{{ name }}::UnknownOrdinal_(unknown_ordinal) => Self::__SourceBreaking { unknown_ordinal },
@@ -108,7 +105,7 @@ pub mod compat {
                             }
                         }
 
-                        impl ::core::convert::From<Option<Box<crate::{{ name }}>>> for Option<Box<::{{ compat_crate_name }}::{{ base_name|compat_camel }}>> {
+                        impl ::core::convert::From<Option<Box<crate::{{ name }}>>> for Option<Box<::{{ compat_crate_name }}::{{ compat_name }}>> {
                             #[inline]
                             fn from(from: Option<Box<crate::{{ name }}>>) -> Self {
                                 from.map(|inner| Box::new(::core::convert::From::from(*inner)))

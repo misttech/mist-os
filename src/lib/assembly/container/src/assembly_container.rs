@@ -12,7 +12,7 @@ use pathdiff::diff_paths;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::fs::{copy, create_dir_all};
+use std::fs::create_dir_all;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -384,7 +384,7 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
                 create_dir_all(&to_path).with_context(|| format!("creating {to_path:?}"))?;
             }
         } else {
-            copy(entry.path(), &to_path)
+            assembly_util::fast_copy(entry.path(), &to_path)
                 .with_context(|| format!("copying {:?} to {:?}", entry.path(), to_path))?;
         }
     }

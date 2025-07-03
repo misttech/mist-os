@@ -176,8 +176,8 @@ class TestMixin : public zxtest::Test, public Base... {
 void CheckCpuTopology(std::span<const zbi_topology_node_t> actual_nodes,
                       std::span<const zbi_topology_node_t> expected_nodes);
 
-void CheckMmioRanges(std::span<const boot_shim::DevicetreeMmioRange> actual,
-                     std::span<const boot_shim::DevicetreeMmioRange> expected);
+void CheckMmioRanges(std::span<const boot_shim::MmioRange> actual,
+                     std::span<const boot_shim::MmioRange> expected);
 
 }  // namespace boot_shim::testing
 

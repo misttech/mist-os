@@ -340,7 +340,7 @@ impl FileOps for PerfEventFile {
 }
 
 pub fn sys_perf_event_open(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     attr: UserRef<perf_event_attr>,
     tid: tid_t,
@@ -409,9 +409,10 @@ pub fn sys_perf_event_open(
         perf_event_file: RwLock::new(perf_event_file),
     });
     // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
-    let file_handle = Anon::new_private_file(current_task, file, OpenFlags::RDWR, "[perf_event]");
+    let file_handle =
+        Anon::new_private_file(locked, current_task, file, OpenFlags::RDWR, "[perf_event]");
     let file_descriptor: Result<FdNumber, Errno> =
-        current_task.add_file(file_handle, FdFlags::empty());
+        current_task.add_file(locked, file_handle, FdFlags::empty());
 
     match file_descriptor {
         Ok(fd) => Ok(fd.into()),

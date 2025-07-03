@@ -42,20 +42,17 @@
 #include <ktl/algorithm.h>
 #include <lk/init.h>
 #include <phys/handoff.h>
-#include <platform/console.h>
 #include <platform/crashlog.h>
 #include <platform/efi.h>
 #include <platform/efi_crashlog.h>
-#include <platform/keyboard.h>
 #include <platform/pc.h>
 #include <platform/pc/acpi.h>
+#include <platform/pc/memory.h>
 #include <platform/pc/smbios.h>
 #include <platform/ram_mappable_crashlog.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm_aspace.h>
-
-#include "platform_p.h"
 
 #include <ktl/enforce.h>
 
@@ -396,13 +393,14 @@ zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug
 const char* manufacturer = "unknown";
 const char* product = "unknown";
 
-extern Cbuf rx_queue;
+//extern Cbuf rx_queue;
 
 void platform_init(void) {
   platform_init_crashlog();
 
 #if NO_USER_KEYBOARD
-  platform_init_keyboard(&rx_queue);
+  platform_init_keyboard(&console_input_buf);
+  //platform_init_keyboard(&rx_queue);
 #endif
 
   // Initialize all PvEoi instances prior to starting secondary CPUs.

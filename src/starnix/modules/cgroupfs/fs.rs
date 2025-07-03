@@ -7,7 +7,7 @@ use starnix_core::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeHandle,
     FsNodeInfo, FsStr,
 };
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -27,7 +27,7 @@ pub struct CgroupV1Fs {
 
 impl CgroupV1Fs {
     pub fn new_fs(
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -35,8 +35,13 @@ impl CgroupV1Fs {
         let root = CgroupRoot::new();
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&root));
         let root_dir = dir_nodes.root.clone();
-        let fs =
-            FileSystem::new(kernel, CacheMode::Uncached, CgroupV1Fs { dir_nodes, root }, options)?;
+        let fs = FileSystem::new(
+            locked,
+            kernel,
+            CacheMode::Uncached,
+            CgroupV1Fs { dir_nodes, root },
+            options,
+        )?;
         root_dir.create_root_interface_files(&fs);
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, root_dir);
@@ -64,27 +69,39 @@ pub struct CgroupV2Fs {
 
 struct CgroupV2FsHandle(FileSystemHandle);
 pub fn cgroup2_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     Ok(current_task
         .kernel()
         .expando
-        .get_or_try_init(|| Ok(CgroupV2FsHandle(CgroupV2Fs::new_fs(current_task, options)?)))?
+        .get_or_try_init(|| {
+            Ok(CgroupV2FsHandle(CgroupV2Fs::new_fs(locked, current_task, options)?))
+        })?
         .0
         .clone())
 }
 
 impl CgroupV2Fs {
-    fn new_fs(
+    fn new_fs<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let kernel = current_task.kernel();
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&kernel.cgroups.cgroup2));
         let root = dir_nodes.root.clone();
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, CgroupV2Fs { dir_nodes }, options)?;
+        let fs = FileSystem::new(
+            locked,
+            kernel,
+            CacheMode::Uncached,
+            CgroupV2Fs { dir_nodes },
+            options,
+        )?;
         root.create_root_interface_files(&fs);
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, root);
@@ -171,12 +188,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_filesystem_creates_nodes() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let registry = kernel.expando.get::<FsRegistry>();
         registry.register(b"cgroup2".into(), cgroup2_fs);
 
         let fs = current_task
-            .create_filesystem(&mut locked, b"cgroup2".into(), Default::default())
+            .create_filesystem(locked, b"cgroup2".into(), Default::default())
             .expect("create_filesystem");
 
         let cgroupfs = fs.downcast_ops::<CgroupV2Fs>().expect("downcast_ops");

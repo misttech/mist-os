@@ -5,8 +5,7 @@
 use serde::Deserialize;
 
 use super::r#type::Type;
-use super::{Attributes, CompIdent, Ident};
-use crate::de::Index;
+use super::{Attributes, CompIdent, Decl, DeclType, Ident};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Protocol {
@@ -19,21 +18,23 @@ pub struct Protocol {
     pub openness: ProtocolOpenness,
 }
 
-impl Index for Protocol {
-    type Key = CompIdent;
+impl Decl for Protocol {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Protocol
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
     }
 }
 
 impl Protocol {
     pub fn transport(&self) -> Option<&str> {
-        self.attributes
-            .attributes
-            .get("transport")
-            .and_then(|attr| attr.args.get("value"))
-            .map(|arg| arg.value.value.as_str())
+        self.attributes.get("transport")
     }
 }
 

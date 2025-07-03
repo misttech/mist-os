@@ -17,8 +17,10 @@
 
 namespace storage {
 
+constexpr const char* kTestPartitionName = "fs-test-partition";
+
 struct FvmOptions {
-  std::string_view name = "fs-test-partition";
+  std::string_view name = kTestPartitionName;
 
   // If not set, a test GUID type is used.
   std::optional<std::array<uint8_t, 16>> type;
@@ -26,7 +28,7 @@ struct FvmOptions {
   uint64_t initial_fvm_slice_count = 1;
 };
 
-// Manages a bound FVM driver.
+// Manages an FVM component instance.
 class FvmInstance {
  public:
   FvmInstance(fs_management::FsComponent component, fs_management::StartedMultiVolumeFilesystem fs)
@@ -39,7 +41,7 @@ class FvmInstance {
   fs_management::StartedMultiVolumeFilesystem fs_;
 };
 
-// Manages a specific partition and a bound FVM driver.
+// Manages a specific partition and a launched FVM component.
 class FvmPartition {
  public:
   FvmPartition(FvmInstance fvm, fs_management::NamespaceBinding binding,
@@ -48,6 +50,8 @@ class FvmPartition {
         binding_(std::move(binding)),
         partition_name_(partition_name),
         path_(path) {}
+
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>> Connect() const;
 
   FvmInstance& fvm() { return fvm_; }
   const std::string& partition_name() const { return partition_name_; }
@@ -63,19 +67,17 @@ class FvmPartition {
   std::string path_;
 };
 
-// Formats the given block device to be managed by FVM, and start up an FVM instance.
-//
-// Returns that path to the FVM device.
-zx::result<FvmInstance> CreateFvmInstance(const std::string& device_path, size_t slice_size);
-
-// Formats the given block device to be FVM managed, and create a new partition on the device.
+// Formats the given block device to be FVM managed, launches an FVM component, and creates a new
+// partition on the device.
 //
 // Returns the path to the newly created block device.
 zx::result<FvmPartition> CreateFvmPartition(const std::string& device_path, size_t slice_size,
                                             const FvmOptions& options = {});
 
-// Binds the FVM driver to the given device.
-zx::result<> BindFvm(fidl::UnownedClientEnd<fuchsia_device::Controller> device);
+// Launches an FVM component for the given device, and opens the partition which was previously
+// created by `CreateFvmPartition`.
+zx::result<FvmPartition> OpenFvmPartition(const std::string& device_path,
+                                          std::string_view partition_name = kTestPartitionName);
 
 }  // namespace storage
 

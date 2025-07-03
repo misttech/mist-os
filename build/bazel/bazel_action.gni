@@ -17,6 +17,9 @@ declare_args() {
   # uses the //:console pool to print its output directly
   # to stdout/stderr during the Ninja build.
   bazel_quiet = false
+
+  # Output extra information when Bazel build actions fail.
+  bazel_verbose_failures = true
 }
 
 # Wrap a Bazel command with a GN action.
@@ -665,7 +668,6 @@ template("bazel_action") {
     script = "//build/bazel/scripts/bazel_action.py"
 
     inputs = [
-               "//build/bazel/toplevel.WORKSPACE.bzlmod",
                "//build/bazel/toplevel.MODULE.bazel",
 
                # Imported by bazel_action.py
@@ -722,6 +724,9 @@ template("bazel_action") {
            ]
     foreach(s, _dedupe_stamps) {
       args += [ rebase_path(s, root_build_dir) ]
+    }
+    if (bazel_verbose_failures) {
+      args += [ "--verbose_failures" ]
     }
 
     if (_has_file_outputs) {

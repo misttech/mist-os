@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
-use fidl_fuchsia_update::{
-    ListenerRequest, ListenerRequestStream, ListenerWaitForFirstUpdateCheckToCompleteResponder,
-};
+use fidl::endpoints::ControlHandle as _;
+use fidl_fuchsia_update::{ListenerRequest, ListenerRequestStream, NotifierProxy};
 use fidl_fuchsia_update_ext::State;
 use futures::channel::mpsc;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
@@ -17,7 +16,7 @@ pub(crate) struct CompletionResponder {
 }
 
 enum CompletionResponderState {
-    Waiting(Vec<ListenerWaitForFirstUpdateCheckToCompleteResponder>),
+    Waiting { notifiers: Vec<NotifierProxy> },
     Satisfied,
 }
 
@@ -28,7 +27,7 @@ pub(crate) struct CompletionResponderFidlServer(mpsc::UnboundedSender<Message>);
 
 enum Message {
     Completed,
-    NewWaiter(ListenerWaitForFirstUpdateCheckToCompleteResponder),
+    NewNotifier(NotifierProxy),
 }
 
 impl CompletionResponderFidlServer {
@@ -40,8 +39,16 @@ impl CompletionResponderFidlServer {
             request_stream.try_next().await.context("extracting request from stream")?
         {
             match request {
-                ListenerRequest::WaitForFirstUpdateCheckToComplete { responder, .. } => {
-                    if let Err(e) = self.0.send(Message::NewWaiter(responder)).await {
+                ListenerRequest::NotifyOnFirstUpdateCheck { payload, control_handle } => {
+                    let notifier = match payload.notifier {
+                        Some(notifier) => notifier,
+                        None => {
+                            // This is a required field.
+                            control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                            return Ok(());
+                        }
+                    };
+                    if let Err(e) = self.0.send(Message::NewNotifier(notifier.into_proxy())).await {
                         warn!(e:?; "Internal bug; this send should always succeed");
                     }
                 }
@@ -87,7 +94,7 @@ impl CompletionResponder {
         (
             CompletionResponderStateReactor(sender.clone()),
             CompletionResponderFidlServer(sender),
-            Self { state: CompletionResponderState::Waiting(Vec::new()), receiver },
+            Self { state: CompletionResponderState::Waiting { notifiers: Vec::new() }, receiver },
         )
     }
 
@@ -95,7 +102,7 @@ impl CompletionResponder {
         while let Some(message) = self.receiver.next().await {
             match message {
                 Message::Completed => self.state.become_satisfied(),
-                Message::NewWaiter(responder) => self.state.respond_when_appropriate(responder),
+                Message::NewNotifier(notifier) => self.state.notify_when_appropriate(notifier),
             }
         }
         warn!("CompletionResponder stream shouldn't close");
@@ -104,23 +111,27 @@ impl CompletionResponder {
 
 impl CompletionResponderState {
     fn become_satisfied(&mut self) {
-        if let CompletionResponderState::Waiting(ref mut responders) = self {
-            for responder in responders.drain(..) {
-                let _ = responder.send();
+        if let CompletionResponderState::Waiting { ref mut notifiers } = self {
+            for notifier in notifiers.drain(..) {
+                if let Err(e) = notifier.notify() {
+                    warn!(
+                        "Received FIDL error notifying client of software update completion: {e:?}"
+                    );
+                }
             }
             *self = CompletionResponderState::Satisfied;
         }
     }
 
-    fn respond_when_appropriate(
-        &mut self,
-        responder: ListenerWaitForFirstUpdateCheckToCompleteResponder,
-    ) {
+    fn notify_when_appropriate(&mut self, notifier: NotifierProxy) {
         match self {
-            CompletionResponderState::Waiting(ref mut responses) => responses.push(responder),
+            CompletionResponderState::Waiting { ref mut notifiers } => notifiers.push(notifier),
             CompletionResponderState::Satisfied => {
-                // If the client has closed the connection, that's not our concern.
-                let _ = responder.send();
+                if let Err(e) = notifier.notify() {
+                    warn!(
+                        "Received FIDL error notifying client of software update completion: {e:?}"
+                    );
+                }
             }
         }
     }
@@ -130,13 +141,18 @@ impl CompletionResponderState {
 mod tests {
     use super::*;
     use crate::CompletionResponder;
+    use assert_matches::assert_matches;
     use core::task::Poll;
-    use fidl_fuchsia_update::ListenerMarker;
+    use fidl_fuchsia_update::{
+        ListenerMarker, ListenerNotifyOnFirstUpdateCheckRequest, ListenerProxy, NotifierMarker,
+        NotifierRequest,
+    };
     use fidl_fuchsia_update_ext::{
         InstallationDeferredData, InstallationErrorData, InstallingData,
     };
     use fuchsia_async::{self as fasync, TestExecutor};
     use futures::pin_mut;
+    use test_case::test_case;
 
     // Don't drop tasks until the end of the test.
     fn setup_responder(
@@ -146,43 +162,67 @@ mod tests {
         (reactor, server, task)
     }
 
-    async fn wait_for_completion(server: CompletionResponderFidlServer) {
+    fn spawn_server(server: CompletionResponderFidlServer) -> ListenerProxy {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ListenerMarker>();
         fasync::Task::local(async move {
             server.serve_completion_responses(stream).await.unwrap();
         })
         .detach();
-        proxy.wait_for_first_update_check_to_complete().await.unwrap();
+        proxy
     }
 
+    enum TestExpect {
+        /// Listener is waiting for the correct state.
+        Wait,
+        /// Listener has notified clients.
+        Notify,
+    }
+
+    #[test_case(
+        State::InstallationDeferredByPolicy(InstallationDeferredData::default()),
+        TestExpect::Notify
+    )]
+    #[test_case(State::NoUpdateAvailable, TestExpect::Notify)]
+    #[test_case(State::ErrorCheckingForUpdate, TestExpect::Notify)]
+    #[test_case(State::CheckingForUpdates, TestExpect::Wait)]
+    #[test_case(State::InstallingUpdate(InstallingData::default()), TestExpect::Wait)]
+    #[test_case(State::WaitingForReboot(InstallingData::default()), TestExpect::Wait)]
+    #[test_case(State::InstallationError(InstallationErrorData::default()), TestExpect::Wait)]
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_whether_state_satisfies() {
-        for state in [
-            State::InstallationDeferredByPolicy(InstallationDeferredData::default()),
-            State::NoUpdateAvailable,
-            State::ErrorCheckingForUpdate,
-            State::CheckingForUpdates,
-            State::InstallingUpdate(InstallingData::default()),
-            State::WaitingForReboot(InstallingData::default()),
-            State::InstallationError(InstallationErrorData::default()),
-        ] {
-            let (mut reactor, server, _task) = setup_responder();
-            reactor.react_to(&state).await;
-            let fut = wait_for_completion(server);
-            pin_mut!(fut);
-            let result = TestExecutor::poll_until_stalled(&mut fut).await;
-            match state {
-                State::InstallationDeferredByPolicy(_)
-                | State::NoUpdateAvailable
-                | State::ErrorCheckingForUpdate => {
-                    assert_eq!(result, Poll::Ready(()), "State {state:?} didn't satisfy");
-                }
-                State::CheckingForUpdates
-                | State::InstallingUpdate(_)
-                | State::WaitingForReboot(_)
-                | State::InstallationError(_) => {
-                    assert_eq!(result, Poll::Pending, "State {state:?} satisfied");
-                }
+    async fn test_whether_state_satisfies(state: State, expect: TestExpect) {
+        let (mut reactor, server, _task) = setup_responder();
+        reactor.react_to(&state).await;
+        let proxy = spawn_server(server);
+
+        let (notifier_client, notifier_server) =
+            fidl::endpoints::create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+
+        let mut notifier_stream = notifier_server.into_stream();
+        let notify_fut = notifier_stream.try_next();
+        pin_mut!(notify_fut);
+        let notify_result = TestExecutor::poll_until_stalled(&mut notify_fut).await;
+
+        match expect {
+            TestExpect::Notify => {
+                assert_matches!(
+                    notify_result,
+                    Poll::Ready(Ok(Some(NotifierRequest::Notify { .. }))),
+                    "Notifier didn't receive request"
+                );
+            }
+            TestExpect::Wait => {
+                assert_matches!(
+                    notify_result,
+                    Poll::Pending,
+                    "Notifier received unexpected request"
+                );
             }
         }
     }
@@ -190,19 +230,64 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn correct_response_sequencing() {
         let (mut reactor, server, _task) = setup_responder();
-        let waiter1 = wait_for_completion(server.clone());
-        let waiter2 = wait_for_completion(server.clone());
-        pin_mut!(waiter1);
-        pin_mut!(waiter2);
+        let proxy1 = spawn_server(server.clone());
+        let proxy2 = spawn_server(server.clone());
+
+        let (notifier_client_1, notifier_server_1) =
+            fidl::endpoints::create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy1.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client_1),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+        let mut notifier_stream_1 = notifier_server_1.into_stream();
+        let notifier1 = notifier_stream_1.try_next();
+        pin_mut!(notifier1);
+
+        let (notifier_client_2, notifier_server_2) =
+            fidl::endpoints::create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy2.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client_2),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+        let mut notifier_stream_2 = notifier_server_2.into_stream();
+        let notifier2 = notifier_stream_2.try_next();
+        pin_mut!(notifier2);
 
         reactor.react_to(&State::CheckingForUpdates).await;
-        assert_eq!(TestExecutor::poll_until_stalled(&mut waiter1).await, Poll::Pending);
-        assert_eq!(TestExecutor::poll_until_stalled(&mut waiter2).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut notifier1).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut notifier2).await, Poll::Pending);
 
         reactor.react_to(&State::NoUpdateAvailable).await;
-        waiter1.await;
-        waiter2.await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut notifier1).await,
+            Poll::Ready(Ok(Some(NotifierRequest::Notify { .. })))
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut notifier2).await,
+            Poll::Ready(Ok(Some(NotifierRequest::Notify { .. })))
+        );
+
         // Clients that start to wait after the happy state is received should return immediately.
-        wait_for_completion(server).await;
+        let proxy3 = spawn_server(server);
+        let (notifier_client_3, notifier_server_3) =
+            fidl::endpoints::create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy3.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client_3),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+        let mut notifier_stream_3 = notifier_server_3.into_stream();
+        assert_matches!(
+            notifier_stream_3.try_next().await,
+            Ok(Some(NotifierRequest::Notify { .. }))
+        );
     }
 }

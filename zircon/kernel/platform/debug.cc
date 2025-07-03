@@ -168,6 +168,16 @@ void UartDriverHandoffEarly(const uart::all::Driver& serial) {
       serial);
 
   gUart = serial;
+  if constexpr (DPRINTF_ENABLED_FOR_LEVEL(INFO)) {
+    if (is_serial_enabled) {
+      ktl::array<char, 128> buffer = {};
+      StringFile file{buffer};
+      fprintf(&file, "UART: Selected driver kernel.serial=");
+      gUart.Unparse(&file);
+      dprintf(INFO, "%.*s\n", static_cast<int>(file.as_string_view().size()),
+              file.as_string_view().data());
+    }
+  }
 }
 
 void UartDriverHandoffLate(const uart::all::Driver& serial) {
@@ -199,7 +209,7 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
     if (!uart_irq || gBootOptions->debug_uart_poll) {
       // Start the polling without performing any drain.
       UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_mono_time(), nullptr);
-      printf("UART: POLLING mode enabled.\n");
+      dprintf(INFO, "UART: POLLING mode enabled.\n");
       polling_mode = true;
       return;
     }
@@ -273,10 +283,10 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
   });
 
   if (!polling_mode) {
-    printf("UART: IRQ driven RX: enabled\n");
+    dprintf(INFO, "UART: IRQ driven RX: enabled\n");
 
     is_tx_irq_enabled = !dlog_bypass();
-    printf("UART: IRQ driven TX: %s\n", is_tx_irq_enabled ? "enabled" : "disabled");
+    dprintf(INFO, "UART: IRQ driven TX: %s\n", is_tx_irq_enabled ? "enabled" : "disabled");
   }
 }
 

@@ -19,6 +19,7 @@ def main() -> int:
     parser.add_argument(
         "--aib-list", type=argparse.FileType("r"), required=True
     )
+    parser.add_argument("--name", type=str, required=True)
     parser.add_argument("--version", type=str)
     parser.add_argument("--repo", type=str, required=True)
     parser.add_argument("--tools", type=str, nargs="*")
@@ -54,7 +55,7 @@ def main() -> int:
     version = args.version if args.version else "unversioned"
     config_data = {
         "release_info": {
-            "name": "fuchsia_platform_artifacts",
+            "name": args.name,
             "repository": args.repo,
             "version": version,
         },

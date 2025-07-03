@@ -4,10 +4,7 @@
 
 group("lib") {
   testonly = true
-  deps = [
-    "core",
-    "usb_vsock",
-  ]
+  deps = [ "core" ]
   if (is_host) {
     deps += [ "ascendd" ]
   }
@@ -18,6 +15,5 @@ group("tests") {
   deps = [
     "circuit:tests",
     "core:tests",
-    "usb_vsock:tests",
   ]
 }

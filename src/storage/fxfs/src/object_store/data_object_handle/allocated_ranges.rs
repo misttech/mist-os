@@ -77,6 +77,10 @@ impl AllocatedRanges {
         self.ranges.lock().clear();
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.ranges.lock().is_empty()
+    }
+
     /// Find the overlapping overwrite ranges in the given range for this file, so writes can be
     /// split between them appropriately. Ranges with RangeType::Overwrite should be written to
     /// with multi_overwrite and RangeType::Cow should use multi_write.

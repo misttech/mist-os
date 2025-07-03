@@ -1,0 +1,23 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This shard provides support for running a recovery package from bootfs
+// in the bootstrap realm before filesystems are mounted.
+{
+    children: [
+        {
+            name: "bootfs_recovery",
+            url: "{{COMPONENT_URL}}",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.fshost.Admin" ],
+            from: "#fshost",
+            to: "#bootfs_recovery",
+            source_availability: "unknown",
+        },
+    ]
+}

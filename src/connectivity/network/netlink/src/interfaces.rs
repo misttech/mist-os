@@ -60,10 +60,13 @@ use crate::FeatureFlags;
 /// A handler for interface events.
 pub trait InterfacesHandler: Send + Sync + 'static {
     /// Handle a new link.
-    fn handle_new_link(&mut self, name: &str);
+    fn handle_new_link(&mut self, name: &str, interface_id: NonZeroU64);
 
     /// Handle a deleted link.
     fn handle_deleted_link(&mut self, name: &str);
+
+    /// Handle the idle event.
+    fn handle_idle_event(&mut self) {}
 }
 
 /// Represents the ways RTM_*LINK messages may specify an individual link.
@@ -266,6 +269,12 @@ pub(crate) struct InterfacesWorkerState<
         u64,
         fnet_interfaces_ext::PropertiesAndState<InterfaceState, fnet_interfaces_ext::AllInterest>,
     >,
+    /// Corresponds to the `/proc/sys/net/ipv6/conf/default/accept_ra_rt_table`.
+    /// It is the default sysctl value for the interfaces to be added.
+    pub(crate) default_accept_ra_rt_table: AcceptRaRtTable,
+    /// Corresponds to the `/proc/sys/net/ipv6/conf/all/accept_ra_rt_table`.
+    /// It does _nothing_ upon write, same as Linux.
+    pub(crate) all_accept_ra_rt_table: AcceptRaRtTable,
 }
 
 /// FIDL errors from the interfaces worker.
@@ -293,6 +302,49 @@ pub(crate) enum InterfacesNetstackError {
     Update(fnet_interfaces_ext::UpdateError),
 }
 
+/// This models the `accept_ra_rt_table` sysctl.
+///
+/// The sysctl behaves as follows:
+///   - = 0: default. Put routes into RT6_TABLE_MAIN if the interface
+///     is not in a VRF, or into the VRF table if it is.
+///   - > 0: manual. Put routes into the specified table.
+///   - < 0: automatic. Add the absolute value of the sysctl to the
+///     device's ifindex, and use that table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum AcceptRaRtTable {
+    /// Installs routes in the main table.
+    #[default]
+    Main,
+    /// Installs routes in the specified table.
+    Manual(u32),
+    /// Installs routes in table ID that is interface ID plus the diff.
+    Auto(u32),
+}
+
+impl From<i32> for AcceptRaRtTable {
+    fn from(val: i32) -> Self {
+        if val == 0 {
+            Self::Main
+        } else if val > 0 {
+            Self::Manual(val.unsigned_abs())
+        } else {
+            Self::Auto(val.unsigned_abs())
+        }
+    }
+}
+
+impl From<AcceptRaRtTable> for i32 {
+    fn from(val: AcceptRaRtTable) -> Self {
+        match val {
+            AcceptRaRtTable::Main => 0,
+            AcceptRaRtTable::Manual(val) => i32::try_from(val).expect("larger than i32::MAX"),
+            AcceptRaRtTable::Auto(val) => {
+                0i32.checked_sub_unsigned(val).expect("less than i32::MIN")
+            }
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub(crate) struct InterfaceState {
     // `BTreeMap` so that addresses are iterated in deterministic order
@@ -300,6 +352,7 @@ pub(crate) struct InterfaceState {
     addresses: BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
     link_address: Option<Vec<u8>>,
     control: Option<fnet_interfaces_ext::admin::Control>,
+    pub(crate) accept_ra_rt_table: AcceptRaRtTable,
 }
 
 async fn set_link_address(
@@ -422,6 +475,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                             addresses: Default::default(),
                             link_address: Some(vec![0, 0, 0, 0, 0, 0]),
                             control: None,
+                            accept_ra_rt_table: AcceptRaRtTable::default(),
                         },
                         properties: fake_ifb0::fake_ifb0_properties(),
                     },
@@ -432,7 +486,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
         for fnet_interfaces_ext::PropertiesAndState {
             properties,
-            state: InterfaceState { addresses, link_address, control: _ },
+            state: InterfaceState { addresses, link_address, control: _, accept_ra_rt_table: _ },
         } in interface_properties.values_mut()
         {
             set_link_address(&interfaces_proxy, properties.id, link_address, feature_flags).await;
@@ -443,8 +497,10 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 *addresses = interface_addresses;
             }
 
-            interfaces_handler.handle_new_link(&properties.name);
+            interfaces_handler.handle_new_link(&properties.name, properties.id);
         }
+
+        interfaces_handler.handle_idle_event();
 
         Ok((
             InterfacesWorkerState {
@@ -452,6 +508,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 interfaces_proxy,
                 route_clients,
                 interface_properties,
+                default_accept_ra_rt_table: Default::default(),
+                all_accept_ra_rt_table: Default::default(),
             },
             if_event_stream,
         ))
@@ -475,7 +533,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         match update {
             fnet_interfaces_ext::UpdateResult::Added {
                 properties,
-                state: InterfaceState { addresses, link_address, control: _ },
+                state: InterfaceState { addresses, link_address, control: _, accept_ra_rt_table },
             } => {
                 set_link_address(
                     &self.interfaces_proxy,
@@ -484,6 +542,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     feature_flags,
                 )
                 .await;
+                // The newly added device should have the default sysctl.
+                *accept_ra_rt_table = self.default_accept_ra_rt_table;
 
                 if let Some(message) = NetlinkLinkMessage::optionally_from(properties, link_address)
                 {
@@ -502,7 +562,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     update_addresses(addresses, updated_addresses, &self.route_clients);
                 }
 
-                self.interfaces_handler.handle_new_link(&properties.name);
+                self.interfaces_handler.handle_new_link(&properties.name, properties.id);
 
                 log_debug!("processed add/existing event for id {}", properties.id);
             }
@@ -528,7 +588,13 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         has_default_ipv4_route: _,
                         has_default_ipv6_route: _,
                     },
-                state: InterfaceState { addresses: interface_addresses, link_address, control: _ },
+                state:
+                    InterfaceState {
+                        addresses: interface_addresses,
+                        link_address,
+                        control: _,
+                        accept_ra_rt_table: _,
+                    },
             } => {
                 if online.is_some() {
                     if let Some(message) =
@@ -565,7 +631,13 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             fnet_interfaces_ext::UpdateResult::Removed(
                 fnet_interfaces_ext::PropertiesAndState {
                     properties,
-                    state: InterfaceState { mut addresses, link_address, control: _ },
+                    state:
+                        InterfaceState {
+                            mut addresses,
+                            link_address,
+                            control: _,
+                            accept_ra_rt_table: _,
+                        },
                 },
             ) => {
                 update_addresses(&mut addresses, BTreeMap::new(), &self.route_clients);
@@ -610,7 +682,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             // event for the interface.
             let fnet_interfaces_ext::PropertiesAndState {
                 properties: _,
-                state: InterfaceState { addresses, link_address: _, control: _ },
+                state:
+                    InterfaceState { addresses, link_address: _, control: _, accept_ra_rt_table: _ },
             } = self
                 .interface_properties
                 .get(&interface_id.get().into())
@@ -722,7 +795,13 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             .filter_map(
                 |fnet_interfaces_ext::PropertiesAndState {
                      properties,
-                     state: InterfaceState { addresses: _, link_address, control: _ },
+                     state:
+                         InterfaceState {
+                             addresses: _,
+                             link_address,
+                             control: _,
+                             accept_ra_rt_table: _,
+                         },
                  }| {
                     NetlinkLinkMessage::optionally_from(&properties, &link_address)
                 },
@@ -866,6 +945,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         }
                         AddressRemovalReason::AlreadyAssigned => RequestError::AlreadyExists,
                         reason @ (AddressRemovalReason::DadFailed
+                        | AddressRemovalReason::Forfeited
                         | AddressRemovalReason::InterfaceRemoved
                         | AddressRemovalReason::UserRemoved) => {
                             // These errors are only returned when the address
@@ -1547,7 +1627,7 @@ pub(crate) mod testutil {
     }
 
     impl InterfacesHandler for FakeInterfacesHandler {
-        fn handle_new_link(&mut self, name: &str) {
+        fn handle_new_link(&mut self, name: &str, _interface_id: NonZeroU64) {
             let Self(rc) = self;
             rc.lock()
                 .unwrap()

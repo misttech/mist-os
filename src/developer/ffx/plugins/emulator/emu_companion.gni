@@ -35,7 +35,6 @@ template("emu_companion") {
   assert(defined(invoker.sdk_dest_path),
          "Must define the destination path relative to SDK root")
 
-  source_files = [ invoker.default_binary ]
   if (defined(invoker.prebuilt_files)) {
     assert(
         invoker.prebuilt_files != [],
@@ -43,39 +42,6 @@ template("emu_companion") {
     included_files = []
     foreach(f, invoker.prebuilt_files) {
       included_files += [ rebase_path(f, invoker.prebuilt_path) ]
-    }
-    source_files += invoker.prebuilt_files
-  }
-
-  create_data_action_name = "${target_name}_create_companion_data"
-
-  action(create_data_action_name) {
-    forward_variables_from(invoker, [ "testonly" ])
-    visibility = [ ":*" ]
-    script = "//src/developer/ffx/plugins/emulator/create_companion_data.py"
-    sources = source_files
-    inputs = [ invoker.prebuilt_path ]
-    outputs = [
-      "$target_gen_dir/${target_name}.txt",
-      "$target_gen_dir/${target_name}_metadata.json",
-    ]
-    args = [
-      "--name",
-      invoker.target_name,
-      "--binary",
-      rebase_path(sources[0], root_build_dir),
-      "--src_root",
-      rebase_path(inputs[0], root_build_dir),
-      "--dest_root",
-      invoker.sdk_dest_path,
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-      "--meta_out",
-      rebase_path(outputs[1], root_build_dir),
-    ]
-    if (defined(included_files)) {
-      args += [ "--include" ]
-      args += included_files
     }
   }
 
@@ -88,13 +54,9 @@ template("emu_companion") {
     id = "sdk://tools/$current_cpu/${target_name}"
     category = "partner"
 
-    # Declare the support files to add for this host tool.
-    _file_list_array = get_target_outputs(":${create_data_action_name}")
-
     meta = {
       dest = "${invoker.sdk_dest_path}-meta.json"
       type = "companion_host_tool"
-      source = _file_list_array[1]
       source_prebuild_info = {
         name = invoker.target_name
         binary = rebase_path(invoker.default_binary, root_build_dir)
@@ -105,9 +67,5 @@ template("emu_companion") {
         }
       }
     }
-
-    file_list = _file_list_array[0]
-
-    non_sdk_deps = [ ":${create_data_action_name}" ]
   }
 }

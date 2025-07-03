@@ -2,6 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+group("products") {
+  testonly = true
+  deps = [
+    "//products/microfuchsia:products",
+    "//products/minimal:products",
+    "//products/terminal:products",
+    "//products/workbench:products",
+  ]
+}
+
 group("product_bundles") {
   testonly = true
   deps = [

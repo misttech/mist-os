@@ -216,20 +216,11 @@ void Server::TxnEnd() {
 }
 
 zx::result<std::unique_ptr<Server>> Server::Create(
-    ddk::BlockProtocolClient* bp, fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map,
-    std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings) {
-  if (offset_map.is_valid()) {
-    // TODO(https://fxbug.dev/402515764): Support dynamically querying offsets for FVM as needed.
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
+    ddk::BlockProtocolClient* bp,
+    std::optional<fuchsia_hardware_block::wire::BlockOffsetMapping> mapping) {
   std::unique_ptr<OffsetMap> map;
-  if (!initial_mappings.empty()) {
-    if (initial_mappings.size() != 1) {
-      // TODO(https://fxbug.dev/402515764): support multiple mappings for FVM as needed.
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-    zx::result result = OffsetMap::Create(initial_mappings.front());
+  if (mapping) {
+    zx::result result = OffsetMap::Create(*mapping);
     if (result.is_error()) {
       return result.take_error();
     }

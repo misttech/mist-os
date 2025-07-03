@@ -17,7 +17,6 @@
 // Lookup the data rate for a given set of PHY data rate parameters.
 // See IEEE 802.11-2016 19.5 and IEEE 802.11-2016 21.5 for details on data rate parameters.
 
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <zircon/status.h>
 #include <zircon/types.h>

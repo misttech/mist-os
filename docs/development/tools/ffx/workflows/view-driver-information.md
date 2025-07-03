@@ -272,9 +272,9 @@ dev.sys.platform.pt.acpi.acpi-_SB_
 dev.sys.platform.pt.acpi.acpi-_TZ_
 dev.sys.platform.00_00_1b.sysmem.sysmem-banjo
 dev.sys.platform.00_00_1b.sysmem.sysmem-fidl
-dev.sys.platform.pt.PCI0.bus.00_00.0
-dev.sys.platform.pt.PCI0.bus.00_01.0
-dev.sys.platform.pt.PCI0.bus.00_02.0
+dev.sys.platform.pt.PCI0.bus.00_00_0
+dev.sys.platform.pt.PCI0.bus.00_01_0
+dev.sys.platform.pt.PCI0.bus.00_02_0
 ...
 ```
 

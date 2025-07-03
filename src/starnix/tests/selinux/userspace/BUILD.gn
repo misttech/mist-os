@@ -81,6 +81,8 @@ source_set("userspace_test_main") {
   testonly = true
   sources = [
     "test_main.cc",
+    "tests/binder_helper.cc",
+    "tests/binder_helper.h",
     "util.cc",
     "util.h",
   ]
@@ -111,6 +113,7 @@ test_names = [
   "procattr",
   "selinuxfs",
   "socket",
+  "syslog",
   "timerslack",
   "unlabeled_fs",
 
@@ -120,6 +123,7 @@ test_names = [
 # List of programs launched by "inherit" tests.
 inherit_test_executable_names = [
   # keep-sorted start
+  "is_itimer_real_reset",
   "is_selinux_null_inode",
   "true",
 
@@ -140,6 +144,7 @@ resource("policies") {
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/pipe_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/syslog.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/timerslack.pp",
   ]
   outputs = "data/policies/{{source_file_part}}"

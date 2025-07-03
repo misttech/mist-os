@@ -3,4 +3,4 @@
 // found in the LICENSE file.
 
 // x86_64 doesn't depend on vDSO for sigreturn.
-pub const VDSO_SIGRETURN_NAME: Option<&'static str> = None;
+pub const VDSO_SIGRETURN_NAME: Option<&'static [u8]> = None;

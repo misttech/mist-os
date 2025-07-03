@@ -4,8 +4,6 @@
 
 #include "sim-frame.h"
 
-#include <fuchsia/wlan/common/c/banjo.h>
-
 namespace wlan::simulation {
 
 /* InformationElement function implementations.*/

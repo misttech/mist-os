@@ -91,6 +91,10 @@ Test that we can walk into a sub-directory.
 └── lost+found/
 ```
 
+## nest64.img
+
+Just like nest.img, but enables 64bit.
+
 ## xattr.img
 
 Test that we can read extended attributes, both from the inode and a separate block.

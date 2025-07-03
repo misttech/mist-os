@@ -8,15 +8,7 @@
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_FORMAT_H_
 
 #include <assert.h>
-#include <stdbool.h>
 #include <stdint.h>
-#include <zircon/types.h>
-
-#include <algorithm>
-#include <limits>
-
-#include <fbl/algorithm.h>
-#include <fbl/macros.h>
 
 namespace fs {
 

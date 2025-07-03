@@ -385,8 +385,8 @@ mod test {
     use fidl_next::{Client, ClientEnd, Responder, Server, ServerEnd, ServerSender};
     use fidl_next_fuchsia_examples_gizmo::device::{GetEvent, GetHardwareId};
     use fidl_next_fuchsia_examples_gizmo::{
-        Device, DeviceClientHandler, DeviceClientSender, DeviceGetEventResponse,
-        DeviceGetHardwareIdResponse, DeviceServerHandler,
+        Device, DeviceClientHandler, DeviceGetEventResponse, DeviceGetHardwareIdResponse,
+        DeviceServerHandler,
     };
     use fuchsia_async::OnSignals;
     use zx::{AsHandleRef, Event, HandleBased, Signals};
@@ -397,40 +397,30 @@ mod test {
 
     struct DeviceServer;
     impl DeviceServerHandler<DriverChannel> for DeviceServer {
-        fn get_hardware_id(
+        async fn get_hardware_id(
             &mut self,
-            sender: &ServerSender<DriverChannel, Device>,
+            sender: &ServerSender<Device, DriverChannel>,
             responder: Responder<GetHardwareId>,
         ) {
-            let sender = sender.clone();
-            CurrentDispatcher
-                .spawn_task(async move {
-                    responder
-                        .respond(
-                            &sender,
-                            Result::<_, i32>::Ok(DeviceGetHardwareIdResponse { response: 4004 }),
-                        )
-                        .unwrap()
-                        .await
-                        .unwrap();
-                })
+            responder
+                .respond(
+                    &sender,
+                    Result::<_, i32>::Ok(DeviceGetHardwareIdResponse { response: 4004 }),
+                )
+                .unwrap()
+                .await
                 .unwrap();
         }
 
-        fn get_event(
+        async fn get_event(
             &mut self,
-            sender: &ServerSender<DriverChannel, Device>,
+            sender: &ServerSender<Device, DriverChannel>,
             responder: Responder<GetEvent>,
         ) {
-            let sender = sender.clone();
             let event = Event::create();
             event.signal_handle(Signals::empty(), Signals::USER_0).unwrap();
             let response = DeviceGetEventResponse { event: event.into_handle() };
-            CurrentDispatcher
-                .spawn_task(async move {
-                    responder.respond(&sender, response).unwrap().await.unwrap();
-                })
-                .unwrap();
+            responder.respond(&sender, response).unwrap().await.unwrap();
         }
     }
 
@@ -441,8 +431,9 @@ mod test {
     fn driver_fidl_server() {
         spawn_in_driver("driver fidl server", async {
             let (server_chan, client_chan) = Channel::<[Chunk]>::create();
-            let client_end = ClientEnd::from_untyped(DriverChannel::new(client_chan));
-            let server_end: ServerEnd<_, Device> =
+            let client_end: ClientEnd<Device, _> =
+                ClientEnd::<Device, _>::from_untyped(DriverChannel::new(client_chan));
+            let server_end: ServerEnd<Device, _> =
                 ServerEnd::from_untyped(DriverChannel::new(server_chan));
             let mut client = Client::new(client_end);
             let mut server = Server::new(server_end);

@@ -5,6 +5,24 @@
 #ifndef SRC_STORAGE_MEMFS_VNODE_DIR_H_
 #define SRC_STORAGE_MEMFS_VNODE_DIR_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
+
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/lib/vfs/cpp/watcher.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode.h"

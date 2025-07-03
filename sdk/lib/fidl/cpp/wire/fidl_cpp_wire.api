@@ -53,5 +53,5 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_encoder.h": "1fa6397c5a1dc207d805a7c6d18a616f",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_messaging.h": "e746835e7f08881d27089e9be4b610de",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_messaging_declarations.h": "b1f2be25d0b925a037e752b6c07d94c4",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_types.h": "d5d1fc61809cff6ddbca7a76e6dd8466"
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_types.h": "a7fb2aa43c3da04d0e5a2ce412b72b77"
 }

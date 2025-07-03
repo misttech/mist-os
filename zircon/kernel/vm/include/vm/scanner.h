@@ -37,6 +37,13 @@ void scanner_enable_page_table_reclaim();
 // Inverse of |scanner_enable_page_table_reclaim|, also does not stack.
 void scanner_disable_page_table_reclaim();
 
+// Ask the scanner to dump informational state before issuing a panic. The assumption on calling
+// this is that the panic is due to eviction/scanner going wrong for some hard to infer reason at
+// the panic site, and this method can attempt to provide some additional context in the kernel log.
+// This should only be called if a panic is expected as this performs semi-unsafe operations that
+// might themselves crash or panic the kernel.
+void scanner_debug_dump_state_before_panic();
+
 // Blocks until the scanner has completed an access scan that occurred at |upate_time| or later.
 // This means if an accessed scan already happened more recently this function will immediately
 // return, otherwise it will wait for a new scan to complete.

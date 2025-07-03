@@ -42,7 +42,6 @@ constexpr VnodeConnectionOptions FlagsToConnectionOptions(fio::OpenFlags flags) 
   options.flags = flags & ~kAllIo1Rights;
 
   // Using Open1 requires GET_ATTRIBUTES as this is not expressible via |fio::OpenFlags|.
-  // TODO(https://fxbug.dev/324080764): Restrict GET_ATTRIBUTES.
   options.rights = fio::Rights::kGetAttributes;
 
   // Approximate a set of io2 Rights corresponding to what is expected by |flags|.

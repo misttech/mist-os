@@ -31,6 +31,7 @@ fidl("fuchsia.power.broker") {
     "//src/devices/bus/drivers/platform/test/*:*",
     "//src/devices/hrtimer/drivers/aml-hrtimer/*:*",
     "//src/graphics/drivers/msd-arm-mali/*:*",
+    "//src/graphics/magma/lib/magma_service/sys_driver/*:*",
     "//src/power/bench/*:*",
     "//src/power/broker/*:*",
     "//src/power/shutdown-shim/*:*",

@@ -20,7 +20,10 @@ use test_case::test_case;
 
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::testutil::{set_logger_for_test, TestAddrs, TestIpExt};
-use netstack3_base::{CounterContext, EitherDeviceId, IpDeviceAddr, Mms, ResourceCounterContext};
+use netstack3_base::{
+    CounterCollection as _, CounterContext, EitherDeviceId, IpDeviceAddr, Mms,
+    ResourceCounterContext,
+};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
 use netstack3_core::{CoreTxMetadata, IpExt};
@@ -434,7 +437,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
             send_ip_packet: 1,
             ..Default::default()
         },
-        CounterContext::<IpCounters<I>>::counters(&ctx.core_ctx()).into(),
+        CounterContext::<IpCounters<I>>::counters(&ctx.core_ctx()).cast(),
     );
     // Verify the per-device counters for each device.
     assert_eq!(
@@ -444,11 +447,11 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
             deliver_unicast: 1,
             ..Default::default()
         },
-        ctx.core_ctx().per_resource_counters(&device_id).into()
+        ctx.core_ctx().per_resource_counters(&device_id).cast()
     );
     assert_eq!(
         IpCounterExpectations::<I> { send_ip_packet: 1, ..Default::default() },
-        ctx.core_ctx().per_resource_counters(&loopback_device_id).into()
+        ctx.core_ctx().per_resource_counters(&loopback_device_id).cast()
     );
 }
 

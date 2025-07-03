@@ -8,6 +8,9 @@
 #define ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_CURRENT_THREAD_H_
 
 #include <lib/arch/intrin.h>
+#include <stdint.h>
+
+#include <ktl/byte.h>
 
 // Routines to directly access the current thread pointer out of the current
 // cpu structure pointed the TPIDR_EL1 register.
@@ -15,18 +18,18 @@
 // NOTE: must be included after the definition of Thread due to the offsetof
 // applied in the following routines.
 
-// Use the cpu local thread context pointer to store current_thread.
-static inline Thread* arch_get_current_thread() {
-#ifdef __clang__
-  // Clang with --target=aarch64-unknown-fuchsia -mtp=el1 reads
+static inline ktl::byte* arch_get_current_compiler_thread_pointer() {
+  // Clang and GCC with --target=aarch64-unknown-fuchsia -mtp=el1 read
   // TPIDR_EL1 for __builtin_thread_pointer (instead of the usual
   // TPIDR_EL0 for user mode).  Using the intrinsic instead of asm
   // lets the compiler understand what it's doing a little better,
   // which conceivably could let it optimize better.
-  char* tp = (char*)__builtin_thread_pointer();
-#else
-  char* tp = (char*)__arm_rsr64("tpidr_el1");
-#endif
+  return static_cast<ktl::byte*>(__builtin_thread_pointer());
+}
+
+// Use the cpu local thread context pointer to store current_thread.
+static inline Thread* arch_get_current_thread() {
+  ktl::byte* tp = arch_get_current_compiler_thread_pointer();
 
   // The Thread structure isn't standard layout, but it's "POD enough"
   // for us to rely on computing this member offset via offsetof.
@@ -35,7 +38,7 @@ static inline Thread* arch_get_current_thread() {
   tp -= offsetof(Thread, arch_.thread_pointer_location);
 #pragma GCC diagnostic pop
 
-  return (Thread*)tp;
+  return reinterpret_cast<Thread*>(tp);
 }
 
 static inline void arch_set_current_thread(Thread* t) {

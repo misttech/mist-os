@@ -196,15 +196,6 @@ zx::result<> SpmiVisitor::ParseController(fdf_devicetree::Node& node) {
     return zx::error(metadata.error_value().status());
   }
 
-  {
-    // TODO(b/418000349): Don't add metadata once it is no longer retrieved.
-    fuchsia_hardware_platform_bus::Metadata pbus_metadata{{
-        .id = std::to_string(fuchsia_hardware_spmi::kControllerInfoMetadataType),
-        .data = metadata.value(),
-    }};
-    node.AddMetadata(std::move(pbus_metadata));
-  }
-
   fuchsia_hardware_platform_bus::Metadata pbus_metadata{{
       .id = fuchsia_hardware_spmi::ControllerInfo::kSerializableName,
       .data = std::move(metadata.value()),

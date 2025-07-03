@@ -37,11 +37,13 @@ The features of FEMU include:
 *   **GUI Support:** You can run Fuchsia with the GUI (by default) or without
     the GUI (using the `--headless` argument).
 *   **GPU Support:** You can run with the host's GPU (by default) with full
-    [Vulkan](/docs/development/graphics/magma/concepts/vulkan.md){:.exyernal} support, or
+    [Vulkan](/docs/development/graphics/magma/concepts/vulkan.md){:.external} support, or
     you can choose software rendering using
     [SwiftShader](https://swiftshader.googlesource.com/SwiftShader/){:.external}.
 *   **Remote Development:** You can use a remote desktop with FEMU over Chrome
     Remote Desktop.
+*   **UEFI/GPT Support**: You can approximate a physical device including GPT
+    partition layout based on Fuchsia's ABR-scheme (using the `--uefi` argument).
 
 To see full list of supported flags:
 

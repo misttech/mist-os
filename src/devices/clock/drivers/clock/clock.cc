@@ -97,8 +97,12 @@ void ClockDevice::ClockDevice::QuerySupportedRate(QuerySupportedRateRequestView 
     return;
   }
   if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to query supported rate for clock %u: %s", id_,
-            zx_status_get_string(result->error_value()));
+    // TODO(b/426652785): ZX_ERR_OUT_OF_RANGE is a sentinel value that means that no suitable rate
+    // could be found.
+    if (result->error_value() != ZX_ERR_OUT_OF_RANGE) {
+      FDF_LOG(ERROR, "Failed to query supported rate for clock %u: %s", id_,
+              zx_status_get_string(result->error_value()));
+    }
     completer.ReplyError(result->error_value());
     return;
   }

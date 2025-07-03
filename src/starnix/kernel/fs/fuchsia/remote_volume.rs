@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_fshost::{StarnixVolumeProviderMarker, StarnixVolumeProviderSynchronousProxy};
+use fidl::endpoints::{create_sync_proxy, DiscoverableProtocolMarker, SynchronousProxy};
+use fidl_fuchsia_fshost::StarnixVolumeProviderMarker;
 use fidl_fuchsia_fxfs::{CryptMarker, KeyPurpose};
 use starnix_core::fs::fuchsia::{RemoteFs, RemoteNode};
 use starnix_core::task::CurrentTask;
@@ -26,7 +27,7 @@ const KEY_FILE_PATH: &str = "key_file";
 
 pub struct RemoteVolume {
     remotefs: RemoteFs,
-    volume_provider: StarnixVolumeProviderSynchronousProxy,
+    exposed_dir_proxy: fio::DirectorySynchronousProxy,
 }
 
 impl RemoteVolume {
@@ -79,10 +80,18 @@ impl FileSystemOps for RemoteVolume {
     }
 
     fn unmount(&self) {
-        match self.volume_provider.unmount(zx::MonotonicInstant::INFINITE) {
-            Ok(Ok(_)) => (),
-            Ok(Err(e)) => log_error!(e:%; "StarnixVolumeProvider.Unmount failed"),
-            Err(e) => log_error!(e:%; "StarnixVolumeProvider.Unmount failed at FIDL layer"),
+        let (proxy, server_end) = create_sync_proxy::<fidl_fuchsia_fs::AdminMarker>();
+        if let Err(e) = fdio::service_connect_at(
+            self.exposed_dir_proxy.as_channel(),
+            &format!("svc/{}", fidl_fuchsia_fs::AdminMarker::PROTOCOL_NAME),
+            server_end.into(),
+        ) {
+            log_error!(e:%; "StarnixVolumeProvider.Unmount failed to connect to fuchsia.fs.Admin");
+            return;
+        }
+
+        if let Err(e) = proxy.shutdown(zx::MonotonicInstant::INFINITE) {
+            log_error!(e:%; "StarnixVolumeProvider.Unmount failed at FIDL layer");
         }
     }
 }
@@ -165,7 +174,7 @@ fn get_or_create_volume_keys(
 }
 
 pub fn new_remote_vol(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -239,8 +248,10 @@ pub fn new_remote_vol(
             })?;
     }
 
+    let exposed_dir_proxy = exposed_dir_client_end.into_sync_proxy();
+
     let root = syncio::directory_open_directory_async(
-        &exposed_dir_client_end.into_sync_proxy(),
+        &exposed_dir_proxy,
         "root",
         fio::PERM_READABLE | fio::PERM_WRITABLE,
     )
@@ -261,9 +272,14 @@ pub fn new_remote_vol(
         };
 
     let use_remote_ids = remotefs.use_remote_ids();
-    let remotevol = RemoteVolume { remotefs, volume_provider };
-    let fs =
-        FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotevol, options)?;
+    let remotevol = RemoteVolume { remotefs, exposed_dir_proxy };
+    let fs = FileSystem::new(
+        locked,
+        kernel,
+        CacheMode::Cached(CacheConfig::default()),
+        remotevol,
+        options,
+    )?;
     if use_remote_ids {
         fs.create_root(node_id, remote_node);
     } else {

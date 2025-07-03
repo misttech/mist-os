@@ -13,7 +13,7 @@ use net_types::SpecifiedAddr;
 use netstack3_core::ip::{
     IpSockCreateAndSendError, IpSockSendError, RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError,
     RawIpSocketProtocol, RawIpSocketSendToError, RawIpSocketsBindingsContext,
-    RawIpSocketsBindingsTypes,
+    RawIpSocketsBindingsTypes, ReceivePacketError,
 };
 use netstack3_core::socket::StrictlyZonedAddr;
 use netstack3_core::sync::Mutex;
@@ -28,7 +28,8 @@ use {
     fuchsia_async as fasync,
 };
 
-use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::settings::IpLayerSettings;
+use crate::bindings::socket::queue::{BodyLen, MessageQueue, NoSpace};
 use crate::bindings::socket::{ErrnoError, IntoErrno, IpSockAddrExt, SockAddr};
 use crate::bindings::util::{
     AllowBindingIdFromWeak, DeviceNotFoundError, ErrnoResultExt as _, IntoCore, IntoFidl,
@@ -54,8 +55,11 @@ impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId> for BindingsCtx {
         socket: &RawIpSocketId<I>,
         packet: &I::Packet<B>,
         device: &DeviceId,
-    ) {
-        socket.external_state().enqueue_rx_packet::<B>(packet, device.downgrade())
+    ) -> Result<(), ReceivePacketError> {
+        socket
+            .external_state()
+            .enqueue_rx_packet::<B>(packet, device.downgrade())
+            .map_err(|NoSpace {}| ReceivePacketError::QueueFull)
     }
 }
 
@@ -67,18 +71,35 @@ pub struct SocketState<I: Ip> {
 }
 
 impl<I: IpExt> SocketState<I> {
-    fn new(event: zx::EventPair) -> Self {
-        SocketState { rx_queue: Mutex::new(MessageQueue::new(event)) }
+    fn new(event: zx::EventPair, settings: &IpLayerSettings) -> Self {
+        SocketState {
+            rx_queue: Mutex::new(MessageQueue::new(event, settings.raw_receive_buffer.default())),
+        }
     }
 
-    fn enqueue_rx_packet<B: SplitByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
+    fn enqueue_rx_packet<B: SplitByteSlice>(
+        &self,
+        packet: &I::Packet<B>,
+        device: WeakDeviceId,
+    ) -> Result<(), NoSpace> {
         // NB: Perform the expensive tasks before taking the message queue lock.
         let packet = ReceivedIpPacket::new::<B>(packet, device);
-        self.rx_queue.lock().receive(packet);
+        self.rx_queue.lock().receive(packet)
     }
 
     fn dequeue_rx_packet(&self) -> Option<ReceivedIpPacket<I>> {
         self.rx_queue.lock().pop()
+    }
+
+    fn set_receive_buffer(&self, value: u64, settings: &IpLayerSettings) {
+        self.rx_queue.lock().set_max_available_messages_size(
+            value.try_into().unwrap_or(usize::MAX),
+            &settings.raw_receive_buffer,
+        );
+    }
+
+    fn receive_buffer(&self) -> u64 {
+        self.rx_queue.lock().max_available_messages_size().get().try_into().unwrap_or(u64::MAX)
     }
 }
 
@@ -133,7 +154,8 @@ impl<I: IpExt> SocketWorkerState<I> {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         };
 
-        let id = ctx.api().raw_ip_socket().create(proto, SocketState::new(local_event));
+        let state = SocketState::new(local_event, &*ctx.bindings_ctx().settings.ip.read());
+        let id = ctx.api().raw_ip_socket().create(proto, state);
         SocketWorkerState { peer_event, id }
     }
 }
@@ -246,11 +268,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetSendBuffer { responder } => {
                 respond_not_supported!("raw::GetSendBuffer", responder)
             }
-            fpraw::SocketRequest::SetReceiveBuffer { value_bytes: _, responder } => {
-                respond_not_supported!("raw::SetReceiveBuffer", responder)
+            fpraw::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
+                responder
+                    .send(Ok(data
+                        .id
+                        .external_state()
+                        .set_receive_buffer(value_bytes, &ctx.bindings_ctx().settings.ip.read())))
+                    .unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::GetReceiveBuffer { responder } => {
-                respond_not_supported!("raw::GetReceiveBuffer", responder)
+                responder
+                    .send(Ok(data.id.external_state().receive_buffer()))
+                    .unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::SetKeepAlive { value: _, responder } => {
                 respond_not_supported!("raw::SetKeepAlive", responder)

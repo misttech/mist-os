@@ -3,20 +3,17 @@
 // found in the LICENSE file.
 mod args;
 
-use ::std::path::PathBuf;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use core::fmt;
 use errors::{ffx_bail, ffx_error};
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{deferred, FfxMain, FfxTool};
-use fuchsia_async::unblock;
 use log::info;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::io::{stdin, BufRead};
-use std::process::Command;
 use std::time::Duration;
 use target_holders::moniker;
 use tempfile::Builder;
@@ -118,59 +115,6 @@ fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::Targ
         }
         Ok(profiler::TargetConfig::Tasks(tasks))
     }
-}
-
-pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
-    info!("Symbolizing profile...");
-    let sdk = ffx_config::global_env_context()
-        .context("loading global environment context")?
-        .get_sdk()?;
-    if let Err(e) = symbol_index::ensure_symbol_index_registered(
-        &ffx_config::global_env_context()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get global context"))?,
-    ) {
-        eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
-    }
-
-    let symbolizer_path = ffx_config::get_host_tool(&sdk, "symbolizer")?;
-    let unsymbolized_input = std::fs::File::open(&from)?;
-    let symbolized_output = std::fs::File::create(&to)?;
-    let mut cmd = Command::new(symbolizer_path)
-        .stdin(unsymbolized_input)
-        .stdout(symbolized_output)
-        .spawn()
-        .map_err(|err| ffx_error!("Failed to spawn symbolizer: {err:?}"))?;
-
-    match unblock(move || cmd.wait())
-        .await
-        .map_err(|err| ffx_error!("Failed to wait cmd: {err:?}"))?
-        .code()
-    {
-        Some(0) => {
-            info!("Symbolizer finished.");
-            Ok(())
-        }
-        Some(exit_code) => ffx_bail!("Symbolizer exited with code: {exit_code}"),
-        None => ffx_bail!("Symbolizer terminated by signal."),
-    }
-}
-
-pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
-    info!("Converting to pprof...");
-    let from_str = from
-        .clone()
-        .into_os_string()
-        .into_string()
-        .map_err(|err| ffx_error!("Invalid path name: {err:?}"))?;
-    let to_str = to
-        .into_os_string()
-        .into_string()
-        .map_err(|err| ffx_error!("Invalid path name: {err:?}"))?;
-    if !samples_to_pprof::convert(from_str, to_str) {
-        ffx_bail!("Failed to convert to pprof");
-    }
-    info!("pprof conversion complete.");
-    Ok(())
 }
 
 #[derive(Debug)]
@@ -276,24 +220,14 @@ async fn run_session(
     if !opts.symbolize {
         return Ok(());
     }
-    let symbolized_path = if opts.pprof_conversion {
-        tmp_dir.path().join("symbolized.txt")
+    if let Ok(symbolized_record) = ffx_profiler::symbolize::symbolize(
+        &unsymbolized_path,
+        &opts.output.clone().into(),
+        opts.pprof_conversion,
+    ) {
+        return ffx_profiler::pprof::samples_to_pprof(symbolized_record, opts.output.into());
     } else {
-        std::path::PathBuf::from(&opts.output)
-    };
-    if !opts.pprof_conversion {
-        if let Ok(_symbolized_record) =
-            ffx_profiler::symbolize::symbolize(&unsymbolized_path, &symbolized_path, false)
-        {
-            return Ok(());
-        } else {
-            anyhow::bail!("Failed to symbolize profile");
-        }
-    } else {
-        // TODO(https://fxbug.dev/401034854): We need to remove `ffx debug symbolize` by
-        // implementing symbolized text to pprof.
-        symbolize(&unsymbolized_path, &symbolized_path).await?;
-        pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
+        anyhow::bail!("Failed to symbolize profile");
     }
 }
 
@@ -374,25 +308,18 @@ pub async fn profiler(
             (target, config, session_opts)
         }
         ProfilerSubCommand::Symbolize(opts) => {
-            let tmp_dir = Builder::new().prefix("fuchsia_cpu_profiler_").tempdir()?;
-            let symbolized_path = if opts.pprof_conversion {
-                tmp_dir.path().join("symbolized.txt")
+            if let Ok(symbolized_record) = ffx_profiler::symbolize::symbolize(
+                &opts.input,
+                &opts.output.clone().into(),
+                opts.pprof_conversion,
+            ) {
+                return ffx_profiler::pprof::samples_to_pprof(
+                    symbolized_record,
+                    opts.output.into(),
+                );
             } else {
-                opts.output.clone()
-            };
-            if !opts.pprof_conversion {
-                if let Ok(_symbolized_record) =
-                    ffx_profiler::symbolize::symbolize(&opts.input, &symbolized_path, false)
-                {
-                    return Ok(());
-                } else {
-                    anyhow::bail!("Failed to symbolize profile");
-                }
+                anyhow::bail!("Failed to symbolize profile");
             }
-            // TODO(https://fxbug.dev/401034854): We need to remove `ffx debug symbolize` by
-            // implementing symbolized text to pprof.
-            symbolize(&opts.input, &symbolized_path).await?;
-            return pprof_conversion(&symbolized_path, opts.output);
         }
     };
     let config = profiler::Config {

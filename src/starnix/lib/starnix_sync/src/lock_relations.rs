@@ -108,7 +108,7 @@ mod test {
         const C_DATA: char = '4';
         let state = FakeLocked { a: A_DATA.into(), c: C_DATA.into() };
 
-        let mut locked = unsafe { Unlocked::new() };
+        let locked = unsafe { Unlocked::new() };
 
         let (a, locked) = locked.lock_and::<A, _>(&state);
         assert_eq!(*a, A_DATA);
@@ -140,8 +140,8 @@ mod test {
     where
         L: LockEqualOrBefore<B>,
     {
-        let mut locked = locked.cast_locked::<B>();
-        fixed2(&mut locked, state)
+        let locked = locked.cast_locked::<B>();
+        fixed2(locked, state)
     }
 
     #[test]
@@ -149,17 +149,17 @@ mod test {
         const A_DATA: u32 = 123;
         const C_DATA: char = '4';
         let state = FakeLocked { a: A_DATA.into(), c: C_DATA.into() };
-        let mut locked = unsafe { Unlocked::new() };
+        let locked = unsafe { Unlocked::new() };
 
-        assert_eq!(relaxed(&mut locked, &state), C_DATA);
-        let mut locked = locked.cast_locked::<A>();
-        assert_eq!(relaxed(&mut locked, &state), C_DATA);
-        let mut locked = locked.cast_locked::<B>();
-        assert_eq!(relaxed(&mut locked, &state), C_DATA);
-        assert_eq!(fixed1(&mut locked, &state), C_DATA);
+        assert_eq!(relaxed(locked, &state), C_DATA);
+        let locked = locked.cast_locked::<A>();
+        assert_eq!(relaxed(locked, &state), C_DATA);
+        let locked = locked.cast_locked::<B>();
+        assert_eq!(relaxed(locked, &state), C_DATA);
+        assert_eq!(fixed1(locked, &state), C_DATA);
         // This won't compile as C: LockEqualOrBefore<B> is not satisfied.
-        // let mut locked = locked.cast_locked::<C>();
-        // assert_eq!(relaxed(&mut locked, &state), C_DATA);
+        // let locked = locked.cast_locked::<C>();
+        // assert_eq!(relaxed(locked, &state), C_DATA);
     }
 
     #[test]
@@ -192,7 +192,7 @@ mod test {
 
         let state = HoldsLocks::default();
         // Create a new lock session with the "root" lock level.
-        let mut locked = unsafe { Unlocked::new() };
+        let locked = unsafe { Unlocked::new() };
         // Access locked state.
         let (_a, _locked_a) = locked.lock_and::<LevelA, _>(&state);
     }

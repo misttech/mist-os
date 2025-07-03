@@ -18,7 +18,8 @@ type CustomThreadConfig = table {
     3: trusted_apps vector<tee.Uuid>:MAX_NUM_OF_TRUSTED_APPS;
 };
 
-/// Passed to the TEE driver in metadata as DEVICE_METADATA_TEE_THREAD_CONFIG
+/// Passed to the TEE driver as metadata.
+@serializable
 type TeeMetadata = table {
     /// Number of threads in the default pool.
     1: default_thread_count uint32;

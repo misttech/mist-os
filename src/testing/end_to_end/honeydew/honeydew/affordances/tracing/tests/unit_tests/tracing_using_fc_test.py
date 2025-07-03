@@ -314,25 +314,60 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
+        tracing_using_fc.TracingUsingFc,
+        "_wait_for_peer_closed",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
         f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     def test_terminate(
         self,
         parameterized_dict: dict[str, Any],
-        *unused_args: Any,
+        mock_initialize_tracing: mock.Mock,
+        mock_wait_for_peer_closed: mock.AsyncMock,
     ) -> None:
         """Test for Tracing.terminate() method."""
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):
             self.tracing_obj.initialize()
 
-        # Check whether an `TracingStateError` exception is raised when
-        # state is not valid.
         self.tracing_obj.terminate()
+
+        if parameterized_dict.get("session_initialized"):
+            mock_wait_for_peer_closed.assert_awaited_once()
+            mock_initialize_tracing.assert_called_once()
+        else:
+            mock_wait_for_peer_closed.assert_not_awaited()
+
         self.assertFalse(self.tracing_obj.is_active())
-        # Check that no warning logs got printed.
-        self.assertNoLogs()
+        self.assertFalse(self.tracing_obj.is_session_initialized())
+
+    @mock.patch.object(
+        f_tracingcontroller.ProvisionerClient,
+        "initialize_tracing",
+    )
+    def test_terminate_error(self, mock_initialize_tracing: mock.Mock) -> None:
+        """Test for Tracing.terminate() when an error occurs during wait."""
+        self.tracing_obj.initialize()
+
+        with mock.patch.object(
+            self.tracing_obj,
+            "_wait_for_peer_closed",
+            new_callable=mock.AsyncMock,
+        ) as mock_wait:
+            mock_wait.side_effect = TracingError("test error")
+            with self.assertLogs(level="WARNING") as cm:
+                self.tracing_obj.terminate()
+                self.assertIn(
+                    "Could not cleanly wait for trace termination", cm.output[0]
+                )
+                self.assertIn("test error", cm.output[0])
+
+        mock_initialize_tracing.assert_called_once()
+        self.assertFalse(self.tracing_obj.is_session_initialized())
+        self.assertFalse(self.tracing_obj.is_active())
 
     @parameterized.expand(
         [

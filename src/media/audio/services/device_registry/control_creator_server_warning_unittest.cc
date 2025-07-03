@@ -16,8 +16,14 @@ namespace {
 namespace fad = fuchsia_audio_device;
 
 class ControlCreatorServerWarningTest : public AudioDeviceRegistryServerTestBase {};
-class ControlCreatorServerCodecWarningTest : public ControlCreatorServerWarningTest {};
-class ControlCreatorServerCompositeWarningTest : public ControlCreatorServerWarningTest {};
+class ControlCreatorServerCodecWarningTest : public ControlCreatorServerWarningTest {
+ protected:
+  static inline const std::string kClassName = "ControlCreatorServerCodecWarningTest";
+};
+class ControlCreatorServerCompositeWarningTest : public ControlCreatorServerWarningTest {
+ protected:
+  static inline const std::string kClassName = "ControlCreatorServerCompositeWarningTest";
+};
 
 /////////////////////
 // Device-less tests
@@ -59,9 +65,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadId) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
   ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
@@ -113,9 +119,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -165,9 +171,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -225,9 +231,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -316,9 +322,9 @@ TEST_F(ControlCreatorServerCompositeWarningTest, BadId) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -370,9 +376,9 @@ TEST_F(ControlCreatorServerCompositeWarningTest, MissingServerEnd) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -424,9 +430,9 @@ TEST_F(ControlCreatorServerCompositeWarningTest, BadServerEnd) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -484,9 +490,9 @@ TEST_F(ControlCreatorServerCompositeWarningTest, IdAlreadyControlled) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);

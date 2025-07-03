@@ -179,11 +179,23 @@ impl Connection {
     }
 
     pub fn fake(fidl_pipe: FidlPipe) -> Self {
+        Self { overnet: None, fdomain: Mutex::new(None), fidl_pipe, rcs_info: Mutex::new(None) }
+    }
+
+    /// Testing function for constructing from an already built FDomain client.
+    ///
+    /// No other action should be necessary, but note that all other error-handling functions will
+    /// return nothing of use. All connection-related errors will have to surface from the
+    /// [fdomain_client::Client].
+    ///
+    /// Methods like [Self::rcs_proxy] and other non-fdomain methods won't return anything useful,
+    /// or may panic.
+    pub fn from_fdomain_client(client: Arc<fdomain_client::Client>) -> Self {
         Self {
             overnet: None,
-            fdomain: async_lock::Mutex::new(None),
-            fidl_pipe,
-            rcs_info: async_lock::Mutex::new(None),
+            fdomain: Mutex::new(Some(client)),
+            fidl_pipe: FidlPipe::fake(None),
+            rcs_info: Mutex::new(None),
         }
     }
 }

@@ -49,7 +49,7 @@ class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorS
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
-  static inline const std::string_view kClassName = "ControlCreatorServer";
+  static inline const std::string kClassName = "ControlCreatorServer";
   static inline uint64_t count_ = 0;
 
   explicit ControlCreatorServer(std::shared_ptr<AudioDeviceRegistry> parent);

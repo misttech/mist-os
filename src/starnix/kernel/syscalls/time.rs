@@ -680,7 +680,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_nanosleep_without_remainder() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
         let thread = std::thread::spawn({
             let task = current_task.weak_task();
@@ -696,7 +696,7 @@ mod test {
 
         let duration = timespec_from_duration(zx::MonotonicDuration::from_seconds(60));
         let address = map_memory(
-            &mut locked,
+            locked,
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<timespec>() as u64,
@@ -707,12 +707,7 @@ mod test {
         // nanosleep will be interrupted by the current thread and should not fail with EFAULT
         // because the remainder pointer is null.
         assert_eq!(
-            sys_nanosleep(
-                &mut locked,
-                &mut current_task,
-                address_ptr.into(),
-                UserRef::default().into()
-            ),
+            sys_nanosleep(locked, &mut current_task, address_ptr.into(), UserRef::default().into()),
             error!(ERESTART_RESTARTBLOCK)
         );
 
@@ -721,7 +716,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clock_nanosleep_relative_to_slow_clock() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
         let test_clock = UtcClock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
@@ -739,7 +734,7 @@ mod test {
         let remaining = UserRef::new(UserAddress::default());
 
         super::clock_nanosleep_relative_to_utc(
-            &mut locked,
+            locked,
             &mut current_task,
             tv,
             false,
@@ -752,7 +747,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clock_nanosleep_interrupted_relative_to_fast_utc_clock() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
         let test_clock = UtcClock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
@@ -768,7 +763,7 @@ mod test {
         let tv = timespec { tv_sec: 2, tv_nsec: 0 };
 
         let remaining = {
-            let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             UserRef::new(addr)
         };
 
@@ -790,7 +785,7 @@ mod test {
             .unwrap();
 
         let result = super::clock_nanosleep_relative_to_utc(
-            &mut locked,
+            locked,
             &mut current_task,
             tv,
             false,

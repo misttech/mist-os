@@ -30,7 +30,15 @@
       "optionality": "optional",
       "long": "--dump-annotations",
       "short": null,
-      "description": "print annotations without capturing the snapshot, ignores `dir` flag",
+      "description": "print annotations without capturing the snapshot, ignores `dir` and `upload` flags",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--upload",
+      "short": null,
+      "description": "whether to upload the generated snapshot to a predefined GCS bucket",
       "hidden": false
     }
   ],

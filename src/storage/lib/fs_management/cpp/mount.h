@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_LIB_FS_MANAGEMENT_CPP_MOUNT_H_
 #define SRC_STORAGE_LIB_FS_MANAGEMENT_CPP_MOUNT_H_
 
+#include <fidl/fuchsia.fs/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -74,14 +75,16 @@ class __EXPORT SingleVolumeFilesystemInterface {
 class __EXPORT StartedSingleVolumeFilesystem : public SingleVolumeFilesystemInterface {
  public:
   StartedSingleVolumeFilesystem() = default;
-  explicit StartedSingleVolumeFilesystem(fidl::ClientEnd<fuchsia_io::Directory> export_root)
-      : export_root_(std::move(export_root)) {}
+  explicit StartedSingleVolumeFilesystem(fidl::ClientEnd<fuchsia_io::Directory> export_root,
+                                         fidl::ClientEnd<fuchsia_fs::Admin> admin)
+      : export_root_(std::move(export_root)), admin_(std::move(admin)) {}
   StartedSingleVolumeFilesystem(StartedSingleVolumeFilesystem&& o) noexcept
-      : export_root_(std::move(o.export_root_)) {
+      : export_root_(std::move(o.export_root_)), admin_(std::move(o.admin_)) {
     o.Release();
   }
   StartedSingleVolumeFilesystem& operator=(StartedSingleVolumeFilesystem&& o) noexcept {
     export_root_ = std::move(o.export_root_);
+    admin_ = std::move(o.admin_);
     o.Release();
     return *this;
   }
@@ -103,6 +106,9 @@ class __EXPORT StartedSingleVolumeFilesystem : public SingleVolumeFilesystemInte
 
  private:
   fidl::ClientEnd<fuchsia_io::Directory> export_root_;
+  // Open admin interface early. Requests can hang if the protocol is opened after the fs crashes.
+  // https://fxbug.dev/423646793
+  fidl::ClientEnd<fuchsia_fs::Admin> admin_;
 };
 
 /// Manages a started volume within a filesystem instance (i.e. one opened or created by
@@ -140,10 +146,13 @@ class MountedVolume {
 class __EXPORT StartedMultiVolumeFilesystem {
  public:
   StartedMultiVolumeFilesystem() = default;
-  explicit StartedMultiVolumeFilesystem(fidl::ClientEnd<fuchsia_io::Directory> exposed_dir)
-      : exposed_dir_(std::move(exposed_dir)) {}
+  explicit StartedMultiVolumeFilesystem(fidl::ClientEnd<fuchsia_io::Directory> exposed_dir,
+                                        fidl::ClientEnd<fuchsia_fs::Admin> admin)
+      : exposed_dir_(std::move(exposed_dir)), admin_(std::move(admin)) {}
   StartedMultiVolumeFilesystem(StartedMultiVolumeFilesystem&& o) noexcept
-      : exposed_dir_(std::move(o.exposed_dir_)), volumes_(std::move(o.volumes_)) {
+      : exposed_dir_(std::move(o.exposed_dir_)),
+        admin_(std::move(o.admin_)),
+        volumes_(std::move(o.volumes_)) {
     o.Release();
   }
   StartedMultiVolumeFilesystem& operator=(StartedMultiVolumeFilesystem&& o) noexcept {
@@ -207,6 +216,9 @@ class __EXPORT StartedMultiVolumeFilesystem {
 
  private:
   fidl::ClientEnd<fuchsia_io::Directory> exposed_dir_;
+  // Open admin interface early. Requests can hang if the protocol is opened after the fs crashes.
+  // https://fxbug.dev/423646793
+  fidl::ClientEnd<fuchsia_fs::Admin> admin_;
   std::map<std::string, MountedVolume, std::less<>> volumes_;
 };
 
@@ -216,10 +228,15 @@ class __EXPORT StartedSingleVolumeMultiVolumeFilesystem : public SingleVolumeFil
  public:
   StartedSingleVolumeMultiVolumeFilesystem() = default;
   StartedSingleVolumeMultiVolumeFilesystem(fidl::ClientEnd<fuchsia_io::Directory> exposed_dir,
+                                           fidl::ClientEnd<fuchsia_fs::Admin> admin,
                                            MountedVolume volume)
-      : exposed_dir_(std::move(exposed_dir)), volume_(std::move(volume)) {}
+      : exposed_dir_(std::move(exposed_dir)),
+        admin_(std::move(admin)),
+        volume_(std::move(volume)) {}
   StartedSingleVolumeMultiVolumeFilesystem(StartedSingleVolumeMultiVolumeFilesystem&& o) noexcept
-      : exposed_dir_(std::move(o.exposed_dir_)), volume_(std::move(o.volume_)) {
+      : exposed_dir_(std::move(o.exposed_dir_)),
+        admin_(std::move(o.admin_)),
+        volume_(std::move(o.volume_)) {
     o.Release();
   }
   StartedSingleVolumeMultiVolumeFilesystem& operator=(
@@ -251,6 +268,9 @@ class __EXPORT StartedSingleVolumeMultiVolumeFilesystem : public SingleVolumeFil
 
  private:
   fidl::ClientEnd<fuchsia_io::Directory> exposed_dir_;
+  // Open admin interface early. Requests can hang if the protocol is opened after the fs crashes.
+  // https://fxbug.dev/423646793
+  fidl::ClientEnd<fuchsia_fs::Admin> admin_;
   std::optional<MountedVolume> volume_;
 };
 
@@ -288,12 +308,6 @@ zx::result<StartedMultiVolumeFilesystem> MountMultiVolume(
 zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault(
     fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
     const MountOptions& options, const char* volume_name = "default");
-
-// Shuts down a filesystem.
-//
-// This method takes a directory protocol to the service directory and assumes that we
-// can find the fuchsia.fs.Admin protocol there.
-zx::result<> Shutdown(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir);
 
 }  // namespace fs_management
 

@@ -4,11 +4,12 @@
 
 //! Fake network definitions to place core contexts in a network together.
 
-use alloc::collections::{BinaryHeap, HashMap};
+use alloc::collections::BinaryHeap;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::time::Duration;
+use netstack3_hashmap::HashMap;
 
 use packet::Buf;
 

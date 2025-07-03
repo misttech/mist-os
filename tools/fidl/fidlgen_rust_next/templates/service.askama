@@ -1,11 +1,6 @@
-{% let non_canonical_name = service.name.decl_name().non_canonical() %}
-{% let service_base_name = service.name.decl_name().camel() %}
-{% let service_name = filters::ident(service_base_name)? %}
-{% let instance_trait_name = format!("{service_base_name}Instance") %}
-
 /// The type corresponding to the {{ non_canonical_name }} service.
-{{ self::doc_string(service.attributes) -}}
-{% if context.config.emit_debug_impls -%}
+{{ self.doc_string(service.attributes) -}}
+{% if self.emit_debug_impls() -%}
     #[derive(Debug)]
 {%- endif %}
 pub struct {{ service_name }};
@@ -29,9 +24,9 @@ pub trait {{ instance_trait_name }} {
 
     {% for member in service.members %}
         /// Attempts to connect the given server end to the `{{ member.name.non_canonical() }}` member.
-        fn connect_to_{{ member.name.snake()|ident }}(
+        fn connect_to_{{ member.name|snake }}(
             &self,
-            server_end: ::fidl_next::ServerEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+            server_end: ::fidl_next::ServerEnd<{{ self.natural_type(member.ty) }}, Self::Transport>,
         ) -> Result<(), Self::Error>;
     {% endfor %}
 }
@@ -44,9 +39,9 @@ where
     type Transport = ___I::Transport;
 
     {% for member in service.members %}
-        fn connect_to_{{ member.name.snake()|ident }}(
+        fn connect_to_{{ member.name|snake }}(
             &self,
-            server_end: ::fidl_next::ServerEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+            server_end: ::fidl_next::ServerEnd<{{ self.natural_type(member.ty) }}, Self::Transport>,
         ) -> Result<(), Self::Error> {
             self.as_untyped().connect_to("{{ member.name.snake() }}", server_end.into_untyped())
         }

@@ -582,7 +582,7 @@ template("fuchsia_structured_config_rust_lib") {
       "//sdk/rust/zx",
       "//src/lib/diagnostics/inspect/rust",
       "//src/lib/fidl/rust/fidl",
-      "//src/lib/fuchsia-runtime",
+      "//src/lib/fuchsia-component/config",
     ]
 
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]

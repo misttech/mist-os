@@ -7,8 +7,8 @@ use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, 
 use crate::power::OnWakeOps;
 use crate::security;
 use crate::task::{
-    CurrentTask, EncryptionKeyId, EventHandler, Task, ThreadGroupKey, WaitCallback, WaitCanceler,
-    Waiter,
+    register_delayed_release, CurrentTask, CurrentTaskAndLocked, EncryptionKeyId, EventHandler,
+    Task, ThreadGroupKey, WaitCallback, WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -16,10 +16,12 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    ActiveNamespaceNode, CurrentTaskAndLocked, DirentSink, EpollFileObject, EpollKey, FallocMode,
-    FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
-    FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
+    ActiveNamespaceNode, DirentSink, EpollFileObject, EpollKey, FallocMode, FdTableId,
+    FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle,
+    NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
+use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
+use starnix_types::ownership::ReleaseGuard;
 use starnix_uapi::user_address::ArchSpecific;
 
 use fidl::HandleBased;
@@ -35,6 +37,7 @@ use starnix_sync::{
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::ownership::Releasable;
+use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{CAP_FOWNER, CAP_SYS_RAWIO};
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
@@ -53,7 +56,7 @@ use starnix_uapi::{
     FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SET_ENCRYPTION_POLICY,
     FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
 };
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
@@ -1120,7 +1123,7 @@ pub fn default_ioctl(
                 });
                 let has = zxio_node_attr_has_t { wrapping_key_id: true, ..Default::default() };
                 file.node().ops().update_attributes(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     current_task,
                     &file.node().info(),
                     has,
@@ -1424,6 +1427,12 @@ impl FileAsyncOwner {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileObjectId(u64);
 
+impl FileObjectId {
+    pub fn as_epoll_key(&self) -> EpollKey {
+        self.0 as EpollKey
+    }
+}
+
 /// A session with a file object.
 ///
 /// Each time a client calls open(), we create a new FileObject from the
@@ -1455,7 +1464,7 @@ pub struct FileObject {
 
     /// A set of epoll file descriptor numbers that tracks which `EpollFileObject`s add this
     /// `FileObject` as the control file.
-    epoll_files: Mutex<HashSet<FdNumber>>,
+    epoll_files: Mutex<HashMap<FileHandleKey, WeakFileHandle>>,
 
     /// See fcntl F_SETLEASE and F_GETLEASE.
     lease: Mutex<FileLeaseType>,
@@ -1466,8 +1475,16 @@ pub struct FileObject {
     pub security_state: security::FileObjectState,
 }
 
+pub enum FileObjectReleaserAction {}
+impl ReleaserAction<FileObject> for FileObjectReleaserAction {
+    fn release(file_object: ReleaseGuard<FileObject>) {
+        register_delayed_release(file_object);
+    }
+}
+pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
 pub type FileHandle = Arc<FileReleaser>;
 pub type WeakFileHandle = Weak<FileReleaser>;
+pub type FileHandleKey = WeakKey<FileReleaser>;
 
 impl FileObject {
     /// Create a FileObject that is not mounted in a namespace.
@@ -1585,9 +1602,13 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
         Op: FnMut(&mut Locked<L>) -> Result<T, Errno>,
     {
+        // Don't return EAGAIN for directories. This can happen because glibc always opens a
+        // directory with O_NONBLOCK.
+        let can_return_eagain = self.flags().contains(OpenFlags::NONBLOCK)
+            && !self.flags().contains(OpenFlags::DIRECTORY);
         // Run the operation a first time without registering a waiter in case no wait is needed.
         match op(locked) {
-            Err(errno) if errno == EAGAIN && !self.flags().contains(OpenFlags::NONBLOCK) => {}
+            Err(errno) if errno == EAGAIN && !can_return_eagain => {}
             result => return result,
         }
 
@@ -1599,10 +1620,10 @@ impl FileObject {
                 Err(e) if e == EAGAIN => {}
                 result => return result,
             }
-            let mut locked = locked.cast_locked::<FileOpsCore>();
+            let locked = locked.cast_locked::<FileOpsCore>();
             waiter
                 .wait_until(
-                    &mut locked,
+                    locked,
                     current_task,
                     deadline.unwrap_or(zx::MonotonicInstant::INFINITE),
                 )
@@ -1650,18 +1671,18 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.read_internal(current_task, || {
-            let mut locked = locked.cast_locked::<FileOpsCore>();
+            let locked = locked.cast_locked::<FileOpsCore>();
             if !self.ops().has_persistent_offsets() {
                 if data.available() > MAX_LFS_FILESIZE {
                     return error!(EINVAL);
                 }
-                return self.ops.read(&mut locked, self, current_task, 0, data);
+                return self.ops.read(locked, self, current_task, 0, data);
             }
 
             let mut offset_guard = self.offset.lock();
             let offset = *offset_guard as usize;
             checked_add_offset_and_length(offset, data.available())?;
-            let read = self.ops.read(&mut locked, self, current_task, offset, data)?;
+            let read = self.ops.read(locked, self, current_task, offset, data)?;
             *offset_guard += read as off_t;
             Ok(read)
         })
@@ -1681,10 +1702,8 @@ impl FileObject {
             return error!(ESPIPE);
         }
         checked_add_offset_and_length(offset, data.available())?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.read_internal(current_task, || {
-            self.ops.read(&mut locked, self, current_task, offset, data)
-        })
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.read_internal(current_task, || self.ops.read(locked, self, current_task, offset, data))
     }
 
     /// Common checks before calling ops().write.
@@ -1707,8 +1726,8 @@ impl FileObject {
         //   insufficient space on the underlying physical medium, or the RLIMIT_FSIZE resource
         //   limit is encountered (see setrlimit(2)),
         checked_add_offset_and_length(offset, data.available())?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops().write(&mut locked, self, current_task, offset, data)
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().write(locked, self, current_task, offset, data)
     }
 
     /// Common wrapper work for `write` and `write_at`.
@@ -1751,23 +1770,21 @@ impl FileObject {
             }
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
             // but FileOpsCore must be after FsNodeAppend
-            let mut locked = unsafe { Unlocked::new() };
+            let locked = unsafe { Unlocked::new() };
             let mut offset = self.offset.lock();
             let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
-                let (_guard, mut locked) =
-                    self.node().append_lock.write_and(&mut locked, current_task)?;
+                let (_guard, locked) = self.node().append_lock.write_and(locked, current_task)?;
                 *offset = self.ops().seek(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     self,
                     current_task,
                     *offset,
                     SeekTarget::End(0),
                 )?;
-                self.write_common(&mut locked, current_task, *offset as usize, data)
+                self.write_common(locked, current_task, *offset as usize, data)
             } else {
-                let (_guard, mut locked) =
-                    self.node().append_lock.read_and(&mut locked, current_task)?;
-                self.write_common(&mut locked, current_task, *offset as usize, data)
+                let (_guard, locked) = self.node().append_lock.read_and(locked, current_task)?;
+                self.write_common(locked, current_task, *offset as usize, data)
             }?;
             if self.ops().writes_update_seek_offset() {
                 *offset += bytes_written as off_t;
@@ -1792,9 +1809,8 @@ impl FileObject {
         self.write_fn(locked, current_task, |_locked| {
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
             // but FileOpsCore must be after FsNodeAppend
-            let mut locked = unsafe { Unlocked::new() };
-            let (_guard, mut locked) =
-                self.node().append_lock.read_and(&mut locked, current_task)?;
+            let locked = unsafe { Unlocked::new() };
+            let (_guard, locked) = self.node().append_lock.read_and(locked, current_task)?;
 
             // According to LTP test pwrite04:
             //
@@ -1803,10 +1819,10 @@ impl FileObject {
             //   O_APPEND, pwrite() appends data to the end of the file, regardless of the value of offset.
             if self.flags().contains(OpenFlags::APPEND) && self.ops().is_seekable() {
                 checked_add_offset_and_length(offset, data.available())?;
-                offset = default_eof_offset(&mut locked, self, current_task)? as usize;
+                offset = default_eof_offset(locked, self, current_task)? as usize;
             }
 
-            self.write_common(&mut locked, current_task, offset, data)
+            self.write_common(locked, current_task, offset, data)
         })
     }
 
@@ -1819,8 +1835,8 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        let locked = &mut locked;
+        let locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked;
 
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
@@ -1861,13 +1877,7 @@ impl FileObject {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().get_memory(
-            &mut locked.cast_locked::<FileOpsCore>(),
-            self,
-            current_task,
-            length,
-            prot,
-        )
+        self.ops().get_memory(locked.cast_locked::<FileOpsCore>(), self, current_task, length, prot)
     }
 
     pub fn mmap<L>(
@@ -1884,7 +1894,7 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         if !self.can_read() {
             return error!(EACCES);
         }
@@ -1896,7 +1906,7 @@ impl FileObject {
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
         self.ops().mmap(
-            &mut locked,
+            locked,
             self,
             current_task,
             addr,
@@ -1917,12 +1927,12 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         if self.name.entry.is_dead() {
             return error!(ENOENT);
         }
 
-        self.ops().readdir(&mut locked, self, current_task, sink)?;
+        self.ops().readdir(locked, self, current_task, sink)?;
         self.update_atime();
         self.notify(InotifyMask::ACCESS);
         Ok(())
@@ -2082,7 +2092,7 @@ impl FileObject {
     {
         handler.add_mapping(add_equivalent_fd_events);
         self.ops().wait_async(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             self,
             current_task,
             waiter,
@@ -2101,7 +2111,7 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.ops()
-            .query_events(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
+            .query_events(locked.cast_locked::<FileOpsCore>(), self, current_task)
             .map(add_equivalent_fd_events)
     }
 
@@ -2120,7 +2130,7 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.name.entry.node.record_lock_release(RecordLockOwner::FdTable(id));
-        self.ops().flush(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
+        self.ops().flush(locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     // Notifies watchers on the current node and its parent about an event.
@@ -2150,34 +2160,35 @@ impl FileObject {
 
     /// Register the fd number of an `EpollFileObject` that listens to events from this
     /// `FileObject`.
-    pub fn register_epfd(&self, fd: FdNumber) {
-        self.epoll_files.lock().insert(fd);
+    pub fn register_epfd(&self, file: &FileHandle) {
+        self.epoll_files.lock().insert(WeakKey::from(file), file.weak_handle.clone());
     }
 
-    pub fn unregister_epfd(&self, fd: FdNumber) {
-        self.epoll_files.lock().remove(&fd);
+    pub fn unregister_epfd(&self, file: &FileHandle) {
+        self.epoll_files.lock().remove(&WeakKey::from(file));
     }
 }
 
 impl Releasable for FileObject {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
+    type Context<'a> = CurrentTaskAndLocked<'a>;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(self, context: CurrentTaskAndLocked<'a>) {
         let (locked, current_task) = context;
         // Release all wake leases associated with this file in the corresponding `WaitObject`
         // of each registered epfd.
-        for epfd in self.epoll_files.lock().drain() {
-            if let Ok(file) = current_task.files.get(epfd) {
-                if let Some(_epoll_object) = file.downcast_file::<EpollFileObject>() {
+        for (_, file) in self.epoll_files.lock().drain() {
+            if let Some(file) = file.upgrade() {
+                if let Some(epoll_object) = file.downcast_file::<EpollFileObject>() {
                     current_task
                         .kernel()
                         .suspend_resume_manager
-                        .remove_epoll(self.weak_handle.as_ptr() as EpollKey);
+                        .remove_epoll(self.id.as_epoll_key());
+                    let _ = epoll_object.delete(&self);
                 }
             }
         }
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops().close(&mut locked, &self, current_task);
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().close(locked, &self, current_task);
         self.name.entry.node.on_file_closed(&self);
         let event =
             if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
@@ -2201,8 +2212,8 @@ impl OnWakeOps for FileReleaser {
     /// Called when the underneath `FileOps` is waken up by the power framework.
     fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Handle) {
         // Activate associated wake leases in registered epfd.
-        for epfd in self.epoll_files.lock().iter() {
-            if let Ok(file) = current_task.files.get(*epfd) {
+        for (_, file) in self.epoll_files.lock().iter() {
+            if let Some(file) = file.upgrade() {
                 if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
                     if let Some(weak_handle) = self.weak_handle.upgrade() {
                         if let Err(e) =
@@ -2272,13 +2283,13 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_append_truncate_race() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let root_fs = TmpFs::new_fs(locked, &kernel);
         let mount = MountInfo::detached();
         let root_node = Arc::clone(root_fs.root());
         let file = root_node
             .create_entry(
-                &mut locked,
+                locked,
                 &current_task,
                 &mount,
                 "test".into(),
@@ -2296,7 +2307,7 @@ mod tests {
             )
             .expect("create_node failed");
         let file_handle = file
-            .open_anonymous(&mut locked, &current_task, OpenFlags::APPEND | OpenFlags::RDWR)
+            .open_anonymous(locked, &current_task, OpenFlags::APPEND | OpenFlags::RDWR)
             .expect("open failed");
         let done = Arc::new(AtomicBool::new(false));
 
@@ -2328,9 +2339,8 @@ mod tests {
         // races, then we might unexpectedly see zeroes.
         while !done.load(Ordering::SeqCst) {
             let mut buffer = VecOutputBuffer::new(4096);
-            let amount = file_handle
-                .read_at(&mut locked, &current_task, 0, &mut buffer)
-                .expect("read failed");
+            let amount =
+                file_handle.read_at(locked, &current_task, 0, &mut buffer).expect("read failed");
             let mut last = None;
             let buffer = &Vec::from(buffer)[..amount];
             for i in buffer.chunks_exact(8).map(|chunk| U64::<LE>::read_from_bytes(chunk).unwrap())

@@ -96,6 +96,11 @@ type FormatOptions = table {
 type CheckOptions = resource table {
     /// An optional connection to a crypt client (for encrypted volumes).
     1: crypt client_end:<fuchsia.fxfs.Crypt>;
+
+    /// URI containing implementation specific options.  For example, for FVM backed volumes, this
+    /// indicates the component URL of the filesystem that we should run fsck with.  It must be
+    /// provided for FVM backed volumes.  At time of writing, this is ignored by Fxfs.
+    2: uri string:1024;
 };
 
 // TODO(https://fxbug.dev/42172184): Figure out a more flexible configuration option strategy.

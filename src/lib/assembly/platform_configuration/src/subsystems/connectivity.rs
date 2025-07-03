@@ -104,13 +104,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 .network
                 .netcfg_config_path
                 .clone()
-                .unwrap_or_else(|| context.get_resource("netcfg_default.json"));
+                .unwrap_or_else(|| context.get_resource("netcfg_default.json5"));
             let config_dir = builder
                 .add_domain_config(PackageSetDestination::Blob(PackageDestination::NetcfgConfig))
                 .directory("netcfg-config");
             config_dir.entry(FileEntry {
                 source: config_src,
-                destination: "netcfg_default.json".into(),
+                destination: "netcfg_default.json5".into(),
             })?;
 
             if let Some(netstack_config_path) = &connectivity_config.network.netstack_config_path {

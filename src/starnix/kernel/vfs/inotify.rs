@@ -9,10 +9,10 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::{
     default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, inotify, Anon,
-    DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr, FsString,
+    DirEntryHandle, FileHandle, FileHandleKey, FileObject, FileOps, FsNodeOps, FsStr, FsString,
     WdNumber,
 };
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::auth::CAP_SYS_ADMIN;
@@ -31,8 +31,6 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use zerocopy::IntoBytes;
 
 const DATA_SIZE: usize = size_of::<inotify_event>();
-
-type FileHandleKey = WeakKey<FileReleaser>;
 
 // InotifyFileObject represents an inotify instance created by inotify_init(2) or inotify_init1(2).
 pub struct InotifyFileObject {
@@ -98,13 +96,21 @@ impl InotifyState {
 
 impl InotifyFileObject {
     /// Allocate a new, empty inotify instance.
-    pub fn new_file(current_task: &CurrentTask, non_blocking: bool) -> FileHandle {
+    pub fn new_file<L>(
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        non_blocking: bool,
+    ) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let flags =
             OpenFlags::RDONLY | if non_blocking { OpenFlags::NONBLOCK } else { OpenFlags::empty() };
         let max_queued_events =
             current_task.kernel().system_limits.inotify.max_queued_events.load(Ordering::Relaxed);
         assert!(max_queued_events >= 0);
         Anon::new_private_file(
+            locked,
             current_task,
             Box::new(InotifyFileObject {
                 state: InotifyState {
@@ -595,7 +601,7 @@ pub type InotifyMaxUserWatches = InotifyLimitProcFile<MaxUserWatchesGetter>;
 #[cfg(test)]
 mod tests {
     use super::{InotifyEvent, InotifyEventQueue, InotifyFileObject, DATA_SIZE};
-    use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked};
+    use crate::testing::create_kernel_task_and_unlocked;
     use crate::vfs::buffers::VecOutputBuffer;
     use crate::vfs::{OutputBuffer, WdNumber};
     use starnix_uapi::arc_key::WeakKey;
@@ -721,9 +727,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn notify_from_watchers() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
 
@@ -757,8 +763,7 @@ mod tests {
 
         // Read 1 event.
         let mut buffer = VecOutputBuffer::new(DATA_SIZE);
-        let bytes_read =
-            file.read(&mut locked, &current_task, &mut buffer).expect("read into buffer");
+        let bytes_read = file.read(locked, &current_task, &mut buffer).expect("read into buffer");
 
         assert_eq!(bytes_read, DATA_SIZE);
         assert_eq!(inotify.available(), DATA_SIZE);
@@ -769,8 +774,7 @@ mod tests {
 
         // Read other event.
         buffer.reset();
-        let bytes_read =
-            file.read(&mut locked, &current_task, &mut buffer).expect("read into buffer");
+        let bytes_read = file.read(locked, &current_task, &mut buffer).expect("read into buffer");
 
         assert_eq!(bytes_read, DATA_SIZE);
         assert_eq!(inotify.available(), 0);
@@ -782,9 +786,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn notify_deletion_from_watchers() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
 
@@ -816,9 +820,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn inotify_on_same_file() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let file_key = WeakKey::from(&file);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
@@ -870,9 +874,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn coalesce_events() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
 

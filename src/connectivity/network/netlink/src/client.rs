@@ -16,6 +16,7 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use netlink_packet_core::NetlinkMessage;
 
+use crate::interfaces::AcceptRaRtTable;
 use crate::logging::{log_debug, log_warn};
 use crate::messaging::Sender;
 use crate::multicast_groups::{
@@ -23,6 +24,7 @@ use crate::multicast_groups::{
     MulticastGroupMemberships,
 };
 use crate::protocol_family::ProtocolFamily;
+use crate::{SysctlError, SysctlInterfaceSelector};
 
 /// A unique identifier for a client.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -190,6 +192,15 @@ pub(crate) enum AsyncWorkItem<T> {
         joined: Option<OneOrMany<T>>,
         left: Option<OneOrMany<T>>,
         complete: Option<oneshot_sync::Sender<()>>,
+    },
+    SetAcceptRaRtTable {
+        interface: SysctlInterfaceSelector,
+        value: AcceptRaRtTable,
+        responder: oneshot_sync::Sender<Result<(), SysctlError>>,
+    },
+    GetAcceptRaRtTable {
+        interface: SysctlInterfaceSelector,
+        responder: oneshot_sync::Sender<Result<AcceptRaRtTable, SysctlError>>,
     },
 }
 
@@ -549,8 +560,7 @@ mod tests {
             AsyncWorkItem::OnJoinMulticastGroup((), sender) => {
                 sender.send(());
             }
-            AsyncWorkItem::OnLeaveMulticastGroup(_) => panic!("should be join not leave"),
-            AsyncWorkItem::OnSetMulticastGroups { .. } => panic!("should be join not set"),
+            item @ _ => panic!("should be join, not {item:?}"),
         }
         waiter.assert_blocking_and_wait_until_complete();
 
@@ -565,11 +575,10 @@ mod tests {
         external_client.del_membership(MODERN_GROUP_NEEDS_BLOCKING).expect("add should succeed");
         let work = async_work_receiver.next().await.expect("should yield work");
         match work {
-            AsyncWorkItem::OnJoinMulticastGroup(..) => panic!("should be leave"),
             AsyncWorkItem::OnLeaveMulticastGroup(groups) => {
                 assert_matches!(groups, OneOrMany::One(()));
             }
-            AsyncWorkItem::OnSetMulticastGroups { .. } => panic!("should be leave"),
+            item @ _ => panic!("should be leave, not {item:?}"),
         }
 
         drop(async_work_receiver);

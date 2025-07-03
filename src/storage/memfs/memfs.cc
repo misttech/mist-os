@@ -8,12 +8,21 @@
 #include <lib/async/dispatcher.h>
 #include <lib/zx/event.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <string_view>
+#include <utility>
 
 #include <fbl/ref_ptr.h>
-#include <safemath/safe_math.h>
+#include <safemath/safe_conversions.h>
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
@@ -35,9 +44,9 @@ zx::result<fs::FilesystemInfo> Memfs::GetFilesystemInfo() {
   info.fs_type = fuchsia_fs::VfsType::kMemfs;
   info.SetFsId(fs_id_);
 
-  // TODO(https://fxbug.dev/42168054) Define a better value for "unknown" or "undefined" for the total_bytes
-  // and used_bytes (memfs vends writable duplicates of its underlying VMOs to its clients which
-  // makes accounting difficult).
+  // TODO(https://fxbug.dev/42168054) Define a better value for "unknown" or "undefined" for the
+  // total_bytes and used_bytes (memfs vends writable duplicates of its underlying VMOs to its
+  // clients which makes accounting difficult).
   info.total_bytes = UINT64_MAX;
   info.used_bytes = 0;
   info.total_nodes = UINT64_MAX;
@@ -55,10 +64,13 @@ zx::result<std::pair<std::unique_ptr<Memfs>, fbl::RefPtr<VnodeDir>>> Memfs::Crea
   std::unique_ptr<Memfs> fs(new Memfs(dispatcher));
 
   fbl::RefPtr<VnodeDir> root = fbl::MakeRefCounted<VnodeDir>(*fs);
-  std::unique_ptr<Dnode> dn = Dnode::Create(fs_name, root);
-  root->dnode_ = dn.get();
+  zx::result<std::unique_ptr<Dnode>> dn = Dnode::Create(std::string(fs_name), root);
+  if (dn.is_error()) {
+    return dn.take_error();
+  }
+  root->dnode_ = dn.value().get();
   root->dnode_parent_ = dn->GetParent();
-  fs->root_ = std::move(dn);
+  fs->root_ = std::move(dn).value();
 
   if (zx::result<> result = fs->Init(); result.is_error()) {
     return result.take_error();

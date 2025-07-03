@@ -59,7 +59,8 @@ impl MetadataGeometry {
         sha2::Sha256::digest(temp_metadata_geometry.as_bytes()).into()
     }
 
-    // Returns an error if there is an overflow.
+    // Returns the total super metadata size (including the reserved bytes, geometry, and backup
+    // metadata copies). Returns an error if there is an overflow.
     pub fn get_total_metadata_size(&self) -> Result<u64, Error> {
         // Metadata region looks like:
         //     +-----------------------------------+
@@ -382,6 +383,15 @@ pub struct MetadataPartition {
     pub group_index: u32,
 }
 
+impl MetadataPartition {
+    pub fn trimmed_name(&self) -> Result<String, Error> {
+        Ok(String::from_utf8(self.name.to_vec())
+            .map_err(|e| anyhow!("failed to convert partition UTF8 name to string: {e}"))?
+            .trim_end_matches(|c| c == '\0')
+            .to_string())
+    }
+}
+
 impl ValidateTable for MetadataPartition {
     fn validate(&self, header: &MetadataHeader) -> Result<(), Error> {
         if header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN {
@@ -402,6 +412,9 @@ impl ValidateTable for MetadataPartition {
             "Logical partition has invalid group index."
         );
         ensure!(self.name.is_ascii(), "Logical parition name is not ASCII.");
+        let _ = self
+            .trimmed_name()
+            .map_err(|e| anyhow!("Logical partition name canot be converted to String {e}."))?;
 
         let attributes = self.attributes;
         if attributes.contains(PartitionAttributes::SLOT_SUFFIXED) {
@@ -473,7 +486,7 @@ impl ValidateTable for MetadataExtent {
 }
 
 impl MetadataExtent {
-    pub fn as_range(&self) -> Result<SuperDeviceRange, Error> {
+    pub fn as_byte_range(&self) -> Result<SuperDeviceRange, Error> {
         let start = self
             .target_data
             .checked_mul(SECTOR_SIZE as u64)
@@ -939,6 +952,17 @@ mod tests {
         }
     }
 
+    #[fuchsia::test]
+    async fn test_partition_trimmed_name() {
+        let partition = VALID_PARTITION_TABLE_ENTRY;
+        partition
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata partition failed validation");
+        let partition_name =
+            partition.trimmed_name().expect("MetadataPartition::trimmed_name failed");
+        assert_eq!(partition_name, "system");
+    }
+
     const VALID_EXTENT: MetadataExtent = MetadataExtent {
         num_sectors: 4,
         target_type: TARGET_TYPE_LINEAR,
@@ -996,7 +1020,7 @@ mod tests {
             target_data: 1,
             target_source: 0,
         };
-        let range = extent.as_range().expect("failed to convert metadata extent to range");
+        let range = extent.as_byte_range().expect("failed to convert metadata extent to range");
         let start = 1 * SECTOR_SIZE as u64;
         let end = start + 3 * SECTOR_SIZE as u64;
         assert_eq!(range, SuperDeviceRange(start..end));
@@ -1010,7 +1034,7 @@ mod tests {
             target_data: 1,
             target_source: 0,
         };
-        extent.as_range().expect_err("converting extent to range should have failed");
+        extent.as_byte_range().expect_err("converting extent to range should have failed");
     }
 
     const VALID_PARTITION_GROUP: MetadataPartitionGroup = MetadataPartitionGroup {

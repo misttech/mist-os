@@ -22,6 +22,9 @@ const API_BASE: &str = "https://www.googleapis.com/storage/v1";
 /// Base URL for reading (blob) objects.
 const STORAGE_BASE: &str = "https://storage.googleapis.com";
 
+/// Base URL for reading objects with auth.
+const AUTHENTICATED_STORAGE_BASE: &str = "https://storage.mtls.cloud.google.com";
+
 /// Response from the `/b/<bucket>/o` object listing API.
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -247,6 +250,7 @@ impl TokenStore {
         object_name: &str,
         file_path: &PathBuf,
     ) -> Result<Url> {
+        log::debug!("upload to gs://{}/{}", bucket, object_name);
         let file_data = std::fs::read(file_path)?;
 
         let mut upload_url = self.storage_base.to_owned();
@@ -269,19 +273,34 @@ impl TokenStore {
             .await?
             .body(Body::from(file_data))
             .context("Failed to build GCS upload request")?;
-        let res = https_client.request(req).await.context("Failed to send GCS upload request")?;
 
-        // Check the HTTP response status for a successful upload.
-        let status = res.status();
-        if !status.is_success() {
-            // If the upload failed, provide a detailed error from the response body.
-            let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
-            let error_body = String::from_utf8_lossy(&body_bytes);
-            bail!("GCS upload failed with status {}: {}", status, error_body);
+        let auth_used = req.headers().contains_key("Authorization");
+        let res = https_client.request(req).await.context("Failed to send GCS upload request")?;
+        match res.status() {
+            StatusCode::OK => (),
+            // Status 403 (FORBIDDEN) means an access token is needed.
+            // If an access token was already used, there's no need in getting
+            // a new one, the server is saying NO to this request.
+            StatusCode::FORBIDDEN if !auth_used => {
+                log::debug!("send_request status {} (FORBIDDEN)", res.status());
+                bail!(GcsError::NeedNewAccessToken);
+            }
+            // Status 401 (UNAUTHORIZED) means the access token didn't work.
+            StatusCode::UNAUTHORIZED => {
+                log::debug!("send_request status {} (UNAUTHORIZED)", res.status());
+                bail!(GcsError::NeedNewAccessToken);
+            }
+            status => {
+                // If the upload failed, provide a detailed error from the response body.
+                let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
+                let error_body = String::from_utf8_lossy(&body_bytes);
+                bail!("GCS upload failed with status {}: {}", status, error_body);
+            }
         }
 
         // On success, construct and return the canonical URL for the created object.
-        let mut final_url = self.storage_base.to_owned();
+        let mut final_url =
+            Url::parse(AUTHENTICATED_STORAGE_BASE).expect("parse AUTHENTICATED_STORAGE_BASE");
         final_url
             .path_segments_mut()
             .map_err(|_| anyhow::anyhow!("Internal error: GCS URL cannot be a base"))?

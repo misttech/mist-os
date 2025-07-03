@@ -4,7 +4,6 @@
 
 use crate::ContainerStartInfo;
 use anyhow::{anyhow, Context, Error};
-use bstr::BString;
 use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 use starnix_core::device::remote_block_device::remote_block_device_init;
@@ -14,6 +13,7 @@ use starnix_core::vfs::FsString;
 use starnix_features::Feature;
 use starnix_logging::log_error;
 use starnix_modules_ashmem::ashmem_device_init;
+use starnix_modules_fastrpc::fastrpc_device_init;
 use starnix_modules_framebuffer::{AspectRatio, Framebuffer};
 use starnix_modules_gpu::gpu_device_init;
 use starnix_modules_gralloc::gralloc_device_init;
@@ -34,11 +34,9 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use {
-    fidl_fuchsia_sysinfo as fsysinfo, fidl_fuchsia_ui_composition as fuicomposition,
-    fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
-    fidl_fuchsia_ui_views as fuiviews,
+    fidl_fuchsia_ui_composition as fuicomposition, fidl_fuchsia_ui_input3 as fuiinput,
+    fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews,
 };
 
 /// A collection of parsed features, and their arguments.
@@ -106,6 +104,9 @@ pub struct Features {
     /// Whether to enable the nanohub module.
     pub nanohub: bool,
 
+    /// Whether to enable the fastrpc module.
+    pub fastrpc: bool,
+
     pub enable_utc_time_adjustment: bool,
 
     pub thermal: Option<Vec<String>>,
@@ -167,6 +168,7 @@ impl Features {
                 rootfs_rw,
                 network_manager,
                 nanohub,
+                fastrpc,
                 enable_utc_time_adjustment,
                 thermal,
                 android_bootreason,
@@ -215,6 +217,7 @@ impl Features {
                 inspect_node.record_bool("rootfs_rw", *rootfs_rw);
                 inspect_node.record_bool("network_manager", *network_manager);
                 inspect_node.record_bool("nanohub", *nanohub);
+                inspect_node.record_bool("fastrpc", *fastrpc);
                 inspect_node.record_string(
                     "thermal",
                     match thermal {
@@ -325,6 +328,7 @@ pub fn parse_features(
                 return Err(anyhow!("Feature format must be: magma_supported_vendors:0x1234[,0xabcd]"))
             }
             (Feature::Nanohub, _) => features.nanohub = true,
+            (Feature::Fastrpc, _) => features.fastrpc = true,
             (Feature::NetstackMark, _) => features.kernel.netstack_mark = true,
             (Feature::NetworkManager, _) => features.network_manager = true,
             (Feature::Gfxstream, _) => features.gfxstream = true,
@@ -555,10 +559,13 @@ pub fn run_container_features(
         nanohub_device_init(locked, system_task);
     }
     if let Some(devices) = &features.thermal {
-        thermal_device_init(locked, system_task, devices.clone());
+        thermal_device_init(locked, kernel, devices.clone());
     }
     if features.hvdcp_opti {
         hvdcp_opti_init(locked, system_task);
+    }
+    if features.fastrpc {
+        fastrpc_device_init(locked, system_task);
     }
 
     Ok(())
@@ -566,7 +573,7 @@ pub fn run_container_features(
 
 /// Runs features requested by individual components inside the container.
 pub fn run_component_features(
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     entries: &Vec<String>,
     mut incoming_dir: Option<fidl_fuchsia_io::DirectoryProxy>,
 ) -> Result<(), Errno> {
@@ -581,10 +588,4 @@ pub fn run_component_features(
         }
     }
     Ok(())
-}
-
-pub async fn get_serial_number() -> anyhow::Result<BString> {
-    let sysinfo = fuchsia_component::client::connect_to_protocol::<fsysinfo::SysInfoMarker>()?;
-    let serial = sysinfo.get_serial_number().await?.map_err(zx::Status::from_raw)?;
-    Ok(BString::from(serial))
 }

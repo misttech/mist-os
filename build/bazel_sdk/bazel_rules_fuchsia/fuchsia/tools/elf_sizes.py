@@ -9,9 +9,12 @@ import json
 import mmap
 import os
 import struct
+import subprocess
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
 
 # Standard ELF constants.
 ELFMAG = b"\x7fELF"
@@ -433,7 +436,7 @@ class elf_info(
             return True
 
 
-def get_elf_info(filename, match_notes=False):
+def get_elf_info(filename: str, match_notes: bool = False) -> None | elf_info:
     file = None
     elf = None
     ehdr = None
@@ -804,64 +807,145 @@ def get_elf_info(filename, match_notes=False):
 __all__ = ["cpu", "elf_info", "elf_note", "get_elf_accessor", "get_elf_info"]
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--bootfs-dir", help="bootfs content", metavar="DIR", required=True
+        "--assembly-dir",
+        help="Path to an assembled-system container directory",
+        type=Path,
+        metavar="DIR",
+        required=True,
     )
     parser.add_argument(
-        "--zbi", help="Read zbi.json", metavar="FILE", required=True
+        "--zbi-tool",
+        help="Path to the 'zbi' tool",
+        type=Path,
+        metavar="FILE",
+        required=True,
     )
     parser.add_argument(
-        "--blobs", help="Read blobs.json", metavar="FILE", required=True
+        "--scratch-dir",
+        help="Path to a directory to write temporary files in",
+        type=Path,
+        metavar="DIR",
+        required=True,
     )
     parser.add_argument(
-        "--sizes", help="Write elf_sizes.json", metavar="FILE", required=True
+        "--sizes",
+        help="Output path for elf_sizes.json file",
+        type=Path,
+        metavar="FILE",
+        required=True,
     )
     args = parser.parse_args()
 
+    # The path to the ZBI
+    zbi = None
+    # The json description of blobfs/fxblob (described below)
+    contents = None
+
+    # Open the 'assembled_system.json' manifest that describes the
+    # assembled system's output, and use that to locate the zbi and
+    # the contents of the blobfs/fxblob image.
+    with open(args.assembly_dir / "assembled_system.json") as f:
+        assembled_system = json.load(f)
+        for image in assembled_system["images"]:
+            if image["type"] == "zbi":
+                zbi = args.assembly_dir / image["path"]
+            else:
+                if "contents" in image:
+                    contents = image["contents"]
+
+    if not zbi:
+        raise ValueError("Unable to find ZBI in assembled_system.json")
+    if not contents:
+        raise ValueError("Unable to find packages in assembled_system.json")
+
+    # Extract the zbi into a scratch directory, so that all of the files
+    # within it can processed.
+    extracted_bootfs_dir = args.scratch_dir / "bootfs"
+    extracted_zbi_json = args.scratch_dir / "zbi.json"
+    os.makedirs(args.scratch_dir, exist_ok=True)
+
+    rc = subprocess.run(
+        [
+            args.zbi_tool,
+            "--extract",
+            "--output-dir",
+            extracted_bootfs_dir,
+            "--json-output",
+            extracted_zbi_json,
+            zbi,
+        ],
+    )
+    if rc.returncode != 0:
+        raise ValueError("Unable to extract BOOTFS from ZBI")
+
+    # Walk the 'zbi.json' created during the extraction, to find all the bootfs
+    # files, and compute the path in the scratch dir for the file.
     files = []
-    if not args.bootfs_dir:
-        parser.exit("--zbi and --bootfs-dir must be specified together")
     bootfs_map = {}
-    with open(args.zbi) as f:
+    with open(extracted_zbi_json) as f:
         zbi = json.load(f)
     for entry in zbi:
         if entry["type"] != "BOOTFS":
             continue
         for item in entry["contents"]:
-            filepath = os.path.join(args.bootfs_dir, item["name"])
+            filepath = str(extracted_bootfs_dir / item["name"])
             files.append(filepath)
             bootfs_map[filepath] = item
 
-    with open(args.blobs) as f:
-        blobs = json.load(f)
-    files += [blob["source_path"] for blob in blobs]
+    # 'contents' is a dict based on json such as:
+    # {
+    #   "contents":
+    #     "packages": {
+    #         "base": [
+    #             {
+    #               "name": <package name>,
+    #               "manifest": <path to manifest>,
+    #               "blobs": [
+    #                {
+    #                  "merkle": <hash>,
+    #                  "path": <path in package>,
+    #                  "used_space_in_blobfs": <int>
+    #
+    # Theinfo needed from this are the merkles and their sizes in blobfs,
+    # as the individual package blobs can be found in:
+    #   '<args.assembly_dir>/blobs/<merkle>'
+    #
 
-    blob_map = {blob["source_path"]: blob for blob in blobs}
+    # This is a map of all blobs in the fxfs/blobfs image, by merkle and their
+    # size in blobfs (not the data size of the file, but the size taken up in
+    # the image
+    blobs_map: dict[str, int] = {}
+    for _, packages in contents["packages"].items():
+        for package in packages:
+            for blob in package["blobs"]:
+                merkle = blob["merkle"]
+                if merkle not in blobs_map:
+                    blobs_map[merkle] = blob["used_space_in_blobfs"]
 
-    def json_size(info):
+    files += [
+        str(args.assembly_dir / "blobs" / merkle) for merkle in blobs_map.keys()
+    ]
+
+    # Now that all the files have been found, get the elf info for each one
+    # if it is an ELF file, ignoring those that aren't.
+    def json_size(info: Any) -> dict[Any, Any]:
         sizes = info.sizes._asdict()
         sizes["path"] = info.filename
         sizes["build_id"] = info.build_id
-        if args.zbi and info.filename in bootfs_map:
+        if info.filename in bootfs_map:
             item = bootfs_map[info.filename]
             assert info.sizes.file == item["length"], "%r != %r in %r vs %r" % (
                 info.sizes.file,
-                blob["length"],
+                item["length"],
                 info,
-                blob,
+                item,
             )
             sizes["zbi"] = item["size"]
-        if args.blobs and info.filename in blob_map:
-            blob = blob_map[info.filename]
-            assert info.sizes.file == blob["bytes"], "%r != %r in %r vs %r" % (
-                info.sizes.file,
-                blob["bytes"],
-                info,
-                blob,
-            )
-            sizes["blob"] = blob["size"]
+        if info.filename in blobs_map:
+            sizes["blob"] = blobs_map[info.filename]
         return sizes
 
     # Sort for stable output.
@@ -874,12 +958,14 @@ def main():
         key=lambda info: info["path"],
     )
 
-    totals = {}
+    # Compute the totals for each section
+    totals: dict[str, int] = {}
     for file in sizes:
         for key, val in file.items():
             if isinstance(val, int):
                 totals[key] = totals.get(key, 0) + val
 
+    # And write out the output file.
     with open(args.sizes, "w") as outf:
         json.dump(
             {"files": sizes, "totals": totals}, outf, sort_keys=True, indent=1

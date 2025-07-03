@@ -388,17 +388,16 @@ mod test {
             Unlocked => TestLevel
         }
 
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let queue = RwQueue::<TestLevel>::default();
-        let read_guard1 = queue.read(&mut locked, &current_task).expect("shouldn't be interrupted");
+        let read_guard1 = queue.read(locked, &current_task).expect("shouldn't be interrupted");
         std::mem::drop(read_guard1);
 
-        let write_guard =
-            queue.write(&mut locked, &current_task).expect("shouldn't be interrupted");
+        let write_guard = queue.write(locked, &current_task).expect("shouldn't be interrupted");
         std::mem::drop(write_guard);
 
-        let read_guard2 = queue.read(&mut locked, &current_task).expect("shouldn't be interrupted");
+        let read_guard2 = queue.read(locked, &current_task).expect("shouldn't be interrupted");
         std::mem::drop(read_guard2);
     }
 

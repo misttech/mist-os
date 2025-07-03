@@ -98,6 +98,12 @@ template("generate_idk_targets") {
       # files are modified in ways that affect individual API levels but not
       # the output when fidlc is targeting "PLATFORM".
       non_sdk_deps += invoker.fidl_libraries
+
+      # For consistency, do not include those FIDL atoms in the prebuild data.
+      metadata = {
+        idk_atom_prebuild_info_barrier =
+            deps + (non_sdk_deps - invoker.fidl_libraries)
+      }
     }
   }
 

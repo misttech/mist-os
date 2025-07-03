@@ -123,7 +123,7 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// Optional version information for all input artifacts.
     /// TODO(https://fxbug.dev/416239346): Make this a required field.
-    system_release_info: Option<SystemReleaseInfo>,
+    system_release_info: SystemReleaseInfo,
 }
 
 impl ImageAssemblyConfigBuilder {
@@ -133,7 +133,7 @@ impl ImageAssemblyConfigBuilder {
         partitions_config: Option<Utf8PathBuf>,
         image_mode: FilesystemImageMode,
         feature_set_level: FeatureSetLevel,
-        system_release_info: Option<SystemReleaseInfo>,
+        system_release_info: SystemReleaseInfo,
     ) -> Self {
         Self {
             build_type,
@@ -837,10 +837,10 @@ impl ImageAssemblyConfigBuilder {
         self,
         outdir: impl AsRef<Utf8Path>,
         tools: &impl ToolProvider,
-        warn_only: bool,
+        validation_mode: ValidationMode,
     ) -> Result<(ImageAssemblyConfig, Option<ProductValidationError>)> {
         let (config, validator) = self.build(outdir, tools)?;
-        let error = validator.validate_product(&config, warn_only);
+        let error = validator.validate_product(&config, validation_mode);
         Ok((config, error.err()))
     }
 
@@ -1355,6 +1355,18 @@ impl std::fmt::Display for KernelArg {
     }
 }
 
+/// How to validate the product.
+pub enum ValidationMode {
+    /// Do not validate.
+    Off,
+
+    /// Validate everything.
+    On,
+
+    /// Validate everything, but print warnings instead of exiting.
+    WarnOnly,
+}
+
 struct Validator;
 
 impl Validator {
@@ -1362,7 +1374,7 @@ impl Validator {
     fn validate_product(
         &self,
         product: &ImageAssemblyConfig,
-        warn_only: bool,
+        validation_mode: ValidationMode,
     ) -> Result<(), ProductValidationError> {
         // validate the packages in the system/base/cache package sets
         let manifests =
@@ -1378,17 +1390,19 @@ impl Validator {
                         Err(e) => {
                             // If validation issues have been downgraded to warnings, then print
                             // a warning instead of returning an error.
-                            let print_warning = warn_only && match e {
+                            let warning_eligible = match e {
                                 PackageValidationError::MissingAbiRevisionFile(_) => true,
                                 PackageValidationError::InvalidAbiRevisionFile(_) => true,
                                 PackageValidationError::UnsupportedAbiRevision (_) => true,
-                                _ => false};
-                             if print_warning {
-                                eprintln!("WARNING: The package named '{}', with manifest at {} failed validation:\n{}", manifest.name(), package_manifest_path, e);
-                                None
-                             } else {
-                                // return the error
-                                Some((package_manifest_path.to_owned(), e))
+                                _ => false,
+                            };
+                            match (&validation_mode, warning_eligible) {
+                                (&ValidationMode::Off, _) => None,
+                                (&ValidationMode::WarnOnly, false) | (&ValidationMode::On, _) => Some((package_manifest_path.to_owned(), e)),
+                                (&ValidationMode::WarnOnly, true) => {
+                                    eprintln!("WARNING: The package named '{}', with manifest at {} failed validation:\n{}", manifest.name(), package_manifest_path, e);
+                                    None
+                                },
                             }
                         }
                     }
@@ -1502,6 +1516,7 @@ mod tests {
     use assembly_named_file_map::SourceMerklePair;
     use assembly_package_utils::PackageManifestPathBuf;
     use assembly_platform_configuration::ComponentConfigs;
+    use assembly_release_info::SystemReleaseInfo;
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolCommandLog;
@@ -1680,7 +1695,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder.add_parsed_bundle(outdir.as_ref().join("minimum_bundle"), minimum_bundle).unwrap();
         builder
@@ -1697,7 +1712,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder
             .add_parsed_bundle(
@@ -1705,7 +1720,8 @@ mod tests {
                 make_test_assembly_bundle(&vars.outdir, &vars.bundle_path),
             )
             .unwrap();
-        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
+        let (result, _) =
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap();
 
         assert_eq!(
             result.base,
@@ -1756,7 +1772,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder
             .add_parsed_bundle(
@@ -1764,7 +1780,8 @@ mod tests {
                 make_test_assembly_bundle(&vars.outdir, &vars.bundle_path),
             )
             .unwrap();
-        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
+        let (result, _) =
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap();
 
         assert_eq!(
             result.base,
@@ -1810,7 +1827,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder
             .add_parsed_bundle(
@@ -1818,7 +1835,8 @@ mod tests {
                 make_test_assembly_bundle(&vars.outdir, &vars.bundle_path),
             )
             .unwrap();
-        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
+        let (result, _) =
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap();
 
         assert_eq!(
             result.base,
@@ -1863,7 +1881,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
 
         // Write a file to the temp dir for use with config_data.
@@ -1915,7 +1933,8 @@ mod tests {
             )
             .unwrap();
         builder.add_parsed_bundle(&vars.bundle_path, bundle).unwrap();
-        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
+        let (result, _) =
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap();
 
         // config_data's manifest is in outdir
         let expected_config_data_manifest_path =
@@ -1985,7 +2004,8 @@ mod tests {
         };
         builder.add_domain_config(destination, config).unwrap();
 
-        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
+        let (result, _) =
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap();
 
         // The domain config's manifest is in outdir
         let expected_manifest_path = vars.outdir.join("for-test").join("package_manifest.json");
@@ -2010,7 +2030,8 @@ mod tests {
         };
         builder.add_domain_config(destination, config).unwrap();
 
-        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
+        let (result, _) =
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap();
 
         // The domain config's manifest is in outdir
         let expected_manifest_path = vars.outdir.join("for-test").join("package_manifest.json");
@@ -2035,7 +2056,8 @@ mod tests {
         );
         let builder = setup_builder(&vars, vec![bundle]);
 
-        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
+        let (result, _) =
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap();
 
         // config_data's manifest is in outdir
         let expected_manifest_path =
@@ -2106,7 +2128,7 @@ mod tests {
             vec!["platform_a".to_owned(), "platform_b".to_owned()],
         );
         builder.add_product_packages(packages).unwrap();
-        let (result, _) = builder.build_and_validate(outdir, &tools, false).unwrap();
+        let (result, _) = builder.build_and_validate(outdir, &tools, ValidationMode::On).unwrap();
 
         assert_eq!(
             result.base,
@@ -2204,7 +2226,7 @@ mod tests {
 
         let builder = setup_builder(&vars, vec![bundle1, bundle2]);
         let _: ImageAssemblyConfig =
-            builder.build_and_validate(&vars.outdir, &tools, false).unwrap().0;
+            builder.build_and_validate(&vars.outdir, &tools, ValidationMode::On).unwrap().0;
 
         // Make sure all the components and CML shards from the separate bundles
         // are merged.
@@ -2311,7 +2333,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         assert!(builder.add_parsed_bundle(root, aib).is_err());
     }
@@ -2342,7 +2364,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder.add_parsed_bundle(outdir, aib).unwrap();
         assert!(builder.add_parsed_bundle(outdir.join("second"), second_aib).is_err());
@@ -2383,7 +2405,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         assert!(builder.add_parsed_bundle(outdir, aib).is_err());
     }
@@ -2430,11 +2452,11 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder.add_parsed_bundle(outdir, aib).ok();
         builder.add_parsed_bundle(outdir, aib2).ok();
-        assert!(builder.build_and_validate(outdir, &tools, false).is_err());
+        assert!(builder.build_and_validate(outdir, &tools, ValidationMode::On).is_err());
     }
     /// Asserts that attempting to add a package to the base package set with the same
     /// PackageName but a different package manifest path will result in an error if coming
@@ -2477,7 +2499,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder.add_parsed_bundle(outdir, aib).ok();
         assert!(builder.add_parsed_bundle(outdir, aib2).is_err());
@@ -2514,7 +2536,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
         builder.add_parsed_bundle(root, first_aib).unwrap();
         assert!(builder.add_parsed_bundle(root.join("second"), second_aib).is_err());
@@ -2530,7 +2552,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
 
         let board_package_path = root.join("board");
@@ -2578,7 +2600,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
 
         builder.add_kernel_args(vec!["arg1=value1".to_owned()]).unwrap();
@@ -2597,7 +2619,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
-            None,
+            SystemReleaseInfo::new_for_testing(),
         );
 
         // Provide developer overrides for kernel commandline args
@@ -2631,7 +2653,7 @@ mod tests {
             )
             .unwrap();
 
-        let config = builder.build_and_validate(vars.outdir, &tools, false).unwrap().0;
+        let config = builder.build_and_validate(vars.outdir, &tools, ValidationMode::On).unwrap().0;
 
         assert_eq!(
             config.kernel.args,

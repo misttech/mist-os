@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.registers/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -81,16 +82,23 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
 }  // namespace
 
 zx_status_t Astro::RegistersInit() {
-  auto metadata_bytes = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
-  if (!metadata_bytes.is_ok()) {
-    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__, metadata_bytes.status_string());
-    return metadata_bytes.error_value();
+  zx::result metadata = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
+  if (!metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to convert registers to metadata %s", metadata.status_string());
+    return metadata.error_value();
+  }
+
+  fit::result persisted_metadata = fidl::Persist(metadata.value());
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist registers metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
   }
 
   std::vector<fpbus::Metadata> registers_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_REGISTERS),
-          .data = metadata_bytes.value(),
+          .id = fuchsia_hardware_registers::Metadata::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
       }},
   };
 

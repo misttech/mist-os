@@ -17,6 +17,7 @@
 #include <type_traits>
 
 #include "layout.h"
+#include "memory.h"
 #include "phdr.h"
 
 namespace elfldltl {

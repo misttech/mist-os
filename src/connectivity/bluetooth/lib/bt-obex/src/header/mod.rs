@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime};
 use fuchsia_bluetooth::types::Uuid;
 use log::trace;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
@@ -655,7 +655,7 @@ impl Encodable for Header {
                 buf[start_index..start_index + s.len()].copy_from_slice(&s);
             }
             Time4Byte(time) => {
-                let timestamp_bytes = (time.timestamp() as u32).to_be_bytes();
+                let timestamp_bytes = (time.and_utc().timestamp() as u32).to_be_bytes();
                 buf[start_index..start_index + 4].copy_from_slice(&timestamp_bytes[..])
             }
             WanUuid(uuid) => buf[start_index..start_index + Uuid::BLUETOOTH_UUID_LENGTH_BYTES]
@@ -735,12 +735,12 @@ impl Decodable for Header {
             }
             HeaderIdentifier::Time4Byte => {
                 let elapsed_time_seconds = u32::from_be_bytes(data[..].try_into().unwrap());
-                let parsed = NaiveDateTime::from_timestamp_opt(
-                    elapsed_time_seconds.into(),
-                    /*nsecs= */ 0,
-                )
-                .ok_or_else(|| PacketError::external(anyhow::format_err!("invalid timestamp")))?;
-                Ok(Header::Time4Byte(parsed))
+                let parsed =
+                    DateTime::from_timestamp(elapsed_time_seconds.into(), /*nsecs= */ 0)
+                        .ok_or_else(|| {
+                            PacketError::external(anyhow::format_err!("invalid timestamp"))
+                        })?;
+                Ok(Header::Time4Byte(parsed.naive_utc()))
             }
             HeaderIdentifier::Description => Ok(Header::Description(ObexString::try_from(data)?)),
             HeaderIdentifier::Target => {
@@ -1215,7 +1215,8 @@ mod tests {
         ];
         assert_eq!(buf, expected_buf);
 
-        let timestamp = Header::Time4Byte(NaiveDateTime::from_timestamp_opt(1_000_000, 0).unwrap());
+        let timestamp =
+            Header::Time4Byte(DateTime::from_timestamp(1_000_000, 0).unwrap().naive_utc());
         assert_eq!(timestamp.encoded_len(), 5);
         let mut buf = vec![0; timestamp.encoded_len()];
         timestamp.encode(&mut buf).expect("can encode");

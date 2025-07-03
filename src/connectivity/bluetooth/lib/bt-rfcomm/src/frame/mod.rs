@@ -84,6 +84,10 @@ impl UserData {
     pub fn is_empty(&self) -> bool {
         self.information.is_empty()
     }
+
+    pub fn empty() -> Self {
+        Self { information: vec![] }
+    }
 }
 
 impl Decodable for UserData {

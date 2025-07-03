@@ -18,6 +18,7 @@ group("tests") {
 
 source_set("fake-lib") {
   sources = [
+    "fake-display-device-config.h",
     "fake-display.cc",
     "fake-display.h",
     "image-info.cc",

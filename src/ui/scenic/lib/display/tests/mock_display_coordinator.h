@@ -18,8 +18,7 @@ class MockDisplayCoordinator;
 class MockDisplayCoordinator
     : public fidl::testing::WireTestBase<fuchsia_hardware_display::Coordinator> {
  public:
-  using CheckConfigFn =
-      std::function<void(bool, fuchsia_hardware_display_types::wire::ConfigResult*)>;
+  using CheckConfigFn = std::function<void(fuchsia_hardware_display_types::wire::ConfigResult*)>;
   using SetDisplayColorConversionFn =
       std::function<void(fuchsia_hardware_display_types::wire::DisplayId, fidl::Array<float, 3>,
                          fidl::Array<float, 9>, fidl::Array<float, 3>)>;
@@ -58,8 +57,7 @@ class MockDisplayCoordinator
   void SetLayerPrimaryPosition(
       fuchsia_hardware_display::wire::CoordinatorSetLayerPrimaryPositionRequest* request,
       SetLayerPrimaryPositionCompleter::Sync& completer) override;
-  void CheckConfig(fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest* request,
-                   CheckConfigCompleter::Sync& completer) override;
+  void CheckConfig(CheckConfigCompleter::Sync& completer) override;
   void AcknowledgeVsync(fuchsia_hardware_display::wire::CoordinatorAcknowledgeVsyncRequest* request,
                         AcknowledgeVsyncCompleter::Sync& completer) override;
   void SetDisplayPower(fuchsia_hardware_display::wire::CoordinatorSetDisplayPowerRequest* request,

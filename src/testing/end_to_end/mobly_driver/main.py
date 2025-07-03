@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import sys
+import traceback
 from typing import Any
 
 import mobly_driver
@@ -96,17 +97,29 @@ def main() -> None:
     )
     driver = factory.get_driver()
 
-    # Use the same Python runtime for Mobly test execution as the one that's
-    # currently running this Mobly driver script.
-    mobly_driver.run(
-        driver=driver,
-        python_path=sys.executable,
-        test_path=args.mobly_test_path,
-        test_cases=args.test_cases,
-        timeout_sec=args.test_timeout_sec,
-        verbose=args.v,
-        hermetic=args.hermetic,
-    )
+    try:
+        # Use the same Python runtime for Mobly test execution as the one that's
+        # currently running this Mobly driver script.
+        mobly_driver.run(
+            driver=driver,
+            python_path=sys.executable,
+            test_path=args.mobly_test_path,
+            test_cases=args.test_cases,
+            timeout_sec=args.test_timeout_sec,
+            verbose=args.v,
+            hermetic=args.hermetic,
+        )
+    except mobly_driver.MoblyTestFailureException as mtfe:
+        # If an exception escapes a python process, the exit code is set to 1.
+        # The goal here is to explicitly exit with the return code in mtfe, so
+        # the exception must be caught...but that suppresses the traceback.
+        # Print it explicitly to behave consistently with how other exceptions
+        # coming out of Mobly appear in logs.
+        # Note that `raise SystemExit(mtfe.return_code) from mtfe` doesn't
+        # result in a traceback, because raising SystemExit is how python
+        # programs exit gracefully.
+        traceback.print_exc()
+        sys.exit(mtfe.return_code)
 
 
 def generate_honeydew_config() -> dict[str, Any]:

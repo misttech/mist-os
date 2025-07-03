@@ -18,16 +18,16 @@ use structured_ui::{Notice, Presentation, TableRows};
 
 /// `ffx product show` sub-command.
 #[derive(FfxTool)]
-pub struct ProductCreateTool {
+pub struct ProductShowTool {
     #[command]
     pub cmd: ShowCommand,
 }
 
-fho::embedded_plugin!(ProductCreateTool);
+fho::embedded_plugin!(ProductShowTool);
 
 /// Create a product bundle.
 #[async_trait::async_trait(?Send)]
-impl FfxMain for ProductCreateTool {
+impl FfxMain for ProductShowTool {
     type Writer = SimpleWriter;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let mut input = stdin();

@@ -29,10 +29,10 @@
 #include <object/resource_dispatcher.h>
 #include <platform/pc.h>
 #include <platform/pc/acpi.h>
-#include <platform/pic.h>
+#include <platform/pc/memory.h>
+#include <platform/pc/pic.h>
 
 #include "interrupt_manager.h"
-#include "platform_p.h"
 
 #include <ktl/enforce.h>
 

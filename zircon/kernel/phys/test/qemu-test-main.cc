@@ -7,12 +7,11 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/uart/qemu.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include <ktl/utility.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 
 #include "test-main.h"
 

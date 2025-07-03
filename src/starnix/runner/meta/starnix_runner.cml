@@ -76,6 +76,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.boot.Items",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.feedback.CrashReporter",
@@ -105,7 +106,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.alarms.WakeAlarms",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
@@ -115,6 +116,7 @@
             protocol: [
                 "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.hardware.google.nanohub.Device",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.policy.socketproxy.StarnixNetworks",
                 "fuchsia.net.stack.Stack",
@@ -171,7 +173,10 @@
             to: [ "#kernels" ],
         },
         {
-            service: "fuchsia.hardware.adb.Service",
+            service: [
+                "fuchsia.hardware.adb.Service",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureService",
+            ],
             from: "parent",
             to: [ "#kernels" ],
         },

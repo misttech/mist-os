@@ -590,12 +590,13 @@ TEST_P(MinfsTest, UnlinkFail) {
   }
 
   // Sync Minfs to ensure all close operations complete. Since Minfs is in a read-only state and
-  // some requests have not been successfully persisted to disk, the sync is expected to fail.
+  // some requests have not been successfully persisted to disk, the sync and the unmount are
+  // expected to fail
   ASSERT_LT(syncfs(fd.get()), 0);
+  EXPECT_LT(fs().Unmount().status_value(), 0);
 
   // Remount Minfs, which should cause leftover unlinked files to be removed.
   ASSERT_EQ(fs().GetRamDisk()->Wake().status_value(), ZX_OK);
-  EXPECT_EQ(fs().Unmount().status_value(), ZX_OK);
   EXPECT_EQ(fs().Mount().status_value(), ZX_OK);
 
   // Check that the block count has been reverted to the value before any files were added.

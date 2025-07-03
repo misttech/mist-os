@@ -36,6 +36,7 @@ def _fuchsia_board_configuration_impl(ctx):
 
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
+    board_config["arch"] = ctx.attr.arch
 
     kernel = json.decode(ctx.attr.kernel)
     check_type(kernel, "dict")
@@ -107,6 +108,15 @@ def _fuchsia_board_configuration_impl(ctx):
     # required.
     if repo:
         creation_args += ["--repo", repo]
+
+    release_info = {}
+    release_info["info"] = {
+        "name": ctx.attr.board_name,
+        "repository": "intermediate_repository",
+        "version": "intermediate_version",
+    }
+    release_info["bib_sets"] = []
+    board_config["release_info"] = release_info
 
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
@@ -193,6 +203,11 @@ _fuchsia_board_configuration = rule(
     attrs = {
         "board_name": attr.string(
             doc = "Name of this board.",
+            mandatory = True,
+        ),
+        "arch": attr.string(
+            doc = "Architecture of this board.",
+            values = ["x64", "arm64", "riscv64"],
             mandatory = True,
         ),
         "hardware_info": attr.string(
@@ -282,6 +297,11 @@ def fuchsia_board_configuration(
         kernel = json.encode_indent(kernel, indent = "    "),
         hardware_info = json.encode_indent(hardware_info, indent = "    "),
         filesystems_labels = filesystem_labels,
+        arch = select({
+            "@rules_fuchsia//fuchsia/constraints:cpu_x64": "x64",
+            "@rules_fuchsia//fuchsia/constraints:cpu_arm64": "arm64",
+            "@rules_fuchsia//fuchsia/constraints:cpu_riscv64": "riscv64",
+        }),
         **kwargs
     )
 

@@ -265,8 +265,8 @@ void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
 // static
 std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                                        async_dispatcher_t* dispatcher, std::string_view name,
-                                       fad::DeviceType device_type,
-                                       fad::DriverClient driver_client) {
+                                       fad::DeviceType device_type, fad::DriverClient driver_client,
+                                       const std::string& added_by) {
   ADR_LOG_STATIC(kLogObjectLifetimes);
 
   // The constructor is private, forcing clients to use Device::Create().
@@ -274,13 +274,14 @@ std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> pres
    public:
     MakePublicCtor(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                    async_dispatcher_t* dispatcher, std::string_view name,
-                   fad::DeviceType device_type, fad::DriverClient driver_client)
+                   fad::DeviceType device_type, fad::DriverClient driver_client,
+                   const std::string& added_by)
         : Device(std::move(presence_watcher), dispatcher, name, device_type,
-                 std::move(driver_client)) {}
+                 std::move(driver_client), added_by) {}
   };
 
   return std::make_shared<MakePublicCtor>(presence_watcher, dispatcher, name, device_type,
-                                          std::move(driver_client));
+                                          std::move(driver_client), added_by);
 }
 
 // Device notifies presence_watcher when it is available (Initialized), unhealthy (Error) or
@@ -288,7 +289,7 @@ std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> pres
 // such as fuchsia.hardware.audio.signalprocessing.Reader or fuchsia.hardware.audio.RingBuffer.
 Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                async_dispatcher_t* dispatcher, std::string_view name, fad::DeviceType device_type,
-               fad::DriverClient driver_client)
+               fad::DriverClient driver_client, const std::string& added_by)
     : presence_watcher_(std::move(presence_watcher)),
       dispatcher_(dispatcher),
       name_(name.substr(0, name.find('\0'))),
@@ -298,7 +299,7 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       state_(State::Initializing) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   device_inspect_instance_ = Inspector::Singleton()->RecordDeviceInitializing(
-      name_, device_type_, zx::clock::get_monotonic());
+      name_, device_type_, zx::clock::get_monotonic(), added_by);
   inspect()->RecordTokenId(token_id_);
 
   ++count_;
@@ -648,7 +649,8 @@ void Device::DropRingBuffer(ElementId element_id) {
   if (rb_record.inspect_instance) {
     rb_record.inspect_instance->RecordDestructionTime(zx::clock::get_monotonic());
   } else {
-    ADR_WARN_METHOD() << "cannot RecordDestructionTime: inspect node was not yet created";
+    ADR_WARN_METHOD()
+        << "cannot RecordDestructionTime: no RB inspect node (CreateRingBuffer must have failed)";
   }
 
   if (!rb_record.ring_buffer_client.has_value() || !rb_record.ring_buffer_client->is_valid()) {
@@ -1921,7 +1923,8 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
           }
 
           // Reset DaiFormat (and Start state if it's a change). Notify our controlling entity.
-          codec_format_ = CodecFormat{dai_format, result->state()};
+          codec_format_ =
+              CodecFormat{.dai_format = dai_format, .codec_format_info = result->state()};
           if (codec_start_state_.started) {
             codec_start_state_ = CodecStartState{false, zx::clock::get_monotonic()};
             notify->CodecIsStopped(codec_start_state_.start_stop_time);

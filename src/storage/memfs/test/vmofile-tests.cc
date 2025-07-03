@@ -2,32 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <dirent.h>
-#include <errno.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/zx/channel.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/string_view.h>
+#include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
+#include <lib/fit/internal/result.h>
+#include <lib/sync/completion.h>
+#include <lib/zx/object.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <threads.h>
-#include <unistd.h>
 #include <zircon/errors.h>
-#include <zircon/processargs.h>
 #include <zircon/rights.h>
-#include <zircon/syscalls.h>
+#include <zircon/status.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
-#include <fbl/unique_fd.h>
+#include <cstdint>
+#include <memory>
+#include <span>
+#include <string_view>
+#include <utility>
+
 #include <zxtest/zxtest.h>
 
 #include "src/storage/memfs/memfs.h"
-#include "src/storage/memfs/vnode_dir.h"
+#include "src/storage/memfs/vnode_dir.h"  // IWYU pragma: keep
 
 namespace {
 

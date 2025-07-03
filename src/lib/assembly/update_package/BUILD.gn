@@ -34,6 +34,7 @@ rustc_library("update_package") {
     "src/update_package.rs",
   ]
   test_deps = [
+    "//src/lib/assembly/release_info",
     "//src/lib/assembly/util",
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",

@@ -4,10 +4,13 @@
 
 use anyhow::{bail, Context, Error};
 use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_wlan_wlanix::{
+    Nl80211MessageResponder, Nl80211MessageResponse, Nl80211MessageV2Responder,
+};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::future::OptionFuture;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use ieee80211::{Bssid, MacAddrBytes};
 use log::{debug, error, info, warn};
 use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable};
@@ -82,7 +85,12 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             match payload.iface {
                 Some(iface) => {
                     let reqs = iface.into_stream();
-                    let iface_id = iface_manager.create_client_iface(chip_id).await?;
+                    let iface_id = iface_manager
+                        .create_client_iface(chip_id)
+                        .inspect_err(|_e| {
+                            telemetry_sender.send(TelemetryEvent::IfaceCreationFailure)
+                        })
+                        .await?;
                     telemetry_sender.send(TelemetryEvent::ClientIfaceCreated { iface_id });
                     responder.send(Ok(())).context("send CreateStaIface response")?;
                     serve_wifi_sta_iface(iface_id, reqs).await;
@@ -149,6 +157,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                     }
                     Err(e) => {
                         error!("Failed to remove iface: {}", e);
+                        telemetry_sender.send(TelemetryEvent::IfaceDestructionFailure);
                         responder
                             .send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))
                             .context("send RemoveStaIface response")?;
@@ -344,6 +353,7 @@ async fn handle_wifi_request<I: IfaceManager>(
                     // Tear down all ifaces before calling power_down.
                     for iface in iface_manager.list_ifaces() {
                         if let Err(e) = iface_manager.destroy_iface(iface).await {
+                            telemetry_sender.send(TelemetryEvent::IfaceDestructionFailure);
                             error!(
                                 "Failed to destroy iface {} in response to WifiRequest::Stop: {}",
                                 iface, e
@@ -705,7 +715,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                 let state = sta_network_state.lock();
                 (state.ssid.clone(), state.passphrase.clone(), state.bssid)
             };
-            let (result, connection_ctx) = match ssid {
+            let (result, status_code, connected_bssid, connection_ctx) = match ssid {
                 Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase, bssid).await {
                     Ok(ConnectResult::Success(connected)) => {
                         info!("Connected to requested network");
@@ -728,6 +738,8 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                         );
                         (
                             Ok(()),
+                            fidl_ieee80211::StatusCode::Success,
+                            Some(connected.bss.bssid),
                             Some(ConnectionContext {
                                 stream: connected.transaction_stream,
                                 original_bss_desc: connected.bss.clone(),
@@ -757,33 +769,39 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             |callback_proxy| callback_proxy.on_association_rejected(&event),
                             &mut sta_iface_state.lock().callback,
                         );
-                        (Err(zx::sys::ZX_ERR_INTERNAL), None)
+                        (Ok(()), fail.status_code, None, None)
                     }
                     Err(e) => {
                         error!("Error while connecting to network: {}", e);
-                        (Err(zx::sys::ZX_ERR_INTERNAL), None)
+                        (
+                            Err(zx::sys::ZX_ERR_INTERNAL),
+                            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                            None,
+                            None,
+                        )
                     }
                 },
                 None => {
                     warn!("No SSID set. fidl_wlanix::SupplicantStaNetworkRequest::Select ignored");
-                    (Err(zx::sys::ZX_ERR_BAD_STATE), None)
+                    (
+                        Err(zx::sys::ZX_ERR_BAD_STATE),
+                        fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                        None,
+                        None,
+                    )
                 }
             };
             responder.send(result).context("send Select response")?;
             if let Some(proxy) = state.lock().mlme_multicast_proxy.as_ref() {
-                let status_code = match result {
-                    Ok(()) => 0,
-                    Err(_) => 1,
-                };
+                let bssid = connected_bssid.map(|bssid| bssid.to_array()).unwrap_or_default();
                 proxy
                     .message(fidl_wlanix::Nl80211MulticastMessageRequest {
                         message: Some(build_nl80211_message(
                             Nl80211Cmd::Connect,
                             vec![
                                 Nl80211Attr::IfaceIndex(iface_id.into()),
-                                // TODO(b/316035583): Do we need to send the actual station MAC?
-                                Nl80211Attr::Mac([0u8; 6]),
-                                Nl80211Attr::StatusCode(status_code),
+                                Nl80211Attr::Mac(bssid),
+                                Nl80211Attr::StatusCode(status_code.into_primitive()),
                             ],
                         )),
                         ..Default::default()
@@ -1012,6 +1030,21 @@ async fn handle_supplicant_request<I: IfaceManager>(
                 }
             }
         }
+        fidl_wlanix::SupplicantRequest::RemoveInterface { payload: _, .. } => {
+            info!("fidl_wlanix::SupplicantRequest::RemoveInterface");
+            let ifaces = iface_manager.list_ifaces();
+            if ifaces.is_empty() {
+                bail!("RemoveInterface but no interfaces exist.");
+            } else {
+                // As a supplicant call, RemoveInterface implies that the interface should no
+                // longer serve connections but does not actually destroy the interface. We
+                // simulate this by tearing down any existing connection.
+                let client_iface = iface_manager.get_client_iface(ifaces[0]).await?;
+                if let Err(e) = client_iface.disconnect().await {
+                    error!("Failed to disconnect on RemoveInterface: {e}");
+                }
+            }
+        }
         fidl_wlanix::SupplicantRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantRequest ordinal: {}", ordinal);
         }
@@ -1047,10 +1080,12 @@ async fn serve_supplicant<I: IfaceManager>(
     .await;
 }
 
-fn nl80211_message_resp(
-    responses: Vec<fidl_wlanix::Nl80211Message>,
-) -> fidl_wlanix::Nl80211MessageResponse {
-    fidl_wlanix::Nl80211MessageResponse { responses: Some(responses), ..Default::default() }
+fn nl80211_message_resp(messages: Vec<fidl_wlanix::Nl80211Message>) -> zx::Vmo {
+    let output = fidl::persist(&fidl_wlanix::Nl80211MessageArray { messages }).unwrap();
+    let vmo = zx::Vmo::create(output.len() as u64).unwrap();
+    vmo.write(&output, 0).unwrap();
+    vmo.set_content_size(&(output.len() as u64)).unwrap();
+    vmo
 }
 
 fn build_nl80211_message(cmd: Nl80211Cmd, attrs: Vec<Nl80211Attr>) -> fidl_wlanix::Nl80211Message {
@@ -1111,9 +1146,38 @@ fn get_supported_frequencies() -> Vec<Vec<Nl80211FrequencyAttr>> {
         .collect()
 }
 
+trait MessageResponder {
+    fn send(self, result: Result<Vec<fidl_wlanix::Nl80211Message>, i32>)
+        -> Result<(), fidl::Error>;
+}
+
+impl MessageResponder for Nl80211MessageV2Responder {
+    fn send(
+        self,
+        result: Result<Vec<fidl_fuchsia_wlan_wlanix::Nl80211Message>, i32>,
+    ) -> Result<(), fidl::Error> {
+        Nl80211MessageV2Responder::send(self, result.map(nl80211_message_resp))
+    }
+}
+
+impl MessageResponder for Nl80211MessageResponder {
+    fn send(
+        self,
+        result: Result<Vec<fidl_fuchsia_wlan_wlanix::Nl80211Message>, i32>,
+    ) -> Result<(), fidl::Error> {
+        Nl80211MessageResponder::send(
+            self,
+            result.map(|responses| Nl80211MessageResponse {
+                responses: Some(responses),
+                ..Default::default()
+            }),
+        )
+    }
+}
+
 async fn handle_nl80211_message<I: IfaceManager>(
     netlink_message: fidl_wlanix::Nl80211Message,
-    responder: WithDefaultDrop<fidl_wlanix::Nl80211MessageResponder>,
+    responder: WithDefaultDrop<impl MessageResponder + DefaultDrop>,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
     telemetry_sender: TelemetrySender,
@@ -1159,10 +1223,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     ],
                 ));
             }
-            responder
-                .take()
-                .send(Ok(nl80211_message_resp(resp)))
-                .context("Failed to send NewWiphy")?;
+            responder.take().send(Ok(resp)).context("Failed to send NewWiphy")?;
         }
         Nl80211Cmd::GetInterface => {
             info!("Nl80211Cmd::GetInterface");
@@ -1180,10 +1241,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 ));
             }
             resp.push(build_nl80211_done());
-            responder
-                .take()
-                .send(Ok(nl80211_message_resp(resp)))
-                .context("Failed to send scan results")?;
+            responder.take().send(Ok(resp)).context("Failed to send scan results")?;
         }
         Nl80211Cmd::GetStation => {
             debug!("Nl80211Cmd::GetStation");
@@ -1196,7 +1254,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     let rssi = client_iface.get_connected_network_rssi().unwrap_or(INVALID_RSSI);
                     responder
                         .take()
-                        .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                        .send(Ok(vec![build_nl80211_message(
                             Nl80211Cmd::NewStation,
                             vec![Nl80211Attr::StaInfo(vec![
                                 // TX packet counters don't seem to be used, so just set
@@ -1208,7 +1266,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                                 // can also be included. We don't have those information, so
                                 // we are not including them here.
                             ])],
-                        )])))
+                        )]))
                         .context("Failed to send GetStation")?;
                 }
                 Err(e) => {
@@ -1221,10 +1279,10 @@ async fn handle_nl80211_message<I: IfaceManager>(
             info!("Nl80211Cmd::GetProtocolFeatures");
             responder
                 .take()
-                .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                .send(Ok(vec![build_nl80211_message(
                     Nl80211Cmd::GetProtocolFeatures,
                     vec![Nl80211Attr::ProtocolFeatures(0)],
-                )])))
+                )]))
                 .context("Failed to send GetProtocolFeatures")?;
         }
         Nl80211Cmd::TriggerScan => {
@@ -1233,7 +1291,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 Ok((client_iface, iface_id)) => {
                     responder
                         .take()
-                        .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                        .send(Ok(vec![build_nl80211_ack()]))
                         .context("Failed to ack TriggerScan")?;
                     telemetry_sender.send(TelemetryEvent::ScanStart);
                     match client_iface.trigger_scan().await {
@@ -1312,14 +1370,14 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         });
                         responder
                             .take()
-                            .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                            .send(Ok(vec![build_nl80211_ack()]))
                             .context("Failed to ack AbortScan")?;
                     }
                     Err(e) => {
                         error!("Failed to abort scan: {:?}", e);
                         responder
                             .take()
-                            .send(Ok(nl80211_message_resp(vec![build_nl80211_err()])))
+                            .send(Ok(vec![build_nl80211_err()]))
                             .context("Failed to ack AbortScan")?;
                     }
                 },
@@ -1343,10 +1401,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         ));
                     }
                     resp.push(build_nl80211_done());
-                    responder
-                        .take()
-                        .send(Ok(nl80211_message_resp(resp)))
-                        .context("Failed to send scan results")?;
+                    responder.take().send(Ok(resp)).context("Failed to send scan results")?;
                 }
                 Err(e) => {
                     responder.take().send(Err(e)).context("sending error status for GetScan")?;
@@ -1365,7 +1420,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         );
                         responder
                             .take()
-                            .send(Ok(nl80211_message_resp(vec![resp])))
+                            .send(Ok(vec![resp]))
                             .context("Failed to respond to GetReg")?;
                     }
                     Err(e) => {
@@ -1387,10 +1442,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
         }
         _ => {
             warn!("Dropping nl80211 message: {:?}", message);
-            responder
-                .take()
-                .send(Ok(nl80211_message_resp(vec![])))
-                .context("Failed to respond to unhandled message")?;
+            responder.take().send(Ok(vec![])).context("Failed to respond to unhandled message")?;
         }
     }
     Ok(())
@@ -1399,6 +1451,15 @@ async fn handle_nl80211_message<I: IfaceManager>(
 impl DefaultDrop for fidl_wlanix::Nl80211MessageResponder {
     fn default_drop(self) {
         error!("Dropped Nl80211MessageResponder without responding.");
+        if let Err(e) = self.send(Err(zx::sys::ZX_ERR_INTERNAL)) {
+            error!("Failed to send internal error response: {}", e);
+        }
+    }
+}
+
+impl DefaultDrop for fidl_wlanix::Nl80211MessageV2Responder {
+    fn default_drop(self) {
+        error!("Dropped Nl80211MessageV2Responder without responding.");
         if let Err(e) = self.send(Err(zx::sys::ZX_ERR_INTERNAL)) {
             error!("Failed to send internal error response: {}", e);
         }
@@ -1476,19 +1537,30 @@ async fn serve_nl80211<I: IfaceManager>(
             return;
         };
         match req {
-            Ok(fidl_wlanix::Nl80211Request::Message { payload, responder, .. }) => {
-                if let Some(message) = payload.message {
-                    if let Err(e) = handle_nl80211_message(
-                        message,
-                        WithDefaultDrop::new(responder),
-                        Arc::clone(&state),
-                        Arc::clone(&iface_manager),
-                        telemetry_sender.clone(),
-                    )
-                    .await
-                    {
-                        error!("Failed to handle Nl80211 message: {}", e);
-                    }
+            Ok(fidl_wlanix::Nl80211Request::MessageV2 { message, responder }) => {
+                if let Err(e) = handle_nl80211_message(
+                    message,
+                    WithDefaultDrop::new(responder),
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender.clone(),
+                )
+                .await
+                {
+                    error!("Failed to handle Nl80211 message: {}", e);
+                }
+            }
+            Ok(fidl_wlanix::Nl80211Request::Message { payload, responder }) => {
+                if let Err(e) = handle_nl80211_message(
+                    payload.message.unwrap(),
+                    WithDefaultDrop::new(responder),
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender.clone(),
+                )
+                .await
+                {
+                    error!("Failed to handle Nl80211 message: {}", e);
                 }
             }
             Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, .. }) => {
@@ -1676,6 +1748,7 @@ mod tests {
     use super::*;
     use anyhow::format_err;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy};
+    use fidl_fuchsia_wlan_wlanix::Nl80211Message;
     use futures::channel::mpsc;
     use futures::task::Poll;
     use futures::Future;
@@ -1690,6 +1763,7 @@ mod tests {
     };
 
     const CHIP_ID: u32 = 1;
+    const FAKE_IFACE_NAME: &str = "fake-iface-name";
 
     // This will only work if the message is a parseable nl80211 message. Some
     // attributes are currently write only in our NL80211 implementation. If a
@@ -1912,6 +1986,37 @@ mod tests {
     }
 
     #[test]
+    fn test_wifi_stop_fails_to_destroy_iface() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test_with_iface_manager(
+            TestIfaceManager::new().mock_destroy_client_iface_failure(),
+        );
+
+        let start_fut = test_helper.wifi_proxy.start();
+        let mut start_fut = pin!(start_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        // Clear out the client connections toggle event so that we can test for the telemetry
+        // event we are interested in later in this test.
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ClientConnectionsToggle {
+                event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
+            }))
+        );
+
+        let stop_fut = test_helper.wifi_proxy.stop();
+        let mut stop_fut = pin!(stop_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        // Verify that telemetry event for iface destruction failure is sent.
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceDestructionFailure))
+        );
+    }
+
+    #[test]
     fn test_wifi_get_chip_ids() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
@@ -1947,6 +2052,88 @@ mod tests {
         assert_variant!(
             &calls[1],
             ifaces::test_utils::IfaceManagerCall::SetCountry { country, .. } => { assert_eq!(*country, COUNTRY_CODE) }
+        );
+    }
+
+    #[test]
+    fn test_wifi_chip_create_sta_iface_fails() {
+        // Set up
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
+        let (wifi_proxy, wifi_server_end) = create_proxy::<fidl_wlanix::WifiMarker>();
+        let result = wlanix_proxy.get_wifi(fidl_wlanix::WlanixGetWifiRequest {
+            wifi: Some(wifi_server_end),
+            ..Default::default()
+        });
+        assert_variant!(result, Ok(()));
+
+        let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>();
+        let get_chip_fut = wifi_proxy.get_chip(fidl_wlanix::WifiGetChipRequest {
+            chip_id: Some(CHIP_ID),
+            chip: Some(wifi_chip_server_end),
+            ..Default::default()
+        });
+        let mut get_chip_fut = pin!(get_chip_fut);
+        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
+
+        let (_wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
+        let create_sta_iface_fut =
+            wifi_chip_proxy.create_sta_iface(fidl_wlanix::WifiChipCreateStaIfaceRequest {
+                iface: Some(wifi_sta_iface_server_end),
+                ..Default::default()
+            });
+        let mut create_sta_iface_fut = pin!(create_sta_iface_fut);
+        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
+
+        let wifi_state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new().mock_create_client_iface_failure());
+        let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let test_fut = serve_wlanix(
+            wlanix_stream,
+            wifi_state,
+            Arc::clone(&iface_manager),
+            TelemetrySender::new(telemetry_sender),
+        );
+        let mut test_fut = Box::pin(test_fut);
+        assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Ready(Ok(Ok(()))));
+
+        // Execute test
+        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Ready(Err(_)));
+
+        // Verify telemetry event for iface creation failure is sent
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceCreationFailure))
+        );
+    }
+
+    #[test]
+    fn test_wifi_chip_remove_sta_iface_fails() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test_with_iface_manager(
+            TestIfaceManager::new().mock_destroy_client_iface_failure(),
+        );
+
+        let request = fidl_wlanix::WifiChipRemoveStaIfaceRequest {
+            iface_name: Some("mock-sta-iface".to_string()),
+            ..Default::default()
+        };
+        let remove_sta_iface_fut = test_helper.wifi_chip_proxy.remove_sta_iface(request);
+        let mut remove_sta_iface_fut = pin!(remove_sta_iface_fut);
+
+        assert_eq!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut remove_sta_iface_fut),
+            Poll::Ready(Ok(Err(_)))
+        );
+
+        // Verify telemetry event for iface destruction failure is sent
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceDestructionFailure))
         );
     }
 
@@ -2176,6 +2363,12 @@ mod tests {
     }
 
     fn setup_wifi_test() -> (WifiTestHelper, Pin<Box<impl Future<Output = ()>>>) {
+        setup_wifi_test_with_iface_manager(TestIfaceManager::new())
+    }
+
+    fn setup_wifi_test_with_iface_manager(
+        iface_manager: TestIfaceManager,
+    ) -> (WifiTestHelper, Pin<Box<impl Future<Output = ()>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
@@ -2207,7 +2400,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
-        let iface_manager = Arc::new(TestIfaceManager::new());
+        let iface_manager = Arc::new(iface_manager);
         let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let test_fut = serve_wlanix(
             wlanix_stream,
@@ -2238,6 +2431,23 @@ mod tests {
             exec,
         };
         (test_helper, test_fut)
+    }
+
+    #[test]
+    fn test_supplicant_remove_interface() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        test_helper
+            .supplicant_proxy
+            .remove_interface(fidl_wlanix::SupplicantRemoveInterfaceRequest {
+                iface_name: Some(FAKE_IFACE_NAME.to_string()),
+                ..Default::default()
+            })
+            .expect("Failed to call RemoveInterface");
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::Disconnect);
     }
 
     #[test]
@@ -2338,6 +2548,7 @@ mod tests {
 
         let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
+        assert!(mcast_msg.payload.attrs.contains(&Nl80211Attr::Mac([42, 42, 42, 42, 42, 42])));
 
         assert_variant!(
             test_helper.telemetry_receiver.try_next(),
@@ -2560,7 +2771,7 @@ mod tests {
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         assert_variant!(
             test_helper.exec.run_until_stalled(&mut network_select_fut),
-            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INTERNAL)))
+            Poll::Ready(Ok(Ok(())))
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
@@ -2839,7 +3050,7 @@ mod tests {
 
     struct SupplicantTestHelper {
         _wlanix_proxy: fidl_wlanix::WlanixProxy,
-        _supplicant_proxy: fidl_wlanix::SupplicantProxy,
+        supplicant_proxy: fidl_wlanix::SupplicantProxy,
         supplicant_sta_iface_proxy: fidl_wlanix::SupplicantStaIfaceProxy,
         nl80211_proxy: fidl_wlanix::Nl80211Proxy,
         supplicant_sta_network_proxy: fidl_wlanix::SupplicantStaNetworkProxy,
@@ -2876,7 +3087,7 @@ mod tests {
         let result =
             supplicant_proxy.add_sta_interface(fidl_wlanix::SupplicantAddStaInterfaceRequest {
                 iface: Some(supplicant_sta_iface_server_end),
-                iface_name: Some("fake-iface-name".to_string()),
+                iface_name: Some(FAKE_IFACE_NAME.to_string()),
                 ..Default::default()
             });
         assert_variant!(result, Ok(()));
@@ -2915,7 +3126,7 @@ mod tests {
 
         let test_helper = SupplicantTestHelper {
             _wlanix_proxy: wlanix_proxy,
-            _supplicant_proxy: supplicant_proxy,
+            supplicant_proxy,
             supplicant_sta_iface_proxy,
             nl80211_proxy,
             supplicant_sta_network_proxy,
@@ -3054,10 +3265,7 @@ mod tests {
             ..Default::default()
         };
 
-        let query_resp_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(invalid_message),
-            ..Default::default()
-        });
+        let query_resp_fut = proxy.message_v2(&invalid_message);
         let mut query_resp_fut = pin!(query_resp_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(
@@ -3079,16 +3287,13 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_interface_message = build_nl80211_message(Nl80211Cmd::GetInterface, vec![]);
-        let get_interface_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_interface_message),
-            ..Default::default()
-        });
+        let get_interface_fut = proxy.message_v2(&get_interface_message);
         let mut get_interface_fut = pin!(get_interface_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_interface_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
 
         assert_eq!(responses.len(), 2);
         let message = expect_nl80211_message(&responses[0]);
@@ -3118,17 +3323,14 @@ mod tests {
             Nl80211Cmd::GetStation,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let get_station_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_station_message),
-            ..Default::default()
-        });
+        let get_station_fut = proxy.message_v2(&get_station_message);
 
         let mut get_station_fut = pin!(get_station_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_station_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
         assert_eq!(responses.len(), 1);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
     }
@@ -3156,20 +3358,17 @@ mod tests {
             Nl80211Cmd::TriggerScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
 
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut trigger_scan_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
         assert_eq!(responses.len(), 1);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Ack));
 
@@ -3199,10 +3398,7 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let trigger_scan_message = build_nl80211_message(Nl80211Cmd::TriggerScan, vec![]);
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3226,10 +3422,7 @@ mod tests {
 
         let trigger_scan_message =
             build_nl80211_message(Nl80211Cmd::TriggerScan, vec![Nl80211Attr::IfaceIndex(123)]);
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3268,10 +3461,7 @@ mod tests {
             Nl80211Cmd::TriggerScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
@@ -3315,10 +3505,7 @@ mod tests {
             Nl80211Cmd::AbortScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let abort_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(abort_scan_message),
-            ..Default::default()
-        });
+        let abort_scan_fut = proxy.message_v2(&abort_scan_message);
 
         let mut abort_scan_fut = pin!(abort_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3347,17 +3534,14 @@ mod tests {
             Nl80211Cmd::GetScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_scan_message),
-            ..Default::default()
-        });
+        let get_scan_fut = proxy.message_v2(&get_scan_message);
 
         let mut get_scan_fut = pin!(get_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_scan_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
         assert_eq!(responses.len(), 2);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
         assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
@@ -3376,10 +3560,7 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_scan_message = build_nl80211_message(Nl80211Cmd::GetScan, vec![]);
-        let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_scan_message),
-            ..Default::default()
-        });
+        let get_scan_fut = proxy.message_v2(&get_scan_message);
 
         let mut get_scan_fut = pin!(get_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3387,6 +3568,11 @@ mod tests {
             exec.run_until_stalled(&mut get_scan_fut),
             Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
         );
+    }
+
+    fn deserialize(vmo: zx::Vmo) -> Vec<Nl80211Message> {
+        let value = vmo.read_to_vec(0, vmo.get_content_size().unwrap()).unwrap();
+        fidl::unpersist::<fidl_wlanix::Nl80211MessageArray>(&value).unwrap().messages
     }
 
     #[test]
@@ -3403,17 +3589,15 @@ mod tests {
 
         let get_reg_message =
             build_nl80211_message(Nl80211Cmd::GetReg, vec![Nl80211Attr::Wiphy(123)]);
-        let get_reg_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_reg_message),
-            ..Default::default()
-        });
+        let get_reg_fut = proxy.message_v2(&get_reg_message);
 
         let mut get_reg_fut = pin!(get_reg_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_reg_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
+
         assert_eq!(responses.len(), 1);
         let message = expect_nl80211_message(&responses[0]);
         assert_eq!(message.payload.cmd, Nl80211Cmd::GetReg);

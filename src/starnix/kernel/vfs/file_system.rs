@@ -73,6 +73,12 @@ pub struct FileSystem {
     pub security_state: security::FileSystemState,
 }
 
+impl std::fmt::Debug for FileSystem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileSystem")
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct FileSystemOptions {
     /// The source string passed as the first argument to mount(), e.g. a block device.
@@ -128,31 +134,25 @@ pub enum CacheMode {
 
 impl FileSystem {
     /// Create a new filesystem.
-    pub fn new(
-        kernel: &Arc<Kernel>,
-        cache_mode: CacheMode,
-        ops: impl FileSystemOps,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
-        let uses_external_node_ids = ops.uses_external_node_ids();
-        let node_cache = Arc::new(FsNodeCache::new(uses_external_node_ids));
-        Self::new_with_node_cache(kernel, cache_mode, ops, options, node_cache)
-    }
-
-    pub fn new_with_node_cache(
-        kernel: &Arc<Kernel>,
+    pub fn new<L>(
+        _locked: &mut Locked<L>,
+        kernel: &Kernel,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
         mut options: FileSystemOptions,
-        node_cache: Arc<FsNodeCache>,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let uses_external_node_ids = ops.uses_external_node_ids();
+        let node_cache = Arc::new(FsNodeCache::new(uses_external_node_ids));
         assert_eq!(ops.uses_external_node_ids(), node_cache.uses_external_node_ids());
 
         let mount_options = security::sb_eat_lsm_opts(&kernel, &mut options.params)?;
-        let security_state = security::file_system_init_security(ops.name(), &mount_options)?;
+        let security_state = security::file_system_init_security(&mount_options)?;
 
         let file_system = Arc::new(FileSystem {
-            kernel: Arc::downgrade(kernel),
+            kernel: kernel.weak_self.clone(),
             root: OnceLock::new(),
             ops: Box::new(ops),
             options,
@@ -331,9 +331,9 @@ impl FileSystem {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         self.ops.rename(
-            &mut locked,
+            locked,
             self,
             current_task,
             old_parent,
@@ -382,8 +382,8 @@ impl FileSystem {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         security::sb_statfs(current_task, &self)?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        let mut stat = self.ops.statfs(&mut locked, self, current_task)?;
+        let locked = locked.cast_locked::<FileOpsCore>();
+        let mut stat = self.ops.statfs(locked, self, current_task)?;
         if stat.f_frsize == 0 {
             stat.f_frsize = stat.f_bsize as i64;
         }

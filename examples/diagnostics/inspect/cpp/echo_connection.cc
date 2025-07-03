@@ -11,13 +11,13 @@ namespace example {
 EchoConnection::EchoConnection(std::weak_ptr<EchoConnectionStats> stats)
     : stats_(std::move(stats)) {}
 
-void EchoConnection::EchoString(::fidl::StringPtr value, EchoStringCallback callback) {
+void EchoConnection::EchoString(EchoStringRequest& request, EchoStringCompleter::Sync& completer) {
   auto stats = stats_.lock();
   if (stats) {
     stats->total_requests.Add(1);
-    stats->bytes_processed.Add(value->size());
+    stats->bytes_processed.Add(request.value()->size());
   }
-  callback(std::move(value));
+  completer.Reply({{.response = request.value()}});
 }
 
 }  // namespace example

@@ -110,11 +110,12 @@ RingBufferServerTest::SetupForCleanShutdownTesting(ElementId element_id,
 
 class RingBufferServerCompositeTest : public RingBufferServerTest {
  protected:
+  static inline const std::string kClassName = "RingBufferServerCompositeTest";
   std::shared_ptr<Device> EnableDriverAndAddDevice(
       const std::shared_ptr<FakeComposite>& fake_driver) {
-    auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                 fad::DeviceType::kComposite,
-                                 fad::DriverClient::WithComposite(fake_driver->Enable()));
+    auto device = Device::Create(
+        adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+        fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName);
     adr_service()->AddDevice(device);
 
     RunLoopUntilIdle();

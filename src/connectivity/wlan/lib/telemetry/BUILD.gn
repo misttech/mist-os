@@ -45,6 +45,7 @@ rustc_library("wlan-telemetry") {
     "src/lib.rs",
     "src/processors/client_iface_counters.rs",
     "src/processors/connect_disconnect.rs",
+    "src/processors/iface.rs",
     "src/processors/mod.rs",
     "src/processors/power.rs",
     "src/processors/recovery.rs",

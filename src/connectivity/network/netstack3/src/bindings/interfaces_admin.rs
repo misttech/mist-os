@@ -34,7 +34,6 @@
 use std::collections::hash_map;
 use std::convert::Infallible as Never;
 use std::fmt::Debug;
-use std::num::NonZeroU16;
 use std::ops::DerefMut as _;
 use std::pin::pin;
 
@@ -46,20 +45,14 @@ use futures::future::FusedFuture as _;
 use futures::stream::FusedStream as _;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, info, warn};
-use net_types::ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6};
+use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness};
-use netstack3_core::device::{
-    ArpConfiguration, ArpConfigurationUpdate, BlackholeDevice, DeviceConfiguration,
-    DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId, NdpConfiguration,
-    NdpConfigurationUpdate,
-};
+use netstack3_core::device::{BlackholeDevice, DeviceConfigurationUpdateError, DeviceId};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressConfig,
-    CommonAddressProperties, IgmpConfigMode, IpDeviceConfiguration, IpDeviceConfigurationAndFlags,
-    IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfiguration,
-    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationUpdate, Lifetime, MldConfigMode, PreferredLifetime,
-    SetIpAddressPropertiesError, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
+    CommonAddressProperties, IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate,
+    Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
+    Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SetIpAddressPropertiesError,
     UpdateIpConfigurationError,
 };
 use thiserror::Error;
@@ -76,12 +69,14 @@ use crate::bindings::devices::{
     self, BlackholeDeviceInfo, DynamicCommonInfo, EthernetInfo, LoopbackInfo,
     OwnedDeviceSpecificInfo, PureIpDeviceInfo, StaticCommonInfo, TxTask, TxTaskError,
 };
+use crate::bindings::interface_config::{
+    FidlInterfaceConfig, InterfaceConfig, InterfaceConfigUpdate,
+};
 use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
 use crate::bindings::time::StackTime;
 use crate::bindings::util::{
-    ErrorLogExt, IllegalNonPositiveValueError, IntoCore as _, IntoFidl,
-    RemoveResourceResultExt as _, ScopeExt as _, TryIntoCore,
+    ErrorLogExt, IntoCore as _, RemoveResourceResultExt as _, ScopeExt as _, TryIntoCore,
 };
 use crate::bindings::{
     netdevice_worker, BindingId, CoreRwLock, Ctx, DeviceIdExt as _, InterfaceProperties,
@@ -188,44 +183,8 @@ async fn run_blackhole_interface(
         ),
         info,
     );
-    let core_id = netstack3_core::device::DeviceId::Blackhole(core_id);
-
-    // Don't need DAD and IGMP/MLD on blackhole.
-    let ip_config = IpDeviceConfigurationUpdate {
-        ip_enabled: Some(false),
-        unicast_forwarding_enabled: Some(false),
-        multicast_forwarding_enabled: Some(false),
-        gmp_enabled: Some(false),
-        dad_transmits: Some(None),
-    };
-    let _: Ipv4DeviceConfigurationUpdate = ns
-        .ctx
-        .api()
-        .device_ip::<Ipv4>()
-        .update_configuration(
-            &core_id,
-            Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode: None },
-        )
-        .unwrap();
-    let _: Ipv6DeviceConfigurationUpdate = ns
-        .ctx
-        .api()
-        .device_ip::<Ipv6>()
-        .update_configuration(
-            &core_id,
-            // Don't need DAD, MLD, router solicitations, or temporary addresses on blackhole
-            // interfaces.
-            Ipv6DeviceConfigurationUpdate {
-                max_router_solicitations: Some(None),
-                slaac_config: SlaacConfigurationUpdate {
-                    stable_address_configuration: None,
-                    temporary_address_configuration: None,
-                },
-                ip_config,
-                mld_mode: None,
-            },
-        )
-        .unwrap();
+    let core_id = DeviceId::Blackhole(core_id);
+    ns.ctx.apply_interface_defaults(&core_id);
 
     info!("created interface {:?}", core_id);
     ns.ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);
@@ -1005,137 +964,30 @@ fn set_configuration(
         .get_core_id(id)
         .expect("device lifetime should be tied to channel lifetime");
 
-    let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = config;
+    let InterfaceConfigUpdate { ipv4: ipv4_update, ipv6: ipv6_update, device: device_update } =
+        FidlInterfaceConfig::from(config).try_into_update()?;
 
-    let (ipv4_update, arp) = match ipv4 {
-        Some(fnet_interfaces_admin::Ipv4Configuration {
-            igmp,
-            multicast_forwarding,
-            unicast_forwarding,
-            arp,
-            __source_breaking,
-        }) => {
-            let fnet_interfaces_admin::IgmpConfiguration {
-                version: igmp_version,
-                __source_breaking,
-            } = igmp.unwrap_or_default();
-            let igmp_mode = igmp_version.map(|v|{
-                match v {
-                    fnet_interfaces_admin::IgmpVersion::V1 => {
-                        Ok(IgmpConfigMode::V1)
-                    },
-                    fnet_interfaces_admin::IgmpVersion::V2 => Ok(IgmpConfigMode::V2),
-                    fnet_interfaces_admin::IgmpVersion::V3 => Ok(IgmpConfigMode::V3),
-                    fnet_interfaces_admin::IgmpVersion::__SourceBreaking { .. } => {
-                        Err(fnet_interfaces_admin::ControlSetConfigurationError::Ipv4IgmpVersionUnsupported)
-                    },
-                }
-            }).transpose()?;
-
-            if let Some(forwarding) = unicast_forwarding {
-                info!("updating IPv4 unicast forwarding on {core_id:?} to enabled={forwarding}");
+    let log_forwarding_change =
+        |version: IpVersion, ip_config: Option<&IpDeviceConfigurationUpdate>| {
+            if let Some(forwarding) = ip_config.and_then(|i| i.unicast_forwarding_enabled.as_ref())
+            {
+                info!(
+                    "updating {version:?} unicast forwarding on \
+                    {core_id:?} to enabled={forwarding}"
+                );
             }
-            if let Some(forwarding) = multicast_forwarding {
-                info!("updating IPv4 multicast forwarding on {core_id:?} to enabled={forwarding}");
+            if let Some(forwarding) =
+                ip_config.and_then(|i| i.multicast_forwarding_enabled.as_ref())
+            {
+                info!(
+                    "updating {version:?} multicast forwarding on \
+                    {core_id:?} to enabled={forwarding}"
+                );
             }
+        };
 
-            let fnet_interfaces_admin::ArpConfiguration { nud, dad, __source_breaking } =
-                arp.unwrap_or_default();
-
-            let fnet_interfaces_admin::DadConfiguration {
-                transmits: dad_transmits,
-                __source_breaking,
-            } = dad.unwrap_or_default();
-
-            (
-                Some(Ipv4DeviceConfigurationUpdate {
-                    ip_config: IpDeviceConfigurationUpdate {
-                        unicast_forwarding_enabled: unicast_forwarding,
-                        multicast_forwarding_enabled: multicast_forwarding,
-                        dad_transmits: dad_transmits.map(|v| NonZeroU16::new(v)),
-                        ..Default::default()
-                    },
-                    igmp_mode,
-                }),
-                nud.map(|nud| Ok(ArpConfigurationUpdate { nud: Some(nud.try_into_core()?) }))
-                    .transpose()
-                    .map_err(|e: IllegalNonPositiveValueError| e.into_fidl())?,
-            )
-        }
-        None => (None, None),
-    };
-
-    let (ipv6_update, ndp) = match ipv6 {
-        Some(fnet_interfaces_admin::Ipv6Configuration {
-            mld,
-            multicast_forwarding,
-            unicast_forwarding,
-            ndp,
-            __source_breaking,
-        }) => {
-            let fnet_interfaces_admin::MldConfiguration { version: mld_version, __source_breaking } =
-                mld.unwrap_or_default();
-            let mld_mode = mld_version.map(|v|{
-                match v {
-                    fnet_interfaces_admin::MldVersion::V1 => {
-                        Ok(MldConfigMode::V1)
-                    },
-                    fnet_interfaces_admin::MldVersion::V2 => Ok(MldConfigMode::V2),
-                    fnet_interfaces_admin::MldVersion::__SourceBreaking { .. } => {
-                        Err(fnet_interfaces_admin::ControlSetConfigurationError::Ipv6MldVersionUnsupported)
-                    },
-                }
-            }).transpose()?;
-
-            if let Some(forwarding) = unicast_forwarding {
-                info!("updating IPv6 unicast forwarding on {core_id:?} to enabled={forwarding}");
-            }
-            if let Some(forwarding) = multicast_forwarding {
-                info!("updating IPv6 multicast forwarding on {core_id:?} to enabled={forwarding}");
-            }
-
-            let fnet_interfaces_admin::NdpConfiguration { nud, dad, slaac, __source_breaking } =
-                ndp.unwrap_or_default();
-
-            let fnet_interfaces_admin::DadConfiguration {
-                transmits: dad_transmits,
-                __source_breaking,
-            } = dad.unwrap_or_default();
-
-            let fnet_interfaces_admin::SlaacConfiguration { temporary_address, __source_breaking } =
-                slaac.unwrap_or_default();
-
-            let temporary_address_configuration = temporary_address.map(|enabled| {
-                if enabled {
-                    TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults()
-                } else {
-                    TemporarySlaacAddressConfiguration::Disabled
-                }
-            });
-
-            (
-                Some(Ipv6DeviceConfigurationUpdate {
-                    ip_config: IpDeviceConfigurationUpdate {
-                        unicast_forwarding_enabled: unicast_forwarding,
-                        ip_enabled: None,
-                        multicast_forwarding_enabled: multicast_forwarding,
-                        gmp_enabled: None,
-                        dad_transmits: dad_transmits.map(|v| NonZeroU16::new(v)),
-                    },
-                    slaac_config: SlaacConfigurationUpdate {
-                        temporary_address_configuration,
-                        stable_address_configuration: None,
-                    },
-                    max_router_solicitations: None,
-                    mld_mode,
-                }),
-                nud.map(|nud| Ok(NdpConfigurationUpdate { nud: Some(nud.try_into_core()?) }))
-                    .transpose()
-                    .map_err(|e: IllegalNonPositiveValueError| e.into_fidl())?,
-            )
-        }
-        None => (None, None),
-    };
+    log_forwarding_change(IpVersion::V4, ipv4_update.as_ref().map(|i| &i.ip_config));
+    log_forwarding_change(IpVersion::V6, ipv6_update.as_ref().map(|i| &i.ip_config));
 
     let ipv4_update = ipv4_update
         .map(|ipv4_update| {
@@ -1163,10 +1015,11 @@ fn set_configuration(
                 fnet_interfaces_admin::ControlSetConfigurationError::Ipv6MulticastForwardingUnsupported
             }
         })?;
-    let device_update = ctx
-        .api()
-        .device_any()
-        .new_configuration_update(&core_id, DeviceConfigurationUpdate { arp, ndp })
+    let device_update = device_update
+        .map(|device_update| {
+            ctx.api().device_any().new_configuration_update(&core_id, device_update)
+        })
+        .transpose()
         .map_err(|e| match e {
             DeviceConfigurationUpdateError::ArpNotSupported => {
                 fnet_interfaces_admin::ControlSetConfigurationError::ArpNotSupported
@@ -1176,102 +1029,14 @@ fn set_configuration(
             }
         })?;
 
-    let DeviceConfigurationUpdate { arp, ndp } =
-        ctx.api().device_any().apply_configuration(device_update);
+    let device = device_update.map(|u| ctx.api().device_any().apply_configuration(u));
 
     // Apply both updates now that we have checked for errors and get the deltas
-    // back. If we didn't apply updates, use the default struct to construct the
-    // delta responses.
-    let ipv4 = ipv4_update.map(|u| {
-        let Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode } =
-            ctx.api().device_ip::<Ipv4>().apply_configuration(u);
-        let IpDeviceConfigurationUpdate {
-            unicast_forwarding_enabled,
-            multicast_forwarding_enabled,
-            ip_enabled: _,
-            gmp_enabled: _,
-            dad_transmits,
-        } = ip_config;
+    // back.
+    let ipv4 = ipv4_update.map(|u| ctx.api().device_ip::<Ipv4>().apply_configuration(u));
+    let ipv6 = ipv6_update.map(|u| ctx.api().device_ip::<Ipv6>().apply_configuration(u));
 
-        let nud = arp.and_then(|ArpConfigurationUpdate { nud }| nud);
-
-        let dad = dad_transmits.map(|transmits| fnet_interfaces_admin::DadConfiguration {
-            transmits: Some(transmits.map_or(0, NonZeroU16::get)),
-            __source_breaking: fidl::marker::SourceBreaking,
-        });
-
-        let arp = fnet_interfaces_admin::ArpConfiguration {
-            nud: nud.map(IntoFidl::into_fidl),
-            dad,
-            __source_breaking: fidl::marker::SourceBreaking,
-        };
-        let arp = (arp != Default::default()).then_some(arp);
-
-        let igmp = fnet_interfaces_admin::IgmpConfiguration {
-            version: igmp_mode.map(IntoFidl::into_fidl),
-            __source_breaking: fidl::marker::SourceBreaking,
-        };
-        let igmp = (igmp != Default::default()).then_some(igmp);
-
-        fnet_interfaces_admin::Ipv4Configuration {
-            unicast_forwarding: unicast_forwarding_enabled,
-            multicast_forwarding: multicast_forwarding_enabled,
-            igmp,
-            arp,
-            __source_breaking: fidl::marker::SourceBreaking,
-        }
-    });
-
-    let ipv6 = ipv6_update.map(|u| {
-        let Ipv6DeviceConfigurationUpdate {
-            ip_config,
-            slaac_config,
-            max_router_solicitations: _,
-            mld_mode,
-        } = ctx.api().device_ip::<Ipv6>().apply_configuration(u);
-        let IpDeviceConfigurationUpdate {
-            unicast_forwarding_enabled,
-            multicast_forwarding_enabled,
-            ip_enabled: _,
-            gmp_enabled: _,
-            dad_transmits,
-        } = ip_config;
-
-        let nud = ndp.and_then(|NdpConfigurationUpdate { nud }| nud);
-
-        let dad = dad_transmits.map(|transmits| fnet_interfaces_admin::DadConfiguration {
-            transmits: Some(transmits.map_or(0, NonZeroU16::get)),
-            __source_breaking: fidl::marker::SourceBreaking,
-        });
-
-        let slaac = slaac_config.into_fidl();
-        let ndp = fnet_interfaces_admin::NdpConfiguration {
-            nud: nud.map(IntoFidl::into_fidl),
-            dad,
-            slaac: (slaac != Default::default()).then_some(slaac),
-            __source_breaking: fidl::marker::SourceBreaking,
-        };
-        let ndp = (ndp != Default::default()).then_some(ndp);
-
-        let mld = fnet_interfaces_admin::MldConfiguration {
-            version: mld_mode.map(IntoFidl::into_fidl),
-            __source_breaking: fidl::marker::SourceBreaking,
-        };
-        let mld: Option<fidl_fuchsia_net_interfaces_admin::MldConfiguration> =
-            (mld != Default::default()).then_some(mld);
-        fnet_interfaces_admin::Ipv6Configuration {
-            unicast_forwarding: unicast_forwarding_enabled,
-            multicast_forwarding: multicast_forwarding_enabled,
-            mld,
-            ndp,
-            __source_breaking: fidl::marker::SourceBreaking,
-        }
-    });
-    Ok(fnet_interfaces_admin::Configuration {
-        ipv4,
-        ipv6,
-        __source_breaking: fidl::marker::SourceBreaking,
-    })
+    Ok(FidlInterfaceConfig::new_update(InterfaceConfigUpdate { ipv4, ipv6, device }).into())
 }
 
 /// Returns the configuration used for the interface with the given `id`.
@@ -1282,94 +1047,15 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         .get_core_id(id)
         .expect("device lifetime should be tied to channel lifetime");
 
-    let DeviceConfiguration { arp, ndp } = ctx.api().device_any().get_configuration(&core_id);
+    let device = ctx.api().device_any().get_configuration(&core_id);
 
-    let IpDeviceConfigurationAndFlags {
-        config:
-            Ipv4DeviceConfiguration {
-                ip_config:
-                    IpDeviceConfiguration {
-                        unicast_forwarding_enabled,
-                        multicast_forwarding_enabled,
-                        gmp_enabled: _,
-                        dad_transmits,
-                    },
-            },
-        flags: _,
-        gmp_mode,
-    } = ctx.api().device_ip::<Ipv4>().get_configuration(&core_id);
+    let IpDeviceConfigurationAndFlags { config: ipv4, flags: _, gmp_mode: igmp } =
+        ctx.api().device_ip::<Ipv4>().get_configuration(&core_id);
 
-    let nud = arp.map(|ArpConfiguration { nud }| nud);
+    let IpDeviceConfigurationAndFlags { config: ipv6, flags: _, gmp_mode: mld } =
+        ctx.api().device_ip::<Ipv6>().get_configuration(&core_id);
 
-    let arp = Some(fnet_interfaces_admin::ArpConfiguration {
-        nud: nud.map(IntoFidl::into_fidl),
-        dad: Some(fnet_interfaces_admin::DadConfiguration {
-            transmits: Some(dad_transmits.map_or(0, NonZeroU16::get)),
-            __source_breaking: fidl::marker::SourceBreaking,
-        }),
-        __source_breaking: fidl::marker::SourceBreaking,
-    });
-
-    let igmp = fnet_interfaces_admin::IgmpConfiguration {
-        version: Some(gmp_mode.into_fidl()),
-        __source_breaking: fidl::marker::SourceBreaking,
-    };
-
-    let ipv4 = Some(fnet_interfaces_admin::Ipv4Configuration {
-        unicast_forwarding: Some(unicast_forwarding_enabled),
-        igmp: Some(igmp),
-        multicast_forwarding: Some(multicast_forwarding_enabled),
-        arp,
-        __source_breaking: fidl::marker::SourceBreaking,
-    });
-
-    let IpDeviceConfigurationAndFlags {
-        config:
-            Ipv6DeviceConfiguration {
-                max_router_solicitations: _,
-                slaac_config,
-                ip_config:
-                    IpDeviceConfiguration {
-                        gmp_enabled: _,
-                        unicast_forwarding_enabled,
-                        multicast_forwarding_enabled,
-                        dad_transmits,
-                    },
-            },
-        flags: _,
-        gmp_mode,
-    } = ctx.api().device_ip::<Ipv6>().get_configuration(&core_id);
-
-    let nud = ndp.map(|NdpConfiguration { nud }| nud);
-
-    let ndp = Some(fnet_interfaces_admin::NdpConfiguration {
-        nud: nud.map(IntoFidl::into_fidl),
-        dad: Some(fnet_interfaces_admin::DadConfiguration {
-            transmits: Some(dad_transmits.map_or(0, NonZeroU16::get)),
-            __source_breaking: fidl::marker::SourceBreaking,
-        }),
-        slaac: Some(slaac_config.into_fidl()),
-        __source_breaking: fidl::marker::SourceBreaking,
-    });
-
-    let mld = fnet_interfaces_admin::MldConfiguration {
-        version: Some(gmp_mode.into_fidl()),
-        __source_breaking: fidl::marker::SourceBreaking,
-    };
-
-    let ipv6 = Some(fnet_interfaces_admin::Ipv6Configuration {
-        unicast_forwarding: Some(unicast_forwarding_enabled),
-        mld: Some(mld),
-        multicast_forwarding: Some(multicast_forwarding_enabled),
-        ndp,
-        __source_breaking: fidl::marker::SourceBreaking,
-    });
-
-    fnet_interfaces_admin::Configuration {
-        ipv4,
-        ipv6,
-        __source_breaking: fidl::marker::SourceBreaking,
-    }
+    FidlInterfaceConfig::new_complete(InterfaceConfig { device, ipv4, ipv6, igmp, mld }).into()
 }
 
 /// Adds the given `address` to the interface with the given `id`.
@@ -1567,6 +1253,7 @@ pub(crate) enum AddressStateProviderCancellationReason {
     InvalidProperties,
     UserRemoved,
     DadFailed,
+    Forfeited,
     InterfaceRemoved,
 }
 
@@ -1578,6 +1265,9 @@ impl From<AddressStateProviderCancellationReason> for fnet_interfaces_admin::Add
             }
             AddressStateProviderCancellationReason::DadFailed => {
                 fnet_interfaces_admin::AddressRemovalReason::DadFailed
+            }
+            AddressStateProviderCancellationReason::Forfeited => {
+                fnet_interfaces_admin::AddressRemovalReason::Forfeited
             }
             AddressStateProviderCancellationReason::InterfaceRemoved => {
                 fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved
@@ -1911,6 +1601,7 @@ async fn address_state_provider_main_loop(
     (
         match cancelation_reason {
             Some(AddressStateProviderCancellationReason::DadFailed)
+            | Some(AddressStateProviderCancellationReason::Forfeited)
             | Some(AddressStateProviderCancellationReason::InterfaceRemoved) => {
                 AddressNeedsExplicitRemovalFromCore::No
             }
@@ -2338,6 +2029,7 @@ mod tests {
 
     use crate::bindings::integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder};
     use crate::bindings::interfaces_watcher::{InterfaceEvent, InterfaceUpdate};
+    use crate::bindings::util::IntoFidl as _;
 
     // Verifies that when an an interface is removed, its addresses are
     // implicitly removed, rather then explicitly removed one-by-one. Explicit

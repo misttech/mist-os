@@ -136,7 +136,7 @@ template("rustc_artifact") {
     _rustflags = [ "-Cmetadata=${_codegen_metadata}" ]
 
     _flag_deps = [ "//build/rust:api_level_cfg_flags" ]
-    _flag_inputs = [ "${root_build_dir}/rust_api_level_cfg_flags.txt" ]
+    _flag_inputs = [ "${root_out_dir}/rust_api_level_cfg_flags.txt" ]
     _rustflags += [ "@rust_api_level_cfg_flags.txt" ]
 
     if (defined(invoker.features)) {

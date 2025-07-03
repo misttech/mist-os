@@ -117,6 +117,7 @@ pub trait Notifier {
 }
 
 /// Simple Notifier when the goal is to just collect the messages into a String
+#[derive(Debug)]
 pub struct StringNotifier(String);
 
 impl StringNotifier {

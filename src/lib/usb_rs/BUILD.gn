@@ -37,7 +37,10 @@ rustc_library("usb_rs") {
   ]
 
   if (is_mac) {
-    deps += [ ":usb_rs_stubs" ]
+    deps += [
+      ":usb_rs_stubs",
+      "//src/lib/fuchsia-async",
+    ]
     sources += [
       "src/usb_osx/iokit_usb.rs",
       "src/usb_osx/iokit_wrappers.rs",

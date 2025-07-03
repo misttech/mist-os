@@ -117,6 +117,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
+
+[[package]]
 name = "argh"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,9 +614,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.34"
+version = "0.4.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bc015644b92d5890fab7489e49d21f879d5c990186827d42ec511919404f38b"
+checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -618,7 +624,7 @@ dependencies = [
  "num-traits",
  "serde",
  "wasm-bindgen",
- "windows-targets 0.52.0",
+ "windows-link",
 ]
 
 [[package]]
@@ -1382,6 +1388,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "flyweights"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6db94692a9bc37c6252bf43d051604ff42ea0ea1c0716558739c516623cd7bbc"
+dependencies = [
+ "ahash",
+ "bstr",
+ "byteorder",
+ "schemars",
+ "serde",
+ "static_assertions",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1453,6 +1473,7 @@ dependencies = [
  "ansi_term",
  "anyhow",
  "arbitrary",
+ "arc-swap",
  "argh",
  "arrayref",
  "arrayvec",
@@ -1519,6 +1540,7 @@ dependencies = [
  "fatfs",
  "flagset",
  "flate2",
+ "flyweights",
  "foreign-types",
  "foreign-types-shared",
  "fragile",
@@ -1557,7 +1579,6 @@ dependencies = [
  "libc",
  "libm",
  "linked-hash-map",
- "lipsum",
  "lock_api",
  "log",
  "loom",
@@ -2247,9 +2268,9 @@ dependencies = [
 
 [[package]]
 name = "instant"
-version = "0.1.9"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
+checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if 1.0.0",
 ]
@@ -2373,15 +2394,6 @@ name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
-
-[[package]]
-name = "lipsum"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58e4464067d52ca040073c04dfd9185658ec8a32236b857b5e1577f9d19f9d5a"
-dependencies = [
- "rand 0.6.5",
-]
 
 [[package]]
 name = "lock_api"
@@ -3020,7 +3032,7 @@ dependencies = [
  "libc",
  "redox_syscall 0.4.1",
  "smallvec",
- "windows-targets 0.48.5",
+ "windows-targets",
 ]
 
 [[package]]
@@ -5391,6 +5403,10 @@ name = "windows-core"
 version = "0.52.0"
 
 [[package]]
+name = "windows-link"
+version = "0.1.2"
+
+[[package]]
 name = "windows-sys"
 version = "0.45.0"
 
@@ -5409,10 +5425,6 @@ version = "0.59.0"
 [[package]]
 name = "windows-targets"
 version = "0.48.5"
-
-[[package]]
-name = "windows-targets"
-version = "0.52.0"
 
 [[package]]
 name = "x509-cert"
@@ -5536,3 +5548,8 @@ version = "2.0.1+zstd.1.5.6"
 dependencies = [
  "libc",
 ]
+
+[[patch.unused]]
+name = "windows-targets"
+version = "0.52.0"
+
