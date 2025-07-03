@@ -13,5 +13,10 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
+        {
+            storage: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
     ],
 }

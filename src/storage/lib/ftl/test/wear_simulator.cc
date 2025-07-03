@@ -23,6 +23,7 @@
 #include <fbl/array.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <zstd/zstd.h>
 
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/fs_test/fs_test.h"
@@ -73,6 +74,11 @@ struct MountedSystem {
   fs_management::NamespaceBinding minfs_binding;
 };
 
+struct Snapshot {
+  zx::vmo image;
+  zx::vmo wear_info;
+};
+
 class WearSimulator {
  public:
   WearSimulator() = delete;
@@ -104,6 +110,13 @@ class WearSimulator {
   // Tears down the current system and remounts everything.
   void Reboot();
 
+  // Return a snapshot of the nand image and the nand wear info. The two snapshots are not perfectly
+  // atomic, and may be slightly our of sync from each other.
+  zx::result<Snapshot> Snapshot();
+
+  // Write out the images to the custom_artifacts directory.
+  void ExportImage();
+
  private:
   zx::vmo vmo_;
   zx::vmo wear_vmo_;
@@ -111,7 +124,6 @@ class WearSimulator {
   std::unique_ptr<MountedSystem> mount_;
   std::vector<size_t> cycle_files_;
 };
-
 void InitMinfs(const char* root_path, const SystemConfig& config, std::vector<size_t>* file_sizes) {
   constexpr size_t kMaxWritePages = 64ul;
   constexpr size_t kMaxWriteSize = kMaxWritePages * kPageSize;
@@ -363,29 +375,16 @@ zx::result<RamDevice> WearSimulator::RemountFtl() {
   }
   mount_.reset();
 
-  // Taking a snapshot when remounting to ensure that the new component doesn't come up before the
-  // old one dies and end up with two components modifying the device at once.
-  zx::vmo vmo_snapshot;
-  if (zx_status_t s =
-          vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, NandSize(config_.block_count), &vmo_snapshot);
-      s != ZX_OK) {
-    return zx::error(s);
-  }
-  // The two snapshots won't be atomic, but it won't matter much in the aggregate. Due to racing
-  // with the ramnand component the erase and wear count increment will never be perfectly in sync
-  // anyways, so it will always be racy.
-  zx::vmo wear_snapshot;
-  if (zx_status_t s = wear_vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0,
-                                             WearSize(config_.block_count), &wear_snapshot);
-      s != ZX_OK) {
-    return zx::error(s);
+  auto snapshot = Snapshot();
+  if (snapshot.is_error()) {
+    return snapshot.take_error();
   }
 
   RamDevice ramnand = CreateRamDevice({
                                           .use_ram_nand = true,
-                                          .vmo = vmo_snapshot.borrow(),
+                                          .vmo = snapshot->image.borrow(),
                                           .use_existing_fvm = true,
-                                          .nand_wear_vmo = wear_snapshot.borrow(),
+                                          .nand_wear_vmo = snapshot->wear_info.borrow(),
                                           .device_block_size = kPageSize,
                                           .device_block_count = 0,
                                           .fvm_slice_size = config_.fvm_slice_size,
@@ -394,7 +393,7 @@ zx::result<RamDevice> WearSimulator::RemountFtl() {
 
   {
     fzl::VmoMapper mapper;
-    if (zx_status_t s = mapper.Map(wear_snapshot); s != ZX_OK) {
+    if (zx_status_t s = mapper.Map(snapshot->wear_info); s != ZX_OK) {
       return zx::error(s);
     }
 
@@ -407,8 +406,8 @@ zx::result<RamDevice> WearSimulator::RemountFtl() {
     }
     printf("Max wear: %u, Min wear: %u\n", max, min);
   }
-  vmo_ = std::move(vmo_snapshot);
-  wear_vmo_ = std::move(wear_snapshot);
+  vmo_ = std::move(snapshot->image);
+  wear_vmo_ = std::move(snapshot->wear_info);
   return zx::ok(std::move(ramnand));
 }
 
@@ -460,6 +459,83 @@ void WearSimulator::Reboot() {
       .minfs_export_root = minfs->Release(),
       .minfs_binding = std::move(minfs_bind),
   });
+}
+
+zx::result<Snapshot> WearSimulator::Snapshot() {
+  struct Snapshot snapshot;
+
+  // Taking a snapshot when remounting to ensure that the new component doesn't come up before the
+  // old one dies and end up with two components modifying the device at once.
+  zx::vmo vmo_snapshot;
+  if (zx_status_t s = vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, NandSize(config_.block_count),
+                                        &snapshot.image);
+      s != ZX_OK) {
+    return zx::error(s);
+  }
+  // The two snapshots won't be atomic, but it won't matter much in the aggregate. Due to racing
+  // with the ramnand component the erase and wear count increment will never be perfectly in sync
+  // anyways, so it will always be racy.
+  zx::vmo wear_snapshot;
+  if (zx_status_t s = wear_vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0,
+                                             WearSize(config_.block_count), &snapshot.wear_info);
+      s != ZX_OK) {
+    return zx::error(s);
+  }
+
+  return zx::ok(std::move(snapshot));
+}
+
+void WearSimulator::ExportImage() {
+  auto snapshot = Snapshot();
+  ASSERT_TRUE(snapshot.is_ok());
+
+  // Write out the data vmo. Compressed with zstd.
+  {
+    fzl::OwnedVmoMapper compressed_mapper;
+    size_t compressed_max_size = ZSTD_compressBound(NandSize(config_.block_count));
+    ASSERT_EQ(compressed_mapper.CreateAndMap(compressed_max_size, "compressed_image"), ZX_OK);
+    fzl::OwnedVmoMapper image_mapper;
+    ASSERT_EQ(image_mapper.Map(std::move(snapshot->image), 0, NandSize(config_.block_count),
+                               ZX_VM_PERM_READ),
+              ZX_OK);
+
+    size_t compressed_size;
+    compressed_size = ZSTD_compress(compressed_mapper.start(), compressed_max_size,
+                                    image_mapper.start(), NandSize(config_.block_count), 17);
+    ASSERT_FALSE(ZSTD_isError(compressed_size)) << ZSTD_getErrorName(compressed_size);
+
+    int f = open("custom_artifacts/nand.zstd", O_WRONLY | O_CREAT, 0644);
+    ASSERT_GE(f, 0) << errno;
+    uint8_t* offset = reinterpret_cast<uint8_t*>(compressed_mapper.start());
+    while (compressed_size > 0) {
+      ssize_t written = write(f, offset, compressed_size);
+      ASSERT_GT(written, 0) << errno;
+      compressed_size -= written;
+      offset += written;
+    }
+    ASSERT_EQ(close(f), 0) << errno;
+  }
+
+  // Write out the wear info. No need to compress, it should be relatively small.
+  {
+    fzl::OwnedVmoMapper mapper;
+    ASSERT_EQ(mapper.Map(std::move(snapshot->wear_info), 0, WearSize(config_.block_count),
+                         ZX_VM_PERM_READ),
+              ZX_OK);
+
+    size_t size = WearSize(config_.block_count);
+
+    int f = open("custom_artifacts/wear_info.bin", O_WRONLY | O_CREAT, 0644);
+    ASSERT_GE(f, 0) << errno;
+    uint8_t* offset = reinterpret_cast<uint8_t*>(mapper.start());
+    while (size > 0) {
+      ssize_t written = write(f, offset, size);
+      ASSERT_GT(written, 0) << errno;
+      size -= written;
+      offset += written;
+    }
+    ASSERT_EQ(close(f), 0) << errno;
+  }
 }
 
 // Test disabled because it isn't meant to run as part of CI. Meant for local experimentation.
@@ -517,6 +593,8 @@ TEST(Wear, MinimalSimulator) {
   sim.FillBlobfs(1ul * 1024 * 1024 - reduce_by);
   sim.SimulateMinfs(100);
 
+  // The image compresses to ~40K in the test. So leave it in.
+  sim.ExportImage();
   ASSERT_TRUE(sim.RemountFtl().is_ok());
 }
 

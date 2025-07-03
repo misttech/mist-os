@@ -58,6 +58,7 @@ test("ftl-wear-simulator-test") {
     "//src/storage/fvm:fvm-component",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp",
     "//src/storage/minfs/bin:minfs-test-component",
+    "//third_party/zstd",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
   ]
