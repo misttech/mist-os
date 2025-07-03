@@ -32,8 +32,12 @@ impl Validation {
 
         info!("checking if any of the {} base package blobs are missing", base_blobs.len());
 
-        let mut missing =
-            self.blobfs.filter_to_missing_blobs(base_blobs).await.into_iter().collect::<Vec<_>>();
+        let mut missing = self
+            .blobfs
+            .filter_to_missing_blobs(base_blobs.iter().copied())
+            .await
+            .into_iter()
+            .collect::<Vec<_>>();
         missing.sort();
 
         if missing.is_empty() {

@@ -18,7 +18,7 @@ pub struct FrozenIndex<Marker> {
     packages: HashSet<Hash>,
     /// The meta.fars and content blobs of the packages (including subpackages).
     /// Equivalently, the contents of `packages` plus their corresponding content blobs.
-    blobs: HashSet<Hash>,
+    blobs: Vec<Hash>,
     /// The package urls and hashes of the root packages (i.e. not including subpackages).
     root_package_urls_and_hashes: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, Hash>,
 
@@ -118,7 +118,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
         .context("Error determining blobs")?;
         Ok(Self {
             packages,
-            blobs,
+            blobs: blobs.into_iter().collect(),
             root_package_urls_and_hashes,
             phantom: std::marker::PhantomData,
         })
@@ -149,7 +149,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
         }
         drop(futures);
 
-        Ok((memoized_packages.into_inner().into_keys().collect(), blobs))
+        Ok((memoized_packages.into_inner().into_keys().collect(), blobs.into_iter().collect()))
     }
 
     // Returns all blobs of `package`: the meta.far, the content blobs, and the transitive
@@ -176,14 +176,14 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
     pub fn empty() -> Self {
         Self {
             packages: HashSet::new(),
-            blobs: HashSet::new(),
+            blobs: vec![],
             root_package_urls_and_hashes: HashMap::new(),
             phantom: std::marker::PhantomData,
         }
     }
 
     /// The meta.fars and content blobs of the packages (including subpackages).
-    pub fn list_blobs(&self) -> &HashSet<Hash> {
+    pub fn list_blobs(&self) -> &[Hash] {
         &self.blobs
     }
 
@@ -239,7 +239,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
     ) -> Self {
         Self {
             packages: HashSet::new(),
-            blobs,
+            blobs: blobs.into_iter().collect(),
             root_package_urls_and_hashes: root_package_urls_and_hashes.into_iter().collect(),
             phantom: std::marker::PhantomData,
         }
@@ -323,8 +323,11 @@ mod tests {
             .into_iter()
             .chain(a_base_package.list_blobs())
             .chain(base_subpackage.list_blobs())
-            .collect();
-        assert_eq!(base_packages.list_blobs(), &expected_blobs);
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            base_packages.list_blobs().iter().copied().collect::<HashSet<_>>(),
+            expected_blobs
+        );
         // Six expected blobs:
         //   system_image meta.far
         //   system_image content blob "data/static_packages"
@@ -546,7 +549,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(cache_packages.packages, HashSet::from([*present.hash()]));
-        assert_eq!(cache_packages.blobs, HashSet::from_iter(present.list_blobs()));
+        assert_eq!(cache_packages.blobs.len(), present.list_blobs().len());
+        assert_eq!(
+            cache_packages.blobs.iter().collect::<HashSet<_>>(),
+            present.list_blobs().iter().collect::<HashSet<_>>(),
+        );
         assert_eq!(
             cache_packages.root_package_urls_and_hashes(),
             &HashMap::from_iter([

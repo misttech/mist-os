@@ -437,7 +437,10 @@ impl Client {
     /// 3. resolve A encounters an error and retries the fetch, which attempts to open the blob for
     ///    write, which collides with the partially written blob from (1) that is being kept alive
     ///    by (2) and so fails
-    pub async fn filter_to_missing_blobs(&self, candidates: &HashSet<Hash>) -> HashSet<Hash> {
+    pub async fn filter_to_missing_blobs(
+        &self,
+        candidates: impl IntoIterator<Item = Hash>,
+    ) -> HashSet<Hash> {
         // Attempt to open each blob instead of using ReadDirents to catch more forms of filesystem
         // metadata corruption.
         // We don't use ReadDirents even as a pre-filter because emulator testing suggests
@@ -445,7 +448,7 @@ impl Client {
         // on missing blobs, and it's about 5x worse on c++blobfs (on which both ReadDirents is
         // slower and has_blob is faster). The minor speedup on packages with a great number of
         // missing blobs is not worth a rarely taken branch deep within package resolution.
-        stream::iter(candidates.clone())
+        stream::iter(candidates)
             .map(move |blob| async move {
                 if self.has_blob(&blob).await {
                     None
@@ -743,9 +746,7 @@ mod tests {
             client
                 .filter_to_missing_blobs(
                     // Pass in <= 20 candidates so the heuristic is not used.
-                    &hashset! { missing_hash0, missing_hash1,
-                        present_blob0.hash, present_blob1.hash
-                    },
+                    [missing_hash0, missing_hash1, present_blob0.hash, present_blob1.hash]
                 )
                 .await,
             hashset! { missing_hash0, missing_hash1 }
@@ -774,12 +775,12 @@ mod tests {
 
         assert_eq!(
             client
-                .filter_to_missing_blobs(&hashset! {
+                .filter_to_missing_blobs([
                     missing_blob0.hash,
                     missing_blob1.hash,
                     missing_blob2.hash,
                     present_blob.hash
-                },)
+                ])
                 .await,
             // All partially written blobs should count as missing.
             hashset! { missing_blob0.hash, missing_blob1.hash, missing_blob2.hash }
