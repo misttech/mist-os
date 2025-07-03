@@ -13,6 +13,7 @@ rustc_binary("bin") {
     "//src/performance/lib/fxt/rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:prettytable-rs",
   ]
 }
 
