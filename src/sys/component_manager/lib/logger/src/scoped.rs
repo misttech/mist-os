@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_log::{PublishError, Publisher, PublisherOptions};
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_logger as flogger;
 use thiserror::Error;
 
@@ -18,7 +19,7 @@ pub struct ScopedLogger {
 }
 
 impl ScopedLogger {
-    pub fn create(logsink: flogger::LogSinkProxy) -> Result<Self, ScopedLoggerError> {
+    pub fn create(logsink: ClientEnd<flogger::LogSinkMarker>) -> Result<Self, ScopedLoggerError> {
         let publisher = Publisher::new(
             PublisherOptions::default().wait_for_initial_interest(false).use_log_sink(logsink),
         )

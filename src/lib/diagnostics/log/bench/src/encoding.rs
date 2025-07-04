@@ -129,7 +129,7 @@ fn main() {
 
     for size in [16, 128, 256, 512, 1024, 32000] {
         bench = bench.with_function(
-            format!("Encoder/Argument/Text/{}", size),
+            format!("Encoder/Argument/Text/{size}"),
             bench_argument((*common::PLACEHOLDER_TEXT).get(..size).unwrap()),
         )
     }

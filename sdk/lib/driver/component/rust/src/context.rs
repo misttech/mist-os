@@ -88,8 +88,8 @@ impl DriverContext {
     }
 
     pub(crate) fn start_logging(&self, driver_name: &str) -> Result<(), Status> {
-        let log_proxy = match self.incoming.connect_protocol() {
-            Ok(log_proxy) => log_proxy,
+        let log_client = match self.incoming.connect_protocol() {
+            Ok(log_client) => log_client,
             Err(err) => {
                 eprintln!("Error connecting to log sink proxy at driver startup: {err}. Continuing without logging.");
                 return Ok(());
@@ -98,7 +98,7 @@ impl DriverContext {
 
         if let Err(e) = diagnostics_log::initialize(
             diagnostics_log::PublishOptions::default()
-                .use_log_sink(log_proxy)
+                .use_log_sink(log_client)
                 .tags(&["driver", driver_name]),
         ) {
             eprintln!("Error initializing logging at driver startup: {e}");

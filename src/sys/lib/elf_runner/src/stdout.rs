@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use cm_logger::scoped::ScopedLogger;
 use cm_types::NamespacePath;
 use fidl::prelude::*;
-use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_component::client::connect::connect_to_named_protocol_at_dir_root;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::StreamExt;
 use lazy_static::lazy_static;
@@ -75,11 +75,9 @@ pub fn bind_streams_to_syslog(
 
 fn create_namespace_logger(ns: &Namespace) -> Option<ScopedLogger> {
     let svc_dir = ns.get(&SVC_DIRECTORY_PATH)?;
-    let logsink = connect_to_named_protocol_at_dir_root::<flogger::LogSinkMarker>(
-        svc_dir,
-        flogger::LogSinkMarker::PROTOCOL_NAME,
-    )
-    .ok()?;
+    let logsink =
+        connect_to_named_protocol_at_dir_root(svc_dir, flogger::LogSinkMarker::PROTOCOL_NAME)
+            .ok()?;
     ScopedLogger::create(logsink).ok()
 }
 

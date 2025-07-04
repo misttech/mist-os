@@ -11,13 +11,13 @@ use std::thread;
 use std::time::Duration;
 
 async fn setup_logger() -> (thread::JoinHandle<()>, Publisher) {
-    let (proxy, mut requests) = fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
+    let (client, mut requests) = fidl::endpoints::create_request_stream::<LogSinkMarker>();
     let task = fasync::Task::spawn(async move {
         let options = PublisherOptions::default()
             .tags(&["some-tag"])
             .wait_for_initial_interest(false)
             .listen_for_interest_updates(false)
-            .use_log_sink(proxy);
+            .use_log_sink(client);
 
         Publisher::new(options).unwrap()
     });
@@ -78,17 +78,17 @@ fn setup_log_write_benchmarks(
         });
     };
     let bench = if let Some(benchmark) = benchmark {
-        benchmark.with_function(format!("Publisher/{}/AllArguments", name), all_args_bench)
+        benchmark.with_function(format!("Publisher/{name}/AllArguments"), all_args_bench)
     } else {
-        criterion::Benchmark::new(format!("Publisher/{}/AllArguments", name), all_args_bench)
+        criterion::Benchmark::new(format!("Publisher/{name}/AllArguments"), all_args_bench)
     };
     bench
-        .with_function(format!("Publisher/{}/NoArguments", name), move |b| {
+        .with_function(format!("Publisher/{name}/NoArguments"), move |b| {
             write_log_benchmark(b, || {
                 log::info!("this is a log emitted from the benchmark");
             });
         })
-        .with_function(format!("Publisher/{}/MessageWithSomeArguments", name), move |b| {
+        .with_function(format!("Publisher/{name}/MessageWithSomeArguments"), move |b| {
             write_log_benchmark(b, || {
                 log::info!(
                     boolean = true,
@@ -98,7 +98,7 @@ fn setup_log_write_benchmarks(
                 );
             });
         })
-        .with_function(format!("Publisher/{}/MessageAsString", name), move |b| {
+        .with_function(format!("Publisher/{name}/MessageAsString"), move |b| {
             write_log_benchmark(b, || {
                 log::info!(
                     "this is a log emitted from the benchmark boolean={} int={} string={}",
@@ -112,12 +112,12 @@ fn setup_log_write_benchmarks(
 
 fn setup_old_log_write_benchmarks(name: &str, bench: criterion::Benchmark) -> criterion::Benchmark {
     bench
-        .with_function(format!("Publisher/{}/NoArguments", name), move |b| {
+        .with_function(format!("Publisher/{name}/NoArguments"), move |b| {
             write_log_benchmark(b, || {
                 log::info!("this is a log emitted from the benchmark");
             });
         })
-        .with_function(format!("Publisher/{}/MessageAsString", name), move |b| {
+        .with_function(format!("Publisher/{name}/MessageAsString"), move |b| {
             write_log_benchmark(b, || {
                 log::info!(
                     "this is a log emitted from the benchmark boolean={} int={} string={}",
