@@ -47,6 +47,14 @@
             service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
             from: "#boot-drivers",
             to: [ "#cpu_manager" ],
+            availability: "optional",
+        },
+        {
+            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
+            from: "#base-drivers",
+            to: [ "#cpu_manager" ],
+            availability: "optional",
+            source_availability: "unknown",
         },
         {
             directory: "dev-topological",
