@@ -31,6 +31,9 @@ pub trait Radio {
     /// Functional equivalent of
     /// [`otsys::otPlatRadioGetVersionString`](crate::otsys::otPlatRadioGetVersionString).
     fn radio_get_version_string(&self) -> &str;
+
+    /// Calling into OT state change handler in platform radio
+    fn on_radio_handle_state_change(&self, flags: ot::ChangedFlags);
 }
 
 impl<T: Radio + Boxable> Radio for ot::Box<T> {
@@ -56,6 +59,10 @@ impl<T: Radio + Boxable> Radio for ot::Box<T> {
 
     fn radio_get_version_string(&self) -> &str {
         self.as_ref().radio_get_version_string()
+    }
+
+    fn on_radio_handle_state_change(&self, flags: ot::ChangedFlags) {
+        self.as_ref().on_radio_handle_state_change(flags)
     }
 }
 
@@ -99,5 +106,9 @@ impl Radio for Instance {
                 .to_str()
                 .expect("OpenThread version string was bad UTF8")
         }
+    }
+
+    fn on_radio_handle_state_change(&self, flags: ot::ChangedFlags) {
+        unsafe { platformRadioHandleStateChange(self.as_ot_ptr(), flags.bits()) }
     }
 }
