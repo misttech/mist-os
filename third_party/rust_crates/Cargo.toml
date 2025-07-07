@@ -404,7 +404,6 @@ windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }
 windows-sys-0_59_0 = { package = "windows-sys", path = "empty/windows-sys-0.59.0" }
 windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-targets-0.48.5" }
-windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
 # keep-sorted end
 
 ### Forks: vendored crates whose code doesn't match the upstream version

@@ -5539,8 +5539,3 @@ version = "2.0.1+zstd.1.5.6"
 dependencies = [
  "libc",
 ]
-
-[[patch.unused]]
-name = "windows-targets"
-version = "0.52.0"
-
