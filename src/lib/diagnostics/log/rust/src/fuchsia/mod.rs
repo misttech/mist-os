@@ -151,7 +151,7 @@ publisher_options!((PublisherOptions, self,), (PublishOptions, self, publisher))
 
 fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishError> {
     let publisher = Publisher::new(opts.publisher)?;
-    log::set_boxed_logger(Box::new(publisher.clone()))?;
+    publisher.register_logger()?;
     if opts.install_panic_hook {
         crate::install_panic_hook(opts.panic_prefix);
     }
@@ -332,9 +332,23 @@ impl Publisher {
     fn take_interest_listening_task(&mut self) -> Option<fasync::Task<()>> {
         self.inner.interest_listening_task.lock().unwrap().take()
     }
+
+    /// Sets the global logger to this publisher. This function may only be called once in the
+    /// lifetime of a program.
+    pub fn register_logger(&self) -> Result<(), PublishError> {
+        // SAFETY: This leaks which guarantees the publisher remains alive for the lifetime of the
+        // program.
+        unsafe {
+            let ptr = Arc::into_raw(self.inner.clone());
+            log::set_logger(&*ptr).inspect_err(|_| {
+                let _ = Arc::from_raw(ptr);
+            })?;
+        }
+        Ok(())
+    }
 }
 
-impl log::Log for Publisher {
+impl log::Log for InnerPublisher {
     fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
         // NOTE: we handle minimum severity directly through the log max_level. So we call,
         // log::set_max_level, log::max_level where appropriate.
@@ -342,10 +356,27 @@ impl log::Log for Publisher {
     }
 
     fn log(&self, record: &log::Record<'_>) {
-        self.inner.sink.record_log(record);
+        self.sink.record_log(record);
     }
 
     fn flush(&self) {}
+}
+
+impl log::Log for Publisher {
+    #[inline]
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        self.inner.enabled(metadata)
+    }
+
+    #[inline]
+    fn log(&self, record: &log::Record<'_>) {
+        self.inner.log(record)
+    }
+
+    #[inline]
+    fn flush(&self) {
+        self.inner.flush()
+    }
 }
 
 /// Errors arising while forwarding a diagnostics stream to the environment.

@@ -10,7 +10,7 @@ use futures::{AsyncReadExt, StreamExt};
 use std::thread;
 use std::time::Duration;
 
-async fn setup_logger() -> (thread::JoinHandle<()>, Publisher) {
+async fn set_up_logger() -> (thread::JoinHandle<()>, Publisher) {
     let (client, mut requests) = fidl::endpoints::create_request_stream::<LogSinkMarker>();
     let task = fasync::Task::spawn(async move {
         let options = PublisherOptions::default()
@@ -60,7 +60,7 @@ where
 // to log. They set up different cases: just a string, a string with arguments, the same string
 // but with the arguments formatted, etc. It'll measure the time it takes for the log to go
 // through the tracing mechanisms, our encoder and finally writing to the socket.
-fn setup_log_write_benchmarks(
+fn set_up_log_write_benchmarks(
     name: &str,
     benchmark: Option<criterion::Benchmark>,
 ) -> criterion::Benchmark {
@@ -110,7 +110,10 @@ fn setup_log_write_benchmarks(
         })
 }
 
-fn setup_old_log_write_benchmarks(name: &str, bench: criterion::Benchmark) -> criterion::Benchmark {
+fn set_up_old_log_write_benchmarks(
+    name: &str,
+    bench: criterion::Benchmark,
+) -> criterion::Benchmark {
     bench
         .with_function(format!("Publisher/{name}/NoArguments"), move |b| {
             write_log_benchmark(b, || {
@@ -131,7 +134,7 @@ fn setup_old_log_write_benchmarks(name: &str, bench: criterion::Benchmark) -> cr
 
 fn create_logger() -> (thread::JoinHandle<()>, Publisher) {
     let mut executor = fasync::LocalExecutor::new();
-    let (drain_socket, publisher) = executor.run_singlethreaded(setup_logger());
+    let (drain_socket, publisher) = executor.run_singlethreaded(set_up_logger());
     (drain_socket, publisher)
 }
 
@@ -147,12 +150,12 @@ fn main() {
         .sample_size(10);
 
     let (_drain_logs, logger) = create_logger();
-    log::set_boxed_logger(Box::new(logger)).expect("setp logger");
+    logger.register_logger().expect("set up logger");
 
     // TODO(https://fxbug.dev/344980783): keep the old benchmarks to see continuity, but then
     // rename "Tracing" to "Log" and remove the old tracing benchmarks.
-    let mut bench = setup_log_write_benchmarks("Tracing", None);
-    bench = setup_old_log_write_benchmarks("Log", bench);
+    let mut bench = set_up_log_write_benchmarks("Tracing", None);
+    bench = set_up_old_log_write_benchmarks("Log", bench);
 
     c.bench("fuchsia.diagnostics_log_rust.core", bench);
 }
