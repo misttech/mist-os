@@ -10,7 +10,7 @@ use fuchsia_inspect_derive::{AttachError, IValue, Inspect};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Shared};
 use futures::{select, FutureExt, SinkExt, StreamExt};
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
 use std::collections::VecDeque;
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
@@ -268,7 +268,9 @@ impl FlowController for CreditFlowController {
 
         // Deliver the data to the application if the payload is not empty.
         if !user_data.is_empty() {
-            let _ = client.write(&user_data.information[..]);
+            if let Err(e) = client.write(&user_data.information[..]) {
+                warn!(dlci:% = self.dlci; "Error forwarding {} bytes to client: {e:?}", user_data.information.len());
+            };
             self.stream_inspect.record_inbound_transfer(
                 user_data.information.len(),
                 fasync::MonotonicInstant::now(),
