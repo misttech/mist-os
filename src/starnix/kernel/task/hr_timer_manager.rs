@@ -7,7 +7,6 @@ use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
 use anyhow::{Context, Result};
-use fidl::endpoints::Proxy;
 use fuchsia_inspect::ArrayProperty;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -80,16 +79,6 @@ async fn wait_signaled<H: HandleBased>(handle: &H) -> Result<()> {
     Ok(())
 }
 
-// Used to inject a fake proxy in tests.
-fn get_wake_proxy_internal(mut wake_channel: Option<zx::Channel>) -> fta::WakeAlarmsProxy {
-    wake_channel
-        .take()
-        .map(|c| fta::WakeAlarmsProxy::new(fidl::AsyncChannel::from_channel(c)))
-        .unwrap_or_else(|| {
-            connect_to_wake_alarms_async().expect("connection to wake alarms async proxy")
-        })
-}
-
 /// Cancels an alarm by ID.
 async fn cancel_by_id(
     _suspend_lock: &SuspendLock,
@@ -147,11 +136,14 @@ fn process_alarm_protocol_error(
 }
 
 // This function is swapped out for an injected proxy in tests.
-fn connect_to_wake_alarms_async() -> Result<fta::WakeAlarmsProxy, Errno> {
+fn connect_to_wake_alarms_async() -> Result<zx::Channel, Errno> {
     log_debug!("connecting to wake alarms");
-    fuchsia_component::client::connect_to_protocol::<fta::WakeAlarmsMarker>().map_err(|err| {
-        errno!(EINVAL, format!("Failed to connect to fuchsia.time.alarms/Wake: {err}"))
-    })
+    let (client, server) = zx::Channel::create();
+    fuchsia_component::client::connect_channel_to_protocol::<fta::WakeAlarmsMarker>(server)
+        .map(|()| client)
+        .map_err(|err| {
+            errno!(EINVAL, format!("Failed to connect to fuchsia.time.alarms/Wake: {err}"))
+        })
 }
 
 #[derive(Debug)]
@@ -419,16 +411,17 @@ impl HrTimerManager {
         let setup_done_clone = duplicate_handle(&setup_done)?;
 
         system_task.kernel().kthreads.spawn(move |_, system_task| {
-            let mut executor = fasync::LocalExecutor::new();
-            let _ = executor
-                .run_singlethreaded(self_ref.watch_new_hrtimer_loop(
+            if let Err(e) =
+                fasync::LocalExecutor::new().run_singlethreaded(self_ref.watch_new_hrtimer_loop(
                     &system_task,
                     start_next_receiver,
                     wake_channel_for_test,
                     message_counter_for_test,
                     Some(setup_done_clone),
                 ))
-                .map_err(|err| log_error!("while running watch_new_hrtimer_loop: {err:?}"));
+            {
+                log_error!("while running watch_new_hrtimer_loop: {e:?}");
+            }
             log_warn!("hr_timer_manager: finished kernel thread. should never happen in prod code");
         });
         wait_signaled_sync(&setup_done)
@@ -542,7 +535,7 @@ impl HrTimerManager {
         self: &HrTimerManagerHandle,
         system_task: &CurrentTask,
         mut start_next_receiver: UnboundedReceiver<Cmd>,
-        wake_channel_for_test: Option<zx::Channel>,
+        mut wake_channel_for_test: Option<zx::Channel>,
         message_counter_for_test: Option<zx::Counter>,
         setup_done: Option<zx::Event>,
     ) -> Result<()> {
@@ -551,11 +544,9 @@ impl HrTimerManager {
             log_warn!("watch_new_hrtimer_loop: exiting. This should only happen in tests.");
         }
 
-        let wake_proxy = get_wake_proxy_internal(wake_channel_for_test);
-        let wake_channel = wake_proxy
-            .into_channel()
-            .expect("Failed to convert wake alarms proxy to channel")
-            .into();
+        let wake_channel = wake_channel_for_test.take().unwrap_or_else(|| {
+            connect_to_wake_alarms_async().expect("connection to wake alarms async proxy")
+        });
 
         let (device_channel, message_counter) =
             if let Some(message_counter) = message_counter_for_test {
@@ -1194,29 +1185,19 @@ mod tests {
     }
 
     // Injected for testing.
-    async fn connect_factory(
-        message_counter: zx::Counter,
-        response_type: Response,
-    ) -> fta::WakeAlarmsProxy {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fta::WakeAlarmsMarker>();
-        let channel = server_end.into_channel();
+    async fn connect_factory(message_counter: zx::Counter, response_type: Response) -> zx::Channel {
+        let (client, server) = zx::Channel::create();
 
         // A separate thread is needed to allow independent execution of the server.
         let _detached = thread::spawn(move || {
-            let mut executor = fasync::LocalExecutor::new();
-            let server_end: fidl::endpoints::ServerEnd<fta::WakeAlarmsMarker> =
-                fidl::endpoints::ServerEnd::new(channel);
-            let _ = executor.run_singlethreaded(async move {
-                serve_fake_wake_alarms(
-                    message_counter,
-                    response_type,
-                    server_end.into_stream(),
-                    /*once*/ false,
-                )
-                .await;
+            fasync::LocalExecutor::new().run_singlethreaded(async move {
+                let stream =
+                    fidl::endpoints::ServerEnd::<fta::WakeAlarmsMarker>::new(server).into_stream();
+                serve_fake_wake_alarms(message_counter, response_type, stream, /*once*/ false)
+                    .await;
             });
         });
-        proxy
+        client
     }
 
     // Initializes HrTimerManager for tests.
@@ -1237,14 +1218,10 @@ mod tests {
         });
         let counter = zx::Counter::create();
         let counter_clone = duplicate_handle(&counter).unwrap();
-        let proxy = connect_factory(counter_clone, response_type).await;
+        let wake_channel = connect_factory(counter_clone, response_type).await;
         let counter_clone = duplicate_handle(&counter).unwrap();
         manager
-            .init_internal(
-                &current_task,
-                Some(proxy.into_channel().unwrap().into_zx_channel()),
-                Some(counter_clone),
-            )
+            .init_internal(&current_task, Some(wake_channel), Some(counter_clone))
             .expect("infallible");
         (manager, current_task, counter)
     }
