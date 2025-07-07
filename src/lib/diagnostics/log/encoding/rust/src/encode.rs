@@ -4,13 +4,16 @@
 
 //! Encoding diagnostic records using the Fuchsia Tracing format.
 
-use crate::{constants, ArgType, Argument, Header, Metatag, RawSeverity, Record, Value};
+use crate::{
+    constants, ArgType, Argument, Header, Metatag, RawSeverity, Record, Value, MAX_SIZE_WORDS,
+};
 use std::array::TryFromSliceError;
 use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
 use thiserror::Error;
+use zerocopy::{FromBytes, IntoBytes};
 
 #[cfg(fuchsia_api_level_less_than = "27")]
 use fidl_fuchsia_diagnostics::Severity;
@@ -382,7 +385,7 @@ impl<B: MutableBuffer> WriteArgumentValue<B> for Value<'_> {
     }
 }
 
-fn string_mask(s: &str) -> u16 {
+const fn string_mask(s: &str) -> u16 {
     let len = s.len();
     if len == 0 {
         return 0;
@@ -881,6 +884,55 @@ impl From<TryFromSliceError> for EncodingError {
     }
 }
 
+/// Adds `count` to the dropped count for the message.  Returns `true` if successful.
+pub fn add_dropped_count(message: &mut Vec<u8>, count: u64) -> bool {
+    const DROPPED_HEADER_SIZE_WORDS: u16 = 4; // Header (1), name (2), value (1)
+    const DROPPED_HEADER: Header = Header(
+        4                                                     // arg type U64
+        | (DROPPED_HEADER_SIZE_WORDS as u64) << 4             // size words
+        | (string_mask(constants::NUM_DROPPED) as u64) << 16, // string ref
+    );
+
+    if message.len() < 16 {
+        return false;
+    }
+
+    // See if the message already has a dropped argument.
+    let mut argument = &mut message[16..];
+    while !argument.is_empty() {
+        let Ok((header, _)) = Header::read_from_prefix(argument) else {
+            return false;
+        };
+        let arg_len = header.size_words() as usize * 8;
+        if arg_len == 0 || arg_len > argument.len() {
+            return false;
+        }
+        if header.0 == DROPPED_HEADER.0
+            && &argument[8..8 + constants::NUM_DROPPED.len()] == constants::NUM_DROPPED.as_bytes()
+        {
+            let value = u64::mut_from_bytes(&mut argument[24..32]).unwrap();
+            *value = value.saturating_add(count);
+            return true;
+        }
+        argument = &mut argument[arg_len..];
+    }
+
+    let message_header = Header::mut_from_bytes(&mut message[..8]).unwrap();
+    let new_size = message_header.size_words() + DROPPED_HEADER_SIZE_WORDS;
+    if new_size > MAX_SIZE_WORDS {
+        return false;
+    }
+    message_header.set_size_words(new_size);
+
+    // Append the dropped argument.
+    message.extend(DROPPED_HEADER.0.as_bytes());
+    message.extend(constants::NUM_DROPPED.as_bytes());
+    message.extend(std::iter::repeat_n(0, 16 - constants::NUM_DROPPED.len()));
+    message.extend(count.as_bytes());
+
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1018,5 +1070,178 @@ mod tests {
             vec.put_slice_at(&[4, 5, 6], 5);
         }
         assert_eq!(vec.get_ref().0, vec![1, 2, 3, 0, 0, 4, 5, 6]);
+    }
+
+    #[test]
+    fn add_dropped_count_to_existing_count() {
+        const INITIAL_DROPPED: u64 = 7;
+        const EXTRA_DROPPED: u64 = 53;
+
+        let mut encoder = Encoder::new(Cursor::new(vec![0; 256]), EncoderOpts::default());
+        encoder
+            .write_event(WriteEventParams::<_, &str, _> {
+                event: TestRecord {
+                    severity: Severity::Error.into_primitive(),
+                    timestamp: zx::BootInstant::from_nanos(12345),
+                    file: None,
+                    line: Some(123),
+                    record_arguments: vec![],
+                },
+                tags: &[],
+                metatags: std::iter::empty(),
+                pid: zx::Koid::from_raw(0),
+                tid: zx::Koid::from_raw(0),
+                dropped: INITIAL_DROPPED,
+            })
+            .expect("wrote event");
+        let cursor = encoder.take();
+        let position = cursor.position();
+        let mut buffer = cursor.into_inner();
+        buffer.truncate(position as usize);
+        assert!(add_dropped_count(&mut buffer, EXTRA_DROPPED));
+        let (record, _) = parse_record(&buffer).expect("wrote valid record");
+        assert_eq!(
+            record,
+            Record {
+                timestamp: zx::BootInstant::from_nanos(12345),
+                severity: Severity::Error.into_primitive(),
+                arguments: vec![
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::dropped(INITIAL_DROPPED + EXTRA_DROPPED),
+                    Argument::Line(123),
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn add_dropped_count_when_none_exists() {
+        const DROPPED: u64 = 53;
+
+        let mut encoder = Encoder::new(Cursor::new(vec![0; 256]), EncoderOpts::default());
+        encoder
+            .write_event(WriteEventParams::<_, &str, _> {
+                event: TestRecord {
+                    severity: Severity::Error.into_primitive(),
+                    timestamp: zx::BootInstant::from_nanos(12345),
+                    file: None,
+                    line: Some(123),
+                    record_arguments: vec![],
+                },
+                tags: &[],
+                metatags: std::iter::empty(),
+                pid: zx::Koid::from_raw(0),
+                tid: zx::Koid::from_raw(0),
+                dropped: 0,
+            })
+            .expect("wrote event");
+        let cursor = encoder.take();
+        let position = cursor.position();
+        let mut buffer = cursor.into_inner();
+        buffer.truncate(position as usize);
+        assert!(add_dropped_count(&mut buffer, DROPPED));
+        let (record, _) = parse_record(&buffer).expect("wrote valid record");
+        assert_eq!(
+            record,
+            Record {
+                timestamp: zx::BootInstant::from_nanos(12345),
+                severity: Severity::Error.into_primitive(),
+                arguments: vec![
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::Line(123),
+                    Argument::dropped(DROPPED),
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn add_dropped_count_when_just_enough_room() {
+        const DROPPED: u64 = 53;
+
+        let mut encoder =
+            Encoder::new(Cursor::new(vec![0; MAX_SIZE_WORDS as usize * 8]), EncoderOpts::default());
+        // We want the argument to be just big enough so that there is only just enough room for
+        // the dropped count:
+        //
+        //   Header    :    1
+        //   Timestamp :    1
+        //   Pid       :    3
+        //   Tid       :    3
+        //   Line      :    3
+        //   Foo       : 4080
+        //   Dropped   :    4
+        //               ====
+        //               4095
+        let foo_arg = Argument::new("foo", String::from_iter(std::iter::repeat_n('x', 4078 * 8)));
+        encoder
+            .write_event(WriteEventParams::<_, &str, _> {
+                event: TestRecord {
+                    severity: Severity::Error.into_primitive(),
+                    timestamp: zx::BootInstant::from_nanos(12345),
+                    file: None,
+                    line: Some(123),
+                    record_arguments: vec![foo_arg.clone()],
+                },
+                tags: &[],
+                metatags: std::iter::empty(),
+                pid: zx::Koid::from_raw(0),
+                tid: zx::Koid::from_raw(0),
+                dropped: 0,
+            })
+            .expect("wrote event");
+        let cursor = encoder.take();
+        let position = cursor.position();
+        let mut buffer = cursor.into_inner();
+        buffer.truncate(position as usize);
+        assert!(add_dropped_count(&mut buffer, DROPPED));
+        let (record, _) = parse_record(&buffer).expect("wrote valid record");
+        assert_eq!(
+            record,
+            Record {
+                timestamp: zx::BootInstant::from_nanos(12345),
+                severity: Severity::Error.into_primitive(),
+                arguments: vec![
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::Line(123),
+                    foo_arg,
+                    Argument::dropped(DROPPED),
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn add_dropped_count_invalid_message() {
+        // Message too small.
+        assert!(!add_dropped_count(&mut vec![1, 2, 3], 5));
+
+        // Argument too small.
+        assert!(!add_dropped_count(&mut vec![0; 17], 5));
+
+        // Zero argument len.
+        assert!(!add_dropped_count(&mut vec![0; 24], 5));
+
+        // Argument too big.
+        let mut message = vec![0; 16];
+        let mut arg_header = Header(0);
+        arg_header.set_size_words(2);
+        message.extend(arg_header.0.as_bytes());
+        assert!(!add_dropped_count(&mut message, 5));
+
+        // Message too too big to accept another argument.
+        let mut message = Vec::new();
+        let mut header = Header(0);
+        header.set_size_words(MAX_SIZE_WORDS);
+        message.extend(header.0.as_bytes());
+        message.extend([0; 8]); // timestamp
+        let mut arg_header = Header(0);
+        arg_header.set_size_words(4093);
+        message.extend(arg_header.0.as_bytes());
+        message.resize(4095 * 8, 0);
+        assert!(!add_dropped_count(&mut message, 5));
     }
 }

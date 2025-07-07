@@ -273,6 +273,9 @@ impl From<bool> for Value<'static> {
     }
 }
 
+/// The maximum value acceptable for `size_words` below.
+pub const MAX_SIZE_WORDS: u16 = 4095;
+
 bitfield! {
     /// A header in the tracing format. Expected to precede every Record and Argument.
     ///
