@@ -10021,7 +10021,7 @@ rustc_library("mockall-v0_9_0") {
   deps += [ ":fragile-v1_0_0" ]
   deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":mockall_derive-v0_9_0($host_toolchain)" ]
-  deps += [ ":predicates-tree-v1_0_2" ]
+  deps += [ ":predicates-tree-v1_0_12" ]
   deps += [ ":predicates-v1_0_8" ]
   deps += [ "//build/validate:non_production_tag" ]
   rustenv = []
@@ -12646,39 +12646,39 @@ rustc_library("predicates-core-v1_0_9") {
   applicable_licenses = [ ":predicates-core-v1_0_9.license" ]
 }
 
-license("predicates-tree-v1_0_2.license") {
+license("predicates-tree-v1_0_12.license") {
   public_package_name = "predicates_tree"
   license_files = [
-    "//third_party/rust_crates/vendor/predicates-tree-1.0.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/predicates-tree-1.0.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/predicates-tree-1.0.12/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/predicates-tree-1.0.12/LICENSE-MIT",
   ]
 }
 
-rustc_library("predicates-tree-v1_0_2") {
+rustc_library("predicates-tree-v1_0_12") {
   crate_name = "predicates_tree"
   source_root =
-      "//third_party/rust_crates/vendor/predicates-tree-1.0.2/src/lib.rs"
-  output_name = "predicates_tree-2fdd83d7979f6648"
-  edition = "2018"
+      "//third_party/rust_crates/vendor/predicates-tree-1.0.12/src/lib.rs"
+  output_name = "predicates_tree-2edfa1533b69257a"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":predicates-core-v1_0_9" ]
-  deps += [ ":treeline-v0_1_0" ]
+  deps += [ ":termtree-v0_5_1" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=2fdd83d7979f6648",
-    "-Cextra-filename=-2fdd83d7979f6648",
+    "-Cmetadata=2edfa1533b69257a",
+    "-Cextra-filename=-2edfa1533b69257a",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":predicates-tree-v1_0_2.license" ]
+  applicable_licenses = [ ":predicates-tree-v1_0_12.license" ]
 }
 
 license("pretty-v0_5_2.license") {
@@ -18619,35 +18619,6 @@ rustc_library("tracing-subscriber-v0_3_18") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":tracing-subscriber-v0_3_18.license" ]
-}
-
-license("treeline-v0_1_0.license") {
-  public_package_name = "treeline"
-  license_files = [ "//third_party/rust_crates/vendor/treeline-0.1.0/LICENSE" ]
-}
-
-rustc_library("treeline-v0_1_0") {
-  crate_name = "treeline"
-  source_root = "//third_party/rust_crates/vendor/treeline-0.1.0/src/lib.rs"
-  output_name = "treeline-73b2c02cee81d97b"
-  edition = "2015"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=73b2c02cee81d97b",
-    "-Cextra-filename=-73b2c02cee81d97b",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":treeline-v0_1_0.license" ]
 }
 
 license("trust-dns-proto-v0_22_0.license") {

@@ -21,8 +21,8 @@ package(
 package_info(
     name = "package_info",
     package_name = "predicates-tree",
-    package_url = "https://github.com/assert-rs/predicates-rs/tree/master/predicates-tree",
-    package_version = "1.0.2",
+    package_url = "https://github.com/assert-rs/predicates-rs/tree/master/crates/tree",
+    package_version = "1.0.12",
 )
 
 license(
@@ -53,7 +53,7 @@ rust_library(
         ],
     ),
     crate_root = "src/lib.rs",
-    edition = "2018",
+    edition = "2021",
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -72,9 +72,9 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "1.0.2",
+    version = "1.0.12",
     deps = [
         "//third_party/rust_crates/vendor/predicates-core-1.0.9:predicates_core",
-        "//third_party/rust_crates/vendor/treeline-0.1.0:treeline",
+        "//third_party/rust_crates/vendor/termtree-0.5.1:termtree",
     ],
 )
