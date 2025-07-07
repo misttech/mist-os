@@ -39,7 +39,6 @@ use async_trait::async_trait;
 use async_utils::async_once::Once;
 use clonable_error::ClonableError;
 use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
-use cm_logger::scoped::ScopedLogger;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
     FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
@@ -300,7 +299,7 @@ pub struct ResolvedInstanceState {
     weak_component: WeakComponentInstance,
 
     /// The component's execution scope, shared with [ComponentInstance::execution_scope].
-    execution_scope: ExecutionScope,
+    pub execution_scope: ExecutionScope,
 
     /// Caches an instance token.
     instance_token_state: InstanceTokenState,
@@ -1248,11 +1247,6 @@ pub struct StartedInstanceState {
     /// This stores the hook for notifying an ExecutionController about stop events for this
     /// component.
     execution_controller_task: Option<controller::ExecutionControllerTask>,
-
-    /// Logger attributed to this component.
-    ///
-    /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
-    pub logger: Option<Arc<ScopedLogger>>,
 }
 
 impl StartedInstanceState {
@@ -1265,7 +1259,6 @@ impl StartedInstanceState {
         component: WeakComponentInstance,
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
-        logger: Option<ScopedLogger>,
     ) -> Self {
         let timestamp = zx::BootInstant::get();
         let timestamp_monotonic = zx::MonotonicInstant::get();
@@ -1276,7 +1269,6 @@ impl StartedInstanceState {
             binder_server_ends: vec![],
             start_reason,
             execution_controller_task,
-            logger: logger.map(Arc::new),
         }
     }
 

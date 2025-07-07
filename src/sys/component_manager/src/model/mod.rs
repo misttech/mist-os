@@ -6,6 +6,7 @@ pub mod actions;
 pub mod component;
 pub mod escrow;
 pub mod event_logger;
+mod logger;
 pub mod model;
 pub mod start;
 

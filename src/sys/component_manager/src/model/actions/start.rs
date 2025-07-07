@@ -12,34 +12,26 @@ use crate::runner::RemoteRunner;
 use ::namespace::Entry as NamespaceEntry;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::RoutingError;
-use ::routing::DictExt;
-use anyhow::Context;
 use async_trait::async_trait;
-use cm_logger::scoped::ScopedLogger;
 use cm_rust::ComponentDecl;
 use cm_types::Name;
 use cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope};
 use config_encoder::ConfigFields;
 use errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError};
-use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
-use fidl::{endpoints, Vmo};
+use fidl::endpoints::create_proxy;
+use fidl::Vmo;
 use futures::channel::oneshot;
 use hooks::{EventPayload, RuntimeInfo};
 use log::warn;
 use moniker::Moniker;
 use router_error::RouterError;
 use routing::bedrock::request_metadata::runner_metadata;
-use sandbox::{
-    Capability, Connector, Dict, Message, RemotableCapability, Request, Router, RouterResponse,
-};
+use sandbox::{Capability, Connector, Dict, Message, Request, Router, RouterResponse};
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
-use vfs::directory::entry::OpenRequest;
-use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
 };
 
 /// Starts a component instance.
@@ -93,7 +85,6 @@ struct StartContext {
     encoded_config: Option<fmem::Data>,
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
-    logger: Option<ScopedLogger>,
 }
 
 async fn do_start(
@@ -192,19 +183,7 @@ async fn do_start(
         fdecl::OnTerminate::None => {}
     }
 
-    // Create a component-scoped logger if the component uses LogSink.
     let decl = &resolved_component.decl;
-    let logger = if let Some(logsink_decl) = get_logsink_decl(&decl) {
-        match create_scoped_logger(logsink_decl.clone(), component, &program_input_dict).await {
-            Ok(logger) => Some(logger),
-            Err(err) => {
-                warn!(moniker:% = component.moniker, err:%; "Could not create logger for component. Logs will be attributed to component_manager");
-                None
-            }
-        }
-    } else {
-        None
-    };
 
     let encoded_config = match decl.config {
         None => None,
@@ -246,7 +225,6 @@ async fn do_start(
         encoded_config,
         start_reason: start_reason.clone(),
         execution_controller_task,
-        logger,
     };
 
     start_component(&component, resolved_component.decl, start_context).await
@@ -320,7 +298,6 @@ async fn start_component(
             encoded_config,
             start_reason,
             execution_controller_task,
-            logger,
         } = start_context;
 
         let program = if let Some(runner) = runner {
@@ -359,7 +336,6 @@ async fn start_component(
             component.as_weak(),
             start_reason,
             execution_controller_task,
-            logger,
         );
         timestamp = started.timestamp;
         let timestamp_monotonic = started.timestamp_monotonic;
@@ -604,45 +580,6 @@ async fn encode_config(
         moniker: moniker.clone(),
     })?;
     Ok(fmem::Data::Buffer(fmem::Buffer { vmo, size }))
-}
-
-/// Returns the UseProtocolDecl for the LogSink protocol, if any.
-fn get_logsink_decl<'a>(decl: &'a cm_rust::ComponentDecl) -> Option<&'a cm_rust::UseProtocolDecl> {
-    decl.uses.iter().find_map(|use_| match use_ {
-        cm_rust::UseDecl::Protocol(decl) => {
-            (decl.source_name == flogger::LogSinkMarker::PROTOCOL_NAME).then_some(decl)
-        }
-        _ => None,
-    })
-}
-
-/// Returns a ScopedLogger attributed to the component, given its use declaration for the
-/// `fuchsia.logger.LogSink` protocol.
-async fn create_scoped_logger(
-    logsink_decl: cm_rust::UseProtocolDecl,
-    component: &Arc<ComponentInstance>,
-    program_input_dict: &Dict,
-) -> Result<ScopedLogger, anyhow::Error> {
-    let Capability::ConnectorRouter(router) = program_input_dict
-        .get_capability(&logsink_decl.target_path)
-        .context("no logger in namespace")?
-    else {
-        anyhow::bail!("LogSink has wrong type in namespace?");
-    };
-    let dir_entry = router
-        .try_into_directory_entry(component.execution_scope.clone())
-        .context("LogSink could not convert to DirEntry?")?;
-    let (logsink, server) = endpoints::create_endpoints::<flogger::LogSinkMarker>();
-    const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
-    FLAGS.to_object_request(server.into_channel()).handle(|object_request| {
-        dir_entry.clone().open_entry(OpenRequest::new(
-            component.execution_scope.clone(),
-            FLAGS,
-            vfs::path::Path::dot(),
-            object_request,
-        ))
-    });
-    Ok(ScopedLogger::create(logsink)?)
 }
 
 #[cfg(all(test, not(feature = "src_model_tests")))]
@@ -1100,7 +1037,6 @@ mod tests {
                 None,
                 WeakComponentInstance::invalid(),
                 StartReason::Debug,
-                None,
                 None,
             );
             assert_matches!(

@@ -197,10 +197,7 @@ impl Puppet {
         let start_time = zx::BootInstant::get();
         let proxy: LogSinkPuppetProxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
-        info!("Waiting for first LogSink connection (from Component Manager) (to be ignored).");
-        let _ = incoming_log_sink_requests.next().await.unwrap();
-
-        info!("Waiting for second LogSink connection.");
+        info!("Waiting for LogSink connection.");
         let mut stream = incoming_log_sink_requests.next().await.unwrap();
 
         info!("Waiting for LogSink.ConnectStructured call.");
