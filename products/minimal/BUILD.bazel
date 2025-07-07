@@ -32,7 +32,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.x64",
-    product = ":product_bundle.x64",
+    product = ":image.x64",
 )
 
 fuchsia_product_bundle(
@@ -60,7 +60,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.arm64",
-    product = ":product_bundle.arm64",
+    product = ":image.arm64",
 )
 
 fuchsia_product_bundle(
@@ -88,7 +88,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.vim3",
-    product = ":product_bundle.vim3",
+    product = ":image.vim3",
 )
 
 fuchsia_product_bundle(
@@ -110,7 +110,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.emac",
-    product = ":product_bundle.emac",
+    product = ":image.emac",
 )
 
 fuchsia_product_bundle(
@@ -131,7 +131,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.riscv64",
-    product = ":product_bundle.riscv64",
+    product = ":image.riscv64",
 )
 
 fuchsia_product_bundle(
