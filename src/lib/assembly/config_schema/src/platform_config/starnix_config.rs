@@ -50,9 +50,9 @@ pub enum SocketMarkTreatment {
 pub enum RtnetlinkTreatmentOfIfb0Interface {
     /// Provide a fake implementation of that interface such that common netlink commands work
     /// against it (e.g. installing and listing addresses).
-    #[derivative(Default)]
     ProvideFake,
     /// Do not provide any fake interface implementation.
+    #[derivative(Default)]
     NoProvideFake,
 }
 
