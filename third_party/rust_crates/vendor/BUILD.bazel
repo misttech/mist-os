@@ -2959,14 +2959,14 @@ alias(
 )
 
 alias(
-    name = "tracing-mutex-0.3.0",
-    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.0:tracing_mutex",
+    name = "tracing-mutex-0.3.1",
+    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.1:tracing_mutex",
     tags = ["manual"],
 )
 
 alias(
     name = "tracing-mutex",
-    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.0:tracing_mutex",
+    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.1:tracing_mutex",
     tags = ["manual"],
 )
 

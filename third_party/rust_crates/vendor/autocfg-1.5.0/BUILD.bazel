@@ -6,7 +6,6 @@
 #     fx update-rustc-third-party
 ###############################################################################
 
-load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
@@ -21,9 +20,9 @@ package(
 
 package_info(
     name = "package_info",
-    package_name = "lock_api",
-    package_url = "https://github.com/Amanieu/parking_lot",
-    package_version = "0.4.11",
+    package_name = "autocfg",
+    package_url = "https://github.com/cuviper/autocfg",
+    package_version = "1.5.0",
 )
 
 license(
@@ -36,7 +35,7 @@ license(
 )
 
 rust_library(
-    name = "lock_api",
+    name = "autocfg",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -53,18 +52,14 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
-    crate_features = [
-        "atomic_usize",
-        "default",
-    ],
     crate_root = "src/lib.rs",
-    edition = "2018",
+    edition = "2015",
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=lock_api",
+        "crate-name=autocfg",
         "manual",
         "noclippy",
         "norustfmt",
@@ -77,71 +72,5 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.4.11",
-    deps = [
-        "//third_party/rust_crates/vendor/lock_api-0.4.11:build_script_build",
-        "//third_party/rust_crates/vendor/scopeguard-1.2.0:scopeguard",
-    ],
-)
-
-cargo_build_script(
-    name = "_bs",
-    srcs = glob(
-        include = ["**/*.rs"],
-        allow_empty = False,
-    ),
-    compile_data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            "**/*.rs",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    crate_features = [
-        "atomic_usize",
-        "default",
-    ],
-    crate_name = "build_script_build",
-    crate_root = "build.rs",
-    data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    edition = "2018",
-    pkg_name = "lock_api",
-    rustc_flags = [
-        "--cap-lints=allow",
-    ],
-    tags = [
-        "cargo-bazel",
-        "crate-name=lock_api",
-        "manual",
-        "noclippy",
-        "norustfmt",
-    ],
-    version = "0.4.11",
-    visibility = ["//visibility:private"],
-    deps = [
-        "//third_party/rust_crates/vendor/autocfg-1.5.0:autocfg",
-    ],
-)
-
-alias(
-    name = "build_script_build",
-    actual = ":_bs",
-    tags = ["manual"],
+    version = "1.5.0",
 )

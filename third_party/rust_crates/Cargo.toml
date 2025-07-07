@@ -239,7 +239,7 @@ toml_edit = "0.2.1"
 tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes", "log"] }
 tracing-core = "0.1.32"
 tracing-log = "0.2.0"
-tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
+tracing-mutex = { version = "0.3.1", features = ["experimental", "lockapi", "parkinglot"] }
 tuf = { version = "=0.3.0-beta13", default-features = false, features = ["hyper"] }
 typed-builder = "0.10.0"
 unic-char-range = "0.9"
@@ -1120,6 +1120,9 @@ rustflags = [
 
 [gn.package.tracing."0.1.40"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_visibility" }
+
+[gn.package.tracing-mutex."0.3.1"]
+# Has build script but no config needed.
 
 [gn.package.tracing-subscriber."0.3.18"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_subscriber_visibility" }

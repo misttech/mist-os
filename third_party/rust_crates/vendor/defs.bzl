@@ -474,7 +474,7 @@ _NORMAL_DEPENDENCIES = {
             "tracing": Label("//third_party/rust_crates/vendor/tracing-0.1.40:tracing"),
             "tracing-core": Label("//third_party/rust_crates/vendor/tracing-core-0.1.32:tracing_core"),
             "tracing-log": Label("//third_party/rust_crates/vendor/tracing-log-0.2.0:tracing_log"),
-            "tracing-mutex": Label("//third_party/rust_crates/vendor/tracing-mutex-0.3.0:tracing_mutex"),
+            "tracing-mutex": Label("//third_party/rust_crates/vendor/tracing-mutex-0.3.1:tracing_mutex"),
             "tracing-subscriber": Label("//third_party/rust_crates/vendor/tracing-subscriber-0.3.18:tracing_subscriber"),
             "tuf": Label("//third_party/rust_crates/vendor/tuf-0.3.0-beta13:tuf"),
             "unic-char-range": Label("//third_party/rust_crates/vendor/unic-char-range-0.9.0:unic_char_range"),
