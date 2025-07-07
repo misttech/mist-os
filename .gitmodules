@@ -750,6 +750,6 @@
 	ignore = all
 [submodule "third_party/perfetto"]
 	path = third_party/perfetto
-	url = https://github.com/google/perfetto
+	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto/
 	name = third_party/perfetto
 	ignore = all
