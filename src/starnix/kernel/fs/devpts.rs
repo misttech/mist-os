@@ -5,7 +5,6 @@
 use crate::device::kobject::DeviceMetadata;
 use crate::device::terminal::{Terminal, TtyState};
 use crate::device::{DeviceMode, DeviceOps};
-use crate::fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_node};
 use crate::fs::sysfs::build_device_directory;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
@@ -17,7 +16,7 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, FsString, SpecialNode,
 };
-use starnix_logging::{log_error, track_stub};
+use starnix_logging::track_stub;
 use starnix_sync::{
     DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, ProcessGroupState, Unlocked,
 };
@@ -171,14 +170,6 @@ where
         tty_class,
         build_device_directory,
     );
-
-    devtmpfs_mkdir(locked, current_task, "pts".into()).unwrap();
-
-    // Create a symlink from /dev/ptmx to /dev/pts/ptmx for pseudo-tty subsystem.
-    if let Err(err) = devtmpfs_remove_node(locked, current_task, "ptmx".into()) {
-        log_error!("Cannot remove device: ptmx ({:?})", err);
-    }
-    devtmpfs_create_symlink(locked, current_task, "ptmx".into(), "pts/ptmx".into()).unwrap();
 }
 
 struct DevPtsFs {

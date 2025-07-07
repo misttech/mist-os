@@ -209,6 +209,18 @@ impl DirEntry {
         )
     }
 
+    /// Set the children of this DirEntry to the given `children`. This should only ever be called
+    /// when children is empty.
+    pub fn set_children(self: &DirEntryHandle, children: BTreeMap<FsString, DirEntryHandle>) {
+        let mut dir_entry_children = self.lock_children();
+        assert!(dir_entry_children.children.is_empty());
+        for (name, child) in children.into_iter() {
+            let mut state = child.state.write();
+            state.parent = Some(self.clone());
+            dir_entry_children.children.insert(name, Arc::downgrade(&child));
+        }
+    }
+
     fn lock_children<'a>(self: &'a DirEntryHandle) -> DirEntryLockedChildren<'a> {
         DirEntryLockedChildren { entry: self, children: self.children.write() }
     }

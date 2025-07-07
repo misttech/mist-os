@@ -6,7 +6,7 @@
 
 use once_cell::sync::OnceCell;
 use rand::Rng;
-use starnix_core::fs::tmpfs::{TmpFs, TmpfsDirectory};
+use starnix_core::fs::tmpfs::{TmpFs, TmpFsDirectory};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::security;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -1200,7 +1200,7 @@ impl OverlayStack {
         fn create_directory(fs: &FileSystemHandle) -> DirEntryHandle {
             let ino = fs.allocate_ino();
             let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
-            let node = fs.create_detached_node(ino, TmpfsDirectory::new(), info);
+            let node = fs.create_detached_node(ino, TmpFsDirectory::new(), info);
             DirEntry::new(node, None, FsString::default())
         }
 
