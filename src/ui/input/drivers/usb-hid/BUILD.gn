@@ -33,13 +33,15 @@ driver_bind_rules("two_endpoint_hid_bind") {
 }
 
 fuchsia_cc_driver("usb-hid-driver") {
-  legacy = true
   output_name = "usb-hid"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "usb-hid.cc" ]
+  sources = [
+    "usb-hid.cc",
+    "usb-hid.h",
+  ]
   deps = [
     ":usb_hid_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
@@ -48,14 +50,11 @@ fuchsia_cc_driver("usb-hid-driver") {
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/fidl/fuchsia.hardware.usb:fuchsia.hardware.usb_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//src/devices/lib/driver",
+    "//sdk/lib/driver/compat/cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:hid",
-    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-client",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
+    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-client-dfv2-compat-logging",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/sync",
@@ -166,12 +165,13 @@ test("usb-hid-test") {
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/testing/usb-virtual-bus-launcher",
-    "//src/lib/ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//src/ui/input/lib/hid",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
