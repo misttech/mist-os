@@ -650,7 +650,7 @@ impl Kernel {
     ///
     /// This function follows the lazy initialization pattern, where the first
     /// call will instantiate the Generic Netlink server in a separate kthread.
-    pub(crate) fn generic_netlink(&self) -> &GenericNetlink<NetlinkToClientSender<GenericMessage>> {
+    pub fn generic_netlink(&self) -> &GenericNetlink<NetlinkToClientSender<GenericMessage>> {
         self.generic_netlink.get_or_init(|| {
             let (generic_netlink, generic_netlink_fut) = GenericNetlink::new();
             self.kthreads.spawn_future(async move {

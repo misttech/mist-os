@@ -39,7 +39,7 @@ const MIN_FAMILY_ID: u16 = GENL_ID_CTRL + 1;
 const NLCTRL_FAMILY: &str = "nlctrl";
 
 #[async_trait]
-trait GenericNetlinkFamily<S>: Send + Sync {
+pub trait GenericNetlinkFamily<S>: Send + Sync {
     /// Return the unique name for this generic netlink protocol.
     ///
     /// This name is used by the ctrl server to identify this server for clients.
@@ -434,7 +434,7 @@ pub(crate) struct GenericNetlinkClient<S> {
     receiver: mpsc::UnboundedReceiver<NetlinkMessage<GenericMessage>>,
 }
 
-pub(crate) struct GenericNetlink<S> {
+pub struct GenericNetlink<S> {
     server: GenericNetlinkServer<S>,
     new_client_sender: mpsc::UnboundedSender<GenericNetlinkClient<S>>,
 }
@@ -510,7 +510,13 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
     }
 }
 
-pub(crate) struct GenericNetlinkClientHandle<S> {
+impl<S: Sender<GenericMessage>> GenericNetlink<S> {
+    pub fn add_family(&self, family: Arc<dyn GenericNetlinkFamily<S>>) {
+        self.server.state.lock().add_family(family)
+    }
+}
+
+pub struct GenericNetlinkClientHandle<S> {
     client_id: ClientId,
     server: GenericNetlinkServer<S>,
 }
@@ -660,6 +666,61 @@ mod tests {
         let (netlink, _test_family, fut) = netlink_with_test_family();
         pin_mut!(fut);
         let (messages_to_client, sender, _client_handle) = new_client(&netlink);
+
+        sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+
+        // Verify that we got all expected information in the response.
+        assert!(messages_to_client.lock().len() == 1);
+        let (_netlink_header, payload) = messages_to_client.lock().pop().unwrap().into_parts();
+        let (_genl_header, ctrl_payload) = assert_matches!(
+            payload,
+            NetlinkPayload::InnerMessage(GenericMessage::Ctrl(m)) => m.into_parts());
+        assert_eq!(ctrl_payload.cmd, GenlCtrlCmd::NewFamily);
+        assert!(ctrl_payload
+            .nlas
+            .iter()
+            .any(|nla| *nla == GenlCtrlAttrs::FamilyName(TEST_FAMILY.into())));
+        assert!(ctrl_payload.nlas.iter().any(|nla| matches!(nla, GenlCtrlAttrs::FamilyId(_))));
+        let multicast_groups = ctrl_payload
+            .nlas
+            .iter()
+            .filter_map(
+                |nla| if let GenlCtrlAttrs::McastGroups(vec) = nla { Some(vec) } else { None },
+            )
+            .next()
+            .expect("No multicast groups");
+        assert_eq!(multicast_groups.len(), 2);
+        assert!(multicast_groups.iter().any(|group| {
+            group.iter().any(|attr| matches!(attr, McastGrpAttrs::Id(_)));
+            group.iter().any(|attr| *attr == McastGrpAttrs::Name(MCAST_GROUP_1.into()))
+        }));
+        assert!(multicast_groups.iter().any(|group| {
+            group.iter().any(|attr| matches!(attr, McastGrpAttrs::Id(_)));
+            group.iter().any(|attr| *attr == McastGrpAttrs::Name(MCAST_GROUP_2.into()))
+        }));
+    }
+
+    #[test]
+    fn test_ctrl_getfamily_before_and_after_add_family() {
+        let mut exec = TestExecutor::new();
+        let (netlink, fut) = GenericNetlink::new_internal();
+        pin_mut!(fut);
+        let (messages_to_client, sender, _client_handle) = new_client(&netlink);
+
+        sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+
+        // The family doesn't exist, so an error should be returned.
+        assert!(messages_to_client.lock().len() == 1);
+
+        let (_netlink_header, payload) = messages_to_client.lock().pop().unwrap().into_parts();
+        let err_msg = assert_matches!(payload, NetlinkPayload::Error(m) => m);
+        assert_eq!(err_msg.code, NonZero::new(-2));
+
+        // Add the test family and try again.
+        let test_family = Arc::new(TestFamily::default());
+        netlink.add_family(test_family);
 
         sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
         assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
