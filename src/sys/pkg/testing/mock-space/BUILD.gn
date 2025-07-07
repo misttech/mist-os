@@ -26,7 +26,7 @@ fuchsia_unittest_package("mock-space-tests") {
   deps = [ ":mock-space_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":mock-space-tests" ]
 }
