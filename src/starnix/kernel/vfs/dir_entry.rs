@@ -171,6 +171,7 @@ impl DirEntry {
             let _l1 = result.children.read();
             let _l2 = result.state.read();
         }
+        result.node.fs().did_create_dir_entry(&result);
         result
     }
 
@@ -1105,7 +1106,6 @@ impl<'a> DirEntryLockedChildren<'a> {
 
         security::fs_node_init_with_dentry(locked, current_task, &child)?;
 
-        child.node.fs().did_create_dir_entry(&child);
         Ok((child, create_result))
     }
 }
