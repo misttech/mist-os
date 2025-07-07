@@ -119,7 +119,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read GN targets to preserve: %v", err)
 	}
-	finalContent, err := gnFormated(
+	finalContent, err := gnFormatted(
 		context.Background(),
 		*gnBin,
 		toPreserve+"\n"+sentinelComment+"\n"+bazel2gnComment+"\n"+strings.Join(finalLines, "\n"),
@@ -200,7 +200,7 @@ func gnTargetsToPreserve(r io.Reader) (string, error) {
 	return ret.String(), nil
 }
 
-func gnFormated(ctx context.Context, gnBin string, original string) (string, error) {
+func gnFormatted(ctx context.Context, gnBin string, original string) (string, error) {
 	cmd := exec.CommandContext(ctx, gnBin, "format", "--stdin")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

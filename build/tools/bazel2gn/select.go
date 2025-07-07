@@ -6,6 +6,7 @@ package bazel2gn
 
 import (
 	"fmt"
+
 	"go.starlark.net/syntax"
 )
 
@@ -125,7 +126,10 @@ func selectToGN(attrName string, op string, expr *syntax.CallExpr, transformers 
 		if err != nil {
 			return nil, fmt.Errorf("converting dictionary value in select to GN: %v", err)
 		}
-		ret = append(ret, fmt.Sprintf("  %s %s %s", attrName, op, valueInGN[0]))
+		ret = append(ret, indent(
+			[]string{fmt.Sprintf("%s %s %s", attrName, op, valueInGN[0])},
+			1,
+		)...)
 		ret = append(ret, indent(valueInGN[1:], 1)...)
 		ret = append(ret, "}")
 	}
@@ -142,11 +146,13 @@ func selectToGN(attrName string, op string, expr *syntax.CallExpr, transformers 
 		}
 
 		ret[len(ret)-1] += " else {"
-		ret = append(ret, []string{
-			// NOTE: raw is quoted so we don't need to quote again.
-			fmt.Sprintf("  assert(false, %s)", errStr.Raw),
-			"}",
-		}...)
+		ret = append(ret, indent(
+			[]string{
+				// NOTE: raw is quoted so we don't need to quote again.
+				fmt.Sprintf("assert(false, %s)", errStr.Raw),
+			}, 1)...,
+		)
+		ret = append(ret, "}")
 	}
 	return ret, nil
 }

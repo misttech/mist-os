@@ -5,8 +5,9 @@
 package bazel2gn_test
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestSelectConversion(t *testing.T) {
@@ -20,27 +21,27 @@ func TestSelectConversion(t *testing.T) {
 			bazel: `load("@rules_rust//rust:defs.bzl", "rust_library")
 
 rust_library(
-  name = "simple_select",
-  srcs = select({
-    "@platforms//os:fuchsia": [ "fuchsia.rs" ],
-    "@platforms//os:linux": [ "linux.rs" ],
-    "//conditions:default": [ "default.rs" ],
-  }),
+	name = "simple_select",
+	srcs = select({
+		"@platforms//os:fuchsia": [ "fuchsia.rs" ],
+		"@platforms//os:linux": [ "linux.rs" ],
+		"//conditions:default": [ "default.rs" ],
+	}),
 )`,
 			wantGN: `rustc_library("simple_select") {
-  if (is_fuchsia) {
-    sources = [
-      "fuchsia.rs",
-    ]
-  } else if (is_linux) {
-    sources = [
-      "linux.rs",
-    ]
-  } else {
-    sources = [
-      "default.rs",
-    ]
-  }
+	if (is_fuchsia) {
+		sources = [
+			"fuchsia.rs",
+		]
+	} else if (is_linux) {
+		sources = [
+			"linux.rs",
+		]
+	} else {
+		sources = [
+			"default.rs",
+		]
+	}
 }`,
 		},
 		{
@@ -48,28 +49,28 @@ rust_library(
 			bazel: `load("@rules_rust//rust:defs.bzl", "rust_library")
 
 rust_library(
-  name = "list_concatenation",
-  srcs = [
-    "foo.rs",
-  ] + select({
-    "@platforms//os:fuchsia": [ "fuchsia.rs" ],
-    "@platforms//os:linux": [ "linux.rs" ],
-  }),
+	name = "list_concatenation",
+	srcs = [
+		"foo.rs",
+	] + select({
+		"@platforms//os:fuchsia": [ "fuchsia.rs" ],
+		"@platforms//os:linux": [ "linux.rs" ],
+	}),
 )`,
 			wantGN: `rustc_library("list_concatenation") {
-  sources = []
-  sources += [
-    "foo.rs",
-  ]
-  if (is_fuchsia) {
-    sources += [
-      "fuchsia.rs",
-    ]
-  } else if (is_linux) {
-    sources += [
-      "linux.rs",
-    ]
-  }
+	sources = []
+	sources += [
+		"foo.rs",
+	]
+	if (is_fuchsia) {
+		sources += [
+			"fuchsia.rs",
+		]
+	} else if (is_linux) {
+		sources += [
+			"linux.rs",
+		]
+	}
 }`,
 		},
 		{
@@ -77,7 +78,7 @@ rust_library(
 			bazel: `load("@rules_rust//rust:defs.bzl", "rust_library")
 
 rust_library(
-  name = "no_match_error",
+	name = "no_match_error",
 	srcs = [
 		"foo.rs",
 	] + select(
@@ -89,21 +90,21 @@ rust_library(
 	),
 )`,
 			wantGN: `rustc_library("no_match_error") {
-  sources = []
-  sources += [
-    "foo.rs",
-  ]
-  if (is_fuchsia) {
-    sources += [
-      "bar.rs",
-    ]
-  } else if (is_linux) {
-    sources += [
-      "baz.rs",
-    ]
-  } else {
-    assert(false, "unknown platform!")
-  }
+	sources = []
+	sources += [
+		"foo.rs",
+	]
+	if (is_fuchsia) {
+		sources += [
+			"bar.rs",
+		]
+	} else if (is_linux) {
+		sources += [
+			"baz.rs",
+		]
+	} else {
+		assert(false, "unknown platform!")
+	}
 }`,
 		},
 		{
@@ -129,29 +130,29 @@ rust_library(
 	),
 )`,
 			wantGN: `rustc_library("multiple_selects") {
-  sources = []
-  sources += [
-    "foo.rs",
-  ]
-  if (is_fuchsia) {
-    sources += [
-      "bar.rs",
-    ]
-  } else if (is_linux) {
-    sources += [
-      "baz.rs",
-    ]
-  } else {
-    assert(false, "unknown platform!")
-  }
-  sources += [
-    "yet_another_foo.rs",
-  ]
-  if (is_fuchsia) {
-    sources += [
-      "yet_another_bar.rs",
-    ]
-  }
+	sources = []
+	sources += [
+		"foo.rs",
+	]
+	if (is_fuchsia) {
+		sources += [
+			"bar.rs",
+		]
+	} else if (is_linux) {
+		sources += [
+			"baz.rs",
+		]
+	} else {
+		assert(false, "unknown platform!")
+	}
+	sources += [
+		"yet_another_foo.rs",
+	]
+	if (is_fuchsia) {
+		sources += [
+			"yet_another_bar.rs",
+		]
+	}
 }`,
 		},
 		{
@@ -169,32 +170,32 @@ rust_library(
 	) + select(
 		{
 			"@platforms//os:linux": [ "baz.rs" ],
-      "//conditions:default": [ "qux.rs" ],
+			"//conditions:default": [ "qux.rs" ],
 		},
 	),
 )`,
 			wantGN: `rustc_library("consecutive_selects") {
-  sources = []
-  if (is_fuchsia) {
-    sources += [
-      "foo.rs",
-    ]
-  } else if (is_linux) {
-    sources += [
-      "bar.rs",
-    ]
-  } else {
-    assert(false, "unknown platform!")
-  }
-  if (is_linux) {
-    sources += [
-      "baz.rs",
-    ]
-  } else {
-    sources += [
-      "qux.rs",
-    ]
-  }
+	sources = []
+	if (is_fuchsia) {
+		sources += [
+			"foo.rs",
+		]
+	} else if (is_linux) {
+		sources += [
+			"bar.rs",
+		]
+	} else {
+		assert(false, "unknown platform!")
+	}
+	if (is_linux) {
+		sources += [
+			"baz.rs",
+		]
+	} else {
+		sources += [
+			"qux.rs",
+		]
+	}
 }`,
 		},
 	} {
@@ -221,12 +222,12 @@ func TestSelectConversionErrors(t *testing.T) {
 			bazel: `load("@rules_rust//rust:defs.bzl", "rust_library")
 
 rust_library(
-  name = "unsupported_operator",
+	name = "unsupported_operator",
   srcs = select({
-    "@platforms//os:fuchsia": [ "fuchsia.rs" ],
-    "@platforms//os:linux": [ "linux.rs" ],
+		"@platforms//os:fuchsia": [ "fuchsia.rs" ],
+		"@platforms//os:linux": [ "linux.rs" ],
 		"//conditions:default": [ "default.rs" ],
-  }) - [ "minux.rs" ],
+	}) - [ "minux.rs" ],
 )`,
 		},
 		{
@@ -234,11 +235,11 @@ rust_library(
 			bazel: `load("@rules_rust//rust:defs.bzl", "rust_library")
 
 rust_library(
-  name = "unsupported_condition",
-  srcs = select({
+	name = "unsupported_condition",
+	srcs = select({
 		"unknown_condition": [],
 		"//conditions:default": [ "default.rs" ],
-  }),
+	}),
 )`,
 		},
 	} {

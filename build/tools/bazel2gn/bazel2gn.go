@@ -14,7 +14,10 @@ import (
 )
 
 // indentPrefix is the string value used to indent a line by one level.
-const indentPrefix = "  "
+//
+// NOTE: This prefix is only used by the internal representation of this package.
+// The final output is formatted by `gn format`.
+const indentPrefix = "\t"
 
 // bazelRuleToGNTemplate maps from Bazel rule names to GN template names. They can
 // be the same if Bazel and GN shared the same template name.
