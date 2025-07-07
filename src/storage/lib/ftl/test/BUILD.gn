@@ -51,12 +51,14 @@ source_set("ftl-workload-fuzzer") {
 test("ftl-wear-simulator-test") {
   sources = [ "wear_simulator.cc" ]
   deps = [
+    "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/blobfs/test:test_utils",
     "//src/storage/fs_test",
     "//src/storage/fvm:fvm-component",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp",
+    "//src/storage/lib/ftl/test/testdata:minimal_image",
     "//src/storage/minfs/bin:minfs-test-component",
     "//third_party/zstd",
     "//zircon/system/ulib/fbl",

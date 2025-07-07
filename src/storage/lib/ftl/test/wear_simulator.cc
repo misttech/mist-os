@@ -25,6 +25,7 @@
 #include <gtest/gtest.h>
 #include <zstd/zstd.h>
 
+#include "src/lib/files/file.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/fs_test/fs_test.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
@@ -91,6 +92,9 @@ class WearSimulator {
 
   // Mounts the partitions and sets everything up. Must be called exactly once before anything else.
   void Init();
+
+  // Bring up the system by reading the image and wear_info into their vmos, and then rebooting.
+  void InitFromImage(std::string image_path, std::string wear_info_path);
 
   // Simulates a number of operations or "cycles" in minfs.
   void SimulateMinfs(int cycles);
@@ -267,6 +271,30 @@ void WearSimulator::Init() {
   });
 }
 
+void WearSimulator::InitFromImage(std::string image_path, std::string wear_info_path) {
+  {
+    std::vector<uint8_t> compressed;
+    ASSERT_TRUE(files::ReadFileToVector(image_path, &compressed));
+    ASSERT_EQ(zx::vmo::create(NandSize(config_.block_count), 0, &vmo_), ZX_OK);
+    fzl::VmoMapper image_mapper;
+    ASSERT_EQ(image_mapper.Map(vmo_, 0, NandSize(config_.block_count)), ZX_OK);
+
+    size_t decompressed = ZSTD_decompress(image_mapper.start(), NandSize(config_.block_count),
+                                          compressed.data(), compressed.size());
+    ASSERT_FALSE(ZSTD_isError(decompressed));
+    ASSERT_EQ(decompressed, NandSize(config_.block_count)) << "Image ws not expected size";
+  }
+
+  {
+    std::vector<uint8_t> wear_data;
+    ASSERT_TRUE(files::ReadFileToVector(wear_info_path, &wear_data));
+    ASSERT_EQ(wear_data.size(), WearSize(config_.block_count));
+    ASSERT_EQ(zx::vmo::create(WearSize(config_.block_count), 0, &wear_vmo_), ZX_OK);
+    ASSERT_EQ(wear_vmo_.write(wear_data.data(), 0, wear_data.size()), ZX_OK);
+  }
+  Reboot();
+}
+
 void WearSimulator::SimulateMinfs(int cycles) {
   constexpr size_t kMaxWritePages = 64ul;
   constexpr size_t kMaxWriteSize = kMaxWritePages * kPageSize;
@@ -370,9 +398,6 @@ void WearSimulator::ReduceBlobfsBy(size_t* space) {
 }
 
 zx::result<RamDevice> WearSimulator::RemountFtl() {
-  if (!mount_) {
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
   mount_.reset();
 
   auto snapshot = Snapshot();
@@ -412,6 +437,8 @@ zx::result<RamDevice> WearSimulator::RemountFtl() {
 }
 
 void WearSimulator::Reboot() {
+  ASSERT_TRUE(vmo_.is_valid()) << "No image vmo to snapshot";
+  ASSERT_TRUE(wear_vmo_.is_valid()) << "No wear info to snapshot";
   RamDevice ramnand = RemountFtl().value();
 
   fidl::Arena arena;
@@ -596,6 +623,17 @@ TEST(Wear, MinimalSimulator) {
   // The image compresses to ~40K in the test. So leave it in.
   sim.ExportImage();
   ASSERT_TRUE(sim.RemountFtl().is_ok());
+}
+
+TEST(Wear, ImageImport) {
+  // Must match the size settings from MinimalSimulator which generated this image.
+  WearSimulator sim = WearSimulator({
+      .fvm_slice_size = 32ul * 1024,
+      .block_count = 100,
+      .blobfs_partition_size = 10ul * 1024 * 1024,
+      .minfs_partition_size = 10ul * 1024 * 1024,
+  });
+  sim.InitFromImage("pkg/testdata/nand.zstd", "pkg/testdata/wear_info.bin");
 }
 
 }  // namespace
