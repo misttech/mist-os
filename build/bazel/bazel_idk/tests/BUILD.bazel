@@ -17,6 +17,10 @@ idk_atom(
     type = "data",
 )
 
+# The headers used by some_library.cc are made available as follows:
+# * dependency.h: via `hdrs` in the deps ":test_source_set_dependency"
+#   * another_header.h: via `hdrs_for_internal_use` in the deps ":test_source_set_dependency"
+# * test_header.h: via `hdrs`
 idk_cc_source_library(
     name = "test-source-set",
     testonly = True,
@@ -34,8 +38,9 @@ idk_cc_source_library(
 idk_cc_source_library(
     name = "test_source_set_dependency",
     testonly = True,
-    hdrs = ["test_header.h"],
+    hdrs = ["dependency.h"],
     category = "partner",
+    hdrs_for_internal_use = ["another_header.h"],
     idk_name = "source_set_dependency",
     include_base = ".",
     stable = True,
@@ -65,5 +70,12 @@ filegroup(
     testonly = True,
     srcs = [
         ":test_molecule",
+
+        # Depend directly on the underlying source libraries since they are not
+        # dependencies of the atoms.
+        ":test-source-set",
+        ":test_source_set_dependency",
+        "//sdk/lib/magma_common",
+        "//sdk/lib/memory_barriers",
     ],
 )

@@ -380,12 +380,10 @@ idk_molecule = rule(
 # (https://bazel.build/reference/be/c-cpp#cc_library) or the results of
 # `fx format-code`, which reorders most non-common arguments alphabetically at
 # call sites.
-# TODO(https://fxbug.dev/417305295): Add the following argument supported by
-# the GN `sdk_source_set()` template if necessary. Note that
-# `sdk_static_library()` and `sdk_shared_library()` do not support it.
-# When adding support, assert that it is only used for
-# "//sdk/fidl/zbi:zbi.c.checked-in"
-# * `non_idk_implementation_deps` (GN equivalent: `non_sdk_deps`)
+# TODO(https://fxbug.dev/428229472): When migrating "zbi-format":
+# * add `non_idk_implementation_deps` (GN equivalent: `non_sdk_deps`) argument.
+# * assert that it is only used for "//sdk/fidl/zbi:zbi.c.checked-in".
+# * Add TODO for https://fxbug.dev/42062786 to remove the argument when fixing the bug.
 def idk_cc_source_library(
         name,
         idk_name,
@@ -399,10 +397,9 @@ def idk_cc_source_library(
         # `runtime_deps`.
         srcs = [],
         hdrs = [],
+        hdrs_for_internal_use = [],
         implementation_deps = [],
         include_base = "include",
-        # TODO(https://fxbug.dev/417306131): Implement PlaSA support.
-        # idk_headers_for_internal_use = [],
         testonly = False,
         visibility = ["//visibility:private"],
         # TODO(https://fxbug.dev/417305295): Add this argument if there is a way
@@ -434,20 +431,33 @@ def idk_cc_source_library(
         deps: List of labels for other IDK elements this element publicly depends on at build time.
             These labels must point to targets with corresponding `_create_idk_atom` targets.
             GN equivalent: `public_deps`
-        srcs: The list of C and C++ source and header files that are processed to create the library target.
+        srcs: The list of C and C++ source and header files that are processed to create the
+            library target, excluding those in `hdrs` and hdrs_for_internal_use.
+            Header files in this list can only be included by this library.
             GN equivalent: `sources`
-            Unlike the GN template, public headers must actually be in `hdrs`.
-        hdrs: The list of C and C++ header files published by this library to be directly included by sources in dependent rules.
+            GN note: Unlike the GN template, public headers must actually be in `hdrs`.
+        hdrs: The list of C and C++ header files published by this library to be directly included
+            by sources in dependent rules. Does not include internal headers that are included from
+            public headers but not meant to be included by dependents - see `hdrs_for_internal_use`.
+            Atoms providing headers used by these headers must be included in the (public) `deps`.
             GN equivalent: `public`
+            GN note: Unlike the GN template, this list does not include `hdrs_for_internal_use`.
+        hdrs_for_internal_use: List of C and C++ headers included by headers in `hdrs` that are not
+            meant to be included by a client of this library. They usually contain implementation
+            details. Their contents are not included in documentation but they are included in the
+            `headers` metadata for the IDK library. They may be excluded from some but not all API
+            compatibility checks.
+            Like `hdrs`, the atoms providing headers used by these headers must be included in the
+            (public) `deps`.
+            GN equivalent: `sdk_headers_for_internal_use`
+            GN note: Unlike the GN template where this argument specifices headers already included
+            elsewhere, such headers are only listed here.
         implementation_deps: List of labels for other IDK elements this element depends on at build time.
             These labels must point to targets with corresponding `_create_idk_atom` targets.
             GN equivalent: `deps`.
         include_base: Path to the root directory for includes.
-            This path will be added to the underlying libraries `includes`.
+            This path will be added to the underlying library's `includes`.
             GN note: This is a change in behavior from the GN template.
-        # TODO(https://fxbug.dev/417306131): Implement PlaSA support.
-        # idk_headers_for_internal_use:
-            GN equivalent: `sdk_headers_for_internal_use`
         testonly: Standard definition.
         visibility: Standard definition.
         public_configs: Unused in Bazel, for GN conversion only.
@@ -468,18 +478,32 @@ def idk_cc_source_library(
     else:
         allowlist_deps = ["//build/bazel/bazel_idk:partner_idk_unstable_source_sets_allowlist"]
 
+    # Group the source files for various uses.
+    # Per https://bazel.build/versions/6.2.0/reference/be/c-cpp#cc_library.hdrs,
+    # "Headers not meant to be included by a client of this library should be
+    # listed in the srcs attribute instead, even if they are included by a
+    # published header." Thus, `hdrs_for_internal_use` is added to `srcs` in the
+    # underlying library, not `hdrs`. However, other build systems that use the
+    # IDK may not  work this way, so include `hdrs_for_internal_use` as headers
+    # in the IDK. This is also consistent with prebuilt libraries where the IDK
+    # only includes headers.
+    all_source_files = hdrs + hdrs_for_internal_use + srcs
+    hdrs_for_idk = hdrs + hdrs_for_internal_use
+    hdrs_for_bazel_library = hdrs
+    srcs_for_bazel_library = srcs + hdrs_for_internal_use
+
     # TODO(https://fxbug.dev/421888626): Apply the equivalent of GN's
     # `default_common_binary_configs` using the `copts` argument.
     # TODO(https://fxbug.dev/421888626): Add "//build/config:sdk_extra_warnings"
     # using the `copts` argument.
     cc_library(
         name = name,
-        srcs = srcs,
+        srcs = srcs_for_bazel_library,
         data = allowlist_deps,
-        hdrs = hdrs,
+        hdrs = hdrs_for_bazel_library,
         deps = deps,
-        # TODO(https://fxbug.dev/417305295): If we must support
-        # `non_idk_implementation_deps`, add it below.
+        # TODO(https://fxbug.dev/428229472): If we must support
+        # `non_idk_implementation_deps`, include it below.
         implementation_deps = implementation_deps,
         includes = [include_base],
         linkstatic = True,
@@ -496,7 +520,7 @@ def idk_cc_source_library(
     idk_metadata_sources = []
     idk_header_files_map = {}
 
-    for header in hdrs:
+    for header in hdrs_for_idk:
         relative_destination = paths.relativize(header, include_base)
         destination = include_dest + "/" + relative_destination
         idk_metadata_headers.append(destination)
@@ -509,13 +533,10 @@ def idk_cc_source_library(
         idk_metadata_sources.append(source_dest_path)
         idk_files_map |= {source_dest_path: source}
 
-    # TODO(https://fxbug.dev/417306131): Implement PlaSA support. Add to
-    # `atom_build_deps`.
-
     idk_deps = _get_idk_deps(deps) + _get_idk_deps(implementation_deps)
 
     # Dependencies for generating the actual IDK atom (not the underlying library).
-    # TODO(https://fxbug.dev/417305295): If we must support
+    # TODO(https://fxbug.dev/428229472): If we must support
     # `non_idk_implementation_deps`, add it here.
     # TODO(https://fxbug.dev/417307356): When implementing prebuilt
     # libraries, add `[":%s" % name]`. It may also be necessary to return
@@ -530,7 +551,7 @@ def idk_cc_source_library(
     verify_no_duplicate_files_target_name = "%s_verify_no_duplicate_files_in_hdrs_and_srcs" % name
     native.filegroup(
         name = verify_no_duplicate_files_target_name,
-        data = hdrs + srcs,
+        data = all_source_files,
         testonly = testonly,
         visibility = ["//visibility:private"],
     )
@@ -540,7 +561,7 @@ def idk_cc_source_library(
     verify_pragma_once_target_name = "%s_verify_pragma_once" % name
     verify_no_pragma_once(
         name = verify_pragma_once_target_name,
-        files = hdrs + srcs,
+        files = all_source_files,
         testonly = testonly,
         visibility = ["//visibility:private"],
     )
@@ -607,4 +628,4 @@ def idk_cc_source_library(
 
     # TODO(https://fxbug.dev/417305295):Implement the //sdk:sdk_source_set_list
     # build API module and merge with the GN data.
-    # sdk_source_set_sources = srcs + hdrs
+    # sdk_source_set_sources = all_source_files
