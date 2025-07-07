@@ -118,7 +118,7 @@ impl RingBuffer {
             this.clone(),
             Reader {
                 ring_buffer: this,
-                registration: fasync::EHandle::local().register_receiver(Arc::default()),
+                registration: fasync::EHandle::local().register_receiver(Receiver::default()),
             },
         )
     }

@@ -248,9 +248,9 @@ impl Pager {
         initial_size: u64,
         vmo_options: zx::VmoOptions,
     ) -> Result<(zx::Vmo, PagerPacketReceiverRegistration<T>), Error> {
-        let registration = self.executor.register_receiver(Arc::new(PagerPacketReceiver {
-            file: Mutex::new(FileHolder::Weak(file)),
-        }));
+        let registration = self
+            .executor
+            .register_receiver(PagerPacketReceiver { file: Mutex::new(FileHolder::Weak(file)) });
         Ok((
             self.pager.create_vmo(
                 vmo_options,

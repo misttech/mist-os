@@ -7,8 +7,9 @@
 //! This module contains the `Timer` type which is a future that will resolve
 //! at a particular point in the future.
 
+use super::executor::Executor;
 use crate::runtime::{BootInstant, EHandle, MonotonicInstant, WakeupTime};
-use crate::PacketReceiver;
+use crate::{PacketReceiver, ReceiverRegistration};
 use fuchsia_sync::Mutex;
 
 use futures::future::FusedFuture;
@@ -331,15 +332,12 @@ impl Stream for Interval {
 pub(crate) struct Timers<T: TimeInterface> {
     inner: Mutex<Inner>,
 
-    // We can't easily use ReceiverRegistration because there would be a circular dependency we'd
-    // have to break: Executor -> Timers -> ReceiverRegistration -> EHandle -> ScopeRef ->
-    // Executor, so instead we just store the port key and then change the executor to drop the
-    // registration at the appropriate place.
-    port_key: u64,
-
     fake: bool,
 
     timer: zx::Timer<T::Timeline>,
+
+    // This will form a reference cycle which the caller *must* break by calling `deregister`.
+    receiver_registration: Mutex<Option<ReceiverRegistration<Arc<Self>>>>,
 }
 
 struct Inner {
@@ -352,19 +350,23 @@ struct Inner {
 
     // True if there's a pending async_wait.
     async_wait: bool,
+
+    // The port key.
+    port_key: u64,
 }
 
 impl<T: TimeInterface> Timers<T> {
-    pub fn new(port_key: u64, fake: bool) -> Self {
+    pub fn new(fake: bool) -> Self {
         Self {
             inner: Mutex::new(Inner {
                 timers: Heap::default(),
                 last_deadline: None,
                 async_wait: false,
+                port_key: 0,
             }),
-            port_key,
             fake,
             timer: T::create_timer(),
+            receiver_registration: Mutex::default(),
         }
     }
 
@@ -378,6 +380,22 @@ impl<T: TimeInterface> Timers<T> {
             index: UnsafeCell::new(HeapIndex::NULL),
             _pinned: PhantomPinned,
         })
+    }
+
+    /// Registers the timers to receive packets.  This will establish a reference cycle that
+    /// the caller must break by calling `deregister`.
+    pub fn register(self: &Arc<Self>, executor: &Arc<Executor>) {
+        let key = self
+            .receiver_registration
+            .lock()
+            .get_or_insert_with(|| executor.receivers.register(executor.clone(), self.clone()))
+            .key();
+        self.inner.lock().port_key = key;
+    }
+
+    /// Deregisters the timers and breaks the reference cycle.
+    pub fn deregister(&self) {
+        *self.receiver_registration.lock() = None;
     }
 
     /// Ensures the underlying Zircon timer has been correctly set or canceled after
@@ -422,7 +440,7 @@ impl<T: TimeInterface> Timers<T> {
             self.timer
                 .wait_async_handle(
                     EHandle::local().port(),
-                    self.port_key,
+                    inner.port_key,
                     if self.fake { zx::Signals::USER_0 } else { zx::Signals::TIMER_SIGNALED },
                     zx::WaitAsyncOpts::empty(),
                 )
@@ -430,10 +448,6 @@ impl<T: TimeInterface> Timers<T> {
 
             inner.async_wait = true;
         }
-    }
-
-    pub fn port_key(&self) -> u64 {
-        self.port_key
     }
 
     /// Wakes timers that should be firing now.  Returns true if any timers were woken.
@@ -937,7 +951,8 @@ mod test {
     #[test]
     fn timer_heap() {
         let _exec = TestExecutor::new_with_fake_time();
-        let timers = Arc::new(Timers::<MonotonicInstant>::new(0, true));
+        let timers = Arc::new(Timers::<MonotonicInstant>::new(true));
+        timers.register(EHandle::local().inner());
 
         let mut timer_futures = Vec::new();
         let mut nanos: Vec<_> = (0..1000).collect();
@@ -984,12 +999,15 @@ mod test {
         for i in 1000..2000 {
             assert_eq!(timers.wake_next_timer(), Some(MonotonicInstant::from_nanos(i)));
         }
+
+        timers.deregister();
     }
 
     #[test]
     fn timer_heap_with_same_time() {
         let _exec = TestExecutor::new_with_fake_time();
-        let timers = Arc::new(Timers::<MonotonicInstant>::new(0, true));
+        let timers = Arc::new(Timers::<MonotonicInstant>::new(true));
+        timers.register(EHandle::local().inner());
 
         let mut timer_futures = Vec::new();
         let mut nanos: Vec<_> = (1..100).collect();
@@ -1009,6 +1027,8 @@ mod test {
         for n in nanos {
             assert_eq!(timers.wake_next_timer(), Some(MonotonicInstant::from_nanos(n)));
         }
+
+        timers.deregister();
     }
 
     #[test]

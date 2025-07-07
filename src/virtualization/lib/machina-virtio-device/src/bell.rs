@@ -88,8 +88,8 @@ impl GuestBellTrap {
     /// range, even after dropping the first one, will fail.
     pub fn new(guest: &zx::Guest, base: zx::GPAddr, len: usize) -> Result<Self, zx::Status> {
         let (tx, rx) = mpsc::unbounded();
-        let registration = fasync::EHandle::local()
-            .register_receiver(std::sync::Arc::new(PortForwarder { channel: tx }));
+        let registration =
+            fasync::EHandle::local().register_receiver(PortForwarder { channel: tx });
         guest.set_trap_bell(base, len, registration.port(), registration.key())?;
         Self::with_registration(base, len, rx, registration)
     }
