@@ -69,7 +69,7 @@ struct MountedSystem {
 
   fidl::ClientEnd<fuchsia_io::Directory> blobfs_export_root;
   fs_management::NamespaceBinding blobfs_binding;
-  fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> blob_creator;
+  blobfs::BlobCreatorWrapper blob_creator;
 
   fidl::ClientEnd<fuchsia_io::Directory> minfs_export_root;
   fs_management::NamespaceBinding minfs_binding;
@@ -265,7 +265,7 @@ void WearSimulator::Init() {
       .ramnand = std::move(ramnand),
       .blobfs_export_root = blobfs->Release(),
       .blobfs_binding = std::move(blobfs_bind),
-      .blob_creator = std::move(blob_creator),
+      .blob_creator = blobfs::BlobCreatorWrapper(std::move(blob_creator)),
       .minfs_export_root = minfs->Release(),
       .minfs_binding = std::move(minfs_bind),
   });
@@ -373,8 +373,9 @@ void WearSimulator::FillBlobfs(size_t space) {
 
     // Don't compress the delivery blob, this way the blob will fill asmich space as needed for the
     // test, but can be well compressed for image import/export.
-    ASSERT_NO_FATAL_FAILURE(blobfs::CreateUncompressedBlob(
-        std::span<uint8_t>(blob.begin(), blob.end()), mount_->blob_creator));
+    auto delivery_blob =
+        blobfs::TestDeliveryBlob::CreateUncompressed(std::span<uint8_t>(blob.begin(), blob.end()));
+    ASSERT_TRUE(mount_->blob_creator.CreateAndWriteBlob(delivery_blob).is_ok());
     space -= size;
   }
 }
@@ -482,7 +483,7 @@ void WearSimulator::Reboot() {
       .ramnand = std::move(ramnand),
       .blobfs_export_root = blobfs->Release(),
       .blobfs_binding = std::move(blobfs_bind),
-      .blob_creator = std::move(blob_creator),
+      .blob_creator = blobfs::BlobCreatorWrapper(std::move(blob_creator)),
       .minfs_export_root = minfs->Release(),
       .minfs_binding = std::move(minfs_bind),
   });

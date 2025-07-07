@@ -6,19 +6,22 @@
 #define SRC_STORAGE_BLOBFS_TEST_BLOB_UTILS_H_
 
 #include <fidl/fuchsia.fxfs/cpp/markers.h>
-#include <lib/fdio/io.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/object_traits.h>
+#include <lib/zx/result.h>
 
+#include <cstdint>
 #include <cstring>
 #include <functional>
 #include <memory>
 #include <span>
 #include <string>
 
+#include <fbl/array.h>
 #include <fbl/unique_fd.h>
 
-#include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/blob_layout.h"
+#include "src/storage/blobfs/format.h"
 
 namespace blobfs {
 
@@ -84,10 +87,6 @@ void VerifyContents(int fd, const uint8_t* data, size_t data_size);
 // TODO(jfsulliv): Return a status, or change the name to indicate that this will assert on failure.
 void MakeBlob(const BlobInfo& info, fbl::unique_fd* fd);
 
-// Uses the provided BlobCreator client to write the blob as is without compression.
-void CreateUncompressedBlob(std::span<uint8_t> data,
-                            fidl::WireSyncClient<fuchsia_fxfs::BlobCreator>& creator);
-
 // Returns the name of |format| for use in parameterized tests.
 std::string GetBlobLayoutFormatNameForTests(BlobLayoutFormat format);
 
@@ -101,6 +100,61 @@ struct MerkleTreeInfo {
 // Constructs a Merkle tree for |data|.
 std::unique_ptr<MerkleTreeInfo> CreateMerkleTree(const uint8_t* data, uint64_t data_size,
                                                  bool use_compact_format);
+
+constexpr uint64_t kRingBufferSize = 256ul * 1024;
+
+struct TestDeliveryBlob {
+  static TestDeliveryBlob CreateCompressed(uint64_t size);
+
+  static TestDeliveryBlob CreateCompressed(std::span<uint8_t> blob_data);
+
+  static TestDeliveryBlob CreateUncompressed(uint64_t size);
+
+  static TestDeliveryBlob CreateUncompressed(std::span<uint8_t> blob_data);
+
+  const Digest digest;
+  const fbl::Array<uint8_t> delivery_blob;
+};
+
+class BlobReaderWrapper {
+ public:
+  explicit BlobReaderWrapper(fidl::WireSyncClient<fuchsia_fxfs::BlobReader> reader);
+
+  zx::result<zx::vmo> GetVmo(const Digest& digest) const;
+
+ private:
+  fidl::WireSyncClient<fuchsia_fxfs::BlobReader> reader_;
+};
+
+class BlobWriterWrapper {
+ public:
+  explicit BlobWriterWrapper(fidl::WireSyncClient<fuchsia_fxfs::BlobWriter> writer);
+
+  zx::result<> BytesReady(uint64_t bytes_written);
+
+  zx::result<zx::vmo> GetVmo(uint64_t size);
+
+  zx::result<> WriteBlob(const TestDeliveryBlob& blob);
+
+ private:
+  fidl::WireSyncClient<fuchsia_fxfs::BlobWriter> writer_;
+};
+
+class BlobCreatorWrapper {
+ public:
+  explicit BlobCreatorWrapper(fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> creator);
+
+  zx::result<BlobWriterWrapper> Create(const Digest& digest) const;
+
+  zx::result<BlobWriterWrapper> CreateExisting(const Digest& digest) const;
+
+  zx::result<> CreateAndWriteBlob(const TestDeliveryBlob& blob) const;
+
+ private:
+  zx::result<BlobWriterWrapper> Create(const Digest& digest, bool allow_existing) const;
+
+  fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> creator_;
+};
 
 }  // namespace blobfs
 
