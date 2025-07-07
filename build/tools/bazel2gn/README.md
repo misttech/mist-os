@@ -4,6 +4,28 @@ bazel2gn is a tool for syncing build targets between BUILD.bazel and BUILD.gn
 files in fuchsia.git. It works by converting build targets from BUILD.bazel
 files and replacing the corresponding targets in BUILD.gn.
 
+# GN to Bazel migration instructions
+
+## To migrate new targets from foo/bar/BUILD.gn to Bazel
+
+NOTE: Don't forget step 5 in the process, to make sure your targets are
+continuously validated in CQ.
+
+1. Create foo/bar/BUILD.bazel if it doesn't exist already.
+2. Implement the target you want to migrate in foo/bar/BUILD.bazel.
+3. Run `fx bazel2gn -d foo/bar` to sync the targets defined in
+   foo/bar/BUILD.bazel to foo/bar/BUILD.gn.
+4. Remove old GN targets you've migrated from foo/bar/BUILD.gn.
+5. Add `//foo/bar:verify_bazel2gn` to the `deps` of
+   `//build:bazel2gn_verifications` in `//build/BUILD.gn`.
+
+## To re-sync targets managed by bazel2gn
+
+* Run `fx bazel2gn`, which will sync your target if it's a dep in
+  `//build:bazel2gn_verifications`, plus all other deps of that group.
+* Or, run `fx bazel2gn -d path/to/dir`, if you only want to sync targets in a
+  specific directory.
+
 # Motivation
 
 This tool is created to facilitate the GN to Bazel migration in fuchsia.git.
@@ -16,8 +38,8 @@ sync those targets to GN.
 
 There are two main sources of differences between BUILD.gn and BUILD.bazel:
 
-*   Differences between GN templates and Bazel rules for the same target;
-*   Differences between Starlark and GN languages.
+* Differences between GN templates and Bazel rules for the same target;
+* Differences between Starlark and GN languages.
 
 Examples of these differences and ideas for tackling them during conversion are
 discussed in the sections below. For implementation details, please refer to the
@@ -35,8 +57,8 @@ mixes embed sources with other sources in `sources`. To bridge this gap, it is
 preferred to modify template implementation in GN while maintaining backward
 compatibility, because:
 
-*   The build team owns most of the GN templates, making them easier to change;
-*   We'll eventually remove the GN targets, so it's better to keep Bazel targets
+* The build team owns most of the GN templates, making them easier to change;
+* We'll eventually remove the GN targets, so it's better to keep Bazel targets
     as idiomatic as possible.
 
 ## Starlark vs GN
