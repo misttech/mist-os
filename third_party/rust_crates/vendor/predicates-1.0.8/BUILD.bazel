@@ -84,7 +84,7 @@ rust_library(
         "//third_party/rust_crates/vendor/difference-2.0.0:difference",
         "//third_party/rust_crates/vendor/float-cmp-0.8.0:float_cmp",
         "//third_party/rust_crates/vendor/normalize-line-endings-0.3.0:normalize_line_endings",
-        "//third_party/rust_crates/vendor/predicates-core-1.0.2:predicates_core",
+        "//third_party/rust_crates/vendor/predicates-core-1.0.9:predicates_core",
         "//third_party/rust_crates/vendor/regex-1.7.3:regex",
     ],
 )

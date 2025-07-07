@@ -12592,7 +12592,7 @@ rustc_library("predicates-v1_0_8") {
   deps += [ ":difference-v2_0_0" ]
   deps += [ ":float-cmp-v0_8_0" ]
   deps += [ ":normalize-line-endings-v0_3_0" ]
-  deps += [ ":predicates-core-v1_0_2" ]
+  deps += [ ":predicates-core-v1_0_9" ]
   deps += [ ":regex-v1_7_3" ]
 
   rustenv = []
@@ -12613,20 +12613,20 @@ rustc_library("predicates-v1_0_8") {
   applicable_licenses = [ ":predicates-v1_0_8.license" ]
 }
 
-license("predicates-core-v1_0_2.license") {
+license("predicates-core-v1_0_9.license") {
   public_package_name = "predicates_core"
   license_files = [
-    "//third_party/rust_crates/vendor/predicates-core-1.0.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/predicates-core-1.0.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/predicates-core-1.0.9/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/predicates-core-1.0.9/LICENSE-MIT",
   ]
 }
 
-rustc_library("predicates-core-v1_0_2") {
+rustc_library("predicates-core-v1_0_9") {
   crate_name = "predicates_core"
   source_root =
-      "//third_party/rust_crates/vendor/predicates-core-1.0.2/src/lib.rs"
-  output_name = "predicates_core-9278ecd8b23c9da2"
-  edition = "2018"
+      "//third_party/rust_crates/vendor/predicates-core-1.0.9/src/lib.rs"
+  output_name = "predicates_core-eec89fe69e30e302"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -12637,13 +12637,13 @@ rustc_library("predicates-core-v1_0_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=9278ecd8b23c9da2",
-    "-Cextra-filename=-9278ecd8b23c9da2",
+    "-Cmetadata=eec89fe69e30e302",
+    "-Cextra-filename=-eec89fe69e30e302",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":predicates-core-v1_0_2.license" ]
+  applicable_licenses = [ ":predicates-core-v1_0_9.license" ]
 }
 
 license("predicates-tree-v1_0_2.license") {
@@ -12665,7 +12665,7 @@ rustc_library("predicates-tree-v1_0_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":predicates-core-v1_0_2" ]
+  deps += [ ":predicates-core-v1_0_9" ]
   deps += [ ":treeline-v0_1_0" ]
 
   rustenv = []
