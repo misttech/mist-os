@@ -247,26 +247,23 @@ impl EpollFileObject {
         let mut state = self.state.lock();
         let key = file.id.as_epoll_key();
         state.rearm_list.retain(|x| x.key != key.into());
-        match state.wait_objects.entry(key.into()) {
-            Entry::Occupied(mut entry) => {
-                let wait_object = entry.get_mut();
-                if let Some(wait_canceler) = wait_object.wait_canceler.take() {
-                    wait_canceler.cancel();
-                }
-                wait_object.events = epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR;
-                wait_object.data = epoll_event.data();
-                // If the new epoll event doesn't include EPOLLWAKEUP, we need to take down the
-                // wake lease. This ensures that the system doesn't stay awake unnecessarily when
-                // the event no longer requires it to be awake.
-                if wait_object.events.contains(FdEvents::EPOLLWAKEUP)
-                    && !epoll_event.events().contains(FdEvents::EPOLLWAKEUP)
-                {
-                    current_task.kernel().suspend_resume_manager.remove_epoll(key);
-                }
-                self.wait_on_file(locked, current_task, key.into(), wait_object)
-            }
-            Entry::Vacant(_) => error!(ENOENT),
+        let Some(wait_object) = state.wait_objects.get_mut(&key.into()) else {
+            return error!(ENOENT);
+        };
+        if let Some(wait_canceler) = wait_object.wait_canceler.take() {
+            wait_canceler.cancel();
         }
+        wait_object.events = epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR;
+        wait_object.data = epoll_event.data();
+        // If the new epoll event doesn't include EPOLLWAKEUP, we need to take down the
+        // wake lease. This ensures that the system doesn't stay awake unnecessarily when
+        // the event no longer requires it to be awake.
+        if wait_object.events.contains(FdEvents::EPOLLWAKEUP)
+            && !epoll_event.events().contains(FdEvents::EPOLLWAKEUP)
+        {
+            current_task.kernel().suspend_resume_manager.remove_epoll(key);
+        }
+        self.wait_on_file(locked, current_task, key.into(), wait_object)
     }
 
     /// Cancel an asynchronous wait on an object. Events triggered before

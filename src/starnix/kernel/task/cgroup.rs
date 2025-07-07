@@ -233,18 +233,15 @@ impl CgroupOps for CgroupRoot {
         thread_group: &ThreadGroup,
     ) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
-        match pid_table.entry(thread_group.into()) {
-            hash_map::Entry::Occupied(entry) => {
-                // If pid is in a child cgroup, remove it.
-                if let Some(cgroup) = entry.get().upgrade() {
-                    cgroup.state.lock().remove_process(locked, thread_group)?;
-                }
-                entry.remove();
+        if let Some(entry) = pid_table.remove(&thread_group.into()) {
+            // If pid is in a child cgroup, remove it.
+            if let Some(cgroup) = entry.upgrade() {
+                cgroup.state.lock().remove_process(locked, thread_group)?;
             }
-            // If pid is not in a child cgroup, then it must be in the root cgroup already.
-            // This does not throw an error on Linux, so just return success here.
-            hash_map::Entry::Vacant(_) => {}
         }
+        // Else if pid is not in a child cgroup, then it must be in the root cgroup already.
+        // This does not throw an error on Linux, so just return success here.
+
         Ok(())
     }
 

@@ -102,10 +102,7 @@ impl DeviceMapperRegistry {
             }
         }
         let dev_minor = ((io.dev >> 12 & 0xffffff00) | (io.dev & 0xff)) as u32;
-        match self.devices.lock().entry(dev_minor) {
-            Entry::Occupied(e) => Ok(e.get().clone()),
-            Entry::Vacant(_) => return error!(ENODEV),
-        }
+        self.devices.lock().get(&dev_minor).ok_or_else(|| errno!(ENODEV)).cloned()
     }
 
     fn get_by_name(
@@ -192,20 +189,15 @@ impl DeviceMapperRegistry {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        match devices.entry(minor) {
-            Entry::Vacant(_) => error!(ENODEV),
-            Entry::Occupied(e) => {
-                e.remove();
-                let kernel = current_task.kernel();
-                let registry = &kernel.device_registry;
-                if let Some(dev) = &k_device {
-                    registry.remove_device(locked, current_task, dev.clone());
-                } else {
-                    return error!(EINVAL);
-                }
-                Ok(())
-            }
+        devices.remove(&minor).ok_or_else(|| errno!(ENODEV))?;
+        let kernel = current_task.kernel();
+        let registry = &kernel.device_registry;
+        if let Some(dev) = &k_device {
+            registry.remove_device(locked, current_task, dev.clone());
+        } else {
+            return error!(EINVAL);
         }
+        Ok(())
     }
 }
 #[derive(Debug, Default)]

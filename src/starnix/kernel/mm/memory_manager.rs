@@ -22,6 +22,7 @@ use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use rand::{thread_rng, Rng};
 use range_map::RangeMap;
 use smallvec::SmallVec;
+use starnix_ext::map_ext::EntryExt;
 use starnix_logging::{
     impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
@@ -54,7 +55,6 @@ use starnix_uapi::{
     MADV_UNMERGEABLE, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED,
     MREMAP_MAYMOVE, PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -3553,12 +3553,10 @@ impl MemoryManager {
                         create_anonymous_mapping_memory(length as u64)?
                     } else {
                         let basic_info = backing.memory().basic_info();
-                        let memory = match clone_cache.entry(basic_info.koid) {
-                            Entry::Occupied(o) => o.into_mut(),
-                            Entry::Vacant(v) => {
-                                v.insert(clone_memory(backing.memory(), basic_info.rights)?)
-                            }
-                        };
+                        let memory =
+                            clone_cache.entry(basic_info.koid).or_insert_with_fallible(|| {
+                                clone_memory(backing.memory(), basic_info.rights)
+                            })?;
                         memory.clone()
                     };
 
