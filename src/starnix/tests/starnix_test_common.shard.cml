@@ -47,6 +47,10 @@
             name: "timekeeper",
             url: "wake-alarms#meta/default.cm",
         },
+        {
+            name: "profiler",
+            url: "profiler#meta/profiler.cm",
+        },
     ],
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
@@ -75,6 +79,19 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.RootJob",
+            ],
+            from: "parent",
+            to: [ "#profiler" ],
+        },
+        {
+            protocol: [ "fuchsia.cpu.profiler.Session" ],
+            from: "#profiler",
             to: [ "#kernel" ],
         },
         {
@@ -185,6 +202,11 @@
             service: "fuchsia.hardware.hrtimer.Service",
             from: "#fake-hrtimer",
             to: [ "#timekeeper" ],
+        },
+        {
+            event_stream: [ "debug_started" ],
+            from: "parent",
+            to: "#profiler",
         },
     ],
     environments: [

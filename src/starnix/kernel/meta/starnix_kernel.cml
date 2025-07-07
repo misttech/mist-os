@@ -43,8 +43,12 @@
     use: [
         { protocol: "fuchsia.kernel.VmexResource" },
         {
-            // Requires AIB starnix_runner_settable_utc_time.
-            protocol: "fuchsia.time.external.Adjust",
+            protocol: [
+                "fuchsia.cpu.profiler.Session",
+
+                // Requires AIB starnix_runner_settable_utc_time.
+                "fuchsia.time.external.Adjust",
+            ],
             availability: "optional",
         },
         {

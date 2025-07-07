@@ -301,6 +301,7 @@ rustc_library("starnix_core") {
     ":vdso_data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
+    "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.ebpf:fuchsia.ebpf_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",

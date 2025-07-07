@@ -8,6 +8,7 @@ starnix_test_subpackages = [
   "//src/connectivity/network/tun/network-tun",
   "//src/devices/haptics/testing/fake_haptics_service:package",
   "//src/media/audio/services/device_registry/testing:stub_adr_pkg",
+  "//src/performance/experimental/profiler:profiler",
   "//src/power/broker:package",
   "//src/power/system-activity-governor:config-no-suspender",
   "//src/power/system-activity-governor:config-use-suspender",

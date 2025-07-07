@@ -78,6 +78,7 @@
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
                     "/core/trace_manager/cpuperf_provider/cpu-trace",
+                    "/core/testing/starnix-tests:**",
                 ],
             },
             {
@@ -183,6 +184,7 @@
                     "/core/debugger/agents:**",
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
+                    "/core/testing/starnix-tests:**",
                 ],
             },
             {
