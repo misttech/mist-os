@@ -1166,6 +1166,10 @@ mod tests {
                                 }
                             }
                         }
+                        fta::WakeAlarmsRequest::Set { .. } => {
+                            // TODO(https://fxbug.dev/424009669): Finish implementation
+                            todo!("https://fxbug.dev/424009669");
+                        }
                         fta::WakeAlarmsRequest::Cancel { alarm_id, .. } => {
                             let r_count_before = responders.len();
                             responders.retain(|k, _| *k != alarm_id);
