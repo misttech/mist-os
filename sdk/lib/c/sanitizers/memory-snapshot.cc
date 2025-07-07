@@ -18,9 +18,9 @@
 #include <runtime/thread.h>
 
 #include "../dlfcn/dlfcn-abi.h"
+#include "../ld/writable-segments.h"
 #include "../threads/thread-list.h"
 #include "../weak.h"
-#include "dynlink.h"
 #include "threads_impl.h"
 
 namespace LIBC_NAMESPACE_DECL {
@@ -188,7 +188,7 @@ using SuspendedThreadVector = RelocatingPageAllocatedVector<SuspendedThread>;
 
 class __TA_SCOPED_CAPABILITY ThreadSuspender {
  public:
-  ThreadSuspender() __TA_ACQUIRE(gAllThreadsLock) = default;
+  ThreadSuspender() __TA_ACQUIRE(kDlfcnLock, kAllocationLock, gAllThreadsLock) = default;
   ~ThreadSuspender() __TA_RELEASE() = default;
 
   zx_status_t Collect(SuspendedThreadVector& threads) {
@@ -374,10 +374,17 @@ class MemorySnapshot {
 
   bool Ok() const { return status_ == ZX_OK; }
 
+  // Note that once SuspendThreads() returns, no locks are held!  But all other
+  // threads are suspended, and the locks were held while they were all being
+  // suspended--so it's as if all those locks are still held in the sense that
+  // not only is none of them held by any thread now but there is no other
+  // thread that could attempt to take them until the threads are resumed.
+  // That only happens at the destruction of the whole MemorySnapshot object
+  // when all the suspend-token handles are closed.
   void SuspendThreads() { status_ = ThreadSuspender().Collect(threads_); }
 
   void ReportGlobals(sanitizer_memory_snapshot_callback_t* callback) {
-    _dl_locked_report_globals(callback, callback_arg_);
+    WritableSegmentsMemorySnapshot(callback, callback_arg_);
   }
 
   void ReportThreads(sanitizer_memory_snapshot_callback_t* stacks,

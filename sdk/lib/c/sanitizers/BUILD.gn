@@ -57,6 +57,7 @@ libc_source_set("memory-snapshot") {
   deps = [
     "..:weak",
     "../dlfcn:dlfcn-abi",
+    "../ld:writable-segments",
     "../threads:thread-list",
     "//zircon/system/ulib/zx",
   ]
