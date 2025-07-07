@@ -68,6 +68,7 @@ TEST_F(StartupAnnotationsTest, Keys) {
                                        Key(kSystemBootIdPreviousKey),
                                        Key(kSystemLastRebootReasonKey),
                                        Key(kSystemLastRebootRuntimeKey),
+                                       Key(kSystemLastRebootTotalSuspendedTimeKey),
                                        Key(kSystemLastRebootUptimeKey),
                                    }));
 }
@@ -119,6 +120,8 @@ TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
           Pair(kSystemBootIdPreviousKey, ErrorOrString("previous-boot-id")),
           Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
           Pair(kSystemLastRebootRuntimeKey, LastRebootRuntimeAnnotation(reboot_log)),
+          Pair(kSystemLastRebootTotalSuspendedTimeKey,
+               LastRebootTotalSuspendedTimeAnnotation(reboot_log)),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
 }
 
@@ -146,6 +149,8 @@ TEST_F(StartupAnnotationsTest, Values_FilesMissing) {
           Pair(kSystemBootIdPreviousKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
           Pair(kSystemLastRebootRuntimeKey, LastRebootRuntimeAnnotation(reboot_log)),
+          Pair(kSystemLastRebootTotalSuspendedTimeKey,
+               LastRebootTotalSuspendedTimeAnnotation(reboot_log)),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
 }
 
@@ -199,7 +204,7 @@ TEST_F(StartupAnnotationsTest, BuildProductVersionPreviousBootFallback) {
           Pair(kBuildIsDebugKey, _), Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
           Pair(kSystemBootIdCurrentKey, _), Pair(kSystemBootIdPreviousKey, _),
           Pair(kSystemLastRebootReasonKey, _), Pair(kSystemLastRebootRuntimeKey, _),
-          Pair(kSystemLastRebootUptimeKey, _)));
+          Pair(kSystemLastRebootTotalSuspendedTimeKey, _), Pair(kSystemLastRebootUptimeKey, _)));
 }
 
 }  // namespace

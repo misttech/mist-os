@@ -114,6 +114,7 @@ Annotations GetStartupAnnotations(const RebootLog& reboot_log) {
       {kSystemBootIdPreviousKey, ReadAnnotation(kPreviousBootIdPath)},
       {kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))},
       {kSystemLastRebootRuntimeKey, LastRebootRuntimeAnnotation(reboot_log)},
+      {kSystemLastRebootTotalSuspendedTimeKey, LastRebootTotalSuspendedTimeAnnotation(reboot_log)},
       {kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log)},
   };
 }

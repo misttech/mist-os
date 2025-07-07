@@ -56,6 +56,8 @@ constexpr const char kSystemBootIdCurrentKey[] = "system.boot-id.current";
 constexpr const char kSystemBootIdPreviousKey[] = "system.boot-id.previous";
 constexpr const char kSystemLastRebootReasonKey[] = "system.last-reboot.reason";
 constexpr const char kSystemLastRebootRuntimeKey[] = "system.last-reboot.runtime";
+constexpr const char kSystemLastRebootTotalSuspendedTimeKey[] =
+    "system.last-reboot.total-suspended-time";
 constexpr const char kSystemLastRebootUptimeKey[] = "system.last-reboot.uptime";
 constexpr const char kSystemLocalePrimaryKey[] = "system.locale.primary";
 constexpr const char kSystemTimezonePrimaryKey[] = "system.timezone.primary";

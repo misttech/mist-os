@@ -91,4 +91,16 @@ ErrorOrString LastRebootRuntimeAnnotation(const RebootLog& reboot_log) {
   return ErrorOrString(Error::kMissingValue);
 }
 
+ErrorOrString LastRebootTotalSuspendedTimeAnnotation(const RebootLog& reboot_log) {
+  if (reboot_log.Uptime().has_value() && reboot_log.Runtime().has_value()) {
+    const std::optional<std::string> suspended_time =
+        FormatDuration(*reboot_log.Uptime() - *reboot_log.Runtime());
+    if (suspended_time.has_value()) {
+      return ErrorOrString(*suspended_time);
+    }
+  }
+
+  return ErrorOrString(Error::kMissingValue);
+}
+
 }  // namespace forensics::feedback
