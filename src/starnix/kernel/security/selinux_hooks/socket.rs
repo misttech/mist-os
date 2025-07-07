@@ -382,8 +382,7 @@ pub(in crate::security) fn check_socket_setsockopt_access(
         return Ok(());
     };
     let current_sid = task_effective_sid(current_task);
-    todo_has_socket_permission(
-        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_setsockopt checks."),
+    has_socket_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
