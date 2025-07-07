@@ -138,7 +138,7 @@ impl<U: UnsafeMmio> MmioRegion<U> {
     }
 
     /// Converts this region into one which can be split.
-    pub fn into_split(self) -> impl MmioSplit {
+    pub fn into_split(self) -> MmioRegion<U, Rc<U>> {
         let owner = Rc::new(self.owner);
         let bounds = self.bounds;
         // Safety:
@@ -151,7 +151,7 @@ impl<U: UnsafeMmio> MmioRegion<U> {
 
 impl<U: UnsafeMmio + Send + Sync> MmioRegion<U> {
     /// Converts this region into one which can be split and sent.
-    pub fn into_split_send(self) -> impl MmioSplit + Send {
+    pub fn into_split_send(self) -> MmioRegion<U, Arc<U>> {
         let owner = Arc::new(self.owner);
         let bounds = self.bounds;
         // Safety:
