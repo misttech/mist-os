@@ -6,7 +6,7 @@ use askama::Template;
 
 use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
-use crate::ir::Service;
+use crate::ir::{Service, TypeKind};
 use crate::templates::reserved::escape;
 
 #[derive(Template)]

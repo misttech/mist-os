@@ -23,11 +23,13 @@ pub trait {{ instance_trait_name }} {
     type Transport: ::fidl_next::Transport;
 
     {% for member in service.members %}
-        /// Attempts to connect the given server end to the `{{ member.name.non_canonical() }}` member.
-        fn connect_to_{{ member.name|snake }}(
-            &self,
-            server_end: ::fidl_next::ServerEnd<{{ self.natural_type(member.ty) }}, Self::Transport>,
-        ) -> Result<(), Self::Error>;
+        {% if let TypeKind::Endpoint with { nullable: _, role: _, protocol, protocol_transport: _ } = member.ty.kind %}
+            /// Attempts to connect the given server end to the `{{ member.name.non_canonical() }}` member.
+            fn connect_to_{{ member.name|snake }}(
+                &self,
+                server_end: ::fidl_next::ServerEnd<{{ self.natural_id(protocol) }}, Self::Transport>,
+            ) -> Result<(), Self::Error>;
+        {% endif %}
     {% endfor %}
 }
 
@@ -39,11 +41,13 @@ where
     type Transport = ___I::Transport;
 
     {% for member in service.members %}
-        fn connect_to_{{ member.name|snake }}(
-            &self,
-            server_end: ::fidl_next::ServerEnd<{{ self.natural_type(member.ty) }}, Self::Transport>,
-        ) -> Result<(), Self::Error> {
-            self.as_untyped().connect_to("{{ member.name.snake() }}", server_end.into_untyped())
-        }
+        {% if let TypeKind::Endpoint with { nullable: _, role: _, protocol, protocol_transport: _ } = member.ty.kind %}
+            fn connect_to_{{ member.name|snake }}(
+                &self,
+                server_end: ::fidl_next::ServerEnd<{{ self.natural_id(protocol) }}, Self::Transport>,
+            ) -> Result<(), Self::Error> {
+                self.as_untyped().connect_to("{{ member.name.snake() }}", server_end.into_untyped())
+            }
+        {% endif %}
     {% endfor %}
 }

@@ -22,10 +22,7 @@ pub trait DriverOnlyServiceInstance {
     /// Attempts to connect the given server end to the `member` member.
     fn connect_to_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::SomeDriverProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::SomeDriverProtocol, Self::Transport>,
     ) -> Result<(), Self::Error>;
 }
 
@@ -38,10 +35,7 @@ where
 
     fn connect_to_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::SomeDriverProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::SomeDriverProtocol, Self::Transport>,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("member", server_end.into_untyped())
     }
