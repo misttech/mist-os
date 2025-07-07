@@ -76,8 +76,9 @@ void _dl_log_write(const char* buffer, size_t len) ATTR_LIBC_VISIBILITY;
 void _dl_log_write_init(zx_handle_t handle, uint32_t info) ATTR_LIBC_VISIBILITY;
 void _dl_log_write_init_fallback(void) ATTR_LIBC_VISIBILITY;
 
-void _dl_rdlock(void) ATTR_LIBC_VISIBILITY;
-void _dl_unlock(void) ATTR_LIBC_VISIBILITY;
+// These are redundant with the decls in dlfcn/dlfcn-abi.h, which is C++-only.
+void _dlfcn_lock(void) ATTR_LIBC_VISIBILITY;
+void _dlfcn_unlock(void) ATTR_LIBC_VISIBILITY;
 
 void _dl_locked_report_globals(sanitizer_memory_snapshot_callback_t* callback,
                                void* callback_arg) ATTR_LIBC_VISIBILITY;

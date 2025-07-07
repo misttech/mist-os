@@ -17,6 +17,7 @@
 
 #include <runtime/thread.h>
 
+#include "../dlfcn/dlfcn-abi.h"
 #include "../threads/thread-list.h"
 #include "../weak.h"
 #include "dynlink.h"
@@ -63,7 +64,6 @@ class PrimeSyscallsBeforeTakingLocks {
   }
 };
 
-constexpr WeakLock<_dl_rdlock, _dl_unlock> kDlLock;
 constexpr WeakLock<__thread_allocation_inhibit, __thread_allocation_release> kAllocationLock;
 
 // This is a simple container similar to std::vector but using only whole-page
@@ -340,7 +340,7 @@ class __TA_SCOPED_CAPABILITY ThreadSuspender {
 
   // The dynamic linker data structures are used to find all the global
   // ranges, so they must be in a consistent state.
-  std::lock_guard<decltype(kDlLock)> lock_dl_{kDlLock};
+  std::lock_guard<decltype(kDlfcnLock)> lock_dl_{kDlfcnLock};
 
   // This approximately prevents thread creation.  It doesn't affirmatively
   // prevent thread creation per se.  Rather, it prevents thrd_create or
