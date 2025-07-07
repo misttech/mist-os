@@ -22,18 +22,28 @@ const indentPrefix = "  "
 // This map is also used to check known Bazel rules that can be converted to GN.
 // i.e. Bazel rules not found in this map is not supported by bazel2gn yet.
 var bazelRuleToGNTemplate = map[string]string{
-	"go_binary":             "go_binary",
-	"go_library":            "go_library",
-	"go_test":               "go_test",
+	// Go
+	"go_binary":  "go_binary",
+	"go_library": "go_library",
+	"go_test":    "go_test",
+
+	// Rust
+	"rust_binary":     "rustc_binary",
+	"rust_library":    "rustc_library",
+	"rustc_binary":    "rustc_binary",
+	"rustc_library":   "rustc_library",
+	"rust_proc_macro": "rustc_macro",
+
+	// C++
+	"cc_library": "source_set",
+
+	// IDK & SDK
 	"idk_cc_source_library": "sdk_source_set",
-	"install_host_tools":    "install_host_tools",
-	"package":               "package",
-	"rust_binary":           "rustc_binary",
-	"rust_library":          "rustc_library",
-	"rustc_binary":          "rustc_binary",
-	"rustc_library":         "rustc_library",
-	"rust_proc_macro":       "rustc_macro",
 	"sdk_host_tool":         "sdk_host_tool",
+
+	// Other
+	"install_host_tools": "install_host_tools",
+	"package":            "package",
 }
 
 // attrsToOmitByRules stores a mapping from known Bazel rules to attributes to
@@ -53,12 +63,22 @@ var commonAttrMap = map[string]string{
 	"hdrs": "public",
 }
 
-// Rust specific attributes that use different names in GN.
+// ccAttrMap maps from attribute names in Bazel CC rules to GN parameter names.
+// This map only includes attributes that have different names in Bazel and GN.
+var ccAttrMap = map[string]string{
+	"copts":               "configs",
+	"deps":                "public_deps",
+	"implementation_deps": "deps",
+}
+
+// rustAttrMap maps from attribute name in Bazel Rust rules to GN parameter names.
+// This map only includes attributes that have different names in Bazel and GN.
 var rustAttrMap = map[string]string{
 	"crate_features": "features",
 }
 
-// IDK specific attributes that use different names in GN.
+// idkAttrMap maps from attribute name in Bazel IDK rules to GN parameter names.
+// This map only includes attributes that have different names in Bazel and GN.
 var idkAttrMap = map[string]string{
 	"idk_name": "sdk_name",
 }
@@ -66,11 +86,17 @@ var idkAttrMap = map[string]string{
 // A mapping from Bazel rule names to attribute mappings.
 // Attribute mappings map from Bazel rule attributes that use different names in GN.
 var attrMapsByRules = map[string]map[string]string{
-	"rust_binary":           rustAttrMap,
-	"rust_library":          rustAttrMap,
-	"rust_proc_macro":       rustAttrMap,
-	"rustc_binary":          rustAttrMap,
-	"rustc_library":         rustAttrMap,
+	// C++
+	"cc_library": ccAttrMap,
+
+	// Rust
+	"rust_binary":     rustAttrMap,
+	"rust_library":    rustAttrMap,
+	"rust_proc_macro": rustAttrMap,
+	"rustc_binary":    rustAttrMap,
+	"rustc_library":   rustAttrMap,
+
+	// IDK
 	"idk_cc_source_library": idkAttrMap,
 }
 
@@ -93,6 +119,11 @@ var bazelConstraintsToGNConditions = map[string]string{
 }
 
 var thirdPartyRustCrateRE = regexp.MustCompile(`^"\/\/third_party\/rust_crates.+:`)
+
+// coptToConfig maps from Bazel copt values to configs to use in GN.
+var coptToConfig = map[string]string{
+	"-Wno-implicit-fallthrough": "//build/config:Wno-implicit-fallthrough",
+}
 
 // indent indents input lines by input levels.
 func indent(lines []string, level int) []string {
@@ -209,6 +240,21 @@ func bazelVisibilityToGN(expr syntax.Expr) (syntax.Expr, error) {
 		// This is a Bazel visibility on a package group, it should stay unchanged.
 		// In GN there should be a target matching the path of this package group.
 	}
+	return lit, nil
+}
+
+// bazelCOptToGNConfig converts Bazel copts values to GN configs.
+func bazelCOptToGNConfig(expr syntax.Expr) (syntax.Expr, error) {
+	lit, ok := expr.(*syntax.Literal)
+	if !ok {
+		return expr, nil
+	}
+	coptWithoutQuotes := lit.Raw[1 : len(lit.Raw)-1]
+	config, ok := coptToConfig[coptWithoutQuotes]
+	if !ok {
+		return nil, fmt.Errorf("unexpected copt %s", coptWithoutQuotes)
+	}
+	lit.Raw = fmt.Sprintf(`"%s"`, config)
 	return lit, nil
 }
 
@@ -347,8 +393,10 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 	switch attrName {
 	case "visibility":
 		transformers = append(transformers, bazelVisibilityToGN)
-	case "deps", "test_deps":
+	case "deps", "public_deps", "test_deps":
 		transformers = append(transformers, bazelDepToGN)
+	case "configs":
+		transformers = append(transformers, bazelCOptToGNConfig)
 	}
 
 	// This is a simple `attr = select(...)`, convert in-place.

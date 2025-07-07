@@ -390,3 +390,82 @@ idk_cc_source_library(
 		})
 	}
 }
+
+func TestCCConversion(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		bazel  string
+		wantGN string
+	}{
+		{
+			name: "Simple C++ targets",
+			bazel: `cc_library(
+    name = "foo",
+    srcs = [
+	  "path/to/bar.cc",
+	  "path/to/bar.h",
+	  "path/to/baz.cc",
+      "path/to/foo.cc",
+      "yet/another/path/to/foo.cc",
+    ],
+    hdrs = [
+	  "path/to/baz.h",
+      "path/to/foo.h",
+    ],
+    deps = [
+      "//path/to:foo",
+      "//yet/another/path/to:bar",
+    ],
+    implementation_deps = [
+      "//path/to:bar",
+    ],
+    copts = [
+      "-Wno-implicit-fallthrough",
+    ],
+    visibility = [
+      ":__pkg__",
+      "//path/to/dir:__subpackages__",
+    ],
+)
+`,
+			wantGN: `source_set("foo") {
+  sources = [
+    "path/to/bar.cc",
+    "path/to/bar.h",
+    "path/to/baz.cc",
+    "path/to/foo.cc",
+    "yet/another/path/to/foo.cc",
+  ]
+  public = [
+    "path/to/baz.h",
+    "path/to/foo.h",
+  ]
+  public_deps = [
+    "//path/to:foo",
+    "//yet/another/path/to:bar",
+  ]
+  deps = [
+    "//path/to:bar",
+  ]
+  configs = [
+    "//build/config:Wno-implicit-fallthrough",
+  ]
+  visibility = [
+    ":*",
+    "//path/to/dir/*",
+  ]
+}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := toSyntaxFile(t, tc.bazel)
+			gotGN, err := bazelToGN(f)
+			if err != nil {
+				t.Fatalf("Unexpected failure converting Bazel build targets: %v", err)
+			}
+			if diff := cmp.Diff(gotGN, tc.wantGN); diff != "" {
+				t.Errorf("Diff found after GN conversion (-got +want):\n%s\nBazel source:\n%s", diff, tc.bazel)
+			}
+		})
+	}
+}
