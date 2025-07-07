@@ -1,0 +1,34 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("rust") {
+  name = "fdf_power"
+  version = "0.1.0"
+  edition = "2024"
+  with_unit_tests = true
+
+  deps = [
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+    "//sdk/lib/driver/component/rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+
+  sources = [ "src/lib.rs" ]
+}
+
+fuchsia_unittest_package("fdf_rust_power_tests") {
+  deps = [ ":rust_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":fdf_rust_power_tests" ]
+}
