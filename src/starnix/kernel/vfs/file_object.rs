@@ -29,7 +29,7 @@ use fuchsia_inspect_contrib::profile_duration;
 use hkdf::Hkdf;
 use linux_uapi::{FSCRYPT_MODE_AES_256_CTS, FSCRYPT_MODE_AES_256_XTS};
 use starnix_logging::{
-    impossible_error, log_error, log_info, trace_duration, track_stub, CATEGORY_STARNIX_MM,
+    impossible_error, log_error, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked,
@@ -1032,8 +1032,6 @@ pub fn default_ioctl(
             }
             let key = current_task
                 .read_memory_to_vec(key_ref_addr, fscrypt_add_key_arg.raw_size as usize)?;
-            let root = current_task.fs().root();
-            let path_from_root = file.name.path_from_root(Some(&root)).into_path();
             let user_id = current_task.creds().uid;
             let (key_identifier, wrapping_key) = derive_wrapping_key(key.as_bytes());
             current_task.kernel().crypt_service.add_wrapping_key(
@@ -1041,12 +1039,6 @@ pub fn default_ioctl(
                 wrapping_key.to_vec(),
                 user_id,
             )?;
-            log_info!(
-                "Adding encryption key {:?} for {:?} for user {:?}",
-                &key_identifier,
-                &path_from_root,
-                user_id
-            );
             fscrypt_add_key_arg.key_spec.u.identifier =
                 fscrypt_identifier { value: key_identifier, ..Default::default() };
             current_task.write_object(fscrypt_add_key_ref, &fscrypt_add_key_arg)?;
@@ -1080,16 +1072,7 @@ pub fn default_ioctl(
                     policy.filenames_encryption_mode
                 );
             }
-            let root = current_task.fs().root();
-            let path_from_root = file.name.path_from_root(Some(&root)).into_path();
             let user_id = current_task.creds().uid;
-            log_info!(
-                "Setting encryption policy for {:?} with key {:?} for user {:?}",
-                &path_from_root,
-                &policy.master_key_identifier,
-                user_id,
-            );
-
             if user_id != file.node().info().uid {
                 security::check_task_capable(current_task, CAP_FOWNER)
                     .map_err(|_| errno!(EACCES))?;
@@ -1141,7 +1124,6 @@ pub fn default_ioctl(
             let user_id = current_task.creds().uid;
             let identifier = unsafe { fscrypt_remove_key_arg.key_spec.u.identifier.value };
             current_task.kernel().crypt_service.forget_wrapping_key(identifier, user_id)?;
-            log_info!("Removing encryption key {:?} for user {:?}", &identifier, user_id,);
             Ok(SUCCESS)
         }
         _ => {
