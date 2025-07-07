@@ -8,7 +8,7 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::InputBuffer;
 use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
 use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps, FsNodeOps, OutputBuffer};
-use starnix_logging::CATEGORY_ATRACE;
+use starnix_logging::CATEGORY_TRACE_META;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use std::sync::Arc;
@@ -46,8 +46,7 @@ impl FileOps for TraceMarkerFile {
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        // TODO(wilkinsonclay): Should we have a category for tracing?
-        fuchsia_trace::duration!(CATEGORY_ATRACE, c"Write event");
+        fuchsia_trace::duration!(CATEGORY_TRACE_META, c"Write atrace event");
         let mut bytes = data.read_all()?;
         // The TraceEvent struct appends a new line to the trace data unconditionally, so
         // remove the trailing newline if here to avoid generating empty events when reading.
