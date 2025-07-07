@@ -29,7 +29,7 @@ fuchsia_unittest_package("far-integration-tests") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":far-integration-tests" ]
 }

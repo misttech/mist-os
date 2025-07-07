@@ -86,7 +86,7 @@ fuchsia_test_package("base-resolver-integration-fxblob-tests") {
   test_components = [ ":component_fxblob" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [
     ":base-resolver-integration-fxblob-tests",

@@ -228,7 +228,7 @@ if (is_linux || is_mac) {
   }
 }
 
-group("tests") {
+group("e2e_tests") {
   testonly = true
   public_deps = [
     ":system_tests",

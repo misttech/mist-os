@@ -84,7 +84,7 @@ fuchsia_test_package("system-updater-integration-tests") {
   }
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":system-updater-integration-tests" ]
 }

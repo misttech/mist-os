@@ -98,7 +98,7 @@ fuchsia_test_package("omaha-client-integration-tests") {
   }
 }
 
-group("tests") {
+group("non_hermetic_tests") {
   testonly = true
   public_deps = [ ":omaha-client-integration-tests" ]
 }

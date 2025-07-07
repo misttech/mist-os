@@ -52,7 +52,7 @@ fuchsia_test_package("package") {
   deps = [ "//src/sys/pkg/bin/system-update-committer:component" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":package" ]
 }
