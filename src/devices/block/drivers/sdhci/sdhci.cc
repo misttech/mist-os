@@ -14,7 +14,6 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
-#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
@@ -22,7 +21,6 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
-#include <threads.h>
 
 #include <bind/fuchsia/hardware/sdmmc/cpp/bind.h>
 #include <fbl/algorithm.h>
@@ -300,42 +298,41 @@ void Sdhci::CompleteRequest() {
   sync_completion_signal(&req_completion_);
 }
 
-int Sdhci::IrqThread() {
-  SetSchedulerRole(kIrqProfileName);
-  while (true) {
-    zx_status_t wait_res = WaitForInterrupt();
-    if (wait_res != ZX_OK) {
-      if (wait_res != ZX_ERR_CANCELED) {
-        FDF_LOG(ERROR, "sdhci: interrupt wait failed with retcode = %d", wait_res);
-      }
-      break;
+void Sdhci::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                      const zx_packet_interrupt_t* interrupt) {
+  if (status != ZX_OK) {
+    if (status != ZX_ERR_CANCELED) {
+      FDF_LOG(ERROR, "Failed to wait for interrupt: %s", zx_status_get_string(status));
     }
+    return;
+  }
 
-    // Acknowledge the IRQs that we stashed. IRQs are cleared by writing
-    // 1s into the IRQs that fired.
-    auto status = InterruptStatus::Get().ReadFrom(&*regs_mmio_buffer_).WriteTo(&*regs_mmio_buffer_);
+  // Acknowledge the IRQs that we stashed. IRQs are cleared by writing
+  // 1s into the IRQs that fired.
+  auto interrupt_status =
+      InterruptStatus::Get().ReadFrom(&*regs_mmio_buffer_).WriteTo(&*regs_mmio_buffer_);
 
-    FDF_LOG(DEBUG, "got irq 0x%08x en 0x%08x", status.reg_value(),
-            InterruptSignalEnable::Get().ReadFrom(&*regs_mmio_buffer_).reg_value());
+  FDF_LOG(DEBUG, "got irq 0x%08x en 0x%08x", interrupt_status.reg_value(),
+          InterruptSignalEnable::Get().ReadFrom(&*regs_mmio_buffer_).reg_value());
 
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (pending_request_ && !pending_request_->request_complete) {
-      HandleTransferInterrupt(status);
-    }
+  std::lock_guard<std::mutex> lock(mtx_);
+  if (pending_request_ && !pending_request_->request_complete) {
+    HandleTransferInterrupt(interrupt_status);
+  }
 
-    if (status.card_interrupt()) {
-      // Disable the card interrupt and call the callback if there is one.
-      InterruptStatusEnable::Get()
-          .ReadFrom(&*regs_mmio_buffer_)
-          .set_card_interrupt(0)
-          .WriteTo(&*regs_mmio_buffer_);
-      card_interrupt_masked_ = true;
-      if (interrupt_cb_.is_valid()) {
-        interrupt_cb_.Callback();
-      }
+  if (interrupt_status.card_interrupt()) {
+    // Disable the card interrupt and call the callback if there is one.
+    InterruptStatusEnable::Get()
+        .ReadFrom(&*regs_mmio_buffer_)
+        .set_card_interrupt(0)
+        .WriteTo(&*regs_mmio_buffer_);
+    card_interrupt_masked_ = true;
+    if (interrupt_cb_.is_valid()) {
+      interrupt_cb_.Callback();
     }
   }
-  return thrd_success;
+
+  irq_.ack();
 }
 
 void Sdhci::HandleTransferInterrupt(const InterruptStatus status) {
@@ -1014,48 +1011,6 @@ void Sdhci::SdmmcAckInBandInterrupt() {
   card_interrupt_masked_ = false;
 }
 
-void Sdhci::PrepareStop(fdf::PrepareStopCompleter completer) {
-  // stop irq thread
-  irq_.destroy();
-  if (irq_thread_started_) {
-    thrd_join(irq_thread_, nullptr);
-  }
-
-  completer(zx::ok());
-}
-
-void Sdhci::SetSchedulerRole(const std::string& role) {
-  FDF_LOG(DEBUG, "Connecting to RoleManager");
-  auto client_end_res = incoming()->Connect<fuchsia_scheduler::RoleManager>();
-  if (client_end_res.is_error()) {
-    FDF_LOG(WARNING, "Failed to connect to RoleManager: %s", client_end_res.status_string());
-    return;
-  }
-  fidl::SyncClient<fuchsia_scheduler::RoleManager> role_manager(std::move(*client_end_res));
-
-  FDF_LOG(DEBUG, "Cloning self thread");
-  zx::thread thread_self;
-  zx_status_t status = zx::thread::self()->duplicate(ZX_RIGHT_SAME_RIGHTS, &thread_self);
-  if (status != ZX_OK) {
-    zx::result<> err = zx::error(status);
-    FDF_LOG(ERROR, "Couldn't clone self thread for profile: %s", err.status_string());
-    return;
-  }
-
-  FDF_LOG(DEBUG, "Setting thread role");
-  fuchsia_scheduler::RoleManagerSetRoleRequest request;
-  request.target(fuchsia_scheduler::RoleTarget::WithThread(std::move(thread_self)))
-      .role(fuchsia_scheduler::RoleName(role));
-  auto set_role_res = role_manager->SetRole(std::move(request));
-  if (!set_role_res.is_ok()) {
-    std::string err_str = set_role_res.error_value().FormatDescription();
-    FDF_LOG(WARNING, "Couldn't set thread role: %s", err_str.c_str());
-    return;
-  }
-
-  FDF_LOG(DEBUG, "Set thread role %s successfully.", role.c_str());
-}
-
 zx_status_t Sdhci::Init() {
   SetBusClock(0);
 
@@ -1196,14 +1151,21 @@ zx_status_t Sdhci::Init() {
     DisableInterrupts();
   }
 
-  // TODO: Switch to use dispatcher thread instead.
-  if (thrd_create_with_name(
-          &irq_thread_, [](void* arg) -> int { return reinterpret_cast<Sdhci*>(arg)->IrqThread(); },
-          this, "sdhci_irq_thread") != thrd_success) {
-    FDF_LOG(ERROR, "sdhci: failed to create irq thread");
-    return ZX_ERR_INTERNAL;
+  if (zx::result irq_dispatcher = fdf::SynchronizedDispatcher::Create(
+          {}, "sdhci_irq_thread", [](fdf_dispatcher_t*) {}, kIrqProfileName);
+      irq_dispatcher.is_ok()) {
+    irq_dispatcher_ = *std::move(irq_dispatcher);
+  } else {
+    FDF_LOG(ERROR, "Failed to create interrupt dispatcher: %s", irq_dispatcher.status_string());
+    return irq_dispatcher.error_value();
   }
-  irq_thread_started_ = true;
+
+  irq_handler_.set_object(irq_.get());
+  status = irq_handler_.Begin(irq_dispatcher_.async_dispatcher());
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to wait on interrupt: %s", zx_status_get_string(status));
+    return status;
+  }
 
   // Set controller preferences
   fuchsia_hardware_sdmmc::SdmmcHostPrefs default_speed_capabilities{};
@@ -1363,12 +1325,6 @@ zx::result<> Sdhci::Start() {
 
   // initialize the controller
   status = Init();
-  auto cleanup = fit::defer([this] {
-    irq_.destroy();
-    if (irq_thread_started_) {
-      thrd_join(irq_thread_, nullptr);
-    }
-  });
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "%s: SDHCI Controller init failed", __func__);
     return zx::error(status);
@@ -1415,7 +1371,6 @@ zx::result<> Sdhci::Start() {
   }
   node_controller_.Bind(std::move(result.value()));
 
-  cleanup.cancel();
   return zx::ok();
 }
 
