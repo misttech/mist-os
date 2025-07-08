@@ -110,7 +110,7 @@ std::string SignatureToString(const fidl::Array<uint8_t, N>& array) {
 //
 // We attempt to copy the same output as Linux's "acpidump" command.
 void PrintTableNames(const fidl::VectorView<TableInfo>& entries) {
-  for (size_t i = 0; i < entries.count(); i++) {
+  for (size_t i = 0; i < entries.size(); i++) {
     printf("ACPI: %s %06x\n", SignatureToString(entries[i].name).c_str(), entries[i].size);
   }
 }

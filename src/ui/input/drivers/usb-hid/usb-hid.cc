@@ -227,9 +227,9 @@ void UsbHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
       completer.ReplyError(ZX_ERR_SHOULD_WAIT);
       return;
     }
-    auto actual = req->CopyTo(0, request->data.data(), request->data.count(), ep_out_->GetMapped());
+    auto actual = req->CopyTo(0, request->data.data(), request->data.size(), ep_out_->GetMapped());
     ZX_ASSERT(actual.size() == 1);
-    if (request->data.count() != actual[0]) {
+    if (request->data.size() != actual[0]) {
       completer.ReplyError(ZX_ERR_BUFFER_TOO_SMALL);
       return;
     }
@@ -251,7 +251,7 @@ void UsbHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
   auto status = UsbHidControlOut(
       USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE, USB_HID_SET_REPORT,
       (static_cast<uint16_t>(static_cast<uint16_t>(request->rpt_type) << 8 | request->rpt_id)),
-      interface_, request->data.data(), request->data.count(), NULL);
+      interface_, request->data.data(), request->data.size(), NULL);
   if (status != ZX_OK) {
     completer.ReplyError(status);
     return;

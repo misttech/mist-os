@@ -634,7 +634,7 @@ static bool do_recv(zx::socket& socket, const std::vector<std::string>& path,
                      << (result.ok() ? result->error_value() : result.status());
       return false;
     }
-    msg.data.size = static_cast<uint32_t>(result->value()->data.count());
+    msg.data.size = static_cast<uint32_t>(result->value()->data.size());
     if (msg.data.size == 0) {
       break;
     }

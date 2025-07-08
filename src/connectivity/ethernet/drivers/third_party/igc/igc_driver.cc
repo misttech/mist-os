@@ -573,7 +573,7 @@ void IgcDriver::ReapTxBuffers() {
     n = (n + 1) & (kEthTxDescRingCount - 1);
   }
   if (reap_count > 0) {
-    results.set_count(reap_count);
+    results.set_size(reap_count);
     fdf::Arena fdf_arena(0u);
     if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(fdf_arena)->CompleteTx(results);
         !status.ok()) {
@@ -670,7 +670,7 @@ void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
       ZX_ASSERT_MSG(buf_idx <= kEthRxBufCount, "buf_idx: %zu", buf_idx);
     }
     if (buf_idx > 0) {
-      buffers.set_count(buf_idx);
+      buffers.set_size(buf_idx);
       if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteRx(buffers);
           !status.ok()) {
         FDF_LOG(ERROR, "Failed to complete RX buffers during stop: %s",
@@ -701,7 +701,7 @@ void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
       txh = (txh + 1) & (kEthTxDescRingCount - 1);
     }
     if (res_idx > 0) {
-      results.set_count(res_idx);
+      results.set_size(res_idx);
       if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteTx(results);
           !status.ok()) {
         FDF_LOG(ERROR, "Failed to complete TX during stop: %s", status.FormatDescription().c_str());
@@ -745,9 +745,9 @@ void IgcDriver::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* reques
     // Assume TX depth here to simplify this and avoid having to deal with batching.
     static_assert(kEthTxBufCount < netdriver::wire::kMaxTxResults,
                   "TX depth exceeds maximum TX results that can be completed");
-    fidl::VectorView<netdriver::wire::TxResult> results(arena, request->buffers.count());
+    fidl::VectorView<netdriver::wire::TxResult> results(arena, request->buffers.size());
 
-    for (size_t i = 0; i < request->buffers.count(); ++i) {
+    for (size_t i = 0; i < request->buffers.size(); ++i) {
       results[i].id = request->buffers[i].id;
       results[i].status = ZX_ERR_UNAVAILABLE;
     }
@@ -760,7 +760,7 @@ void IgcDriver::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* reques
 
   uint32_t& n = adapter_->txt_ind;
   for (const auto& buffer : request->buffers) {
-    ZX_ASSERT_MSG(buffer.data.count() == 1,
+    ZX_ASSERT_MSG(buffer.data.size() == 1,
                   "Tx buffer contains multiple regions, which does not fit the configuration.");
     const netdriver::wire::BufferRegion& region = buffer.data[0];
     // Get physical address of buffers from region data.
@@ -985,7 +985,7 @@ void IgcDriver::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_ba
       buf_idx++;
       if (buf_idx == adapter::kRxBuffersPerBatch) {  // Local buffer array is full.
         // Pass up a full batch of packets and reset buffer index.
-        buffers.set_count(buf_idx);
+        buffers.set_size(buf_idx);
         if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteRx(buffers);
             !status.ok()) {
           FDF_LOG(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
@@ -995,7 +995,7 @@ void IgcDriver::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_ba
       }
     }
     if (buf_idx != 0) {
-      buffers.set_count(buf_idx);
+      buffers.set_size(buf_idx);
       if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteRx(buffers);
           !status.ok()) {
         FDF_LOG(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());

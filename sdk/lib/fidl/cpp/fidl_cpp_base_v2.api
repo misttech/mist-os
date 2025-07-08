@@ -6,5 +6,5 @@
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_decoder.h": "4e483a994d8830987d71a80be8a84fd8",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_encoder.h": "5d8f475cabaf0162e8fedbb971a448ae",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_types.h": "1a3a9c87b0b1794170cabff0e7da21e1",
-  "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/wire_natural_conversions.h": "8411ca23f866d589ee80e4c8304eb3a5"
+  "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/wire_natural_conversions.h": "69c66e478f7544b56ef3070eca6930e3"
 }

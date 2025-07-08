@@ -120,7 +120,7 @@ void TpmDevice::ExecuteVendorCommand(ExecuteVendorCommandRequestView request,
                                      ExecuteVendorCommandCompleter::Sync &completer) {
   auto cmd = std::make_unique<TpmVendorCmd>(
       kTpmVendorPrefix | request->command_code,
-      cpp20::span<const uint8_t>(request->data.data(), request->data.count()));
+      cpp20::span<const uint8_t>(request->data.data(), request->data.size()));
 
   auto async = completer.ToAsync();
   QueueCommand(std::move(cmd),
@@ -140,10 +140,10 @@ void TpmDevice::ExecuteVendorCommand(ExecuteVendorCommandRequestView request,
 void TpmDevice::ExecuteCommand(ExecuteCommandRequestView request,
                                ExecuteCommandCompleter::Sync &completer) {
   auto cmd = std::make_unique<TpmCmd>(
-      cpp20::span<const uint8_t>(request->data.data(), request->data.count()));
+      cpp20::span<const uint8_t>(request->data.data(), request->data.size()));
   auto async = completer.ToAsync();
   // Ignore commands that are smaller than the minimum command header size.
-  if (request->data.count() < sizeof(TpmCmdHeader)) {
+  if (request->data.size() < sizeof(TpmCmdHeader)) {
     async.ReplyError(ZX_ERR_OUT_OF_RANGE);
   }
   QueueCommand(std::move(cmd),
@@ -415,8 +415,8 @@ zx_status_t TpmDevice::ReadFromFifo(cpp20::span<uint8_t> data) {
       }
       auto &received = result->value()->data;
 
-      memcpy(&data.data()[read], received.data(), received.count());
-      read += received.count();
+      memcpy(&data.data()[read], received.data(), received.size());
+      read += received.size();
     }
 
     status = sts.ReadFrom(tpm_);

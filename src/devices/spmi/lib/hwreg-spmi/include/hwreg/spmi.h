@@ -120,7 +120,7 @@ class SpmiRegisterBase : public RegisterBase<DerivedType, IntType, PrinterState>
       return internal::MapError(response.value().error_value()).take_error();
     }
 
-    if (response.value().value()->data.count() != sizeof(IntType)) {
+    if (response.value().value()->data.size() != sizeof(IntType)) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
@@ -216,7 +216,7 @@ class SpmiRegisterArray {
       return internal::MapError(response.value().error_value()).take_error();
     }
 
-    if (response.value().value()->data.count() != static_cast<uint32_t>(regs_.size())) {
+    if (response.value().value()->data.size() != static_cast<uint32_t>(regs_.size())) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 

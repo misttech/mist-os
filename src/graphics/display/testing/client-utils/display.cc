@@ -29,7 +29,7 @@ Display::Display(const fhd::wire::Info& info) {
 
   auto mode =
       reinterpret_cast<const fuchsia_hardware_display_types::wire::Mode*>(info.modes.data());
-  for (unsigned i = 0; i < info.modes.count(); i++) {
+  for (unsigned i = 0; i < info.modes.size(); i++) {
     modes_.push_back(mode[i]);
   }
 

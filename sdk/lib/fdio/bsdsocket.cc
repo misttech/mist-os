@@ -331,8 +331,8 @@ int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const c
   if (!result.has_addresses()) {
     return 0;
   }
-  ZX_ASSERT_MSG(result.addresses().count() <= MAXADDRS,
-                "%lu addresses in DNS response, maximum is %d", result.addresses().count(),
+  ZX_ASSERT_MSG(result.addresses().size() <= MAXADDRS,
+                "%lu addresses in DNS response, maximum is %d", result.addresses().size(),
                 MAXADDRS);
   int count = 0;
   for (const fnet::wire::IpAddress& addr : result.addresses()) {
@@ -600,8 +600,8 @@ struct if_nameindex* if_nameindex(void) {
   // Allocate memory with one extra entry at the tail, which is set to 0 to
   // mark the end of the array.
   struct if_nameindex* result = reinterpret_cast<struct if_nameindex*>(
-      calloc(response->interfaces.count() + 1, sizeof(struct if_nameindex)));
-  for (size_t i = 0; i < response->interfaces.count(); ++i) {
+      calloc(response->interfaces.size() + 1, sizeof(struct if_nameindex)));
+  for (size_t i = 0; i < response->interfaces.size(); ++i) {
     auto* nameindex = result + i;
     auto& iface = response->interfaces[i];
     nameindex->if_index = static_cast<unsigned int>(iface.id());

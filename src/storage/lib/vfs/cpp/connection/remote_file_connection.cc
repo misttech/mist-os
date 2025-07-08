@@ -108,7 +108,7 @@ zx_status_t RemoteFileConnection::WriteInternal(const void* data, size_t len, si
 
 void RemoteFileConnection::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   size_t actual;
-  zx_status_t status = WriteInternal(request->data.data(), request->data.count(), &actual);
+  zx_status_t status = WriteInternal(request->data.data(), request->data.size(), &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {
@@ -132,7 +132,7 @@ zx_status_t RemoteFileConnection::WriteAtInternal(const void* data, size_t len, 
 void RemoteFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter::Sync& completer) {
   size_t actual = 0;
   zx_status_t status =
-      WriteAtInternal(request->data.data(), request->data.count(), request->offset, &actual);
+      WriteAtInternal(request->data.data(), request->data.size(), request->offset, &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {

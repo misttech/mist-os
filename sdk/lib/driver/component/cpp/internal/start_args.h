@@ -62,7 +62,7 @@ inline zx::result<std::vector<std::string>> ProgramValueAsVector(
       }
       auto& values = entry.value->str_vec();
       std::vector<std::string> result;
-      result.reserve(values.count());
+      result.reserve(values.size());
       for (auto& value : values) {
         result.emplace_back(value.data(), value.size());
       }
@@ -109,7 +109,7 @@ inline zx::result<std::vector<fuchsia_data::wire::Dictionary>> ProgramValueAsObj
     }
     auto& values = entry.value->obj_vec();
     std::vector<fuchsia_data::wire::Dictionary> result;
-    result.reserve(values.count());
+    result.reserve(values.size());
     for (auto& value : values) {
       result.emplace_back(value);
     }

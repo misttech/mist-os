@@ -228,7 +228,7 @@ void dump_formats(const audio::utils::AudioDeviceStream& stream) {
     printf("\nNumber of channels      :");
     bool has_attributes = false;
     for (auto i : pcm.channel_sets()) {
-      printf(" %zu", i.attributes().count());
+      printf(" %zu", i.attributes().size());
       for (auto j : i.attributes()) {
         if (j.has_min_frequency()) {
           has_attributes = true;
@@ -251,7 +251,7 @@ void dump_formats(const audio::utils::AudioDeviceStream& stream) {
             printf("%u", j.max_frequency());
           }
         }
-        printf(" (min/max Hz for %zu channels)", i.attributes().count());
+        printf(" (min/max Hz for %zu channels)", i.attributes().size());
       }
     }
     printf("\nFrame rate              :");
@@ -818,14 +818,14 @@ int main(int argc, const char** argv) {
   }
 
   if (!channels.has_value()) {
-    if (formats.value().supported_formats.count() < 1 ||
-        formats.value().supported_formats[0].pcm_supported_formats().channel_sets().count() < 1) {
+    if (formats.value().supported_formats.size() < 1 ||
+        formats.value().supported_formats[0].pcm_supported_formats().channel_sets().size() < 1) {
       printf("No valid format reported by driver\n");
       return ZX_ERR_BAD_STATE;
     }
     // Use the first number of channels value reported.
     auto& pcm = formats.value().supported_formats[0].pcm_supported_formats();
-    channels = static_cast<uint32_t>(pcm.channel_sets()[0].attributes().count());
+    channels = static_cast<uint32_t>(pcm.channel_sets()[0].attributes().size());
   }
 
   async::Loop async_loop(&kAsyncLoopConfigNoAttachToCurrentThread);

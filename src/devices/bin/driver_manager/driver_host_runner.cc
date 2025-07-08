@@ -365,7 +365,7 @@ void DriverHostRunner::Start(StartRequestView request, StartCompleter::Sync& com
     return;
   }
   auto& handles = request->start_info.numbered_handles();
-  if (handles.count() != 1 || !handles[0].handle || handles[0].id != kTokenId) {
+  if (handles.size() != 1 || !handles[0].handle || handles[0].id != kTokenId) {
     LOGF(ERROR, "Failed to start driver host '%s', invalid request", url.c_str());
     completer.Close(ZX_ERR_INVALID_ARGS);
     return;

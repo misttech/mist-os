@@ -280,9 +280,9 @@ void BlockDevice::QuerySlices(QuerySlicesRequestView request,
   static_assert(sizeof(decltype(ranges)::value_type) == sizeof(slice_region_t));
   slice_region_t* ranges_ptr = reinterpret_cast<slice_region_t*>(ranges.data());
   size_t range_count;
-  zx_status_t status = parent_volume_protocol_.QuerySlices(
-      request->start_slices.data(), request->start_slices.count(), ranges_ptr, std::size(ranges),
-      &range_count);
+  zx_status_t status = parent_volume_protocol_.QuerySlices(request->start_slices.data(),
+                                                           request->start_slices.size(), ranges_ptr,
+                                                           std::size(ranges), &range_count);
   completer.Reply(status, ranges, range_count);
 }
 

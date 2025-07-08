@@ -538,12 +538,12 @@ zx::result<std::vector<PlatformBus::BootItemResult>> PlatformBus::GetBootItem(
     return zx::error(result->error_value());
   }
   fidl::VectorView items = result->value()->retrieved_items;
-  if (items.count() == 0) {
+  if (items.size() == 0) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   std::vector<PlatformBus::BootItemResult> ret;
-  ret.reserve(items.count());
-  for (size_t i = 0; i < items.count(); i++) {
+  ret.reserve(items.size());
+  for (size_t i = 0; i < items.size(); i++) {
     ret.emplace_back(PlatformBus::BootItemResult{
         .vmo = std::move(items[i].payload),
         .length = items[i].length,

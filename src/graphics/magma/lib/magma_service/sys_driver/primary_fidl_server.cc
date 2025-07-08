@@ -289,7 +289,7 @@ void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
   FlowControl();
 
   std::vector<magma_exec_command_buffer> command_buffers;
-  command_buffers.reserve(request->command_buffers.count());
+  command_buffers.reserve(request->command_buffers.size());
 
   for (auto& command_buffer : request->command_buffers) {
     command_buffers.push_back(magma_exec_command_buffer{
@@ -299,7 +299,7 @@ void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
   }
 
   std::vector<magma_exec_resource> resources;
-  resources.reserve(request->resources.count());
+  resources.reserve(request->resources.size());
 
   for (auto& buffer_range : request->resources) {
     resources.push_back({
@@ -310,14 +310,14 @@ void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
   }
 
   std::vector<uint64_t> wait_semaphores;
-  wait_semaphores.reserve(request->wait_semaphores.count());
+  wait_semaphores.reserve(request->wait_semaphores.size());
 
   for (uint64_t semaphore_id : request->wait_semaphores) {
     wait_semaphores.push_back(semaphore_id);
   }
 
   std::vector<uint64_t> signal_semaphores;
-  signal_semaphores.reserve(request->signal_semaphores.count());
+  signal_semaphores.reserve(request->signal_semaphores.size());
 
   for (uint64_t semaphore_id : request->signal_semaphores) {
     signal_semaphores.push_back(semaphore_id);
@@ -344,7 +344,7 @@ void PrimaryFidlServer::ExecuteInlineCommands(ExecuteInlineCommandsRequestView r
   FlowControl();
 
   std::vector<magma_inline_command_buffer> commands;
-  commands.reserve(request->commands.count());
+  commands.reserve(request->commands.size());
 
   for (auto& fidl_command : request->commands) {
     if (!fidl_command.has_data() || !fidl_command.has_semaphores()) {
@@ -353,9 +353,9 @@ void PrimaryFidlServer::ExecuteInlineCommands(ExecuteInlineCommandsRequestView r
     }
     commands.push_back({
         .data = fidl_command.data().data(),
-        .size = fidl_command.data().count(),
+        .size = fidl_command.data().size(),
         .semaphore_ids = fidl_command.semaphores().data(),
-        .semaphore_count = magma::to_uint32(fidl_command.semaphores().count()),
+        .semaphore_count = magma::to_uint32(fidl_command.semaphores().size()),
     });
   }
 
@@ -450,7 +450,7 @@ void PrimaryFidlServer::EnablePerformanceCounters(
     EnablePerformanceCountersCompleter::Sync& completer) {
   FlowControl();
   magma::Status status =
-      delegate_->EnablePerformanceCounters(request->counters.data(), request->counters.count());
+      delegate_->EnablePerformanceCounters(request->counters.data(), request->counters.size());
   if (!status) {
     SetError(&completer, status.get());
   }
@@ -516,7 +516,7 @@ void PrimaryFidlServer::ClearPerformanceCounters(
     ClearPerformanceCountersCompleter::Sync& completer) {
   FlowControl();
   magma::Status status =
-      delegate_->ClearPerformanceCounters(request->counters.data(), request->counters.count());
+      delegate_->ClearPerformanceCounters(request->counters.data(), request->counters.size());
   if (!status) {
     SetError(&completer, status.get());
   }

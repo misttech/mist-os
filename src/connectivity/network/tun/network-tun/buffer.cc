@@ -100,7 +100,7 @@ zx_status_t Buffer::Write(const uint8_t* data, size_t count) {
 }
 
 zx_status_t Buffer::Write(const fidl::VectorView<uint8_t>& data) {
-  return Write(data.data(), data.count());
+  return Write(data.data(), data.size());
 }
 
 zx_status_t Buffer::Write(const std::vector<uint8_t>& data) {

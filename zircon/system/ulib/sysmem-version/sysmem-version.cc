@@ -64,12 +64,12 @@ template <typename T>
 struct IsFidlScalar<
     T, typename std::enable_if<fidl::IsFidlType<T>::value &&
                                (std::is_arithmetic<T>::value || std::is_enum<T>::value)>::type>
-    : std::true_type{};
+    : std::true_type {};
 template <typename T>
 struct IsFidlScalar<T, typename std::enable_if<fidl::IsFidlType<T>::value &&
                                                (internal::HasOperatorUInt32<T>::value ||
                                                 internal::HasOperatorUInt64<T>::value)>::type>
-    : std::true_type{};
+    : std::true_type {};
 
 template <typename DstType, typename SrcType, bool allow_bigger_src, typename Enable = void>
 struct IsCompatibleAssignmentFidlScalarTypes : std::false_type {};
@@ -86,7 +86,7 @@ struct IsCompatibleAssignmentFidlScalarTypes<
          (std::is_same<RemoveCVRef_t<DstType>, uint64_t>::value &&
           std::is_same<RemoveCVRef_t<SrcType>, uint32_t>::value) ||
          (allow_bigger_src && std::is_same<RemoveCVRef_t<DstType>, uint32_t>::value &&
-          std::is_same<RemoveCVRef_t<SrcType>, uint64_t>::value))>::type> : std::true_type{};
+          std::is_same<RemoveCVRef_t<SrcType>, uint64_t>::value))>::type> : std::true_type {};
 template <typename DstType, typename SrcType, bool allow_bigger_src = false>
 inline constexpr bool IsCompatibleAssignmentFidlScalarTypes_v =
     IsCompatibleAssignmentFidlScalarTypes<DstType, SrcType, allow_bigger_src>::value;
@@ -1029,16 +1029,15 @@ V1CopyFromV2BufferCollectionConstraints(
   }
   ZX_DEBUG_ASSERT(!v1.image_format_constraints_count);
   if (v2.has_image_format_constraints()) {
-    if (v2.image_format_constraints().count() >
+    if (v2.image_format_constraints().size() >
         fuchsia_sysmem::wire::kMaxCountBufferCollectionConstraintsImageFormatConstraints) {
       LOG(ERROR,
           "v2 image_format_constraints count > v1 "
           "MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS");
       return fpromise::error();
     }
-    v1.image_format_constraints_count =
-        static_cast<uint32_t>(v2.image_format_constraints().count());
-    for (uint32_t i = 0; i < v2.image_format_constraints().count(); ++i) {
+    v1.image_format_constraints_count = static_cast<uint32_t>(v2.image_format_constraints().size());
+    for (uint32_t i = 0; i < v2.image_format_constraints().size(); ++i) {
       auto image_format_constraints_result =
           V1CopyFromV2ImageFormatConstraints(v2.image_format_constraints()[i]);
       if (!image_format_constraints_result.is_ok()) {
@@ -1106,14 +1105,14 @@ fpromise::result<fuchsia_sysmem::wire::BufferMemoryConstraints> V1CopyFromV2Buff
   PROCESS_WIRE_SCALAR_FIELD_V2(inaccessible_domain_supported);
   ZX_DEBUG_ASSERT(!v1.heap_permitted_count);
   if (v2.has_permitted_heaps()) {
-    if (v2.permitted_heaps().count() >
+    if (v2.permitted_heaps().size() >
         fuchsia_sysmem::wire::kMaxCountBufferMemoryConstraintsHeapPermitted) {
       LOG(ERROR,
           "v2 permitted_heaps count > v1 MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED");
       return fpromise::error();
     }
-    v1.heap_permitted_count = static_cast<uint32_t>(v2.permitted_heaps().count());
-    for (uint32_t i = 0; i < v2.permitted_heaps().count(); ++i) {
+    v1.heap_permitted_count = static_cast<uint32_t>(v2.permitted_heaps().size());
+    for (uint32_t i = 0; i < v2.permitted_heaps().size(); ++i) {
       if (!v2.permitted_heaps().at(i).has_heap_type()) {
         LOG(ERROR, "v2 heap_type not set");
         return fpromise::error();
@@ -1274,7 +1273,7 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
     if (v2.color_spaces()->size() >
         fuchsia_sysmem::wire::kMaxCountImageFormatConstraintsColorSpaces) {
       LOG(ERROR,
-          "v2.color_spaces().count() > "
+          "v2.color_spaces().size() > "
           "fuchsia_sysmem::wire::kMaxCountImageFormatConstraintsColorSpaces");
       return fpromise::error();
     }
@@ -1527,7 +1526,7 @@ fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> V1MoveFromV2BufferCollec
   if (v2.buffers().has_value()) {
     if (v2.buffers()->size() > fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers) {
       LOG(ERROR,
-          "v2.buffers().count() > "
+          "v2.buffers().size() > "
           "fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers");
       return fpromise::error();
     }
@@ -1549,14 +1548,14 @@ fpromise::result<fuchsia_sysmem::wire::BufferCollectionInfo2> V1MoveFromV2Buffer
     fuchsia_sysmem2::wire::BufferCollectionInfo v2) {
   fuchsia_sysmem::wire::BufferCollectionInfo2 v1;
   if (v2.has_buffers()) {
-    if (v2.buffers().count() > fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers) {
+    if (v2.buffers().size() > fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers) {
       LOG(ERROR,
-          "v2.buffers().count() > "
+          "v2.buffers().size() > "
           "fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers");
       return fpromise::error();
     }
-    v1.buffer_count = static_cast<uint32_t>(v2.buffers().count());
-    for (uint32_t i = 0; i < v2.buffers().count(); ++i) {
+    v1.buffer_count = static_cast<uint32_t>(v2.buffers().size());
+    for (uint32_t i = 0; i < v2.buffers().size(); ++i) {
       v1.buffers[i] = V1MoveFromV2VmoBuffer(v2.buffers()[i]);
     }
   }
@@ -1699,8 +1698,8 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
                                         V2CloneSingleBufferSettings(allocator, src.settings()));
   }
   if (src.has_buffers()) {
-    buffer_collection_info.set_buffers(allocator, allocator, src.buffers().count());
-    for (uint32_t i = 0; i < src.buffers().count(); ++i) {
+    buffer_collection_info.set_buffers(allocator, allocator, src.buffers().size());
+    for (uint32_t i = 0; i < src.buffers().size(); ++i) {
       auto clone_result = V2CloneVmoBuffer(allocator, src.buffers()[i], vmo_rights_mask);
       if (!clone_result.is_ok()) {
         return clone_result.take_error_result();

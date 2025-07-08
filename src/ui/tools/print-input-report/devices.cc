@@ -43,7 +43,7 @@ zx_status_t PrintFeatureReports(std::string filename, Printer* printer,
           if (report.sensor().has_sensitivity()) {
             printer->Print("Sensitivity:\n");
             printer->IncreaseIndent();
-            for (size_t i = 0; i < report.sensor().sensitivity().count(); i++) {
+            for (size_t i = 0; i < report.sensor().sensitivity().size(); i++) {
               printer->Print("%ld ", report.sensor().sensitivity().data()[i]);
             }
             printer->Print("\n");
@@ -52,7 +52,7 @@ zx_status_t PrintFeatureReports(std::string filename, Printer* printer,
           if (report.sensor().has_threshold_high()) {
             printer->Print("Threshold High:\n");
             printer->IncreaseIndent();
-            for (size_t i = 0; i < report.sensor().threshold_high().count(); i++) {
+            for (size_t i = 0; i < report.sensor().threshold_high().size(); i++) {
               printer->Print("%ld ", report.sensor().threshold_high().data()[i]);
             }
             printer->Print("\n");
@@ -61,7 +61,7 @@ zx_status_t PrintFeatureReports(std::string filename, Printer* printer,
           if (report.sensor().has_threshold_low()) {
             printer->Print("Threshold Low:\n");
             printer->IncreaseIndent();
-            for (size_t i = 0; i < report.sensor().threshold_low().count(); i++) {
+            for (size_t i = 0; i < report.sensor().threshold_low().size(); i++) {
               printer->Print("%ld ", report.sensor().threshold_low().data()[i]);
             }
             printer->Print("\n");
@@ -208,7 +208,7 @@ void PrintSensorDesc(Printer* printer,
   if (sensor_desc.has_report_id()) {
     printer->Print("ReportID: %02d\n", sensor_desc.report_id());
   }
-  for (size_t i = 0; i < sensor_desc.values().count(); i++) {
+  for (size_t i = 0; i < sensor_desc.values().size(); i++) {
     printer->Print("Value %02d:\n", i);
     printer->IncreaseIndent();
     printer->Print("SensorType: %s\n", Printer::SensorTypeToString(sensor_desc.values()[i].type));
@@ -233,7 +233,7 @@ void PrintTouchDesc(Printer* printer,
       printer->Print("Max Contacts: %ld\n", input.max_contacts());
     }
     if (input.has_contacts()) {
-      for (size_t i = 0; i < input.contacts().count(); i++) {
+      for (size_t i = 0; i < input.contacts().size(); i++) {
         const fuchsia_input_report::wire::ContactInputDescriptor& contact = input.contacts()[i];
 
         printer->Print("Contact: %02d\n", i);
@@ -290,7 +290,7 @@ void PrintKeyboardDesc(Printer* printer,
     printer->Print("Input Report:\n");
     printer->IncreaseIndent();
     if (input.has_keys3()) {
-      for (size_t i = 0; i < input.keys3().count(); i++) {
+      for (size_t i = 0; i < input.keys3().size(); i++) {
         printer->Print("Key: %8ld\n", input.keys3()[i]);
       }
     }
@@ -301,7 +301,7 @@ void PrintKeyboardDesc(Printer* printer,
     printer->Print("Output Report:\n");
     printer->IncreaseIndent();
     if (output.has_leds()) {
-      for (size_t i = 0; i < output.leds().count(); i++) {
+      for (size_t i = 0; i < output.leds().size(); i++) {
         printer->Print("Led: %s\n", Printer::LedTypeToString(output.leds()[i]));
       }
     }
@@ -318,7 +318,7 @@ void PrintConsumerControlDesc(
     printer->Print("Input Report:\n");
     printer->IncreaseIndent();
     if (input.has_buttons()) {
-      for (size_t i = 0; i < input.buttons().count(); i++) {
+      for (size_t i = 0; i < input.buttons().size(); i++) {
         printer->Print("Button: %16s\n",
                        Printer::ConsumerControlButtonToString(input.buttons()[i]));
       }
@@ -489,7 +489,7 @@ void PrintSensorInputReport(Printer* printer,
     return;
   }
 
-  for (size_t i = 0; i < sensor_report.values().count(); i++) {
+  for (size_t i = 0; i < sensor_report.values().size(); i++) {
     printer->Print("Sensor[%02d]: %08d\n", i, sensor_report.values()[i]);
   }
 }
@@ -497,7 +497,7 @@ void PrintSensorInputReport(Printer* printer,
 void PrintTouchInputReport(Printer* printer,
                            const fuchsia_input_report::wire::TouchInputReport& touch_report) {
   if (touch_report.has_contacts()) {
-    for (size_t i = 0; i < touch_report.contacts().count(); i++) {
+    for (size_t i = 0; i < touch_report.contacts().size(); i++) {
       const fuchsia_input_report::wire::ContactInputReport& contact = touch_report.contacts()[i];
 
       if (contact.has_contact_id()) {
@@ -536,10 +536,10 @@ void PrintKeyboardInputReport(
   printer->Print("Keyboard Report\n");
   printer->IncreaseIndent();
   if (keyboard_report.has_pressed_keys3()) {
-    for (size_t i = 0; i < keyboard_report.pressed_keys3().count(); i++) {
+    for (size_t i = 0; i < keyboard_report.pressed_keys3().size(); i++) {
       printer->Print("Key: %8ld\n", keyboard_report.pressed_keys3()[i]);
     }
-    if (keyboard_report.pressed_keys3().count() == 0) {
+    if (keyboard_report.pressed_keys3().size() == 0) {
       printer->Print("No keys pressed\n");
     }
   }
@@ -551,7 +551,7 @@ void PrintConsumerControlInputReport(
   printer->Print("ConsumerControl Report\n");
   printer->IncreaseIndent();
   if (report.has_pressed_buttons()) {
-    for (size_t i = 0; i < report.pressed_buttons().count(); i++) {
+    for (size_t i = 0; i < report.pressed_buttons().size(); i++) {
       printer->Print("Button: %16s\n",
                      Printer::ConsumerControlButtonToString(report.pressed_buttons()[i]));
     }

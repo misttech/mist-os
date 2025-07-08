@@ -118,7 +118,7 @@ class CompleteTxTransaction {
     if (count_ == 0) {
       return;
     }
-    tx_results_.set_count(count_);
+    tx_results_.set_size(count_);
     if (fidl::OneWayStatus status = adapter_.ifc.buffer(arena_)->CompleteTx(tx_results_);
         !status.ok()) {
       FDF_LOG(ERROR, "Failed to complete TX: %s", status.FormatDescription().c_str());
@@ -161,7 +161,7 @@ class CompleteRxTransaction {
     if (count_ == 0) {
       return;
     }
-    rx_buffers_.set_count(count_);
+    rx_buffers_.set_size(count_);
     if (fidl::OneWayStatus status = adapter_.ifc.buffer(arena_)->CompleteRx(rx_buffers_);
         !status.ok()) {
       FDF_LOG(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
@@ -1397,11 +1397,11 @@ void Device<RxDescriptor>::SetMode(netdriver::wire::MacAddrSetModeRequest* reque
                                    fdf::Arena& arena, SetModeCompleter::Sync& completer) {
   {
     std::lock_guard lock(mac_filter_mutex_);
-    for (size_t i = 0; i < request->multicast_macs.count(); ++i) {
+    for (size_t i = 0; i < request->multicast_macs.size(); ++i) {
       memcpy(&mac_filters_[i * ETH_ALEN], request->multicast_macs[i].octets.data(), ETH_ALEN);
     }
     mac_filter_mode_ = request->mode;
-    mac_filters_.resize(request->multicast_macs.count() * ETH_ALEN);
+    mac_filters_.resize(request->multicast_macs.size() * ETH_ALEN);
     SetMacFilterMode();
   }
   completer.buffer(arena).Reply();

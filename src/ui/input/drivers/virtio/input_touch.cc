@@ -41,7 +41,7 @@ void TouchReport::ToFidlInputReport(
                                .position_y(contacts[i].y)
                                .Build();
   }
-  contact_rpt.set_count(count);
+  contact_rpt.set_size(count);
 
   input_report.event_time(event_time.get())
       .touch(fuchsia_input_report::wire::TouchInputReport::Builder(allocator)

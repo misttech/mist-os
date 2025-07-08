@@ -368,11 +368,11 @@ void FtdiI2c::Transact(TransactRequestView request, fdf::Arena& arena,
   size_t total_read_bytes = 0;
   size_t total_write_bytes = 0;
   size_t last_stopped_op = 0;
-  for (size_t i = 0; i < request->op.count(); i++) {
+  for (size_t i = 0; i < request->op.size(); i++) {
     if (request->op[i].type.is_read_size()) {
       total_read_bytes += request->op[i].type.read_size();
     } else if (request->op[i].type.is_write_data()) {
-      size_t copy_amt = request->op[i].type.write_data().count();
+      size_t copy_amt = request->op[i].type.write_data().size();
       uint8_t* data_buffer = request->op[i].type.write_data().data();
       size_t data_buffer_index = 0;
       while (copy_amt--) {

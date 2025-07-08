@@ -115,7 +115,7 @@ zx::result<> ReadFromDevice(Client& client_end) {
 
   // We could do something smarter here, for now just pretend printable data.
   auto& data = read_result.value()->data;
-  std::string_view data_view{reinterpret_cast<char*>(data.data()), data.count()};
+  std::string_view data_view{reinterpret_cast<char*>(data.data()), data.size()};
   std::cout << data_view << std::endl << std::endl;
 
   return zx::ok();

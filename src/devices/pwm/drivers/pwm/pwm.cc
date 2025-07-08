@@ -134,7 +134,7 @@ void PwmChannel::SetConfig(SetConfigRequestView request, SetConfigCompleter::Syn
   new_config.period_ns = request->config.period_ns;
   new_config.duty_cycle = request->config.duty_cycle;
   new_config.mode_config_buffer = request->config.mode_config.data();
-  new_config.mode_config_size = request->config.mode_config.count();
+  new_config.mode_config_size = request->config.mode_config.size();
 
   zx_status_t status = pwm_impl_.SetConfig(id_, &new_config);
   if (status != ZX_OK) {

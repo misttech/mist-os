@@ -65,7 +65,7 @@ zx::result<SysmemBufferInfo> SysmemBufferInfo::GetSysmemMetadata(
       wait_response->buffer_collection_info();
 
   ZX_DEBUG_ASSERT_MSG(collection_info.has_buffers(), "Sysmem deviated from its contract");
-  if (buffer_index >= collection_info.buffers().count()) {
+  if (buffer_index >= collection_info.buffers().size()) {
     fdf::warn("Rejecting access to out-of-range BufferCollection index: {}", buffer_index);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }

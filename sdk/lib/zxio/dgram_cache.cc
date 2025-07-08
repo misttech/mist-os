@@ -313,7 +313,7 @@ RouteCacheResult RouteCache::Get(
     }
 
     std::vector<zx::eventpair> eventpairs;
-    eventpairs.reserve(res.validity().count());
+    eventpairs.reserve(res.validity().size());
     std::move(res.validity().begin(), res.validity().end(), std::back_inserter(eventpairs));
 
     // Remove least-recently-used element if cache is at capacity.

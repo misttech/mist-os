@@ -727,7 +727,7 @@ void BtTransportUart::QueueUartRead() {
       HciReadComplete(result->error_value(), nullptr, 0);
       return;
     }
-    HciReadComplete(ZX_OK, result->value()->data.data(), result->value()->data.count());
+    HciReadComplete(ZX_OK, result->value()->data.data(), result->value()->data.size());
   });
 }
 

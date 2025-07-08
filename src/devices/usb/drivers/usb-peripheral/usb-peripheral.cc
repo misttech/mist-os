@@ -597,10 +597,10 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
     return ZX_OK;
   } else if (desc_type == USB_DT_BOS) {
     usb_bos_descriptor_t bos{
-      .b_length = sizeof(usb_bos_descriptor_t),
-      .b_descriptor_type = USB_DT_BOS,
-      .w_total_length = sizeof(usb_bos_descriptor_t),
-      .b_num_device_caps = 0,  // No device capabilities.
+        .b_length = sizeof(usb_bos_descriptor_t),
+        .b_descriptor_type = USB_DT_BOS,
+        .w_total_length = sizeof(usb_bos_descriptor_t),
+        .b_num_device_caps = 0,  // No device capabilities.
     };
     length = std::min(length, sizeof(usb_bos_descriptor_t));
     memcpy(buffer, &bos, length);
@@ -941,7 +941,7 @@ void UsbPeripheral::SetConfiguration(SetConfigurationRequestView request,
       }
     }
 
-    if (func_descs.count() == 0) {
+    if (func_descs.size() == 0) {
       completer.ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }

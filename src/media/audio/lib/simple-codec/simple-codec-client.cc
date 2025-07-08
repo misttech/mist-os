@@ -190,7 +190,7 @@ zx::result<DaiSupportedFormats> SimpleCodecClient::GetDaiFormats() {
     return zx::error(result->error_value());
   }
 
-  ZX_ASSERT(result->value()->formats.count() == 1);
+  ZX_ASSERT(result->value()->formats.size() == 1);
   const auto& llcpp_formats = result->value()->formats[0];
 
   DaiSupportedFormats formats;

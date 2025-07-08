@@ -172,7 +172,7 @@ acpi::status<std::string> EvaluateObjectFidlHelper::ValidateAndLookupPath(const 
 
 acpi::status<std::vector<ACPI_OBJECT>> EvaluateObjectFidlHelper::DecodeParameters(
     fidl::VectorView<fuchsia_hardware_acpi::wire::Object>& request_params) {
-  std::vector<ACPI_OBJECT> result(request_params.count());
+  std::vector<ACPI_OBJECT> result(request_params.size());
   size_t i = 0;
   for (auto& param : request_params) {
     auto status = DecodeObject(param, &result[i]);
@@ -394,11 +394,11 @@ acpi::status<> EvaluateObjectFidlHelper::DecodeObject(
     }
     case Tag::kPackageVal: {
       auto& list = obj.package_val().value;
-      if (list.count() > std::numeric_limits<uint32_t>::max()) {
+      if (list.size() > std::numeric_limits<uint32_t>::max()) {
         return acpi::error(AE_BAD_VALUE);
       }
-      std::vector<ACPI_OBJECT> package(list.count());
-      for (size_t i = 0; i < list.count(); i++) {
+      std::vector<ACPI_OBJECT> package(list.size());
+      for (size_t i = 0; i < list.size(); i++) {
         auto status = DecodeObject(list[i], &package[i]);
         if (status.is_error()) {
           return status.take_error();
@@ -406,17 +406,17 @@ acpi::status<> EvaluateObjectFidlHelper::DecodeObject(
       }
       allocated_packages_.emplace_front(std::move(package));
       out->Package.Type = ACPI_TYPE_PACKAGE;
-      out->Package.Count = static_cast<uint32_t>(list.count());
+      out->Package.Count = static_cast<uint32_t>(list.size());
       out->Package.Elements = allocated_packages_.front().data();
       break;
     }
     case Tag::kBufferVal: {
       auto& buffer = obj.buffer_val();
-      if (buffer.count() > std::numeric_limits<uint32_t>::max()) {
+      if (buffer.size() > std::numeric_limits<uint32_t>::max()) {
         return acpi::error(AE_BAD_VALUE);
       }
       out->Buffer.Type = ACPI_TYPE_BUFFER;
-      out->Buffer.Length = static_cast<uint32_t>(buffer.count());
+      out->Buffer.Length = static_cast<uint32_t>(buffer.size());
       out->Buffer.Pointer = buffer.data();
       break;
     }

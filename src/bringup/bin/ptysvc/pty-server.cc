@@ -72,7 +72,7 @@ void PtyServer::Read(ReadRequestView request, ReadCompleter::Sync& completer) {
 
 void PtyServer::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   size_t out_actual;
-  if (zx_status_t status = Write(request->data.data(), request->data.count(), &out_actual);
+  if (zx_status_t status = Write(request->data.data(), request->data.size(), &out_actual);
       status != ZX_OK) {
     return completer.ReplyError(status);
   }

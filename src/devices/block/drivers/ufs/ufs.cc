@@ -1315,7 +1315,7 @@ zx::result<> Ufs::ConfigResources() {
 zx::result<> Ufs::ConfigurePowerManagement() {
   fidl::Arena<> arena;
   const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs());
-  if (power_configs.count() == 0) {
+  if (power_configs.size() == 0) {
     FDF_LOG(INFO, "No power configs found.");
     return zx::error(ZX_ERR_NOT_FOUND);
   }

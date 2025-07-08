@@ -126,7 +126,7 @@ class MockI2cGtest : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
 
     const bool is_read = op.data_transfer().is_read_size();
     const size_t data_size =
-        is_read ? op.data_transfer().read_size() : op.data_transfer().write_data().count();
+        is_read ? op.data_transfer().read_size() : op.data_transfer().write_data().size();
 
     const I2cExpectation& exp = expectations_[expectations_index_++];
     const bool override_last_stop = exp_callback(exp);

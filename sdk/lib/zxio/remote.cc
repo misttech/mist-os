@@ -51,7 +51,7 @@ zx_status_t RemoteReadv(const fidl::UnownedClientEnd<fio::Readable>& client_end,
           return response.error_value();
         }
         const fidl::VectorView data = response.value()->data;
-        const size_t actual = data.count();
+        const size_t actual = data.size();
         if (actual > capacity) {
           return ZX_ERR_IO;
         }
@@ -109,7 +109,7 @@ zx_status_t FileReadvAt(const fidl::WireSyncClient<fio::File>& client, zx_off_t 
           return response.error_value();
         }
         const fidl::VectorView data = response.value()->data;
-        const size_t actual = data.count();
+        const size_t actual = data.size();
         if (actual > capacity) {
           return ZX_ERR_IO;
         }
@@ -259,7 +259,7 @@ class DirentIteratorImpl {
       return status;
     }
     const fidl::VectorView dirents = response.dirents;
-    if (dirents.count() > kBufferSize) {
+    if (dirents.size() > kBufferSize) {
       return ZX_ERR_IO;
     }
 
@@ -795,7 +795,7 @@ zx_status_t Remote<Protocol>::XattrList(void (*callback)(void* context, const ui
     }
     const fidl::VectorView data = response->attributes;
     for (fidl::VectorView<uint8_t>& name : data) {
-      callback(context, name.data(), name.count());
+      callback(context, name.data(), name.size());
     }
     if (response->last) {
       break;
@@ -836,7 +836,7 @@ zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len,
     data = {
         .data = value_bytes.data(),
         .vmo = ZX_HANDLE_INVALID,
-        .len = value_bytes.count(),
+        .len = value_bytes.size(),
     };
   } else {
     const zx::vmo& value_vmo = value_resp->buffer();
@@ -1674,7 +1674,7 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
   if (in.immutable_attributes.has_options()) {
     zxio_verification_options_t out_options{};
     fio::wire::VerificationOptions in_options = in.immutable_attributes.options();
-    size_t salt_size = in_options.salt().count();
+    size_t salt_size = in_options.salt().size();
     if (salt_size > ZXIO_MAX_SALT_SIZE)
       return ZX_ERR_INVALID_ARGS;
     out_options.salt_size = salt_size;
@@ -1712,8 +1712,8 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
       fidl::VectorView<uint8_t>& data_view = in.mutable_attributes.selinux_context().data();
       out->selinux_context_state = ZXIO_SELINUX_CONTEXT_STATE_DATA;
       static_assert(ZXIO_SELINUX_CONTEXT_MAX_ATTR_LEN < UINT16_MAX);
-      out->selinux_context_length = static_cast<uint16_t>(data_view.count());
-      memcpy(out->selinux_context, data_view.data(), data_view.count());
+      out->selinux_context_length = static_cast<uint16_t>(data_view.size());
+      memcpy(out->selinux_context, data_view.data(), data_view.size());
     } else if (in.mutable_attributes.selinux_context().is_use_extended_attributes()) {
       out->selinux_context_state = ZXIO_SELINUX_CONTEXT_STATE_USE_XATTRS;
     } else {

@@ -892,7 +892,7 @@ TestFidlClient::SysmemTokenDuplicateSync(
   fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncResponse& fidl_result =
       fidl_status.value();
   ZX_ASSERT(fidl_result.has_tokens());
-  ZX_ASSERT(fidl_result.tokens().count() == 1);
+  ZX_ASSERT(fidl_result.tokens().size() == 1);
 
   return zx::ok(std::move(fidl_result.tokens()[0]));
 }
@@ -943,7 +943,7 @@ zx::result<size_t> TestFidlClient::SysmemWaitForAllBuffersAllocated(
                       "Sysmem deviated from its contract");
   ZX_DEBUG_ASSERT_MSG(fidl_result->buffer_collection_info().has_buffers(),
                       "Sysmem deviated from its contract");
-  return zx::ok(fidl_result->buffer_collection_info().buffers().count());
+  return zx::ok(fidl_result->buffer_collection_info().buffers().size());
 }
 
 zx::result<> TestFidlClient::SetSysmemConstraintsForImage(

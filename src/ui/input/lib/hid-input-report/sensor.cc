@@ -61,7 +61,7 @@ ParseResult Sensor::CreateDescriptor(fidl::AnyArena& allocator,
                                      fuchsia_input_report::wire::DeviceDescriptor& descriptor) {
   // Find the first SensorInputDescriptor that isn't filled out yet.
   uint32_t index = 0;
-  for (; index < descriptor.sensor().input().count(); index++) {
+  for (; index < descriptor.sensor().input().size(); index++) {
     if (descriptor.sensor().input()[index].IsEmpty()) {
       break;
     }

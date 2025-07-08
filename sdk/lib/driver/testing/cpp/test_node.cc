@@ -121,7 +121,7 @@ void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& co
 
   if (request->args.has_properties()) {
     std::vector<fuchsia_driver_framework::NodeProperty2> properties;
-    properties.reserve(request->args.properties().count());
+    properties.reserve(request->args.properties().size());
     for (auto& deprecated_prop : request->args.properties().get()) {
       if (deprecated_prop.key.Which() !=
           fuchsia_driver_framework::wire::NodePropertyKey::Tag::kStringValue) {

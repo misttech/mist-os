@@ -42,6 +42,6 @@ zx::result<> VirtioGpuControlFidl::SendHardwareCommand(
     return result.take_error();
   }
   auto response = result.value();
-  callback(cpp20::span<uint8_t>(response->response.data(), response->response.count()));
+  callback(cpp20::span<uint8_t>(response->response.data(), response->response.size()));
   return zx::ok();
 }

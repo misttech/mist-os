@@ -595,7 +595,7 @@ TEEC_Result PostprocessOperation(
     uint32_t param_type = GetParamTypeForIndex(out_operation->paramTypes, i);
 
     // This check catches the case where we did not receive all the parameters we expected.
-    if (i >= parameter_set.count() && param_type != TEEC_NONE) {
+    if (i >= parameter_set.size() && param_type != TEEC_NONE) {
       rc = TEEC_ERROR_BAD_PARAMETERS;
       break;
     }
@@ -636,7 +636,7 @@ TEEC_Result PostprocessOperation(
   }
 
   // This check catches the case where we received more parameters than we expected.
-  for (size_t i = num_params; i < parameter_set.count(); i++) {
+  for (size_t i = num_params; i < parameter_set.size(); i++) {
     if (parameter_set[i].Which() != fuchsia_tee::wire::Parameter::Tag::kNone) {
       return TEEC_ERROR_BAD_PARAMETERS;
     }

@@ -130,7 +130,7 @@ zx_status_t InputDeviceAdded(int dirfd, int event, const char* name, void* cooki
   }
 
   hid::DeviceDescriptor* desc;
-  if (hid::ParseReportDescriptor(result->desc.data(), result->desc.count(), &desc) !=
+  if (hid::ParseReportDescriptor(result->desc.data(), result->desc.size(), &desc) !=
       hid::kParseOk) {
     return ZX_OK;
   }

@@ -95,7 +95,7 @@ void DisplayManager::OnDisplaysChanged(
 
       // Set display mode if requested.
       if (display_mode_index_override_.has_value()) {
-        if (*display_mode_index_override_ < display.modes.count()) {
+        if (*display_mode_index_override_ < display.modes.size()) {
           mode_index = *display_mode_index_override_;
         } else {
           FX_LOGS(ERROR) << "Requested display mode=" << *display_mode_index_override_

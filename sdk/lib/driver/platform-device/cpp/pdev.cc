@@ -202,7 +202,7 @@ zx::result<std::vector<fdf_power::PowerElementConfiguration>> PDev::GetPowerConf
   }
 
   std::vector<fdf_power::PowerElementConfiguration> configs;
-  configs.reserve(result.value()->config.count());
+  configs.reserve(result.value()->config.size());
   for (const auto& fidl_config : result.value()->config) {
     zx::result config = fdf_power::PowerElementConfiguration::FromFidl(fidl_config);
     if (config.is_error()) {

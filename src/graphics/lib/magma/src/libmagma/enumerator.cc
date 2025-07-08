@@ -58,7 +58,7 @@ fit::result<magma_status_t, uint32_t> Enumerator::Enumerate(uint32_t device_path
     }
 
     fidl::VectorView<uint8_t> dirents_buffer = response.dirents;
-    if (dirents_buffer.count() == 0) {
+    if (dirents_buffer.size() == 0) {
       // No more entries.
       return fit::ok(device_count);
     }
@@ -66,17 +66,17 @@ fit::result<magma_status_t, uint32_t> Enumerator::Enumerate(uint32_t device_path
     // Iterate through the series of entries.
     for (std::size_t offset = 0;;) {
       MAGMA_DASSERT(offset <= ZX_CHANNEL_MAX_MSG_BYTES);
-      MAGMA_DASSERT(dirents_buffer.count() <= ZX_CHANNEL_MAX_MSG_BYTES);
+      MAGMA_DASSERT(dirents_buffer.size() <= ZX_CHANNEL_MAX_MSG_BYTES);
       // offset and dirents_buffer.count() can be at most ZX_CHANNEL_MAX_MSG_BYTES,
       // so we don't have to worry about overflow.
-      if (offset + kSizeofDirentBeforeName > dirents_buffer.count()) {
+      if (offset + kSizeofDirentBeforeName > dirents_buffer.size()) {
         break;
       }
 
       auto entry = reinterpret_cast<const struct dirent*>(&dirents_buffer.data()[offset]);
       {
         std::size_t entry_size = kSizeofDirentBeforeName + entry->size;
-        assert(offset + entry_size <= dirents_buffer.count());
+        assert(offset + entry_size <= dirents_buffer.size());
         offset += entry_size;
       }
 

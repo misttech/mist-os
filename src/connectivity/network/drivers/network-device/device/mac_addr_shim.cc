@@ -18,11 +18,11 @@ void MacAddrShim::SetMode(netdriver::wire::MacAddrSetModeRequest* request, fdf::
                           SetModeCompleter::Sync& completer) {
   std::array<mac_address_t, MAX_MAC_FILTER> macs{};
 
-  for (size_t i = 0; i < request->multicast_macs.count() && i < macs.size(); ++i) {
+  for (size_t i = 0; i < request->multicast_macs.size() && i < macs.size(); ++i) {
     memcpy(macs[i].octets, request->multicast_macs[i].octets.data(), MAC_SIZE);
   }
 
-  impl_.SetMode(static_cast<uint32_t>(request->mode), macs.data(), request->multicast_macs.count());
+  impl_.SetMode(static_cast<uint32_t>(request->mode), macs.data(), request->multicast_macs.size());
 
   completer.buffer(arena).Reply();
 }

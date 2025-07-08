@@ -153,7 +153,7 @@ void UsbCdcAcmDevice::Write(fuchsia_hardware_serialimpl::wire::DeviceWriteReques
       // Per the serialimpl protocol, ZX_ERR_ALREADY_BOUND should be returned if the client makes a
       // write request when one was already in progress.
       status = ZX_ERR_ALREADY_BOUND;
-    } else if (request->data.count() > 0) {
+    } else if (request->data.size() > 0) {
       cpp20::span<const uint8_t> data = request->data.get();
       size_t pending_write_requests = 0;
       while (!data.empty()) {

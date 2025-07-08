@@ -116,7 +116,7 @@ zx::result<zxio_object_type_t> zxio_get_object_type(
   }
   const fidl::WireResponse response = result.value();
   const std::string_view protocol{reinterpret_cast<const char*>(response.protocol.data()),
-                                  response.protocol.count()};
+                                  response.protocol.size()};
   const zxio_object_type_t type = ProtocolToObjectType(protocol);
   if (type != ZXIO_OBJECT_TYPE_NONE) {
     return zx::ok(type);

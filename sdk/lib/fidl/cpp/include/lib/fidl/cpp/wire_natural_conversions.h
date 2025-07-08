@@ -109,8 +109,8 @@ template <typename WireType, typename NaturalType>
 struct WireNaturalConversionTraits<fidl::VectorView<WireType>, std::vector<NaturalType>> {
   static std::vector<NaturalType> ToNatural(fidl::VectorView<WireType> src) {
     std::vector<NaturalType> vec;
-    vec.reserve(src.count());
-    for (uint32_t i = 0; i < src.count(); i++) {
+    vec.reserve(src.size());
+    for (uint32_t i = 0; i < src.size(); i++) {
       vec.push_back(
           WireNaturalConversionTraits<WireType, NaturalType>::ToNatural(std::move(src[i])));
     }

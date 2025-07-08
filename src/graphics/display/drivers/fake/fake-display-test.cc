@@ -270,8 +270,8 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
     }
 
     auto& duplicate_value = duplicate_result.value();
-    EXPECT_EQ(duplicate_value.tokens().count(), 1u);
-    if (duplicate_value.tokens().count() != 1u) {
+    EXPECT_EQ(duplicate_value.tokens().size(), 1u);
+    if (duplicate_value.tokens().size() != 1u) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
@@ -395,9 +395,9 @@ std::pair<zx::vmo, fuchsia_sysmem2::wire::SingleBufferSettings> GetAllocatedBuff
   ZX_ASSERT_MSG(wait_result.ok(), "WaitForBuffersAllocated() FIDL call failed: %s (%u)",
                 wait_result.status_string(), fidl::ToUnderlying(wait_result->error_value()));
   auto& buffer_collection_info = wait_result.value()->buffer_collection_info();
-  ZX_ASSERT_MSG(buffer_collection_info.buffers().count() == 1u,
+  ZX_ASSERT_MSG(buffer_collection_info.buffers().size() == 1u,
                 "Incorrect number of buffers allocated: actual %zu, expected 1",
-                buffer_collection_info.buffers().count());
+                buffer_collection_info.buffers().size());
   // wire types don't provide a way to clone into a different arena short of converting to natural
   // type and back; we could consider returning the natural type instead, or converting this whole
   // file to natural types, but for now this allows the caller to use wire types everyhwere (not

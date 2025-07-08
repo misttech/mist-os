@@ -38,7 +38,7 @@ class TpmReg : public hwreg::RegisterBase<SelfType, BaseType, hwreg::EnablePrint
       return result->error_value();
     }
     auto& data = result->value()->data;
-    if (data.count() != sizeof(BaseType)) {
+    if (data.size() != sizeof(BaseType)) {
       zxlogf(ERROR, "Incorrect response size");
       return ZX_ERR_BAD_STATE;
     }

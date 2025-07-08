@@ -73,7 +73,7 @@ void ButtonsDevice::ButtonsInputReport::ToFidlInputReport(
         FDF_LOG(ERROR, "Invalid Button ID encountered %d", id);
     }
   }
-  buttons_rpt.set_count(count);
+  buttons_rpt.set_size(count);
 
   auto consumer_control =
       fuchsia_input_report::wire::ConsumerControlInputReport::Builder(allocator).pressed_buttons(

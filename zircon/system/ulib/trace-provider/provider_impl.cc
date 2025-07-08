@@ -49,7 +49,7 @@ trace_start_mode_t FidlBufferingDispositionToTraceEngineStartMode(
 std::vector<std::string> CloneCategories(
     const fuchsia_tracing_provider::wire::ProviderConfig& config) {
   std::vector<std::string> categories;
-  categories.reserve(config.categories.count());
+  categories.reserve(config.categories.size());
   for (const auto& category : config.categories) {
     categories.emplace_back(category.data(), category.size());
   }

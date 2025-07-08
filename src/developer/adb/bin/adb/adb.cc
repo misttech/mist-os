@@ -35,7 +35,7 @@ void Adb::ReceiveCallback(
     return;
   }
 
-  size_t data_left = response.value()->data.count();
+  size_t data_left = response.value()->data.size();
   size_t offset = 0;
   size_t copy_len = 0;
   bool complete = false;

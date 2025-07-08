@@ -116,7 +116,7 @@ zx_status_t StreamFileConnection::WriteInternal(const void* data, size_t len, si
 
 void StreamFileConnection::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   size_t actual = 0u;
-  zx_status_t status = WriteInternal(request->data.data(), request->data.count(), &actual);
+  zx_status_t status = WriteInternal(request->data.data(), request->data.size(), &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {
@@ -144,7 +144,7 @@ zx_status_t StreamFileConnection::WriteAtInternal(const void* data, size_t len, 
 void StreamFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter::Sync& completer) {
   size_t actual = 0;
   zx_status_t status =
-      WriteAtInternal(request->data.data(), request->data.count(), request->offset, &actual);
+      WriteAtInternal(request->data.data(), request->data.size(), request->offset, &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {

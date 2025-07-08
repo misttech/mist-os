@@ -80,7 +80,7 @@ void SoftmacIfcBridge::Recv(RecvRequestView fdf_request, fdf::Arena& arena,
 
   fuchsia_wlan_softmac::WlanRxTransferRequest fidl_request;
   fidl_request.packet_address(reinterpret_cast<uint64_t>(fdf_request->packet.mac_frame.data()));
-  fidl_request.packet_size(reinterpret_cast<uint64_t>(fdf_request->packet.mac_frame.count()));
+  fidl_request.packet_size(reinterpret_cast<uint64_t>(fdf_request->packet.mac_frame.size()));
   fidl_request.packet_info(fidl::ToNatural(fdf_request->packet.info));
   fidl_request.async_id(async_id);
   fidl_request.arena(reinterpret_cast<uint64_t>(raw_arena));

@@ -126,7 +126,7 @@ void DeviceManager::Format(FormatRequestView request, FormatCompleter::Sync& com
     completer.Reply(ZX_ERR_BAD_STATE);
     return;
   }
-  completer.Reply(FormatLocked(request->key.data(), request->key.count(), request->slot));
+  completer.Reply(FormatLocked(request->key.data(), request->key.size(), request->slot));
 }
 
 void DeviceManager::Unseal(UnsealRequestView request, UnsealCompleter::Sync& completer) {
@@ -136,7 +136,7 @@ void DeviceManager::Unseal(UnsealRequestView request, UnsealCompleter::Sync& com
     completer.Reply(ZX_ERR_BAD_STATE);
     return;
   }
-  completer.Reply(UnsealLocked(request->key.data(), request->key.count(), request->slot));
+  completer.Reply(UnsealLocked(request->key.data(), request->key.size(), request->slot));
 }
 
 void DeviceManager::Seal(SealCompleter::Sync& completer) {

@@ -83,8 +83,8 @@ zx::result<size_t> Checker::File::Read(void* buf, size_t count) const {
       return zx::error(response.error_value());
     }
     fidl::VectorView<uint8_t> data = response.value()->data;
-    memcpy(dst + offset, data.data(), data.count());
-    offset += data.count();
+    memcpy(dst + offset, data.data(), data.size());
+    offset += data.size();
   }
   return zx::ok(count);
 }

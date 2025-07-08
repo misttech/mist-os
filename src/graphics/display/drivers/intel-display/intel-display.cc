@@ -948,9 +948,9 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
     fdf::error("No image format constraints");
     return ZX_ERR_INVALID_ARGS;
   }
-  if (index >= collection_info.buffers().count()) {
+  if (index >= collection_info.buffers().size()) {
     fdf::error("Invalid index {} greater than buffer count {}", index,
-               collection_info.buffers().count());
+               collection_info.buffers().size());
     return ZX_ERR_OUT_OF_RANGE;
   }
 

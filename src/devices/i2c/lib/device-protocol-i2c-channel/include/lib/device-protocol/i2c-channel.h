@@ -122,11 +122,11 @@ class I2cChannel {
     if (rx_len > 0) {
       const auto& read_data = reply->value()->read_data;
       // Truncate the returned buffer to match the behavior of the Banjo version.
-      if (read_data.count() != 1) {
+      if (read_data.size() != 1) {
         return ZX_ERR_IO;
       }
 
-      memcpy(rx_buf, read_data[0].data(), std::min(rx_len, read_data[0].count()));
+      memcpy(rx_buf, read_data[0].data(), std::min(rx_len, read_data[0].size()));
     }
 
     return ZX_OK;

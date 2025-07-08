@@ -157,7 +157,7 @@ void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceiv
     }
   }
 
-  size_t len = event->buf().count();
+  size_t len = event->buf().size();
   const uint8_t* buf = event->buf().data();
   auto timestamp = event->has_timestamp() ? event->timestamp() : zx_clock_get_monotonic();
 
@@ -245,7 +245,7 @@ zx_status_t HidDevice::SetReportDescriptor() {
       return result->error_value();
     }
     hid_report_desc_ = std::vector<uint8_t>(
-        result.value()->data.data(), result.value()->data.data() + result.value()->data.count());
+        result.value()->data.data(), result.value()->data.data() + result.value()->data.size());
   }
 
   if (!info_.boot_protocol() || *info_.boot_protocol() == fhidbus::wire::HidBootProtocol::kNone) {

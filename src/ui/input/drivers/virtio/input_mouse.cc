@@ -41,7 +41,7 @@ void MouseReport::ToFidlInputReport(
       pressed_buttons[idx++] = i + 1;
     }
   }
-  pressed_buttons.set_count(idx);
+  pressed_buttons.set_size(idx);
 
   auto mouse_rpt = fuchsia_input_report::wire::MouseInputReport::Builder(allocator);
   mouse_rpt.pressed_buttons(pressed_buttons);

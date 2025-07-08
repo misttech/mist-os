@@ -54,8 +54,8 @@ void VmoManager::UnlockVmo(const uint32_t vmo_id) {
 
 StatusCode VmoManager::RegisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
                                     fidl::VectorView<zx::vmo> vmos) {
-  if (vmo_ids.count() != vmos.count() ||
-      vmo_ids.count() > fuchsia_hardware_radar::wire::kVmoVectorMaxCount) {
+  if (vmo_ids.size() != vmos.size() ||
+      vmo_ids.size() > fuchsia_hardware_radar::wire::kVmoVectorMaxCount) {
     return StatusCode::kInvalidArgs;
   }
 
@@ -63,7 +63,7 @@ StatusCode VmoManager::RegisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
 
   zx_status_t status = ZX_OK;
   size_t last_vmo_index = 0;
-  for (; last_vmo_index < vmo_ids.count(); last_vmo_index++) {
+  for (; last_vmo_index < vmo_ids.size(); last_vmo_index++) {
     const uint32_t vmo_id = vmo_ids[last_vmo_index];
 
     status = registered_vmos_.RegisterWithKey(
@@ -124,7 +124,7 @@ StatusCode VmoManager::RegisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
 StatusCode VmoManager::RegisterVmos(fidl::VectorView<uint32_t> vmo_ids,
                                     fidl::VectorView<zx::vmo> vmos) {
   return RegisterVmos(
-      fidl::VectorView<const uint32_t>::FromExternal(vmo_ids.data(), vmo_ids.count()), vmos);
+      fidl::VectorView<const uint32_t>::FromExternal(vmo_ids.data(), vmo_ids.size()), vmos);
 }
 
 fit::result<StatusCode> VmoManager::RegisterVmos(const std::vector<uint32_t>& vmo_ids,
@@ -140,8 +140,8 @@ fit::result<StatusCode> VmoManager::RegisterVmos(const std::vector<uint32_t>& vm
 
 StatusCode VmoManager::UnregisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
                                       fidl::VectorView<zx::vmo> out_vmos) {
-  if (vmo_ids.count() != out_vmos.count() ||
-      vmo_ids.count() > fuchsia_hardware_radar::wire::kVmoVectorMaxCount) {
+  if (vmo_ids.size() != out_vmos.size() ||
+      vmo_ids.size() > fuchsia_hardware_radar::wire::kVmoVectorMaxCount) {
     return StatusCode::kInvalidArgs;
   }
 
@@ -153,7 +153,7 @@ StatusCode VmoManager::UnregisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
     }
   }
 
-  for (size_t i = 0; i < vmo_ids.count(); i++) {
+  for (size_t i = 0; i < vmo_ids.size(); i++) {
     const uint32_t vmo_id = vmo_ids[i];
 
     RemoveVmoId(vmo_id, &unlocked_vmos_);
@@ -170,7 +170,7 @@ StatusCode VmoManager::UnregisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
 StatusCode VmoManager::UnregisterVmos(fidl::VectorView<uint32_t> vmo_ids,
                                       fidl::VectorView<zx::vmo> out_vmos) {
   return UnregisterVmos(
-      fidl::VectorView<const uint32_t>::FromExternal(vmo_ids.data(), vmo_ids.count()), out_vmos);
+      fidl::VectorView<const uint32_t>::FromExternal(vmo_ids.data(), vmo_ids.size()), out_vmos);
 }
 
 fit::result<StatusCode, std::vector<zx::vmo>> VmoManager::UnregisterVmos(

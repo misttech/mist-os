@@ -48,10 +48,10 @@ fdf::async_helpers::AsyncTask FindDirectoryEntries(fidl::ClientEnd<fuchsia_io::D
 
         std::vector<std::string> names;
 
-        while (index + sizeof(dirent) < dirents.count()) {
+        while (index + sizeof(dirent) < dirents.size()) {
           auto packed_entry = reinterpret_cast<const dirent*>(&result->dirents[index]);
           size_t packed_entry_size = sizeof(dirent) + packed_entry->size;
-          if (index + packed_entry_size > dirents.count()) {
+          if (index + packed_entry_size > dirents.size()) {
             break;
           }
           names.emplace_back(packed_entry->name, packed_entry->size);
@@ -92,10 +92,10 @@ zx::result<std::vector<std::string>> FindDirectoryEntries(
 
   std::vector<std::string> names;
 
-  while (index + sizeof(dirent) < dirents.count()) {
+  while (index + sizeof(dirent) < dirents.size()) {
     auto packed_entry = reinterpret_cast<const dirent*>(&result->dirents[index]);
     size_t packed_entry_size = sizeof(dirent) + packed_entry->size;
-    if (index + packed_entry_size > dirents.count()) {
+    if (index + packed_entry_size > dirents.size()) {
       break;
     }
     names.emplace_back(packed_entry->name, packed_entry->size);

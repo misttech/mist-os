@@ -88,7 +88,7 @@ zx_status_t IntelI2cSubordinate::Transfer(const IntelI2cSubordinateSegment* segm
     last_type = segments->type;
 
   while (segment_count--) {
-    auto len = static_cast<ssize_t>(segments->buf.count());
+    auto len = static_cast<ssize_t>(segments->buf.size());
     uint8_t* buf = segments->buf.data();
 
     // If this segment is in the same direction as the last, inject a

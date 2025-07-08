@@ -149,7 +149,7 @@ void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer
         if (!result->value()->has_supported_mac_roles()) {
           completer.ReplyError(ZX_ERR_UNAVAILABLE);
         }
-        if (result->value()->supported_mac_roles().count() >
+        if (result->value()->supported_mac_roles().size() >
             fuchsia::wlan::common::MAX_SUPPORTED_MAC_ROLES) {
           completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
           return;

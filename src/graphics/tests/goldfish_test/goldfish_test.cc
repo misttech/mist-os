@@ -243,7 +243,7 @@ TEST(GoldfishControlTests, GoldfishControlTest) {
   EXPECT_TRUE(wait_result->is_ok());
 
   const auto& info = wait_result->value()->buffer_collection_info();
-  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.buffers().size(), 1U);
 
   zx::vmo vmo = std::move(info.buffers()[0].vmo());
   ASSERT_TRUE(vmo.is_valid());
@@ -364,7 +364,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible) {
   EXPECT_TRUE(wait_result->is_ok());
 
   const auto& info = wait_result->value()->buffer_collection_info();
-  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.buffers().size(), 1U);
   EXPECT_EQ(info.settings().buffer_settings().coherency_domain(),
             fuchsia_sysmem2::wire::CoherencyDomain::kCpu);
 
@@ -514,7 +514,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible_MultiClients) {
   EXPECT_TRUE(wait_result->is_ok());
 
   const auto& info = wait_result->value()->buffer_collection_info();
-  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.buffers().size(), 1U);
   EXPECT_EQ(info.settings().buffer_settings().coherency_domain(),
             fuchsia_sysmem2::wire::CoherencyDomain::kCpu);
 
@@ -680,7 +680,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateColorBuffer2Args) {
   EXPECT_TRUE(wait_result->is_ok());
 
   const auto& info = wait_result->value()->buffer_collection_info();
-  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.buffers().size(), 1U);
 
   zx::vmo vmo = std::move(info.buffers()[0].vmo());
   ASSERT_TRUE(vmo.is_valid());
@@ -826,7 +826,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_GetNotCreatedColorBuffer) {
   EXPECT_TRUE(wait_result->is_ok());
 
   const auto& info = wait_result->value()->buffer_collection_info();
-  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.buffers().size(), 1U);
 
   zx::vmo vmo = std::move(info.buffers()[0].vmo());
   ASSERT_TRUE(vmo.is_valid());
@@ -1092,7 +1092,7 @@ TEST(GoldfishHostMemoryTests, GoldfishHostVisibleColorBuffer) {
   EXPECT_TRUE(wait_result->is_ok());
 
   const auto& info = wait_result->value()->buffer_collection_info();
-  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.buffers().size(), 1U);
 
   zx::vmo vmo = std::move(info.buffers()[0].vmo());
   ASSERT_TRUE(vmo.is_valid());
@@ -1228,7 +1228,7 @@ TEST_P(GoldfishCreateColorBufferTest, CreateColorBufferWithFormat) {
   EXPECT_TRUE(wait_result->is_ok());
 
   const auto& info = wait_result->value()->buffer_collection_info();
-  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.buffers().size(), 1U);
 
   zx::vmo vmo = std::move(info.buffers()[0].vmo());
   ASSERT_TRUE(vmo.is_valid());

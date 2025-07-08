@@ -75,10 +75,10 @@ class I2cRegisterBase : public RegisterBase<DerivedType, IntType, PrinterState> 
       return response.value().error_value();
     }
 
-    if (response.value().value()->read_data.count() != 1) {
+    if (response.value().value()->read_data.size() != 1) {
       return ZX_ERR_BAD_STATE;
     }
-    if (response.value().value()->read_data[0].count() != sizeof(IntType)) {
+    if (response.value().value()->read_data[0].size() != sizeof(IntType)) {
       return ZX_ERR_BAD_STATE;
     }
 

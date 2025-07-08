@@ -84,7 +84,7 @@ zx::result<zbi_swfb_t> GetFramebufferInfo(fdf::Namespace& incoming) {
     return zx::error(result->error_value());
   }
   fidl::VectorView items = result->value()->retrieved_items;
-  if (items.count() == 0) {
+  if (items.size() == 0) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   if (items[0].length < sizeof(zbi_swfb_t)) {

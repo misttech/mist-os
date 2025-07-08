@@ -244,7 +244,7 @@ std::optional<fdecl::wire::Offer> CreateCompositeServiceOffer(fidl::AnyArena& ar
     return std::nullopt;
   }
 
-  size_t new_instance_count = offer.service().renamed_instances().count();
+  size_t new_instance_count = offer.service().renamed_instances().size();
   if (primary_parent) {
     for (auto& instance : offer.service().renamed_instances()) {
       if (IsDefaultOffer(instance.target_name.get())) {
@@ -253,7 +253,7 @@ std::optional<fdecl::wire::Offer> CreateCompositeServiceOffer(fidl::AnyArena& ar
     }
   }
 
-  size_t new_filter_count = offer.service().source_instance_filter().count();
+  size_t new_filter_count = offer.service().source_instance_filter().size();
   if (primary_parent) {
     for (auto& filter : offer.service().source_instance_filter()) {
       if (IsDefaultOffer(filter.get())) {
@@ -788,14 +788,14 @@ std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
         // request failed. If we do get it, we will continue to wait for the driver's start hook
         // to complete, which will only occur after the successful bind. The remaining flow will
         // be similar to the RestartNode flow.
-        if (info.count() < 1) {
+        if (info.size() < 1) {
           // Failed binding attempt should make the node have an unbound url. Reset this in case
           // there was a previous driver on this node that had failed to start and was stored
           // in quarantine_driver_url_ as part of the node quarantining.
           self->quarantine_driver_url_.reset();
 
           self->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
-        } else if (info.count() > 1) {
+        } else if (info.size() > 1) {
           LOGF(ERROR, "Unexpectedly bound multiple drivers to a single node");
           self->CompleteBind(zx::error(ZX_ERR_BAD_STATE));
         }

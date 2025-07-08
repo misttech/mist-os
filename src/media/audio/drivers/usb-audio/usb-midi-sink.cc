@@ -128,7 +128,7 @@ void UsbMidiSink::Read(ReadCompleter::Sync& completer) {
 }
 
 void UsbMidiSink::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
-  auto status = WriteInternal(request->data.data(), request->data.count());
+  auto status = WriteInternal(request->data.data(), request->data.size());
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
