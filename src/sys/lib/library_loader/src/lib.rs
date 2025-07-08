@@ -7,14 +7,13 @@ use fidl::prelude::*;
 use fidl_fuchsia_ldsvc::{LoaderRequest, LoaderRequestStream};
 use futures::{TryFutureExt, TryStreamExt};
 use log::*;
-use std::sync::Arc;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Helper function to load `object_name` from `search_dirs`.
 /// This function looks in the given directories, and returns the
 /// first VMO matching |object_name| that is found.
 pub async fn load_object(
-    search_dirs: &Vec<Arc<fio::DirectoryProxy>>,
+    search_dirs: &Vec<fio::DirectoryProxy>,
     object_name: &str,
 ) -> Result<zx::Vmo, Vec<Error>> {
     let mut errors = vec![];
@@ -34,7 +33,7 @@ pub async fn load_object(
 ///
 /// `lib_proxy` must have been opened with at minimum OPEN_RIGHT_READABLE and OPEN_RIGHT_EXECUTABLE
 /// rights.
-pub fn start(lib_proxy: Arc<fio::DirectoryProxy>, chan: zx::Channel) {
+pub fn start(lib_proxy: fio::DirectoryProxy, chan: zx::Channel) {
     start_with_multiple_dirs(vec![lib_proxy], chan);
 }
 
@@ -44,7 +43,7 @@ pub fn start(lib_proxy: Arc<fio::DirectoryProxy>, chan: zx::Channel) {
 ///
 /// Each library directory must have been opened with at minimum OPEN_RIGHT_READABLE and
 /// OPEN_RIGHT_EXECUTABLE rights.
-pub fn start_with_multiple_dirs(lib_dirs: Vec<Arc<fio::DirectoryProxy>>, chan: zx::Channel) {
+pub fn start_with_multiple_dirs(lib_dirs: Vec<fio::DirectoryProxy>, chan: zx::Channel) {
     fasync::Task::spawn(
         async move {
             let mut search_dirs = lib_dirs.clone();
@@ -120,9 +119,9 @@ pub async fn load_vmo<'a>(
 /// `//docs/concepts/booting/program_loading.md` for a description of the format. Returns the set
 /// of directories which should be searched for objects.
 pub fn parse_config_string(
-    lib_dirs: &Vec<Arc<fio::DirectoryProxy>>,
+    lib_dirs: &Vec<fio::DirectoryProxy>,
     config: &str,
-) -> Result<Vec<Arc<fio::DirectoryProxy>>, Error> {
+) -> Result<Vec<fio::DirectoryProxy>, Error> {
     if config.contains("/") {
         return Err(format_err!("'/' character found in loader service config string"));
     }
@@ -137,7 +136,7 @@ pub fn parse_config_string(
             config,
             fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_EXECUTABLE,
         )?;
-        search_dirs.push(Arc::new(sub_dir_proxy));
+        search_dirs.push(sub_dir_proxy);
     }
     if search_root {
         search_dirs.append(&mut lib_dirs.clone());

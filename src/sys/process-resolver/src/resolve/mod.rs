@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use log::warn;
-use std::sync::Arc;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc};
 
 mod serve;
@@ -52,7 +51,7 @@ pub async fn get_binary_and_loader_from_pkg_dir(
         Ok(lib_dir) => {
             let (ldsvc, server_end) = fidl::endpoints::create_endpoints::<fldsvc::LoaderMarker>();
             let server_end = server_end.into_channel();
-            library_loader::start(Arc::new(lib_dir), server_end);
+            library_loader::start(lib_dir, server_end);
             Some(ldsvc)
         }
         Err(e) => {
