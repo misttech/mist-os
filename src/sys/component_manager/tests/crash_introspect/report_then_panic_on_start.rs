@@ -11,7 +11,8 @@ use {fidl_fuchsia_test as ftest, fuchsia_runtime as fruntime};
 async fn main() {
     info!("started");
 
-    let my_thread_koid = fruntime::thread_self().get_koid().expect("failed to get thread koid");
+    let my_thread_koid =
+        fruntime::with_thread_self(|thread| thread.get_koid().expect("failed to get thread koid"));
     let thread_koid_reporter_proxy =
         fclient::connect_to_protocol::<ftest::ThreadKoidReporterMarker>()
             .expect("failed to connect to thread koid reporter");

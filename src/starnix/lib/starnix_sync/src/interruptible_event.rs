@@ -234,9 +234,9 @@ mod test {
 
         let event = Arc::new(InterruptibleEvent::new());
 
-        let root_thread_handle =
-            fuchsia_runtime::thread_self().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-        let root_thread_koid = fuchsia_runtime::thread_self().get_koid().unwrap();
+        let (root_thread_handle, root_thread_koid) = fuchsia_runtime::with_thread_self(|thread| {
+            (thread.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(), thread.get_koid().unwrap())
+        });
 
         let event_for_blocked_thread = event.clone();
 
@@ -267,9 +267,10 @@ mod test {
         std::thread::scope(|s| {
             s.spawn(|| {
                 new_owner = Some(
-                    fuchsia_runtime::thread_self()
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .unwrap(),
+                    fuchsia_runtime::with_thread_self(|thread| {
+                        thread.duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    })
+                    .unwrap(),
                 );
             });
         });

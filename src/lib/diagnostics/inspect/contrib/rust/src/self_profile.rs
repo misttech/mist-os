@@ -219,7 +219,7 @@ impl ProfileDurationTree {
 }
 
 fn current_thread_runtime() -> zx::TaskRuntimeInfo {
-    fuchsia_runtime::thread_self()
-        .get_runtime_info()
-        .expect("should always be able to read own thread's runtime info")
+    fuchsia_runtime::with_thread_self(|thread| {
+        thread.get_runtime_info().expect("should always be able to read own thread's runtime info")
+    })
 }

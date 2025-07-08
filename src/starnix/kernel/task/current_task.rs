@@ -1097,7 +1097,7 @@ impl CurrentTask {
         } else {
             path
         };
-        set_zx_name(&fuchsia_runtime::thread_self(), basename.as_bytes());
+        fuchsia_runtime::with_thread_self(|thread| set_zx_name(thread, basename.as_bytes()));
         self.set_command_name(basename);
 
         Ok(())

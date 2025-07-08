@@ -212,10 +212,10 @@ impl PerThreadData {
 fn get_current_thread_koid_and_name(koid_cache: &mut Option<zx::Koid>) -> (zx::Koid, zx::Name) {
     // Obtain the koid and the name of the current thread. Unlike the koid, the thread name
     // cannot be cached as it can change between calls.
-    let thread = fuchsia_runtime::thread_self();
-    let koid = koid_cache
-        .get_or_insert_with(|| thread.get_koid().expect("failed to get current thread's koid"));
-    let name = thread.get_name().expect("failed to get current thread's name");
-
-    (*koid, name)
+    fuchsia_runtime::with_thread_self(|thread| {
+        let koid = koid_cache
+            .get_or_insert_with(|| thread.get_koid().expect("failed to get current thread's koid"));
+        let name = thread.get_name().expect("failed to get current thread's name");
+        (*koid, name)
+    })
 }

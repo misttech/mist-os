@@ -26,9 +26,9 @@ pub(crate) struct SinkConfig {
 thread_local! {
     static PROCESS_ID: zx::Koid =
         rt::process_self().get_koid().unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX));
-    static THREAD_ID: zx::Koid = rt::thread_self()
-        .get_koid()
-        .unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX));
+    static THREAD_ID: zx::Koid = rt::with_thread_self(|thread| {
+        thread.get_koid().unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX))
+    });
 }
 
 pub(crate) struct Sink {
