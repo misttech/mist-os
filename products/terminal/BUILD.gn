@@ -52,13 +52,6 @@ group("products") {
   }
 }
 
-bazel_product_configuration("terminal_product") {
-  testonly = true
-  name = "terminal"
-  bazel_product_configuration_target = ":product_config"
-  deps = common_bazel_inputs
-}
-
 group("terminal") {
   testonly = true
   if (current_cpu == "x64") {
