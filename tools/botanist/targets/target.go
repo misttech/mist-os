@@ -648,6 +648,11 @@ type Options struct {
 
 	// AuthorizedKey is the authorized key file corresponding to the private SSH key.
 	AuthorizedKey string
+
+	// SerialLogDir is the path to the directory to write serial logs to. This is used
+	// for emulators that aren't configured as a serial device that we can read from/write to.
+	// Instead, we'll just copy the emulator output to a file in this dir within the Start() method.
+	SerialLogDir string
 }
 
 // FromJSON parses a Base target from JSON config.
