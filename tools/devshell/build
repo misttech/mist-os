@@ -221,6 +221,7 @@ function main {
 
   if [[ -n "${quiet}" ]]; then
     ninja_switches+=("--quiet")
+    export FX_BUILD_QUIET=1
   fi
 
   # Set no_checks=true when running a Ninja tool or printing the Ninja help.

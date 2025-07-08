@@ -1272,6 +1272,10 @@ def main() -> int:
     if jobs:
         cmd += [f"--jobs={jobs}"]
 
+    quiet = os.environ.get("FX_BUILD_QUIET") == "1"
+    if quiet:
+        cmd += ["--config=quiet"]
+
     if _DEBUG:
         debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
 
@@ -1290,10 +1294,29 @@ def main() -> int:
             " \\\n  ".join(shlex.quote(c) for c in cmd) + "\n",
         )
 
-    # NOTE: It is important to NOT capture output from this subprocess, to make
-    # sure console output from Bazel are correctly printed out by Ninja.
-    ret = subprocess.run(cmd)
+    if quiet:
+        # Even when using `--config=quiet`, Bazel insists on printing some output when
+        # it runs in an interactive terminal.
+        # Capture the outputs to ensure that does not happen.
+        ret = subprocess.run(
+            cmd,
+            text=False,
+            check=False,
+            capture_output=True,
+        )
+    else:
+        # NOTE: It is important to NOT capture output from this subprocess, to make
+        # sure console output from Bazel are correctly printed out by Ninja.
+        ret = subprocess.run(cmd)
+
     if ret.returncode != 0:
+        if quiet:
+            # Print the captured outputs in quiet mode to help debugging build errors.
+            if ret.stdout:
+                sys.stdout.buffer.write(ret.stdout)
+            if ret.stderr:
+                sys.stderr.buffer.write(ret.stderr)
+
         # Detect the error message corresponding to a Bazel target
         # referencing a @gn_targets//<dir>:<name> label
         # that does not exist. This happens when the GN bazel_action()
