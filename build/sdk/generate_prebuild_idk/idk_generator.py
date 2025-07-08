@@ -227,6 +227,7 @@ class PrebuildMap(object):
                     # TODO(https://fxbug.dev/42131085): verify that such
                     # libraries are header-only.
                     "cc_source_library",
+                    "none",
                 ]
             case "fidl_library":
                 allowed_deps_types = ["fidl_library"]
