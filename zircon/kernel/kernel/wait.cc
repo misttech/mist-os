@@ -211,9 +211,10 @@ Thread* WaitQueueCollection::Peek(zx_instant_mono_t signed_now) {
   const Thread& front = threads_.front();
   MarkInWaitQueue(front);
 
-  if (IsFairThreadSortBitSet(front)) {
-    // Front of the queue is a fair thread, which means that there are no
-    // deadline threads in the queue.  This thread is our best choice.
+  if (IsFairThreadSortBitSet(front) || Count() == 1) {
+    // Front of the queue is a fair thread, or the only thread, which means that
+    // there are no other deadline threads in the queue.  This thread is our
+    // best choice.
     return const_cast<Thread*>(&front);
   }
 
