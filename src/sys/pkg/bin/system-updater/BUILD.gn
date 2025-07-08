@@ -25,6 +25,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
+    "//sdk/fidl/fuchsia.net.http:fuchsia.net.http_rust",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//sdk/fidl/fuchsia.space:fuchsia.space_rust",
@@ -65,6 +66,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:url",
     "//third_party/rust_crates:uuid",
   ]
   non_rust_deps = [ ":epoch.json" ]
@@ -85,6 +87,7 @@ rustc_binary("bin") {
     "src/update.rs",
     "src/update/config.rs",
     "src/update/environment.rs",
+    "src/update/fetch.rs",
     "src/update/genutil.rs",
     "src/update/history.rs",
     "src/update/history/version.rs",
@@ -128,6 +131,7 @@ fuchsia_structured_config_rust_lib("config_lib") {
 
 structured_config_values = {
   concurrent_package_resolves = 5
+  enable_attempt_v2 = false
 }
 
 fuchsia_structured_config_values("config_values_from_gn") {

@@ -27,6 +27,7 @@ use {
 
 mod config;
 mod environment;
+mod fetch;
 mod genutil;
 mod history;
 mod metrics;
@@ -97,6 +98,12 @@ enum PrepareError {
 
     #[error("force-recovery mode is incompatible with skip-recovery option")]
     VerifyUpdateMode,
+
+    #[error("while parsing update package url")]
+    ParseUpdatePackageUrl(#[source] fuchsia_url::ParseError),
+
+    #[error("while fetching update url")]
+    FetchUrl(#[source] fetch::FetchError),
 }
 
 impl PrepareError {
@@ -239,6 +246,7 @@ impl Updater for RealUpdater {
             Arc::clone(&self.history),
             reboot_controller,
             self.structured_config.concurrent_package_resolves.into(),
+            self.structured_config.enable_attempt_v2,
             cancel_receiver,
         )
         .await;
@@ -261,6 +269,7 @@ async fn update(
     history: Arc<Mutex<UpdateHistory>>,
     reboot_controller: RebootController,
     concurrent_package_resolves: usize,
+    enable_attempt_v2: bool,
     mut cancel_receiver: oneshot::Receiver<()>,
 ) -> (String, impl FusedStream<Item = fupdate_installer_ext::State>) {
     let attempt_fut = history.lock().start_update_attempt(
@@ -269,7 +278,7 @@ async fn update(
             allow_attach_to_existing_attempt: config.allow_attach_to_existing_attempt,
             should_write_recovery: config.should_write_recovery,
         },
-        config.update_url.clone(),
+        &config.update_url,
         config.start_time,
         &env.data_sink,
         &env.boot_manager,
@@ -298,9 +307,16 @@ async fn update(
         let mut target_version = history::Version::default();
 
         let attempt_res = {
-            let attempt_fut = Attempt { config: &config, env: &env, concurrent_package_resolves }
-                .run(&mut co, &mut phase, &mut target_version)
-                .fuse();
+            let attempt_fut = match config.update_url.scheme() {
+                "http" | "https" if enable_attempt_v2 => AttemptV2 { config: &config, env: &env }
+                    .run(&mut co, &mut phase, &mut target_version)
+                    .left_future()
+                    .fuse(),
+                _ => Attempt { config: &config, env: &env, concurrent_package_resolves }
+                    .run(&mut co, &mut phase, &mut target_version)
+                    .right_future()
+                    .fuse(),
+            };
 
             futures::pin_mut!(attempt_fut);
 
@@ -747,16 +763,18 @@ impl Attempt<'_> {
             .await
             .map_err(PrepareError::PreparePartitionMetdata)?;
 
+        let update_url = AbsolutePackageUrl::from_url(&self.config.update_url)
+            .map_err(PrepareError::ParseUpdatePackageUrl)?;
         let update_pkg = resolve_update_package(
             &self.env.pkg_resolver,
-            &self.config.update_url,
+            &update_url,
             &self.env.space_manager,
             &self.env.retained_packages,
         )
         .await
         .map_err(PrepareError::ResolveUpdate)?;
 
-        let update_package_hash = if let Some(hash) = self.config.update_url.hash() {
+        let update_package_hash = if let Some(hash) = update_url.hash() {
             Some(hash)
         } else {
             match update_pkg.hash().await {
@@ -1079,6 +1097,78 @@ impl Attempt<'_> {
         }
 
         Ok(())
+    }
+}
+
+// Update attempt that uses a manifest instead of update package.
+struct AttemptV2<'a> {
+    config: &'a Config,
+    env: &'a Environment,
+}
+
+impl AttemptV2<'_> {
+    // Run the update attempt, if update is canceled, any await during this attempt could be an
+    // early return point.
+    async fn run(
+        mut self,
+        co: &mut async_generator::Yield<fupdate_installer_ext::State>,
+        _phase: &mut metrics::Phase,
+        target_version: &mut history::Version,
+    ) -> Result<
+        (state::WaitToReboot, update_package::UpdateMode, Vec<fio::DirectoryProxy>),
+        AttemptError,
+    > {
+        // Prepare
+        let state = state::Prepare::enter(co).await;
+
+        let _current_configuration = match self.prepare(target_version).await {
+            Ok(current_configuration) => current_configuration,
+            Err(e) => {
+                state.fail(co, e.reason()).await;
+                return Err(e.into());
+            }
+        };
+
+        unimplemented!("AttemptV2 is still work in progress");
+    }
+
+    /// Acquire the necessary data to perform the update.
+    ///
+    /// This includes fetching the update manifest, which contains the list of blobs in the
+    /// target OS and partition images that need written.
+    async fn prepare(
+        &mut self,
+        _target_version: &mut history::Version,
+    ) -> Result<paver::CurrentConfiguration, PrepareError> {
+        // Ensure that the partition boot metadata is ready for the update to begin. Specifically:
+        // - the current configuration must be Healthy and Active, and
+        // - the non-current configuration must be Unbootable.
+        //
+        // If anything goes wrong, abort the update. See the comments in
+        // `prepare_partition_metadata` for why this is justified.
+        //
+        // We do this here rather than just before we write images because this location allows us
+        // to "unstage" a previously staged OS in the non-current configuration that would otherwise
+        // become active on next reboot. If we moved this to just before writing images, we would be
+        // susceptible to a bug of the form:
+        // - A is active/current running system version 1.
+        // - Stage an OTA of version 2 to B, B is now marked active. Defer reboot.
+        // - Start to stage a new OTA (version 3). Fetch packages encounters an error after fetching
+        //   half of the updated packages.
+        // - Retry the attempt for the new OTA (version 3). This GC may delete packages from the
+        //   not-yet-booted system (version 2).
+        // - Interrupt the update attempt, reboot.
+        // - System attempts to boot to B (version 2), but the packages are not all present anymore
+        let current_config = paver::prepare_partition_metadata(&self.env.boot_manager)
+            .await
+            .map_err(PrepareError::PreparePartitionMetdata)?;
+
+        let _manifest_bytes = fetch::fetch_url(self.config.update_url.to_string())
+            .await
+            .map_err(PrepareError::FetchUrl)?;
+
+        // TODO(https://fxbug.dev/429271527): parse manifest
+        Ok(current_config)
     }
 }
 

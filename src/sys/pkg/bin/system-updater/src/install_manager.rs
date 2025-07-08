@@ -224,7 +224,7 @@ async fn handle_active_control_request<N>(
     req: ControlRequest<N>,
     monitor_queue: &mut event_queue::ControlHandle<N>,
     attempt_id: &str,
-    update_url: &fuchsia_url::AbsolutePackageUrl,
+    update_url: &url::Url,
     should_write_recovery: bool,
     suspend_state: &mut SuspendState,
     suspend_deadline: zx::MonotonicInstant,
