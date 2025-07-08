@@ -36,5 +36,4 @@ rust_proto_library("perfetto_trace_protos") {
       [ "//third_party/perfetto/protos/perfetto/trace/perfetto_trace.proto" ]
   packages = [ "perfetto.protos" ]
   include_dirs = [ "//third_party/perfetto" ]
-  quiet_clippy = true
 }
