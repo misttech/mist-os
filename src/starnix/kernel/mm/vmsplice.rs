@@ -79,11 +79,10 @@ impl VmsplicePayloadSegment {
 /// is modified such that the original segment is partially unmapped.
 ///
 /// When the `VmsplicePayload` is created, it will be appended to its associated
-/// memory manager's [`InflightVmsplicedPayloads`]. When the `VmsplicePayload`
-/// is dropped, it will remove itself from the [`InflightVmsplicedPayloads`].
+/// memory manager's [`InflightVmsplicedPayloads`]. The list cleans itself when
+/// `handle_unmapping` is run.
 #[derive(Debug, Default)]
 pub struct VmsplicePayload {
-    self_weak_ref: Weak<VmsplicePayload>,
     mapping: Weak<MemoryManager>,
     segments: Mutex<SmallVec<[VmsplicePayloadSegment; 1]>>,
 }
@@ -98,25 +97,11 @@ impl VmsplicePayload {
         segments: SmallVec<[VmsplicePayloadSegment; 1]>,
     ) -> Arc<Self> {
         let mapping_strong = mapping.upgrade();
-        let payload = Arc::new_cyclic(|self_weak_ref| Self {
-            self_weak_ref: self_weak_ref.clone(),
-            mapping,
-            segments: Mutex::new(segments),
-        });
+        let payload = Arc::new(Self { mapping, segments: Mutex::new(segments) });
         if let Some(mapping) = mapping_strong {
             mapping.inflight_vmspliced_payloads.handle_new_payload(&payload);
         }
         payload
-    }
-}
-
-impl Drop for VmsplicePayload {
-    fn drop(&mut self) {
-        let Some(mapping) = self.mapping.upgrade() else {
-            return;
-        };
-
-        mapping.inflight_vmspliced_payloads.handle_payload_consumed(&self.self_weak_ref);
     }
 }
 
@@ -281,22 +266,20 @@ impl InflightVmsplicedPayloads {
         self.payloads.lock().push(Arc::downgrade(payload));
     }
 
-    fn handle_payload_consumed(&self, consumed: &Weak<VmsplicePayload>) {
-        let mut payloads = self.payloads.lock();
-        let len_prev = payloads.len();
-        payloads.retain(|payload| !payload.ptr_eq(consumed));
-        debug_assert_eq!(len_prev, payloads.len() + 1);
-    }
-
     pub fn handle_unmapping(
         &self,
         unmapped_memory: &Arc<MemoryObject>,
         unmapped_range: &Range<UserAddress>,
     ) -> Result<(), Errno> {
-        for payload in self.payloads.lock().iter() {
-            let Some(payload) = payload.upgrade() else {
+        // Iterate over payloads while removing any deleted payload.
+        let mut payloads = self.payloads.lock();
+        let mut index = 0;
+        while index < payloads.len() {
+            let Some(payload) = payloads[index].upgrade() else {
+                payloads.swap_remove(index);
                 continue;
             };
+            index += 1;
 
             let mut segments = payload.segments.lock();
             let mut new_segments = SmallVec::new();
@@ -419,6 +402,12 @@ mod tests {
         assert_eq!(got.data(), &bytes);
 
         std::mem::drop(payload);
+
+        // Run the unmapping again to ensure payload is dropped.
+        mm.inflight_vmspliced_payloads
+            .handle_unmapping(&memory, &(UserAddress::NULL..page_size.into()))
+            .unwrap();
+
         assert!(mm.inflight_vmspliced_payloads.payloads.lock().is_empty());
     }
 }
