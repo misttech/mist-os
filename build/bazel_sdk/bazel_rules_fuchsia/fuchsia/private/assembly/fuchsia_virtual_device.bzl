@@ -13,7 +13,9 @@ ARCH = struct(
 )
 
 def _fuchsia_virtual_device_impl(ctx):
-    virtual_device_file = ctx.actions.declare_file(ctx.attr.device_name + ".json")
+    # Use Label name for output file to avoid conflicts. It's possible for different virtual device
+    # targets to share the same device name.
+    virtual_device_file = ctx.actions.declare_file(ctx.label.name + ".json")
     virtual_device = {
         "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device.json",
         "data": {

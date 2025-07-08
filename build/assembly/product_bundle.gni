@@ -98,17 +98,17 @@ template("product_bundle") {
     # If virtual devices were not specified by the invoker, add
     # the "default" devices if the board type supports the emulator.
   } else if (board_is_emu) {
-    virtual_devices = [
-      "$root_build_dir/virtual_device_recommended.json",
-      "$root_build_dir/virtual_device_min.json",
-      "$root_build_dir/virtual_device_large.json",
-    ]
-    bundle_deps += [
-      "//build/virtual-devices:virtual_device_specification_large",
-      "//build/virtual-devices:virtual_device_specification_min",
-      "//build/virtual-devices:virtual_device_specification_recommended",
-    ]
-    default_virtual_device = "virtual_device_recommended"
+    virtual_devices = []
+    foreach(virtual_device,
+            [
+              "${board_name}-emu-recommended",
+              "${board_name}-emu-min",
+              "${board_name}-emu-large",
+            ]) {
+      virtual_devices += [ "${root_build_dir}/${virtual_device}.json" ]
+      bundle_deps += [ "//build/virtual-devices:${virtual_device}" ]
+    }
+    default_virtual_device = "${board_name}-emu-recommended"
   }
 
   skip_transfer_manifest = false

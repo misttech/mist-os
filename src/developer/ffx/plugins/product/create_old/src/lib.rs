@@ -108,8 +108,9 @@ pub async fn pb_create_with_sdk_version(
     for path in &cmd.virtual_device {
         let device = VirtualDevice::try_load_from(&path)
             .with_context(|| format!("Parsing file as virtual device: '{}'", path))?;
-        let name = path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path));
-        pb_builder = pb_builder.virtual_device(name, device);
+        let file_name =
+            path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path));
+        pb_builder = pb_builder.virtual_device(file_name, device);
     }
     if let Some(recommended_device) = &cmd.recommended_device {
         pb_builder = pb_builder.recommended_virtual_device(recommended_device.clone());
@@ -143,9 +144,6 @@ mod test {
     use std::fs;
     use std::io::Write;
     use tempfile::TempDir;
-
-    const VIRTUAL_DEVICE_VALID: &str =
-        include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");
 
     #[fuchsia::test]
     async fn test_pb_create_minimal() {
@@ -517,12 +515,15 @@ mod test {
 
         let vd_path1 = tempdir.join("device_1.json");
         let vd_path2 = tempdir.join("device_2.json");
-        let template_path = tempdir.join("device_1.json.template");
         let mut vd_file1 = File::create(&vd_path1)?;
         let mut vd_file2 = File::create(&vd_path2)?;
-        File::create(&template_path)?;
-        vd_file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-        vd_file2.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        File::create(tempdir.join("device.json.template"))?;
+        const DEVICE_1: &str =
+            include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");
+        const DEVICE_2: &str =
+            include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device2.json");
+        vd_file1.write_all(DEVICE_1.as_bytes())?;
+        vd_file2.write_all(DEVICE_2.as_bytes())?;
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
 
@@ -538,7 +539,7 @@ mod test {
                 update_package_version_file: None,
                 update_package_epoch: None,
                 virtual_device: vec![vd_path1, vd_path2],
-                recommended_device: Some("device_2".to_string()),
+                recommended_device: Some("device2".to_string()),
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
                 with_deprecated_flash_manifest: true,
@@ -587,14 +588,14 @@ mod test {
 
         let devices = manifest.device_names();
         assert_eq!(devices.len(), 2);
-        assert!(devices.contains(&"device_1".to_string()));
-        assert!(devices.contains(&"device_2".to_string()));
+        assert!(devices.contains(&"device".to_string()));
+        assert!(devices.contains(&"device2".to_string()));
 
-        let device1 = manifest.device("device_1");
+        let device1 = manifest.device("device");
         assert!(device1.is_ok(), "{:?}", device1.unwrap_err());
         assert!(matches!(device1, Ok(VirtualDevice::V1(VirtualDeviceV1 { .. }))));
 
-        let device2 = manifest.device("device_2");
+        let device2 = manifest.device("device2");
         assert!(device2.is_ok(), "{:?}", device2.unwrap_err());
         assert!(matches!(device2, Ok(VirtualDevice::V1(VirtualDeviceV1 { .. }))));
 

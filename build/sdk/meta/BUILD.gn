@@ -100,6 +100,8 @@ if (is_host) {
       "host_tool.json",
       "manifest.json",
       "test_data/virtual_device.json",
+      "test_data/virtual_device2.json",
+      "test_data/virtual_device3.json",
       "test_data/empty_vd_manifest.json",
       "test_data/single_vd_manifest.json",
       "test_data/multi_vd_manifest.json",

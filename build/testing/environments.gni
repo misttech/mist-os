@@ -289,7 +289,7 @@ _all_named_fuchsia_envs += [
 qemu_1cpu_env = {
   forward_variables_from(qemu_env, "*")
   virtual_device_spec = {
-    name = "virtual_device_min"
+    name = "${board_name}-emu-min"
     env_name = "1cpu"
   }
 }

@@ -8,9 +8,6 @@ if (board_is_emu) {
   # Append '-emu' to the end of the device_name in order to make it unique for
   # cases where the board is compatible with a physical and virtual device.
   device_name = "${board_name}-emu"
-  if (virtual_device_name_prefix != "") {
-    device_name = "${virtual_device_name_prefix}-${device_name}"
-  }
 
   # Certain variants require more memory.
   need_more_memory =
@@ -24,11 +21,11 @@ if (board_is_emu) {
 
   # Add the recommended configuration first. This is the default
   # used unless a specific device is requested.
-  virtual_device_specification("virtual_device_specification_recommended") {
+  virtual_device_specification("${device_name}-recommended") {
     testonly = true
-    name = "${device_name}-recommended"
+    name = target_name
     description = "Recommended configuration for running this product"
-    output = "$root_build_dir/virtual_device_recommended.json"
+    output = "${root_build_dir}/${name}.json"
     if (need_more_memory) {
       memory = {
         quantity = recommended_memory
@@ -46,11 +43,11 @@ if (board_is_emu) {
   }
 
   # Add the Minimum configuration
-  virtual_device_specification("virtual_device_specification_min") {
+  virtual_device_specification("${device_name}-min") {
     testonly = true
-    name = "${device_name}-min"
+    name = target_name
     description = "Minimum configuration for running this product"
-    output = "$root_build_dir/virtual_device_min.json"
+    output = "${root_build_dir}/${name}.json"
     memory = {
       if (need_more_memory) {
         quantity = recommended_memory
@@ -71,11 +68,11 @@ if (board_is_emu) {
   }
 
   # Add a Large configuration
-  virtual_device_specification("virtual_device_specification_large") {
+  virtual_device_specification("${device_name}-large") {
     testonly = true
-    name = "${device_name}-large"
+    name = target_name
     description = "Larger configuration for running this product with extra storage and memory"
-    output = "$root_build_dir/virtual_device_large.json"
+    output = "${root_build_dir}/${name}.json"
     storage = {
       quantity = 10
       units = "gigabytes"

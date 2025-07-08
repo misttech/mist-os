@@ -582,7 +582,9 @@ fn write_virtual_devices(
             .with_context(|| format!("Writing virtual device: {}", device_file_path))?;
 
         // Add the virtual device to the manifest.
-        manifest.device_paths.insert(name, device_file_name);
+        if let Some(_) = manifest.device_paths.insert(name.clone(), device_file_name) {
+            anyhow::bail!("Multiple virtual device entries for: {}", name);
+        }
     }
 
     // Write the manifest into the directory.
@@ -767,13 +769,12 @@ mod test {
         assert_eq!(expected, product_bundle);
 
         // Fetch the VD by name.
-        // Yes... vd_file_name is correct although unexpected.
         let virtual_device = product_bundle.get_device(&Some("my_virtual_device".into())).unwrap();
-        assert_eq!("vd_file_name", virtual_device.name.as_str());
+        assert_eq!("my_virtual_device", virtual_device.name.as_str());
 
         // Fetch the VD as the default/recommended.
         let virtual_device = product_bundle.get_device(&None).unwrap();
-        assert_eq!("vd_file_name", virtual_device.name.as_str());
+        assert_eq!("my_virtual_device", virtual_device.name.as_str());
 
         // Check the size report.
         let size_report_file = std::fs::File::open(size_report_path).unwrap();

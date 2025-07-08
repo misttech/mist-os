@@ -3,7 +3,7 @@
     "data": {
         "description": "Some device description",
         "type": "virtual_device",
-        "name": "device",
+        "name": "device2",
         "hardware": {
             "audio": {
                 "model": "hda"
