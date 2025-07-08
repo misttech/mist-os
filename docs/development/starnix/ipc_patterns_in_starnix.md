@@ -58,10 +58,11 @@ selecting FIDL bindings in Starnix.
 
   However, keep in mind that if a request can be blocked for a non-trivial amount
   of time, the Starnix thread making the request, which is blocked, cannot be
-  killed by a Linux signal. The Zircon team is working on adding a mechanism for
-  interrupting a thread that is blocked in a `zx_channel_call`. But until Starnix
-  supports such a mechanism, you need to be careful about when to block Starnix
-  threads in synchronous FIDL calls.
+  killed by a Linux signal. The Zircon team has explored adding a mechanism for
+  interrupting a thread that is blocked in a `zx_channel_call` (see
+  [Bug 42106200](http://fxbug.dev/42106200)) but has not found a satisfactory design. Until
+  Starnix supports such a mechanism, please avoid blocking user threads for indefinite periods
+  of time in synchronous FIDL calls.
 
 - Select **asynchronous FIDL binding** for the FIDL calls that are not
   associated with any syscalls.
