@@ -240,7 +240,7 @@ async fn dad_state(
 /// Assert that the address state provider event stream yields an address
 /// removal error, indicating that DAD failed.
 pub async fn assert_dad_failed(
-    mut state_stream: (impl Stream<Item = DadState> + std::marker::Unpin),
+    mut state_stream: impl Stream<Item = DadState> + std::marker::Unpin,
 ) {
     assert_matches::assert_matches!(
         dad_state(&mut state_stream).await,

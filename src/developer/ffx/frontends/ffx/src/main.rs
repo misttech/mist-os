@@ -163,7 +163,7 @@ impl ToolSuite for FfxSuite {
     async fn try_from_args(
         &self,
         ffx_cmd: &FfxCommandLine,
-    ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
+    ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
         let context = self.context.clone();
         let app = ffx_cmd.clone();
         let args = Vec::from_iter(app.global.subcommand.iter().map(String::as_str));

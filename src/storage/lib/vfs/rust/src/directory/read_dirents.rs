@@ -85,8 +85,8 @@ impl dirents_sink::Sealed for Done {
 pub async fn read_dirents<'a>(
     entries: &'a [(EntryInfo, String)],
     pos: &'a TraversalPosition,
-    mut sink: Box<(dyn dirents_sink::Sink + 'static)>,
-) -> Result<(TraversalPosition, Box<(dyn dirents_sink::Sealed + 'static)>), Status> {
+    mut sink: Box<dyn dirents_sink::Sink + 'static>,
+) -> Result<(TraversalPosition, Box<dyn dirents_sink::Sealed + 'static>), Status> {
     let starting_position = match pos {
         TraversalPosition::Start => {
             match sink.append(&EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory), ".") {

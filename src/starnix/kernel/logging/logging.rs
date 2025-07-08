@@ -179,7 +179,7 @@ pub fn set_current_task_info(name: &CString, pid: pid_t, tid: tid_t) {
 /// purposes of writing kernel logic beyond logging for debugging purposes, those should be accessed
 /// through the `CurrentTask` type as an argument explicitly passed to your function.
 #[doc(hidden)]
-pub fn with_current_task_info<T>(f: impl Fn(&(dyn fmt::Display)) -> T) -> T {
+pub fn with_current_task_info<T>(f: impl Fn(&dyn fmt::Display) -> T) -> T {
     match CURRENT_TASK_INFO.try_with(|task_info| f(&task_info.borrow())) {
         Ok(value) => value,
         Err(_) => f(&TaskDebugInfo::Unknown),
