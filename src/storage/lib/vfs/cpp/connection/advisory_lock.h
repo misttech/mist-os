@@ -17,16 +17,12 @@
 
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 void advisory_lock(zx_koid_t owner, fbl::RefPtr<fs::Vnode> vnode, bool range_ok,
                    ::fuchsia_io::wire::AdvisoryLockRequest& request,
                    fit::callback<void(zx_status_t status)> callback);
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_CONNECTION_ADVISORY_LOCK_H_

@@ -9,10 +9,18 @@
 #error "Fuchsia-only header"
 #endif
 
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+
+#include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/connection/file_connection.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs::internal {

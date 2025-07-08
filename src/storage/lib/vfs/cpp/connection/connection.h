@@ -9,16 +9,19 @@
 #error "Fuchsia-only header"
 #endif
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/wire/transaction.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <lib/zx/result.h>
-#include <zircon/fidl.h>
+#include <zircon/assert.h>
+#include <zircon/types.h>
 
-#include <memory>
+#include <optional>
+#include <utility>
 
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
