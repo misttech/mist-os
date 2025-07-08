@@ -457,7 +457,7 @@ TEST_F(UsbAdbTest, RecvAdbMessage) {
   std::thread t([&]() {
     auto response = usb_impl->Receive();
     ASSERT_OK(response.status());
-    ASSERT_EQ(response.value().value()->data.count(), kReceiveSize);
+    ASSERT_EQ(response.value().value()->data.size(), kReceiveSize);
   });
 
   // Wait to make it so (most likely) the `Receive` request arrives first. This is

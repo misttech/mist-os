@@ -125,7 +125,7 @@ class FakeCtapHidDevice : public fidl::testing::WireTestBase<finput::Device> {
 
   void SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) override {
     report_ = std::vector<uint8_t>(request->report.data(),
-                                   request->report.data() + request->report.count());
+                                   request->report.data() + request->report.size());
     n_set_reports_received++;
     completer.ReplySuccess();
   }

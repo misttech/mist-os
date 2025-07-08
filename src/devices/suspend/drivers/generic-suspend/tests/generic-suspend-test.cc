@@ -117,7 +117,7 @@ TEST_F(GenericSuspendTestFixture, TrivialGetSuspendStates) {
 
   // The protocol mandates that at least one suspend state is returned.
   ASSERT_TRUE(result.value()->has_suspend_states());
-  EXPECT_GT(result.value()->suspend_states().count(), 0ul);
+  EXPECT_GT(result.value()->suspend_states().size(), 0ul);
 }
 
 TEST_F(GenericSuspendTestFixture, TrivialSuspend) {

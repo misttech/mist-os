@@ -308,7 +308,7 @@ void AmlI2c::Transact(TransactRequestView request, fdf::Arena& arena,
   TRACE_DURATION("i2c", "aml-i2c Transact");
   for (const auto& op : request->op) {
     if ((op.type.is_read_size() && op.type.read_size() > kMaxTransferSize) ||
-        (op.type.is_write_data() && op.type.write_data().count() > kMaxTransferSize)) {
+        (op.type.is_write_data() && op.type.write_data().size() > kMaxTransferSize)) {
       completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
       return;
     }

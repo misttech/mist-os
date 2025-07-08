@@ -929,9 +929,9 @@ class CheckOptionsProcessor : public BaseProcessor {
       : BaseProcessor(options, std::move(server_end), dispatcher) {}
 
   void Process(ProcessRequestView request, ProcessCompleter::Sync& completer) {
-    ASSERT_EQ(request->options.total_applied_gain_db_per_input().count(), 1u);
+    ASSERT_EQ(request->options.total_applied_gain_db_per_input().size(), 1u);
     EXPECT_EQ(request->options.total_applied_gain_db_per_input()[0], kExpectedAppliedGainDb);
-    ASSERT_EQ(request->options.usage_mask_per_input().count(), 1u);
+    ASSERT_EQ(request->options.usage_mask_per_input().size(), 1u);
     ASSERT_EQ(request->options.usage_mask_per_input()[0], kExpectedUsageMask);
     completer.ReplySuccess(fidl::VectorView<fuchsia_audio_effects::wire::ProcessMetrics>());
   }

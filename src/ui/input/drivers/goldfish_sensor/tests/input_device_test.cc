@@ -108,11 +108,11 @@ TEST_P(AccelerationInputDeviceTest, ReadInputReports) {
   auto* response = result.Unwrap();
   ASSERT_TRUE(response->is_ok());
   auto& reports = response->value()->reports;
-  ASSERT_EQ(reports.count(), 1u);
+  ASSERT_EQ(reports.size(), 1u);
   auto& report = response->value()->reports[0];
   ASSERT_TRUE(report.has_sensor());
   auto& sensor = response->value()->reports[0].sensor();
-  ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 3);
+  ASSERT_TRUE(sensor.has_values() && sensor.values().size() == 3);
   EXPECT_EQ(sensor.values().at(0), 100);
   EXPECT_EQ(sensor.values().at(1), 200);
   EXPECT_EQ(sensor.values().at(2), 300);
@@ -132,11 +132,11 @@ TEST_F(AccelerationInputDeviceTest, Descriptor) {
   EXPECT_FALSE(descriptor.has_consumer_control());
 
   ASSERT_TRUE(descriptor.sensor().has_input());
-  ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
+  ASSERT_EQ(descriptor.sensor().input().size(), 1UL);
   ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
   const auto& values = descriptor.sensor().input()[0].values();
 
-  ASSERT_EQ(values.count(), 3u);
+  ASSERT_EQ(values.size(), 3u);
   EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kAccelerometerX);
   EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kAccelerometerY);
   EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kAccelerometerZ);
@@ -224,11 +224,11 @@ TEST_P(GyroscopeInputDeviceTest, ReadInputReports) {
   auto* response = result.Unwrap();
   ASSERT_TRUE(response->is_ok());
   auto& reports = response->value()->reports;
-  ASSERT_EQ(reports.count(), 1u);
+  ASSERT_EQ(reports.size(), 1u);
   auto& report = response->value()->reports[0];
   ASSERT_TRUE(report.has_sensor());
   auto& sensor = response->value()->reports[0].sensor();
-  ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 3);
+  ASSERT_TRUE(sensor.has_values() && sensor.values().size() == 3);
   EXPECT_EQ(sensor.values().at(0), 18000);
   EXPECT_EQ(sensor.values().at(1), 36000);
   EXPECT_EQ(sensor.values().at(2), 54000);
@@ -249,11 +249,11 @@ TEST_F(GyroscopeInputDeviceTest, Descriptor) {
   EXPECT_FALSE(descriptor.has_consumer_control());
 
   ASSERT_TRUE(descriptor.sensor().has_input());
-  ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
+  ASSERT_EQ(descriptor.sensor().input().size(), 1UL);
   ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
   const auto& values = descriptor.sensor().input()[0].values();
 
-  ASSERT_EQ(values.count(), 3u);
+  ASSERT_EQ(values.size(), 3u);
   EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kGyroscopeX);
   EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kGyroscopeY);
   EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kGyroscopeZ);
@@ -343,11 +343,11 @@ TEST_P(RgbcLightInputDeviceTest, ReadInputReports) {
   auto* response = result.Unwrap();
   ASSERT_TRUE(response->is_ok());
   auto& reports = response->value()->reports;
-  ASSERT_EQ(reports.count(), 1u);
+  ASSERT_EQ(reports.size(), 1u);
   auto& report = response->value()->reports[0];
   ASSERT_TRUE(report.has_sensor());
   auto& sensor = response->value()->reports[0].sensor();
-  ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 4);
+  ASSERT_TRUE(sensor.has_values() && sensor.values().size() == 4);
   EXPECT_EQ(sensor.values().at(0), 100L);
   EXPECT_EQ(sensor.values().at(1), 200L);
   EXPECT_EQ(sensor.values().at(2), 300L);
@@ -368,11 +368,11 @@ TEST_F(RgbcLightInputDeviceTest, Descriptor) {
   EXPECT_FALSE(descriptor.has_consumer_control());
 
   ASSERT_TRUE(descriptor.sensor().has_input());
-  ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
+  ASSERT_EQ(descriptor.sensor().input().size(), 1UL);
   ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
   const auto& values = descriptor.sensor().input()[0].values();
 
-  ASSERT_EQ(values.count(), 4u);
+  ASSERT_EQ(values.size(), 4u);
   EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kLightRed);
   EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kLightGreen);
   EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kLightBlue);

@@ -356,7 +356,7 @@ void AmlUart::Write(WriteRequestView request, fdf::Arena& arena, WriteCompleter:
     return;
   }
   write_buffer_ = request->data.data();
-  write_size_ = request->data.count();
+  write_size_ = request->data.size();
   write_operation_.emplace(std::move(arena), completer.ToAsync());
   HandleTX();
 }

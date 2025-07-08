@@ -62,7 +62,7 @@ class IsolatedDevMgrTest : public zxtest::Test {
         fidl::StringView::FromExternal(fuchsia_board_test::wire::kPdevMetadataId));
     ASSERT_OK(result.status());
     fidl::VectorView<uint8_t> received_metadata = std::move(result->data);
-    ASSERT_EQ(received_metadata.count(), expected_metadata.size());
+    ASSERT_EQ(received_metadata.size(), expected_metadata.size());
 
     EXPECT_BYTES_EQ(received_metadata.data(), expected_metadata.data(), expected_metadata.size());
   }

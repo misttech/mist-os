@@ -435,30 +435,30 @@ TEST_F(UsbAudioTest, Enumerate) {
 
   auto ret = stream_client->GetSupportedFormats();
   auto& supported_formats = ret.value().supported_formats;
-  ASSERT_EQ(2, supported_formats.count());
+  ASSERT_EQ(2, supported_formats.size());
 
   auto& formats1 = supported_formats[0].pcm_supported_formats();
-  ASSERT_EQ(1, formats1.channel_sets().count());
-  ASSERT_EQ(2, formats1.channel_sets()[0].attributes().count());
-  ASSERT_EQ(1, formats1.sample_formats().count());
+  ASSERT_EQ(1, formats1.channel_sets().size());
+  ASSERT_EQ(2, formats1.channel_sets()[0].attributes().size());
+  ASSERT_EQ(1, formats1.sample_formats().size());
   ASSERT_EQ(audio_fidl::wire::SampleFormat::kPcmSigned, formats1.sample_formats()[0]);
-  ASSERT_EQ(1, formats1.frame_rates().count());
+  ASSERT_EQ(1, formats1.frame_rates().size());
   ASSERT_EQ(48'000, formats1.frame_rates()[0]);
-  ASSERT_EQ(1, formats1.bytes_per_sample().count());
+  ASSERT_EQ(1, formats1.bytes_per_sample().size());
   ASSERT_EQ(2, formats1.bytes_per_sample()[0]);
-  ASSERT_EQ(1, formats1.valid_bits_per_sample().count());
+  ASSERT_EQ(1, formats1.valid_bits_per_sample().size());
   ASSERT_EQ(16, formats1.valid_bits_per_sample()[0]);
 
   auto& formats2 = supported_formats[1].pcm_supported_formats();
-  ASSERT_EQ(1, formats2.channel_sets().count());
-  ASSERT_EQ(2, formats2.channel_sets()[0].attributes().count());
-  ASSERT_EQ(1, formats2.sample_formats().count());
+  ASSERT_EQ(1, formats2.channel_sets().size());
+  ASSERT_EQ(2, formats2.channel_sets()[0].attributes().size());
+  ASSERT_EQ(1, formats2.sample_formats().size());
   ASSERT_EQ(audio_fidl::wire::SampleFormat::kPcmSigned, formats2.sample_formats()[0]);
-  ASSERT_EQ(1, formats2.frame_rates().count());
+  ASSERT_EQ(1, formats2.frame_rates().size());
   ASSERT_EQ(44'100, formats2.frame_rates()[0]);
-  ASSERT_EQ(1, formats2.bytes_per_sample().count());
+  ASSERT_EQ(1, formats2.bytes_per_sample().size());
   ASSERT_EQ(2, formats2.bytes_per_sample()[0]);
-  ASSERT_EQ(1, formats2.valid_bits_per_sample().count());
+  ASSERT_EQ(1, formats2.valid_bits_per_sample().size());
   ASSERT_EQ(16, formats2.valid_bits_per_sample()[0]);
 }
 
@@ -536,12 +536,12 @@ TEST_F(UsbAudioContinuousFrameRatesTest,
   auto ret2 = stream_client->GetSupportedFormats();
   ASSERT_TRUE(ret2.ok());
   auto& supported_formats = ret2.value().supported_formats;
-  ASSERT_EQ(4, supported_formats.count());
+  ASSERT_EQ(4, supported_formats.size());
 
-  ASSERT_EQ(1, supported_formats[0].pcm_supported_formats().frame_rates().count());
-  ASSERT_EQ(1, supported_formats[1].pcm_supported_formats().frame_rates().count());
-  ASSERT_EQ(1, supported_formats[2].pcm_supported_formats().frame_rates().count());
-  ASSERT_EQ(1, supported_formats[3].pcm_supported_formats().frame_rates().count());
+  ASSERT_EQ(1, supported_formats[0].pcm_supported_formats().frame_rates().size());
+  ASSERT_EQ(1, supported_formats[1].pcm_supported_formats().frame_rates().size());
+  ASSERT_EQ(1, supported_formats[2].pcm_supported_formats().frame_rates().size());
+  ASSERT_EQ(1, supported_formats[3].pcm_supported_formats().frame_rates().size());
 
   ASSERT_EQ(8'000, supported_formats[0].pcm_supported_formats().frame_rates()[0]);
   ASSERT_EQ(16'000, supported_formats[1].pcm_supported_formats().frame_rates()[0]);

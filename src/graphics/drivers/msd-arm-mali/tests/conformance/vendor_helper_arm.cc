@@ -36,7 +36,7 @@ class VendorHelperServerArm : public VendorHelperServerGeneric {
       ValidateCalibratedTimestampsCompleter::Sync& completer) override {
     struct magma_arm_mali_device_timestamp_return arm_timestamp_return;
 
-    FX_CHECK(request->query_buffer.count() >= sizeof(arm_timestamp_return));
+    FX_CHECK(request->query_buffer.size() >= sizeof(arm_timestamp_return));
     memcpy(&arm_timestamp_return, request->query_buffer.data(), sizeof(arm_timestamp_return));
 
     if (request->before_ns >= arm_timestamp_return.monotonic_raw_timestamp_before) {

@@ -187,7 +187,7 @@ TEST_F(Gt92xxTest, TestGetDescriptor) {
 
   EXPECT_FALSE(descriptor.touch().input().has_buttons());
   EXPECT_TRUE(descriptor.touch().input().has_contacts());
-  EXPECT_EQ(descriptor.touch().input().contacts().count(), 5u);
+  EXPECT_EQ(descriptor.touch().input().contacts().size(), 5u);
 
   for (const auto& c : descriptor.touch().input().contacts()) {
     EXPECT_TRUE(c.has_position_x());
@@ -230,7 +230,7 @@ TEST_F(Gt92xxTest, TestReport) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1u);
+    ASSERT_EQ(reports.size(), 1u);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -238,7 +238,7 @@ TEST_F(Gt92xxTest, TestReport) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 5u);
+    ASSERT_EQ(touch_report.contacts().size(), 5u);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0u);
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
@@ -290,7 +290,7 @@ TEST_F(Gt92xxTest, TestReportMoreContacts) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1u);
+    ASSERT_EQ(reports.size(), 1u);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -298,7 +298,7 @@ TEST_F(Gt92xxTest, TestReportMoreContacts) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 5u);
+    ASSERT_EQ(touch_report.contacts().size(), 5u);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0u);
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
@@ -350,7 +350,7 @@ TEST_F(Gt92xxTest, TestReportLessContacts) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1u);
+    ASSERT_EQ(reports.size(), 1u);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -358,7 +358,7 @@ TEST_F(Gt92xxTest, TestReportLessContacts) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 3u);
+    ASSERT_EQ(touch_report.contacts().size(), 3u);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0u);
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);

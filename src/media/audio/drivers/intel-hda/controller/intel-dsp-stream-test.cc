@@ -213,17 +213,17 @@ TEST_F(SstStreamTest, GetRingBufferFormats) {
   auto result = stream_client->GetRingBufferFormats();
   ASSERT_OK(result.status());
   auto& formats = result.value().value()->ring_buffer_formats;
-  EXPECT_EQ(formats.count(), 1);
-  EXPECT_EQ(formats[0].pcm_supported_formats().channel_sets().count(), 1);
-  EXPECT_EQ(formats[0].pcm_supported_formats().channel_sets()[0].attributes().count(), 2);
-  EXPECT_EQ(formats[0].pcm_supported_formats().sample_formats().count(), 1);
+  EXPECT_EQ(formats.size(), 1);
+  EXPECT_EQ(formats[0].pcm_supported_formats().channel_sets().size(), 1);
+  EXPECT_EQ(formats[0].pcm_supported_formats().channel_sets()[0].attributes().size(), 2);
+  EXPECT_EQ(formats[0].pcm_supported_formats().sample_formats().size(), 1);
   EXPECT_EQ(formats[0].pcm_supported_formats().sample_formats()[0],
             fuchsia_hardware_audio::wire::SampleFormat::kPcmSigned);
-  EXPECT_EQ(formats[0].pcm_supported_formats().bytes_per_sample().count(), 1);
+  EXPECT_EQ(formats[0].pcm_supported_formats().bytes_per_sample().size(), 1);
   EXPECT_EQ(formats[0].pcm_supported_formats().bytes_per_sample()[0], 2);
-  EXPECT_EQ(formats[0].pcm_supported_formats().valid_bits_per_sample().count(), 1);
+  EXPECT_EQ(formats[0].pcm_supported_formats().valid_bits_per_sample().size(), 1);
   EXPECT_EQ(formats[0].pcm_supported_formats().valid_bits_per_sample()[0], 16);
-  EXPECT_EQ(formats[0].pcm_supported_formats().frame_rates().count(), 1);
+  EXPECT_EQ(formats[0].pcm_supported_formats().frame_rates().size(), 1);
   EXPECT_EQ(formats[0].pcm_supported_formats().frame_rates()[0], 48'000);
 }
 
@@ -234,20 +234,20 @@ TEST_F(SstStreamTest, GetDaiFormats) {
   auto result = stream_client->GetDaiFormats();
   ASSERT_OK(result.status());
   auto& formats = result.value().value()->dai_formats;
-  EXPECT_EQ(formats.count(), 1);
-  EXPECT_EQ(formats[0].number_of_channels.count(), 1);
+  EXPECT_EQ(formats.size(), 1);
+  EXPECT_EQ(formats[0].number_of_channels.size(), 1);
   EXPECT_EQ(formats[0].number_of_channels[0], 2);  // I2S.
-  EXPECT_EQ(formats[0].sample_formats.count(), 1);
+  EXPECT_EQ(formats[0].sample_formats.size(), 1);
   EXPECT_EQ(formats[0].sample_formats[0],
             fuchsia_hardware_audio::wire::DaiSampleFormat::kPcmSigned);
-  EXPECT_EQ(formats[0].frame_formats.count(), 1);
+  EXPECT_EQ(formats[0].frame_formats.size(), 1);
   EXPECT_EQ(formats[0].frame_formats[0].frame_format_standard(),
             fuchsia_hardware_audio::wire::DaiFrameFormatStandard::kI2S);
-  EXPECT_EQ(formats[0].frame_rates.count(), 1);
+  EXPECT_EQ(formats[0].frame_rates.size(), 1);
   EXPECT_EQ(formats[0].frame_rates[0], 48'000);
-  EXPECT_EQ(formats[0].bits_per_slot.count(), 1);
+  EXPECT_EQ(formats[0].bits_per_slot.size(), 1);
   EXPECT_EQ(formats[0].bits_per_slot[0], 32);
-  EXPECT_EQ(formats[0].bits_per_sample.count(), 1);
+  EXPECT_EQ(formats[0].bits_per_sample.size(), 1);
   EXPECT_EQ(formats[0].bits_per_sample[0], 24);
 }
 
@@ -321,20 +321,20 @@ TEST(SstStream, GetDaiFormats2) {
   auto result = stream_client->GetDaiFormats();
   ASSERT_OK(result.status());
   auto& formats = result.value().value()->dai_formats;
-  EXPECT_EQ(formats.count(), 1);
-  EXPECT_EQ(formats[0].number_of_channels.count(), 1);
+  EXPECT_EQ(formats.size(), 1);
+  EXPECT_EQ(formats[0].number_of_channels.size(), 1);
   EXPECT_EQ(formats[0].number_of_channels[0], 8);  // TDM.
-  EXPECT_EQ(formats[0].sample_formats.count(), 1);
+  EXPECT_EQ(formats[0].sample_formats.size(), 1);
   EXPECT_EQ(formats[0].sample_formats[0],
             fuchsia_hardware_audio::wire::DaiSampleFormat::kPcmSigned);
-  EXPECT_EQ(formats[0].frame_formats.count(), 1);
+  EXPECT_EQ(formats[0].frame_formats.size(), 1);
   EXPECT_EQ(formats[0].frame_formats[0].frame_format_standard(),
             fuchsia_hardware_audio::wire::DaiFrameFormatStandard::kTdm1);
-  EXPECT_EQ(formats[0].frame_rates.count(), 1);
+  EXPECT_EQ(formats[0].frame_rates.size(), 1);
   EXPECT_EQ(formats[0].frame_rates[0], 96'000);
-  EXPECT_EQ(formats[0].bits_per_slot.count(), 1);
+  EXPECT_EQ(formats[0].bits_per_slot.size(), 1);
   EXPECT_EQ(formats[0].bits_per_slot[0], 16);
-  EXPECT_EQ(formats[0].bits_per_sample.count(), 1);
+  EXPECT_EQ(formats[0].bits_per_sample.size(), 1);
   EXPECT_EQ(formats[0].bits_per_sample[0], 16);
 
   loop.Shutdown();

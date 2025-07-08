@@ -323,7 +323,9 @@ TEST_F(HandleTest, HandleClosedAfterHandleStructMove) {
   ASSERT_EQ(result.value().value.h.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe), ZX_OK);
 
   // A move of a struct holding a handle will move the handle from the result, resulting in a close
-  { auto release = std::move(result.value().value); }  // ~HandleStruct
+  {
+    auto release = std::move(result.value().value);
+  }  // ~HandleStruct
 
   // Only remaining handle should be the dupe.
   ASSERT_EQ(GetHandleCount(dupe.borrow()), 1u);
@@ -346,7 +348,9 @@ TEST_F(HandleTest, HandleCloseForTableAndUnionPayload) {
   ASSERT_EQ(result.value().h().duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe), ZX_OK);
 
   // A move of a union holding a handle will move the handle from the result, resulting in a close
-  { auto release = std::move(result.value().h()); }  // ~HandleUnion
+  {
+    auto release = std::move(result.value().h());
+  }  // ~HandleUnion
 
   // Only remaining handle should be the dupe.
   ASSERT_EQ(GetHandleCount(dupe.borrow()), 1u);
@@ -362,7 +366,7 @@ TEST_F(HandleTest, HandleClosedOnResultOfDestructorAfterVectorMove) {
     auto result = client->GetHandleVector(kNumHandles);
 
     ASSERT_OK(result.status());
-    ASSERT_EQ(result.value().value.count(), kNumHandles);
+    ASSERT_EQ(result.value().value.size(), kNumHandles);
 
     for (uint32_t i = 0; i < kNumHandles; i++) {
       ASSERT_TRUE(result.value().value[i].h.is_valid());
@@ -398,7 +402,9 @@ TEST_F(HandleTest, HandleUnion) {
   ASSERT_EQ(GetHandleCount(dupe.borrow()), 2u);
 
   // A move of a struct holding a handle will move the handle from the result, resulting in a close
-  { auto release = std::move(result.value().value); }  // ~HandleUnionStruct
+  {
+    auto release = std::move(result.value().value);
+  }  // ~HandleUnionStruct
 
   // Only remaining handle should be the dupe.
   ASSERT_EQ(GetHandleCount(dupe.borrow()), 1u);

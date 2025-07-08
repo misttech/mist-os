@@ -128,7 +128,7 @@ int main(int argc, const char** argv) {
               auto& items = exportable->items();
 
               // Log some information about the exported data.
-              FX_LOGS(INFO) << "Printing " << items.count() << " exported entries, which are:";
+              FX_LOGS(INFO) << "Printing " << items.size() << " exported entries, which are:";
               for (const auto& item : items) {
                 FX_LOGS(INFO) << "  * " << item.key.get();
               }
@@ -140,8 +140,8 @@ int main(int argc, const char** argv) {
   }
   // [END diff_1]
 
-  // TODO(https://fxbug.dev/42156498): We need to sleep here to make sure all logs get drained. Once the
-  // referenced bug has been resolved, we can remove the sleep.
+  // TODO(https://fxbug.dev/42156498): We need to sleep here to make sure all logs get drained. Once
+  // the referenced bug has been resolved, we can remove the sleep.
   sleep(2);
   return 0;
 }

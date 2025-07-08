@@ -82,8 +82,8 @@ void CheckEq(facpi::Object value, facpi::Object expected) {
     case Tag::kPackageVal: {
       auto &val_list = value.package_val().value;
       auto &exp_list = expected.package_val().value;
-      ASSERT_EQ(val_list.count(), exp_list.count());
-      for (size_t i = 0; i < val_list.count(); i++) {
+      ASSERT_EQ(val_list.size(), exp_list.size());
+      for (size_t i = 0; i < val_list.size(); i++) {
         ASSERT_NO_FATAL_FAILURE(CheckEq(val_list[i], exp_list[i]));
       }
       break;
@@ -91,8 +91,8 @@ void CheckEq(facpi::Object value, facpi::Object expected) {
     case Tag::kBufferVal: {
       auto &val = value.buffer_val();
       auto &exp = expected.buffer_val();
-      ASSERT_EQ(val.count(), exp.count());
-      ASSERT_BYTES_EQ(val.data(), exp.data(), val.count());
+      ASSERT_EQ(val.size(), exp.size());
+      ASSERT_BYTES_EQ(val.data(), exp.data(), val.size());
       break;
     }
     case Tag::kPowerResourceVal: {
@@ -657,7 +657,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeMmioResource) {
   ASSERT_TRUE(result->response().result.has_value());
   ASSERT_TRUE(result->response().result->is_resources());
   auto &fidl = result->response().result->resources();
-  ASSERT_EQ(fidl.count(), 1);
+  ASSERT_EQ(fidl.size(), 1);
   ASSERT_TRUE(fidl[0].is_mmio());
 
   ASSERT_EQ(fidl[0].mmio().offset, 32);

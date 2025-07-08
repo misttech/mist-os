@@ -30,7 +30,7 @@ void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacQueryResponse* resp,
   builder.hardware_capability(tap_phy_config.hardware_capability);
 
   size_t const band_cap_count =
-      std::min(tap_phy_config.bands.count(), static_cast<size_t>(wlan_common::kMaxBands));
+      std::min(tap_phy_config.bands.size(), static_cast<size_t>(wlan_common::kMaxBands));
 
   std::vector<fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability> softmac_band_caps;
 
@@ -52,7 +52,7 @@ void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacQueryResponse* resp,
       softmac_band_caps_builder.vht_caps(tap_band_caps.vht_caps);
     }
 
-    auto basic_rate_count = std::min<size_t>(tap_band_caps.rates.count(),
+    auto basic_rate_count = std::min<size_t>(tap_band_caps.rates.size(),
                                              fuchsia_wlan_ieee80211::wire::kMaxSupportedBasicRates);
     std::vector<uint8_t> basic_rates(basic_rate_count);
     std::copy(tap_band_caps.rates.begin(), tap_band_caps.rates.begin() + basic_rate_count,
@@ -60,7 +60,7 @@ void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacQueryResponse* resp,
     softmac_band_caps_builder.basic_rates(fidl::VectorView(arena, basic_rates));
 
     auto operating_channel_count =
-        std::min<size_t>(tap_band_caps.operating_channels.count(),
+        std::min<size_t>(tap_band_caps.operating_channels.size(),
                          fuchsia::wlan::ieee80211::MAX_UNIQUE_CHANNEL_NUMBERS);
     std::vector<uint8_t> operating_channels(operating_channel_count);
     std::copy(tap_band_caps.operating_channels.begin(),

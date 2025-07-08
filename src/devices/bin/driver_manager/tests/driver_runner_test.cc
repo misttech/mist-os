@@ -1372,7 +1372,7 @@ TEST_P(DriverRunnerTest, TestBindResultTracker) {
                       fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) {
     ASSERT_EQ(std::string_view("node_name"), results[0].node_name().get());
     ASSERT_EQ(std::string_view("driver_url"), results[0].driver_url().get());
-    ASSERT_EQ(1ul, results.count());
+    ASSERT_EQ(1ul, results.size());
     *callback_called_ptr = true;
   };
 
@@ -1389,7 +1389,7 @@ TEST_P(DriverRunnerTest, TestBindResultTracker) {
   auto callback_two =
       [callback_called_ptr](
           fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) {
-        ASSERT_EQ(0ul, results.count());
+        ASSERT_EQ(0ul, results.size());
         *callback_called_ptr = true;
       };
 
@@ -1411,7 +1411,7 @@ TEST_P(DriverRunnerTest, TestBindResultTracker) {
                   results[0].composite_parents()[0].composite().spec().name().get());
         ASSERT_EQ(std::string_view("test_spec_2"),
                   results[0].composite_parents()[1].composite().spec().name().get());
-        ASSERT_EQ(1ul, results.count());
+        ASSERT_EQ(1ul, results.size());
         *callback_called_ptr = true;
       };
 
@@ -1582,7 +1582,7 @@ TEST(CompositeServiceOfferTest, WorkingOffer) {
   auto new_offer = driver_manager::CreateCompositeServiceOffer(arena, offer, "parent_node", false);
   ASSERT_TRUE(new_offer);
 
-  ASSERT_EQ(2ul, new_offer->service().renamed_instances().count());
+  ASSERT_EQ(2ul, new_offer->service().renamed_instances().size());
   // Check that the default instance got renamed.
   ASSERT_EQ(std::string("instance-1"),
             std::string(new_offer->service().renamed_instances()[0].source_name.get()));
@@ -1595,7 +1595,7 @@ TEST(CompositeServiceOfferTest, WorkingOffer) {
   ASSERT_EQ(std::string("instance-2"),
             std::string(new_offer->service().renamed_instances()[1].target_name.get()));
 
-  ASSERT_EQ(2ul, new_offer->service().source_instance_filter().count());
+  ASSERT_EQ(2ul, new_offer->service().source_instance_filter().size());
   // Check that the default filter got renamed.
   ASSERT_EQ(std::string("parent_node"),
             std::string(new_offer->service().source_instance_filter()[0].get()));
@@ -1629,7 +1629,7 @@ TEST(CompositeServiceOfferTest, WorkingOfferPrimary) {
   auto new_offer = driver_manager::CreateCompositeServiceOffer(arena, offer, "parent_node", true);
   ASSERT_TRUE(new_offer);
 
-  ASSERT_EQ(3ul, new_offer->service().renamed_instances().count());
+  ASSERT_EQ(3ul, new_offer->service().renamed_instances().size());
   // Check that the default instance stayed the same (because we're primary).
   ASSERT_EQ(std::string("instance-1"),
             std::string(new_offer->service().renamed_instances()[0].source_name.get()));
@@ -1648,7 +1648,7 @@ TEST(CompositeServiceOfferTest, WorkingOfferPrimary) {
   ASSERT_EQ(std::string("instance-2"),
             std::string(new_offer->service().renamed_instances()[2].target_name.get()));
 
-  ASSERT_EQ(3ul, new_offer->service().source_instance_filter().count());
+  ASSERT_EQ(3ul, new_offer->service().source_instance_filter().size());
   // Check that the default filter stayed the same (because we're primary).
   EXPECT_EQ(std::string("default"),
             std::string(new_offer->service().source_instance_filter()[0].get()));

@@ -329,8 +329,8 @@ class I2cHidTest : public zxtest::Test {
       auto expected = std::move(expected_reports_.front());
       expected_reports_.pop();
       auto report = event->buf();
-      ASSERT_EQ(report.count(), expected.size());
-      for (size_t i = 0; i < report.count(); i++) {
+      ASSERT_EQ(report.size(), expected.size());
+      for (size_t i = 0; i < report.size(); i++) {
         EXPECT_EQ(report[i], expected[i]);
       }
     }
@@ -400,8 +400,8 @@ TEST_F(I2cHidTest, HidTestReadReportDesc) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto report = result->value()->data;
-    ASSERT_EQ(report.count(), report_desc.size());
-    for (size_t i = 0; i < report.count(); i++) {
+    ASSERT_EQ(report.size(), report_desc.size());
+    for (size_t i = 0; i < report.size(); i++) {
       ASSERT_EQ(report[i], report_desc[i]);
     }
   });
@@ -608,8 +608,8 @@ TEST_F(I2cHidTest, HidTestSetReport) {
       ASSERT_TRUE(result.ok());
       ASSERT_TRUE(result->is_ok());
       auto report = result->value()->data;
-      ASSERT_EQ(report.count(), 4);
-      for (size_t i = 0; i < report.count(); i++) {
+      ASSERT_EQ(report.size(), 4);
+      for (size_t i = 0; i < report.size(); i++) {
         EXPECT_EQ(report[i], report_data[i]);
       }
     }

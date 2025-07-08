@@ -134,7 +134,7 @@ TEST_F(UsbOneEndpointTest, SetAndGetReport) {
   ASSERT_TRUE(get_result.ok());
   ASSERT_TRUE(get_result->is_ok());
 
-  ASSERT_EQ(get_result.value()->report.count(), sizeof(hid_boot_mouse_report_t));
+  ASSERT_EQ(get_result.value()->report.size(), sizeof(hid_boot_mouse_report_t));
   ASSERT_EQ(0xab, get_result.value()->report[0]);
   ASSERT_EQ(0xbc, get_result.value()->report[1]);
   ASSERT_EQ(0xde, get_result.value()->report[2]);
@@ -164,7 +164,7 @@ TEST_F(UsbTwoEndpointTest, SetAndGetReport) {
   ASSERT_TRUE(get_result.ok());
   ASSERT_TRUE(get_result->is_ok());
 
-  ASSERT_EQ(get_result.value()->report.count(), sizeof(hid_boot_mouse_report_t));
+  ASSERT_EQ(get_result.value()->report.size(), sizeof(hid_boot_mouse_report_t));
   ASSERT_EQ(0xab, get_result.value()->report[0]);
   ASSERT_EQ(0xbc, get_result.value()->report[1]);
   ASSERT_EQ(0xde, get_result.value()->report[2]);

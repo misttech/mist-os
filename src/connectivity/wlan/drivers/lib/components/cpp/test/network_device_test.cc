@@ -371,11 +371,11 @@ struct NetworkDeviceTestFixture : public BasicNetworkDeviceTest {
       fdf::Arena& arena, fidl::VectorView<fuchsia_hardware_network_driver::wire::TxBuffer>& buffers,
       fidl::VectorView<fuchsia_hardware_network_driver::wire::BufferRegion>& regions,
       size_t frame_size = 256, uint16_t head_length = 0, uint16_t tail_length = 0) {
-    ASSERT_EQ(buffers.count(), regions.count());
+    ASSERT_EQ(buffers.size(), regions.size());
 
     size_t vmo_offset = 0;
     uint32_t buffer_id = 0;
-    for (size_t i = 0; i < buffers.count(); ++i) {
+    for (size_t i = 0; i < buffers.size(); ++i) {
       regions[i].length = frame_size;
       regions[i].vmo = kVmoId;
       regions[i].offset = vmo_offset;
@@ -421,7 +421,7 @@ TEST_F(NetworkDeviceTestFixture, CompleteTx) {
       [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest* request,
           fdf::Arena& arena, auto&) {
         const auto& results = request->tx;
-        ASSERT_EQ(results.count(), 3u);
+        ASSERT_EQ(results.size(), 3u);
         EXPECT_EQ(results[0].id, frames[0].BufferId());
         EXPECT_EQ(results[0].status, ZX_OK);
         EXPECT_EQ(results[1].id, frames[1].BufferId());
@@ -453,7 +453,7 @@ TEST_F(NetworkDeviceTestFixture, CompleteTxInvalidVmos) {
           fdf::Arena&, auto&) {
         // Size should only be 2, the first frame should not have completed
         const auto& results = request->tx;
-        ASSERT_EQ(results.count(), 2u);
+        ASSERT_EQ(results.size(), 2u);
         EXPECT_EQ(results[0].id, frames[1].BufferId());
         EXPECT_EQ(results[0].status, ZX_OK);
         EXPECT_EQ(results[1].id, frames[2].BufferId());
@@ -484,7 +484,7 @@ TEST_F(NetworkDeviceTestFixture, CompleteTxStatusPropagates) {
       [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest* request,
           fdf::Arena&, auto&) {
         const auto& results = request->tx;
-        ASSERT_EQ(results.count(), 3u);
+        ASSERT_EQ(results.size(), 3u);
         EXPECT_EQ(results[0].status, kStatus);
         EXPECT_EQ(results[1].status, kStatus);
         EXPECT_EQ(results[2].status, kStatus);
@@ -507,14 +507,14 @@ TEST_F(NetworkDeviceTestFixture, CompleteRx) {
             fdf::Arena&, auto&) {
           auto verifyBuffer = [](const fuchsia_hardware_network_driver::wire::RxBuffer& buffer,
                                  const Frame& frame) {
-            ASSERT_EQ(buffer.data.count(), 1u);
+            ASSERT_EQ(buffer.data.size(), 1u);
             EXPECT_EQ(buffer.meta.port, frame.PortId());
             EXPECT_EQ(buffer.data[0].id, frame.BufferId());
             EXPECT_EQ(buffer.data[0].length, frame.Size());
             EXPECT_EQ(buffer.data[0].offset, frame.Headroom());
           };
           const auto& buffers = request->rx;
-          ASSERT_EQ(buffers.count(), 3u);
+          ASSERT_EQ(buffers.size(), 3u);
           verifyBuffer(buffers[0], frames[0]);
           verifyBuffer(buffers[1], frames[1]);
           verifyBuffer(buffers[2], frames[2]);
@@ -545,7 +545,7 @@ TEST_F(NetworkDeviceTestFixture, CompleteRxIgnoreInvalidVmoId) {
             fdf::Arena&, auto&) {
           // Only two results should be present
           const auto& buffers = request->rx;
-          ASSERT_EQ(buffers.count(), 2u);
+          ASSERT_EQ(buffers.size(), 2u);
           EXPECT_EQ(buffers[0].data[0].id, frames[1].BufferId());
           EXPECT_EQ(buffers[1].data[0].id, frames[2].BufferId());
           completed_rx.Signal();
@@ -574,7 +574,7 @@ TEST_F(NetworkDeviceTestFixture, CompleteRxEmptyFrames) {
             fdf::Arena&, auto&) {
           // All results should be present
           const auto& buffers = request->rx;
-          ASSERT_EQ(buffers.count(), 3u);
+          ASSERT_EQ(buffers.size(), 3u);
           EXPECT_EQ(buffers[0].data[0].id, frames[0].BufferId());
           EXPECT_EQ(buffers[1].data[0].id, frames[1].BufferId());
           EXPECT_EQ(buffers[2].data[0].id, frames[2].BufferId());
@@ -609,12 +609,12 @@ TEST_F(NetworkDeviceTestFixture, QueueTx) {
   fdf::Arena arena('NETD');
   fidl::VectorView<fuchsia_hardware_network_driver::wire::TxBuffer> buffers(arena, 3);
   fidl::VectorView<fuchsia_hardware_network_driver::wire::BufferRegion> regions(arena,
-                                                                                buffers.count());
+                                                                                buffers.size());
   FillTxBuffers(arena, buffers, regions, kFrameSize, kHeadLength, kTailLength);
 
   libsync::Completion queued_tx;
   EXPECT_CALL(test_network_device_, NetDevQueueTx).WillOnce([&](cpp20::span<Frame> frames) {
-    ASSERT_EQ(frames.size(), buffers.count());
+    ASSERT_EQ(frames.size(), buffers.size());
     auto verify = [&](const Frame& frame,
                       const fuchsia_hardware_network_driver::wire::TxBuffer& buffer) {
       EXPECT_EQ(frame.VmoId(), buffer.data[0].vmo);
@@ -653,7 +653,7 @@ TEST_F(NetworkDeviceTestFixture, QueueTxWhenStopped) {
 
   fidl::VectorView<fuchsia_hardware_network_driver::wire::TxBuffer> buffers(arena, 3);
   fidl::VectorView<fuchsia_hardware_network_driver::wire::BufferRegion> regions(arena,
-                                                                                buffers.count());
+                                                                                buffers.size());
 
   FillTxBuffers(arena, buffers, regions, 256, 0, 0);
 
@@ -663,8 +663,8 @@ TEST_F(NetworkDeviceTestFixture, QueueTxWhenStopped) {
       [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest* request,
           fdf::Arena&, auto&) {
         const auto& results = request->tx;
-        EXPECT_EQ(results.count(), buffers.count());
-        for (size_t i = 0; i < results.count(); ++i) {
+        EXPECT_EQ(results.size(), buffers.size());
+        for (size_t i = 0; i < results.size(); ++i) {
           EXPECT_EQ(results[i].id, buffers[i].id);
           EXPECT_EQ(results[i].status, ZX_ERR_UNAVAILABLE);
         }

@@ -415,7 +415,6 @@ void Device::DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& 
     return;
   }
 
-
   InterfaceInfo info = GetInterfaceInfoForRole(GetMacRoleForInterfaceId(iface_id));
 
   // First check if the interface is present
@@ -752,7 +751,7 @@ std::unique_ptr<WlanInterface>* Device::GetInterfaceForId(uint16_t interface_id)
 void Device::Get(GetRequestView request, GetCompleter::Sync& completer) {
   zx_status_t status =
       brcmf_send_cmd_to_firmware(brcmf_pub_.get(), request->iface_idx, request->cmd,
-                                 (void*)request->request.data(), request->request.count(), false);
+                                 (void*)request->request.data(), request->request.size(), false);
   if (status == ZX_OK) {
     completer.ReplySuccess(request->request);
   } else {
@@ -763,7 +762,7 @@ void Device::Get(GetRequestView request, GetCompleter::Sync& completer) {
 void Device::Set(SetRequestView request, SetCompleter::Sync& completer) {
   zx_status_t status =
       brcmf_send_cmd_to_firmware(brcmf_pub_.get(), request->iface_idx, request->cmd,
-                                 (void*)request->request.data(), request->request.count(), true);
+                                 (void*)request->request.data(), request->request.size(), true);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {

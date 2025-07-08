@@ -68,7 +68,7 @@ TEST(RecorderTest, MaybeRecordAllocation) {
       called_ = true;
       EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address);
       EXPECT_EQ(kTestSize, request->size);
-      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().count());
+      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().size());
     }
     ~Sampler() override { EXPECT_TRUE(called_); }
 
@@ -99,7 +99,7 @@ TEST(RecorderTest, ForgetAllocation) {
                             RecordAllocationCompleter::Sync& completer) override {
       called_ = true;
       EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address);
-      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().count());
+      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().size());
     }
     ~Sampler() override { EXPECT_TRUE(called_); }
 
@@ -139,12 +139,12 @@ TEST(RecorderTest, SetModulesInfo) {
       called_ = true;
       EXPECT_EQ(std::string_view{process_name}, request->process_name().get());
 
-      EXPECT_LE(kMeaningfulModuleMapLength, request->module_map().count());
+      EXPECT_LE(kMeaningfulModuleMapLength, request->module_map().size());
 
       auto& module_map = request->module_map()[0];
       EXPECT_GE(static_cast<size_t>(fuchsia_memory_sampler::kBuildIdBytes),
-                module_map.build_id().count());
-      EXPECT_LE(kMeaningfulExecutableSegmentsLength, module_map.executable_segments().count());
+                module_map.build_id().size());
+      EXPECT_LE(kMeaningfulExecutableSegmentsLength, module_map.executable_segments().size());
 
       auto& segment = module_map.executable_segments()[0];
       EXPECT_NE(0U, segment.start_address());

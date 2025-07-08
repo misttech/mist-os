@@ -476,7 +476,7 @@ void Tcs3400Device::SetFeatureReport(SetFeatureReportRequestView request,
     return;
   }
 
-  if (!report.sensor().has_sensitivity() || report.sensor().sensitivity().count() != 1 ||
+  if (!report.sensor().has_sensitivity() || report.sensor().sensitivity().size() != 1 ||
       !FeatureValueValid(report.sensor().sensitivity()[0], kSensitivityAxis)) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
@@ -488,13 +488,13 @@ void Tcs3400Device::SetFeatureReport(SetFeatureReportRequestView request,
     return;
   }
 
-  if (!report.sensor().has_threshold_high() || report.sensor().threshold_high().count() != 1 ||
+  if (!report.sensor().has_threshold_high() || report.sensor().threshold_high().size() != 1 ||
       !FeatureValueValid(report.sensor().threshold_high()[0], kLightSensorAxis)) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  if (!report.sensor().has_threshold_low() || report.sensor().threshold_low().count() != 1 ||
+  if (!report.sensor().has_threshold_low() || report.sensor().threshold_low().size() != 1 ||
       !FeatureValueValid(report.sensor().threshold_low()[0], kLightSensorAxis)) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;

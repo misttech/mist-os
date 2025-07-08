@@ -126,7 +126,7 @@ void MockData::CheckWireDir(const fidl_cpp_wire_interop_test::wire::Node& node) 
   EXPECT_TRUE(node.has_kind());
   EXPECT_EQ(fidl_cpp_wire_interop_test::wire::Kind::Tag::kDirectory, node.kind().Which());
   const fidl_cpp_wire_interop_test::wire::Directory& dir = node.kind().directory();
-  EXPECT_EQ(1, dir.children->elements.count());
+  EXPECT_EQ(1, dir.children->elements.size());
   const fidl_cpp_wire_interop_test::wire::Node& child = dir.children->elements[0];
   CheckWireFile(child);
 }

@@ -48,8 +48,8 @@ TEST(SensorTest, AmbientLight) {
   EXPECT_TRUE(descriptor.sensor().has_input());
 
   // Check the descriptor.
-  ASSERT_EQ(1, descriptor.sensor().input().count());
-  ASSERT_EQ(4, descriptor.sensor().input()[0].values().count());
+  ASSERT_EQ(1, descriptor.sensor().input().size());
+  ASSERT_EQ(4, descriptor.sensor().input()[0].values().size());
 
   ASSERT_EQ(descriptor.sensor().input()[0].values()[0].type,
             fuchsia_input_report::wire::SensorType::kLightIlluminance);
@@ -93,7 +93,7 @@ TEST(SensorTest, AmbientLight) {
                                     report_allocator, input_report));
 
   ASSERT_TRUE(input_report.has_sensor());
-  EXPECT_EQ(4, input_report.sensor().values().count());
+  EXPECT_EQ(4, input_report.sensor().values().size());
 
   // Check the report.
   // These will always match the ordering in the descriptor.
@@ -139,14 +139,14 @@ TEST(SensorTest, MultiSensor) {
     ASSERT_TRUE(descriptor.has_sensor());
     EXPECT_TRUE(descriptor.sensor().has_input());
   }
-  ASSERT_EQ(std::size(sensor), descriptor.sensor().input().count());
+  ASSERT_EQ(std::size(sensor), descriptor.sensor().input().size());
 
   // Accelerometer
   {
     ASSERT_TRUE(descriptor.sensor().input()[0].has_report_id());
     EXPECT_EQ(ACCELEROMETER_RPT_ID_B, descriptor.sensor().input()[0].report_id());
     ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
-    ASSERT_EQ(3, descriptor.sensor().input()[0].values().count());
+    ASSERT_EQ(3, descriptor.sensor().input()[0].values().size());
 
     EXPECT_EQ(descriptor.sensor().input()[0].values()[0].type,
               fuchsia_input_report::wire::SensorType::kAccelerometerX);
@@ -183,7 +183,7 @@ TEST(SensorTest, MultiSensor) {
                                          sizeof(report_data), report_allocator, input_report));
 
     ASSERT_TRUE(input_report.has_sensor());
-    ASSERT_EQ(3, input_report.sensor().values().count());
+    ASSERT_EQ(3, input_report.sensor().values().size());
 
     // Check the report.
     // These will always match the ordering in the descriptor.
@@ -197,7 +197,7 @@ TEST(SensorTest, MultiSensor) {
     ASSERT_TRUE(descriptor.sensor().input()[1].has_report_id());
     EXPECT_EQ(GYROMETER_RPT_ID, descriptor.sensor().input()[1].report_id());
     ASSERT_TRUE(descriptor.sensor().input()[1].has_values());
-    ASSERT_EQ(3, descriptor.sensor().input()[1].values().count());
+    ASSERT_EQ(3, descriptor.sensor().input()[1].values().size());
 
     EXPECT_EQ(descriptor.sensor().input()[1].values()[0].type,
               fuchsia_input_report::wire::SensorType::kGyroscopeX);
@@ -235,7 +235,7 @@ TEST(SensorTest, MultiSensor) {
                                    sizeof(gyrometer_report_data), report_allocator, input_report));
 
     ASSERT_TRUE(input_report.has_sensor());
-    ASSERT_EQ(3, input_report.sensor().values().count());
+    ASSERT_EQ(3, input_report.sensor().values().size());
 
     // Check the report.
     // These will always match the ordering in the descriptor.
@@ -249,7 +249,7 @@ TEST(SensorTest, MultiSensor) {
     ASSERT_TRUE(descriptor.sensor().input()[2].has_report_id());
     EXPECT_EQ(COMPASS_RPT_ID, descriptor.sensor().input()[2].report_id());
     ASSERT_TRUE(descriptor.sensor().input()[2].has_values());
-    ASSERT_EQ(3, descriptor.sensor().input()[2].values().count());
+    ASSERT_EQ(3, descriptor.sensor().input()[2].values().size());
 
     EXPECT_EQ(descriptor.sensor().input()[2].values()[0].type,
               fuchsia_input_report::wire::SensorType::kMagnetometerX);
@@ -287,7 +287,7 @@ TEST(SensorTest, MultiSensor) {
                                    sizeof(compass_report_data), report_allocator, input_report));
 
     ASSERT_TRUE(input_report.has_sensor());
-    ASSERT_EQ(3, input_report.sensor().values().count());
+    ASSERT_EQ(3, input_report.sensor().values().size());
 
     // Check the report.
     // These will always match the ordering in the descriptor.
@@ -301,7 +301,7 @@ TEST(SensorTest, MultiSensor) {
     ASSERT_TRUE(descriptor.sensor().input()[3].has_report_id());
     EXPECT_EQ(ACCELEROMETER_RPT_ID_A, descriptor.sensor().input()[3].report_id());
     ASSERT_TRUE(descriptor.sensor().input()[3].has_values());
-    ASSERT_EQ(3, descriptor.sensor().input()[3].values().count());
+    ASSERT_EQ(3, descriptor.sensor().input()[3].values().size());
 
     EXPECT_EQ(descriptor.sensor().input()[3].values()[0].type,
               fuchsia_input_report::wire::SensorType::kAccelerometerX);
@@ -339,7 +339,7 @@ TEST(SensorTest, MultiSensor) {
                                          input_report));
 
     ASSERT_TRUE(input_report.has_sensor());
-    ASSERT_EQ(3, input_report.sensor().values().count());
+    ASSERT_EQ(3, input_report.sensor().values().size());
 
     // Check the report.
     // These will always match the ordering in the descriptor.
@@ -353,7 +353,7 @@ TEST(SensorTest, MultiSensor) {
     ASSERT_TRUE(descriptor.sensor().input()[4].has_report_id());
     EXPECT_EQ(ILLUMINANCE_RPT_ID, descriptor.sensor().input()[4].report_id());
     ASSERT_TRUE(descriptor.sensor().input()[4].has_values());
-    ASSERT_EQ(1, descriptor.sensor().input()[4].values().count());
+    ASSERT_EQ(1, descriptor.sensor().input()[4].values().size());
 
     EXPECT_EQ(descriptor.sensor().input()[4].values()[0].type,
               fuchsia_input_report::wire::SensorType::kLightIlluminance);
@@ -377,7 +377,7 @@ TEST(SensorTest, MultiSensor) {
                                          input_report));
 
     ASSERT_TRUE(input_report.has_sensor());
-    ASSERT_EQ(1, input_report.sensor().values().count());
+    ASSERT_EQ(1, input_report.sensor().values().size());
 
     // Check the report.
     // These will always match the ordering in the descriptor.

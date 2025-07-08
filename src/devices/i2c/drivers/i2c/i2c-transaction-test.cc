@@ -67,7 +67,7 @@ TEST_F(I2cDriverTransactionTest, Write3BytesOnce) {
           FakeI2cImpl::TransactCompleter::Sync& comp) {
     fidl::VectorView<fuchsia_hardware_i2cimpl::wire::I2cImplOp>& ops = req->op;
 
-    if (ops.count() != 1) {
+    if (ops.size() != 1) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -79,7 +79,7 @@ TEST_F(I2cDriverTransactionTest, Write3BytesOnce) {
     }
 
     auto write_data = op.type.write_data();
-    if (write_data.count() != 3 || write_data[0] != kTestWrite0 || write_data[1] != kTestWrite1 ||
+    if (write_data.size() != 3 || write_data[0] != kTestWrite0 || write_data[1] != kTestWrite1 ||
         write_data[2] != kTestWrite2) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
@@ -114,7 +114,7 @@ TEST_F(I2cDriverTransactionTest, Read3BytesOnce) {
           FakeI2cImpl::TransactCompleter::Sync& comp) {
     fidl::VectorView<fuchsia_hardware_i2cimpl::wire::I2cImplOp>& ops = req->op;
 
-    if (ops.count() != 1) {
+    if (ops.size() != 1) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -143,7 +143,7 @@ TEST_F(I2cDriverTransactionTest, Read3BytesOnce) {
   auto read = i2c_client->Transfer(transactions);
   ASSERT_OK(read.status());
   ASSERT_FALSE(read->is_error());
-  ASSERT_EQ(read->value()->read_data.count(), 1u);
+  ASSERT_EQ(read->value()->read_data.size(), 1u);
   ASSERT_EQ(read->value()->read_data[0][0], kTestRead0);
   ASSERT_EQ(read->value()->read_data[0][1], kTestRead1);
   ASSERT_EQ(read->value()->read_data[0][2], kTestRead2);
@@ -154,7 +154,7 @@ TEST_F(I2cDriverTransactionTest, Write1ByteOnceRead1Byte3TimesTransactions) {
           FakeI2cImpl::TransactCompleter::Sync& comp) {
     fidl::VectorView<fuchsia_hardware_i2cimpl::wire::I2cImplOp>& ops = req->op;
 
-    if (ops.count() != 4) {
+    if (ops.size() != 4) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -169,7 +169,7 @@ TEST_F(I2cDriverTransactionTest, Write1ByteOnceRead1Byte3TimesTransactions) {
       return;
     }
     const auto& op1_write_data = op1.type.write_data();
-    if (op1_write_data.count() != 1 || op1_write_data[0] != kTestWrite0) {
+    if (op1_write_data.size() != 1 || op1_write_data[0] != kTestWrite0) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -233,7 +233,7 @@ TEST_F(I2cDriverTransactionTest, StopFlagPropagates) {
   Init([](FakeI2cImpl::TransactRequestView req, fdf::Arena& arena,
           FakeI2cImpl::TransactCompleter::Sync& comp) {
     fidl::VectorView<fuchsia_hardware_i2cimpl::wire::I2cImplOp>& ops = req->op;
-    if (ops.count() != 4) {
+    if (ops.size() != 4) {
       comp.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -392,7 +392,7 @@ TEST_F(I2cDriverTransactionTest, HugeTransfer) {
 
   auto write_buffer = std::make_unique<uint8_t[]>(1024);
   auto write_data = fidl::VectorView<uint8_t>::FromExternal(write_buffer.get(), 1024);
-  memset(write_data.data(), 'w', write_data.count());
+  memset(write_data.data(), 'w', write_data.size());
 
   fidl::Arena arena;
   auto write_transfer = fidl_i2c::wire::DataTransfer::WithWriteData(arena, write_data);
@@ -409,9 +409,9 @@ TEST_F(I2cDriverTransactionTest, HugeTransfer) {
   ASSERT_OK(read.status());
   ASSERT_FALSE(read->is_error());
 
-  ASSERT_EQ(read->value()->read_data.count(), 1u);
-  ASSERT_EQ(read->value()->read_data[0].count(), 1024u);
-  cpp20::span data(read->value()->read_data[0].data(), read->value()->read_data[0].count());
+  ASSERT_EQ(read->value()->read_data.size(), 1u);
+  ASSERT_EQ(read->value()->read_data[0].size(), 1024u);
+  cpp20::span data(read->value()->read_data[0].data(), read->value()->read_data[0].size());
   EXPECT_TRUE(std::all_of(data.begin(), data.end(), [](uint8_t b) { return b == 'r'; }));
 }
 

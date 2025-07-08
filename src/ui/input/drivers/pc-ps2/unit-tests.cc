@@ -242,11 +242,11 @@ TEST_F(ControllerTest, GetKbdDescriptorTest) {
   ASSERT_TRUE(response.value().descriptor.has_keyboard());
   ASSERT_TRUE(response.value().descriptor.keyboard().has_input());
   ASSERT_TRUE(response.value().descriptor.keyboard().input().has_keys3());
-  ASSERT_EQ(response.value().descriptor.keyboard().input().keys3().count(), 106);
+  ASSERT_EQ(response.value().descriptor.keyboard().input().keys3().size(), 106);
 
   ASSERT_TRUE(response.value().descriptor.keyboard().has_output());
   ASSERT_TRUE(response.value().descriptor.keyboard().output().has_leds());
-  ASSERT_EQ(response.value().descriptor.keyboard().output().leds().count(), 5);
+  ASSERT_EQ(response.value().descriptor.keyboard().output().leds().size(), 5);
   const auto& leds = response.value().descriptor.keyboard().output().leds();
   EXPECT_EQ(leds[0], fuchsia_input_report::wire::LedType::kNumLock);
   EXPECT_EQ(leds[1], fuchsia_input_report::wire::LedType::kCapsLock);
@@ -277,7 +277,7 @@ TEST_F(ControllerTest, KeyboardPressTest) {
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1, reports.size());
 
     auto& report = reports[0];
     ASSERT_TRUE(report.has_event_time());
@@ -285,7 +285,7 @@ TEST_F(ControllerTest, KeyboardPressTest) {
     auto& keyboard_report = report.keyboard();
 
     ASSERT_TRUE(keyboard_report.has_pressed_keys3());
-    ASSERT_EQ(keyboard_report.pressed_keys3().count(), 1);
+    ASSERT_EQ(keyboard_report.pressed_keys3().size(), 1);
     EXPECT_EQ(keyboard_report.pressed_keys3()[0], fuchsia_input::wire::Key::kKey1);
   }
   {
@@ -296,7 +296,7 @@ TEST_F(ControllerTest, KeyboardPressTest) {
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1, reports.size());
 
     auto& report = reports[0];
     ASSERT_TRUE(report.has_event_time());
@@ -304,7 +304,7 @@ TEST_F(ControllerTest, KeyboardPressTest) {
     auto& keyboard_report = report.keyboard();
 
     ASSERT_TRUE(keyboard_report.has_pressed_keys3());
-    EXPECT_EQ(keyboard_report.pressed_keys3().count(), 0);
+    EXPECT_EQ(keyboard_report.pressed_keys3().size(), 0);
   }
 }
 
@@ -324,7 +324,7 @@ TEST_F(ControllerTest, GetMouseDescriptorTest) {
   ASSERT_TRUE(response.value().descriptor.has_mouse());
   ASSERT_TRUE(response.value().descriptor.mouse().has_input());
   ASSERT_TRUE(response.value().descriptor.mouse().input().has_buttons());
-  ASSERT_EQ(response.value().descriptor.mouse().input().buttons().count(), 3);
+  ASSERT_EQ(response.value().descriptor.mouse().input().buttons().size(), 3);
   EXPECT_EQ(response.value().descriptor.mouse().input().buttons()[0], 0x01);
   EXPECT_EQ(response.value().descriptor.mouse().input().buttons()[1], 0x02);
   EXPECT_EQ(response.value().descriptor.mouse().input().buttons()[2], 0x03);
@@ -369,7 +369,7 @@ TEST_F(ControllerTest, MouseMoveTest) {
   ASSERT_FALSE(result.value().is_error());
   auto& reports = result.value().value()->reports;
 
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1, reports.size());
 
   auto& report = reports[0];
   ASSERT_TRUE(report.has_event_time());
@@ -377,7 +377,7 @@ TEST_F(ControllerTest, MouseMoveTest) {
   auto& mouse_report = report.mouse();
 
   ASSERT_TRUE(mouse_report.has_pressed_buttons());
-  ASSERT_EQ(mouse_report.pressed_buttons().count(), 1);
+  ASSERT_EQ(mouse_report.pressed_buttons().size(), 1);
   EXPECT_EQ(mouse_report.pressed_buttons()[0], 0x1);
   ASSERT_TRUE(mouse_report.has_movement_x());
   EXPECT_EQ(mouse_report.movement_x(), 0x70);

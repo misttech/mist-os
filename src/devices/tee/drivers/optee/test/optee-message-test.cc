@@ -30,7 +30,7 @@ class MockMessage : public Message {
     ZX_DEBUG_ASSERT(message_pool != nullptr);
     ZX_DEBUG_ASSERT(temp_memory_pool != nullptr);
 
-    const size_t num_params = parameter_set.count() + start_index;
+    const size_t num_params = parameter_set.size() + start_index;
     ZX_DEBUG_ASSERT(num_params <= std::numeric_limits<uint32_t>::max());
 
     SharedMemoryPtr memory;
@@ -128,9 +128,9 @@ TEST_F(MessageTest, ParameterSetInvertabilityTest) {
   fidl::VectorView<fuchsia_tee::wire::Parameter> parameters_out;
   result.take_value().CreateOutputParameterSet(allocator, 0, &parameters_out);
 
-  ASSERT_EQ(parameters_in.count(), parameters_out.count());
+  ASSERT_EQ(parameters_in.size(), parameters_out.size());
 
-  for (size_t i = 0; i < parameters_in.count(); i++) {
+  for (size_t i = 0; i < parameters_in.size(); i++) {
     auto& param_in = parameters_in[i];
     auto& param_out = parameters_out[i];
 

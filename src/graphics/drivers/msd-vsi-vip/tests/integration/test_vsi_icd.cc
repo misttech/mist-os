@@ -20,7 +20,7 @@ TEST(TestIcd, IcdList) {
   const fidl::WireResult result = fidl::WireCall(channel)->GetIcdList();
   EXPECT_TRUE(result.ok()) << result.FormatDescription();
   const fidl::WireResponse response = result.value();
-  EXPECT_EQ(response.icd_list.count(), 2u);
+  EXPECT_EQ(response.icd_list.size(), 2u);
 
   const auto& icd_item = response.icd_list[0];
 

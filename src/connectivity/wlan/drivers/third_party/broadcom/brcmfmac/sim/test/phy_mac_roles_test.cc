@@ -25,7 +25,7 @@ TEST_F(PhyMacRolesTest, VerifyMacRoles) {
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
   ASSERT_TRUE(result->value()->has_supported_mac_roles());
-  EXPECT_EQ(result->value()->supported_mac_roles().count(), 2u);
+  EXPECT_EQ(result->value()->supported_mac_roles().size(), 2u);
   EXPECT_EQ(result->value()->supported_mac_roles().data()[0], wlan_common::WlanMacRole::kClient);
   EXPECT_EQ(result->value()->supported_mac_roles().data()[1], wlan_common::WlanMacRole::kAp);
 }

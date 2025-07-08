@@ -59,8 +59,8 @@ class SdioTest : public zxtest::Test,
 
   void DoRwTxn(DoRwTxnRequestView request, DoRwTxnCompleter::Sync& completer) override {
     fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> buffers(
-        arena_, request->txn.buffers.count());
-    for (size_t i = 0; i < request->txn.buffers.count(); i++) {
+        arena_, request->txn.buffers.size());
+    for (size_t i = 0; i < request->txn.buffers.size(); i++) {
       buffers[i] = std::move(request->txn.buffers[i]);
     }
     txns_.emplace_back(wire::SdioRwTxn{.addr = request->txn.addr,
@@ -128,8 +128,8 @@ class SdioTest : public zxtest::Test,
     EXPECT_EQ(lhs.addr, rhs.addr);
     EXPECT_EQ(lhs.incr, rhs.incr);
     EXPECT_EQ(lhs.write, rhs.write);
-    EXPECT_EQ(lhs.buffers.count(), rhs.buffers.count());
-    EXPECT_EQ(lhs.buffers.count(), 1);
+    EXPECT_EQ(lhs.buffers.size(), rhs.buffers.size());
+    EXPECT_EQ(lhs.buffers.size(), 1);
     EXPECT_EQ(lhs.buffers.begin()->buffer.Which(), rhs.buffers.begin()->buffer.Which());
     EXPECT_EQ(lhs.buffers.begin()->offset, rhs.buffers.begin()->offset);
     EXPECT_EQ(lhs.buffers.begin()->size, rhs.buffers.begin()->size);

@@ -22,14 +22,14 @@ TEST(Memory, TrackingPointerUnowned) {
 TEST(Memory, VectorViewUnownedArray) {
   uint32_t obj[1] = {1};
   auto vv = fidl::VectorView<uint32_t>::FromExternal(obj);
-  EXPECT_EQ(vv.count(), std::size(obj));
+  EXPECT_EQ(vv.size(), std::size(obj));
   EXPECT_EQ(vv.data(), std::data(obj));
 }
 
 TEST(Memory, VectorViewUnownedFidlArray) {
   std::array<uint32_t, 1> obj = {1};
   auto vv = fidl::VectorView<uint32_t>::FromExternal(obj);
-  EXPECT_EQ(vv.count(), std::size(obj));
+  EXPECT_EQ(vv.size(), std::size(obj));
   EXPECT_EQ(vv.data(), std::data(obj));
 }
 
@@ -37,7 +37,7 @@ TEST(Memory, VectorViewUnownedStdVector) {
   std::vector<uint32_t> obj;
   obj.push_back(1);
   auto vv = fidl::VectorView<uint32_t>::FromExternal(obj);
-  EXPECT_EQ(vv.count(), std::size(obj));
+  EXPECT_EQ(vv.size(), std::size(obj));
   EXPECT_EQ(vv.data(), std::data(obj));
 }
 
@@ -92,7 +92,7 @@ TEST(Memory, ObjectViewFromVectorViewOwned) {
 
   fidl::Arena arena;
   auto ov = fidl::ObjectView(arena, vv);
-  EXPECT_EQ(ov->count(), std::size(obj));
+  EXPECT_EQ(ov->size(), std::size(obj));
   EXPECT_EQ(ov->data(), std::data(obj));
 }
 
@@ -102,7 +102,7 @@ TEST(Memory, ObjectViewFromVectorViewOfMoveOnlyOwned) {
 
   fidl::Arena arena;
   auto ov = fidl::ObjectView(arena, vv);
-  EXPECT_EQ(ov->count(), std::size(obj));
+  EXPECT_EQ(ov->size(), std::size(obj));
   EXPECT_EQ(ov->data(), std::data(obj));
 }
 

@@ -65,7 +65,7 @@ zx::result<> ChildZirconTransportDriver::QueryParent(
     return transfer_result->take_error();
   }
 
-  read_result_.reserve(transfer_result->value()->read_data.count());
+  read_result_.reserve(transfer_result->value()->read_data.size());
   for (auto& read_data : transfer_result->value()->read_data) {
     read_result_.emplace_back(std::vector<uint8_t>(read_data.begin(), read_data.end()));
   }

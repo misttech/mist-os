@@ -318,7 +318,7 @@ class ButtonsTest : public ::testing::Test {
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(1U, reports.count());
+    ASSERT_EQ(1U, reports.size());
     auto report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -386,7 +386,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -394,7 +394,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
 
@@ -415,7 +415,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -423,7 +423,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 0U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 0U);
 
     driver_test().RunInEnvironmentTypeContext([suspend_enabled](ButtonsTestEnvironment& env) {
       EXPECT_EQ(env.fake_sag_.HasWakeLeaseBeenTaken(), suspend_enabled);
@@ -451,7 +451,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutPower) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -459,7 +459,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutPower) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
   }
@@ -476,7 +476,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutPower) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -484,7 +484,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutPower) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 0U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 0U);
   }
 }
 
@@ -522,7 +522,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonFlaky) {
   ASSERT_TRUE(result->is_ok());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(reports.count(), 1U);
+  ASSERT_EQ(reports.size(), 1U);
   auto& report = reports[0];
 
   ASSERT_TRUE(report.has_event_time());
@@ -530,7 +530,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonFlaky) {
   auto& consumer_control = report.consumer_control();
 
   ASSERT_TRUE(consumer_control.has_pressed_buttons());
-  ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+  ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
   EXPECT_EQ(consumer_control.pressed_buttons()[0],
             fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
 }
@@ -566,7 +566,7 @@ TEST_P(ParameterizedButtonsTest, MatrixButtonPush) {
   ASSERT_TRUE(result->is_ok());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(reports.count(), 1U);
+  ASSERT_EQ(reports.size(), 1U);
   auto& report = reports[0];
 
   ASSERT_TRUE(report.has_event_time());
@@ -574,7 +574,7 @@ TEST_P(ParameterizedButtonsTest, MatrixButtonPush) {
   auto& consumer_control = report.consumer_control();
 
   ASSERT_TRUE(consumer_control.has_pressed_buttons());
-  ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+  ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
   EXPECT_EQ(consumer_control.pressed_buttons()[0],
             fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
 
@@ -650,7 +650,7 @@ TEST_P(ParameterizedButtonsTest, DuplicateReports) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -658,7 +658,7 @@ TEST_P(ParameterizedButtonsTest, DuplicateReports) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 3U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 3U);
     std::set<fuchsia_input_report::wire::ConsumerControlButton> pressed_buttons;
     for (const auto& button : consumer_control.pressed_buttons()) {
       pressed_buttons.insert(button);
@@ -680,7 +680,7 @@ TEST_P(ParameterizedButtonsTest, DuplicateReports) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
     report = reports[0];
 
@@ -689,7 +689,7 @@ TEST_P(ParameterizedButtonsTest, DuplicateReports) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::ConsumerControlButton::kVolumeDown);
   }
@@ -724,7 +724,7 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -732,7 +732,7 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kCameraDisable);
   }
@@ -756,7 +756,7 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -764,7 +764,7 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 0U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 0U);
   }
 }
 
@@ -792,7 +792,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -800,7 +800,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
   }
@@ -817,7 +817,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -825,7 +825,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 0U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 0U);
   }
 }
 
@@ -848,7 +848,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -856,7 +856,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
   }
@@ -874,7 +874,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -882,7 +882,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 2U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 2U);
     std::set<fuchsia_input_report::wire::ConsumerControlButton> pressed_buttons;
     for (const auto& button : consumer_control.pressed_buttons()) {
       pressed_buttons.insert(button);
@@ -904,7 +904,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -912,7 +912,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 1U);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kMicMute);
   }
@@ -926,7 +926,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1U);
+    ASSERT_EQ(reports.size(), 1U);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -934,7 +934,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 0U);
+    ASSERT_EQ(consumer_control.pressed_buttons().size(), 0U);
   }
 }
 

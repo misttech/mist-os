@@ -1371,7 +1371,7 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemReadFile(ReadFileFileSystemRp
     }
 
     const auto& data = response.value()->data;
-    read_chunk_actual = data.count();
+    read_chunk_actual = data.size();
     memcpy(buffer, data.begin(), read_chunk_actual);
     buffer += read_chunk_actual;
     offset += read_chunk_actual;

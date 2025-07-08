@@ -119,7 +119,7 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
+        ASSERT_EQ(result->value()->rxdata.size(), sizeof(buf));
         EXPECT_TRUE(IsBytesEqual(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf)));
         driver_test().runtime().Quit();
       });
@@ -224,7 +224,7 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
+        ASSERT_EQ(result->value()->rxdata.size(), sizeof(buf));
         EXPECT_TRUE(IsBytesEqual(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf)));
         driver_test().runtime().Quit();
       });
@@ -328,7 +328,7 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
+        ASSERT_EQ(result->value()->rxdata.size(), sizeof(buf));
         EXPECT_TRUE(IsBytesEqual(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf)));
         driver_test().runtime().Quit();
       });

@@ -102,7 +102,7 @@ TEST_F(AmlSpiTest, Exchange) {
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok() && result->is_ok());
-        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        ASSERT_EQ(result->value()->rxdata.size(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
         driver_test().runtime().Quit();
@@ -139,7 +139,7 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
       ->ExchangeVector(2, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok() && result->is_ok());
-        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        ASSERT_EQ(result->value()->rxdata.size(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
         driver_test().runtime().Quit();
@@ -544,7 +544,7 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok() && result->is_ok());
-        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        ASSERT_EQ(result->value()->rxdata.size(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
         driver_test().runtime().Quit();
@@ -588,7 +588,7 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok() && result->is_ok());
-        ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
+        ASSERT_EQ(result->value()->rxdata.size(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
         driver_test().runtime().Quit();
@@ -619,7 +619,7 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 17u);
+        EXPECT_EQ(result->value()->rxdata.size(), 17u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
         driver_test().runtime().Quit();
@@ -636,7 +636,7 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 16u);
+        EXPECT_EQ(result->value()->rxdata.size(), 16u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_TRUE(env.ControllerReset()); });
         driver_test().runtime().Quit();
@@ -651,7 +651,7 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 3u);
+        EXPECT_EQ(result->value()->rxdata.size(), 3u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
         driver_test().runtime().Quit();
@@ -666,7 +666,7 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 6u);
+        EXPECT_EQ(result->value()->rxdata.size(), 6u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
         driver_test().runtime().Quit();
@@ -681,7 +681,7 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 8u);
+        EXPECT_EQ(result->value()->rxdata.size(), 8u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_TRUE(env.ControllerReset()); });
         driver_test().runtime().Quit();
@@ -897,7 +897,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 17u);
+        EXPECT_EQ(result->value()->rxdata.size(), 17u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
@@ -908,7 +908,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 16u);
+        EXPECT_EQ(result->value()->rxdata.size(), 16u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
@@ -918,7 +918,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 3u);
+        EXPECT_EQ(result->value()->rxdata.size(), 3u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
@@ -928,7 +928,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 6u);
+        EXPECT_EQ(result->value()->rxdata.size(), 6u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
@@ -938,7 +938,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        EXPECT_EQ(result->value()->rxdata.count(), 8u);
+        EXPECT_EQ(result->value()->rxdata.size(), 8u);
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
         driver_test().runtime().Quit();

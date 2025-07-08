@@ -68,8 +68,8 @@ TEST_F(SetKeysTest, MultipleKeys) {
     EXPECT_BYTES_EQ(firmware_keys[i].data, keys[i], firmware_keys[i].len);
   }
 
-  ASSERT_EQ(set_keys_resp.statuslist.count(), wlan_fullmac_wire::kWlanMaxKeylistSize);
-  for (size_t i = 0; i < set_keys_resp.statuslist.count(); i++) {
+  ASSERT_EQ(set_keys_resp.statuslist.size(), wlan_fullmac_wire::kWlanMaxKeylistSize);
+  for (size_t i = 0; i < set_keys_resp.statuslist.size(); i++) {
     ASSERT_EQ(set_keys_resp.statuslist[i], ZX_OK);
   }
 }
@@ -114,7 +114,7 @@ TEST_F(SetKeysTest, SetGroupKey) {
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.statuslist.count(), 2ul);
+  ASSERT_EQ(set_keys_resp.statuslist.size(), 2ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
   ASSERT_OK(set_keys_resp.statuslist.data()[1]);
 
@@ -159,7 +159,7 @@ TEST_F(SetKeysTest, CustomOuiNotSupported) {
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.statuslist.count(), 1ul);
+  ASSERT_EQ(set_keys_resp.statuslist.size(), 1ul);
   ASSERT_EQ(set_keys_resp.statuslist.data()[0], ZX_ERR_NOT_SUPPORTED);
 
   std::vector<brcmf_wsec_key_le> firmware_keys;
@@ -193,7 +193,7 @@ TEST_F(SetKeysTest, OptionalOuiSupported) {
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.statuslist.count(), 1ul);
+  ASSERT_EQ(set_keys_resp.statuslist.size(), 1ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
 
   std::vector<brcmf_wsec_key_le> firmware_keys;
@@ -231,7 +231,7 @@ TEST_F(SetKeysTest, MsftOuiSupported) {
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.statuslist.count(), 1ul);
+  ASSERT_EQ(set_keys_resp.statuslist.size(), 1ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
 
   std::vector<brcmf_wsec_key_le> firmware_keys;

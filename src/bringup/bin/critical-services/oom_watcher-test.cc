@@ -27,7 +27,7 @@ class FakePowerManager : public fidl::WireServer<fuchsia_hardware_power_statecon
 
   void PerformReboot(PerformRebootRequestView view,
                      PerformRebootCompleter::Sync& completer) override {
-    if (!view->options.has_reasons() || view->options.reasons().count() != 1 ||
+    if (!view->options.has_reasons() || view->options.reasons().size() != 1 ||
         view->options.reasons().at(0) !=
             fuchsia_hardware_power_statecontrol::RebootReason2::kOutOfMemory) {
       unexpected_calls_ = true;

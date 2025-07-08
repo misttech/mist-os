@@ -36,7 +36,7 @@ void TryFilesystemOperations(fidl::UnownedClientEnd<fio::File> client_end) {
   const fit::result read_response = read_result.value();
   ASSERT_TRUE(read_response.is_ok(), "%s", zx_status_get_string(read_response.error_value()));
   const fidl::VectorView data = read_result->value()->data;
-  ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()), payload);
+  ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()), payload);
 }
 
 void TryFilesystemOperations(const zx::unowned_channel& channel) {

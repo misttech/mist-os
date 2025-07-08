@@ -56,7 +56,7 @@ TEST(TouchscreenTest, ParadiseV1) {
   EXPECT_TRUE(descriptor.has_touch());
   EXPECT_TRUE(descriptor.touch().has_input());
 
-  EXPECT_EQ(5UL, descriptor.touch().input().contacts().count());
+  EXPECT_EQ(5UL, descriptor.touch().input().contacts().size());
 
   EXPECT_TRUE(descriptor.touch().input().contacts()[0].has_position_x());
   EXPECT_EQ(0, descriptor.touch().input().contacts()[0].position_x().range.min);
@@ -82,7 +82,7 @@ TEST(TouchscreenTest, ParadiseV1) {
                                    sizeof(touch_v1_report), report_allocator, input_report));
   ASSERT_TRUE(input_report.has_touch());
 
-  EXPECT_EQ(1UL, input_report.touch().contacts().count());
+  EXPECT_EQ(1UL, input_report.touch().contacts().size());
 
   // The expected values below have been manually converted from logical to physical units based
   // on the report descriptor.
@@ -116,7 +116,7 @@ TEST(TouchscreenTest, ParadiseV1Touchpad) {
   EXPECT_TRUE(descriptor.has_touch());
   EXPECT_TRUE(descriptor.touch().has_input());
 
-  EXPECT_EQ(5UL, descriptor.touch().input().contacts().count());
+  EXPECT_EQ(5UL, descriptor.touch().input().contacts().size());
 
   EXPECT_TRUE(descriptor.touch().input().contacts()[0].has_position_x());
   EXPECT_EQ(0, descriptor.touch().input().contacts()[0].position_x().range.min);
@@ -126,7 +126,7 @@ TEST(TouchscreenTest, ParadiseV1Touchpad) {
   EXPECT_EQ(0, descriptor.touch().input().contacts()[0].position_y().range.min);
   EXPECT_EQ(68000, descriptor.touch().input().contacts()[0].position_y().range.max);
 
-  EXPECT_EQ(1, descriptor.touch().input().buttons().count());
+  EXPECT_EQ(1, descriptor.touch().input().buttons().size());
   EXPECT_EQ(fuchsia_input_report::wire::TouchButton::kPalm,
             descriptor.touch().input().buttons()[0]);
 
@@ -147,14 +147,14 @@ TEST(TouchscreenTest, ParadiseV1Touchpad) {
                                    report_allocator, input_report));
   ASSERT_TRUE(input_report.has_touch());
 
-  EXPECT_EQ(1UL, input_report.touch().contacts().count());
+  EXPECT_EQ(1UL, input_report.touch().contacts().size());
 
   // The expected values below have been manually converted from logical to physical units based
   // on the report descriptor.
   EXPECT_EQ(5U, input_report.touch().contacts()[0].contact_id());
   EXPECT_EQ(1562, input_report.touch().contacts()[0].position_x());
   EXPECT_EQ(781, input_report.touch().contacts()[0].position_y());
-  EXPECT_EQ(1, input_report.touch().pressed_buttons().count());
+  EXPECT_EQ(1, input_report.touch().pressed_buttons().size());
   EXPECT_EQ(fuchsia_input_report::wire::TouchButton::kPalm,
             input_report.touch().pressed_buttons()[0]);
 }
@@ -217,7 +217,7 @@ TEST(TouchscreenTest, AtlasTouchpad) {
   ASSERT_TRUE(descriptor.has_mouse());
   ASSERT_TRUE(descriptor.mouse().has_input());
   EXPECT_TRUE(descriptor.mouse().input().has_buttons());
-  EXPECT_EQ(descriptor.mouse().input().buttons().count(), 2);
+  EXPECT_EQ(descriptor.mouse().input().buttons().size(), 2);
   ASSERT_TRUE(descriptor.mouse().input().has_movement_x());
   EXPECT_EQ(descriptor.mouse().input().movement_x().range.min, -127);
   EXPECT_EQ(descriptor.mouse().input().movement_x().range.max, 127);
@@ -237,10 +237,10 @@ TEST(TouchscreenTest, AtlasTouchpad) {
   EXPECT_EQ(descriptor.touch().input().touch_type(),
             fuchsia_input_report::wire::TouchType::kTouchpad);
   ASSERT_TRUE(descriptor.touch().input().has_buttons());
-  EXPECT_EQ(descriptor.touch().input().buttons().count(), 1);
+  EXPECT_EQ(descriptor.touch().input().buttons().size(), 1);
   ASSERT_TRUE(descriptor.touch().input().has_contacts());
-  ASSERT_EQ(descriptor.touch().input().contacts().count(), 5);
-  for (size_t i = 0; i < descriptor.touch().input().contacts().count(); i++) {
+  ASSERT_EQ(descriptor.touch().input().contacts().size(), 5);
+  for (size_t i = 0; i < descriptor.touch().input().contacts().size(); i++) {
     ASSERT_TRUE(descriptor.touch().input().contacts()[i].has_position_x());
     EXPECT_EQ(descriptor.touch().input().contacts()[i].position_x().unit.type,
               fuchsia_input_report::wire::UnitType::kMeters);
@@ -335,7 +335,7 @@ TEST(TouchscreenTest, AtlasTouchpad) {
     ASSERT_TRUE(input_report.mouse().has_movement_y());
     EXPECT_EQ(kMouseYTestVal, input_report.mouse().movement_y());
     ASSERT_TRUE(input_report.mouse().has_pressed_buttons());
-    ASSERT_EQ(input_report.mouse().pressed_buttons().count(), 1);
+    ASSERT_EQ(input_report.mouse().pressed_buttons().size(), 1);
     EXPECT_EQ(input_report.mouse().pressed_buttons()[0], 1);
   }
 
@@ -370,11 +370,11 @@ TEST(TouchscreenTest, AtlasTouchpad) {
 
     ASSERT_TRUE(input_report.has_touch());
     ASSERT_TRUE(input_report.touch().has_pressed_buttons());
-    ASSERT_EQ(input_report.touch().pressed_buttons().count(), 1);
+    ASSERT_EQ(input_report.touch().pressed_buttons().size(), 1);
     EXPECT_EQ(input_report.touch().pressed_buttons()[0],
               fuchsia_input_report::wire::TouchButton::kPalm);
     ASSERT_TRUE(input_report.touch().has_contacts());
-    ASSERT_EQ(input_report.touch().contacts().count(), 3);
+    ASSERT_EQ(input_report.touch().contacts().size(), 3);
     size_t tmp_counter = 0;
     for (size_t i = 0; i < 5; i++) {
       if (!kTouchTipSwitchTestVal[i]) {

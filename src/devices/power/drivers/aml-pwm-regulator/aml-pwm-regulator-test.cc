@@ -29,7 +29,7 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
     ASSERT_EQ(actual_config.polarity, expect_config.polarity);
     ASSERT_EQ(actual_config.period_ns, expect_config.period_ns);
     ASSERT_EQ(actual_config.duty_cycle, expect_config.duty_cycle);
-    ASSERT_EQ(actual_config.mode_config.count(), expect_config.mode_config.count());
+    ASSERT_EQ(actual_config.mode_config.size(), expect_config.mode_config.size());
     ASSERT_EQ(reinterpret_cast<aml_pwm::mode_config*>(actual_config.mode_config.data())->mode,
               reinterpret_cast<aml_pwm::mode_config*>(expect_config.mode_config.data())->mode);
 
@@ -55,13 +55,12 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   void ExpectEnable() { expect_enable_ = true; }
 
   void ExpectSetConfig(fuchsia_hardware_pwm::wire::PwmConfig config) {
-    std::unique_ptr<uint8_t[]> mode_config =
-        std::make_unique<uint8_t[]>(config.mode_config.count());
-    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.count());
+    std::unique_ptr<uint8_t[]> mode_config = std::make_unique<uint8_t[]>(config.mode_config.size());
+    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.size());
 
     auto copy = config;
     copy.mode_config =
-        fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.count());
+        fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.size());
     expect_configs_.push_back(std::move(copy));
     mode_config_buffers_.push_back(std::move(mode_config));
   }

@@ -391,7 +391,7 @@ TEST_F(BindManagerTestBase, TestAddNode) {
 
   auto test_node_1 = nodes()["test-1"];
   ASSERT_TRUE(test_node_1);
-  ASSERT_EQ(1u, test_node_1->properties().count());
+  ASSERT_EQ(1u, test_node_1->properties().size());
   const auto& test_node_1_properties = test_node_1->GetNodeProperties();
   ASSERT_TRUE(test_node_1_properties.has_value());
   ASSERT_EQ(2u, test_node_1_properties->size());
@@ -405,7 +405,7 @@ TEST_F(BindManagerTestBase, TestAddNode) {
 
   auto test_node_2 = nodes()["test-2"];
   ASSERT_TRUE(test_node_2);
-  ASSERT_EQ(1u, test_node_2->properties().count());
+  ASSERT_EQ(1u, test_node_2->properties().size());
   const auto& test_node_2_properties = test_node_2->GetNodeProperties();
   ASSERT_TRUE(test_node_2_properties.has_value());
   ASSERT_EQ(2u, test_node_2_properties->size());

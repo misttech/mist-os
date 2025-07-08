@@ -329,7 +329,7 @@ bool AmlSpi::StartExchange(SpiRequest request) {
   ZX_DEBUG_ASSERT_MSG(!request.txdata().is_null() || !request.rxdata().is_null(),
                       "txdata and rxdata are both null");
   ZX_DEBUG_ASSERT_MSG(request.txdata().empty() || request.rxdata().empty() ||
-                          request.txdata().count() == request.rxdata().count(),
+                          request.txdata().size() == request.rxdata().size(),
                       "txdata and rxdata have different sizes");
 
   current_request_.emplace(std::move(request));
@@ -500,7 +500,7 @@ void AmlSpi::ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVecto
         }
       };
   SpiRequest spi_request{request->chip_select, std::move(txdata),
-                         std::vector<uint8_t>(request->txdata.count()), std::move(start_cb),
+                         std::vector<uint8_t>(request->txdata.size()), std::move(start_cb),
                          std::move(complete_cb)};
 
   HandleRequest(std::move(spi_request));

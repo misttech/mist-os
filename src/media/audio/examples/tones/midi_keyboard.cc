@@ -69,19 +69,19 @@ void MidiKeyboard::IssueRead() {
 }
 
 void MidiKeyboard::HandleRead(const fuchsia_hardware_midi::wire::DeviceReadResponse& response) {
-  if (response.event.count() == 0) {
+  if (response.event.size() == 0) {
     IssueRead();
     return;
   }
 
-  if (response.event.count() > 3) {
-    FX_LOGS(WARNING) << "Shutting down MIDI keyboard, bad event size (" << response.event.count()
+  if (response.event.size() > 3) {
+    FX_LOGS(WARNING) << "Shutting down MIDI keyboard, bad event size (" << response.event.size()
                      << ")";
     return;
   }
 
   std::array<uint8_t, 3> event;
-  memcpy(event.data(), response.event.data(), response.event.count());
+  memcpy(event.data(), response.event.data(), response.event.size());
 
   // In theory, USB MIDI event sizes are always supposed to be 4 bytes.  1
   // byte for virtual MIDI cable IDs, and then 3 bytes of the MIDI event

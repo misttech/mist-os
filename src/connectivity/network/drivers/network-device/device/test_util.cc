@@ -20,7 +20,7 @@ zx::result<std::vector<uint8_t>> TxBuffer::GetData(const VmoProvider& vmo_provid
     return zx::error(ZX_ERR_INTERNAL);
   }
   // We don't support copying chained buffers.
-  if (buffer_.data.count() != 1) {
+  if (buffer_.data.size() != 1) {
     return zx::error(ZX_ERR_INTERNAL);
   }
   const fuchsia_hardware_network_driver::wire::BufferRegion& region = buffer_.data.at(0);
@@ -354,7 +354,7 @@ void FakeNetworkDeviceImpl::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& c
 void FakeNetworkDeviceImpl::QueueTx(
     fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueTxRequest* request,
     fdf::Arena& arena, QueueTxCompleter::Sync& completer) {
-  EXPECT_NE(request->buffers.count(), 0u);
+  EXPECT_NE(request->buffers.size(), 0u);
   ASSERT_TRUE(device_client_.is_valid());
 
   fbl::AutoLock lock(&lock_);
@@ -362,7 +362,7 @@ void FakeNetworkDeviceImpl::QueueTx(
   queue_tx_called_.push_back(buffers.size());
   if (immediate_return_tx_ || !device_started_) {
     const zx_status_t return_status = device_started_ ? ZX_OK : ZX_ERR_UNAVAILABLE;
-    ASSERT_LE(request->buffers.count(), kDefaultTxDepth);
+    ASSERT_LE(request->buffers.size(), kDefaultTxDepth);
     std::array<fuchsia_hardware_network_driver::wire::TxResult, kDefaultTxDepth> results;
     auto results_iter = results.begin();
     for (const fuchsia_hardware_network_driver::wire::TxBuffer& buff : buffers) {
@@ -372,7 +372,7 @@ void FakeNetworkDeviceImpl::QueueTx(
       };
     }
     auto output = fidl::VectorView<fuchsia_hardware_network_driver::wire::TxResult>::FromExternal(
-        results.data(), request->buffers.count());
+        results.data(), request->buffers.size());
     EXPECT_TRUE(device_client_.buffer(arena)->CompleteTx(output).ok());
     return;
   }
@@ -388,7 +388,7 @@ void FakeNetworkDeviceImpl::QueueRxSpace(
     fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
     fdf::Arena& arena, QueueRxSpaceCompleter::Sync& completer) {
   ASSERT_TRUE(device_client_.is_valid());
-  size_t buf_count = request->buffers.count();
+  size_t buf_count = request->buffers.size();
 
   fbl::AutoLock lock(&lock_);
   queue_rx_space_called_.push_back(buf_count);

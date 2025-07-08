@@ -70,13 +70,13 @@ inline uint8_t BigEndianToHost(uint8_t val) { return val; }
 template <typename AddressType, typename DataType>
 void FakeI2c<AddressType, DataType>::Transfer(TransferRequestView request,
                                               TransferCompleter::Sync& completer) {
-  const size_t op_count = request->transactions.count();
+  const size_t op_count = request->transactions.size();
   const auto* op_list = request->transactions.data();
 
   // Is this a read? (represented on the wire as a write of an address followed by a read.)
   if (op_count == 2 && op_list[0].has_data_transfer() &&
       op_list[0].data_transfer().is_write_data() &&
-      op_list[0].data_transfer().write_data().count() == sizeof(AddressType) &&
+      op_list[0].data_transfer().write_data().size() == sizeof(AddressType) &&
       op_list[1].has_data_transfer() && op_list[1].data_transfer().is_read_size() &&
       op_list[1].data_transfer().read_size() == sizeof(DataType)) {
     // Decode address.
@@ -101,7 +101,7 @@ void FakeI2c<AddressType, DataType>::Transfer(TransferRequestView request,
   // data.)
   if (op_count == 1 && op_list[0].has_data_transfer() &&
       op_list[0].data_transfer().is_write_data() &&
-      op_list[0].data_transfer().write_data().count()) {
+      op_list[0].data_transfer().write_data().size()) {
     // Decode data.
     struct Payload {
       AddressType address;
@@ -131,10 +131,10 @@ void FakeI2c<AddressType, DataType>::Transfer(TransferRequestView request,
       fbl::StringBuffer<1024> buff;
       const auto* data =
           reinterpret_cast<const uint8_t*>(op_list[i].data_transfer().write_data().data());
-      for (size_t j = 0; j < op_list[i].data_transfer().write_data().count(); j++) {
+      for (size_t j = 0; j < op_list[i].data_transfer().write_data().size(); j++) {
         buff.Append(fbl::StringPrintf(" %02x", data[j]));
       }
-      zxlogf(ERROR, " * WRITE of %ld byte(s): %s", op_list[i].data_transfer().write_data().count(),
+      zxlogf(ERROR, " * WRITE of %ld byte(s): %s", op_list[i].data_transfer().write_data().size(),
              buff.c_str());
     } else {
       zxlogf(ERROR, " * (No data transfer)");

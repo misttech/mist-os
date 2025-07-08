@@ -135,7 +135,7 @@ class AdcButtonsDeviceTest : public ::testing::Test {
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1, reports.size());
     auto report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -173,7 +173,7 @@ TEST_F(AdcButtonsDeviceTest, GetDescriptorTest) {
   ASSERT_TRUE(result->descriptor.has_consumer_control());
   ASSERT_TRUE(result->descriptor.consumer_control().has_input());
   ASSERT_TRUE(result->descriptor.consumer_control().input().has_buttons());
-  EXPECT_EQ(result->descriptor.consumer_control().input().buttons().count(), 1);
+  EXPECT_EQ(result->descriptor.consumer_control().input().buttons().size(), 1);
   EXPECT_EQ(result->descriptor.consumer_control().input().buttons()[0],
             fuchsia_input_report::wire::ConsumerControlButton::kFunction);
 }
@@ -199,7 +199,7 @@ TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1, reports.size());
     auto report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -207,7 +207,7 @@ TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    EXPECT_EQ(consumer_control.pressed_buttons().count(), 1);
+    EXPECT_EQ(consumer_control.pressed_buttons().size(), 1);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kFunction);
   };
@@ -222,7 +222,7 @@ TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1, reports.size());
     auto report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -230,7 +230,7 @@ TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
     auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    EXPECT_EQ(consumer_control.pressed_buttons().count(), 0);
+    EXPECT_EQ(consumer_control.pressed_buttons().size(), 0);
   };
 }
 

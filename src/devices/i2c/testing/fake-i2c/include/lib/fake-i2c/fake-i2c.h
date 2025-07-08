@@ -56,13 +56,12 @@ class FakeI2c : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
 
       if (transaction.data_transfer().is_write_data()) {
         const auto& write_data = transaction.data_transfer().write_data();
-        if (write_buffer_index + write_data.count() >
-            fuchsia_hardware_i2c::wire::kMaxTransferSize) {
+        if (write_buffer_index + write_data.size() > fuchsia_hardware_i2c::wire::kMaxTransferSize) {
           completer.ReplyError(ZX_ERR_NO_MEMORY);
           return;
         }
-        memcpy(write_buffer + write_buffer_index, write_data.data(), write_data.count());
-        write_buffer_index += write_data.count();
+        memcpy(write_buffer + write_buffer_index, write_data.data(), write_data.size());
+        write_buffer_index += write_data.size();
       }
     }
 

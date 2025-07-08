@@ -35,7 +35,7 @@ void Server::GetString(GetStringRequestView request, GetStringCompleter::Sync& c
 
 void Server::GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync& completer) {
   std::vector<fidl::StringView> result;
-  for (uint64_t i = 0; i < request->keys.count(); i++) {
+  for (uint64_t i = 0; i < request->keys.size(); i++) {
     auto ret = arguments_.find(std::string{request->keys[i].data(), request->keys[i].size()});
     if (ret == arguments_.end()) {
       result.emplace_back();
@@ -52,11 +52,11 @@ void Server::GetBool(GetBoolRequestView request, GetBoolCompleter::Sync& complet
 
 void Server::GetBools(GetBoolsRequestView request, GetBoolsCompleter::Sync& completer) {
   // The vector<bool> optimisation means we have to use a manually-allocated array.
-  std::unique_ptr<bool[]> ret = std::make_unique<bool[]>(request->keys.count());
-  for (uint64_t i = 0; i < request->keys.count(); i++) {
+  std::unique_ptr<bool[]> ret = std::make_unique<bool[]>(request->keys.size());
+  for (uint64_t i = 0; i < request->keys.size(); i++) {
     ret[i] = StrToBool(request->keys.data()[i].key, request->keys.data()[i].defaultval);
   }
-  completer.Reply(fidl::VectorView<bool>::FromExternal(ret.get(), request->keys.count()));
+  completer.Reply(fidl::VectorView<bool>::FromExternal(ret.get(), request->keys.size()));
 }
 
 void Server::Collect(CollectRequestView request, CollectCompleter::Sync& completer) {

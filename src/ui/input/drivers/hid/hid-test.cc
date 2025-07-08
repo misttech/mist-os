@@ -74,7 +74,7 @@ class FakeHidbus : public fidl::testing::WireTestBase<fhidbus::Hidbus> {
                  SetReportCompleter::Sync& completer) override {
     last_set_report_id_ = request->rpt_id;
     last_set_report_ =
-        std::vector<uint8_t>(request->data.data(), request->data.data() + request->data.count());
+        std::vector<uint8_t>(request->data.data(), request->data.data() + request->data.size());
     completer.ReplySuccess();
   }
   void GetIdle(fhidbus::wire::HidbusGetIdleRequest* request,
@@ -201,12 +201,12 @@ class HidDeviceTest : public ::testing::Test {
                       ASSERT_TRUE(result.ok());
                       ASSERT_TRUE(result->is_ok());
                       ASSERT_TRUE(result.value()->has_buf());
-                      ASSERT_TRUE(result.value()->buf().count() <= report_size);
+                      ASSERT_TRUE(result.value()->buf().size() <= report_size);
 
-                      for (size_t i = 0; i < result.value()->buf().count(); i++) {
+                      for (size_t i = 0; i < result.value()->buf().size(); i++) {
                         report_data[i] = result.value()->buf()[i];
                       }
-                      *returned_size = result.value()->buf().count();
+                      *returned_size = result.value()->buf().size();
                     })
                     .is_ok());
   }
@@ -386,8 +386,8 @@ TEST_F(HidDeviceTest, ReadReportSingleReport) {
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
                     ASSERT_EQ(time, result.value()->timestamp());
-                    ASSERT_EQ(sizeof(mouse_report), result.value()->buf().count());
-                    for (size_t i = 0; i < result.value()->buf().count(); i++) {
+                    ASSERT_EQ(sizeof(mouse_report), result.value()->buf().size());
+                    for (size_t i = 0; i < result.value()->buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result.value()->buf()[i]);
                     }
                   })
@@ -422,9 +422,8 @@ TEST_F(HidDeviceTest, ReadReportDoubleReport) {
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
                     ASSERT_EQ(time, result.value()->timestamp());
-                    ASSERT_EQ(sizeof(hid_boot_mouse_report_t),
-                              result.value()->buf().count());
-                    for (size_t i = 0; i < result.value()->buf().count(); i++) {
+                    ASSERT_EQ(sizeof(hid_boot_mouse_report_t), result.value()->buf().size());
+                    for (size_t i = 0; i < result.value()->buf().size(); i++) {
                       EXPECT_EQ(double_mouse_report[i], result.value()->buf()[i]);
                     }
                   })
@@ -436,9 +435,8 @@ TEST_F(HidDeviceTest, ReadReportDoubleReport) {
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
                     ASSERT_EQ(time, result.value()->timestamp());
-                    ASSERT_EQ(sizeof(hid_boot_mouse_report_t),
-                              result.value()->buf().count());
-                    for (size_t i = 0; i < result.value()->buf().count(); i++) {
+                    ASSERT_EQ(sizeof(hid_boot_mouse_report_t), result.value()->buf().size());
+                    for (size_t i = 0; i < result.value()->buf().size(); i++) {
                       EXPECT_EQ(double_mouse_report[i + sizeof(hid_boot_mouse_report_t)],
                                 result.value()->buf()[i]);
                     }
@@ -472,8 +470,8 @@ TEST_F(HidDeviceTest, ReadReportsSingleReport) {
                     auto result = client->ReadReports();
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
-                    ASSERT_EQ(sizeof(mouse_report), result.value()->data.count());
-                    for (size_t i = 0; i < result.value()->data.count(); i++) {
+                    ASSERT_EQ(sizeof(mouse_report), result.value()->data.size());
+                    for (size_t i = 0; i < result.value()->data.size(); i++) {
                       EXPECT_EQ(mouse_report[i], result.value()->data[i]);
                     }
                   })
@@ -497,8 +495,8 @@ TEST_F(HidDeviceTest, ReadReportsDoubleReport) {
                     auto result = client->ReadReports();
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
-                    ASSERT_EQ(sizeof(double_mouse_report), result.value()->data.count());
-                    for (size_t i = 0; i < result.value()->data.count(); i++) {
+                    ASSERT_EQ(sizeof(double_mouse_report), result.value()->data.size());
+                    for (size_t i = 0; i < result.value()->data.size(); i++) {
                       EXPECT_EQ(double_mouse_report[i], result.value()->data[i]);
                     }
                   })
@@ -552,8 +550,8 @@ TEST_F(HidDeviceTest, ReadReportsOneAndAHalfReports) {
                     auto result = client->ReadReports();
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
-                    ASSERT_EQ(sizeof(mouse_report), result.value()->data.count());
-                    for (size_t i = 0; i < result.value()->data.count(); i++) {
+                    ASSERT_EQ(sizeof(mouse_report), result.value()->data.size());
+                    for (size_t i = 0; i < result.value()->data.size(); i++) {
                       EXPECT_EQ(mouse_report[i], result.value()->data[i]);
                     }
                   })
@@ -646,9 +644,9 @@ TEST_F(HidDeviceTest, GetDescriptor) {
             auto result = client->GetReportDesc();
             ASSERT_TRUE(result.ok());
 
-            ASSERT_EQ(known_size, result->desc.count());
+            ASSERT_EQ(known_size, result->desc.size());
             ASSERT_EQ(std::vector(known_descriptor, known_descriptor + known_size),
-                      std::vector(result->desc.data(), result->desc.data() + result->desc.count()));
+                      std::vector(result->desc.data(), result->desc.data() + result->desc.size()));
           })
           .is_ok());
 }
@@ -699,12 +697,12 @@ TEST_F(HidDeviceTest, GetSetReport) {
             ASSERT_TRUE(result.ok());
             ASSERT_TRUE(result->is_ok());
 
-            ASSERT_EQ(sizeof(feature_report), result->value()->report.count());
+            ASSERT_EQ(sizeof(feature_report), result->value()->report.size());
             ASSERT_EQ(
                 std::vector(reinterpret_cast<uint8_t*>(&feature_report),
                             reinterpret_cast<uint8_t*>(&feature_report) + sizeof(feature_report)),
                 std::vector(result->value()->report.data(),
-                            result->value()->report.data() + result->value()->report.count()));
+                            result->value()->report.data() + result->value()->report.size()));
           })
           .is_ok());
 }
@@ -784,9 +782,9 @@ TEST_F(HidDeviceTest, DeviceReportReaderSingleReport) {
                     ASSERT_OK(response.status());
                     ASSERT_FALSE(response->is_error());
                     auto result = response->value();
-                    ASSERT_EQ(result->reports.count(), 1UL);
-                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                    ASSERT_EQ(result->reports.size(), 1UL);
+                    ASSERT_EQ(result->reports[0].buf().size(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
                     }
                   })
@@ -836,13 +834,13 @@ TEST_F(HidDeviceTest, DeviceReportReaderDoubleReport) {
                     ASSERT_OK(response.status());
                     ASSERT_FALSE(response->is_error());
                     auto result = response->value();
-                    ASSERT_EQ(result->reports.count(), 2UL);
-                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                    ASSERT_EQ(result->reports.size(), 2UL);
+                    ASSERT_EQ(result->reports[0].buf().size(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
                     }
-                    ASSERT_EQ(result->reports[1].buf().count(), sizeof(mouse_report));
-                    for (size_t i = 0; i < result->reports[1].buf().count(); i++) {
+                    ASSERT_EQ(result->reports[1].buf().size(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[1].buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result->reports[1].buf()[i]);
                     }
                   })
@@ -893,9 +891,9 @@ TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
                     ASSERT_OK(response.status());
                     ASSERT_FALSE(response->is_error());
                     auto result = response->value();
-                    ASSERT_EQ(result->reports.count(), 1UL);
-                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                    ASSERT_EQ(result->reports.size(), 1UL);
+                    ASSERT_EQ(result->reports[0].buf().size(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
                     }
                   })
@@ -907,9 +905,9 @@ TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
                     ASSERT_OK(response.status());
                     ASSERT_FALSE(response->is_error());
                     auto result = response->value();
-                    ASSERT_EQ(result->reports.count(), 1UL);
-                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                    ASSERT_EQ(result->reports.size(), 1UL);
+                    ASSERT_EQ(result->reports[0].buf().size(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
                     }
                   })
@@ -954,9 +952,9 @@ TEST_F(HidDeviceTest, DeviceReportReaderOneAndAHalfReports) {
                     ASSERT_OK(response.status());
                     ASSERT_FALSE(response->is_error());
                     auto result = response->value();
-                    ASSERT_EQ(result->reports.count(), 1UL);
-                    ASSERT_EQ(sizeof(mouse_report), result->reports[0].buf().count());
-                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                    ASSERT_EQ(result->reports.size(), 1UL);
+                    ASSERT_EQ(sizeof(mouse_report), result->reports[0].buf().size());
+                    for (size_t i = 0; i < result->reports[0].buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
                     }
                   })
@@ -998,9 +996,9 @@ TEST_F(HidDeviceTest, DeviceReportReaderHangingGet) {
                     ASSERT_OK(response.status());
                     ASSERT_FALSE(response->is_error());
                     auto result = response->value();
-                    ASSERT_EQ(result->reports.count(), 1UL);
-                    ASSERT_EQ(sizeof(mouse_report), result->reports[0].buf().count());
-                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                    ASSERT_EQ(result->reports.size(), 1UL);
+                    ASSERT_EQ(sizeof(mouse_report), result->reports[0].buf().size());
+                    for (size_t i = 0; i < result->reports[0].buf().size(); i++) {
                       EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
                     }
                   })

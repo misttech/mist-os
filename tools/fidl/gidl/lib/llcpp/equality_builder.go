@@ -284,7 +284,7 @@ func (b *equalityCheckBuilder) visitList(actualExpr fidlExpr, expectedValue []ir
 	actualVar := b.createAndAssignVar(actualExpr)
 	var equalityChecks []boolExpr
 	if _, ok := decl.(*mixer.VectorDecl); ok {
-		equalityChecks = append(equalityChecks, boolSprintf("%s.count() == %d", actualVar, len(expectedValue)))
+		equalityChecks = append(equalityChecks, boolSprintf("%s.size() == %d", actualVar, len(expectedValue)))
 	}
 	for i, item := range expectedValue {
 		equalityChecks = append(equalityChecks, b.visit(fidlSprintf("%s[%d]", actualVar, i), item, decl.Elem()))

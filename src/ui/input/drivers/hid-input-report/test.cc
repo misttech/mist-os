@@ -139,7 +139,7 @@ class FakeHidDevice : public fidl::WireServer<finput::Controller>,
   std::vector<uint8_t>& GetReport() { return report_; }
 
   void SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) override {
-    report_ = ToBinaryVector(request->report.data(), request->report.count());
+    report_ = ToBinaryVector(request->report.data(), request->report.size());
     completer.ReplySuccess();
   }
   void SetReport(std::vector<uint8_t> report) { report_ = std::move(report); }
@@ -348,7 +348,7 @@ TEST_F(HidDevTest, ReadInputReportsTest) {
   ASSERT_FALSE(result->is_error());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(1UL, reports.count());
+  ASSERT_EQ(1UL, reports.size());
 
   auto& report = reports[0];
   ASSERT_TRUE(report.has_event_time());
@@ -363,7 +363,7 @@ TEST_F(HidDevTest, ReadInputReportsTest) {
 
   ASSERT_TRUE(mouse.has_pressed_buttons());
   const fidl::VectorView<uint8_t>& pressed_buttons = mouse.pressed_buttons();
-  for (size_t i = 0; i < pressed_buttons.count(); i++) {
+  for (size_t i = 0; i < pressed_buttons.size(); i++) {
     ASSERT_EQ(i + 1, pressed_buttons[i]);
   }
 }
@@ -385,7 +385,7 @@ TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
         ASSERT_OK(response.status());
         ASSERT_FALSE(response->is_error());
         auto& reports = response->value()->reports;
-        ASSERT_EQ(1UL, reports.count());
+        ASSERT_EQ(1UL, reports.size());
 
         auto& report = reports[0];
         ASSERT_TRUE(report.has_event_time());
@@ -445,10 +445,10 @@ TEST_F(HidDevTest, SensorTest) {
   fuchsia_input_report::wire::DeviceDescriptor& desc = result.value().descriptor;
   ASSERT_TRUE(desc.has_sensor());
   ASSERT_TRUE(desc.sensor().has_input());
-  ASSERT_EQ(desc.sensor().input().count(), 1UL);
+  ASSERT_EQ(desc.sensor().input().size(), 1UL);
   fuchsia_input_report::wire::SensorInputDescriptor& sensor_desc = desc.sensor().input()[0];
   ASSERT_TRUE(sensor_desc.has_values());
-  ASSERT_EQ(4UL, sensor_desc.values().count());
+  ASSERT_EQ(4UL, sensor_desc.values().size());
 
   ASSERT_EQ(sensor_desc.values()[0].type,
             fuchsia_input_report::wire::SensorType::kLightIlluminance);
@@ -486,12 +486,12 @@ TEST_F(HidDevTest, SensorTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(1UL, reports.count());
+  ASSERT_EQ(1UL, reports.size());
 
   ASSERT_TRUE(reports[0].has_sensor());
   const fuchsia_input_report::wire::SensorInputReport& sensor_report = reports[0].sensor();
   EXPECT_TRUE(sensor_report.has_values());
-  EXPECT_EQ(4UL, sensor_report.values().count());
+  EXPECT_EQ(4UL, sensor_report.values().size());
 
   // Check the report.
   // These will always match the ordering in the descriptor.
@@ -529,12 +529,12 @@ TEST_F(HidDevTest, GetTouchInputReportTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(1UL, reports.count());
+  ASSERT_EQ(1UL, reports.size());
 
   const auto& report = reports[0];
   const auto& touch = report.touch();
   ASSERT_TRUE(touch.has_contacts());
-  ASSERT_EQ(1UL, touch.contacts().count());
+  ASSERT_EQ(1UL, touch.contacts().size());
   const auto& contact = touch.contacts()[0];
 
   ASSERT_TRUE(contact.has_position_x());
@@ -589,11 +589,11 @@ TEST_F(HidDevTest, KeyboardTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(1UL, reports.count());
+  ASSERT_EQ(1UL, reports.size());
 
   const auto& report = reports[0];
   const auto& keyboard = report.keyboard();
-  ASSERT_EQ(3UL, keyboard.pressed_keys3().count());
+  ASSERT_EQ(3UL, keyboard.pressed_keys3().size());
   EXPECT_EQ(fuchsia_input::wire::Key::kA, keyboard.pressed_keys3()[0]);
   EXPECT_EQ(fuchsia_input::wire::Key::kUp, keyboard.pressed_keys3()[1]);
   EXPECT_EQ(fuchsia_input::wire::Key::kB, keyboard.pressed_keys3()[2]);
@@ -654,7 +654,7 @@ TEST_F(HidDevTest, ConsumerControlTest) {
   fuchsia_input_report::wire::ConsumerControlInputDescriptor& consumer_control_desc =
       desc.consumer_control().input();
   ASSERT_TRUE(consumer_control_desc.has_buttons());
-  ASSERT_EQ(5UL, consumer_control_desc.buttons().count());
+  ASSERT_EQ(5UL, consumer_control_desc.buttons().size());
 
   ASSERT_EQ(consumer_control_desc.buttons()[0],
             fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
@@ -684,14 +684,14 @@ TEST_F(HidDevTest, ConsumerControlTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(2UL, reports.count());
+  ASSERT_EQ(2UL, reports.size());
 
   // Check the initial report.
   {
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(0UL, report.pressed_buttons().count());
+    EXPECT_EQ(0UL, report.pressed_buttons().size());
   }
 
   // Check the second report.
@@ -699,7 +699,7 @@ TEST_F(HidDevTest, ConsumerControlTest) {
     ASSERT_TRUE(reports[1].has_consumer_control());
     const auto& report = reports[1].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(3UL, report.pressed_buttons().count());
+    EXPECT_EQ(3UL, report.pressed_buttons().size());
 
     EXPECT_EQ(report.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
@@ -732,12 +732,12 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
     ASSERT_OK(report_result.status());
     const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
         report_result->value()->reports;
-    ASSERT_EQ(1UL, reports.count());
+    ASSERT_EQ(1UL, reports.size());
 
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(0UL, report.pressed_buttons().count());
+    EXPECT_EQ(0UL, report.pressed_buttons().size());
   }
 
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader2(GetReader(client));
@@ -746,12 +746,12 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
     ASSERT_OK(report_result.status());
     const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
         report_result->value()->reports;
-    ASSERT_EQ(1UL, reports.count());
+    ASSERT_EQ(1UL, reports.size());
 
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(0UL, report.pressed_buttons().count());
+    EXPECT_EQ(0UL, report.pressed_buttons().size());
   }
 
   // Create another report.
@@ -769,11 +769,11 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
     ASSERT_OK(report_result.status());
     const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
         report_result->value()->reports;
-    ASSERT_EQ(1UL, reports.count());
+    ASSERT_EQ(1UL, reports.size());
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(3UL, report.pressed_buttons().count());
+    EXPECT_EQ(3UL, report.pressed_buttons().size());
 
     EXPECT_EQ(report.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
@@ -787,11 +787,11 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
     ASSERT_OK(report_result.status());
     const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
         report_result->value()->reports;
-    ASSERT_EQ(1UL, reports.count());
+    ASSERT_EQ(1UL, reports.size());
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(3UL, report.pressed_buttons().count());
+    EXPECT_EQ(3UL, report.pressed_buttons().size());
 
     EXPECT_EQ(report.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
@@ -914,7 +914,7 @@ TEST_F(HidDevTest, GetInputReport) {
     ASSERT_TRUE(report.has_sensor());
     const fuchsia_input_report::wire::SensorInputReport& sensor_report = report.sensor();
     EXPECT_TRUE(sensor_report.has_values());
-    EXPECT_EQ(4UL, sensor_report.values().count());
+    EXPECT_EQ(4UL, sensor_report.values().size());
 
     EXPECT_EQ(kIlluminanceTestVal, sensor_report.values()[0]);
     EXPECT_EQ(kRedTestVal, sensor_report.values()[1]);

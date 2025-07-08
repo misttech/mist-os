@@ -175,7 +175,7 @@ TEST(LlcppTypesTests, VectorView) {
   view[1] = data[1];
   view[2] = data[2];
 
-  EXPECT_EQ(view.count(), 3u);
+  EXPECT_EQ(view.size(), 3u);
   EXPECT_EQ(std::vector<int>(std::begin(view), std::end(view)),
             std::vector<int>(std::begin(data), std::end(data)));
 
@@ -215,7 +215,7 @@ TEST(LlcppTypesTests, OwnedEncodedMessageOwns) {
       std::move(converted.message()),
       fidl::internal::WireFormatMetadataForVersion(fidl::internal::WireFormatVersion::kV2));
   ASSERT_TRUE(decoded.is_ok());
-  ASSERT_EQ(vector_view_count, decoded->v.count());
+  ASSERT_EQ(vector_view_count, decoded->v.size());
   for (uint32_t i = 0; i < vector_view_count; i++) {
     EXPECT_EQ(i, decoded->v[i]);
   }

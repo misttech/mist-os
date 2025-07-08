@@ -271,7 +271,7 @@ TEST(ComplexTable, Success) {
     const int32_t& i = msg.u().i();
     ASSERT_EQ(i, xunion_i);
     ASSERT_TRUE(msg.has_strings());
-    ASSERT_EQ(msg.strings().count(), 2u);
+    ASSERT_EQ(msg.strings().size(), 2u);
     ASSERT_STREQ(msg.strings()[0].begin(), &before[0]);
     ASSERT_EQ(msg.strings()[0].size(), before.size());
     ASSERT_STREQ(msg.strings()[1].begin(), &after[0]);

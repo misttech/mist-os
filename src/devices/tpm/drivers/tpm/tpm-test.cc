@@ -143,7 +143,7 @@ class TpmTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_tp
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {
     switch (request->address) {
       case RegisterAddress::kTpmSts: {
-        ASSERT_EQ(request->data.count(), 4);
+        ASSERT_EQ(request->data.size(), 4);
         uint32_t value = *reinterpret_cast<uint32_t*>(request->data.data());
         // There should only be 1 bit set on a TPM write.
         // Leading zeros + trailing zeros should equal 31.
@@ -340,6 +340,6 @@ TEST_F(TpmTest, TestSendVendorCommand) {
   }
   ASSERT_TRUE(result->is_ok());
   ASSERT_EQ(result->value()->result, 0);
-  ASSERT_EQ(result->value()->data.count(), 1);
+  ASSERT_EQ(result->value()->data.size(), 1);
   ASSERT_EQ(result->value()->data[0], 0x32);
 }
