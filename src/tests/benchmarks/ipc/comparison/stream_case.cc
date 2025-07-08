@@ -26,10 +26,15 @@ void StreamCase::send(zx::channel chan, Timing* cur_timing) {
 
     size_t left_to_send = config_.messages_to_send;
     while (left_to_send > 0) {
-      std::vector<uint8_t> formatted_msg(sizeof(uint32_t) + message.size());
+      std::vector<uint8_t> formatted_msg(config_.batch_size * (sizeof(uint32_t) + message.size()));
       *reinterpret_cast<uint32_t*>(formatted_msg.data()) = static_cast<uint32_t>(message.size());
       std::memcpy(formatted_msg.data() + sizeof(uint32_t), message.data(), message.size());
       left_to_send -= 1;
+      for (size_t i = 1; i < config_.batch_size && left_to_send > 0; ++i) {
+        std::memcpy(formatted_msg.data() + (i * (sizeof(uint32_t) + message.size())),
+                    formatted_msg.data(), sizeof(uint32_t) + message.size());
+        left_to_send -= 1;
+      }
 
       size_t offset = 0;
       while (offset < formatted_msg.size()) {

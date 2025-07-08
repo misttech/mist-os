@@ -44,6 +44,7 @@ int main(int argc, const char** argv) {
 
   Timing batch_timings[RUNS_PER_CONFIG];
   Timing stream_timings[RUNS_PER_CONFIG];
+  Timing batch_stream_timings[RUNS_PER_CONFIG];
   Timing sequential_timings[RUNS_PER_CONFIG];
   Timing vmo_timings[RUNS_PER_CONFIG];
 
@@ -69,13 +70,27 @@ int main(int argc, const char** argv) {
     FX_LOGS(INFO) << "Running stream...";
     zx::channel x1, x2;
     ZX_ASSERT(zx::channel::create(0, &x1, &x2) == ZX_OK);
-    StreamCase stream_case(
-        StreamConfig{.messages_to_send = MESSAGES_TO_SEND, .message_size = MESSAGE_SIZE});
+    StreamCase stream_case(StreamConfig{
+        .messages_to_send = MESSAGES_TO_SEND, .batch_size = 1, .message_size = MESSAGE_SIZE});
     auto t1 = std::thread(&StreamCase::send, &stream_case, std::move(x1), &stream_timings[i]);
     auto t2 = std::thread(&StreamCase::recv, &stream_case, std::move(x2), &stream_timings[i]);
     t1.join();
     t2.join();
     FX_LOGS(INFO) << "Done stream.";
+  }
+
+  for (size_t i = 0; i < RUNS_PER_CONFIG; ++i) {
+    FX_LOGS(INFO) << "Running batch stream...";
+    zx::channel x1, x2;
+    ZX_ASSERT(zx::channel::create(0, &x1, &x2) == ZX_OK);
+    StreamCase stream_case(StreamConfig{.messages_to_send = MESSAGES_TO_SEND,
+                                        .batch_size = BATCH_SIZE,
+                                        .message_size = MESSAGE_SIZE});
+    auto t1 = std::thread(&StreamCase::send, &stream_case, std::move(x1), &batch_stream_timings[i]);
+    auto t2 = std::thread(&StreamCase::recv, &stream_case, std::move(x2), &batch_stream_timings[i]);
+    t1.join();
+    t2.join();
+    FX_LOGS(INFO) << "Done batch stream.";
   }
 
   if (MESSAGE_SIZE < 63 * 1024) {
@@ -123,6 +138,7 @@ int main(int argc, const char** argv) {
 
   BenchData bench_data[] = {
       BenchData("Batch/recv", batch_timings), BenchData("Stream/recv", stream_timings),
+      BenchData("BatchStream/recv", batch_stream_timings),
       BenchData("Sequential/recv", sequential_timings), BenchData("VMO/recv", vmo_timings)};
 
   perftest::ResultsSet results;

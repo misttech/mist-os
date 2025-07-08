@@ -15,6 +15,7 @@ struct BatchConfig {
 
 struct StreamConfig {
   size_t messages_to_send;
+  size_t batch_size = 1;
   size_t message_size;
 };
 
