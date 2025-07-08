@@ -66,7 +66,7 @@ pub struct FileSystem {
     /// filesystems with permanent entries, this will hold a strong reference to every node to make
     /// sure it doesn't get freed without being explicitly unlinked. Otherwise, entries are
     /// maintained in an LRU cache.
-    entries: Entries,
+    dcache: DirEntryCache,
 
     /// Holds security state for this file system, which is created and used by the Linux Security
     /// Modules subsystem hooks.
@@ -103,7 +103,7 @@ struct LruCache {
     entries: Mutex<LinkedHashMap<ArcKey<DirEntry>, ()>>,
 }
 
-enum Entries {
+enum DirEntryCache {
     Permanent(Mutex<HashSet<ArcKey<DirEntry>>>),
     Lru(LruCache),
     Uncached,
@@ -159,12 +159,13 @@ impl FileSystem {
             dev_id: kernel.device_registry.next_anonymous_dev_id(),
             rename_mutex: Mutex::new(()),
             node_cache,
-            entries: match cache_mode {
-                CacheMode::Permanent => Entries::Permanent(Mutex::new(HashSet::new())),
-                CacheMode::Cached(CacheConfig { capacity }) => {
-                    Entries::Lru(LruCache { capacity, entries: Mutex::new(LinkedHashMap::new()) })
-                }
-                CacheMode::Uncached => Entries::Uncached,
+            dcache: match cache_mode {
+                CacheMode::Permanent => DirEntryCache::Permanent(Mutex::new(HashSet::new())),
+                CacheMode::Cached(CacheConfig { capacity }) => DirEntryCache::Lru(LruCache {
+                    capacity,
+                    entries: Mutex::new(LinkedHashMap::new()),
+                }),
+                CacheMode::Uncached => DirEntryCache::Uncached,
             },
             security_state,
         });
@@ -185,7 +186,7 @@ impl FileSystem {
     }
 
     pub fn has_permanent_entries(&self) -> bool {
-        matches!(self.entries, Entries::Permanent(_))
+        matches!(self.dcache, DirEntryCache::Permanent(_))
     }
 
     /// The root directory entry of this file system.
@@ -391,32 +392,32 @@ impl FileSystem {
     }
 
     pub fn did_create_dir_entry(&self, entry: &DirEntryHandle) {
-        match &self.entries {
-            Entries::Permanent(p) => {
+        match &self.dcache {
+            DirEntryCache::Permanent(p) => {
                 p.lock().insert(ArcKey(entry.clone()));
             }
-            Entries::Lru(LruCache { entries, .. }) => {
+            DirEntryCache::Lru(LruCache { entries, .. }) => {
                 entries.lock().insert(ArcKey(entry.clone()), ());
             }
-            Entries::Uncached => {}
+            DirEntryCache::Uncached => {}
         }
     }
 
     pub fn will_destroy_dir_entry(&self, entry: &DirEntryHandle) {
-        match &self.entries {
-            Entries::Permanent(p) => {
+        match &self.dcache {
+            DirEntryCache::Permanent(p) => {
                 p.lock().remove(ArcKey::ref_cast(entry));
             }
-            Entries::Lru(LruCache { entries, .. }) => {
+            DirEntryCache::Lru(LruCache { entries, .. }) => {
                 entries.lock().remove(ArcKey::ref_cast(entry));
             }
-            Entries::Uncached => {}
+            DirEntryCache::Uncached => {}
         };
     }
 
     /// Informs the cache that the entry was used.
     pub fn did_access_dir_entry(&self, entry: &DirEntryHandle) {
-        if let Entries::Lru(LruCache { entries, .. }) = &self.entries {
+        if let DirEntryCache::Lru(LruCache { entries, .. }) = &self.dcache {
             entries.lock().get_refresh(ArcKey::ref_cast(entry));
         }
     }
@@ -426,7 +427,7 @@ impl FileSystem {
     /// required when dropping old entries). This should be called after any new entries are
     /// admitted with no locks held that might be required for dropping entries.
     pub fn purge_old_entries(&self) {
-        if let Entries::Lru(l) = &self.entries {
+        if let DirEntryCache::Lru(l) = &self.dcache {
             let mut purged = SmallVec::<[DirEntryHandle; 4]>::new();
             {
                 let mut entries = l.entries.lock();
