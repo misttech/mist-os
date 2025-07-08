@@ -21,6 +21,7 @@ use fxfs::object_store::{
     BLOB_MERKLE_ATTRIBUTE_ID, NO_OWNER,
 };
 use fxfs::round::round_up;
+use sparse::reader::SparseReader;
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::ops::Range;
 use std::sync::{Arc, Weak};
@@ -127,12 +128,9 @@ async fn new_temporary_handle(
     return Ok(handle);
 }
 
-async fn write_data(
-    handle: &DataObjectHandle<FxVolume>,
-    vmo: zx::Vmo,
-    size: u64,
-) -> Result<(), Error> {
-    let mut reader = sparse::reader::SparseReader::new(VmoReader { vmo, size, offset: 0 })?;
+async fn write_data(handle: &DataObjectHandle<FxVolume>, payload: zx::Vmo) -> Result<(), Error> {
+    let size = payload.get_stream_size()?;
+    let mut reader = SparseReader::new(VmoReader { vmo: payload, size, offset: 0 })?;
 
     // Pre-allocate enough space for the image.
     let unsparsed_size = {
@@ -206,8 +204,7 @@ async fn write_data(
 
 pub(crate) async fn write_new_blob_volume(
     destination: &Arc<BlobDirectory>,
-    vmo: zx::Vmo,
-    size: u64,
+    payload: zx::Vmo,
 ) -> Result<(), Error> {
     log::info!("Deleting existing blobs.");
     delete_all_blobs(destination).await?;
@@ -216,7 +213,7 @@ pub(crate) async fn write_new_blob_volume(
     let handle = new_temporary_handle(destination).await?;
     // Store the object ID of the handle so we can tombstone it when we're finished.
     let handle_id = handle.object_id();
-    write_data(&handle, vmo, size).await?;
+    write_data(&handle, payload).await?;
 
     {
         log::info!("Mounting image.");
@@ -417,12 +414,12 @@ mod tests {
     use crate::fuchsia::fxblob::testing::{new_blob_fixture, open_blob_fixture, BlobFixture as _};
     use delivery_blob::CompressionMode;
     use fidl_fuchsia_fxfs::BlobVolumeWriterMarker;
+    use fuchsia_async as fasync;
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fxfs_make_blob_image::FxBlobBuilder;
     use storage_device::block_device::BlockDevice;
     use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt};
     use zx::HandleBased as _;
-    use {fidl_fuchsia_mem as fmem, fuchsia_async as fasync};
 
     // Ensure the volume name from `make-blob-image` matches what we expect here.
     #[test]
@@ -480,7 +477,7 @@ mod tests {
         }
     }
 
-    async fn create_sparse_fxblob_image() -> (zx::Vmo, u64) {
+    async fn create_sparse_fxblob_image() -> zx::Vmo {
         let (fxblob_vmo, used_space) = {
             let vmo = zx::Vmo::create(DEVICE_SIZE).unwrap();
 
@@ -512,30 +509,27 @@ mod tests {
             (vmo, used_space)
         };
 
-        let (sparse_vmo, sparse_size) = {
-            // TODO(https://fxbug.dev/397515768): Use the correct size here once we can determine
-            // how many bytes we need for the sparse output ahead of time.
-            let mut sparse_writer = VmoWriter {
-                vmo: zx::Vmo::create(DEVICE_SIZE).unwrap(),
-                size: DEVICE_SIZE,
-                offset: 0,
-                max_offset: 0,
-            };
-            sparse::builder::SparseImageBuilder::new()
-                .set_block_size(BLOCK_SIZE)
-                .add_chunk(sparse::builder::DataSource::Vmo {
-                    vmo: fxblob_vmo,
-                    size: used_space,
-                    offset: 0,
-                })
-                .add_chunk(sparse::builder::DataSource::Skip(DEVICE_SIZE - used_space))
-                .build(&mut sparse_writer)
-                .unwrap();
-            let VmoWriter { vmo, max_offset, .. } = sparse_writer;
-            (vmo, max_offset)
+        // TODO(https://fxbug.dev/397515768): Use the correct size here once we can determine
+        // how many bytes we need for the sparse output ahead of time.
+        let mut sparse_writer = VmoWriter {
+            vmo: zx::Vmo::create(DEVICE_SIZE).unwrap(),
+            size: DEVICE_SIZE,
+            offset: 0,
+            max_offset: 0,
         };
-
-        (sparse_vmo, sparse_size)
+        sparse::builder::SparseImageBuilder::new()
+            .set_block_size(BLOCK_SIZE)
+            .add_chunk(sparse::builder::DataSource::Vmo {
+                vmo: fxblob_vmo,
+                size: used_space,
+                offset: 0,
+            })
+            .add_chunk(sparse::builder::DataSource::Skip(DEVICE_SIZE - used_space))
+            .build(&mut sparse_writer)
+            .unwrap();
+        let VmoWriter { vmo, max_offset, .. } = sparse_writer;
+        vmo.set_stream_size(max_offset).unwrap();
+        vmo
     }
 
     #[fasync::run(10, test)]
@@ -547,11 +541,11 @@ mod tests {
         // Generate a new fxfs filesystem in a VMO containing different blobs, and write it into
         // the existing filesystem using our protocol.
         {
-            let (vmo, size) = create_sparse_fxblob_image().await;
+            let payload = create_sparse_fxblob_image().await;
             let writer =
                 connect_to_protocol_at_dir_svc::<BlobVolumeWriterMarker>(fixture.volume_out_dir())
                     .unwrap();
-            writer.write(fmem::Buffer { vmo, size }).await.unwrap().unwrap();
+            writer.write(payload).await.unwrap().unwrap();
         }
 
         // Close the test fixture and, re-open it.
