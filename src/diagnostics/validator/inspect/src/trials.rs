@@ -179,10 +179,10 @@ fn basic_string_array() -> Trial {
     ];
 
     for index in array_indexes_to_test().iter() {
-        if *index % 2 == 0 {
+        if (*index).is_multiple_of(2) {
             actions
             .push(crate::array_set!(id: ID, index: *index, value: Value::StringT(format!("string data {}", *index))));
-        } else if *index % 3 == 0 {
+        } else if (*index).is_multiple_of(3) {
             actions.push(
                 crate::array_set!(id: ID, index: *index, value: Value::StringT(String::new())),
             );
@@ -194,14 +194,14 @@ fn basic_string_array() -> Trial {
     }
 
     for index in array_indexes_to_test().iter() {
-        if *index % 2 == 0 {
+        if (*index).is_multiple_of(2) {
             actions
                 .push(crate::array_set!(id: ID, index: *index, value: Value::StringT("".into())));
         }
     }
 
     for index in array_indexes_to_test().iter() {
-        if *index % 4 == 0 {
+        if (*index).is_multiple_of(4) {
             actions.push(
                 crate::array_set!(id: ID, index: *index, value: Value::StringT(format!("{}", *index))),
             );

@@ -312,7 +312,7 @@ impl Header {
     /// Sets the length of the item the header refers to. Panics if not 8-byte aligned.
     pub fn set_len(&mut self, new_len: usize) {
         assert_eq!(new_len % 8, 0, "encoded message must be 8-byte aligned");
-        self.set_size_words((new_len / 8) as u16 + u16::from(new_len % 8 > 0))
+        self.set_size_words((new_len / 8) as u16 + u16::from(!new_len.is_multiple_of(8)))
     }
 }
 

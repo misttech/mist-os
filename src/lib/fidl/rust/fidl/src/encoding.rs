@@ -2703,7 +2703,7 @@ pub unsafe fn decode_envelope_header<D: ResourceDialect>(
     match (num_bytes, num_handles, inlined) {
         (0, 0, 0) => Ok(None),
         (_, _, 1) => Ok(Some((true, 4, num_handles))),
-        (_, _, 0) if num_bytes % 8 == 0 => Ok(Some((false, num_bytes, num_handles))),
+        (_, _, 0) if num_bytes.is_multiple_of(8) => Ok(Some((false, num_bytes, num_handles))),
         (_, _, 0) => Err(Error::InvalidNumBytesInEnvelope),
         _ => Err(Error::InvalidInlineMarkerInEnvelope),
     }

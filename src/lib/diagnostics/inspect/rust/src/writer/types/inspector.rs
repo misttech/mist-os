@@ -227,7 +227,7 @@ impl InspectorConfig {
     fn adjusted_buffer_size(max_size: usize) -> usize {
         let mut size = max(constants::MINIMUM_VMO_SIZE_BYTES, max_size);
         // If the size is not a multiple of 4096, round up.
-        if size % constants::MINIMUM_VMO_SIZE_BYTES != 0 {
+        if !size.is_multiple_of(constants::MINIMUM_VMO_SIZE_BYTES) {
             size =
                 (1 + size / constants::MINIMUM_VMO_SIZE_BYTES) * constants::MINIMUM_VMO_SIZE_BYTES;
         }
@@ -406,7 +406,7 @@ mod fuchsia_tests {
         assert!(is_frozen_result.is_err());
 
         assert_eq!(initial + 2, is_frozen_result.err().unwrap());
-        assert!(is_frozen_result.err().unwrap() % 2 == 0);
+        assert!(is_frozen_result.err().unwrap().is_multiple_of(2));
 
         let frozen_insp = Inspector::new(InspectorConfig::default().no_op().vmo(vmo.unwrap()));
         assert!(frozen_insp.is_frozen().is_ok());

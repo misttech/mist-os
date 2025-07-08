@@ -122,7 +122,7 @@ async fn gc(
                 error!(blob:%; "Failed to delete blob: {:#}", anyhow!(e));
                 errors += 1;
             });
-            if (i + 1) % 100 == 0 {
+            if (i + 1).is_multiple_of(100) {
                 info!("{} blobs deleted...", i + 1 - errors);
             }
         }

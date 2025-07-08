@@ -201,7 +201,7 @@ impl RingBuffer {
     /// (across all processes). The returned slice will only remain valid so long as there is no
     /// other concurrent write access to the range.
     pub unsafe fn first_message_in(&self, range: Range<u64>) -> Result<(u64, &[u8]), Error> {
-        if range.start % 8 != 0 {
+        if !range.start.is_multiple_of(8) {
             return Err(Error::BadAlignment);
         }
         if range.end - range.start < RING_BUFFER_MESSAGE_HEADER_SIZE as u64 {

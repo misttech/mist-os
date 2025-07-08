@@ -34,7 +34,7 @@ fn make_identity(length: usize, level: usize, offset: usize) -> BlockIdentity {
 /// Panics if `block.len()` exceeds [`BLOCK_SIZE`] or if `offset` is not aligned to [`BLOCK_SIZE`]
 pub fn hash_block(block: &[u8], offset: usize) -> Hash {
     assert!(block.len() <= BLOCK_SIZE);
-    assert!(offset % BLOCK_SIZE == 0);
+    assert!(offset.is_multiple_of(BLOCK_SIZE));
 
     let mut hasher = Sha256::default();
     hasher.update(&make_identity(block.len(), 0, offset));
@@ -77,7 +77,7 @@ pub(crate) fn hash_hashes(hashes: &[Hash], level: usize, offset: usize) -> Hash 
     assert_ne!(hashes.len(), 0);
     assert!(hashes.len() <= HASHES_PER_BLOCK);
     assert!(level > 0);
-    assert!(offset % BLOCK_SIZE == 0);
+    assert!(offset.is_multiple_of(BLOCK_SIZE));
 
     let mut hasher = Sha256::default();
     hasher.update(&make_identity(BLOCK_SIZE, level, offset));

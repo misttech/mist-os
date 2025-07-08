@@ -77,7 +77,7 @@ async fn test_budget() {
         // Each message is about 136 bytes.  We always keep 32 KiB free in the buffer, so we can
         // hold nearly 500 messages before messages get rolled out.  Archivist delays processing
         // sockets so that it's not constantly waking up, so we process the observer in batches.
-        if i % 400 == 0 {
+        if i.is_multiple_of(400) {
             while let Some(message) = expected.pop_front() {
                 assert_eq!(message, observed_logs.next().await.unwrap().msg().unwrap());
             }

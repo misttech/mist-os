@@ -253,7 +253,7 @@ mod tests {
             scan_result_with_one_bss.measure().num_bytes - minimal_result_size;
 
         // Validate size is possible
-        if result_sizes.iter().any(|size| size < &minimal_result_size || size % 8 != 0) {
+        if result_sizes.iter().any(|size| size < &minimal_result_size || !size.is_multiple_of(8)) {
             panic!("Invalid size. Requested size must be larger than {minimal_result_size} minimum bytes and divisible into octets (by 8)");
         }
 

@@ -84,7 +84,7 @@ impl MerkleTreeBuilder {
     pub fn push_data_hash(&mut self, hash: Hash) {
         self.block.clear();
         self.levels[0].push(hash);
-        if self.levels[0].len() % HASHES_PER_BLOCK == 0 {
+        if self.levels[0].len().is_multiple_of(HASHES_PER_BLOCK) {
             self.commit_tail_block(0);
         }
     }
@@ -98,7 +98,7 @@ impl MerkleTreeBuilder {
             self.levels.push(Vec::new());
         }
 
-        let first_hash = if len % HASHES_PER_BLOCK == 0 {
+        let first_hash = if len.is_multiple_of(HASHES_PER_BLOCK) {
             len - HASHES_PER_BLOCK
         } else {
             len - (len % HASHES_PER_BLOCK)
@@ -111,7 +111,7 @@ impl MerkleTreeBuilder {
         );
 
         self.levels[next_level].push(hash);
-        if self.levels[next_level].len() % HASHES_PER_BLOCK == 0 {
+        if self.levels[next_level].len().is_multiple_of(HASHES_PER_BLOCK) {
             self.commit_tail_block(next_level);
         }
     }
@@ -134,7 +134,7 @@ impl MerkleTreeBuilder {
             }
 
             let len = self.levels[level].len();
-            if len > 1 && len % HASHES_PER_BLOCK != 0 {
+            if len > 1 && !len.is_multiple_of(HASHES_PER_BLOCK) {
                 self.commit_tail_block(level);
             }
         }
