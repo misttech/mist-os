@@ -307,7 +307,7 @@ impl AvrcpRelay {
                     if notification.status.is_some() ||
                         notification.track_id.is_some() ||
                         notification.addressed_player.is_some() {
-                        let mut building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
+                        let mut building = staged_info.get_or_insert_default();
                         if let Err(e) = update_attributes(&controller, &mut building, &mut last_player_status).await {
                             info!(peer_id:%, e:?; "Couldn't update AVRCP attributes");
                         }
@@ -323,7 +323,7 @@ impl AvrcpRelay {
                     }
 
                     if player_status_updated {
-                        let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
+                        let building = staged_info.get_or_insert_default();
                         building.player_status = Some(last_player_status.clone().into());
                         debug!(peer_id:%, building:?; "Updated player status");
                         self.update_player_status_inspect(&last_player_status);
@@ -336,7 +336,7 @@ impl AvrcpRelay {
                     if let Err(e) = update_status(&controller, &mut last_player_status).await {
                         info!(peer_id:%, e:?; "Error updating AVRCP status (interval)");
                     }
-                    let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
+                    let building = staged_info.get_or_insert_default();
                     building.player_status = Some(last_player_status.clone().into());
                     self.update_player_status_inspect(&last_player_status);
                 }

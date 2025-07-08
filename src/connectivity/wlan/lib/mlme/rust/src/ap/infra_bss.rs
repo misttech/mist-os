@@ -393,7 +393,7 @@ impl InfraBss {
         let mut new_client = None;
         let client = match self.clients.get_mut(&client_addr) {
             Some(client) => client,
-            None => new_client.get_or_insert(RemoteClient::new(client_addr)),
+            None => new_client.get_or_insert_with(|| RemoteClient::new(client_addr)),
         };
 
         if let Err(e) = client
@@ -461,7 +461,7 @@ impl InfraBss {
         let client = self
             .clients
             .get_mut(&src_addr)
-            .unwrap_or_else(|| maybe_client.get_or_insert(RemoteClient::new(src_addr)));
+            .unwrap_or_else(|| maybe_client.get_or_insert_with(|| RemoteClient::new(src_addr)));
 
         client.handle_data_frame(ctx, data_frame).map_err(|e| Rejection::Client(client.addr, e))?;
 
@@ -561,7 +561,7 @@ impl InfraBss {
         let client = self
             .clients
             .get_mut(&hdr.da)
-            .unwrap_or_else(|| maybe_client.get_or_insert(RemoteClient::new(hdr.da)));
+            .unwrap_or_else(|| maybe_client.get_or_insert_with(|| RemoteClient::new(hdr.da)));
         client
             .handle_eth_frame(ctx, hdr.da, hdr.sa, hdr.ether_type.to_native(), body, async_id)
             .map_err(|e| Rejection::Client(client.addr, e))
