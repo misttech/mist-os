@@ -119,7 +119,6 @@ pub trait UnsafeMmio {
 /// - `Owner`: an object with shared ownership of the `Impl` instance.
 ///
 /// An MmioRegion is splittable if `Owner` can be cloned.
-#[derive(Clone)]
 pub struct MmioRegion<Impl, Owner = Impl> {
     owner: Owner,
     bounds: Range<usize>,
