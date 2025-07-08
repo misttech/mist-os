@@ -22,7 +22,7 @@ package_info(
     name = "package_info",
     package_name = "siphasher",
     package_url = "https://github.com/jedisct1/rust-siphash",
-    package_version = "0.3.10",
+    package_version = "0.3.11",
 )
 
 license(
@@ -75,5 +75,5 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.3.10",
+    version = "0.3.11",
 )

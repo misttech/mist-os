@@ -217,7 +217,7 @@ signature =  "1.4.0"
 # TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
 # targetting fuchsia.
 simplelog = "0.10.2"
-siphasher = "0.3.10"
+siphasher = "0.3.11"
 slab = "0.4.9"
 smallvec = {version= "1.14.0", features = ["const_generics", "const_new", "union"]}
 socket2 = { version = "0.5.9", features = ["all"] }

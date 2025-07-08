@@ -977,7 +977,7 @@ group("simplelog") {
 }
 
 group("siphasher") {
-  public_deps = [ ":siphasher-v0_3_10" ]
+  public_deps = [ ":siphasher-v0_3_11" ]
 }
 
 group("slab") {
@@ -16543,16 +16543,16 @@ rustc_library("siphasher-v0_2_3") {
   applicable_licenses = [ ":siphasher-v0_2_3.license" ]
 }
 
-license("siphasher-v0_3_10.license") {
+license("siphasher-v0_3_11.license") {
   public_package_name = "siphasher"
   license_files =
-      [ "//third_party/rust_crates/vendor/siphasher-0.3.10/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/siphasher-0.3.11/LICENSE" ]
 }
 
-rustc_library("siphasher-v0_3_10") {
+rustc_library("siphasher-v0_3_11") {
   crate_name = "siphasher"
-  source_root = "//third_party/rust_crates/vendor/siphasher-0.3.10/src/lib.rs"
-  output_name = "siphasher-e2ef53c2b88c1cff"
+  source_root = "//third_party/rust_crates/vendor/siphasher-0.3.11/src/lib.rs"
+  output_name = "siphasher-b2fe7abda7dc9c8c"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -16564,15 +16564,15 @@ rustc_library("siphasher-v0_3_10") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=e2ef53c2b88c1cff",
-    "-Cextra-filename=-e2ef53c2b88c1cff",
+    "-Cmetadata=b2fe7abda7dc9c8c",
+    "-Cextra-filename=-b2fe7abda7dc9c8c",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":siphasher-v0_3_10.license" ]
+  applicable_licenses = [ ":siphasher-v0_3_11.license" ]
 }
 
 license("slab-v0_4_9.license") {
