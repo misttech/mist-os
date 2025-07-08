@@ -128,6 +128,17 @@ var coptToConfig = map[string]string{
 	"-Wno-implicit-fallthrough": "//build/config:Wno-implicit-fallthrough",
 }
 
+// attrGNAssignmentOps maps from GN attribute names to the assignment operators to use in GN.
+//
+// NOTE: Entries in this map should be clearly documented.
+var attrGNAssignmentOps = map[string]string{
+	// `configs` in GN are rarely (never?) empty lists because we set them in BUILDCONFIG.gn.
+	// Trying to overwrite a non-empty list in GN with a non-empty value will fail.
+	// Simply replacing assignment with `+=` works for the initial use cases we need.
+	// More complex mechanism may be required if we need to selectively overwrite config assignments.
+	"configs": "+=",
+}
+
 // indent indents input lines by input levels.
 func indent(lines []string, level int) []string {
 	var indented []string
@@ -392,6 +403,11 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 	}
 	attrName := convertAttrName(lhs.Name, bazelRule)
 
+	op, ok := attrGNAssignmentOps[attrName]
+	if !ok {
+		op = "="
+	}
+
 	var transformers []transformer
 	switch attrName {
 	case "visibility":
@@ -404,7 +420,7 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 
 	// This is a simple `attr = select(...)`, convert in-place.
 	if isSelectCall(expr.Y) {
-		return selectToGN(attrName, "=", expr.Y.(*syntax.CallExpr), transformers)
+		return selectToGN(attrName, op, expr.Y.(*syntax.CallExpr), transformers)
 	}
 
 	// It is not a simple `select` call on the RHS, and `select`s are found in
@@ -419,7 +435,7 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 		}
 		// Start with an empty list so it's easy to += new elements from later
 		// conversions.
-		return append([]string{fmt.Sprintf("%s = []", attrName)}, lc...), nil
+		return append([]string{fmt.Sprintf("%s %s []", attrName, op)}, lc...), nil
 	}
 
 	rhs, err := exprToGN(expr.Y, transformers)
@@ -430,7 +446,7 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 		return nil, errors.New("rhs hand side of binary expression is unexpectedly empty")
 	}
 
-	ret := []string{fmt.Sprintf("%s = %s", attrName, rhs[0])}
+	ret := []string{fmt.Sprintf("%s %s %s", attrName, op, rhs[0])}
 	ret = append(ret, rhs[1:]...)
 	return ret, nil
 }

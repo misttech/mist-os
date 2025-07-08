@@ -353,13 +353,13 @@ func TestIDKConversion(t *testing.T) {
 			bazel: `load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
 
 idk_cc_source_library(
-		name = "magma_common",
-		category = "partner",
-		idk_name = "magma_common",
-		stable = True,
-		hdrs = ["include/lib/magma_common/magma_common_defs.h"],
-		public_configs = [ ":magma_include" ],
-		visibility = [ "//visibility:public" ],
+	name = "magma_common",
+	category = "partner",
+	idk_name = "magma_common",
+	stable = True,
+	hdrs = ["include/lib/magma_common/magma_common_defs.h"],
+	public_configs = [ ":magma_include" ],
+	visibility = [ "//visibility:public" ],
 )
 `,
 			wantGN: `sdk_source_set("magma_common") {
@@ -400,32 +400,32 @@ func TestCCConversion(t *testing.T) {
 		{
 			name: "Simple C++ targets",
 			bazel: `cc_library(
-		name = "foo",
-		srcs = [
-		"path/to/bar.cc",
-		"path/to/bar.h",
-		"path/to/baz.cc",
-			"path/to/foo.cc",
-			"yet/another/path/to/foo.cc",
-		],
-		hdrs = [
-		"path/to/baz.h",
-			"path/to/foo.h",
-		],
-		deps = [
-			"//path/to:foo",
-			"//yet/another/path/to:bar",
-		],
-		implementation_deps = [
-			"//path/to:bar",
-		],
-		copts = [
-			"-Wno-implicit-fallthrough",
-		],
-		visibility = [
-			":__pkg__",
-			"//path/to/dir:__subpackages__",
-		],
+	name = "foo",
+	srcs = [
+	"path/to/bar.cc",
+	"path/to/bar.h",
+	"path/to/baz.cc",
+		"path/to/foo.cc",
+		"yet/another/path/to/foo.cc",
+	],
+	hdrs = [
+	"path/to/baz.h",
+		"path/to/foo.h",
+	],
+	deps = [
+		"//path/to:foo",
+		"//yet/another/path/to:bar",
+	],
+	implementation_deps = [
+		"//path/to:bar",
+	],
+	copts = [
+		"-Wno-implicit-fallthrough",
+	],
+	visibility = [
+		":__pkg__",
+		"//path/to/dir:__subpackages__",
+	],
 )
 `,
 			wantGN: `source_set("foo") {
@@ -447,13 +447,34 @@ func TestCCConversion(t *testing.T) {
 	deps = [
 		"//path/to:bar",
 	]
-	configs = [
+	configs += [
 		"//build/config:Wno-implicit-fallthrough",
 	]
 	visibility = [
 		":*",
 		"//path/to/dir/*",
 	]
+}`,
+		},
+		{
+			name: "select in copts to configs",
+			bazel: `cc_library(
+	name = "foo",
+	copts = select({
+		"@platforms//os:fuchsia": [ "-Wno-implicit-fallthrough" ],
+		"//conditions:default": [],
+	}),
+)
+`,
+			wantGN: `source_set("foo") {
+	if (is_fuchsia) {
+		configs += [
+			"//build/config:Wno-implicit-fallthrough",
+		]
+	} else {
+		configs += [
+		]
+	}
 }`,
 		},
 	} {
