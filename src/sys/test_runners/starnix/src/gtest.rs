@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::helpers::*;
-use crate::results_parser::*;
+use crate::{helpers, results_parser};
 use anyhow::{Context, Error};
-use fidl::endpoints::create_proxy;
+use fidl::endpoints;
 use fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status};
 use ftest::CaseListenerProxy;
 use futures::io::BufReader;
 use futures::AsyncBufReadExt;
-use gtest_runner_lib::parser::*;
-use log::{debug, error};
+use gtest_runner_lib::parser;
+use gtest_runner_lib::parser::{IndividualTestOutputStatus, TestSuiteOutput};
+use helpers::TestType;
 use std::collections::HashMap;
 use test_runners_lib::cases::TestCaseInfo;
 use {fidl_fuchsia_component_runner as frunner, fuchsia_async as fasync};
@@ -28,13 +28,13 @@ pub async fn get_cases_list_for_gtests(
     component_runner: &frunner::ComponentRunnerProxy,
     test_type: TestType,
 ) -> Result<Vec<ftest::Case>, Error> {
-    debug!("getting test cases for gtest");
+    log::debug!("getting test cases for gtest");
     // Replace the program args to get test cases in a json file.
     let list_tests_arg = format_arg(test_type, LIST_TESTS_ARG);
     let output_file_name = unique_filename();
     let output_path = format!("output=json:{}{}", OUTPUT_PATH, output_file_name);
     let output_arg = format_arg(test_type, &output_path);
-    replace_program_args(
+    helpers::replace_program_args(
         vec![list_tests_arg, output_arg],
         start_info.program.as_mut().context("No program.")?,
     );
@@ -42,22 +42,22 @@ pub async fn get_cases_list_for_gtests(
     let (outgoing_dir, _outgoing_dir_server) = zx::Channel::create();
     start_info.outgoing_dir = Some(outgoing_dir.into());
     start_info.numbered_handles = Some(vec![]);
-    let output_dir = add_output_dir_to_namespace(&mut start_info)?;
+    let output_dir = helpers::add_output_dir_to_namespace(&mut start_info)?;
 
-    debug!(start_info:?; "starting test component to list test cases");
-    let component_controller = start_test_component(start_info, component_runner)?;
-    match read_result(component_controller.take_event_stream()).await.status {
+    log::debug!(start_info:?; "starting test component to list test cases");
+    let component_controller = helpers::start_test_component(start_info, component_runner)?;
+    match helpers::read_result(component_controller.take_event_stream()).await.status {
         Some(ftest::Status::Passed) => (),
-        Some(ftest::Status::Failed) => error!("Test dry-run to list cases failed."),
-        Some(ftest::Status::Skipped) => error!("Test dry-run to list cases was skipped."),
-        None => error!("Test dry-run to list cases didn't provide a status."),
+        Some(ftest::Status::Failed) => log::error!("Test dry-run to list cases failed."),
+        Some(ftest::Status::Skipped) => log::error!("Test dry-run to list cases was skipped."),
+        None => log::error!("Test dry-run to list cases didn't provide a status."),
     }
 
     // Parse tests from output file.
-    let read_content = read_file(&output_dir, &output_file_name)
+    let read_content = parser::read_file(&output_dir, &output_file_name)
         .await
         .context("reading tests from output file.")?;
-    let tests = parse_test_cases(read_content).context("parsing test cases")?;
+    let tests = parser::parse_test_cases(read_content).context("parsing test cases")?;
     Ok(tests
         .iter()
         .map(|TestCaseInfo { name, enabled }| ftest::Case {
@@ -87,22 +87,29 @@ pub async fn run_gunit_cases(
     component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     // Before passing in the handles, we'll need to wire up an IO sink so that we can parse results.
-    let (numbered_handles, mut std_handles) = create_numbered_handles();
+    let (numbered_handles, mut std_handles) = helpers::create_numbered_handles();
     let (stdout_reader, stdout_writer) = zx::Socket::create_stream();
     let stdout_sink = std_handles.out.take().unwrap();
     std_handles.out = Some(stdout_reader);
 
-    let top_level_report_proxy =
-        start_top_level_report(&mut start_info, run_listener_proxy, numbered_handles, std_handles)?;
+    let top_level_report_proxy = helpers::start_top_level_report(
+        &mut start_info,
+        run_listener_proxy,
+        numbered_handles,
+        std_handles,
+    )?;
 
     // Notify test manager of cases starting.
     let mut run_listener_proxies = start_tests(&tests, run_listener_proxy)?;
     let test_filter_arg = create_tests_filter_arg(&tests, TestType::Gunit);
-    append_program_args(vec![test_filter_arg], start_info.program.as_mut().context("No program.")?);
+    helpers::append_program_args(
+        vec![test_filter_arg],
+        start_info.program.as_mut().context("No program.")?,
+    );
 
     // Start the test component.
-    let component_controller = start_test_component(start_info, component_runner)?;
-    let _ = read_result(component_controller.take_event_stream()).await;
+    let component_controller = helpers::start_test_component(start_info, component_runner)?;
+    let _ = helpers::read_result(component_controller.take_event_stream()).await;
     top_level_report_proxy
         .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
 
@@ -154,9 +161,13 @@ pub async fn run_gtest_cases(
     component_runner: &frunner::ComponentRunnerProxy,
     test_type: TestType,
 ) -> Result<(), Error> {
-    let (numbered_handles, std_handles) = create_numbered_handles();
-    let top_level_report_proxy =
-        start_top_level_report(&mut start_info, run_listener_proxy, numbered_handles, std_handles)?;
+    let (numbered_handles, std_handles) = helpers::create_numbered_handles();
+    let top_level_report_proxy = helpers::start_top_level_report(
+        &mut start_info,
+        run_listener_proxy,
+        numbered_handles,
+        std_handles,
+    )?;
     let (run_listener_proxies, test_result_list) =
         execute_gtests(component_runner, start_info, tests, run_listener_proxy, test_type).await?;
 
@@ -195,23 +206,23 @@ pub async fn execute_gtests(
     );
 
     log::info!("writing json output to {:?}", output_arg);
-    append_program_args(
+    helpers::append_program_args(
         vec![test_filter_arg, output_arg],
         start_info.program.as_mut().expect("No program."),
     );
 
-    let output_dir = add_output_dir_to_namespace(&mut start_info)?;
+    let output_dir = helpers::add_output_dir_to_namespace(&mut start_info)?;
 
     // Start the test component.
-    let component_controller = start_test_component(start_info, component_runner)?;
-    let _ = read_result(component_controller.take_event_stream()).await;
+    let component_controller = helpers::start_test_component(start_info, component_runner)?;
+    let _ = helpers::read_result(component_controller.take_event_stream()).await;
 
     // Parse test results.
-    let test_results = read_file(&output_dir, &output_file_name)
+    let test_results = parser::read_file(&output_dir, &output_file_name)
         .await
         .with_context(|| format!("Failed to read {}", output_file_name))
         .and_then(|x| {
-            parse_results(test_type, x.trim())
+            results_parser::parse_results(test_type, x.trim())
                 .with_context(|| format!("Failed to parse {}", output_file_name))
         });
 
@@ -220,7 +231,7 @@ pub async fn execute_gtests(
     let test_result_list = match test_results {
         Ok(results) => results.testsuites,
         Err(e) => {
-            error!("Tests crashed whilst running: {}", e);
+            log::error!("Tests crashed whilst running: {}", e);
             vec![]
         }
     };
@@ -266,7 +277,8 @@ fn start_tests(
     for test in tests {
         let test_name = test.name.clone().expect("No test name.");
 
-        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
+        let (case_listener_proxy, case_listener) =
+            endpoints::create_proxy::<ftest::CaseListenerMarker>();
         run_listener_proxy.on_test_case_started(
             &test,
             ftest::StdHandles::default(),
