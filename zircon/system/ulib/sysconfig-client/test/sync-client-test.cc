@@ -8,20 +8,26 @@
 
 // clang-format on
 
+#include <fuchsia/driver/test/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver-integration-test/fixture.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
+#include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/zx/channel.h>
 #include <zircon/hw/gpt.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <ramdevice-client-test/ramnandctl.h>
 #include <zxtest/zxtest.h>
+
+#include "lib/sys/component/cpp/testing/realm_builder.h"
 
 namespace {
 
@@ -92,16 +98,21 @@ class SkipBlockDevice {
 
   ~SkipBlockDevice() = default;
 
-  SkipBlockDevice(driver_integration_test::IsolatedDevmgr devmgr,
+  SkipBlockDevice(std::unique_ptr<async::Loop> loop,
+                  std::unique_ptr<component_testing::RealmRoot> realm, fbl::unique_fd devfs_root,
                   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl,
                   ramdevice_client::RamNand ram_nand, fzl::VmoMapper mapper)
-      : devmgr_(std::move(devmgr)),
+      : loop_(std::move(loop)),
+        realm_(std::move(realm)),
+        devfs_root_(std::move(devfs_root)),
         ctl_(std::move(ctl)),
         ram_nand_(std::move(ram_nand)),
         mapper_(std::move(mapper)) {}
 
  private:
-  driver_integration_test::IsolatedDevmgr devmgr_;
+  std::unique_ptr<async::Loop> loop_;
+  std::unique_ptr<component_testing::RealmRoot> realm_;
+  fbl::unique_fd devfs_root_;
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl_;
   ramdevice_client::RamNand ram_nand_;
   fzl::VmoMapper mapper_;
@@ -127,6 +138,8 @@ void CreateBadBlockMap(void* buffer) {
 
 void SkipBlockDevice::Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
                              std::optional<SkipBlockDevice>* device) {
+  auto loop = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop->StartThread();
   fzl::VmoMapper mapper;
   zx::vmo vmo;
   ASSERT_OK(mapper.CreateAndMap((kPageSize + kOobSize) * kPagesPerBlock * kNumBlocks,
@@ -135,16 +148,37 @@ void SkipBlockDevice::Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
   CreateBadBlockMap(mapper.start());
   ASSERT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &nand_info.vmo));
 
-  driver_integration_test::IsolatedDevmgr::Args args;
-  driver_integration_test::IsolatedDevmgr devmgr;
-  ASSERT_OK(driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr));
+  auto realm_builder = component_testing::RealmBuilder::Create();
+  driver_test_realm::Setup(realm_builder);
+  auto realm =
+      std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop->dispatcher()));
+  fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
+  ASSERT_OK(realm->component().Connect(driver_test_realm.NewRequest()));
+  fuchsia::driver::test::Realm_Start_Result realm_result;
+  auto realm_args = fuchsia::driver::test::RealmArgs();
+  realm_args.set_root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
+  realm_args.set_software_devices(std::vector{
+      fuchsia::driver::test::SoftwareDevice{
+          .device_name = "ram-nand",
+          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+      },
+  });
+  ASSERT_OK(driver_test_realm->Start(std::move(realm_args), &realm_result));
+  ASSERT_TRUE(realm_result.is_response());
+  fidl::InterfaceHandle<fuchsia::io::Node> dev;
+  ASSERT_OK(realm->component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                               dev.NewRequest().TakeChannel()));
+
+  fbl::unique_fd devfs_root;
+  ASSERT_OK(fdio_fd_create(dev.TakeChannel().release(), devfs_root.reset_and_get_address()));
+
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl;
-  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(devmgr.devfs_root().duplicate(), &ctl));
+  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(devfs_root.duplicate(), &ctl));
   std::optional<ramdevice_client::RamNand> ram_nand;
   ASSERT_OK(ctl->CreateRamNand(std::move(nand_info), &ram_nand));
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform")
-                .status_value());
-  device->emplace(std::move(devmgr), std::move(ctl), *std::move(ram_nand), std::move(mapper));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root.get(), "sys/platform").status_value());
+  device->emplace(std::move(loop), std::move(realm), std::move(devfs_root), std::move(ctl),
+                  *std::move(ram_nand), std::move(mapper));
 }
 
 void CreatePayload(size_t size, zx::vmo* out, uint8_t data = 0x4a) {
