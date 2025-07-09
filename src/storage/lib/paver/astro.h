@@ -58,7 +58,6 @@ class AstroPartitioner : public DevicePartitioner {
 
   static zx::result<> InitializeContext(const paver::BlockDevices& devices,
                                         AbrWearLevelingOption abr_wear_leveling_opt,
-                                        fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
                                         Context* context);
 
   static bool CanSafelyUpdateLayout(std::shared_ptr<Context> context);

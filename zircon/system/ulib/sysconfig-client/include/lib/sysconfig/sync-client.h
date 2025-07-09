@@ -38,13 +38,7 @@ class __EXPORT SyncClient {
     kVerifiedBootMetadataR,
   };
 
-  // Looks for a skip-block device of type sysconfig. If found, returns a client capable of reading
-  // and writing to sub-partitions of the sysconfig device.
-  static zx::result<SyncClient> Create();
-
-  // Variation on `Create` with devfs (/dev) and svc dir injected.
-  static zx::result<SyncClient> Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev,
-                                       fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir);
+  static zx::result<SyncClient> Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev);
 
   // Provides write access for the partition specified. Always writes full partition.
   //

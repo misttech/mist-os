@@ -28,7 +28,6 @@ source_set("sysconfig-sync-client") {
   public_deps = [ ":sysconfig-sync-client-headers" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fidl",

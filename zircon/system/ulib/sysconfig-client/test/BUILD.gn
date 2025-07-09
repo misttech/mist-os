@@ -16,7 +16,6 @@ test("sysconfig-sync-client-test") {
   deps = [
     "///src/devices/testing/driver-integration-test-shim",
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_testing",
     "//sdk/lib/async-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/incoming/cpp",
