@@ -60,8 +60,8 @@ pub(in crate::security) fn file_permission(
 
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission checks"),
-        &current_task.kernel(),
         &security_server.as_permission_check(),
+        &current_task.kernel(),
         current_sid,
         &file.name.entry.node,
         &permissions_from_flags(permission_flags, file_class),
@@ -106,8 +106,8 @@ pub(in crate::security) fn file_receive(
 
     todo_has_file_permissions(
         TODO_DENY!("https://fxbug.dev/399894966", "Check file receive permission."),
-        &current_task.kernel(),
         &permission_check,
+        &current_task.kernel(),
         subject_sid,
         file,
         &permissions_from_flags(permission_flags, fs_node_class),
@@ -239,8 +239,8 @@ pub(in crate::security) fn check_file_fcntl_access(
             // we need to check for permission.
             todo_has_fs_node_permissions(
                 TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
-                &current_task.kernel(),
                 &security_server.as_permission_check(),
+                &current_task.kernel(),
                 subject_sid,
                 file.node(),
                 &permissions_from_flags(PermissionFlags::APPEND, fs_node_class),
@@ -252,8 +252,8 @@ pub(in crate::security) fn check_file_fcntl_access(
         // checked. Now that the append flag was cleared we need to check the WRITE permission.
         todo_has_fs_node_permissions(
             TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
-            &current_task.kernel(),
             &security_server.as_permission_check(),
+            &current_task.kernel(),
             subject_sid,
             file.node(),
             &permissions_from_flags(PermissionFlags::WRITE, fs_node_class),
@@ -330,8 +330,8 @@ pub fn mmap_file(
         let current_sid = task_effective_sid(current_task);
         todo_has_file_permissions(
             TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
-            &current_task.kernel(),
             &security_server.as_permission_check(),
+            &current_task.kernel(),
             current_sid,
             file,
             &[CommonFsNodePermission::Map],
@@ -365,8 +365,8 @@ fn file_map_prot_check(
             let current_sid = task_effective_sid(current_task);
             todo_check_permission(
                 TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
-                &current_task.kernel(),
                 &security_server.as_permission_check(),
+                &current_task.kernel(),
                 current_sid,
                 current_sid,
                 ProcessPermission::ExecMem,
@@ -394,8 +394,8 @@ fn file_map_prot_check(
         let current_sid = task_effective_sid(current_task);
         todo_has_fs_node_permissions(
             TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
-            &current_task.kernel(),
             &security_server.as_permission_check(),
+            &current_task.kernel(),
             current_sid,
             fs_node,
             &permissions,

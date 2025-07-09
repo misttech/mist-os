@@ -39,8 +39,8 @@ pub fn binder_transaction(
     let target_sid = target_task.security_state.lock().current_sid;
     todo_check_permission(
         TODO_DENY!("https://fxbug.dev/427888888", "Enforce call check."),
-        target_task.kernel(),
         &security_server.as_permission_check(),
+        target_task.kernel(),
         source_sid,
         target_sid,
         BinderPermission::Call,

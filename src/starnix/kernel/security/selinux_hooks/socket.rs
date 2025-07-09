@@ -102,8 +102,8 @@ fn todo_has_socket_permission(
     let audit_context = [audit_context, socket_node.into()];
     todo_check_permission(
         bug,
-        kernel,
         permission_check,
+        kernel,
         subject_sid,
         socket_sid,
         permission.for_class(socket_class),
