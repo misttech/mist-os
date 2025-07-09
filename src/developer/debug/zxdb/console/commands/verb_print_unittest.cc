@@ -100,6 +100,12 @@ TEST_F(VerbPrint, IntegerFormat) {
   console().ProcessInputLine("print -d 100");
   event = console().GetOutputEvent();
   EXPECT_EQ("100", event.output.AsString());
+
+  // Strings should be printable as nice strings when given the -c setting.
+  // TODO(https://fxbug.dev/428735755): String formatting should not depend on integer formatting.
+  console().ProcessInputLine("print -c \"string\"");
+  event = console().GetOutputEvent();
+  EXPECT_EQ("\"string\"", event.output.AsString());
 }
 
 // A client end-to-end test for vector register formats.

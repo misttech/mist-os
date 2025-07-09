@@ -5,22 +5,19 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_COMMAND_UTILS_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_COMMAND_UTILS_H_
 
-#include <initializer_list>
 #include <optional>
 #include <string>
 
-#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/breakpoint_settings.h"
 #include "src/developer/debug/zxdb/client/function_return_info.h"
-#include "src/developer/debug/zxdb/client/symbol_server.h"
 #include "src/developer/debug/zxdb/client/target.h"
 #include "src/developer/debug/zxdb/common/err_or.h"
 #include "src/developer/debug/zxdb/console/command.h"
+#include "src/developer/debug/zxdb/console/format_node_console.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
 #include "src/developer/debug/zxdb/expr/eval_callback.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
-#include "src/developer/debug/zxdb/expr/parsed_identifier.h"
 
 namespace zxdb {
 
@@ -146,6 +143,9 @@ Err RewriteCommandExpressionError(const std::string& verb, const Err& err);
 // But if there are spaces or unprintable characters, this will quote or escape in such a way that
 // the console/setting formatter will interpret the string the same way as a single entity.
 std::string FormatConsoleString(const std::string& input);
+
+// Returns the number format setting for the given target, or the default if target is invalid.
+ConsoleFormatOptions::NumFormat GetNumberFormatForTarget(Target* target);
 
 // Makes sure there is a runnable target, creating one if necessary. In the success case, the
 // returned target should be used instead of the one from the command (it may be a new one).

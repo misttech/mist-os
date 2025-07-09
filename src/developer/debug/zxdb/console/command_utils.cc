@@ -622,6 +622,21 @@ std::string FormatConsoleString(const std::string& input) {
   return result;
 }
 
+ConsoleFormatOptions::NumFormat GetNumberFormatForTarget(Target* target) {
+  if (target) {
+    const auto& setting = target->settings().GetString(ClientSettings::Target::kIntegerFormat);
+    if (setting == kIntegerFormatDecimal) {
+      return FormatOptions::NumFormat::kDefault;
+    } else if (setting == kIntegerFormatHexadecimal) {
+      return FormatOptions::NumFormat::kHex;
+    } else if (setting == kIntegerFormatBinary) {
+      return FormatOptions::NumFormat::kBin;
+    }
+  }
+
+  return ConsoleFormatOptions::NumFormat::kDefault;
+}
+
 ErrOr<Target*> GetRunnableTarget(ConsoleContext* context, const Command& cmd) {
   Target::State state = cmd.target()->GetState();
   if (state == Target::State::kNone)

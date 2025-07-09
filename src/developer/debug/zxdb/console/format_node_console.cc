@@ -560,7 +560,9 @@ OutputBuffer DoFormatNodeOneWay(const FormatNode* node, const RecursiveState& st
       case FormatNode::kString:
         // For strings, use the number format to determine if the output should be displayed
         // as the string data or a numeric array.
-        if (state.options.num_format == FormatOptions::NumFormat::kDefault) {
+        // TODO(https://fxbug.dev/428735755): Don't rely on the number formatting for strings.
+        if (state.options.num_format == FormatOptions::NumFormat::kDefault ||
+            state.options.num_format == FormatOptions::NumFormat::kChar) {
           out.Append(DoFormatStandardNode(node, state, Syntax::kStringNormal));
         } else {
           out.Append(DoFormatArrayOrTupleNode(node, state));

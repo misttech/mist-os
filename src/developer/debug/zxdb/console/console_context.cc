@@ -415,6 +415,10 @@ void ConsoleContext::ScheduleDisplayExpressions(Thread* thread) const {
   options.wrapping = ConsoleFormatOptions::Wrapping::kSmart;
   options.pointer_expand_depth = 2;
 
+  if (thread->GetProcess()) {
+    options.num_format = GetNumberFormatForTarget(thread->GetProcess()->GetTarget());
+  }
+
   Console::get()->Output(FormatExpressionsForConsole(exprs, options, eval_context));
 }
 

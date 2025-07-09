@@ -8,6 +8,8 @@
 
 #include "src/developer/debug/zxdb/client/mock_frame.h"
 #include "src/developer/debug/zxdb/client/mock_remote_api.h"
+#include "src/developer/debug/zxdb/client/process.h"
+#include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/client/substatement.h"
 #include "src/developer/debug/zxdb/console/console_test.h"
 
@@ -78,6 +80,18 @@ TEST_F(VerbDisplay, Test) {
   EXPECT_TRUE(IsStopEvent());
   EXPECT_FALSE(console().HasOutputEvent());
   event = console().GetOutputEvent();
+}
+
+TEST_F(VerbDisplay, RespectIntegerFormat) {
+  process()->GetTarget()->settings().SetString(ClientSettings::Target::kIntegerFormat, "hex");
+
+  console().ProcessInputLine("display 15");
+
+  // Since we're just printing a constant, the "name" section will not be formatted specially, but
+  // the value will be.
+  auto event = console().GetOutputEvent();  // Ignore the initial `display` output.
+  event = console().GetOutputEvent();
+  EXPECT_EQ(event.output.AsString(), "15 = 0xf");
 }
 
 }  // namespace zxdb

@@ -96,17 +96,7 @@ ErrOr<ConsoleFormatOptions> GetPrintCommandFormatOptions(const Command& cmd) {
   }
 
   if (num_type_overrides == 0) {
-    if (cmd.target()) {
-      const auto setting =
-          cmd.target()->settings().GetString(ClientSettings::Target::kIntegerFormat);
-      if (setting == kIntegerFormatDecimal) {
-        options.num_format = FormatOptions::NumFormat::kDefault;
-      } else if (setting == kIntegerFormatHexadecimal) {
-        options.num_format = FormatOptions::NumFormat::kHex;
-      } else if (setting == kIntegerFormatBinary) {
-        options.num_format = FormatOptions::NumFormat::kBin;
-      }
-    }
+    options.num_format = GetNumberFormatForTarget(cmd.target());
   }
 
   // Disable pretty-printing.
