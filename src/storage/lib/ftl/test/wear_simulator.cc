@@ -3,25 +3,38 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/markers.h>
-#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/wire/arena.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <stdio.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <set>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <fbl/array.h>
-#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <zstd/zstd.h>
 
@@ -29,7 +42,6 @@
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/fs_test/fs_test.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
-#include "src/storage/testing/fvm.h"
 
 namespace fs_test {
 namespace {
