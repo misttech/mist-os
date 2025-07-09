@@ -50,3 +50,5 @@ enum FUNCTION {
    TDM_B_SCLK,
    TDM_C_SCLK,
 };
+
+string NAME;
