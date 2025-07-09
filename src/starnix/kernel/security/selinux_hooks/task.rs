@@ -465,7 +465,7 @@ pub(in crate::security) fn check_signal_access(
     }
 }
 
-pub(in crate::security) fn check_syslog(
+pub(in crate::security) fn check_syslog_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     action: SyslogAction,
@@ -483,8 +483,7 @@ pub(in crate::security) fn check_syslog(
         | SyslogAction::Clear
         | SyslogAction::SizeUnread => SystemPermission::SyslogMod,
     };
-    todo_check_permission(
-        TODO_DENY!("https://fxbug.dev/425873800", "Enforce syslog permissions."),
+    check_permission(
         permission_check,
         current_task.kernel(),
         sid,

@@ -1332,7 +1332,11 @@ pub fn check_signal_access(
 pub fn check_syslog_access(source: &CurrentTask, action: SyslogAction) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_syslog_access");
     if_selinux_else_default_ok(source, |security_server| {
-        selinux_hooks::task::check_syslog(&security_server.as_permission_check(), &source, action)
+        selinux_hooks::task::check_syslog_access(
+            &security_server.as_permission_check(),
+            &source,
+            action,
+        )
     })
 }
 
