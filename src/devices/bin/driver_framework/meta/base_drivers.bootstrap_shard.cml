@@ -107,6 +107,29 @@
             // packages to provide fshost's (transitive) dependencies.
             dependency: "weak",
         },
+        {
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.backlight.Service",
+                "fuchsia.hardware.bluetooth.Service",
+                "fuchsia.hardware.gnss.Service",
+                "fuchsia.hardware.haptics.Service",
+                "fuchsia.hardware.hrtimer.Service",
+                "fuchsia.hardware.light.LightService",
+                "fuchsia.hardware.nfc.Service",
+                "fuchsia.hardware.power.sensor.Service",
+                "fuchsia.hardware.radar.Service",
+                "fuchsia.hardware.temperature.Service",
+                "fuchsia.hardware.thermal.Service",
+                "fuchsia.hardware.trippoint.TripPointService",
+                "fuchsia.input.report.Service",
+                "fuchsia.power.battery.InfoService",
+                "fuchsia.storage.ftl.Service",
+                "google.powerstats.Service",
+            ],
+            from: "#base-drivers",
+            to: "self/driver-services-for-session",
+        },
 
         // `VisualDebuggingLevel` to driver to change display configuration.
         {

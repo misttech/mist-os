@@ -458,16 +458,15 @@
             availability: "same_as_target",
         },
         {
-            service: [
-                // TODO: b/392629126. Evaluate routing driver FIDL through session_manager.
-                "fuchsia.hardware.gnss.Service",
-                "fuchsia.hardware.nfc.Service",
-                "fuchsia.power.broker.ElementInfoProviderService",
-                "fuchsia.storage.ftl.Service",
-            ],
+            service: "fuchsia.power.broker.ElementInfoProviderService",
             from: "parent",
             to: "#session",
             availability: "same_as_target",
+        },
+        {
+            dictionary: "driver-services",
+            from: "parent",
+            to: "#session",
         },
         {
             storage: [
@@ -544,27 +543,6 @@
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
             // been migrated to services. The service capability has been added below.
             directory: [ "dev-bt-hci" ],
-            from: "parent",
-            to: "#session",
-            availability: "same_as_target",
-        },
-        {
-            service: [
-                "fuchsia.gpu.magma.Service", // replaces /dev/class/gpu
-                "fuchsia.hardware.backlight.Service", // replaces /dev/class/backlight
-                "fuchsia.hardware.bluetooth.Service", // replaces /dev/class/bt-hci
-                "fuchsia.hardware.haptics.Service",
-                "fuchsia.hardware.hrtimer.Service", // replaces /dev/class/hrtimer
-                "fuchsia.hardware.light.LightService", // replaces /dev/class/light
-                "fuchsia.hardware.power.sensor.Service", // replaces /dev/class/power-sensor
-                "fuchsia.hardware.radar.Service", // replaces /dev/class/radar
-                "fuchsia.hardware.temperature.Service", // replaces /dev/class/temperature
-                "fuchsia.hardware.thermal.Service", // replaces /dev/class/thermal
-                "fuchsia.hardware.trippoint.TripPointService", // replaces /dev/class/trippoint
-                "fuchsia.input.report.Service", // replaces /dev/class/input-report
-                "fuchsia.power.battery.InfoService", // replaces /dev/class/battery
-                "google.powerstats.Service",
-            ],
             from: "parent",
             to: "#session",
             availability: "same_as_target",
