@@ -122,7 +122,10 @@ pub async fn suspend_container(
         fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
         if wait_items.len() > 0 {
             log::info!("Waiting on container to receive incoming message on wake proxies");
-            match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
+            match zx::object_wait_many(
+                &mut wait_items,
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(9)),
+            ) {
                 Ok(_) => (),
                 Err(e) => {
                     warn!("error waiting for wake event {:?}", e);
