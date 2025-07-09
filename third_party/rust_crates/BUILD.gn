@@ -659,7 +659,7 @@ group("paste") {
 }
 
 group("pathdiff") {
-  public_deps = [ ":pathdiff-v0_2_1" ]
+  public_deps = [ ":pathdiff-v0_2_3" ]
 }
 
 group("pem") {
@@ -11706,18 +11706,18 @@ rustc_macro("paste-v1_0_15") {
   applicable_licenses = [ ":paste-v1_0_15.license" ]
 }
 
-license("pathdiff-v0_2_1.license") {
+license("pathdiff-v0_2_3.license") {
   public_package_name = "pathdiff"
   license_files = [
-    "//third_party/rust_crates/vendor/pathdiff-0.2.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/pathdiff-0.2.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/pathdiff-0.2.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/pathdiff-0.2.3/LICENSE-MIT",
   ]
 }
 
-rustc_library("pathdiff-v0_2_1") {
+rustc_library("pathdiff-v0_2_3") {
   crate_name = "pathdiff"
-  source_root = "//third_party/rust_crates/vendor/pathdiff-0.2.1/src/lib.rs"
-  output_name = "pathdiff-f92b819d1f19c4a5"
+  source_root = "//third_party/rust_crates/vendor/pathdiff-0.2.3/src/lib.rs"
+  output_name = "pathdiff-136957d711c6ad4f"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -11730,14 +11730,14 @@ rustc_library("pathdiff-v0_2_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=f92b819d1f19c4a5",
-    "-Cextra-filename=-f92b819d1f19c4a5",
+    "-Cmetadata=136957d711c6ad4f",
+    "-Cextra-filename=-136957d711c6ad4f",
     "--cfg=feature=\"camino\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":pathdiff-v0_2_1.license" ]
+  applicable_licenses = [ ":pathdiff-v0_2_3.license" ]
 }
 
 license("pem-v0_8_3.license") {

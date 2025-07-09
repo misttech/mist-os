@@ -1783,14 +1783,14 @@ alias(
 )
 
 alias(
-    name = "pathdiff-0.2.1",
-    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.1:pathdiff",
+    name = "pathdiff-0.2.3",
+    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.3:pathdiff",
     tags = ["manual"],
 )
 
 alias(
     name = "pathdiff",
-    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.1:pathdiff",
+    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.3:pathdiff",
     tags = ["manual"],
 )
 
