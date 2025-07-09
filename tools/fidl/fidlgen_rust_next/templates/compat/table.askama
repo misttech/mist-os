@@ -1,0 +1,15 @@
+{#
+{% let table = self.schema().table_declarations[ident] %}
+{{ restriction }}
+impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
+    #[inline]
+    fn from(from: crate::{{ name }}) -> Self {
+        Self {
+            {% for member in table.members %}
+                {{ member.name|compat_snake }}: {{ member.name|snake }}.map(::core::convert::From::from),
+            {% endfor %}
+            __source_breaking: ::fidl::marker::SourceBreaking,
+        }
+    }
+}
+#}

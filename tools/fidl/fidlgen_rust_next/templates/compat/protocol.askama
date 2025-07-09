@@ -1,0 +1,15 @@
+#[cfg(target_os = "fuchsia")]
+/// An alias for a client sender over `zx::Channel` for the `{{ name }}`
+/// protocol.
+pub type {{ proxy_name }} = ::fidl_next::ClientSender<
+    ::fidl_next::fuchsia::zx::Channel,
+    crate::{{ name }},
+>;
+
+{{ denylist }}
+impl ::core::convert::From<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
+    #[inline]
+    fn from(_: crate::{{ name }}) -> Self {
+        Self
+    }
+}
