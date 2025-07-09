@@ -2,8 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fdio/vfs.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <utility>
 
+#include <fbl/ref_ptr.h>
+#include <fbl/string.h>
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
 

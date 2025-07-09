@@ -2,21 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/vfs.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
 #include <lib/sync/completion.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <memory>
+#include <utility>
 
-#include <fbl/auto_lock.h>
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
-#include "zircon/status.h"
 
 namespace {
 

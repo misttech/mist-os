@@ -3,29 +3,48 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/fd.h>
-#include <lib/fdio/internal.h>
+#include <lib/fdio/internal.h>  // IWYU pragma: keep
 #include <lib/fdio/io.h>
 #include <lib/fdio/unsafe.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/sync/completion.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
-#include <zircon/syscalls-next.h>
+#include <lib/zx/vmo.h>
+#include <lib/zxio/types.h>
+#include <lib/zxio/zxio.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
 #include <algorithm>
 #include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <mutex>
 #include <optional>
+#include <thread>
 #include <utility>
+#include <vector>
 
-#include <fbl/condition_variable.h>
+#include <fbl/ref_ptr.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 
@@ -412,7 +431,7 @@ TEST_F(PagingTest, Write) {
   // Gets the VMO for file1, it should now have a VMO.
   zx::vmo vmo;
   // TODO: Add fdio_get_vmo_write() to fdio
-  fdio_t* io = fdio_unsafe_fd_to_io(static_cast<int>(file1_fd.get()));
+  fdio_t* io = fdio_unsafe_fd_to_io(file1_fd.get());
   ASSERT_EQ(ZX_OK, zxio_vmo_get(&io->zxio_storage().io, ZXIO_VMO_READ | ZXIO_VMO_WRITE,
                                 vmo.reset_and_get_address()));
   fdio_unsafe_release(io);
@@ -455,7 +474,7 @@ TEST_F(PagingTest, Write) {
   EXPECT_TRUE(file1_->HasClones());
 
   // Mmap to another adderss space and verify data in mmaped memory.
-  io = fdio_unsafe_fd_to_io(static_cast<int>(file1_fd.get()));
+  io = fdio_unsafe_fd_to_io(file1_fd.get());
   ASSERT_EQ(ZX_OK,
             zxio_vmo_get(&io->zxio_storage().io, ZXIO_VMO_READ, vmo.reset_and_get_address()));
   fdio_unsafe_release(io);
@@ -490,7 +509,7 @@ TEST_F(PagingTest, VmoDirty) {
   ASSERT_TRUE(file1_fd);
   zx::vmo vmo;
   // TODO: Add fdio_get_vmo_write() to fdio
-  fdio_t* io = fdio_unsafe_fd_to_io(static_cast<int>(file1_fd.get()));
+  fdio_t* io = fdio_unsafe_fd_to_io(file1_fd.get());
   ASSERT_EQ(ZX_OK, zxio_vmo_get(&io->zxio_storage().io, ZXIO_VMO_READ | ZXIO_VMO_WRITE,
                                 vmo.reset_and_get_address()));
   fdio_unsafe_release(io);
@@ -527,7 +546,7 @@ TEST_F(PagingTest, WriteError) {
   ASSERT_TRUE(file_err_fd);
   zx::vmo vmo;
   // TODO: Add fdio_get_vmo_write() to fdio
-  fdio_t* io = fdio_unsafe_fd_to_io(static_cast<int>(file_err_fd.get()));
+  fdio_t* io = fdio_unsafe_fd_to_io(file_err_fd.get());
   ASSERT_EQ(ZX_OK, zxio_vmo_get(&io->zxio_storage().io, ZXIO_VMO_READ | ZXIO_VMO_WRITE,
                                 vmo.reset_and_get_address()));
   fdio_unsafe_release(io);

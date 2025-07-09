@@ -2,14 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zx/vmo.h>
 #include <string.h>
-#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <cassert>
+#include <cstdint>
+#include <utility>
+#include <vector>
+
+#include <fbl/ref_ptr.h>
 #include <fuzzer/FuzzedDataProvider.h>
 
-#include "src/storage/lib/vfs/cpp/vfs.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vmo_file.h"
 
 static const size_t kMaxVmoSz = 1024 * 1024 * 40;

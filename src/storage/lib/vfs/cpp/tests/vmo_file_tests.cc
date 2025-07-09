@@ -2,12 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file->
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#include <limits.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <utility>
+
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
