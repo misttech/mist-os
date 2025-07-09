@@ -405,7 +405,7 @@ def idk_cc_source_library(
         # to tell Bazel to not always compile the source set.
         # build_as_static = False,
         # TODO(https://fxbug.dev/425931839): Remove when no longer converting to GN.
-        public_configs = [],  # Unused in Bazel, for GN conversion only.
+        public_configs = [],  # buildifier: disable=unused-variable - For GN conversion only.
         **kwargs):
     """Defines a C++_source library that can be exported to an IDK.
 
@@ -450,7 +450,10 @@ def idk_cc_source_library(
             GN equivalent: `deps`.
         include_base: Path to the root directory for includes.
             This path will be added to the underlying library's `includes`.
-            GN note: This is a change in behavior from the GN template.
+            If the path is "//sdk", the paths to the headers will be made
+            relative to `//sdk`. Otherwise, `include_base` will be removed from
+            the header paths.
+            GN note: This preserves the behavior of the GN template.
         api_file_path: Override path for the file representing the API of this library.
             This file is used to ensure modifications to the library's API are
             explicitly acknowledged.
@@ -496,6 +499,23 @@ def idk_cc_source_library(
     hdrs_for_bazel_library = hdrs
     srcs_for_bazel_library = srcs + hdrs_for_internal_use
 
+    if include_base == "//sdk":
+        # Some libraries in //sdk/lib/<library_name>[/...] rely on that in-tree
+        # path to allow in-tree code to include `<lib/library_name/header.h>`
+        # and for the IDK destination path rather than providing that structure
+        # within the `library_name` directory. Handle this case here.
+
+        # Get the relative path from the build file's directory to `//sdk`,
+        # which is the real include base for in-tree builds.
+        path_to_this_directory = "//" + native.package_name()
+        this_directory_relative_to_sdk = paths.relativize(path_to_this_directory, "//sdk")
+        include_path = ""
+        for _ in this_directory_relative_to_sdk.split("/"):
+            include_path += "../"
+    else:
+        this_directory_relative_to_sdk = None  # Satisfy buildifier.
+        include_path = include_base
+
     # TODO(https://fxbug.dev/421888626): Apply the equivalent of GN's
     # `default_common_binary_configs` using the `copts` argument.
     # TODO(https://fxbug.dev/421888626): Add "//build/config:sdk_extra_warnings"
@@ -509,7 +529,7 @@ def idk_cc_source_library(
         # TODO(https://fxbug.dev/428229472): If we must support
         # `non_idk_implementation_deps`, include it below.
         implementation_deps = implementation_deps,
-        includes = [include_base],
+        includes = [include_path],
         linkstatic = True,
         testonly = testonly,
         visibility = visibility,
@@ -525,7 +545,12 @@ def idk_cc_source_library(
     idk_header_files_map = {}
 
     for header in hdrs_for_idk:
-        relative_destination = paths.relativize(header, include_base)
+        if include_base == "//sdk":
+            # As above, handle the special case.
+            relative_destination = paths.join(this_directory_relative_to_sdk, header)
+        else:
+            relative_destination = paths.relativize(header, include_base)
+
         destination = include_dest + "/" + relative_destination
         idk_metadata_headers.append(destination)
         idk_header_files_map |= {destination: header}

@@ -63,6 +63,7 @@ idk_molecule(
     deps = [
         ":test_submolecule",
         "//sdk/lib/magma_common:magma_common_idk",
+        "//sdk/lib/media/cpp:no_converters_idk",
         "//sdk/lib/memory_barriers:memory_barriers_idk",
     ],
 )
@@ -78,6 +79,7 @@ filegroup(
         ":test-source-set",
         ":test_source_set_dependency",
         "//sdk/lib/magma_common",
+        "//sdk/lib/media/cpp:no_converters",
         "//sdk/lib/memory_barriers",
     ],
 )
