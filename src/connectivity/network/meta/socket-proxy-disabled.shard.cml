@@ -16,7 +16,10 @@
             ],
         },
         {
-            protocol: "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+            protocol: [
+                "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+                "fuchsia.net.policy.socketproxy.FuchsiaNetworks",
+            ],
             from: "void",
             to: "#netcfg",
             availability: "optional",
@@ -26,6 +29,7 @@
         {
             protocol: [
                 "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+                "fuchsia.net.policy.socketproxy.FuchsiaNetworks",
                 "fuchsia.net.policy.socketproxy.StarnixNetworks",
             ],
             from: "void",

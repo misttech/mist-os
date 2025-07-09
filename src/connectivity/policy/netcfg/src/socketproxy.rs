@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use {
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
     fidl_fuchsia_posix_socket as fposix_socket,
 };
 
+use log::{error, info};
 use socket_proxy::{NetworkConversionError, NetworkExt, NetworkRegistryError};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use thiserror::Error;
-use todo_unused::todo_unused;
 
 use crate::InterfaceId;
 
@@ -23,20 +24,25 @@ pub struct SocketProxyState {
     networks: HashMap<InterfaceId, fnp_socketproxy::Network>,
 }
 
+#[cfg(test)]
+impl SocketProxyState {
+    pub fn default_id(&self) -> Option<InterfaceId> {
+        self.default_id.clone()
+    }
+}
+
 // Fuchsia Networks should only be added to the socketproxy when the link has a default v4 and/or
 // v6 route. The functions that propagate calls to the socketproxy prioritize maintaining a correct
 // version of local state and logging an error if the socketproxy state is not aligned.
 impl SocketProxyState {
-    #[todo_unused("https://fxbug.dev/385368910")]
     pub fn new(fuchsia_networks: fnp_socketproxy::FuchsiaNetworksProxy) -> Self {
         Self { fuchsia_networks, default_id: None, networks: HashMap::new() }
     }
 
-    #[todo_unused("https://fxbug.dev/385368910")]
-    /// Set or unset an existing Fuchsia network as the default in the socket proxy registry.
-    ///
-    /// # Errors
-    /// The network does not exist
+    // Set or unset an existing Fuchsia network as the default in the socket proxy registry.
+    //
+    // # Errors
+    // The network does not exist
     pub(crate) async fn handle_default_network(
         &mut self,
         network_id: Option<InterfaceId>,
@@ -70,7 +76,6 @@ impl SocketProxyState {
         Ok(self.fuchsia_networks.set_default(&socketproxy_network_id).await??)
     }
 
-    #[todo_unused("https://fxbug.dev/385368910")]
     /// Handle the removal of the current default network. When other Fuchsia networks exist,
     /// fallback to one of them instead, prioritizing the network with the lowest id. If no other
     /// networks exist, the Fuchsia default network will be set to None.
@@ -98,7 +103,6 @@ impl SocketProxyState {
         }
     }
 
-    #[todo_unused("https://fxbug.dev/385368910")]
     /// Add a new Fuchsia network to the socket proxy registry.
     ///
     /// # Errors
@@ -107,7 +111,6 @@ impl SocketProxyState {
         &mut self,
         properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
     ) -> Result<(), SocketProxyError> {
-        // TODO(https://fxrev.dev/385368910): Include DNS servers
         let network = fnp_socketproxy::Network::from_watcher_properties(properties)?;
         match self.networks.entry(InterfaceId(properties.id)) {
             Entry::Vacant(entry) => {
@@ -121,7 +124,6 @@ impl SocketProxyState {
         Ok(self.fuchsia_networks.add(&network).await??)
     }
 
-    #[todo_unused("https://fxbug.dev/385368910")]
     /// Remove an existing Fuchsia network in the socket proxy registry.
     ///
     /// # Errors
@@ -147,11 +149,103 @@ impl SocketProxyState {
 
         Ok(self.fuchsia_networks.remove(id_u32).await??)
     }
+
+    // Handle an existing interface that no longer meets the criteria to be provided
+    // to the socketproxy. For example, if the interface lost its default routes or
+    // was `Removed`.
+    pub(crate) async fn handle_interface_no_longer_candidate(&mut self, id: InterfaceId) {
+        let default_id = self.default_id;
+        // Ensure that the network is unset as the default first
+        // prior to removing it.
+        if default_id == Some(id) {
+            match self.handle_default_network_removal().await {
+                Ok(Some(id)) => {
+                    info!(
+                        "Successfully updated default network in socketproxy. \
+                        Default id was {default_id:?}, is now {id}"
+                    );
+                }
+                Ok(None) => {
+                    info!(
+                        "Successfully unset default network in socketproxy. \
+                        No backup network available to fallback"
+                    );
+                }
+                Err(e) => {
+                    // Even with this error, still attempt to remove the network
+                    // in case there is some misaligned state.
+                    error!(
+                        "Failed to reset default network in socketproxy. \
+                        Default id was {default_id:?}; {e:?}"
+                    );
+                }
+            }
+        }
+
+        match self.handle_remove_network(id).await {
+            Ok(()) => {}
+            Err(SocketProxyError::RemovedNonexistentNetwork(_)) => {
+                // It is possible that the interface got removed before
+                // it met the conditions to be added to the socketproxy.
+            }
+            Err(e) => {
+                error!(
+                    "Failed to remove network with id ({id}) \
+                from socketproxy; {e:?}"
+                );
+            }
+        }
+    }
+
+    // Handle a new interface newly meeting the criteria to be provided to the socketproxy.
+    pub(crate) async fn handle_interface_new_candidate(
+        &mut self,
+        properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
+    ) {
+        let add_result = self.handle_add_network(properties).await;
+        let set_default_result = match add_result {
+            // When the new network is added successfully, attempt to set it as the
+            // default network if one does not exist already.
+            Ok(()) => match self.default_id {
+                Some(_) => None,
+                None => Some(self.handle_default_network(Some(InterfaceId(properties.id))).await),
+            },
+            Err(_) => None,
+        };
+
+        match (add_result, set_default_result) {
+            (Ok(()), Some(Ok(()))) => info!(
+                "Successfully added online Fuchsia network ({:?}) \
+            to socketproxy and set it as default",
+                properties.id
+            ),
+            (Ok(()), None) => info!(
+                "Successfully added Fuchsia network ({:?}) \
+            to socketproxy but did not attempt to set default, \
+            it might already be set",
+                properties.id
+            ),
+            (Ok(()), Some(Err(e))) => error!(
+                "Sucessfully added online Fuchsia network ({:?}) \
+            to socketproxy but failed to set default; {e:?}",
+                properties.id
+            ),
+            (Err(e), None) => error!(
+                "Failed to add online Fuchsia network ({:?}) to \
+            socketproxy state; {e:?}",
+                properties.id
+            ),
+            (Err(_), Some(Ok(()))) | (Err(_), Some(Err(_))) => panic!(
+                "State not possible for id ({:?}); set_default is never \
+            called when add has an error",
+                properties.id
+            ),
+        };
+    }
 }
 
-#[todo_unused("https://fxbug.dev/385368910")]
-// Errors produced when maintaining registry state or communicating
-// updates to the socket proxy.
+/// Errors produced when maintaining registry state or communicating
+/// updates to the socket proxy.
 #[derive(Clone, Debug, Error)]
 pub enum SocketProxyError {
     #[error("Error adding network that already exists: {0:?}")]
@@ -187,6 +281,74 @@ impl From<fnp_socketproxy::NetworkRegistryRemoveError> for SocketProxyError {
 impl From<fnp_socketproxy::NetworkRegistrySetDefaultError> for SocketProxyError {
     fn from(error: fnp_socketproxy::NetworkRegistrySetDefaultError) -> Self {
         SocketProxyError::NetworkRegistry(NetworkRegistryError::SetDefault(error))
+    }
+}
+
+// Using the interface's current v4/v6 default route properties and v4/v6 default route
+// properties provided through `fnet_interfaces_ext::Event::Changed`, determine
+// whether the interface gained or lost candidacy because of the event, or maintained
+// the same state.
+//
+// Returns None when the candidacy has not changed, Some(true) when the interface
+// gains candidacy, and Some(false) when the interface loses candidacy.
+pub(crate) fn determine_interface_state_changed(
+    prev: &fnet_interfaces::Properties,
+    curr: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
+) -> Option<bool> {
+    let was_candidate = (prev.has_default_ipv4_route.unwrap_or(curr.has_default_ipv4_route)
+        || prev.has_default_ipv6_route.unwrap_or(curr.has_default_ipv6_route))
+        && prev.online.unwrap_or(curr.online);
+    let is_candidate = (curr.has_default_ipv4_route || curr.has_default_ipv6_route) && curr.online;
+    (is_candidate != was_candidate).then_some(is_candidate)
+}
+
+#[cfg(test)]
+pub(crate) mod socketproxy_utils {
+    use futures::{FutureExt as _, StreamExt as _};
+
+    use super::*;
+
+    pub(crate) async fn respond_to_socketproxy(
+        socket_proxy_req_stream: &mut fnp_socketproxy::FuchsiaNetworksRequestStream,
+        result: Result<(), SocketProxyError>,
+    ) {
+        socket_proxy_req_stream
+            .next()
+            .map(|req| match req.expect("request stream ended").expect("receive request") {
+                fnp_socketproxy::FuchsiaNetworksRequest::SetDefault {
+                    network_id: _,
+                    responder,
+                } => {
+                    let res = result.map_err(|e| match e {
+                        SocketProxyError::NetworkRegistry(NetworkRegistryError::SetDefault(
+                            err,
+                        )) => err,
+                        _ => unreachable!("should have been SetDefault error variant"),
+                    });
+                    responder.send(res).expect("respond to SetDefault");
+                }
+                fnp_socketproxy::FuchsiaNetworksRequest::Add { network: _, responder } => {
+                    let res = result.map_err(|e| match e {
+                        SocketProxyError::NetworkRegistry(NetworkRegistryError::Add(err)) => err,
+                        _ => unreachable!("should have been Add error variant"),
+                    });
+                    responder.send(res).expect("respond to Add");
+                }
+                fnp_socketproxy::FuchsiaNetworksRequest::Update { network: _, responder: _ } => {
+                    unreachable!("FuchsiaNetworks has no network properties to update")
+                }
+                fnp_socketproxy::FuchsiaNetworksRequest::Remove { network_id: _, responder } => {
+                    let res = result.map_err(|e| match e {
+                        SocketProxyError::NetworkRegistry(NetworkRegistryError::Remove(err)) => err,
+                        _ => unreachable!("should have been Remove error variant"),
+                    });
+                    responder.send(res).expect("respond to Remove");
+                }
+                fnp_socketproxy::FuchsiaNetworksRequest::CheckPresence { responder: _ } => {
+                    unreachable!("not called in tests");
+                }
+            })
+            .await;
     }
 }
 

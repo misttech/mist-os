@@ -62,6 +62,10 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.net.policy.socketproxy.FuchsiaNetworks",
+            availability: "optional",
+        },
+        {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
             // been migrated to services. The service capability has been added below.
             directory: "dev-class-network",

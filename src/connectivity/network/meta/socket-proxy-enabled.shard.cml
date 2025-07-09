@@ -29,7 +29,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.net.policy.socketproxy.DnsServerWatcher" ],
+            protocol: [
+                "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+                "fuchsia.net.policy.socketproxy.FuchsiaNetworks",
+            ],
             from: "#socket-proxy",
             to: [ "#netcfg" ],
         },
@@ -38,6 +41,7 @@
         {
             protocol: [
                 "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+                "fuchsia.net.policy.socketproxy.FuchsiaNetworks",
                 "fuchsia.net.policy.socketproxy.StarnixNetworks",
             ],
             from: "#socket-proxy",
