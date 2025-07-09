@@ -40,6 +40,8 @@ use vfs::ToObjectRequest;
 /// Timeout for opening a service capability when aggregating.
 const OPEN_SERVICE_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
+const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::Flags::PROTOCOL_DIRECTORY);
+
 /// Represents a routed service capability from an anonymized aggregate defined in a component.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct AnonymizedServiceRoute {
@@ -368,12 +370,11 @@ impl AnonymizedAggregateServiceDir {
                 for segment in capability.source_path().unwrap().iter_segments() {
                     let (proxy, server_end) =
                         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-                    let flags = fio::OpenFlags::DIRECTORY;
-                    let mut object_request = flags.to_object_request(server_end);
+                    let mut object_request = FLAGS.to_object_request(server_end);
                     source_component
                         .open_outgoing(OpenRequest::new(
                             source_component.execution_scope.clone(),
-                            flags,
+                            FLAGS,
                             cur_path.to_string().try_into().map_err(|_| ModelError::BadPath)?,
                             &mut object_request,
                         ))
@@ -520,12 +521,9 @@ impl AnonymizedAggregateServiceDir {
             }
             RouterResponse::Debug(_) => panic!("we didn't ask for a debug route"),
         };
-        dir_entry.open(
-            scope.clone(),
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            server_end.into_channel(),
-        );
+        FLAGS.to_object_request(server_end.into_channel()).handle(|request| {
+            dir_entry.open_entry(OpenRequest::new(scope.clone(), FLAGS, vfs::Path::dot(), request))
+        });
 
         let watcher = fuchsia_fs::directory::Watcher::new(&proxy)
             .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || {
@@ -869,14 +867,11 @@ mod tests {
     use cm_rust::*;
     use cm_rust_testing::*;
     use errors::OpenError;
-    use fidl::endpoints::ServerEnd;
     use futures::FutureExt;
     use maplit::hashmap;
     use proptest::prelude::*;
     use rand::SeedableRng;
     use std::collections::HashSet;
-    use vfs::directory::entry_container::Directory;
-    use vfs::path::Path;
     use vfs::pseudo_directory;
 
     #[derive(Clone)]
@@ -928,15 +923,14 @@ mod tests {
                 async move {
                     let component = weak_component.upgrade().map_err(RoutingError::from)?;
                     let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-                    let flags = fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE;
-                    let mut object_request = flags.to_object_request(server);
+                    let mut object_request = FLAGS.to_object_request(server);
                     CapabilityOpenRequest::new_from_route_source(
                         RouteSource { source: source.clone(), relative_path: Default::default() },
                         &component,
                         OpenRequest::new(
                             component.execution_scope.clone(),
-                            flags,
-                            Path::dot(),
+                            FLAGS,
+                            vfs::Path::dot(),
                             &mut object_request,
                         ),
                     )
@@ -957,19 +951,6 @@ mod tests {
         async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
             Ok(self.instances.lock().await.keys().cloned().collect())
         }
-    }
-
-    fn open_dir(execution_scope: ExecutionScope, dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
-        dir.deprecated_open(
-            execution_scope,
-            fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server_end.into_channel()),
-        );
-
-        dir_proxy
     }
 
     fn create_test_component_decls() -> Vec<(&'static str, ComponentDecl)> {
@@ -1148,8 +1129,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_anonymized_service_directory() {
         let (test, dir_arc) = create_anonymized_service_test_realm(true).await;
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
 
         // List the entries of the directory served by `open`, and compare them to the
         // internal state.
@@ -1307,8 +1287,7 @@ mod tests {
         root.hooks.install(dir_arc.hooks()).await;
         dir_arc.add_entries_from_children().await.unwrap();
 
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
 
         // Ensure the instance we had initially in "bar" is there.
         let entries = dir_arc.entries().await.len();
@@ -1452,8 +1431,7 @@ mod tests {
 
         // Initialize the aggregate. There are no components yet so it will be empty.
         dir_arc.add_entries_from_children().await.unwrap();
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
         let entries = dir_arc.entries().await.len();
         assert_eq!(entries, 0);
         let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
@@ -1563,8 +1541,7 @@ mod tests {
         ));
         root.hooks.install(dir_arc.hooks()).await;
 
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
 
         // Ensure we are starting with 0 entries.
         let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
@@ -1772,8 +1749,7 @@ mod tests {
 
         root.hooks.install(dir.hooks()).await;
 
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry().await);
 
         // List the entries of the directory served by `open`, and compare them to the
         // internal state.
@@ -1843,8 +1819,7 @@ mod tests {
     async fn test_anonymized_service_directory_component_started() {
         let (test, dir_arc) = create_anonymized_service_test_realm(false).await;
 
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
 
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
         let instance_names: HashSet<String> = entries.iter().map(|d| d.name.clone()).collect();
@@ -1882,8 +1857,7 @@ mod tests {
     async fn test_anonymized_service_directory_component_stopped() {
         let (test, dir_arc) = create_anonymized_service_test_realm(true).await;
 
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir_arc.dir_entry().await);
 
         // List the entries of the directory served by `open`.
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
@@ -1964,8 +1938,7 @@ mod tests {
 
         dir.add_entries_from_children().await.unwrap();
         // Entries from foo should be available even though we can't route to bar
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry().await);
 
         // List the entries of the directory served by `open`.
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
@@ -2036,8 +2009,7 @@ mod tests {
 
         dir.add_entries_from_children().await.unwrap();
 
-        let execution_scope = ExecutionScope::new();
-        let dir_proxy = open_dir(execution_scope.clone(), dir.dir_entry().await);
+        let dir_proxy = vfs::directory::serve_read_only(dir.dir_entry().await);
 
         let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
 
