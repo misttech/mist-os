@@ -563,7 +563,7 @@ void LogBuffer::WriteKeyValue(std::string_view key, bool value) {
   encoder.AppendArgumentValue(*state, value);
 }
 
-bool LogBuffer::FlushRecord() {
+bool LogBuffer::FlushRecord(FlushConfig flush_config) {
   EndRecord();
   auto* state = RecordState::CreatePtr(&data_);
   if (!state->encode_success) {
@@ -572,8 +572,27 @@ bool LogBuffer::FlushRecord() {
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);
   auto slice = external_buffer.GetSlice();
-  auto status =
-      state->socket->write(0, slice.data(), slice.slice().ToByteOffset().unsafe_get(), nullptr);
+  zx_status_t status;
+  while (true) {
+    status =
+        state->socket->write(0, slice.data(), slice.slice().ToByteOffset().unsafe_get(), nullptr);
+    if (status != ZX_ERR_SHOULD_WAIT || !flush_config.block_if_full) {
+      break;
+    }
+    zx_signals_t observed;
+    status = state->socket->wait_one(ZX_SOCKET_WRITABLE | ZX_SOCKET_PEER_CLOSED,
+                                     zx::time::infinite(), &observed);
+    if (status != ZX_OK) {
+      break;
+    }
+    if (observed & ZX_SOCKET_PEER_CLOSED) {
+      status = ZX_ERR_PEER_CLOSED;
+      break;
+    }
+    if (!(observed & ZX_SOCKET_WRITABLE)) {
+      continue;
+    }
+  }
 
   return status != ZX_ERR_BAD_STATE && status != ZX_ERR_PEER_CLOSED;
 }
