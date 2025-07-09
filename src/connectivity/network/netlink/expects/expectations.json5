@@ -9,6 +9,7 @@
                 "*",
             ],
         },
+
         // These are tests that excercise panic or other error conditions which
         // trigger error logs.
         {
@@ -21,6 +22,9 @@
                 "interfaces::tests::test_set_link::enable_fails",
                 "routes::tests::test_new_del_route_failed::*",
                 "routes::tests::test_new_del_route::v[46]_del_failed_attempt_to_delete_route_from_global_set",
+                "routes::tests::handles_duplicate_route_watcher_event_v[46]",
+                "routes::tests::handles_unknown_route_watcher_event_v[46]",
+                "routes::tests::handles_remove_nonexisting_route_watcher_event_v[46]",
             ],
         },
     ],

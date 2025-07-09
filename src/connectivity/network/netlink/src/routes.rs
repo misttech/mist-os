@@ -38,7 +38,6 @@ use netlink_packet_utils::nla::Nla;
 use netlink_packet_utils::DecodeError;
 
 use crate::client::{ClientTable, InternalClient};
-use crate::errors::WorkerInitializationError;
 use crate::logging::{log_debug, log_error, log_warn};
 use crate::messaging::Sender;
 use crate::multicast_groups::ModernGroup;
@@ -258,28 +257,6 @@ fn get_table_u8_and_nla_from_key(table: RouteTableKey) -> (u8, Option<RouteAttri
     }
 }
 
-/// FIDL errors from the routes worker.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum RoutesFidlError {
-    /// Error while getting route event stream from state.
-    #[error("watcher creation: {0}")]
-    WatcherCreation(fnet_routes_ext::WatcherCreationError),
-    /// Error while route watcher stream.
-    #[error("watch: {0}")]
-    Watch(fnet_routes_ext::WatchError),
-}
-
-/// Netstack errors from the routes worker.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum RoutesNetstackError<I: Ip> {
-    /// Event stream ended unexpectedly.
-    #[error("event stream ended")]
-    EventStreamEnded,
-    /// Unexpected event was received from routes watcher.
-    #[error("unexpected event: {0:?}")]
-    UnexpectedEvent(fnet_routes_ext::Event<I>),
-}
-
 /// A subset of `RouteRequestArgs`, containing only `Request` types that can be pending.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PendingRouteRequestArgs<I: Ip> {
@@ -303,40 +280,32 @@ pub(crate) struct PendingRouteRequest<
 impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
     RoutesWorker<I>
 {
+    /// Create the Netlink Routes Worker.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an unexpected error is encountered on one of the FIDL
+    /// connections with the Netstack.
     pub(crate) async fn create(
         main_route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
         routes_state_proxy: &<I::StateMarker as ProtocolMarker>::Proxy,
         route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
-    ) -> Result<
-        (
-            Self,
-            RouteTableMap<I>,
-            impl futures::Stream<
-                    Item = Result<fnet_routes_ext::Event<I>, fnet_routes_ext::WatchError>,
-                > + Unpin
-                + 'static,
-        ),
-        WorkerInitializationError<RoutesFidlError, RoutesNetstackError<I>>,
-    > {
-        let mut route_event_stream =
-            Box::pin(fnet_routes_ext::event_stream_from_state(routes_state_proxy).map_err(
-                |e| WorkerInitializationError::Fidl(RoutesFidlError::WatcherCreation(e)),
-            )?);
+    ) -> (
+        Self,
+        RouteTableMap<I>,
+        impl futures::Stream<Item = Result<fnet_routes_ext::Event<I>, fnet_routes_ext::WatchError>>
+            + Unpin
+            + 'static,
+    ) {
+        let mut route_event_stream = Box::pin(
+            fnet_routes_ext::event_stream_from_state(routes_state_proxy)
+                .expect("connecting to fuchsia.net.routes.State FIDL should succeed"),
+        );
         let installed_routes = fnet_routes_ext::collect_routes_until_idle::<_, HashSet<_>>(
             route_event_stream.by_ref(),
         )
         .await
-        .map_err(|e| match e {
-            fnet_routes_ext::CollectRoutesUntilIdleError::ErrorInStream(e) => {
-                WorkerInitializationError::Fidl(RoutesFidlError::Watch(e))
-            }
-            fnet_routes_ext::CollectRoutesUntilIdleError::StreamEnded => {
-                WorkerInitializationError::Netstack(RoutesNetstackError::EventStreamEnded)
-            }
-            fnet_routes_ext::CollectRoutesUntilIdleError::UnexpectedEvent(event) => {
-                WorkerInitializationError::Netstack(RoutesNetstackError::UnexpectedEvent(event))
-            }
-        })?;
+        .expect("determining already installed routes should succeed");
 
         let mut fidl_route_map = FidlRouteMap::<I>::default();
         for fnet_routes_ext::InstalledRoute { route, effective_properties, table_id } in
@@ -346,12 +315,9 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                 fidl_route_map.add(route, table_id, effective_properties);
         }
 
-        // There's nothing we can do to gracefully recover from failing to get the main route
-        // table's ID, so we might as well crash.
         let main_route_table_id = fnet_routes_ext::admin::get_table_id::<I>(main_route_table)
             .await
             .expect("getting main route table ID should succeed");
-        // Same for getting a route set proxy.
         let unmanaged_route_set_proxy =
             fnet_routes_ext::admin::new_route_set::<I>(main_route_table)
                 .expect("getting unmanaged route set should succeed");
@@ -361,13 +327,16 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             unmanaged_route_set_proxy,
             route_table_provider,
         );
-        Ok((Self { fidl_route_map }, route_table_map, route_event_stream))
+        (Self { fidl_route_map }, route_table_map, route_event_stream)
     }
 
     /// Handles events observed by the route watchers by adding/removing routes
     /// from the underlying `NetlinkRouteMessage` set.
     ///
-    /// Returns a `RouteEventHandlerError` when unexpected events or HashSet issues occur.
+    /// # Panics
+    ///
+    /// Panics if an unexpected Route Watcher Event is published by the
+    /// Netstack.
     pub(crate) fn handle_route_watcher_event<
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     >(
@@ -375,7 +344,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         route_table_map: &mut RouteTableMap<I>,
         route_clients: &ClientTable<NetlinkRoute, S>,
         event: fnet_routes_ext::Event<I>,
-    ) -> Result<Option<TableNeedsCleanup>, RouteEventHandlerError<I>> {
+    ) -> Option<TableNeedsCleanup> {
         handle_route_watcher_event::<I, S>(
             route_table_map,
             &mut self.fidl_route_map,
@@ -909,20 +878,6 @@ fn routes_conflict<I: Ip>(
     destinations_match && metrics_match && tables_match
 }
 
-// Errors related to handling route events.
-#[derive(Debug, PartialEq, thiserror::Error)]
-pub(crate) enum RouteEventHandlerError<I: Ip> {
-    #[error("route watcher event handler attempted to add a route that already existed: {0:?}")]
-    AlreadyExistingRouteAddition(fnet_routes_ext::InstalledRoute<I>),
-    #[error("route watcher event handler attempted to remove a route that does not exist: {0:?}")]
-    NonExistentRouteDeletion(fnet_routes_ext::InstalledRoute<I>),
-    #[error(
-        "route watcher event handler attempted to process \
-         a route event that was not add or remove: {0:?}"
-    )]
-    NonAddOrRemoveEventReceived(fnet_routes_ext::Event<I>),
-}
-
 /// Recreates the original route from the backup route.
 ///
 /// A backup route is deprioritized by [`create_backup_route`] when added to the main table.
@@ -983,7 +938,7 @@ fn handle_route_watcher_event<
     fidl_route_map: &mut FidlRouteMap<I>,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_routes_ext::Event<I>,
-) -> Result<Option<TableNeedsCleanup>, RouteEventHandlerError<I>> {
+) -> Option<TableNeedsCleanup> {
     let (message_for_clients, table_no_routes) = match event {
         fnet_routes_ext::Event::Added(mut added_installed_route) => {
             // TODO(https://fxbug.dev/418849362): Remove once unused.
@@ -994,9 +949,10 @@ fn handle_route_watcher_event<
             match fidl_route_map.add(route, table_id, effective_properties) {
                 None => (),
                 Some(_properties) => {
-                    return Err(RouteEventHandlerError::AlreadyExistingRouteAddition(
-                        added_installed_route,
-                    ));
+                    panic!(
+                        "Netstack reported the addition of an existing route: \
+                        route={route:?}, table={table_id:?}"
+                    );
                 }
             }
 
@@ -1038,9 +994,10 @@ fn handle_route_watcher_event<
 
             let need_clean_up_empty_table = match fidl_route_map.remove(route, table_id) {
                 RouteRemoveResult::DidNotExist => {
-                    return Err(RouteEventHandlerError::NonExistentRouteDeletion(
-                        removed_installed_route,
-                    ));
+                    panic!(
+                        "Netstack reported the removal of an unknown route: \
+                        route={route:?}, table={table_id:?}"
+                    );
                 }
                 RouteRemoveResult::RemovedButTableNotEmpty(_properties) => false,
                 RouteRemoveResult::RemovedAndTableNewlyEmpty(_properties) => true,
@@ -1087,10 +1044,10 @@ fn handle_route_watcher_event<
         }
         // We don't expect to observe any existing events, because the route watchers were drained
         // of existing events prior to starting the event loop.
-        fnet_routes_ext::Event::Existing(_)
-        | fnet_routes_ext::Event::Idle
-        | fnet_routes_ext::Event::Unknown => {
-            return Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(event));
+        e @ fnet_routes_ext::Event::Existing(_)
+        | e @ fnet_routes_ext::Event::Idle
+        | e @ fnet_routes_ext::Event::Unknown => {
+            panic!("Netstack reported an unexpected route event: {e:?}");
         }
     };
     if let Some(message_for_clients) = message_for_clients {
@@ -1101,7 +1058,7 @@ fn handle_route_watcher_event<
         route_clients.send_message_to_group(message_for_clients, route_group);
     }
 
-    Ok(table_no_routes)
+    table_no_routes
 }
 
 /// A wrapper type for the netlink_packet_route `RouteMessage` to enable conversions
@@ -1521,7 +1478,6 @@ mod tests {
         fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     };
 
-    use anyhow::Error;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
@@ -1688,7 +1644,6 @@ mod tests {
         let add_event1 = fnet_routes_ext::Event::Added(installed_route1);
         let add_event2 = fnet_routes_ext::Event::Added(installed_route2);
         let remove_event = fnet_routes_ext::Event::Removed(installed_route1);
-        let unknown_event: fnet_routes_ext::Event<I> = fnet_routes_ext::Event::Unknown;
 
         let table_index = match table {
             RouteTableKey::Unmanaged => UNMANAGED_ROUTE_TABLE_INDEX,
@@ -1763,16 +1718,6 @@ mod tests {
             }
         }
 
-        // An event that is not an add or remove should result in an error.
-        assert_matches!(
-            handle_route_watcher_event(
-                &mut route_table,
-                &mut fidl_route_map,
-                &route_clients,
-                unknown_event,
-            ),
-            Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(_))
-        );
         assert_eq!(fidl_route_map.iter_messages(&route_table, table_index).count(), 0);
         assert_eq!(&right_sink.take_messages()[..], &[]);
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
@@ -1784,7 +1729,7 @@ mod tests {
                 &route_clients,
                 add_event1,
             ),
-            Ok(None)
+            None
         );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
@@ -1801,16 +1746,6 @@ mod tests {
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
-        // Adding the same route again should result in an error.
-        assert_matches!(
-            handle_route_watcher_event(
-                &mut route_table,
-                &mut fidl_route_map,
-                &route_clients,
-                add_event1,
-            ),
-            Err(RouteEventHandlerError::AlreadyExistingRouteAddition(_))
-        );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
             HashSet::from_iter([expected_route_message1.clone()])
@@ -1826,7 +1761,7 @@ mod tests {
                 &route_clients,
                 add_event2,
             ),
-            Ok(None)
+            None
         );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
@@ -1850,7 +1785,7 @@ mod tests {
                 &route_clients,
                 remove_event,
             ),
-            Ok(None)
+            None
         );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
@@ -1865,16 +1800,6 @@ mod tests {
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
-        // Removing a route that doesn't exist should result in an error.
-        assert_matches!(
-            handle_route_watcher_event(
-                &mut route_table,
-                &mut fidl_route_map,
-                &route_clients,
-                remove_event,
-            ),
-            Err(RouteEventHandlerError::NonExistentRouteDeletion(_))
-        );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
             HashSet::from_iter([expected_route_message2.clone()])
@@ -1883,6 +1808,113 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
         drop(route_clients);
         scope.join().await;
+    }
+
+    #[ip_test(I)]
+    #[fuchsia::test]
+    #[should_panic(expected = "Netstack reported an unexpected route event")]
+    async fn handles_unknown_route_watcher_event<
+        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >() {
+        let (route_table_proxy, _route_table_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (unmanaged_route_set_proxy, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
+        let (route_table_provider, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
+        let mut route_table = RouteTableMap::new(
+            route_table_proxy.clone(),
+            MAIN_FIDL_TABLE_ID,
+            unmanaged_route_set_proxy,
+            route_table_provider,
+        );
+        let mut fidl_route_map = FidlRouteMap::<I>::default();
+        let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
+
+        // Receiving an unknown event should result in a panic.
+        let _ = handle_route_watcher_event(
+            &mut route_table,
+            &mut fidl_route_map,
+            &route_clients,
+            fnet_routes_ext::Event::Unknown,
+        );
+    }
+
+    #[ip_test(I)]
+    #[fuchsia::test]
+    #[should_panic(expected = "Netstack reported the addition of an existing route")]
+    async fn handles_duplicate_route_watcher_event<
+        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >() {
+        let (subnet, next_hop) =
+            I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
+        let table_id = MAIN_FIDL_TABLE_ID;
+        let installed_route: fnet_routes_ext::InstalledRoute<I> =
+            create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1, table_id);
+
+        let (route_table_proxy, _route_table_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (unmanaged_route_set_proxy, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
+        let (route_table_provider, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
+        let mut route_table = RouteTableMap::new(
+            route_table_proxy.clone(),
+            MAIN_FIDL_TABLE_ID,
+            unmanaged_route_set_proxy,
+            route_table_provider,
+        );
+        let mut fidl_route_map = FidlRouteMap::<I>::default();
+        let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
+
+        // Receiving an add route event multiple times should result in a panic.
+        for _ in 0..2 {
+            assert_eq!(
+                handle_route_watcher_event(
+                    &mut route_table,
+                    &mut fidl_route_map,
+                    &route_clients,
+                    fnet_routes_ext::Event::Added(installed_route),
+                ),
+                None
+            );
+        }
+    }
+
+    #[ip_test(I)]
+    #[fuchsia::test]
+    #[should_panic(expected = "Netstack reported the removal of an unknown route")]
+    async fn handles_remove_nonexisting_route_watcher_event<
+        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >() {
+        let (subnet, next_hop) =
+            I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
+        let table_id = MAIN_FIDL_TABLE_ID;
+        let installed_route: fnet_routes_ext::InstalledRoute<I> =
+            create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1, table_id);
+
+        let (route_table_proxy, _route_table_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (unmanaged_route_set_proxy, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
+        let (route_table_provider, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
+        let mut route_table = RouteTableMap::new(
+            route_table_proxy.clone(),
+            MAIN_FIDL_TABLE_ID,
+            unmanaged_route_set_proxy,
+            route_table_provider,
+        );
+        let mut fidl_route_map = FidlRouteMap::<I>::default();
+        let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
+
+        // Receiving a remove event for an unknown route should result in a panic.
+        let _ = handle_route_watcher_event(
+            &mut route_table,
+            &mut fidl_route_map,
+            &route_clients,
+            fnet_routes_ext::Event::Removed(installed_route),
+        );
     }
 
     #[ip_test(I, test = false)]
@@ -2005,7 +2037,7 @@ mod tests {
                 &route_clients,
                 add_events1[0],
             ),
-            Ok(None)
+            None
         );
 
         // Shouldn't be counted yet, as we haven't seen the route added to its own table yet.
@@ -2025,7 +2057,7 @@ mod tests {
                 &route_clients,
                 add_events1[1],
             ),
-            Ok(None)
+            None
         );
 
         // Now the route should have been added.
@@ -2058,7 +2090,7 @@ mod tests {
                 &route_clients,
                 add_event2,
             ),
-            Ok(None)
+            None
         );
 
         // Should also contain the route from before.
@@ -2094,7 +2126,7 @@ mod tests {
                 &route_clients,
                 remove_event,
             ),
-            Ok(Some(TableNeedsCleanup(OTHER_FIDL_TABLE_ID, MANAGED_ROUTE_TABLE_INDEX)))
+            Some(TableNeedsCleanup(OTHER_FIDL_TABLE_ID, MANAGED_ROUTE_TABLE_INDEX))
         );
         assert_eq!(
             &fidl_route_map
@@ -2480,19 +2512,6 @@ mod tests {
         }
     }
 
-    fn setup<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>(
-    ) -> Setup<
-        impl Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
-        impl Stream<
-            Item = (
-                fnet_routes_ext::TableId,
-                <<I::RouteSetMarker as ProtocolMarker>::RequestStream as Stream>::Item,
-            ),
-        >,
-    > {
-        setup_with_route_clients::<I>(ClientTable::default())
-    }
-
     async fn respond_to_watcher<
         I: fnet_routes_ext::FidlRouteIpExt,
         S: Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
@@ -2530,51 +2549,13 @@ mod tests {
             .await;
     }
 
-    async fn respond_to_watcher_with_routes<
-        I: fnet_routes_ext::FidlRouteIpExt,
-        S: Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
-    >(
-        stream: S,
-        existing_routes: impl IntoIterator<Item = fnet_routes_ext::InstalledRoute<I>>,
-        new_event: Option<fnet_routes_ext::Event<I>>,
-    ) {
-        let events = existing_routes
-            .into_iter()
-            .map(|route| fnet_routes_ext::Event::<I>::Existing(route))
-            .chain(std::iter::once(fnet_routes_ext::Event::<I>::Idle))
-            .chain(new_event)
-            .map(|event| event.try_into().unwrap());
-
-        respond_to_watcher::<I, _>(stream, events).await;
-    }
-
-    #[test_case(V4_SUB1, V4_NEXTHOP1)]
-    #[test_case(V6_SUB1, V6_NEXTHOP1)]
-    #[fuchsia::test]
-    async fn test_event_loop_event_errors<A: IpAddress>(subnet: Subnet<A>, next_hop: A)
-    where
-        A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    {
-        let route = create_installed_route(
-            subnet,
-            Some(next_hop),
-            DEV1.into(),
-            METRIC1,
-            MAIN_FIDL_TABLE_ID,
-        );
-
-        event_loop_errors_stream_ended_helper::<A::Version>(route).await;
-        event_loop_errors_existing_after_add_helper::<A::Version>(route).await;
-        event_loop_errors_duplicate_adds_helper::<A::Version>(route).await;
-    }
-
     async fn run_event_loop<I: Ip>(
         inputs: crate::eventloop::EventLoopInputs<
             FakeInterfacesHandler,
             FakeSender<RouteNetlinkMessage>,
             OnlyRoutes,
         >,
-    ) -> Result<Never, Error> {
+    ) -> Never {
         let included_workers = match I::VERSION {
             IpVersion::V4 => crate::eventloop::IncludedWorkers {
                 routes_v4: EventLoopComponent::Present(()),
@@ -2594,129 +2575,8 @@ mod tests {
             },
         };
 
-        let event_loop = inputs.initialize(included_workers).await?;
+        let event_loop = inputs.initialize(included_workers).await;
         event_loop.run().await
-    }
-
-    async fn event_loop_errors_stream_ended_helper<
-        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    >(
-        route: fnet_routes_ext::InstalledRoute<I>,
-    ) {
-        let Setup {
-            event_loop_inputs,
-            watcher_stream,
-            route_sets: route_set_stream,
-            interfaces_request_stream: _,
-            request_sink: _,
-            async_work_sink: _,
-        } = setup::<I>();
-        let event_loop_fut = pin!(run_event_loop::<I>(event_loop_inputs));
-        let watcher_fut = pin!(respond_to_watcher_with_routes(watcher_stream, [route], None));
-        // We don't expect to handle any route set requests, but we still need to drain this stream
-        // so that we handle GetTableId requests.
-        let drain_route_sets_fut =
-            pin!(route_set_stream.for_each(|(_table_id, _route_set_request)| async move {
-                panic!("not actually handling any route set requests")
-            }));
-
-        let (err, (), ()) =
-            futures::future::join3(event_loop_fut, watcher_fut, drain_route_sets_fut).await;
-
-        match I::VERSION {
-            IpVersion::V4 => {
-                assert_matches!(
-                    err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
-                    crate::eventloop::EventStreamError::RoutesV4(
-                        fnet_routes_ext::WatchError::Fidl(fidl::Error::ClientChannelClosed { .. })
-                    )
-                );
-            }
-            IpVersion::V6 => {
-                assert_matches!(
-                    err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
-                    crate::eventloop::EventStreamError::RoutesV6(
-                        fnet_routes_ext::WatchError::Fidl(fidl::Error::ClientChannelClosed { .. })
-                    )
-                );
-            }
-        }
-    }
-
-    async fn event_loop_errors_existing_after_add_helper<
-        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    >(
-        route: fnet_routes_ext::InstalledRoute<I>,
-    ) {
-        let Setup {
-            event_loop_inputs,
-            watcher_stream,
-            route_sets: route_set_stream,
-            interfaces_request_stream: _,
-            request_sink: _,
-            async_work_sink: _,
-        } = setup::<I>();
-        let event_loop_fut = pin!(run_event_loop::<I>(event_loop_inputs));
-        let routes_existing = [route.clone()];
-        let new_event = fnet_routes_ext::Event::Existing(route.clone());
-        let watcher_fut =
-            pin!(respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event)));
-        // We don't expect to handle any route set requests, but we still need to drain this stream
-        // so that we handle GetTableId requests.
-        let drain_route_sets_fut =
-            pin!(route_set_stream.for_each(|(_table_id, _route_set_request)| async move {
-                panic!("not actually handling any route set requests")
-            }));
-
-        let (err, (), ()) =
-            futures::future::join3(event_loop_fut, watcher_fut, drain_route_sets_fut).await;
-
-        assert_matches!(
-            err.unwrap_err().downcast::<RouteEventHandlerError<I>>().unwrap(),
-            RouteEventHandlerError::NonAddOrRemoveEventReceived(
-                fnet_routes_ext::Event::Existing(res)
-            ) => {
-                assert_eq!(res, route);
-            }
-        );
-    }
-
-    async fn event_loop_errors_duplicate_adds_helper<
-        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    >(
-        route: fnet_routes_ext::InstalledRoute<I>,
-    ) {
-        let Setup {
-            event_loop_inputs,
-            watcher_stream,
-            route_sets: route_set_stream,
-            interfaces_request_stream: _,
-            request_sink: _,
-            async_work_sink: _,
-        } = setup::<I>();
-        let event_loop_fut = pin!(run_event_loop::<I>(event_loop_inputs));
-        let routes_existing = [route.clone()];
-        let new_event = fnet_routes_ext::Event::Added(route.clone());
-        let watcher_fut =
-            pin!(respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event)));
-        // We don't expect to handle any route set requests, but we still need to drain this stream
-        // so that we handle GetTableId requests.
-        let drain_route_sets_fut =
-            pin!(route_set_stream.for_each(|(_table_id, _route_set_request)| async move {
-                panic!("not actually handling any route set requests")
-            }));
-
-        let (err, (), ()) =
-            futures::future::join3(event_loop_fut, watcher_fut, drain_route_sets_fut).await;
-
-        assert_matches!(
-            err.unwrap_err().downcast::<RouteEventHandlerError<I>>().unwrap(),
-            RouteEventHandlerError::AlreadyExistingRouteAddition(
-                res
-            ) => {
-                assert_eq!(res, route);
-            }
-        );
     }
 
     fn get_test_route_events_new_route_args<A: IpAddress>(
@@ -2841,14 +2701,7 @@ mod tests {
                 route_clients
             });
 
-            let mut event_loop_fut = pin!(run_event_loop::<A::Version>(event_loop_inputs)
-                .map(|res| match res {
-                    Err(e) => {
-                        log_debug!("event_loop_fut exiting with error {:?}", e);
-                        Err::<std::convert::Infallible, _>(e)
-                    }
-                })
-                .fuse());
+            let mut event_loop_fut = pin!(run_event_loop::<A::Version>(event_loop_inputs).fuse());
 
             let watcher_stream_fut = respond_to_watcher::<A::Version, _>(
                 watcher_stream.by_ref(),
@@ -4991,10 +4844,9 @@ mod tests {
 
                 futures::select! {
                     () = main_route_table_fut => unreachable!(),
-                    (event_loop_result, ()) = futures::future::join(
-                            event_loop_fut, watcher_fut) => {
-                        event_loop_result.expect("should not get error")
-                    }
+                    (event_loop, ()) = futures::future::join(
+                        event_loop_fut, watcher_fut
+                    ) => event_loop,
                 }
             };
 
@@ -5039,10 +4891,7 @@ mod tests {
             // Run the event loop and observe the new table get created and the
             // route set requests go out.
             let (mut route_table_stream, mut route_set_stream) = {
-                let event_loop_fut = event_loop
-                    .run_one_step_in_tests()
-                    .map(|result| result.expect("event loop should not hit error"))
-                    .fuse();
+                let event_loop_fut = event_loop.run_one_step_in_tests().fuse();
                 let route_table_fut = async {
                     let server_end = match I::into_route_table_provider_request(
                         route_table_provider_stream
@@ -5132,8 +4981,8 @@ mod tests {
             {
                 let event_loop_fut = async {
                     // Handling two events, so run two steps.
-                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
-                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
+                    event_loop.run_one_step_in_tests().await;
+                    event_loop.run_one_step_in_tests().await;
                 }
                 .fuse();
                 let watcher_fut = async {
@@ -5220,10 +5069,7 @@ mod tests {
 
             // Observe and handle the removal requests.
             {
-                let event_loop_fut = event_loop
-                    .run_one_step_in_tests()
-                    .map(|result| result.expect("event loop should not hit error"))
-                    .fuse();
+                let event_loop_fut = event_loop.run_one_step_in_tests().fuse();
                 let route_set_fut = async {
                     let request = I::into_route_set_request_result(
                         route_set_stream.next().await.expect("should not have ended"),
@@ -5267,8 +5113,8 @@ mod tests {
             {
                 let event_loop_fut = async {
                     // Handling two events, so run two steps.
-                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
-                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
+                    event_loop.run_one_step_in_tests().await;
+                    event_loop.run_one_step_in_tests().await;
                 }
                 .fuse();
                 let watcher_fut = async {
