@@ -198,7 +198,7 @@ mod test {
 
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
-            .add_chunk(DataSource::Buffer(data))
+            .add_source(DataSource::Buffer(data))
             .build(&mut sparse_file)
             .expect("Build sparse image failed");
         sparse_file.seek(SeekFrom::Start(0)).unwrap();
@@ -229,7 +229,7 @@ mod test {
 
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
-            .add_chunk(DataSource::Buffer(data))
+            .add_source(DataSource::Buffer(data))
             .build(&mut sparse_file)
             .expect("Build sparse image failed");
         sparse_file.seek(SeekFrom::Start(0)).unwrap();
@@ -274,7 +274,7 @@ mod test {
 
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
-            .add_chunk(DataSource::Buffer(Box::new([0xffu8; 8192])))
+            .add_source(DataSource::Buffer(Box::new([0xffu8; 8192])))
             .build(&mut sparse_file)
             .expect("Build sparse image failed");
         sparse_file.seek(SeekFrom::Start(0)).unwrap();
@@ -308,11 +308,11 @@ mod test {
 
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
-            .add_chunk(DataSource::Buffer(Box::new([0xffu8; 8192])))
-            .add_chunk(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
-            .add_chunk(DataSource::Skip(16384))
-            .add_chunk(DataSource::Fill(0xaaaa_aaaau32, 1024))
-            .add_chunk(DataSource::Skip(4096))
+            .add_source(DataSource::Buffer(Box::new([0xffu8; 8192])))
+            .add_source(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
+            .add_source(DataSource::Skip(16384))
+            .add_source(DataSource::Fill(0xaaaa_aaaau32, 1024))
+            .add_source(DataSource::Skip(4096))
             .build(&mut sparse_file)
             .expect("Build sparse image failed");
         sparse_file.seek(SeekFrom::Start(0)).unwrap();
@@ -353,11 +353,11 @@ mod test {
 
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
-            .add_chunk(DataSource::Buffer(Box::new([0xffu8; 8192])))
-            .add_chunk(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
-            .add_chunk(DataSource::Skip(16384))
-            .add_chunk(DataSource::Fill(0x0102_0304u32, 1024))
-            .add_chunk(DataSource::Skip(4096))
+            .add_source(DataSource::Buffer(Box::new([0xffu8; 8192])))
+            .add_source(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
+            .add_source(DataSource::Skip(16384))
+            .add_source(DataSource::Fill(0x0102_0304u32, 1024))
+            .add_source(DataSource::Skip(4096))
             .build(&mut sparse_file)
             .expect("Build sparse image failed");
         sparse_file.seek(SeekFrom::Start(0)).unwrap();
