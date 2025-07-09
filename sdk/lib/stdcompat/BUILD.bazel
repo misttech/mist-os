@@ -45,6 +45,7 @@ idk_cc_source_library(
         "include/lib/stdcompat/internal/type_traits.h",
         "include/lib/stdcompat/internal/utility.h",
     ],
+    api_area = "Kernel",
     category = "partner",
     idk_name = "stdcompat",
     stable = True,

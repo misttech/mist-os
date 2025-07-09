@@ -7,6 +7,7 @@ load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
 idk_cc_source_library(
     name = "magma_common",
     hdrs = ["include/lib/magma/magma_common_defs.h"],
+    api_area = "Graphics",
     category = "partner",
     idk_name = "magma_common",
     public_configs = [":magma_include"],

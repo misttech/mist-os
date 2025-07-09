@@ -119,6 +119,7 @@ template("zx_library") {
   unforwarded_params = [
     "include_base",
     "sdk",
+    "sdk_area",
     "sdk_headers",
     "sdk_publishable",
     "stable",

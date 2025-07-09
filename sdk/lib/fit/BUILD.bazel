@@ -25,6 +25,7 @@ idk_cc_source_library(
         "include/lib/fit/thread_safety.h",
         "include/lib/fit/traits.h",
     ],
+    api_area = "Kernel",
     category = "partner",
     idk_name = "fit",
     include_base = "include",

@@ -354,6 +354,7 @@ func TestIDKConversion(t *testing.T) {
 
 idk_cc_source_library(
 	name = "magma_common",
+	api_area = "Media",
 	category = "partner",
 	idk_name = "magma_common",
 	stable = True,
@@ -363,6 +364,7 @@ idk_cc_source_library(
 )
 `,
 			wantGN: `sdk_source_set("magma_common") {
+	sdk_area = "Media"
 	category = "partner"
 	sdk_name = "magma_common"
 	stable = true

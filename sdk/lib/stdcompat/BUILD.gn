@@ -12,6 +12,7 @@ group("tests") {
 # LINT.IfChange
 zx_library("stdcompat") {
   sdk = "source"
+  sdk_area = "Kernel"
   sdk_publishable = "partner"
   stable = true
 

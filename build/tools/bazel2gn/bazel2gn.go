@@ -83,6 +83,7 @@ var rustAttrMap = map[string]string{
 // idkAttrMap maps from attribute name in Bazel IDK rules to GN parameter names.
 // This map only includes attributes that have different names in Bazel and GN.
 var idkAttrMap = map[string]string{
+	"api_area": "sdk_area",
 	"idk_name": "sdk_name",
 }
 

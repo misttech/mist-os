@@ -108,6 +108,7 @@ _compute_atom_api = rule(
                   "mapping the destination path of a file relative to the " +
                   "IDK  root to its source file label.",
             mandatory = True,
+            allow_empty = False,
             default = {},
             allow_files = True,
         ),
@@ -126,6 +127,9 @@ _compute_atom_api = rule(
 def _create_idk_atom_impl(ctx):
     all_deps_depset = depset(direct = ctx.files.idk_deps + ctx.files.atom_build_deps)
     idk_deps = ctx.attr.idk_deps
+
+    if (not ctx.attr.api_file_path) != (not ctx.attr.api_contents_map):
+        fail("`api_file_path` and `api_contents_map` must be specified together.")
 
     return [
         DefaultInfo(files = all_deps_depset),
@@ -199,9 +203,8 @@ Possible values, from most restrictive to least restrictive:
         "api_area": attr.string(
             doc = "The API area responsible for maintaining this atom. " +
                   "See docs/contribute/governance/areas/_areas.yaml for the list of areas. " +
-                  '"Unknown" is also a valid option. By default, the area will be `null` in the build manifest.',
-            mandatory = False,
-            default = "",
+                  '"Unknown" is also a valid option.',
+            mandatory = True,
         ),
         "api_file_path": attr.string(
             doc = "Path to the file representing the API canonically exposed by this atom. " +
@@ -215,7 +218,7 @@ Possible values, from most restrictive to least restrictive:
                   "of  a file relative to the IDK root to its source file label. " +
                   "The set of files will be used to verify that the API has not changed locally. " +
                   "This is very roughly approximated by checking whether the files themselves have changed at all." +
-                  "Required when when `api_file_path` is set.",
+                  "Required and must not be empty when when `api_file_path` is set.",
             mandatory = False,
             default = {},
             allow_files = True,
@@ -249,8 +252,9 @@ Possible values, from most restrictive to least restrictive:
 )
 
 # TODO(https://fxbug.dev/417305295): Make this a symbolic macro after updating
-# to Bazel 8 and move all the args descriptions from _create_idk_atom() to here
-# and reference those definitions from _create_idk_atom().
+# to Bazel 8. Consider moving all the args descriptions from _create_idk_atom()
+# to here and reference those definitions from _create_idk_atom(). Replace
+# "Required" comments with `mandatory = True`.
 def idk_atom(
         name,
         type,
@@ -263,13 +267,13 @@ def idk_atom(
     """Generate an IDK atom and ensure proper validation of it.
 
     Args:
-        name: The name of the IDK atom target.
-        type: See _create_idk_atom().
-        stable:  See _create_idk_atom().
+        name: The name of the IDK atom target. Required.
+        type: See _create_idk_atom(). Required.
+        stable:  See _create_idk_atom(). Required.
+        testonly: Standard definition. Required.
         api_file_path: See _create_idk_atom().
         api_contents_map:  See _create_idk_atom().
         atom_build_deps:  See _create_idk_atom().
-        testonly: Standard definition.
         **kwargs: Additional arguments for the underlying atom.  See _create_idk_atom().
     """
 
@@ -374,12 +378,7 @@ idk_molecule = rule(
 )
 
 # TODO(https://fxbug.dev/417305295): Make this a symbolic macro after updating
-# to Bazel 8.
-# TODO(https://fxbug.dev/417305295): Consider the best order for arguments and
-# whether they should follow the order of arguments in the underlying rule
-# (https://bazel.build/reference/be/c-cpp#cc_library) or the results of
-# `fx format-code`, which reorders most non-common arguments alphabetically at
-# call sites.
+# to Bazel 8. Replace "Required" comments with `mandatory = True`.
 # TODO(https://fxbug.dev/428229472): When migrating "zbi-format":
 # * add `non_idk_implementation_deps` (GN equivalent: `non_sdk_deps`) argument.
 # * assert that it is only used for "//sdk/fidl/zbi:zbi.c.checked-in".
@@ -389,17 +388,17 @@ def idk_cc_source_library(
         idk_name,
         category,
         stable,
-        api_area = None,
-        api_file_path = None,
+        api_area,
+        hdrs,
+        hdrs_for_internal_use = [],
+        srcs = [],
         deps = [],
+        implementation_deps = [],
         # TODO(https://fxbug.dev/417307356): When implementing prebuilt
         # libraries, add `data = []`, which will be equivalent to GN's
         # `runtime_deps`.
-        srcs = [],
-        hdrs = [],
-        hdrs_for_internal_use = [],
-        implementation_deps = [],
         include_base = "include",
+        api_file_path = None,
         testonly = False,
         visibility = ["//visibility:private"],
         # TODO(https://fxbug.dev/417305295): Add this argument if there is a way
@@ -411,35 +410,21 @@ def idk_cc_source_library(
     """Defines a C++_source library that can be exported to an IDK.
 
     Args:
-        name: The name of the underlying `cc_library` target.
+        name: The name of the underlying `cc_library` target. Required.
             GN equivalent: `target_name`
-        idk_name: Name of the library in the IDK. Usually matches `name`.
+        idk_name: Name of the library in the IDK. Usually matches `name`. Required.
             GN equivalent: `sdk_name`
-        category: Publication level of the library in the IDK. See _create_idk_atom().
+        category: Publication level of the library in the IDK. See _create_idk_atom(). Required.
         stable: Whether this source library is stabilized.
             When true, an .api file is generated. When false, the atom is marked
-            as unstable in the final IDK.
-            Must be specified when `category` is defined
-        api_area: The API area responsible for maintaining this library.
+            as unstable in the final IDK. Required.
+        api_area: The API area responsible for maintaining this library. Required.
             GN equivalent: `sdk_area`
-        api_file_path: Override path for the file representing the API of this library.
-            This file is used to ensure modifications to the library's API are
-            explicitly acknowledged.
-            If not specified, the path will be "<idk_name>.api".
-            GN equivalent: `api`
-            Not allowed when `stable` is false.
-        deps: List of labels for other IDK elements this element publicly depends on at build time.
-            These labels must point to targets with corresponding `_create_idk_atom` targets.
-            GN equivalent: `public_deps`
-        srcs: The list of C and C++ source and header files that are processed to create the
-            library target, excluding those in `hdrs` and hdrs_for_internal_use.
-            Header files in this list can only be included by this library.
-            GN equivalent: `sources`
-            GN note: Unlike the GN template, public headers must actually be in `hdrs`.
         hdrs: The list of C and C++ header files published by this library to be directly included
             by sources in dependent rules. Does not include internal headers that are included from
             public headers but not meant to be included by dependents - see `hdrs_for_internal_use`.
             Atoms providing headers used by these headers must be included in the (public) `deps`.
+            Required and may not be empty.
             GN equivalent: `public`
             GN note: Unlike the GN template, this list does not include `hdrs_for_internal_use`.
         hdrs_for_internal_use: List of C and C++ headers included by headers in `hdrs` that are not
@@ -452,17 +437,36 @@ def idk_cc_source_library(
             GN equivalent: `sdk_headers_for_internal_use`
             GN note: Unlike the GN template where this argument specifices headers already included
             elsewhere, such headers are only listed here.
+        srcs: The list of C and C++ source and header files that are processed to create the
+            library target, excluding those in `hdrs` and hdrs_for_internal_use.
+            Header files in this list can only be included by this library.
+            GN equivalent: `sources`
+            GN note: Unlike the GN template, public headers must actually be in `hdrs`.
+        deps: List of labels for other IDK elements this element publicly depends on at build time.
+            These labels must point to targets with corresponding `_create_idk_atom` targets.
+            GN equivalent: `public_deps`
         implementation_deps: List of labels for other IDK elements this element depends on at build time.
             These labels must point to targets with corresponding `_create_idk_atom` targets.
             GN equivalent: `deps`.
         include_base: Path to the root directory for includes.
             This path will be added to the underlying library's `includes`.
             GN note: This is a change in behavior from the GN template.
+        api_file_path: Override path for the file representing the API of this library.
+            This file is used to ensure modifications to the library's API are
+            explicitly acknowledged.
+            If not specified, the path will be "<idk_name>.api".
+            GN equivalent: `api`
+            Not allowed when `stable` is false.
         testonly: Standard definition.
         visibility: Standard definition.
         public_configs: Unused in Bazel, for GN conversion only.
         **kwargs: Additional arguments for the underlying library.
     """
+
+    # TODO(https://fxbug.dev/417305295): Replace this with `allow_empty = False`
+    # when converting this macro to a symbolic macro.
+    if not hdrs:
+        fail("`hdrs` cannot be empty.")
 
     if category not in ["partner"]:
         # Other categories are only to ensure ABI compatibility and thus not
