@@ -81,6 +81,14 @@ closed protocol Device {
     strict VendorSetBusClock(struct {
         frequency_hz uint32;
     }) -> () error zx.Status;
+
+    /// Perform a vendor-specific tuning sequence. `cmd_idx` is the command that should used to
+    /// receive the tuning pattern from the device. If no vendor-specific tuning sequence is needed,
+    /// `ZX_ERR_STOP` should be returned, after which the SDHCI driver will perform tuning using the
+    /// sequence prescribed by the SDHCI specification.
+    strict VendorPerformTuning(struct {
+        cmd_idx uint32;
+    }) -> () error zx.Status;
 };
 
 service Service {

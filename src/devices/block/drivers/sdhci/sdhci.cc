@@ -932,8 +932,52 @@ zx_status_t Sdhci::SdmmcHwReset() {
   return ZX_OK;
 }
 
+zx_status_t Sdhci::PerformVendorTuningIfNeeded(uint32_t cmd_idx) {
+  // Stop waiting on the interrupt, as the controller driver may need to use it for sending tuning
+  // commands. Operations on the interrupt handler object must happen on the dispatcher it is
+  // waiting on.
+  sync_completion_t completion;
+  async::PostTask(irq_dispatcher_.async_dispatcher(), [this, &completion]() {
+    if (zx_status_t status = irq_handler_.Cancel(); status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to unbind interrupt: %s", zx_status_get_string(status));
+    }
+    sync_completion_signal(&completion);
+  });
+  sync_completion_wait(&completion, zx::duration::infinite().get());
+  sync_completion_reset(&completion);
+
+  fdf::Arena arena('SDHC');
+  fdf::WireUnownedResult result = sdhci_.buffer(arena)->VendorPerformTuning(cmd_idx);
+
+  // Resume waiting on the interrupt.
+  async::PostTask(irq_dispatcher_.async_dispatcher(), [this, &completion]() {
+    if (zx_status_t status = irq_handler_.Begin(irq_dispatcher_.async_dispatcher());
+        status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to wait on interrupt: %s", zx_status_get_string(status));
+    }
+    sync_completion_signal(&completion);
+  });
+  sync_completion_wait(&completion, zx::duration::infinite().get());
+
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to send VendorPerformTuning request: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_ok()) {
+    return ZX_OK;
+  }
+  if (result->error_value() != ZX_ERR_STOP) {
+    FDF_LOG(ERROR, "Failed to perform tuning: %s", zx_status_get_string(result->error_value()));
+  }
+  return result->error_value();
+}
+
 zx_status_t Sdhci::SdmmcPerformTuning(uint32_t cmd_idx) {
   FDF_LOG(DEBUG, "sdhci: perform tuning");
+
+  if (zx_status_t status = PerformVendorTuningIfNeeded(cmd_idx); status != ZX_ERR_STOP) {
+    return status;
+  }
 
   uint16_t blocksize;
   auto ctrl2 = HostControl2::Get().FromValue(0);
@@ -1160,12 +1204,13 @@ zx_status_t Sdhci::Init() {
     return irq_dispatcher.error_value();
   }
 
-  irq_handler_.set_object(irq_.get());
-  status = irq_handler_.Begin(irq_dispatcher_.async_dispatcher());
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to wait on interrupt: %s", zx_status_get_string(status));
-    return status;
-  }
+  async::PostTask(irq_dispatcher_.async_dispatcher(), [this, irq = irq_.get()]() {
+    irq_handler_.set_object(irq);
+    if (zx_status_t status = irq_handler_.Begin(irq_dispatcher_.async_dispatcher());
+        status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to wait on interrupt: %s", zx_status_get_string(status));
+    }
+  });
 
   // Set controller preferences
   fuchsia_hardware_sdmmc::SdmmcHostPrefs default_speed_capabilities{};

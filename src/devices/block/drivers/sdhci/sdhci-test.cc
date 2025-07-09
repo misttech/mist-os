@@ -220,6 +220,15 @@ class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
     completer.buffer(arena).ReplySuccess();
   }
 
+  void VendorPerformTuning(VendorPerformTuningRequestView request, fdf::Arena& arena,
+                           VendorPerformTuningCompleter::Sync& completer) override {
+    if (!supports_perform_tuning_) {
+      completer.buffer(arena).ReplyError(ZX_ERR_STOP);
+      return;
+    }
+    completer.buffer(arena).ReplySuccess();
+  }
+
   fuchsia_hardware_sdhci::Service::InstanceHandler GetInstanceHandler() {
     return fuchsia_hardware_sdhci::Service::InstanceHandler({
         .device = binding_group_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
@@ -236,6 +245,7 @@ class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
   }
   bool hw_reset_invoked() const { return hw_reset_invoked_; }
   void set_supports_set_bus_clock() { supports_set_bus_clock_ = true; }
+  void set_supports_perform_tuning() { supports_perform_tuning_ = true; }
 
  private:
   std::vector<zx_paddr_t> dma_paddrs_;
@@ -245,6 +255,7 @@ class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
   uint64_t dma_boundary_alignment_ = 0;
   bool hw_reset_invoked_ = false;
   bool supports_set_bus_clock_ = false;
+  bool supports_perform_tuning_ = false;
   zx::interrupt irq_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_sdhci::Device> binding_group_;
@@ -566,6 +577,17 @@ TEST_F(SdhciTest, SetBusFreqVendorSpecific) {
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
   EXPECT_EQ(clock_control(), initial_value);
+
+  ASSERT_OK(StopDriver());
+}
+
+TEST_F(SdhciTest, PerformTuningVendorSpecific) {
+  driver_test().RunInEnvironmentTypeContext(
+      [&](Environment& env) { env.sdhci().set_supports_perform_tuning(); });
+
+  ASSERT_OK(StartDriver());
+
+  EXPECT_OK(driver_test().driver()->SdmmcPerformTuning(MMC_SEND_TUNING_BLOCK));
 
   ASSERT_OK(StopDriver());
 }

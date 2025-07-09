@@ -117,6 +117,11 @@ void PciSdhci::VendorSetBusClock(VendorSetBusClockRequestView request, fdf::Aren
   completer.buffer(arena).ReplyError(ZX_ERR_STOP);
 }
 
+void PciSdhci::VendorPerformTuning(VendorPerformTuningRequestView request, fdf::Arena& arena,
+                                   VendorPerformTuningCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_STOP);
+}
+
 void PciSdhci::DdkUnbind(ddk::UnbindTxn txn) { device_unbind_reply(zxdev()); }
 
 zx_status_t PciSdhci::Bind(void* /* unused */, zx_device_t* parent) {

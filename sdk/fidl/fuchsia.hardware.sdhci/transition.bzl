@@ -2,4 +2,4 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-sdhci_in_soft_transition = False
+sdhci_in_soft_transition = True

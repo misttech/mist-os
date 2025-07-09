@@ -228,6 +228,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   zx_status_t SetBusClock(uint32_t frequency_hz);
 
+  zx_status_t PerformVendorTuningIfNeeded(uint32_t cmd_idx);
+
   zx::interrupt irq_;
   async::IrqMethod<Sdhci, &Sdhci::HandleIrq> irq_handler_;
 
