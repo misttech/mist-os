@@ -87,9 +87,6 @@ type EmulatorConfig struct {
 	// Path to the vbmeta signing key metadata. Required if 'uefi' is true.
 	VbmetaMetadata string `json:"vbmeta_metadata,omitempty"`
 
-	// Logfile saves emulator standard output to a file if set.
-	Logfile string `json:"logfile"`
-
 	// EDK2Dir is a path to a directory of EDK II (UEFI) prebuilts.
 	EDK2Dir string `json:"edk2_dir"`
 
@@ -301,13 +298,8 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 	}
 	// If t.config.Serial, the serial output will be captured through the CaptureSerialLog()
 	// function. Otherwise copy the emulator output.
-	if !t.config.Serial {
-		var logfile string
-		if t.opts.SerialLogDir != "" {
-			logfile = filepath.Join(t.opts.SerialLogDir, "serial_log.txt")
-		} else {
-			logfile = t.config.Logfile
-		}
+	if !t.config.Serial && t.opts.SerialLogDir != "" {
+		logfile := filepath.Join(t.opts.SerialLogDir, "serial_log.txt")
 		logfileAbsPath, err := filepath.Abs(logfile)
 		if err != nil {
 			return fmt.Errorf("cannot get absolute path for %q: %w", logfile, err)

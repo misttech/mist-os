@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
@@ -24,6 +25,69 @@ const (
 	// the most verbose, and fatal is the least.
 	botanistLogLevel = logger.DebugLevel
 )
+
+type configWithType struct {
+	targets.EmulatorConfig
+	Type string `json:"type"`
+}
+
+func GetBotanistConfig(shard *Shard, buildDir string, tools build.Tools) error {
+	if !shard.Env.TargetsEmulator() {
+		return nil
+	}
+	deviceType := shard.Env.Dimensions.DeviceType()
+	var fvm, zbi string
+	var err error
+	if !shard.Env.Netboot {
+		fvm, err = registerTool(shard, tools, "fvm")
+		if err != nil {
+			return err
+		}
+	}
+	zbi, err = registerTool(shard, tools, "zbi")
+	if err != nil {
+		return err
+	}
+	emuConfig := configWithType{
+		Type: strings.ToLower(deviceType),
+		EmulatorConfig: targets.EmulatorConfig{
+			Path:              fmt.Sprintf("./%s/bin", strings.ToLower(deviceType)),
+			EDK2Dir:           "./edk2",
+			Target:            targets.Target(shard.TargetCPU()),
+			VirtualDeviceSpec: shard.Env.VirtualDeviceSpec.Name,
+			Uefi:              shard.Env.GptUefiDisk.Name != "",
+			VbmetaKey:         shard.Env.GptUefiDisk.VbmetaKeyPath,
+			VbmetaMetadata:    shard.Env.GptUefiDisk.VbmetaKeyMetadataPath,
+			KVM:               !shard.UseTCG,
+			// Is a directive to run the emu process in a way in which we can
+			// synthesize a 'serial device'. We need only do this in the bringup
+			// case, this being used for executing tests at that level;
+			// restriction to the minimal case is especially important as this
+			// mode shows tendencies to slow certain processes down. Shards that
+			// don't expect SSH require serial, but boot tests which only need to
+			// read from serial do not require access to write to serial.
+			Serial: !shard.ExpectsSSH && !shard.IsBootTest,
+			// Used to dynamically extend fvm.blk to fit downloaded
+			// test packages.
+			FVMTool: fvm,
+			// Used to embed the ssh key into the zbi.
+			ZBITool: zbi,
+		},
+	}
+
+	configBasename := shard.Name + ".botanist.json"
+	config := "./" + configBasename
+
+	if err := jsonutil.WriteToFile(
+		filepath.Join(buildDir, configBasename),
+		[]configWithType{emuConfig},
+	); err != nil {
+		return err
+	}
+	shard.BotanistConfig = config
+	shard.AddDeps([]string{configBasename})
+	return nil
+}
 
 func GetBotDimensions(shard *Shard, params *proto.Params) {
 	dimensions := map[string]string{"pool": params.Pool}

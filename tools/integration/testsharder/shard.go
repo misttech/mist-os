@@ -80,6 +80,9 @@ type Shard struct {
 	// BotDimensions specifies the swarming bot dimensions to use for this shard.
 	BotDimensions map[string]string `json:"bot_dimensions,omitmepty"`
 
+	// BotanistConfig is the path to the botanist config to pass to the swarming command.
+	BotanistConfig string `json:"botanist_config,omitempty"`
+
 	// The test manifest passed to botanist containing the tests to run.
 	TestsJSON string `json:"tests_json,omitempty"`
 

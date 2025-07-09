@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
@@ -36,6 +37,204 @@ var gceEnv = build.Environment{
 }
 var macEnv = build.Environment{
 	Dimensions: build.DimensionSet{"os": "Mac", "cpu": "x64"},
+}
+
+func TestGetBotanistConfig(t *testing.T) {
+	toolNames := []string{"fvm", "zbi"}
+	tools := build.Tools{}
+	for _, name := range toolNames {
+		for _, cpu := range []string{"x64", "arm64"} {
+			tools = append(tools, build.Tool{
+				Name: name,
+				OS:   "linux",
+				CPU:  cpu,
+				Path: fmt.Sprintf("host_%s/%s", cpu, name),
+			})
+		}
+	}
+	testCases := []struct {
+		name              string
+		shard             *Shard
+		netboot           bool
+		targetCPU         string
+		virtualDeviceSpec string
+		uefi              bool
+		wantConfig        *configWithType
+		wantDeps          []string
+	}{
+		{
+			name: "linux shard",
+			shard: &Shard{
+				Env: linuxEnv,
+			},
+			targetCPU: "x64",
+		},
+		{
+			name: "mac shard",
+			shard: &Shard{
+				Env: macEnv,
+			},
+			targetCPU: "x64",
+		},
+		{
+			name: "emu x64 shard with ssh",
+			shard: &Shard{
+				Env:        x64EmuEnv,
+				ExpectsSSH: true,
+			},
+			targetCPU: "x64",
+			wantConfig: &configWithType{
+				Type: "qemu",
+				EmulatorConfig: targets.EmulatorConfig{
+					Path:    "./qemu/bin",
+					EDK2Dir: "./edk2",
+					Target:  targets.Target("x64"),
+					KVM:     true,
+					FVMTool: "host_x64/fvm",
+					ZBITool: "host_x64/zbi",
+				}},
+			wantDeps: []string{"QEMU.botanist.json", "host_x64/fvm", "host_x64/zbi"},
+		},
+		{
+			name: "emu x64 shard netboot, no ssh",
+			shard: &Shard{
+				Env: x64EmuEnv,
+			},
+			netboot:   true,
+			targetCPU: "x64",
+			wantConfig: &configWithType{
+				Type: "qemu",
+				EmulatorConfig: targets.EmulatorConfig{
+					Path:    "./qemu/bin",
+					EDK2Dir: "./edk2",
+					Target:  targets.Target("x64"),
+					KVM:     true,
+					Serial:  true,
+					ZBITool: "host_x64/zbi",
+				}},
+			wantDeps: []string{"QEMU-netboot.botanist.json", "host_x64/zbi"},
+		},
+		{
+			name: "emu arm64 shard boot test",
+			shard: &Shard{
+				Env:        arm64EmuEnv,
+				IsBootTest: true,
+			},
+			netboot:   true,
+			targetCPU: "arm64",
+			wantConfig: &configWithType{
+				Type: "qemu",
+				EmulatorConfig: targets.EmulatorConfig{
+					Path:    "./qemu/bin",
+					EDK2Dir: "./edk2",
+					Target:  targets.Target("arm64"),
+					KVM:     true,
+					ZBITool: "host_arm64/zbi",
+				}},
+			wantDeps: []string{"QEMU-netboot.botanist.json", "host_arm64/zbi"},
+		},
+		{
+			name: "emu arm64 shard with tcg",
+			shard: &Shard{
+				Env:        arm64EmuEnv,
+				ExpectsSSH: true,
+				UseTCG:     true,
+			},
+			targetCPU:         "arm64",
+			virtualDeviceSpec: "virtual_device",
+			wantConfig: &configWithType{
+				Type: "qemu",
+				EmulatorConfig: targets.EmulatorConfig{
+					Path:              "./qemu/bin",
+					EDK2Dir:           "./edk2",
+					Target:            targets.Target("arm64"),
+					VirtualDeviceSpec: "virtual_device",
+					FVMTool:           "host_x64/fvm",
+					ZBITool:           "host_x64/zbi",
+				}},
+			wantDeps: []string{"QEMU-virtual_device.botanist.json", "host_x64/fvm", "host_x64/zbi"},
+		},
+		{
+			name: "emu arm64 shard with uefi",
+			shard: &Shard{
+				Env:        arm64EmuEnv,
+				ExpectsSSH: true,
+				UseTCG:     true,
+			},
+			targetCPU: "arm64",
+			uefi:      true,
+			wantConfig: &configWithType{
+				Type: "qemu",
+				EmulatorConfig: targets.EmulatorConfig{
+					Path:           "./qemu/bin",
+					EDK2Dir:        "./edk2",
+					Target:         targets.Target("arm64"),
+					Uefi:           true,
+					VbmetaKey:      "key",
+					VbmetaMetadata: "metadata",
+					FVMTool:        "host_x64/fvm",
+					ZBITool:        "host_x64/zbi",
+				}},
+			wantDeps: []string{"QEMU-uefi-uefi_name.botanist.json", "host_x64/fvm", "host_x64/zbi"},
+		},
+		{
+			name: "nuc shard",
+			shard: &Shard{
+				Env:           nucEnv,
+				ExpectsSSH:    true,
+				ProductBundle: "core.x64",
+			},
+			targetCPU: "x64",
+		},
+		{
+			name: "vim3 shard",
+			shard: &Shard{
+				Env:           vim3Env,
+				ProductBundle: "core.vim3",
+				ExpectsSSH:    true,
+			},
+			targetCPU: "arm64",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			buildDir := t.TempDir()
+			test := makeTest(1, "")
+			test.CPU = tc.targetCPU
+			tc.shard.Tests = []Test{test}
+			tc.shard.Env.Netboot = tc.netboot
+			if tc.uefi {
+				tc.shard.Env.GptUefiDisk = build.GptUefiDiskInfo{
+					Name:                  "uefi-name",
+					VbmetaKeyPath:         "key",
+					VbmetaKeyMetadataPath: "metadata",
+				}
+			}
+			if tc.virtualDeviceSpec != "" {
+				tc.shard.Env.VirtualDeviceSpec = build.VirtualDeviceSpecInfo{
+					Name: tc.virtualDeviceSpec,
+				}
+			}
+			tc.shard.Name = environmentName(tc.shard.Env)
+			if err := GetBotanistConfig(tc.shard, buildDir, tools); err != nil {
+				t.Fatalf("failed to get botanist config: %s", err)
+			}
+			if tc.wantConfig != nil && tc.shard.BotanistConfig == "" {
+				t.Errorf("empty botanist config, want %v", tc.wantConfig)
+			} else if tc.wantConfig != nil {
+				var actualConfig []configWithType
+				if err := jsonutil.ReadFromFile(filepath.Join(buildDir, tc.shard.BotanistConfig), &actualConfig); err != nil {
+					t.Errorf("failed to read botanist config at %s: %s", tc.shard.BotanistConfig, err)
+				}
+				if diff := cmp.Diff(*tc.wantConfig, actualConfig[0]); diff != "" {
+					t.Errorf("wrong shard.BotanistConfig (-want +got):\n%s", diff)
+				}
+			}
+			if diff := cmp.Diff(tc.wantDeps, tc.shard.Deps); diff != "" {
+				t.Errorf("wrong shard.Deps (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestGetBotDimensions(t *testing.T) {

@@ -99,10 +99,13 @@
             }
         },
         "deps": [
+            "QEMU.botanist.json",
             "QEMU_tests.json",
             "host_x64/botanist",
             "host_x64/ffx",
+            "host_x64/fvm",
             "host_x64/llvm-profdata",
+            "host_x64/zbi",
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json"
@@ -133,6 +136,7 @@
             "os": "Debian",
             "pool": ""
         },
+        "botanist_config": "./QEMU.botanist.json",
         "tests_json": "QEMU_tests.json",
         "base_command": [
             "./host_x64/botanist",

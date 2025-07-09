@@ -40,10 +40,13 @@
             }
         },
         "deps": [
+            "AEMU.botanist.json",
             "AEMU_tests.json",
             "host_x64/botanist",
             "host_x64/ffx",
+            "host_x64/fvm",
             "host_x64/llvm-profdata",
+            "host_x64/zbi",
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json"
@@ -74,6 +77,7 @@
             "os": "Debian",
             "pool": ""
         },
+        "botanist_config": "./AEMU.botanist.json",
         "tests_json": "AEMU_tests.json",
         "base_command": [
             "./host_x64/botanist",
@@ -211,8 +215,11 @@
         "deps": [
             "host_x64/botanist",
             "host_x64/ffx",
+            "host_x64/fvm",
             "host_x64/llvm-profdata",
+            "host_x64/zbi",
             "images.json",
+            "multiplied:AEMU.botanist.json",
             "multiplied:AEMU_tests.json",
             "product_bundle/zbi",
             "product_bundles.json"
@@ -243,6 +250,7 @@
             "os": "Debian",
             "pool": ""
         },
+        "botanist_config": "./multiplied:AEMU.botanist.json",
         "tests_json": "multiplied:AEMU_tests.json",
         "base_command": [
             "./host_x64/botanist",
