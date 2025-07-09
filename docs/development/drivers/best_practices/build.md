@@ -128,7 +128,7 @@ To add to this list, you should make sure to add your driver component to
 the local driver group in your source location.
 
 For example, for a new driver added under `//src/ui/input/drivers`, you would
-add an entry to `//src/ui/input:drivers`.
+add an entry to `//src/ui/input/drivers`.
 
 For the `drivers-build-only` target, you need to be sure that you're including
 the path to your `fuchsia_driver_components()` target, and not point to your

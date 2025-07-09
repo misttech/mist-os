@@ -54,7 +54,7 @@ fuchsia_cc_driver("hid-driver") {
 fuchsia_driver_component("hid") {
   visibility = [
     ":*",
-    "//src/ui/input:drivers",
+    "//src/ui/input/drivers",
     "//src/ui/input/drivers/usb-hid:*",
     "//src/ui/input/tests/hid:*",
   ]

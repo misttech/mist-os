@@ -8,13 +8,18 @@ group("drivers") {
     "buttons",
     "ctaphid",
     "focaltech",
+    "focaltech:focaltech-sherlock",
     "goldfish_sensor",
     "goodix",
+    "gt6853:gt6853-module",
     "hid",
     "hid-input-report",
     "hidctl",
     "i2c-hid:drivers",
     "usb-hid",
+    "usb-hid:usb-one-endpoint-hid-fake-usb",
+    "usb-hid:usb-two-endpoint-hid-fake-usb",
+    "virtio:virtio_input",
   ]
   if (current_cpu == "x64") {
     deps += [ "pc-ps2" ]
