@@ -10,7 +10,7 @@
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
-#include <format>
+#include <limits>
 #include <map>
 #include <string>
 
@@ -110,6 +110,19 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
   }
 }
 
+Elf64_Phdr UpcastPhdr(const Elf32_Phdr& phdr32) {
+  Elf64_Phdr phdr;
+  phdr.p_type = phdr32.p_type;
+  phdr.p_offset = phdr32.p_offset;
+  phdr.p_vaddr = phdr32.p_vaddr;
+  phdr.p_paddr = phdr32.p_paddr;
+  phdr.p_filesz = phdr32.p_filesz;
+  phdr.p_memsz = phdr32.p_memsz;
+  phdr.p_flags = phdr32.p_flags;
+  phdr.p_align = phdr32.p_align;
+  return phdr;
+}
+
 }  // namespace
 
 // Load the .eh_frame and/or .debug_frame.
@@ -130,8 +143,56 @@ Error CfiModule::Load() {
     return Error("no elf memory");
   }
 
-  auto eh_frame_err = LoadEhFrame();
-  auto debug_frame_err = LoadDebugFrame();
+  Elf64_Ehdr ehdr;
+
+  // Probe the ELF identification header from the larger ELF header to distinguish between 32 and 64
+  // bit modules. We'll translate any 32 bit headers into their 64 bit ELF type counterparts so the
+  // below code can not worry about the difference.
+  switch (address_size_) {
+    case Module::AddressSize::k32Bit: {
+      Elf32_Ehdr ehdr32;
+      if (auto err = elf_->Read(elf_ptr_, ehdr32); err.has_err()) {
+        return err;
+      }
+
+      memcpy(ehdr.e_ident, ehdr32.e_ident, EI_NIDENT);
+      ehdr.e_type = ehdr32.e_type;
+      ehdr.e_machine = ehdr32.e_machine;
+      ehdr.e_version = ehdr32.e_version;
+      ehdr.e_entry = ehdr32.e_entry;
+      ehdr.e_phoff = ehdr32.e_phoff;
+      ehdr.e_shoff = ehdr32.e_shoff;
+      ehdr.e_flags = ehdr32.e_flags;
+      ehdr.e_ehsize = ehdr32.e_ehsize;
+      ehdr.e_phentsize = ehdr32.e_phentsize;
+      ehdr.e_phnum = ehdr32.e_phnum;
+      ehdr.e_shentsize = ehdr32.e_shentsize;
+      ehdr.e_shnum = ehdr32.e_shnum;
+      ehdr.e_shstrndx = ehdr32.e_shstrndx;
+      break;
+    }
+    case Module::AddressSize::k64Bit: {
+      // 64 Bit modules can just read the 64 bit ELF header directly.
+      if (auto err = elf_->Read(elf_ptr_, ehdr); err.has_err()) {
+        return err;
+      }
+      break;
+    }
+    default:
+      return Error("Unknown ELF class.");
+  }
+
+  // Header magic should be correct.
+  if (strncmp(reinterpret_cast<const char*>(ehdr.e_ident), ELFMAG, SELFMAG) != 0) {
+    return Error("not an ELF image");
+  }
+
+  if (auto err = LoadPhdrs(ehdr); err.has_err()) {
+    return err;
+  }
+
+  auto eh_frame_err = LoadEhFrame(ehdr);
+  auto debug_frame_err = LoadDebugFrame(ehdr);
 
   if (eh_frame_err.has_err() && debug_frame_err.has_err()) {
     return Error("Failed to load both eh_frame (err=\"%s\") and debug_frame (\"%s\") sections\n.",
@@ -141,97 +202,111 @@ Error CfiModule::Load() {
   return Success();
 }
 
-Error CfiModule::LoadEhFrame() {
-  Elf64_Ehdr ehdr;
-  if (auto err = elf_->Read(elf_ptr_, ehdr); err.has_err()) {
+Error CfiModule::LoadEhFrame(const Elf64_Ehdr& ehdr) {
+  if (auto err = LoadEhFrameHdr(ehdr); err.has_err()) {
     return err;
-  }
-
-  // Header magic should be correct.
-  if (strncmp(reinterpret_cast<const char*>(ehdr.e_ident), ELFMAG, SELFMAG) != 0) {
-    return Error("not an ELF image");
   }
 
   // ==============================================================================================
   // Load from the .eh_frame_hdr section.
+  // This section may not always be present - it's purely an optimization when we get to use it.
+  // When not present, we have to resort to linearly scanning the FDE list.
   // ==============================================================================================
-  eh_frame_hdr_ptr_ = 0;
-  pc_begin_ = -1;
-  pc_end_ = 0;
-  for (uint64_t i = 0; i < ehdr.e_phnum; i++) {
-    Elf64_Phdr phdr;
-    if (auto err = elf_->Read(elf_ptr_ + ehdr.e_phoff + ehdr.e_phentsize * i, phdr);
+  if (eh_frame_hdr_ptr_ > 0) {
+    auto p = eh_frame_hdr_ptr_;
+    uint8_t version;
+    if (auto err = elf_->ReadAndAdvance(p, version); err.has_err()) {
+      return err;
+    }
+    if (version != 1) {
+      return Error("unknown eh_frame_hdr version %d", version);
+    }
+
+    uint8_t eh_frame_ptr_enc;
+    uint8_t fde_count_enc;
+    uint64_t eh_frame_ptr;  // not used
+    if (auto err = elf_->ReadAndAdvance(p, eh_frame_ptr_enc); err.has_err()) {
+      return err;
+    }
+    if (auto err = elf_->ReadAndAdvance(p, fde_count_enc); err.has_err()) {
+      return err;
+    }
+    if (auto err = elf_->ReadAndAdvance(p, table_enc_); err.has_err()) {
+      return err;
+    }
+    if (auto err = DecodeTableEntrySize(table_enc_, table_entry_size_); err.has_err()) {
+      return err;
+    }
+    if (auto err =
+            elf_->ReadEncodedAndAdvance(p, eh_frame_ptr, eh_frame_ptr_enc, eh_frame_hdr_ptr_);
         err.has_err()) {
       return err;
     }
+    if (auto err = elf_->ReadEncodedAndAdvance(p, fde_count_, fde_count_enc, eh_frame_hdr_ptr_);
+        err.has_err()) {
+      return err;
+    }
+    table_ptr_ = p;
+
+    if (fde_count_ == 0) {
+      return Error("empty binary search table");
+    }
+  }
+
+  return Success();
+}
+
+Error CfiModule::LoadPhdrs(const Elf64_Ehdr& ehdr) {
+  const bool is_64bit = ehdr.e_ident[EI_CLASS] == ELFCLASS64;
+
+  phdrs_.resize(ehdr.e_phnum);
+  if (is_64bit) {
+    if (auto err = elf_->ReadBytes(elf_ptr_ + ehdr.e_phoff, ehdr.e_phnum * ehdr.e_phentsize,
+                                   phdrs_.data());
+        err.has_err()) {
+      return err;
+    }
+  } else {
+    std::vector<Elf32_Phdr> phdr32_buf(ehdr.e_phnum);
+    if (auto err = elf_->ReadBytes(elf_ptr_ + ehdr.e_phoff, ehdr.e_phnum * ehdr.e_phentsize,
+                                   phdr32_buf.data());
+        err.has_err()) {
+      return err;
+    }
+
+    for (size_t i = 0; i < ehdr.e_phnum; i++) {
+      phdrs_[i] = UpcastPhdr(phdr32_buf[i]);
+    }
+  }
+
+  return Success();
+}
+
+Error CfiModule::LoadEhFrameHdr(const Elf64_Ehdr& ehdr) {
+  pc_begin_ = std::numeric_limits<uint64_t>::max();
+  pc_end_ = std::numeric_limits<uint64_t>::min();
+
+  for (const auto& phdr : phdrs_) {
     if (phdr.p_type == PT_GNU_EH_FRAME) {
       if (address_mode_ == Module::AddressMode::kProcess) {
         eh_frame_hdr_ptr_ = elf_ptr_ + phdr.p_vaddr;
       } else {
         eh_frame_hdr_ptr_ = elf_ptr_ + phdr.p_offset;
       }
-    } else if (phdr.p_type == PT_LOAD && phdr.p_flags & PF_X) {
+    } else if (phdr.p_type == PT_LOAD) {
+      // Note that we cannot limit the inspection of PT_LOAD segments to those that are marked
+      // executable because this does not necessarily match the actual mapping of executable
+      // VMOs. If we want to narrow the range of PCs further we should consult the |zx_info_maps_t|
+      // for this process.
       pc_begin_ = std::min(pc_begin_, elf_ptr_ + phdr.p_vaddr);
       pc_end_ = std::max(pc_end_, elf_ptr_ + phdr.p_vaddr + phdr.p_memsz);
     }
   }
 
-  if (!eh_frame_hdr_ptr_) {
-    return Error("no PT_GNU_EH_FRAME segment");
-  }
-
-  auto p = eh_frame_hdr_ptr_;
-  uint8_t version;
-  if (auto err = elf_->ReadAndAdvance(p, version); err.has_err()) {
-    return err;
-  }
-  if (version != 1) {
-    return Error("unknown eh_frame_hdr version %d", version);
-  }
-
-  uint8_t eh_frame_ptr_enc;
-  uint8_t fde_count_enc;
-  uint64_t eh_frame_ptr;  // not used
-  if (auto err = elf_->ReadAndAdvance(p, eh_frame_ptr_enc); err.has_err()) {
-    return err;
-  }
-  if (auto err = elf_->ReadAndAdvance(p, fde_count_enc); err.has_err()) {
-    return err;
-  }
-  if (auto err = elf_->ReadAndAdvance(p, table_enc_); err.has_err()) {
-    return err;
-  }
-  if (auto err = DecodeTableEntrySize(table_enc_, table_entry_size_); err.has_err()) {
-    return err;
-  }
-  if (auto err = elf_->ReadEncodedAndAdvance(p, eh_frame_ptr, eh_frame_ptr_enc, eh_frame_hdr_ptr_);
-      err.has_err()) {
-    return err;
-  }
-  if (auto err = elf_->ReadEncodedAndAdvance(p, fde_count_, fde_count_enc, eh_frame_hdr_ptr_);
-      err.has_err()) {
-    return err;
-  }
-  table_ptr_ = p;
-
-  if (fde_count_ == 0) {
-    return Error("empty binary search table");
-  }
-
   return Success();
 }
 
-Error CfiModule::LoadDebugFrame() {
-  Elf64_Ehdr ehdr;
-  if (auto err = elf_->Read(elf_ptr_, ehdr); err.has_err()) {
-    return err;
-  }
-
-  // Header magic should be correct.
-  if (strncmp(reinterpret_cast<const char*>(ehdr.e_ident), ELFMAG, SELFMAG) != 0) {
-    return Error("not an ELF image");
-  }
-
+Error CfiModule::LoadDebugFrame(const Elf64_Ehdr& ehdr) {
   // ==============================================================================================
   // Load from the .debug_frame section, if present.
   // ==============================================================================================
@@ -330,7 +405,7 @@ Error CfiModule::PrepareToStep(const Registers& current, DwarfCie& cie) {
   return Success();
 }
 
-Error CfiModule::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
+Error CfiModule::BinarySearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
   // Binary search for fde_ptr in the range [low, high).
   uint64_t low = 0;
   uint64_t high = fde_count_;
@@ -347,7 +422,9 @@ Error CfiModule::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
       low = mid;
     }
   }
+
   uint64_t addr = table_ptr_ + low * table_entry_size_ + table_entry_size_ / 2;
+
   uint64_t fde_ptr;
   if (auto err = elf_->ReadEncoded(addr, fde_ptr, table_enc_, eh_frame_hdr_ptr_); err.has_err()) {
     return err;
@@ -356,6 +433,46 @@ Error CfiModule::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
   if (auto err = DecodeFde(UnwindTableSectionType::kEhFrame, fde_ptr, cie, fde); err.has_err()) {
     return err;
   }
+  return Success();
+}
+
+Error CfiModule::LinearSearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
+  // A length of 0 indicates the terminator FDE.
+  uint64_t addr = eh_frame_begin_;
+
+  while (true) {
+    if (auto err = DecodeFde(UnwindTableSectionType::kEhFrame, addr, cie, fde); err.has_err()) {
+      return err;
+    }
+
+    if (fde.instructions_end == 0) {
+      // Got the terminator FDE without finding an FDE containing pc, now we give up.
+      return Error("Failed to find an FDE containing pc!");
+    } else if (pc >= fde.pc_begin && pc < fde.pc_end) {
+      break;
+    }
+  }
+
+  return Success();
+}
+
+Error CfiModule::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
+  if (eh_frame_hdr_ptr_ != 0) {
+    // We always expect the eh_frame_hdr section to be complete, so there's no fallback mechanism
+    // for errors.
+    if (auto err = BinarySearchEhFrame(pc, cie, fde); err.has_err()) {
+      return err;
+    }
+  } else if (eh_frame_begin_ != 0) {
+    auto err = LinearSearchEhFrame(pc, cie, fde);
+    if (err.ok()) {
+      return Success();
+    }
+
+  } else {
+    return Error("Do not have eh_frame_hdr or eh_frame pointers");
+  }
+
   if (pc < fde.pc_begin || pc >= fde.pc_end) {
     return Error("cannot find FDE for pc %#" PRIx64, pc);
   }
@@ -567,6 +684,11 @@ Error CfiModule::DecodeFde(UnwindTableSectionType section_type, uint64_t fde_ptr
           DecodeCieFdeHdrAndAdvance(elf_, section_type, fde_ptr, fde.instructions_end, cie_offset);
       err.has_err()) {
     return err;
+  }
+
+  if (fde.instructions_end == 0) {
+    // This is a terminator FDE.
+    return Success();
   }
 
   uint64_t cie_ptr;

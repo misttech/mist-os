@@ -5,6 +5,8 @@
 #ifndef SRC_LIB_UNWINDER_CFI_MODULE_H_
 #define SRC_LIB_UNWINDER_CFI_MODULE_H_
 
+#include <elf.h>
+
 #include <cstdint>
 #include <map>
 
@@ -39,8 +41,8 @@ enum UnwindTableSectionType {
 class CfiModule {
  public:
   // Caller must ensure elf to outlive us.
-  CfiModule(Memory* elf, uint64_t elf_ptr, Module::AddressMode address_mode)
-      : elf_(elf), elf_ptr_(elf_ptr), address_mode_(address_mode) {}
+  CfiModule(Memory* elf, uint64_t elf_ptr, const Module& module)
+      : elf_(elf), elf_ptr_(elf_ptr), address_mode_(module.mode), address_size_(module.size) {}
 
   // Load the CFI from the ELF file.
   [[nodiscard]] Error Load();
@@ -82,15 +84,27 @@ class CfiModule {
 
   // Search for CIE and FDE in .eh_frame section.
   [[nodiscard]] Error SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde);
+  [[nodiscard]] Error BinarySearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde);
+  [[nodiscard]] Error LinearSearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde);
 
   // Search for CIE and FDE in .debug_frame section.
   [[nodiscard]] Error SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde);
   [[nodiscard]] Error BuildDebugFrameMap();
 
+  // Reads and caches the program headers corresponding with this ELF header, doing necessary
+  // upcasting for 32 bit binaries if needed.
+  Error LoadPhdrs(const Elf64_Ehdr& ehdr);
+
+  // Finds the eh_frame_hdr segment in |phdrs_| and loads the address and metadata of the binary
+  // search table, as well as marking the beginning and end of the executable regions over all
+  // program headers.
+  Error LoadEhFrameHdr(const Elf64_Ehdr& ehdr);
+
   // Both of these functions read the ELF file header locally to avoid needing to include elf.h here
   // which causes compilation issues on macos.
-  [[nodiscard]] Error LoadEhFrame();
-  [[nodiscard]] Error LoadDebugFrame();
+  [[nodiscard]] Error LoadEhFrame(const Elf64_Ehdr& ehdr);
+
+  [[nodiscard]] Error LoadDebugFrame(const Elf64_Ehdr& ehdr);
 
   // Helpers to decode CIE and FDE in either the eh_frame or debug_frame sections. |type|
   // determines the exact decoding details based on the section.
@@ -102,10 +116,15 @@ class CfiModule {
   Memory* const elf_;
   const uint64_t elf_ptr_;
   const Module::AddressMode address_mode_;
+  const Module::AddressSize address_size_;
 
   // Marks the executable section so that we don't need to find the FDE to know a PC is wrong.
   uint64_t pc_begin_ = 0;  // inclusive
   uint64_t pc_end_ = 0;    // exclusive
+
+  // Marks the beginning of the eh_frame section within some segment of the loaded program. Requires
+  // section info to not be stripped from the binary.
+  uint64_t eh_frame_begin_ = 0;
 
   // .eh_frame_hdr binary search table info.
   uint64_t eh_frame_hdr_ptr_ = 0;
@@ -117,6 +136,8 @@ class CfiModule {
   // .debug_frame info.
   uint64_t debug_frame_ptr_ = 0;
   uint64_t debug_frame_end_ = 0;
+
+  std::vector<Elf64_Phdr> phdrs_;
 
   std::unique_ptr<CfiParser> cfi_parser_;
 

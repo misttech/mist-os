@@ -56,6 +56,11 @@ static_library("common") {
     "//src/lib/unwinder",
     "//third_party/curl:libcurl",
   ]
+
+  # TODO(https://fxbug.dev/430278476): Don't build on mac.
+  if (is_mac) {
+    deps = [ "//src/developer/debug/shared:elf_h_on_mac" ]
+  }
 }
 
 source_set("test_support") {
