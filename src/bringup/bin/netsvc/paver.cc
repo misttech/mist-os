@@ -128,7 +128,7 @@ int Paver::StreamBuffer() {
     ClearBufferRef(kBufferRefWorker);
 
     paver_svc_ = {};
-    fshost_admin_svc_ = {};
+    recovery_svc_ = {};
 
     if (result != 0) {
       printf("netsvc: copy exited prematurely (%d): expect paver errors\n", result);
@@ -398,7 +398,7 @@ zx_status_t Paver::MonitorBuffer() {
   auto cleanup = fit::defer([this, &result]() {
     ClearBufferRef(kBufferRefWorker);
     paver_svc_ = {};
-    fshost_admin_svc_ = {};
+    recovery_svc_ = {};
 
     if (result != 0) {
       printf("netsvc: copy exited prematurely (%d): expect paver errors\n", result);
@@ -465,8 +465,8 @@ zx_status_t Paver::MonitorBuffer() {
   // Blocks until paving is complete.
   switch (command_) {
     case Command::kDataFile: {
-      auto res = fshost_admin_svc_->WriteDataFile(fidl::StringView::FromExternal(path_),
-                                                  std::move(buffer.vmo));
+      auto res = recovery_svc_->WriteDataFile(fidl::StringView::FromExternal(path_),
+                                              std::move(buffer.vmo));
       return (res.status() == ZX_OK ? (res.ok() ? ZX_OK : res->error_value()) : res.status());
     }
     case Command::kFirmware:
@@ -648,17 +648,17 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
             fidl::DiscoverableProtocolName<fuchsia_paver::Paver>);
     return TFTP_ERR_IO;
   }
-  zx::result fshost = ConnectAt<fuchsia_fshost::Admin>(svc_root_);
+  zx::result fshost = ConnectAt<fuchsia_fshost::Recovery>(svc_root_);
   if (fshost.is_error()) {
     fprintf(stderr, "netsvc: Unable to open /svc/%s.\n",
-            fidl::DiscoverableProtocolName<fuchsia_fshost::Admin>);
+            fidl::DiscoverableProtocolName<fuchsia_fshost::Recovery>);
     return TFTP_ERR_IO;
   }
 
   paver_svc_ = fidl::WireSyncClient(std::move(*paver));
-  fshost_admin_svc_ = fidl::WireSyncClient(std::move(*fshost));
+  recovery_svc_ = fidl::WireSyncClient(std::move(*fshost));
   auto svc_cleanup = fit::defer([&]() {
-    fshost_admin_svc_ = {};
+    recovery_svc_ = {};
     paver_svc_ = {};
   });
 

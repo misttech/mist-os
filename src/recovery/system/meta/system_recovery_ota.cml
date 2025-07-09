@@ -81,7 +81,7 @@
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.buildinfo.Provider",
-                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.Recovery",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.paver.Paver",
                 "fuchsia.posix.socket.Provider",

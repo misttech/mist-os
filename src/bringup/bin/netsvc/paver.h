@@ -118,7 +118,7 @@ class Paver final : public PaverInterface {
   fidl::ClientEnd<fuchsia_io::Directory> dev_root_, svc_root_;
 
   fidl::WireSyncClient<fuchsia_paver::Paver> paver_svc_;
-  fidl::WireSyncClient<fuchsia_fshost::Admin> fshost_admin_svc_;
+  fidl::WireSyncClient<fuchsia_fshost::Recovery> recovery_svc_;
 
   fuchsia_paver::wire::Configuration configuration_;
   // Only meaningful when command == Command::kAsset.

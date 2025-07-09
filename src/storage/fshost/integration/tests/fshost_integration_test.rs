@@ -165,12 +165,12 @@ async fn wipe_storage_not_supported() {
     let builder = new_builder();
     let fixture = builder.build().await;
 
-    let admin: fshost::AdminProxy =
+    let recovery: fshost::RecoveryProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
 
-    let result = admin
+    let result = recovery
         .wipe_storage(Some(blobfs_server), None)
         .await
         .unwrap()
