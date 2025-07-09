@@ -13,7 +13,9 @@ use netstack3_base::{
     TimerBindingsTypes, TxMetadataBindingsTypes,
 };
 use netstack3_datagram as datagram;
-use netstack3_device::ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId};
+use netstack3_device::ethernet::{
+    EthernetDeviceEventBindingsContext, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+};
 use netstack3_device::{self as device, DeviceId, DeviceLayerTypes, WeakDeviceId};
 use netstack3_filter::{FilterBindingsContext, FilterBindingsTypes, SocketOpsFilterBindingContext};
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoStateContext};
@@ -205,10 +207,16 @@ where
 
 /// The execution context provided by bindings.
 pub trait BindingsContext:
-    IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + NdpBindingsContext<DeviceId<Self>>
+    IpBindingsContext<Ipv4>
+    + IpBindingsContext<Ipv6>
+    + NdpBindingsContext<DeviceId<Self>>
+    + EthernetDeviceEventBindingsContext<EthernetDeviceId<Self>>
 {
 }
 impl<BC> BindingsContext for BC where
-    BC: IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + NdpBindingsContext<DeviceId<Self>>
+    BC: IpBindingsContext<Ipv4>
+        + IpBindingsContext<Ipv6>
+        + NdpBindingsContext<DeviceId<Self>>
+        + EthernetDeviceEventBindingsContext<EthernetDeviceId<Self>>
 {
 }

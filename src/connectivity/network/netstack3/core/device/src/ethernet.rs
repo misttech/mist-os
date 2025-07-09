@@ -16,10 +16,11 @@ use net_types::{MulticastAddr, UnicastAddr, Witness};
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, FrameDestination, HandleableTimer,
-    LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta,
-    ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
-    TimerContext, TimerHandler, TxMetadataBindingsTypes, WeakDeviceIdentifier, WrapBroadcastMarker,
+    BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, EventContext, FrameDestination,
+    HandleableTimer, LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext,
+    RecvIpFrameMeta, ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason,
+    SendableFrameMeta, TimerContext, TimerHandler, TxMetadataBindingsTypes, WeakDeviceIdentifier,
+    WrapBroadcastMarker,
 };
 use netstack3_ip::nud::{
     LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
@@ -60,6 +61,19 @@ impl<BC: RngContext + TimerContext + DeviceLayerTypes + TxMetadataBindingsTypes>
 {
 }
 
+/// The execution context for an Ethernet device provided by bindings.
+///
+/// This context trait is separate from `EthernetIpLinkDeviceBindingsContext` to prevent
+/// trait bound resolution cycles.
+pub trait EthernetDeviceEventBindingsContext<DeviceId>:
+    EventContext<EthernetDeviceEvent<DeviceId>>
+{
+}
+impl<BC: EventContext<EthernetDeviceEvent<DeviceId>>, DeviceId>
+    EthernetDeviceEventBindingsContext<DeviceId> for BC
+{
+}
+
 /// Provides access to an ethernet device's static state.
 pub trait EthernetIpLinkDeviceStaticStateContext: DeviceIdContext<EthernetLinkDevice> {
     /// Calls the function with an immutable reference to the ethernet device's
@@ -96,6 +110,40 @@ pub trait EthernetIpLinkDeviceDynamicStateContext<BC: EthernetIpLinkDeviceBindin
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
+
+/// Events emitted from ethernet devices.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum EthernetDeviceEvent<D> {
+    /// Device joined a new multicast group.
+    MulticastJoin {
+        /// The device.
+        device: D,
+        /// The address of the multicast group.
+        addr: MulticastAddr<Mac>,
+    },
+
+    /// Device left a multicast group.
+    MulticastLeave {
+        /// The device.
+        device: D,
+        /// The address of the multicast group.
+        addr: MulticastAddr<Mac>,
+    },
+}
+
+impl<D> EthernetDeviceEvent<D> {
+    /// Maps the contained device ID type.
+    pub fn map_device<N, F: FnOnce(D) -> N>(self, map: F) -> EthernetDeviceEvent<N> {
+        match self {
+            Self::MulticastJoin { device, addr } => {
+                EthernetDeviceEvent::MulticastJoin { device: map(device), addr }
+            }
+            Self::MulticastLeave { device, addr } => {
+                EthernetDeviceEvent::MulticastLeave { device: map(device), addr }
+            }
+        }
+    }
 }
 
 /// Send an Ethernet frame `body` directly to `dst_mac` with `ether_type`.
@@ -584,11 +632,11 @@ where
 /// `join_link_multicast` joins an L2 multicast group, whereas
 /// `join_ip_multicast` joins an L3 multicast group.
 pub fn join_link_multicast<
-    BC: EthernetIpLinkDeviceBindingsContext,
+    BC: EthernetIpLinkDeviceBindingsContext + EthernetDeviceEventBindingsContext<CC::DeviceId>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
-    _bindings_ctx: &mut BC,
+    bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
@@ -601,6 +649,10 @@ pub fn join_link_multicast<
                     "ethernet::join_link_multicast: joining link multicast {:?}",
                     multicast_addr
                 );
+                bindings_ctx.on_event(EthernetDeviceEvent::MulticastJoin {
+                    device: device_id.clone(),
+                    addr: multicast_addr,
+                });
             }
             InsertResult::AlreadyPresent => {
                 trace!(
@@ -631,11 +683,11 @@ pub fn join_link_multicast<
 ///
 /// If `device_id` is not in the multicast group `multicast_addr`.
 pub fn leave_link_multicast<
-    BC: EthernetIpLinkDeviceBindingsContext,
+    BC: EthernetIpLinkDeviceBindingsContext + EthernetDeviceEventBindingsContext<CC::DeviceId>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
-    _bindings_ctx: &mut BC,
+    bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
@@ -644,19 +696,28 @@ pub fn leave_link_multicast<
 
         match groups.remove(multicast_addr) {
             RemoveResult::Removed(()) => {
-                trace!("ethernet::leave_link_multicast: leaving link multicast {:?}", multicast_addr);
+                trace!(
+                    "ethernet::leave_link_multicast: \
+                    leaving link multicast {:?}",
+                    multicast_addr
+                );
+                bindings_ctx.on_event(EthernetDeviceEvent::MulticastLeave {
+                    device: device_id.clone(),
+                    addr: multicast_addr,
+                });
             }
             RemoveResult::StillPresent => {
                 trace!(
-                    "ethernet::leave_link_multicast: not leaving link multicast {:?} as there are still listeners for it",
+                    "ethernet::leave_link_multicast: not leaving link multicast \
+                    {:?} as there are still listeners for it",
                     multicast_addr,
                 );
             }
             RemoveResult::NotPresent => {
                 panic!(
-                    "ethernet::leave_link_multicast: device {:?} has not yet joined link multicast {:?}",
-                    device_id,
-                    multicast_addr,
+                    "ethernet::leave_link_multicast: device {:?} has not yet \
+                    joined link multicast {:?}",
+                    device_id, multicast_addr,
                 );
             }
         }
@@ -862,6 +923,7 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::vec;
     use core::convert::Infallible as Never;
+    use netstack3_hashmap::HashSet;
 
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use net_types::SpecifiedAddr;
@@ -912,9 +974,14 @@ mod tests {
     type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<
         EthernetTimerId<FakeWeakDeviceId<FakeDeviceId>>,
         nud::Event<Mac, FakeDeviceId, Ipv4, FakeInstant>,
-        (),
+        FakeBindingsState,
         (),
     >;
+
+    #[derive(Default)]
+    struct FakeBindingsState {
+        link_multicast_group_memberships: HashSet<(FakeDeviceId, MulticastAddr<Mac>)>,
+    }
 
     type FakeInnerCtx =
         netstack3_base::testutil::FakeCoreCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
@@ -1217,6 +1284,26 @@ mod tests {
         }
     }
 
+    impl EventContext<EthernetDeviceEvent<FakeDeviceId>> for FakeBindingsCtx {
+        fn on_event(&mut self, event: EthernetDeviceEvent<FakeDeviceId>) {
+            // Panic if we get more than one join or leave event per group.
+            match event {
+                EthernetDeviceEvent::MulticastJoin { device, addr } => {
+                    assert!(
+                        self.state.link_multicast_group_memberships.insert((device, addr)),
+                        "membership should not be present"
+                    );
+                }
+                EthernetDeviceEvent::MulticastLeave { device, addr } => {
+                    assert!(
+                        self.state.link_multicast_group_memberships.remove(&(device, addr)),
+                        "membership should be present"
+                    );
+                }
+            }
+        }
+    }
+
     impl TransmitQueueCommon<EthernetLinkDevice, FakeBindingsCtx> for FakeCoreCtx {
         type Meta = FakeTxMetadata;
         type Allocator = BufVecU8Allocator;
@@ -1401,5 +1488,44 @@ mod tests {
         let (_body, _src_mac, dst_mac, _ether_type) =
             parse_ethernet_frame(&frame, EthernetFrameLengthCheck::NoCheck).unwrap();
         assert_eq!(dst_mac, Mac::BROADCAST);
+    }
+
+    #[test]
+    fn test_join_link_multicast() {
+        let mut ctx = new_context();
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
+
+        let address1: MulticastAddr<Mac> =
+            MulticastAddr::new(Ipv4Addr::new([224, 0, 0, 200])).unwrap().into();
+        let address2: MulticastAddr<Mac> =
+            MulticastAddr::new(Ipv4Addr::new([224, 0, 10, 30])).unwrap().into();
+
+        join_link_multicast(core_ctx, bindings_ctx, &FakeDeviceId, address1);
+        join_link_multicast(core_ctx, bindings_ctx, &FakeDeviceId, address2);
+        join_link_multicast(core_ctx, bindings_ctx, &FakeDeviceId, address2);
+
+        assert_eq!(
+            bindings_ctx.state.link_multicast_group_memberships,
+            HashSet::from_iter([(FakeDeviceId, address1), (FakeDeviceId, address2)])
+        );
+
+        leave_link_multicast(core_ctx, bindings_ctx, &FakeDeviceId, address1);
+
+        assert_eq!(
+            bindings_ctx.state.link_multicast_group_memberships,
+            HashSet::from_iter([(FakeDeviceId, address2)])
+        );
+
+        // Since we joined address2 twice, we need to leave it twice as well.
+        leave_link_multicast(core_ctx, bindings_ctx, &FakeDeviceId, address2);
+
+        assert_eq!(
+            bindings_ctx.state.link_multicast_group_memberships,
+            HashSet::from_iter([(FakeDeviceId, address2)])
+        );
+
+        leave_link_multicast(core_ctx, bindings_ctx, &FakeDeviceId, address2);
+
+        assert_eq!(bindings_ctx.state.link_multicast_group_memberships, HashSet::new());
     }
 }

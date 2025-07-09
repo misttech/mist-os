@@ -97,9 +97,9 @@ use net_types::ip::{
 use net_types::SpecifiedAddr;
 use netstack3_core::device::{
     DeviceConfigurationUpdate, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
-    DeviceSendFrameError, EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice,
-    LoopbackDeviceId, PureIpDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
-    WeakDeviceId,
+    DeviceSendFrameError, EthernetDeviceEvent, EthernetDeviceId, LoopbackCreationProperties,
+    LoopbackDevice, LoopbackDeviceId, PureIpDeviceId, ReceiveQueueBindingsContext,
+    TransmitQueueBindingsContext, WeakDeviceId,
 };
 use netstack3_core::error::ExistsError;
 use netstack3_core::filter::{FilterBindingsTypes, SocketOpsFilter, SocketOpsFilterBindingContext};
@@ -848,6 +848,16 @@ impl EventContext<RouterAdvertisementEvent<DeviceId<BindingsCtx>>> for BindingsC
                     warn!("could not send RA to NDP watcher worker: sink full");
                 }
             },
+        }
+    }
+}
+
+impl EventContext<EthernetDeviceEvent<EthernetDeviceId<BindingsCtx>>> for BindingsCtx {
+    fn on_event(&mut self, event: EthernetDeviceEvent<EthernetDeviceId<BindingsCtx>>) {
+        // TODO(https://fxbug.dev/427804318): push these across a channel to an async worker
+        match event {
+            EthernetDeviceEvent::MulticastJoin { device: _, addr: _ } => {}
+            EthernetDeviceEvent::MulticastLeave { device: _, addr: _ } => {}
         }
     }
 }

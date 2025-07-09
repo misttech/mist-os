@@ -22,8 +22,8 @@ use netstack3_base::{
     FrameDestination, InstantContext as _, IpAddressId as _, IpDeviceAddr, LocalAddressError,
 };
 use netstack3_core::device::{
-    DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
-    LoopbackDevice, MaxEthernetFrameSize,
+    DeviceId, EthernetCreationProperties, EthernetDeviceEvent, EthernetLinkDevice,
+    LoopbackCreationProperties, LoopbackDevice, MaxEthernetFrameSize,
 };
 use netstack3_core::testutil::{
     CtxPairExt as _, DispatchedEvent, DispatchedFrame, FakeBindingsCtx, FakeCtx,
@@ -84,10 +84,16 @@ fn enable_disable_ipv4() {
     let weak_device_id = device_id.downgrade();
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-            device: weak_device_id.clone(),
-            ip_enabled: true,
-        })]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                device: weak_device_id.clone(),
+                ip_enabled: true,
+            })
+        ]
     );
 
     let addr = SpecifiedAddr::new(net_ip_v4!("192.0.2.1")).expect("addr should be unspecified");
@@ -124,6 +130,10 @@ fn enable_disable_ipv4() {
                 kind: nud::EventKind::Removed,
                 at: ctx.bindings_ctx.now(),
             }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+            }),
             DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
                 device: weak_device_id.clone(),
                 ip_enabled: false,
@@ -134,7 +144,7 @@ fn enable_disable_ipv4() {
     // Assert that static ARP entries are flushed on link down.
     nud::testutil::assert_neighbor_unknown::<Ipv4, _, _, _>(
         &mut ctx.core_ctx(),
-        ethernet_device_id,
+        ethernet_device_id.clone(),
         addr,
     );
 
@@ -158,6 +168,10 @@ fn enable_disable_ipv4() {
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+            }),
             DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
                 device: weak_device_id.clone(),
                 addr: ipv4_addr_subnet.addr(),
@@ -203,6 +217,10 @@ fn enable_disable_ipv4() {
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+            }),
             DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
                 device: weak_device_id.clone(),
                 addr: ipv4_addr_subnet.addr(),
@@ -324,6 +342,14 @@ fn enable_disable_ipv6() {
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
                 device: weak_device_id.clone(),
                 addr: ll_addr.to_witness(),
@@ -385,10 +411,18 @@ fn enable_disable_ipv6() {
                 kind: nud::EventKind::Removed,
                 at: ctx.bindings_ctx.now(),
             }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                 device: weak_device_id.clone(),
                 addr: ll_addr.addr().into(),
                 reason: AddressRemovedReason::Manual,
+            }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into()
             }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                 device: weak_device_id.clone(),
@@ -404,7 +438,11 @@ fn enable_disable_ipv6() {
     });
 
     // Assert that static NDP entry was removed on link down.
-    nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(core_ctx, ethernet_device_id, addr);
+    nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(
+        core_ctx,
+        ethernet_device_id.clone(),
+        addr,
+    );
 
     ctx.core_api()
         .device_ip::<Ipv6>()
@@ -435,6 +473,14 @@ fn enable_disable_ipv6() {
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
                 device: weak_device_id.clone(),
                 addr: ll_addr.addr().into(),
@@ -477,10 +523,18 @@ fn enable_disable_ipv6() {
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
                 device: weak_device_id.clone(),
                 addr: ll_addr.addr().into(),
                 state: IpAddressState::Unavailable,
+            }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into()
             }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                 device: weak_device_id.clone(),
@@ -512,6 +566,14 @@ fn enable_disable_ipv6() {
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
                 device: weak_device_id.clone(),
                 addr: ll_addr.addr().into(),
@@ -584,17 +646,23 @@ fn add_ipv6_address_with_dad_disabled() {
             DEFAULT_INTERFACE_METRIC,
         );
     let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
-    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
+    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.clone().into();
     let weak_device_id = device_id.downgrade();
 
     // Enable the device
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-            device: weak_device_id.clone(),
-            ip_enabled: true,
-        })]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
+                device: weak_device_id.clone(),
+                ip_enabled: true,
+            })
+        ]
     );
 
     // Add the address, and expect its assignment state to immediately be
@@ -606,13 +674,19 @@ fn add_ipv6_address_with_dad_disabled() {
 
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
-            device: weak_device_id,
-            addr: ll_addr.to_witness(),
-            state: IpAddressState::Assigned,
-            valid_until: Lifetime::Infinite,
-            preferred_lifetime: PreferredLifetime::preferred_forever(),
-        })]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+                device: weak_device_id,
+                addr: ll_addr.to_witness(),
+                state: IpAddressState::Assigned,
+                valid_until: Lifetime::Infinite,
+                preferred_lifetime: PreferredLifetime::preferred_forever(),
+            })
+        ]
     );
 }
 
@@ -629,7 +703,7 @@ fn enable_ipv6_dev_with_dad_disabled() {
             DEFAULT_INTERFACE_METRIC,
         );
     let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
-    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
+    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.clone().into();
     let weak_device_id = device_id.downgrade();
 
     // Add the address. Because the device is disabled, its assignment state
@@ -656,6 +730,14 @@ fn enable_ipv6_dev_with_dad_disabled() {
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
                 device: weak_device_id.clone(),
                 addr: ll_addr.addr().into(),
@@ -685,17 +767,15 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
 
     // Install a device.
     let local_mac = Ipv4::TEST_ADDRS.local_mac;
-    let device_id = ctx
-        .core_api()
-        .device::<EthernetLinkDevice>()
-        .add_device_with_default_state(
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
                 mac: local_mac,
                 max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             },
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        );
+    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.clone().into();
     let _: Ipv4DeviceConfigurationUpdate = ctx
         .core_api()
         .device_ip::<Ipv4>()
@@ -763,7 +843,13 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
             // is added it should immediately progress to "tentative" and start
             // DAD.
             let address_events = enable_device(&mut ctx, &device_id);
-            assert_eq!(&address_events[..], []);
+            assert_eq!(
+                &address_events[..],
+                [DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                    device: ethernet_device_id.downgrade(),
+                    addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+                })]
+            );
             ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
             add_address(&mut ctx, &device_id, &ipv4_addr_subnet, IpAddressState::Tentative);
         }
@@ -776,11 +862,17 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
             let address_events = enable_device(&mut ctx, &device_id);
             assert_eq!(
                 &address_events[..],
-                [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
-                    device: device_id.downgrade(),
-                    addr: ipv4_addr_subnet.addr(),
-                    state: IpAddressState::Tentative,
-                })]
+                [
+                    DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                        device: ethernet_device_id.downgrade(),
+                        addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+                    }),
+                    DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
+                        device: device_id.downgrade(),
+                        addr: ipv4_addr_subnet.addr(),
+                        state: IpAddressState::Tentative,
+                    })
+                ]
             );
         }
     }
@@ -925,17 +1017,15 @@ fn notify_on_dad_failure_ipv4(case: Ipv4DadFailureTestCase, expect_conflict: boo
 
     // Install a device.
     let local_mac = Ipv4::TEST_ADDRS.local_mac;
-    let device_id = ctx
-        .core_api()
-        .device::<EthernetLinkDevice>()
-        .add_device_with_default_state(
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
                 mac: local_mac,
                 max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             },
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        );
+    let device_id = ethernet_device_id.clone().into();
     let _: Ipv4DeviceConfigurationUpdate = ctx
         .core_api()
         .device_ip::<Ipv4>()
@@ -955,10 +1045,16 @@ fn notify_on_dad_failure_ipv4(case: Ipv4DadFailureTestCase, expect_conflict: boo
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-            device: device_id.downgrade(),
-            ip_enabled: true,
-        })]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                device: device_id.downgrade(),
+                ip_enabled: true,
+            })
+        ]
     );
 
     // Add an IPv4 Address, requesting that DAD be performed.
@@ -1068,17 +1164,15 @@ fn ipv4_ignores_tentative_addresses(case: Ipv4TentativeAddrTestCase) {
 
     // Install a device.
     let local_mac = Ipv4::TEST_ADDRS.local_mac;
-    let device_id = ctx
-        .core_api()
-        .device::<EthernetLinkDevice>()
-        .add_device_with_default_state(
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
                 mac: local_mac,
                 max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             },
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        );
+    let device_id = ethernet_device_id.clone().into();
     let _: Ipv4DeviceConfigurationUpdate = ctx
         .core_api()
         .device_ip::<Ipv4>()
@@ -1098,10 +1192,16 @@ fn ipv4_ignores_tentative_addresses(case: Ipv4TentativeAddrTestCase) {
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-            device: device_id.downgrade(),
-            ip_enabled: true,
-        })]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                device: device_id.downgrade(),
+                ip_enabled: true,
+            })
+        ]
     );
 
     // Run setup code based on the test case.
@@ -1271,26 +1371,29 @@ fn ipv4_dad_conflict_with_dad_disabled() {
 
     // Install a device.
     let local_mac = Ipv4::TEST_ADDRS.local_mac;
-    let device_id = ctx
-        .core_api()
-        .device::<EthernetLinkDevice>()
-        .add_device_with_default_state(
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
                 mac: local_mac,
                 max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             },
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-
+        );
+    let device_id = ethernet_device_id.clone().into();
     // Enable the device.
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-            device: device_id.downgrade(),
-            ip_enabled: true,
-        })]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into()
+            }),
+            DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                device: device_id.downgrade(),
+                ip_enabled: true,
+            })
+        ]
     );
 
     // Add the address, and assert that it immediately becomes assigned.
@@ -1336,17 +1439,15 @@ fn notify_on_dad_failure_ipv6() {
 
     ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     let local_mac = Ipv6::TEST_ADDRS.local_mac;
-    let device_id = ctx
-        .core_api()
-        .device::<EthernetLinkDevice>()
-        .add_device_with_default_state(
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
                 mac: local_mac,
                 max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             },
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        );
+    let device_id = ethernet_device_id.clone().into();
     let _: Ipv6DeviceConfigurationUpdate = ctx
         .core_api()
         .device_ip::<Ipv6>()
@@ -1378,6 +1479,14 @@ fn notify_on_dad_failure_ipv6() {
     assert_eq!(
         &ctx.bindings_ctx.take_events()[..],
         [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into(),
+            }),
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: ll_addr.addr().to_solicited_node_address().into(),
+            }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
                 device: weak_device_id.clone(),
                 addr: ll_addr.to_witness(),
@@ -1400,13 +1509,19 @@ fn notify_on_dad_failure_ipv6() {
     let (mut core_ctx, bindings_ctx) = ctx.contexts();
     assert_eq!(
         bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
-            device: weak_device_id.clone(),
-            addr: assigned_addr.to_witness(),
-            state: IpAddressState::Tentative,
-            valid_until: Lifetime::Infinite,
-            preferred_lifetime: PreferredLifetime::preferred_forever(),
-        }),]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastJoin {
+                device: ethernet_device_id.downgrade(),
+                addr: assigned_addr.addr().to_solicited_node_address().into(),
+            }),
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+                device: weak_device_id.clone(),
+                addr: assigned_addr.to_witness(),
+                state: IpAddressState::Tentative,
+                valid_until: Lifetime::Infinite,
+                preferred_lifetime: PreferredLifetime::preferred_forever(),
+            }),
+        ]
     );
 
     // When DAD fails, an event should be emitted and the address should be
@@ -1424,11 +1539,17 @@ fn notify_on_dad_failure_ipv6() {
 
     assert_eq!(
         bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
-            device: weak_device_id,
-            addr: assigned_addr.addr(),
-            reason: AddressRemovedReason::DadFailed,
-        }),]
+        [
+            DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                device: ethernet_device_id.downgrade(),
+                addr: assigned_addr.addr().to_solicited_node_address().into(),
+            }),
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
+                device: weak_device_id,
+                addr: assigned_addr.addr(),
+                reason: AddressRemovedReason::DadFailed,
+            }),
+        ]
     );
 
     assert_eq!(

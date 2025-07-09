@@ -60,8 +60,8 @@ pub mod device {
     pub use netstack3_base::{DeviceNameMatcher, StrongDeviceIdentifier};
     pub use netstack3_device::blackhole::{BlackholeDevice, BlackholeDeviceId};
     pub use netstack3_device::ethernet::{
-        EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
-        MaxEthernetFrameSize, RecvEthernetFrameMeta,
+        EthernetCreationProperties, EthernetDeviceEvent, EthernetDeviceId, EthernetLinkDevice,
+        EthernetWeakDeviceId, MaxEthernetFrameSize, RecvEthernetFrameMeta,
     };
     pub use netstack3_device::loopback::{
         LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId,
