@@ -388,6 +388,7 @@
                 "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.backlight.Service",
                 "fuchsia.hardware.bluetooth.Service",
+                "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.gnss.Service",
                 "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.hrtimer.Service",
