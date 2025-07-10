@@ -199,9 +199,6 @@ func TestGetBotanistConfig(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			buildDir := t.TempDir()
-			test := makeTest(1, "")
-			test.CPU = tc.targetCPU
-			tc.shard.Tests = []Test{test}
 			tc.shard.Env.Netboot = tc.netboot
 			if tc.uefi {
 				tc.shard.Env.GptUefiDisk = build.GptUefiDiskInfo{

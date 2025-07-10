@@ -54,6 +54,7 @@ func TestAddFFXDeps(t *testing.T) {
 				Env: build.Environment{
 					Dimensions: build.DimensionSet{
 						"device_type": tc.deviceType,
+						"cpu":         tc.targetCPU,
 					},
 				},
 				Tests: []Test{{Test: build.Test{CPU: tc.targetCPU}}},

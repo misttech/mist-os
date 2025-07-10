@@ -135,8 +135,9 @@ type CIPDPackage struct {
 }
 
 // TargetCPU returns the CPU architecture of the target this shard will run against.
+// Environments should be populated with the default cpu if missing before running MakeShards().
 func (s *Shard) TargetCPU() string {
-	return s.Tests[0].CPU
+	return s.Env.Dimensions.CPU()
 }
 
 // HostCPU returns the host CPU architecture this shard will run on.

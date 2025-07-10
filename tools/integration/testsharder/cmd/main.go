@@ -205,7 +205,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		for ei, env := range testSpecs[ti].Envs {
 			dt := env.Dimensions.DeviceType()
 			// Only applies to host and emulator tests.
-			if dt == "" || strings.HasSuffix(dt, "EMU") {
+			if dt == "" || env.TargetsEmulator() {
 				if _, ok := env.Dimensions["cpu"]; !ok {
 					testSpecs[ti].Envs[ei].Dimensions["cpu"] = defaultCPU
 				}
