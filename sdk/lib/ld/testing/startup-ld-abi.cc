@@ -27,6 +27,7 @@
 #include <zircon/assert.h>
 
 #include <bit>
+#include <vector>
 
 namespace ld::testing {
 namespace {

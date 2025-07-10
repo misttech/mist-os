@@ -9,6 +9,8 @@
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 
+#include <vector>
+
 namespace fake_mmio {
 
 // Fakes a single MMIO register. This class is intended to be used with a fdf::MmioBuffer;

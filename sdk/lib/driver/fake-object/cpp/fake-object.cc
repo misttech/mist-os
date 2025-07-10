@@ -11,6 +11,7 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <vector>
 
 #include "internal.h"
 
