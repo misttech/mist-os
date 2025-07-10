@@ -15,7 +15,7 @@ use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::power::{mark_proxy_message_handled, LockSource};
-use starnix_core::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
+use starnix_core::task::{CurrentTask, Kernel, LockedAndTask, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
@@ -1018,11 +1018,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
-        current_task.kernel().kthreads.spawn_with_role(
+        current_task.kernel().kthreads.spawn_async_with_role(
             EXECUTOR_THREAD_ROLE,
-            move |_locked, _current_task| {
-                let mut exec = fuchsia_async::LocalExecutor::new();
-
+            async move |_: LockedAndTask<'_>| {
                 // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
                 // to keep a strong reference to the thread_group itself.
                 let kernel_and_drop_waiter = handle
@@ -1035,31 +1033,29 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     return;
                 };
 
-                exec.run_singlethreaded(async move {
-                    // Start the 3 servers.
-                    let binder_fut = handle.clone().serve_dev_binder(dev_binder_server_end.into());
-                    let lutex_fut = Self::serve_lutex_controller(
-                        kernel.clone(),
-                        lutex_controller_server_end.into(),
-                    );
-                    let power_fut = Self::serve_container_power_controller(
-                        power_controller_server_end.into(),
-                        power_controller_event,
-                        kernel,
-                        &service_name,
-                    );
-                    // Wait until all are done, or the task exits.
-                    let (binder_res, lutex_res, power_res) = futures::join!(
-                        future_or_task_end(&drop_waiter, binder_fut),
-                        future_or_task_end(&drop_waiter, lutex_fut),
-                        future_or_task_end(&drop_waiter, power_fut),
-                    );
-                    let result = binder_res.and(lutex_res).and(power_res);
-                    if let Err(e) = &result {
-                        log_error!("Error when servicing the DevBinder protocol: {e:#}");
-                    }
-                    handle.lock().exit(result.map_err(|_| errno!(ENOENT)));
-                });
+                // Start the 3 servers.
+                let binder_fut = handle.clone().serve_dev_binder(dev_binder_server_end.into());
+                let lutex_fut = Self::serve_lutex_controller(
+                    kernel.clone(),
+                    lutex_controller_server_end.into(),
+                );
+                let power_fut = Self::serve_container_power_controller(
+                    power_controller_server_end.into(),
+                    power_controller_event,
+                    kernel,
+                    &service_name,
+                );
+                // Wait until all are done, or the task exits.
+                let (binder_res, lutex_res, power_res) = futures::join!(
+                    future_or_task_end(&drop_waiter, binder_fut),
+                    future_or_task_end(&drop_waiter, lutex_fut),
+                    future_or_task_end(&drop_waiter, power_fut),
+                );
+                let result = binder_res.and(lutex_res).and(power_res);
+                if let Err(e) = &result {
+                    log_error!("Error when servicing the DevBinder protocol: {e:#}");
+                }
+                handle.lock().exit(result.map_err(|_| errno!(ENOENT)));
             },
         );
 

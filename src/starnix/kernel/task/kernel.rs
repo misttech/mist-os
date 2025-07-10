@@ -17,7 +17,8 @@ use crate::task::net::NetstackDevices;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, DelayedReleaser,
     HrTimerManager, HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads,
-    PidTable, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
+    LockedAndTask, PidTable, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
+    UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
@@ -673,8 +674,8 @@ impl Kernel {
                     assume_ifb0_existence: self.features.rtnetlink_assume_ifb0_existence,
                 },
             );
-            self.kthreads.spawn(move |_, _| {
-                fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
+            self.kthreads.spawn_async(async move |_: LockedAndTask<'_>| {
+                network_netlink_async_worker.await;
                 log_error!(tag = NETLINK_LOG_TAG; "Netlink async worker unexpectedly exited");
             });
             network_netlink

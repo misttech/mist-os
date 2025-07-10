@@ -18,7 +18,7 @@ use fidl_fuchsia_ui_pointer::{
 };
 use futures::StreamExt as _;
 use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
-use starnix_core::task::Kernel;
+use starnix_core::task::{Kernel, LockedAndTask};
 use starnix_logging::{
     log_warn, trace_duration, trace_duration_begin, trace_duration_end, trace_flow_step,
 };
@@ -177,11 +177,7 @@ impl InputEventsRelay {
         device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
-                log_warn!(e:%; "Failed to set touch relay role.");
-            }
-            fasync::LocalExecutor::new().run_singlethreaded(async {
+        kernel.kthreads.spawn_async_with_role(INPUT_RELAY_ROLE_NAME, async move |_: LockedAndTask<'_>| {
             let mut default_touch_device = DeviceState {
                 device_type: InputDeviceType::Touch(
                     FuchsiaTouchEventToLinuxTouchEventConverter::create(),
@@ -327,7 +323,6 @@ impl InputEventsRelay {
                     }
                 };
             }});
-        });
     }
 
     fn start_keyboard_relay(

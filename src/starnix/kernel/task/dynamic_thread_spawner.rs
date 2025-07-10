@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::execution::create_kernel_thread;
-use crate::task::{with_new_current_task, CurrentTask, Task};
+use crate::task::{with_new_current_task, CurrentTask, LockedAndTask, Task, WrappedFuture};
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::TryFutureExt;
@@ -164,6 +164,85 @@ impl DynamicThreadSpawner {
             .expect("persistent thread should not have ended.");
         state.threads.push(receiver.recv().expect("persistent thread should not have ended."));
     }
+
+    /// Run an async function on a thread with `role` applied if possible.
+    ///
+    /// The given function must return the async function to run. It will be passed as
+    /// instance of `LockedAndTask` than can be used to retrieve a `Locked` or `CurrentTask`.
+    ///
+    /// This method will use an idle thread in the pool if one is available, otherwise it will
+    /// start a new thread. When this method returns, it is guaranteed that a thread is
+    /// responsible to start running the closure.
+    pub fn spawn_async_with_role<'b, F: 'b>(&'b self, role: &'static str, f: F)
+    where
+        for<'a> F: FnScopeHelper<'a>,
+    {
+        self.spawn_async(async move |locked_and_task: LockedAndTask<'_>| {
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(role) {
+                log_debug!(e:%; "failed to set kthread role");
+            }
+            f.call(locked_and_task).await;
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(DEFAULT_THREAD_ROLE) {
+                log_debug!(e:%; "failed to reset kthread role to default priority");
+            }
+        });
+    }
+
+    /// Run an async function on a thread.
+    ///
+    /// The given function must return the async function to run. It will be passed as
+    /// instance of `LockedAndTask` than can be used to retrieve a `Locked` or `CurrentTask`.
+    ///
+    /// This method will use an idle thread in the pool if one is available, otherwise it will
+    /// start a new thread. When this method returns, it is guaranteed that a thread is
+    /// responsible to start running the closure.
+    pub fn spawn_async<F>(&self, f: F)
+    where
+        for<'a> F: FnScopeHelper<'a>,
+    {
+        self.spawn(move |locked, current_task| {
+            let mut exec = fuchsia_async::LocalExecutor::new();
+            let locked_and_task = LockedAndTask::new(locked, current_task);
+            let fut = f.call(locked_and_task.clone());
+            let wrapped_future = WrappedSpawnedFuture::new(locked_and_task, fut);
+            exec.run_singlethreaded(wrapped_future);
+        });
+    }
+}
+
+/// A helper trait for `spawn_async`.
+///
+/// This trait is a workaround for the fact that it is required to constraint the lifetime of the
+/// output of the future used by `spawn_async` with the lifetime of its parameter.
+///
+/// The trait is implemented for any `FnOnce` that takes a `LockedAndTask` and returns a `Future`
+/// with the correct lifetime constraint.
+pub trait FnScopeHelper<'a>: Send + 'static {
+    type Output: Future<Output = ()> + 'a;
+    fn call(self, arg: LockedAndTask<'a>) -> Self::Output;
+}
+
+impl<'a, Fut: 'a, F> FnScopeHelper<'a> for F
+where
+    F: FnOnce(LockedAndTask<'a>) -> Fut + Send + 'static,
+    Fut: Future<Output = ()>,
+{
+    type Output = Fut;
+    fn call(self, arg: LockedAndTask<'a>) -> Fut {
+        self(arg)
+    }
+}
+
+type WrappedSpawnedFuture<'a, F> = WrappedFuture<F, LockedAndTask<'a>>;
+
+impl<'a, F: 'a> WrappedSpawnedFuture<'a, F> {
+    fn new(locked_and_task: LockedAndTask<'a>, fut: F) -> Self {
+        Self::new_with_cleaner(locked_and_task, trigger_delayed_releaser, fut)
+    }
+}
+
+fn trigger_delayed_releaser(locked_and_task: LockedAndTask<'_>) {
+    locked_and_task.current_task().trigger_delayed_releaser(&mut locked_and_task.unlocked());
 }
 
 #[derive(Debug)]
@@ -336,5 +415,18 @@ mod tests {
     async fn run_spawn_and_get_result() {
         let (_task, spawner) = build_spawner(2);
         assert_eq!(spawner.spawn_and_get_result(|_, _| 3).await, Ok(3));
+    }
+
+    #[fuchsia::test]
+    async fn test_spawn_async() {
+        let (_task, spawner) = build_spawner(2);
+        spawner.spawn_async(async |_: LockedAndTask<'_>| {});
+        spawner.spawn_async(async |locked_and_task: LockedAndTask<'_>| {
+            locked_and_task.current_task().get_pid();
+            let _locked: &mut Locked<Unlocked> = &mut locked_and_task.unlocked();
+            let bar = async || {};
+            bar().await;
+            locked_and_task.current_task().get_pid();
+        });
     }
 }

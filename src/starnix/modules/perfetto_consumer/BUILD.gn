@@ -18,7 +18,6 @@ rustc_library("perfetto_consumer") {
 
   deps = [
     "//sdk/rust/zx",
-    "//src/lib/fuchsia-async",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-observer",
     "//src/performance/lib/fxt/rust",

@@ -197,6 +197,12 @@ pub use crate::{LockBefore, LockEqualOrBefore, LockFor, RwLockFor};
 /// new locks until the new instance leaves scope.
 pub struct Locked<L>(PhantomData<L>);
 
+impl<L> std::fmt::Debug for Locked<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct(std::any::type_name::<Self>()).finish()
+    }
+}
+
 /// "Highest" lock level
 ///
 /// The lock level for the thing returned by `Locked::new`. Users of this crate
