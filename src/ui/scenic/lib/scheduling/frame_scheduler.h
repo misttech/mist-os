@@ -10,6 +10,7 @@
 #include <lib/zx/time.h>
 
 #include <unordered_set>
+#include <vector>
 
 #include "src/ui/scenic/lib/scheduling/id.h"
 

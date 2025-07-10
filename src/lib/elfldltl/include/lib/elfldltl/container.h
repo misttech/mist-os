@@ -8,6 +8,7 @@
 #include <optional>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 // This file provides some adapters for container types defined elsewhere to
 // be used with the diagnostics.h API for handling allocation failures.  These

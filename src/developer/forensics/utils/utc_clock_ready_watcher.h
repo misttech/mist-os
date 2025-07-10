@@ -10,6 +10,8 @@
 #include <lib/fit/function.h>
 #include <lib/zx/clock.h>
 
+#include <vector>
+
 namespace forensics {
 
 class UtcClockReadyWatcherBase {

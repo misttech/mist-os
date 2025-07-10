@@ -9,6 +9,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
+#include <iterator>
+
 #include "src/ui/scenic/lib/scheduling/id.h"
 
 namespace flatland {

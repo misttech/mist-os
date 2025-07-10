@@ -6,6 +6,7 @@
 #define SRC_LIB_ANALYTICS_CPP_GOOGLE_ANALYTICS_4_BATCH_H_
 
 #include <cstddef>
+#include <vector>
 
 #include "lib/fit/function.h"
 #include "src/lib/analytics/cpp/google_analytics_4/event.h"

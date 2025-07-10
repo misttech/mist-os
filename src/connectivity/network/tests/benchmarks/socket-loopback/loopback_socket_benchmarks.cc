@@ -11,6 +11,7 @@
 
 #include <array>
 #include <iostream>
+#include <vector>
 
 #include <fbl/unique_fd.h>
 #include <perftest/perftest.h>
