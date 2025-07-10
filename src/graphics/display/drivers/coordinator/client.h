@@ -36,7 +36,6 @@
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
@@ -252,10 +251,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   Layer::Map layers_;
 
-  // TODO(fxbug.com/129082): Move to Controller, so values issued using this
-  // counter are globally unique. Do not pass to display::DriverLayerId values to drivers
-  // until this issue is fixed.
-  display::DriverLayerId next_driver_layer_id = display::DriverLayerId(1);
+  // TODO(https://fxbug.dev/430976567): Move to client-managed LayerId values.
+  display::LayerId next_layer_id_ = display::LayerId(1);
 
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);

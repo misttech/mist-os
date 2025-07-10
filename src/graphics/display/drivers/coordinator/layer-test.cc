@@ -24,9 +24,9 @@
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
@@ -71,7 +71,7 @@ class LayerTest : public TestBase {
   //
   // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
   std::unique_ptr<Layer, std::function<void(Layer*)>> CreateLayerForTest(
-      display::DriverLayerId layer_id) {
+      display::LayerId layer_id) {
     auto deleter = [this](Layer* layer) {
       libsync::Completion completion;
       async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(),
@@ -128,7 +128,7 @@ class LayerTest : public TestBase {
 };
 
 TEST_F(LayerTest, PrimaryBasic) {
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
@@ -144,7 +144,7 @@ TEST_F(LayerTest, PrimaryBasic) {
 }
 
 TEST_F(LayerTest, CleanUpImage) {
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
@@ -222,7 +222,7 @@ TEST_F(LayerTest, CleanUpImage) {
 TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> applied_layers;
 
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
@@ -280,7 +280,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 }
 
 TEST_F(LayerTest, CleanUpAllImages) {
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
@@ -328,7 +328,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
 TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> applied_layers;
 
-  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
   fhdt::wire::ImageMetadata image_config = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},

@@ -59,7 +59,6 @@
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
@@ -326,21 +325,16 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   }
 
   fbl::AllocChecker alloc_checker;
-  display::DriverLayerId driver_layer_id = next_driver_layer_id++;
-  auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, &controller_, driver_layer_id);
+  display::LayerId layer_id = next_layer_id_;
+  ++next_layer_id_;
+  auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, &controller_, layer_id);
   if (!alloc_checker.check()) {
-    --driver_layer_id;
+    --next_layer_id_;
     completer.ReplyError(ZX_ERR_NO_MEMORY);
     return;
   }
 
   layers_.insert(std::move(new_layer));
-
-  // Driver-side layer IDs are currently exposed to coordinator clients.
-  // https://fxbug.dev/42079482 tracks having client-managed IDs. When that
-  // happens, Client instances will be responsible for translating between
-  // driver-side and client-side IDs.
-  display::LayerId layer_id(driver_layer_id.value());
   completer.ReplySuccess(ToFidlLayerId(layer_id));
 }
 
@@ -350,23 +344,20 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  display::DriverLayerId driver_layer_id(layer_id.value());
-
-  auto layer = layers_.find(driver_layer_id);
-  if (!layer.IsValid()) {
+  auto layers_it = layers_.find(layer_id);
+  if (!layers_it.IsValid()) {
     fdf::error("Tried to destroy invalid layer {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
-  if (layer->in_use()) {
+  Layer& layer = *layers_it;
+  if (layer.in_use()) {
     fdf::error("Destroyed layer {} which was in use", layer_id.value());
     TearDown(ZX_ERR_BAD_STATE);
     return;
   }
 
-  layers_.erase(driver_layer_id);
+  layers_.erase(layers_it);
 }
 
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
@@ -498,17 +489,15 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   for (fuchsia_hardware_display::wire::LayerId fidl_layer_id : request->layer_ids) {
     display::LayerId layer_id = display::ToLayerId(fidl_layer_id);
 
-    // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
-    // the driver-side ID will have to be looked up in a map.
-    display::DriverLayerId driver_layer_id(layer_id.value());
-    auto layer = layers_.find(driver_layer_id);
-    if (!layer.IsValid()) {
+    auto layers_it = layers_.find(layer_id);
+    if (!layers_it.IsValid()) {
       fdf::error("SetDisplayLayers called with unknown layer ID: {}", layer_id.value());
       TearDown(ZX_ERR_INVALID_ARGS);
       return;
     }
 
-    if (!layer->AppendToConfigLayerList(display_config.draft_layers_)) {
+    Layer& layer = *layers_it;
+    if (!layer.AppendToConfigLayerList(display_config.draft_layers_)) {
       fdf::error("Tried to reuse an in-use layer");
       TearDown(ZX_ERR_BAD_STATE);
       return;
@@ -526,10 +515,7 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
 
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  display::DriverLayerId driver_layer_id(layer_id.value());
-  auto layers_it = layers_.find(driver_layer_id);
+  auto layers_it = layers_.find(layer_id);
   if (!layers_it.IsValid()) {
     fdf::error("SetLayerPrimaryConfig called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
@@ -552,10 +538,7 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
 
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  display::DriverLayerId driver_layer_id(layer_id.value());
-  auto layers_it = layers_.find(driver_layer_id);
+  auto layers_it = layers_.find(layer_id);
   if (!layers_it.IsValid()) {
     fdf::error("SetLayerPrimaryPosition called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
@@ -586,10 +569,7 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
 
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  display::DriverLayerId driver_layer_id(layer_id.value());
-  auto layers_it = layers_.find(driver_layer_id);
+  auto layers_it = layers_.find(layer_id);
   if (!layers_it.IsValid()) {
     fdf::error("SetLayerPrimaryAlpha called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
@@ -618,10 +598,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
 
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  display::DriverLayerId driver_layer_id(layer_id.value());
-  auto layers_it = layers_.find(driver_layer_id);
+  auto layers_it = layers_.find(layer_id);
   if (!layers_it.IsValid()) {
     fdf::error("SetLayerColorConfig called with unknown layer ID: {}", layer_id.value());
     return;
@@ -656,10 +633,7 @@ void Client::SetLayerImage2(SetLayerImage2RequestView request,
 
 void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
                                display::EventId wait_event_id) {
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  display::DriverLayerId driver_layer_id(layer_id.value());
-  auto layers_it = layers_.find(driver_layer_id);
+  auto layers_it = layers_.find(layer_id);
   if (!layers_it.IsValid()) {
     fdf::error("SetLayerImage called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);

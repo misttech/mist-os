@@ -24,8 +24,8 @@
 #include "src/graphics/display/drivers/coordinator/waiting-image-list.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 
 namespace display_coordinator {
 
@@ -39,10 +39,10 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
 };
 
 // Almost-POD used by Client to manage layer state. Public state is used by Controller.
-class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> {
+class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
  public:
   // `controller` must be non-null.
-  explicit Layer(Controller* controller, display::DriverLayerId id);
+  explicit Layer(Controller* controller, display::LayerId id);
 
   Layer(const Layer&) = delete;
   Layer(Layer&&) = delete;
