@@ -37,6 +37,7 @@ pub enum Nl80211Attr {
     StatusCode(u16),
     ScanFrequencies(Vec<u32>),
     ScanSsids(Vec<Vec<u8>>),
+    Frame(Vec<u8>),
     MaxScheduledScanSsids(u8),
     MaxMatchSets(u8),
     FeatureFlags(u32),
@@ -64,6 +65,7 @@ impl Nla for Nl80211Attr {
             MaxScanSsids(val) => size_of_val(val),
             ScanFrequencies(val) => to_nested_values(val).as_slice().buffer_len(),
             ScanSsids(val) => to_nested_values(val).as_slice().buffer_len(),
+            Frame(val) => val.len(),
             Bss(val) => val.as_slice().buffer_len(),
             StatusCode(val) => size_of_val(val),
             MaxScheduledScanSsids(val) => size_of_val(val),
@@ -93,6 +95,7 @@ impl Nla for Nl80211Attr {
             MaxScanSsids(_) => NL80211_ATTR_MAX_NUM_SCAN_SSIDS,
             ScanFrequencies(_) => NL80211_ATTR_SCAN_FREQUENCIES,
             ScanSsids(_) => NL80211_ATTR_SCAN_SSIDS,
+            Frame(_) => NL80211_ATTR_FRAME,
             Bss(_) => NL80211_ATTR_BSS,
             StatusCode(_) => NL80211_ATTR_STATUS_CODE,
             MaxScheduledScanSsids(_) => NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS,
@@ -131,6 +134,7 @@ impl Nla for Nl80211Attr {
             MaxScanSsids(val) => buffer[0] = *val,
             ScanFrequencies(val) => to_nested_values(val).as_slice().emit(buffer),
             ScanSsids(val) => to_nested_values(val).as_slice().emit(buffer),
+            Frame(val) => buffer.copy_from_slice(&val[..]),
             Bss(val) => val.as_slice().emit(buffer),
             StatusCode(val) => NativeEndian::write_u16(buffer, *val),
             MaxScheduledScanSsids(val) => buffer[0] = *val,
@@ -196,6 +200,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for Nl80211Attr {
                 .collect::<Result<Vec<_>, _>>()
                 .map(Self::ScanSsids)
                 .context("Invalid NL80211_ATTR_SCAN_SSIDS value")?,
+            NL80211_ATTR_FRAME => Self::Frame(payload.to_vec()),
             NL80211_ATTR_STATUS_CODE => Self::StatusCode(
                 parse_u16(payload).context("Invalid NL80211_ATTR_STATUS_CODE value")?,
             ),
@@ -249,6 +254,7 @@ mod tests {
             MaxScanSsids(10),
             ScanFrequencies(vec![1, 2, 3]),
             ScanSsids(vec![]),
+            Frame(vec![1, 2, 3, 4]),
             // Bss is not parseable right now, skip.
             MaxScheduledScanSsids(11),
             MaxMatchSets(12),
@@ -309,6 +315,11 @@ mod tests {
             7, 0, 1, 0, 11, 22, 33, 00, // entry 1
             9, 0, 2, 0, 44, 55, 66, 77, 88, 00, 00, 00, // entry 2
         ] ; "vec of vec of u8"
+    )]
+    #[test_case(
+        Nl80211Attr::Frame(vec![11, 22, 33, 44]),
+        vec![8, 0, NL80211_ATTR_FRAME as u8, 0, 11, 22, 33, 44] ;
+        "frame"
     )]
     #[test_case(
         Nl80211Attr::ExtendedFeatures(vec![11, 22, 33, 44]),

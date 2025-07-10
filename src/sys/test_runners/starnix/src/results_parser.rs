@@ -337,8 +337,7 @@ mod tests {
 
     #[test]
     fn parse_xml_results() {
-        let results_xml = r#"
-<?xml version="1.0" encoding="UTF-8"?>
+        let results_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <testsuites name="AllTests" tests="3" failures="1" disabled="0" errors="0"
             timestamp="2011-10-31T18:52:42Z">
   <testsuite name="MathTest" tests="2" failures="1" disabled="0" errors="0" time="0.015s">

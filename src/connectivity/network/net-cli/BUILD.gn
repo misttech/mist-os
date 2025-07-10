@@ -9,7 +9,7 @@ import("//build/rust/rustc_library.gni")
 rustc_library("lib") {
   name = "net_cli"
   with_unit_tests = true
-  edition = "2021"
+  edition = "2024"
 
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
@@ -73,7 +73,7 @@ rustc_library("lib") {
 
 rustc_binary("bin") {
   name = "net"
-  edition = "2021"
+  edition = "2024"
 
   deps = [
     ":lib",

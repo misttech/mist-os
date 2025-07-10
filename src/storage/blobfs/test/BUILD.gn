@@ -60,8 +60,10 @@ source_set("test_utils") {
     "//sdk/lib/async-loop",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/fidl/cpp/wire",
     "//src/storage/blobfs",
     "//src/storage/blobfs:decompressor_impl",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp",
     "//src/storage/lib/block_client/cpp:fake_device",
     "//zircon/system/ulib/id_allocator",
   ]

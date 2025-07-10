@@ -4810,7 +4810,7 @@ where
         core_ctx.with_socket_state_mut(id, |core_ctx, state| {
             match state {
                 SocketState::Unbound(state) => {
-                    let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } = state;
+                    let UnboundSocketState { device, sharing: _, ip_options: _ } = state;
                     *device = new_device.map(|d| d.downgrade());
                     Ok(())
                 }

@@ -955,8 +955,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_rule_table<I: IpExt>(ip_version_marker: IpVersionMarker<I>) {
         let scope = fasync::Scope::new();
-        let (mut sink, client, async_work_drain_task) =
-            crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let (mut sink, client, async_work_drain_task) = crate::client::testutil::new_fake_client(
+            crate::client::testutil::CLIENT_ID_1,
+            std::iter::empty(),
+        );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (rule_set, server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
         let _serve_task = fuchsia_async::Task::local(
@@ -1166,8 +1168,10 @@ mod tests {
     async fn test_rule_table_new_rule_already_exists<I: IpExt>(
         ip_version_marker: IpVersionMarker<I>,
     ) {
-        let (mut sink, client, async_work_drain_task) =
-            crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let (mut sink, client, async_work_drain_task) = crate::client::testutil::new_fake_client(
+            crate::client::testutil::CLIENT_ID_1,
+            std::iter::empty(),
+        );
         let scope = fasync::Scope::new();
         let _join_handle = scope.spawn(async_work_drain_task);
         let (rule_set, server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
@@ -1273,8 +1277,10 @@ mod tests {
         error: Errno,
         ip_version_marker: IpVersionMarker<I>,
     ) {
-        let (mut sink, client, async_work_drain_task) =
-            crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let (mut sink, client, async_work_drain_task) = crate::client::testutil::new_fake_client(
+            crate::client::testutil::CLIENT_ID_1,
+            std::iter::empty(),
+        );
         let scope = fasync::Scope::new();
         let _join_handle = scope.spawn(async_work_drain_task);
         let (rule_set, _server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
@@ -1303,8 +1309,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_default_rules<I: IpExt>() {
         let scope = fasync::Scope::new();
-        let (mut sink, client, async_work_drain_task) =
-            crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let (mut sink, client, async_work_drain_task) = crate::client::testutil::new_fake_client(
+            crate::client::testutil::CLIENT_ID_1,
+            std::iter::empty(),
+        );
         let _join_handle = scope.spawn(async_work_drain_task);
 
         let mut table = RuleTable::<I>::new_with_defaults();

@@ -19,6 +19,7 @@ use perfetto_trace_protos::perfetto::protos::frame_timeline_event::{
     ActualDisplayFrameStart, ActualSurfaceFrameStart, Event, ExpectedDisplayFrameStart,
     ExpectedSurfaceFrameStart,
 };
+use perfetto_trace_protos::perfetto::protos::ftrace_event::Event::Print;
 use perfetto_trace_protos::perfetto::protos::{trace_packet, Trace};
 use prost::Message;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -30,6 +31,8 @@ use starnix_uapi::pid_t;
 use std::collections::HashMap;
 use std::sync::Arc;
 use zx::Koid;
+
+mod atrace;
 
 const PERFETTO_BUFFER_SIZE_KB: u32 = 63488;
 
@@ -399,12 +402,50 @@ impl CallbackState {
                             }
                         }
                     }
+                    trace_packet::Data::FtraceEvents(ref mut ftrace_bundle) => {
+                        for ref mut evt in &mut ftrace_bundle.event {
+                            if let Some(ref mut pid) = evt.pid {
+                                *pid = self.map_to_koid_val(*pid as i32) as u32;
+                            }
+                            if let Some(ref mut event_data) = evt.event {
+                                match event_data {
+                                    Print(ref mut print) => {
+                                        if let Some(ref mut data) = print.buf {
+                                            *data = self.map_print_event(data)
+                                        }
+                                    }
+                                    _ => (),
+                                }
+                            }
+                        }
+                    }
                     // No need to process other data; we only fixup data that references the pid.
                     _ => (),
                 }
             }
         }
         Ok(proto.encode_to_vec())
+    }
+
+    fn map_print_event(&self, data: &String) -> String {
+        if let Some(mut event) = atrace::ATraceEvent::parse(&data) {
+            match event {
+                atrace::ATraceEvent::Begin { ref mut pid, .. }
+                | atrace::ATraceEvent::End { ref mut pid }
+                | atrace::ATraceEvent::Instant { ref mut pid, .. }
+                | atrace::ATraceEvent::AsyncBegin { ref mut pid, .. }
+                | atrace::ATraceEvent::AsyncEnd { ref mut pid, .. }
+                | atrace::ATraceEvent::Counter { ref mut pid, .. }
+                | atrace::ATraceEvent::AsyncTrackBegin { ref mut pid, .. }
+                | atrace::ATraceEvent::AsyncTrackEnd { ref mut pid, .. }
+                | atrace::ATraceEvent::Track { ref mut pid, .. } => {
+                    *pid = self.map_to_koid_val(*pid as i32) as u64
+                }
+            }
+            event.data()
+        } else {
+            data.to_string()
+        }
     }
 
     fn map_to_koid_val(&self, pid: i32) -> i32 {

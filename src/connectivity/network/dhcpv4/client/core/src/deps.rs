@@ -439,7 +439,7 @@ mod test {
     fn test_rng() {
         let make_sequence = |seed| {
             let mut rng = FakeRngProvider::new(seed);
-            std::iter::from_fn(|| Some(rng.get_rng().gen::<u32>())).take(5).collect::<Vec<_>>()
+            std::iter::from_fn(|| Some(rng.get_rng().r#gen::<u32>())).take(5).collect::<Vec<_>>()
         };
         assert_eq!(
             make_sequence(42),

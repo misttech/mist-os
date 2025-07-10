@@ -1529,7 +1529,7 @@ mod test {
         let (mut client_sink, mut client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[],
+                std::iter::empty(),
             );
         let join_handle = fasync::Task::spawn(async_work_drain_task);
 
@@ -1584,7 +1584,7 @@ mod test {
         let (mut client_sink, mut client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[],
+                std::iter::empty(),
             );
         let join_handle = fasync::Task::spawn(async_work_drain_task);
 
@@ -2802,7 +2802,7 @@ mod test {
         let (mut client_sink, mut client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[],
+                std::iter::empty(),
             );
         let join_handle = fasync::Task::spawn(async_work_drain_task);
 
@@ -3294,7 +3294,7 @@ mod test {
         let (mut client_sink, mut client, async_work_drain_task) = {
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[],
+                std::iter::empty(),
             )
         };
         let join_handle = fasync::Task::spawn(async_work_drain_task);
@@ -3626,7 +3626,7 @@ mod test {
         let (mut client_sink, mut client, async_work_drain_task) = {
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[],
+                std::iter::empty(),
             )
         };
         let join_handle = fasync::Task::spawn(async_work_drain_task);

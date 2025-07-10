@@ -62,7 +62,7 @@ _all_core_crates = [
 
 rustc_library_with_features("netstack3-core") {
   version = "0.1.0"
-  edition = "2021"
+  edition = "2024"
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   check_cfgs = [
@@ -292,7 +292,7 @@ config("no_lock_order") {
 }
 
 rustc_fuzzer("fuzz-single-device") {
-  edition = "2021"
+  edition = "2024"
   rustfunction = "single_device_arbitrary_packets"
   source_root = "fuzz/src/lib.rs"
 

@@ -57,11 +57,17 @@ fn wait_signaled_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
         if let zx::WaitResult::Ok(_) = result {
             return result;
         }
-        fuchsia_trace::instant!(c"alarms", c"starnix:hrtimer:wait_timeout", fuchsia_trace::Scope::Process);
+        fuchsia_trace::instant!(
+            c"alarms",
+            c"starnix:hrtimer:wait_timeout",
+            fuchsia_trace::Scope::Process
+        );
         // This is bad and should never happen. If it does, it's a bug that has to be found and
         // fixed. There is no good way to proceed if these signals are not being signaled properly.
         log_error!(
-            "wait_signaled_sync: not signaled yet: {result:?}. See HrTimer bug: b/428223204"
+            // LINT.IfChange(hrtimer_wait_signaled_sync_tefmo)
+            "wait_signaled_sync: not signaled yet. See HrTimer bug: b/428223204: result={result:?}",
+            // LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go:hrtimer_wait_signaled_sync_tefmo)
         );
     }
 }

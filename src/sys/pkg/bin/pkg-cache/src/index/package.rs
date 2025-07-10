@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::retained::RetainedIndex;
+use super::retained::{RetainedBlobs, RetainedIndex};
 use super::writing::{CleanupGuard, WritingIndex};
 use fuchsia_hash::Hash;
 use futures::future::{BoxFuture, FutureExt as _};
@@ -14,6 +14,7 @@ use {fidl_fuchsia_pkg as fpkg, fuchsia_inspect as finspect};
 #[derive(Clone, Debug)]
 pub struct PackageIndex {
     retained: RetainedIndex,
+    retained_blobs: RetainedBlobs,
     writing: WritingIndex,
 }
 
@@ -26,7 +27,11 @@ pub enum AddBlobsError {
 impl PackageIndex {
     /// Creates an empty PackageIndex.
     pub fn new() -> Self {
-        Self { retained: RetainedIndex::new(), writing: WritingIndex::new() }
+        Self {
+            retained: RetainedIndex::new(),
+            retained_blobs: RetainedBlobs::default(),
+            writing: WritingIndex::new(),
+        }
     }
 
     /// Notifies the appropriate indices that the package with the given hash is going to be
@@ -95,9 +100,14 @@ impl PackageIndex {
         self.retained.replace(index);
     }
 
+    fn set_retained_blobs(&mut self, blobs: RetainedBlobs) {
+        self.retained_blobs = blobs;
+    }
+
     /// Returns all blobs protected by this index.
     pub fn all_blobs(&self) -> HashSet<Hash> {
         let mut all = self.retained.all_blobs();
+        all.extend(self.retained_blobs.all_blobs());
         all.extend(self.writing.all_blobs());
         all
     }
@@ -119,6 +129,8 @@ impl PackageIndex {
                     let index: Self = (*this.read().await).clone();
                     let root = inspector.root();
                     let () = root.record_child("retained", |n| index.retained.record_inspect(n));
+                    let () = root
+                        .record_child("retained-blobs", |n| index.retained_blobs.record_inspect(n));
                     let () = root.record_child("writing", |n| index.writing.record_inspect(n));
                 } else {
                     inspector.root().record_string("error", "the package index was dropped");
@@ -130,11 +142,19 @@ impl PackageIndex {
     }
 }
 
+/// Replaces the retained blobs with one that tracks the given blob hashes.
+pub async fn set_retained_blobs(
+    index: &Arc<async_lock::RwLock<PackageIndex>>,
+    blobs: HashSet<Hash>,
+) {
+    index.write().await.set_retained_blobs(RetainedBlobs::new(blobs));
+}
+
 /// Replaces the retained index with one that tracks the given meta far hashes.
 pub async fn set_retained_index(
     index: &Arc<async_lock::RwLock<PackageIndex>>,
     blobfs: &blobfs::Client,
-    meta_hashes: &[Hash],
+    meta_hashes: HashSet<Hash>,
 ) {
     // To avoid having to hold a lock while reading/parsing meta fars, first produce a fresh
     // retained index from meta fars available in blobfs.

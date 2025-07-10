@@ -146,6 +146,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.hardware.power.statecontrol/RebootReason2.ANDROID_UNEXPECTED_REASON",
+        "value": "12"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.hardware.power.statecontrol/RebootReason2.CRITICAL_COMPONENT_FAILURE",
         "value": "7"
     },

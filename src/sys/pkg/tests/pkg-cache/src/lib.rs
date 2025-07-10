@@ -41,6 +41,7 @@ mod executability_enforcement;
 mod get;
 mod inspect;
 mod pkgfs;
+mod retained_blobs;
 mod retained_packages;
 mod space;
 mod sync;
@@ -343,6 +344,21 @@ pub async fn replace_retained_packages(
         fidl::endpoints::create_request_stream::<fpkg::BlobIdIteratorMarker>();
     let serve_iterator_fut = async {
         fpkg_ext::serve_fidl_iterator_from_slice(iterator_stream, packages).await.unwrap();
+    };
+    let (replace_retained_result, ()) =
+        futures::join!(proxy.replace(iterator_client_end), serve_iterator_fut);
+    assert_matches!(replace_retained_result, Ok(()));
+}
+
+async fn replace_retained_blobs(
+    proxy: &fidl_fuchsia_pkg::RetainedBlobsProxy,
+    blobs: impl IntoIterator<Item = Hash>,
+) {
+    let blobs = blobs.into_iter().map(|h| fpkg_ext::BlobId::from(h).into()).collect::<Vec<_>>();
+    let (iterator_client_end, iterator_stream) =
+        fidl::endpoints::create_request_stream::<fidl_fuchsia_pkg::BlobIdIteratorMarker>();
+    let serve_iterator_fut = async {
+        fidl_fuchsia_pkg_ext::serve_fidl_iterator_from_slice(iterator_stream, blobs).await.unwrap();
     };
     let (replace_retained_result, ()) =
         futures::join!(proxy.replace(iterator_client_end), serve_iterator_fut);
@@ -821,6 +837,7 @@ where
                 Route::new()
                     .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
                     .capability(Capability::protocol::<fpkg::RetainedPackagesMarker>())
+                    .capability(Capability::protocol::<fpkg::RetainedBlobsMarker>())
                     .capability(Capability::protocol::<fspace::ManagerMarker>())
                     .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
                     .capability(Capability::protocol::<fcomponent_resolution::ResolverMarker>())
@@ -852,6 +869,10 @@ where
                 .root
                 .connect_to_protocol_at_exposed_dir()
                 .expect("connect to retained packages"),
+            retained_blobs: realm_instance
+                .root
+                .connect_to_protocol_at_exposed_dir()
+                .expect("connect to retained blobs"),
             pkgfs: fuchsia_fs::directory::open_directory_async(
                 realm_instance.root.get_exposed_dir(),
                 "pkgfs",
@@ -879,6 +900,7 @@ struct Proxies {
     space_manager: fspace::ManagerProxy,
     package_cache: fpkg::PackageCacheProxy,
     retained_packages: fpkg::RetainedPackagesProxy,
+    retained_blobs: fpkg::RetainedBlobsProxy,
     pkgfs: fio::DirectoryProxy,
 }
 

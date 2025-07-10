@@ -6,8 +6,9 @@ Fuchsia codebase and should follow these instructions.
 
 The main way to interact with a fuchsia device is via `fx` and `ffx` commands.
 
-To run a build, run `fx build -q`. Make sure to use the `-q` option to
-make the output smaller.
+To run a build, run `fx build -q`. Make sure to use the `-q` option to make the
+output smaller. The Fuchsia platform uses the GN and Bazel build systems. You
+must not generate Cargo.toml, CMakeLists.txt, or Makefile build files.
 
 To run a test, run `fx test <name of test>`. You can list available tests with
 `fx test --dry`. You can get JSON output by adding the arguments `--logpath -`.
@@ -24,7 +25,9 @@ If you're confused about why a command failed, try taking a look at the logs
 from the device before trying the next command. Device logs often reveal
 information not contained in host-side stdout/stderr.
 
-Always ask for confirmation before running `fx set` or otherwise changing the users build settings and before running destructive commands like `ffx target flash`.
+Always ask for confirmation before running `fx set` or otherwise changing the
+users build settings and before running destructive commands like `ffx target
+flash`.
 
 Documentation for Fuchsia is in the `docs/` subdirectory and the
 `vendor/google/docs/` subdirectory. You should read the documentation if you're
@@ -36,9 +39,12 @@ build code before suggesting it as a solution to ensure it compiles.
 
 ## Searching the codebase
 
-IMPORTANT: Do not use the SearchText tool over the entire codebase
-without first running a `grep` for your search term piped to `wc -l`.
-For instance, if you'd like to search for `foo`, run `grep -r foo | wc -l`.
+IMPORTANT: Do not use the SearchText tool or the `grep` shell command
+in this code-base. If you want to use either of those tools, use `git grep` instead.
+For instance, if you'd like to search for `foo`, run `git --no-pager grep foo`.
+
+If you feel you must use the SearchText first run a `git grep` for your search term
+piped to `wc -l`. For example, `git --no-pager grep foo | wc -l`.
 
 If `wc` returns more than 100 lines, narrow your search terms and try
 to use `tree` to find the right directory to search from rather than
@@ -200,3 +206,93 @@ Once you've collected this additional evidence, you should begin to ask the
 
 If you already know the timestamps you're interested in, use your text
 search tool to read only those regions of the file.
+
+# Git usage guidelines
+
+## Working with Git in a Multi-repo Environment
+
+The Fuchsia project is composed of multiple git repositories (e.g., `//`
+and `//vendor/google`). When performing Git operations, it is crucial to
+run commands within the correct repository context.
+
+**Workflow for Each Git Task:**
+
+Before initiating a set of related `git` actions (like staging and
+committing a file), **always** follow these steps:
+
+1.  **Get Absolute Path of Target File:** No matter if the input path is
+    relative (e.g., `vendor/google/baz/foo.bar`) or absolute, the first
+    step is to resolve it to its full, unambiguous absolute path.
+    *   **Command:** `ABS_FILE_PATH=$(realpath "vendor/google/baz/foo.bar")`
+
+2.  **Determine Absolute Path of Repository Root:** Use the file's
+    absolute path to find the repository root. This will also be an
+    absolute path. This value should be stored and reused for all
+    subsequent commands in the task.
+    *   **Command:** `GIT_ROOT=$(git -C "$(dirname "$ABS_FILE_PATH")" rev-parse --show-toplevel)`
+
+3.  **Calculate Path Relative to Repository Root:** Now that both the file
+    path and the repository root are absolute, we can reliably calculate
+    the file's path relative to the root.
+    *   **Command:** `RELATIVE_PATH="${ABS_FILE_PATH#"$GIT_ROOT"/}"`
+
+4.  **Execute Git Commands in Context:** Use the stored `$GIT_ROOT` and the
+    calculated `$RELATIVE_PATH` for all `git` actions. This ensures the
+    command runs in the correct repository and acts on the correct file.
+    *   **Example:** `git -C "$GIT_ROOT" add "$RELATIVE_PATH"`
+    *   **Example:** `git -C "$GIT_ROOT" commit -m "Your message"`
+
+5.  **Repeat for New Tasks:** If you switch context to a file in a
+    different location (e.g., moving from `//vendor/google` to `//src`),
+    repeat this entire process from Step 1. **Do not assume the previous
+    repository root is still correct.**
+
+## Git Commit Message Formatting
+
+These guidelines are a summary of the full [commit message style
+guide](docs/contribute/commit-message-style-guide.md).
+
+*   **Subject Line:**
+    *   **Tag:** The subject **must** begin with a `[tag]` to categorize
+        the change.
+        *   The tag should be a short keyword relevant to the change's
+            scope (e.g., `[docs]`, `[test]`, `[fidl]`).
+        *   Multiple tags can be used for more specificity (e.g.,
+            `[net][dhcp]`).
+        *   To choose a good tag, check the commit history for the files
+            you are editing.
+    *   **Summary:** Use the imperative mood (e.g., "Add feature," not
+        "Added feature").
+    *   **Length:** Keep the entire subject line under 50 characters if
+        possible.
+
+*   **Body:**
+    *   Separate the subject from the body with a blank line.
+    *   Explain the *reason and intention* of the change, not just what
+        changed.
+    *   Wrap body lines at 72 characters.
+
+*   **Footer:**
+    *   **Bug:** Include a `Bug: <issue-id>` line to link to an issue. This
+        is recommended when applicable but not required. Use `Fixed:` to
+        automatically close the issue. Do not make up an issue-id. If you do
+        not know a relevant issue-id, ask the user for one.
+    *   **Test:** A `Test:` line is required to describe how the change was
+        verified. Describe how the change is tested, whether new tests were
+        added, and what kind of tests they are (unit, integration, or end-to-end
+        tests). If no new tests are needed (e.g., for a documentation
+        change), you can use `Test: None` with a brief explanation.
+
+**Example:**
+```
+[docs] Add commit message guidelines to GEMINI.md
+
+This provides a summary of the commit message style
+guide for quick reference within the agent's primary
+context file.
+
+Bug: 12345
+Test: None, documentation change.
+
+Change-Id: Iabcdef1234567890abcdef1234567890abcdef12
+```

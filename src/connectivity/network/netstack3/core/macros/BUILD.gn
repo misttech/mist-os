@@ -8,7 +8,7 @@ import("//build/rust/rustc_test.gni")
 rustc_macro("netstack3-macros") {
   source_root = "src/lib.rs"
   version = "0.1.0"
-  edition = "2021"
+  edition = "2024"
   deps = [
     "//third_party/rust_crates:proc-macro2",
     "//third_party/rust_crates:quote",
@@ -25,7 +25,7 @@ if (is_host) {
   rustc_test("netstack3-macros-test") {
     source_root = "src/test.rs"
     version = "0.1.0"
-    edition = "2021"
+    edition = "2024"
     deps = [
       ":netstack3-macros",
       "//src/connectivity/lib/net-types",

@@ -223,6 +223,10 @@ if (allowed_device_types == []) {
 #             [string] The path to the metadata file (bin file) accompanying the certificate.
 #             There is no default, the path has to be specified explicitly.
 #
+#       use_tcg (optional)
+#         [bool] Whether to use TCG instead of KVM for emulators. This value only
+#         takes effect if the `device_type` in the `dimensions` is an emulator type.
+#
 #       tags (optional)
 #         [list of strings] keys on which tests may be grouped. Tests with
 #         given tags will be run (1) together, and (2) only with support from

@@ -150,7 +150,7 @@ impl SuspensionBlockControl {
     /// Suspension can be cancelled with a call to
     /// [`SuspensionBlockControl::resume`]. The returned future *must not be
     /// polled* after `resume` is called.
-    pub(crate) fn suspend(&mut self) -> impl Future<Output = ()> {
+    pub(crate) fn suspend(&mut self) -> impl Future<Output = ()> + use<> {
         let Self(inner) = self;
         // Disallow guards synchronously.
         inner.state.lock().allow_guards = false;

@@ -6,7 +6,7 @@ import("//build/rust/rustc_library.gni")
 
 rustc_library("hashmap") {
   name = "netstack3-hashmap"
-  edition = "2021"
+  edition = "2024"
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
 

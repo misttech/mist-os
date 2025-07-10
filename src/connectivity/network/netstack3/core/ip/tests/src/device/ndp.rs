@@ -1922,7 +1922,7 @@ fn test_host_generate_temporary_slaac_address(
         None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
-        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().gen()),
+        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().r#gen()),
         &ctx.core_ctx.ipv6().slaac_temp_secret_key,
     );
     let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -2295,7 +2295,7 @@ fn get_matching_slaac_address_entries<F: FnMut(&SlaacAddr<FakeInstant>) -> bool>
     ctx: &FakeCtx,
     device: &DeviceId<FakeBindingsCtx>,
     filter: F,
-) -> impl Iterator<Item = SlaacAddr<FakeInstant>> {
+) -> impl Iterator<Item = SlaacAddr<FakeInstant>> + use<F> {
     get_slaac_addrs(ctx, device, None).into_iter().filter(filter)
 }
 
@@ -3154,7 +3154,7 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
         None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
-        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().gen()),
+        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().r#gen()),
         &ctx.core_ctx.ipv6().slaac_temp_secret_key,
     );
     let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];

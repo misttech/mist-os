@@ -584,11 +584,11 @@ mod test {
         }
 
         /// Resolves once the initial watcher probe successfully returns.
-        async fn create_watcher_event_stream(
+        async fn create_watcher_event_stream<O: IntoIterator<Item = OptionType>>(
             &mut self,
-            option_types: Option<impl IntoIterator<Item = OptionType>>,
+            option_types: Option<O>,
             interface_id: Option<BindingId>,
-        ) -> impl Stream<Item = (Vec<fnet_ndp::OptionWatchEntry>, u32)> {
+        ) -> impl Stream<Item = (Vec<fnet_ndp::OptionWatchEntry>, u32)> + use<O> {
             let watcher = self.create_watcher(option_types, interface_id);
             watcher.probe().await.expect("should successfully probe");
             futures::stream::unfold(watcher, |watcher| async move {

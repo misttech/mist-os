@@ -6552,7 +6552,7 @@ mod tests {
 
         let mut maybe_drop_frame =
             |_: &mut TcpCtx<_>, meta: DualStackSendIpPacketMeta<_>, buffer: Buf<Vec<u8>>| {
-                let x: f64 = rng.gen();
+                let x: f64 = rng.r#gen();
                 (x > drop_rate).then_some((meta, buffer))
             };
 

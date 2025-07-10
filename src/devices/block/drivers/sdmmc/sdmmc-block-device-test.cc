@@ -205,47 +205,15 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
   fidl::ServerEnd<fuchsia_power_broker::LeaseControl> lease_control_server_end_;
 };
 
-class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
- public:
-  void Update(UpdateRequest& req, UpdateCompleter::Sync& completer) override {
-    current_level_ = req.current_level();
-    completer.Reply(fit::success());
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  fuchsia_power_broker::PowerLevel current_level_ = UINT32_MAX;
-};
-
-class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
- public:
-  void Watch(WatchCompleter::Sync& completer) override {
-    completer.Reply(fit::success(required_level_));
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  fuchsia_power_broker::PowerLevel required_level_ = SdmmcBlockDevice::kPowerLevelOff;
-};
-
 class PowerElement {
  public:
   explicit PowerElement(
       fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control,
-      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
-      fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
-      fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
-      : element_control_(std::move(element_control)),
-        lessor_(std::move(lessor)),
-        current_level_(std::move(current_level)),
-        required_level_(std::move(required_level)) {}
+      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor)
+      : element_control_(std::move(element_control)), lessor_(std::move(lessor)) {}
 
   fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_;
   fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_;
-  fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_;
-  fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_;
 };
 
 class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
@@ -258,11 +226,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   void AddElement(fuchsia_power_broker::ElementSchema& req,
                   AddElementCompleter::Sync& completer) override {
     // Get channels from request.
-    ASSERT_TRUE(req.level_control_channels().has_value());
-    fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>& current_level_server_end =
-        req.level_control_channels().value().current();
-    fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>& required_level_server_end =
-        req.level_control_channels().value().required();
     fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
     fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server_end =
         req.element_control().value();
@@ -295,30 +258,10 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
             [](FakeLessor* impl, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
 
-    // Instantiate (fake) current and required level implementations.
-    auto current_level_impl = std::make_unique<FakeCurrentLevel>();
-    auto required_level_impl = std::make_unique<FakeRequiredLevel>();
-    if (req.element_name() == SdmmcBlockDevice::kHardwarePowerElementName) {
-      hardware_power_current_level_ = current_level_impl.get();
-      hardware_power_required_level_ = required_level_impl.get();
-    } else {
-      ZX_ASSERT_MSG(0, "Unexpected power element.");
-    }
-    fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_binding =
-        fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
-            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(current_level_server_end),
-            std::move(current_level_impl),
-            [](FakeCurrentLevel* impl, fidl::UnbindInfo info,
-               fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> server_end) mutable {});
-    fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_binding =
-        fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
-            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(required_level_server_end),
-            std::move(required_level_impl),
-            [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
-               fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
+    hardware_power_element_runner_client_ = fidl::Client<fuchsia_power_broker::ElementRunner>(
+        std::move(req.element_runner().value()), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
-    servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
-                          std::move(current_level_binding), std::move(required_level_binding));
+    servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding));
 
     completer.Reply(fit::success());
   }
@@ -328,8 +271,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
 
   FakeElementControl* hardware_power_element_control_ = nullptr;
   FakeLessor* hardware_power_lessor_ = nullptr;
-  FakeCurrentLevel* hardware_power_current_level_ = nullptr;
-  FakeRequiredLevel* hardware_power_required_level_ = nullptr;
+  fidl::Client<fuchsia_power_broker::ElementRunner> hardware_power_element_runner_client_;
 
  private:
   fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
@@ -394,9 +336,8 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   void SetUp() override {
     sdmmc_.Reset();
 
-    sdmmc_.set_command_callback(MMC_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
-      out_response[0] = MMC_OCR_BUSY;
-    });
+    sdmmc_.set_command_callback(
+        MMC_SEND_OP_COND, [](uint32_t out_response[4]) -> void { out_response[0] = MMC_OCR_BUSY; });
 
     sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [](uint32_t out_response[4]) -> void {
       out_response[0] = MMC_STATUS_CURRENT_STATE_TRAN;
@@ -2361,15 +2302,11 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
 
   // Trigger power level change to kPowerLevelOff.
   incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ =
-        SdmmcBlockDevice::kPowerLevelOff;
-  });
-  runtime_.PerformBlockingWork([&] {
-    while (incoming_.SyncCall([](IncomingNamespace* incoming) {
-      return incoming->power_broker.hardware_power_current_level_->current_level_ !=
-             SdmmcBlockDevice::kPowerLevelOff;
-    })) {
-    }
+    incoming->power_broker.hardware_power_element_runner_client_
+        ->SetLevel(SdmmcBlockDevice::kPowerLevelOff)
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
 
   // The lease should still be held after moving to kPowerLevelOff.
@@ -2390,15 +2327,11 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
 
   // Trigger power level change to kPowerLevelBoot.
   incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ =
-        SdmmcBlockDevice::kPowerLevelBoot;
-  });
-  runtime_.PerformBlockingWork([&] {
-    while (incoming_.SyncCall([](IncomingNamespace* incoming) {
-      return incoming->power_broker.hardware_power_current_level_->current_level_ !=
-             SdmmcBlockDevice::kPowerLevelBoot;
-    })) {
-    }
+    incoming->power_broker.hardware_power_element_runner_client_
+        ->SetLevel(SdmmcBlockDevice::kPowerLevelBoot)
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
 
   // The lease should still be held after moving to kPowerLevelBoot.
@@ -2419,8 +2352,11 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   // Trigger power level change to kPowerLevelOn. This should be a no-op other than dropping the
   // lease.
   incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ =
-        SdmmcBlockDevice::kPowerLevelOn;
+    incoming->power_broker.hardware_power_element_runner_client_
+        ->SetLevel(SdmmcBlockDevice::kPowerLevelOn)
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
 
   // Wait until the lease has been dropped.
@@ -2444,10 +2380,12 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
 
   // Trigger power level change to kPowerLevelOff. This time the transition should be respected, and
   // the device should be put to sleep.
-  sleep_complete.Reset();
   incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ =
-        SdmmcBlockDevice::kPowerLevelOff;
+    incoming->power_broker.hardware_power_element_runner_client_
+        ->SetLevel(SdmmcBlockDevice::kPowerLevelOff)
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
@@ -2463,8 +2401,11 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   // Trigger power level change back to kPowerLevelOn and wait for the device to be woken up.
   awake_complete.Reset();
   incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ =
-        SdmmcBlockDevice::kPowerLevelOn;
+    incoming->power_broker.hardware_power_element_runner_client_
+        ->SetLevel(SdmmcBlockDevice::kPowerLevelOn)
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
   runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
 

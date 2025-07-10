@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("netstack3_udp_integration_test") {
-  edition = "2021"
+  edition = "2024"
   sources = [
     "src/bindtodevice.rs",
     "src/lib.rs",

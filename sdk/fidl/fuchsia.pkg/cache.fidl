@@ -327,8 +327,9 @@ closed protocol PackageIndexIterator {
 ///
 /// Retained packages will not be removed from the package cache, even if they
 /// aren't fully present. There is only a single set active at once, and the
-/// provided APIs for configuring the set atomically replace that set. On boot,
-/// the retained package set is always initialized to the empty set.
+/// provided APIs for configuring the set atomically replace the retained
+/// packages set, it will not affect the retained blobs set. On boot, the
+/// retained packages set is always initialized to the empty set.
 /// Documentation on [garbage collection](
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/garbage_collection) contains
 /// details on various types of package indexes (static, retained, etc) and
@@ -345,6 +346,34 @@ closed protocol RetainedPackages {
     /// Duplicate IDs provided will be merged and processed as a single one.
     ///
     /// + request `iterator` an iterator of package blob IDs that should be
+    ///   retained.
+    strict Replace(resource struct {
+        iterator client_end:BlobIdIterator;
+    }) -> ();
+};
+
+/// Manages the set of retained blobs.
+///
+/// Retained blobs will not be removed from the package cache, even if they
+/// aren't fully present. There is only a single set active at once, and the
+/// provided APIs for configuring the set atomically replace the retained blobs
+/// set, it will not affect the retained packages set. On boot, the retained
+/// blobs set is always initialized to the empty set.
+/// Documentation on [garbage collection](
+/// https://fuchsia.dev/fuchsia-src/concepts/packages/garbage_collection) contains
+/// details on various types of package indexes (static, retained, etc) and
+/// describes when a blob will be garbage collected or retained.
+@discoverable
+closed protocol RetainedBlobs {
+    /// Atomically clear the retained blob set, releasing any previously
+    /// retained blobs.
+    strict Clear() -> ();
+
+    /// Atomically replace the retained blob set with the blob hashes
+    /// provided by the given iterator.
+    /// Duplicate IDs provided will be merged and processed as a single one.
+    ///
+    /// + request `iterator` an iterator of blob IDs that should be
     ///   retained.
     strict Replace(resource struct {
         iterator client_end:BlobIdIterator;

@@ -8,7 +8,7 @@ import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 network_unified_binary("dhcp_client") {
-  edition = "2021"
+  edition = "2024"
   with_unit_tests = true
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",

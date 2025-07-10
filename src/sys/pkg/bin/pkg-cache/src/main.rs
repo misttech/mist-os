@@ -274,6 +274,27 @@ async fn main_inner() -> Result<(), Error> {
             .context("adding fuchsia.pkg/RetainedPackages to /svc")?;
     }
     {
+        let package_index = Arc::clone(&package_index);
+
+        let () = svc_dir
+            .add_entry(
+                fidl_fuchsia_pkg::RetainedBlobsMarker::PROTOCOL_NAME,
+                vfs::service::host(move |stream| {
+                    retained_packages_service::serve_retained_blobs(
+                        Arc::clone(&package_index),
+                        stream,
+                    )
+                    .unwrap_or_else(|e| {
+                        error!(
+                            "error handling fuchsia.pkg/RetainedBlobs connection: {:#}",
+                            anyhow!(e)
+                        )
+                    })
+                }),
+            )
+            .context("adding fuchsia.pkg/RetainedBlobs to /svc")?;
+    }
+    {
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
         let upgradable_packages = upgradable_packages.clone();

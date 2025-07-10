@@ -11,22 +11,26 @@
 #include <zircon/fidl.h>
 
 #include <cstring>
-#include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 namespace fidl {
 
 // A FIDL string that borrows its contents.
+//
+// StringView instances can be passed by value, as copying is cheap.
 class StringView final : private VectorView<const char> {
  public:
-  StringView() : VectorView() {}
-  explicit StringView(VectorView<char>&& vv) : VectorView(std::move(vv)) {}
-  explicit StringView(VectorView<const char>&& vv) : VectorView(std::move(vv)) {}
+  constexpr StringView() noexcept = default;
+
+  constexpr explicit StringView(const VectorView<char>& vector_view) : VectorView(vector_view) {}
+  constexpr explicit StringView(const VectorView<const char>& vector_view)
+      : VectorView(vector_view) {}
 
   // Allocates a string using an arena.
   StringView(AnyArena& allocator, std::string_view from) : VectorView(allocator, from.size()) {
-    memcpy(const_cast<char*>(VectorView::data()), from.data(), from.size());
+    std::memcpy(const_cast<char*>(VectorView::data()), from.data(), from.size());
   }
 
   // Constructs a fidl::StringView referencing a string literal. For example:
@@ -60,41 +64,38 @@ class StringView final : private VectorView<const char> {
   //     snprintf(name, sizeof(name), "Hello %d", 123);
   //     auto name_view = fidl::StringView::FromExternal(name);
   //
-  static StringView FromExternal(std::string_view from) { return StringView(from); }
-  static StringView FromExternal(const char* data, size_t size) { return StringView(data, size); }
+  static constexpr StringView FromExternal(std::string_view from) { return StringView(from); }
+  static constexpr StringView FromExternal(const char* data, size_t size) {
+    return StringView(data, size);
+  }
 
   void Set(AnyArena& allocator, std::string_view from) {
     Allocate(allocator, from.size());
     memcpy(const_cast<char*>(VectorView::data()), from.data(), from.size());
   }
 
-  std::string_view get() const { return {data(), size()}; }
+  constexpr std::string_view get() const { return {data(), size()}; }
 
-  uint64_t size() const { return count(); }
-  void set_size(uint64_t size) { set_count(size); }
+  using VectorView::data;
+  using VectorView::empty;
+  using VectorView::set_size;
+  using VectorView::size;
 
-  const char* data() const { return VectorView::data(); }
-
-  // Returns if the string view is empty.
-  bool empty() const { return size() == 0; }
+  using VectorView::at;
+  using VectorView::operator[];
+  using VectorView::begin;
+  using VectorView::cbegin;
+  using VectorView::cend;
+  using VectorView::end;
 
   // TODO(https://fxbug.dev/42061094): |is_null| is used to check if an optional view type
   // is absent. This can be removed if optional view types switch to
   // |fidl::WireOptional|.
-  bool is_null() const { return data() == nullptr; }
-
-  const char& at(size_t offset) const { return data()[offset]; }
-  const char& operator[](size_t offset) const { return at(offset); }
-
-  const char* begin() const { return data(); }
-  const char* cbegin() const { return data(); }
-
-  const char* end() const { return data() + size(); }
-  const char* cend() const { return data() + size(); }
+  using VectorView::is_null;
 
  private:
-  explicit StringView(std::string_view from) : VectorView(from.data(), from.size()) {}
-  StringView(const char* data, uint64_t size) : VectorView(data, size) {}
+  explicit constexpr StringView(std::string_view from) : VectorView(from.data(), from.size()) {}
+  explicit constexpr StringView(const char* data, uint64_t size) : VectorView(data, size) {}
 };
 
 }  // namespace fidl

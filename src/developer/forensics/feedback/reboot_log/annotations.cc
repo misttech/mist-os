@@ -62,6 +62,8 @@ std::string LastRebootReasonAnnotation(const RebootLog& reboot_log) {
       return "root job termination";
     case FuchsiaRebootReason::NETSTACK_MIGRATION:
       return "netstack migration";
+    case FuchsiaRebootReason::ANDROID_UNEXPECTED_REASON:
+      return "android unexpected reason";
     default:
       return generic_value;
   }

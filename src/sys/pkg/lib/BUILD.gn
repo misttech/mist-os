@@ -34,8 +34,14 @@ group("lib") {
   ]
 }
 
+# TODO(https://fxbug.dev/314036868): Migrate these tests to be hermetic. Delete
+# this when all unused dependencies are removed.
+#
+# PLEASE DO NOT USE.
 group("tests") {
   testonly = true
+
+  # Please do not add to this list.
   deps = [
     "async-generator:tests",
     "blobfs:tests",
@@ -72,4 +78,33 @@ group("tests") {
       "merkle:tests",
     ]
   }
+}
+
+if (is_fuchsia) {
+  group("hermetic_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("non_hermetic_tests") {
+    testonly = true
+    public_deps = []
+  }
+}
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    public_deps = []
+  }
+}
+
+group("all_tests") {
+  testonly = true
+  public_deps = [
+    ":hermetic_tests($target_toolchain)",
+    ":hon-hermetic_tests($target_toolchain)",
+    ":host_tests($host_toolchain)",
+    ":tests",
+  ]
 }

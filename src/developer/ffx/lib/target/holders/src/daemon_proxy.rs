@@ -68,31 +68,8 @@ impl TryFromEnv for DaemonProxyHolder {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub struct DaemonProtocol<P: Clone>(P);
-
 #[derive(Debug, Clone, Default)]
 pub struct WithDaemonProtocol<P>(PhantomData<fn() -> P>);
-
-impl<P: Clone> std::ops::Deref for DaemonProtocol<P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[async_trait(?Send)]
-impl<P> TryFromEnv for DaemonProtocol<P>
-where
-    P: Proxy + Clone + 'static,
-    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        load_daemon_protocol(env).await.map(DaemonProtocol)
-    }
-}
 
 #[async_trait(?Send)]
 impl<P> TryFromEnvWith for WithDaemonProtocol<P>

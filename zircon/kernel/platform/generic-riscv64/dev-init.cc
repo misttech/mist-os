@@ -9,7 +9,6 @@
 #include <arch/riscv64/timer.h>
 #include <dev/hw_watchdog/generic32/init.h>
 #include <dev/init.h>
-#include <dev/interrupt/arm_gicv2_init.h>
 #include <dev/interrupt/plic.h>
 #include <ktl/type_traits.h>
 #include <ktl/variant.h>
@@ -21,9 +20,6 @@ void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
   if (arch_handoff.plic_driver) {
     PLICInitEarly(arch_handoff.plic_driver.value());
   }
-  if (arch_handoff.gic_driver) {
-    ArmGicInitEarly(arch_handoff.gic_driver.value());
-  }
 
   if (arch_handoff.generic_timer_driver) {
     riscv_generic_timer_init_early(arch_handoff.generic_timer_driver.value());
@@ -33,8 +29,5 @@ void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
 void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff) {
   if (arch_handoff.plic_driver) {
     PLICInitLate();
-  }
-  if (arch_handoff.gic_driver) {
-    ArmGicInitLate(arch_handoff.gic_driver.value());
   }
 }

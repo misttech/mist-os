@@ -29,10 +29,6 @@ static_assert(DEVICE_METADATA_PARTITION_MAP == ZBI_TYPE_DRV_PARTITION_MAP, "");
 #define DEVICE_METADATA_BOARD_PRIVATE 0x524F426D  // mBOR
 static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 
-// Button Metadata
-// type: fuchsia.buttons.Metadata
-#define DEVICE_METADATA_BUTTONS 0x534E5442  // BTNS
-
 // list of buttons_button_config_t
 #define DEVICE_METADATA_BUTTONS_BUTTONS 0x424E5442  // BTNB
 

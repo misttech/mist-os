@@ -73,4 +73,8 @@ type RebootReason2 = flexible enum {
     // TODO(https://fxbug.dev/42081574): Remove this reason once Netstack2 is
     // fully migrated to Netstack3.
     NETSTACK_MIGRATION = 11;
+
+    /// An Android-initiated reboot reason that Starnix doesn't recognize
+    @available(added=NEXT)
+    ANDROID_UNEXPECTED_REASON = 12;
 };

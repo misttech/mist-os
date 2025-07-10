@@ -13,15 +13,6 @@ group("bin") {
   ]
 }
 
-group("all_tests") {
-  testonly = true
-  public_deps = [
-    ":hermetic_tests($target_toolchain)",
-    ":hon-hermetic_tests($target_toolchain)",
-    ":host_tests($host_toolchain)",
-  ]
-}
-
 if (is_fuchsia) {
   group("hermetic_tests") {
     testonly = true
@@ -57,4 +48,13 @@ if (is_host) {
       "system-updater:host_tests",
     ]
   }
+}
+
+group("all_tests") {
+  testonly = true
+  public_deps = [
+    ":hermetic_tests($target_toolchain)",
+    ":hon-hermetic_tests($target_toolchain)",
+    ":host_tests($host_toolchain)",
+  ]
 }

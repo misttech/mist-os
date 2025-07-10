@@ -32,8 +32,7 @@ class AdcButtons : public fdf::DriverBase {
 
   std::unique_ptr<adc_buttons_device::AdcButtonsDevice> device_;
   fidl::ServerBindingGroup<fuchsia_input_report::InputDevice> input_report_bindings_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  fdf::OwnedChildNode child_;
   driver_devfs::Connector<fuchsia_input_report::InputDevice> devfs_connector_;
 };
 

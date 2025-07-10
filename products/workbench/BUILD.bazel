@@ -81,17 +81,17 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.x64",
-    product = ":assembly_eng.x64",
+    product = ":product_bundle_eng.x64",
 )
 
 fuchsia_elf_sizes(
     name = "elf_sizes.arm64",
-    product = ":assembly_eng.arm64",
+    product = ":product_bundle_eng.arm64",
 )
 
 fuchsia_elf_sizes(
     name = "elf_sizes.vim3",
-    product = ":assembly_eng.vim3",
+    product = ":product_bundle_eng.vim3",
 )
 
 fuchsia_virtual_device(

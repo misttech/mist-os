@@ -491,6 +491,17 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			AttributeToTest: true,
 			AddTag:          true,
 		},
+		&stringInLogCheck{
+			// LINT.IfChange(hrtimer_wait_signaled_sync_tefmo)
+			String: "wait_signaled_sync: not signaled yet. See HrTimer bug: b/428223204",
+			// LINT.ThenChange(//src/starnix/kernel/task/hr_timer_manager.rs:hrtimer_wait_signaled_sync_tefmo)
+			Type: syslogType,
+		},
+		// For https://fxbug.dev/428030027
+		&stringInLogCheck{
+			String: "QBG-D: Exit QBG",
+			Type:   syslogType,
+		},
 	}
 
 	oopsExceptBlocks := []*logBlock{

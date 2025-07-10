@@ -111,22 +111,42 @@ impl RetainedIndex {
 /// not be cached.
 pub async fn populate_retained_index(
     blobfs: &blobfs::Client,
-    meta_hashes: &[Hash],
+    meta_hashes: HashSet<Hash>,
 ) -> RetainedIndex {
     let mut packages = HashMap::with_capacity(meta_hashes.len());
     let memoized_packages = async_lock::RwLock::new(HashMap::new());
     for meta_hash in meta_hashes {
         let found = crate::required_blobs::find_required_blobs_recursive(
             blobfs,
-            meta_hash,
+            &meta_hash,
             &memoized_packages,
             crate::required_blobs::ErrorStrategy::BestEffort,
         )
         .await
         .ok();
-        packages.insert(*meta_hash, found);
+        packages.insert(meta_hash, found);
     }
     RetainedIndex { packages }
+}
+
+/// An index of blobs considered to be part of a new system's base package set.
+#[derive(Clone, Debug, Default)]
+pub struct RetainedBlobs(HashSet<Hash>);
+
+impl RetainedBlobs {
+    pub fn new(blobs: HashSet<Hash>) -> Self {
+        Self(blobs)
+    }
+
+    /// Returns the set of all blobs currently protected by the retained blobs index.
+    pub fn all_blobs(&self) -> &HashSet<Hash> {
+        &self.0
+    }
+
+    /// Records self to `node`.
+    pub fn record_inspect(&self, node: &finspect::Node) {
+        node.record_uint("blobs-count", self.0.len() as u64);
+    }
 }
 
 #[cfg(test)]
@@ -315,7 +335,7 @@ mod tests {
     async fn populate_retained_index_maps_missing_packages_to_unknown_content_blobs() {
         let (_blobfs_fake, blobfs) = fuchsia_pkg_testing::blobfs::Fake::new();
 
-        let index = populate_retained_index(&blobfs, &[hash(0), hash(1), hash(2)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0), hash(1), hash(2)].into()).await;
 
         assert_eq!(
             index,
@@ -346,7 +366,7 @@ mod tests {
             [],
         );
 
-        let index = populate_retained_index(&blobfs, &[hash(0), hash(10)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0), hash(10)].into()).await;
 
         assert_eq!(
             index,
@@ -370,7 +390,7 @@ mod tests {
             [],
         );
 
-        let index = populate_retained_index(&blobfs, &[hash(0), hash(10)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0), hash(10)].into()).await;
 
         assert_eq!(
             index,
@@ -387,7 +407,7 @@ mod tests {
 
         add_meta_far_to_blobfs(&blobfs_fake, hash(0), "pkg-0", vec![hash(1), hash(1)], []);
 
-        let index = populate_retained_index(&blobfs, &[hash(0)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0)].into()).await;
 
         assert_eq!(
             index,
@@ -404,7 +424,7 @@ mod tests {
         add_meta_far_to_blobfs(&blobfs_fake, hash(0), "pkg-0", [], [hash(1)]);
         add_meta_far_to_blobfs(&blobfs_fake, hash(1), "pkg-1", [hash(2)], []);
 
-        let index = populate_retained_index(&blobfs, &[hash(0)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0)].into()).await;
 
         assert_eq!(
             index,
@@ -422,7 +442,7 @@ mod tests {
         add_meta_far_to_blobfs(&blobfs_fake, hash(1), "pkg-1", [], [hash(2)]);
         add_meta_far_to_blobfs(&blobfs_fake, hash(2), "pkg-2", [hash(3)], []);
 
-        let index = populate_retained_index(&blobfs, &[hash(0)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0)].into()).await;
 
         assert_eq!(
             index,
@@ -439,7 +459,7 @@ mod tests {
         add_meta_far_to_blobfs(&blobfs_fake, hash(0), "pkg-0", [], [hash(1), hash(2)]);
         add_meta_far_to_blobfs(&blobfs_fake, hash(2), "pkg-2", [hash(3)], []);
 
-        let index = populate_retained_index(&blobfs, &[hash(0)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0)].into()).await;
 
         assert_eq!(
             index,
@@ -457,7 +477,7 @@ mod tests {
         add_meta_far_to_blobfs(&blobfs_fake, hash(1), "pkg-1", [], [hash(2)]);
         add_meta_far_to_blobfs(&blobfs_fake, hash(2), "pkg-2", [], [hash(3)]);
 
-        let index = populate_retained_index(&blobfs, &[hash(0), hash(1)]).await;
+        let index = populate_retained_index(&blobfs, [hash(0), hash(1)].into()).await;
 
         assert_eq!(
             index,

@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("net-cli-integration") {
-  edition = "2021"
+  edition = "2024"
   output_name = "net_cli_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",

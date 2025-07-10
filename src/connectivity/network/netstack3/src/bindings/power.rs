@@ -217,7 +217,7 @@ impl PowerWorkerInner {
         &mut self,
         responder: fpower_system::SuspendBlockerBeforeSuspendResponder,
     ) -> Result<
-        impl Future<Output = ()>,
+        impl Future<Output = ()> + use<>,
         (BadSuspensionStateError, fpower_system::SuspendBlockerBeforeSuspendResponder),
     > {
         let Self { suspension_control, state, lessors } = self;

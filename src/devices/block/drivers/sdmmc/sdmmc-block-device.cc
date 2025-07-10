@@ -94,17 +94,6 @@ zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> SdmmcBlockDevice
   return zx::ok(std::move(result->value()->lease_control));
 }
 
-void SdmmcBlockDevice::UpdatePowerLevel(
-    const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
-    fuchsia_power_broker::PowerLevel power_level) {
-  const fidl::WireResult result = current_level_client->Update(power_level);
-  if (!result.ok()) {
-    FDF_LOGL(ERROR, logger(), "Call to Update failed: %s", result.status_string());
-  } else if (result->is_error()) {
-    FDF_LOGL(ERROR, logger(), "Update returned failure.");
-  }
-}
-
 fdf::Logger& ReadWriteMetadata::logger() { return block_device->logger(); }
 
 void SdmmcBlockDevice::BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status) {
@@ -298,7 +287,8 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   }
 
   fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>> config_result =
-      fdf_power::ApplyPowerConfiguration(*parent_->driver_incoming(), element_configs);
+      fdf_power::ApplyPowerConfiguration(*parent_->driver_incoming(), element_configs,
+                                         /*use_element_runner=*/true);
 
   if (config_result.is_error()) {
     FDF_LOGL(INFO, logger(), "Failed to apply power config: %s",
@@ -318,11 +308,9 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
               std::move(description.element_control_client.value()));
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client.value()));
-      hardware_power_current_level_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client.value()));
-      hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-          std::move(description.required_level_client.value()), parent_->driver_async_dispatcher());
+      hardware_power_element_runner_server_binding_.emplace(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+          std::move(description.element_runner_server.value()), this, fidl::kIgnoreBindingClosure);
       hardware_power_element_assertive_token_ = std::move(description.assertive_token);
     } else {
       FDF_SLOG(ERROR, "Unexpected power element.", KV("index", i),
@@ -374,116 +362,73 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   }
   hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
 
-  // Start continuous monitoring of the required level and adjusting of the hardware's power
-  // level.
-  WatchHardwareRequiredLevel();
-
   return zx::success();
 }
 
-void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
-  fidl::Arena<> arena;
-  hardware_power_required_level_client_.buffer(arena)->Watch().Then(
-      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
-        bool delay_before_next_watch = true;
+void SdmmcBlockDevice::SetLevel(fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+                                SetLevelCompleter::Sync& set_level_completer) {
+  const fuchsia_power_broker::PowerLevel required_level = request.level();
+  // TODO(424264756): Remove this case when we're able to get a lease at the time the PE is
+  // created.
+  if (hardware_power_lease_control_client_end_.is_valid()) {
+    // Power Framework will immediately call SetLevel(OFF) followed by SetLevel(BOOT). These
+    // calls can be ignored while we still have a lease on the BOOT level.
 
-        auto defer = fit::defer([&]() {
-          if ((result.status() == ZX_ERR_CANCELED) || (result.status() == ZX_ERR_PEER_CLOSED)) {
-            FDF_LOGL(WARNING, logger(), "Watch returned %s. Stop monitoring required power level.",
-                     zx_status_get_string(result.status()));
-          } else {
-            if (delay_before_next_watch) {
-              // TODO(b/339826112): Determine how to handle errors when communicating with the Power
-              // Broker. For now, avoid overwhelming the Power Broker with calls.
-              zx::nanosleep(zx::deadline_after(zx::msec(1)));
-            }
-            // Recursively call self to watch the required hardware power level again. The Watch()
-            // call blocks until the required power level has changed.
-            WatchHardwareRequiredLevel();
-          }
-        });
+    if (required_level == kPowerLevelOn) {
+      // If we're rising above the boot power level, it must because an
+      // external lease raised our power level. This means we can drop
+      // our self-lease and allow the external entity to drive our power
+      // state.
+      hardware_power_lease_control_client_end_.reset();
+    }
+    set_level_completer.Reply();
+    return;
+  }
 
-        if (!result.ok()) {
-          FDF_LOGL(ERROR, logger(), "Call to Watch failed: %s", result.status_string());
-          return;
-        }
-        if (result->is_error()) {
-          switch (result->error_value()) {
-            case fuchsia_power_broker::RequiredLevelError::kInternal:
-              FDF_LOGL(ERROR, logger(), "Watch returned internal error.");
-              break;
-            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
-              FDF_LOGL(ERROR, logger(), "Watch returned not authorized error.");
-              break;
-            default:
-              FDF_LOGL(ERROR, logger(), "Watch returned unknown error.");
-              break;
-          }
-          return;
-        }
+  switch (required_level) {
+    case kPowerLevelOn:
+    case kPowerLevelBoot: {
+      const zx::time start = zx::clock::get_monotonic();
 
-        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
+      fbl::AutoLock lock(&worker_lock_);
+      // Actually raise the hardware's power level.
+      zx_status_t status = ResumePower();
+      if (status != ZX_OK) {
+        const zx::duration duration = zx::clock::get_monotonic() - start;
+        FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s", duration.to_usecs(),
+                 zx_status_get_string(status));
+        return;
+      }
 
-        // TODO(424264756): Remove this case when we're able to get a lease at the time the PE is
-        // created.
-        if (hardware_power_lease_control_client_end_.is_valid()) {
-          // Power Framework will immediately call SetLevel(OFF) followed by SetLevel(BOOT). These
-          // calls can be ignored while we still have a lease on the BOOT level.
+      // Communicate to Power Broker that the hardware power level has been raised.
+      set_level_completer.Reply();
 
-          if (required_level == kPowerLevelOn) {
-            // If we're rising above the boot power level, it must because an
-            // external lease raised our power level. This means we can drop
-            // our self-lease and allow the external entity to drive our power
-            // state.
-            hardware_power_lease_control_client_end_.reset();
-          }
-          UpdatePowerLevel(hardware_power_current_level_client_, required_level);
-          delay_before_next_watch = false;
-          return;
-        }
+      worker_condition_.Broadcast();
+      break;
+    }
+    case kPowerLevelOff: {
+      fbl::AutoLock lock(&worker_lock_);
+      // Actually lower the hardware's power level.
+      zx_status_t status = SuspendPower();
+      if (status != ZX_OK) {
+        FDF_LOGL(ERROR, logger(), "Failed to suspend power: %s", zx_status_get_string(status));
+        return;
+      }
+      // Communicate to Power Broker that the hardware power level has been lowered.
+      set_level_completer.Reply();
+      break;
+    }
+    default:
+      FDF_LOGL(ERROR, logger(), "Unexpected power level for hardware power element: %u",
+               required_level);
+      return;
+  }
+}
 
-        switch (required_level) {
-          case kPowerLevelOn:
-          case kPowerLevelBoot: {
-            const zx::time start = zx::clock::get_monotonic();
-
-            fbl::AutoLock lock(&worker_lock_);
-            // Actually raise the hardware's power level.
-            zx_status_t status = ResumePower();
-            if (status != ZX_OK) {
-              const zx::duration duration = zx::clock::get_monotonic() - start;
-              FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s",
-                       duration.to_usecs(), zx_status_get_string(status));
-              return;
-            }
-
-            // Communicate to Power Broker that the hardware power level has been raised.
-            UpdatePowerLevel(hardware_power_current_level_client_, required_level);
-
-            worker_condition_.Broadcast();
-            break;
-          }
-          case kPowerLevelOff: {
-            fbl::AutoLock lock(&worker_lock_);
-            // Actually lower the hardware's power level.
-            zx_status_t status = SuspendPower();
-            if (status != ZX_OK) {
-              FDF_LOGL(ERROR, logger(), "Failed to suspend power: %s",
-                       zx_status_get_string(status));
-              return;
-            }
-            // Communicate to Power Broker that the hardware power level has been lowered.
-            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
-            break;
-          }
-          default:
-            FDF_LOGL(ERROR, logger(), "Unexpected power level for hardware power element: %u",
-                     required_level);
-            return;
-        }
-
-        delay_before_next_watch = false;
-      });
+void SdmmcBlockDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOGL(ERROR, logger(), "ElementRunner received unknown method %lu", metadata.method_ordinal);
 }
 
 void SdmmcBlockDevice::StopWorkerDispatcher(std::optional<fdf::PrepareStopCompleter> completer) {

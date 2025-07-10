@@ -16,8 +16,6 @@ source_set("generic-riscv64") {
     "//src/lib/zbitl",
     "//zircon/kernel/dev/hw_rng",
     "//zircon/kernel/dev/hw_watchdog/generic32",
-    "//zircon/kernel/dev/interrupt/gic/common",
-    "//zircon/kernel/dev/interrupt/gic/v2",
     "//zircon/kernel/dev/interrupt/plic",
     "//zircon/kernel/dev/pdev/power",
     "//zircon/kernel/dev/pdev/timer",

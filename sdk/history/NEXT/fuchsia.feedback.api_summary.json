@@ -634,6 +634,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.feedback/RebootReason.ANDROID_UNEXPECTED_REASON",
+        "value": "21"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.feedback/RebootReason.BRIEF_POWER_LOSS",
         "value": "3"
     },

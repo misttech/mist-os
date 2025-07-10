@@ -999,14 +999,6 @@ impl CurrentTask {
         mm.exec(resolved_elf.file.name.to_passive(), resolved_elf.arch_width)
             .map_err(|status| from_status_like_fdio!(status))?;
 
-        // Update the SELinux state, if enabled.
-        // TODO: Do we need to update this state after updating the creds for exec?
-        security::update_state_on_exec(
-            locked.cast_locked::<MmDumpable>(),
-            self,
-            &resolved_elf.security_state,
-        );
-
         {
             let mut state = self.write();
 
@@ -1059,6 +1051,8 @@ impl CurrentTask {
             persistent_info.creds_mut().exec(maybe_set_id);
         }
 
+        let security_state = resolved_elf.security_state.clone();
+
         let start_info = load_executable(self, resolved_elf, &path)?;
         // Before consuming start_info below, note if the task is 32-bit.
         self.thread_state.arch_width = start_info.arch_width;
@@ -1068,12 +1062,11 @@ impl CurrentTask {
         self.thread_state.extended_pstate.reset();
         self.thread_group().signal_actions.reset_for_exec();
 
-        // TODO(http://b/320436714): when adding SELinux support for the file subsystem, implement
-        // hook to clean up state after exec.
-
         // TODO: The termination signal is reset to SIGCHLD.
 
         // TODO(https://fxbug.dev/42082680): All threads other than the calling thread are destroyed.
+
+        // TODO: POSIX timers are not preserved.
 
         // TODO: The file descriptor table is unshared, undoing the effect of
         //       the CLONE_FILES flag of clone(2).
@@ -1086,7 +1079,14 @@ impl CurrentTask {
         // For now, we do not implement that behavior.
         self.files.exec();
 
-        // TODO: POSIX timers are not preserved.
+        // If SELinux is enabled, enforce permissions related to inheritance of file descriptors
+        // and resource limits. Then update the current task's SID.
+        //
+        // TODO: https://fxbug.dev/378655436 - After the above, enforce permissions related to
+        // signal state inheritance.
+        //
+        // This needs to be called after closing any files marked "close-on-exec".
+        security::exec_binprm(&mut locked.cast_locked::<MmDumpable>(), self, &security_state);
 
         self.thread_group().write().did_exec = true;
 

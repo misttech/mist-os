@@ -5,7 +5,7 @@
 import("//build/rust/rustc_test.gni")
 
 rustc_test("dns") {
-  edition = "2021"
+  edition = "2024"
   output_name = "netstack_dns_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",

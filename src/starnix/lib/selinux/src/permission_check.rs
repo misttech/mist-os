@@ -257,8 +257,8 @@ mod tests {
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use crate::policy::{AccessDecision, AccessVector, IoctlAccessDecision};
     use crate::{
-        CommonFilePermission, CommonFsNodePermission, FileClass, FilePermission, ObjectClass,
-        ProcessPermission,
+        CommonFilePermission, CommonFsNodePermission, FileClass, FilePermission, ForClass,
+        ObjectClass, ProcessPermission,
     };
 
     use std::num::NonZeroU32;

@@ -124,6 +124,9 @@ type BatteryInfo = table {
 
     /// Full Charge Capacity in uAh.
     12: full_capacity_uah int32;
+
+    /// Temperature in MilliCelsius.
+    13: temperature_mc int32;
 };
 
 /// Provider interface used to obtain battery status details.

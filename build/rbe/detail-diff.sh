@@ -169,8 +169,19 @@ function binary_diff() {
   return "$diff_status"
 }
 
+function rustc_linker_map_diff() {
+  # Workaround for linker map differences pointing to /tmp.
+  # See b/427157992.
+  # TODO: revert back to plain text diff after
+  # https://github.com/rust-lang/rust/issues/142989 is resolved.
+  diff_with sed -e '/\.rustc$/,/\.symtab$/s|/tmp/rustc.*/|/tmp/rustcXXXXXXX/|' -- "$1" "$2" | head -n "$diff_limit"
+}
+
 # main
 case "$1" in
+  *rust*.so.map)
+    rustc_linker_map_diff "$1" "$2"
+    ;;
   *.d | *.map | *.ll)
     echo "text diff (first $diff_limit lines):"
     diff -u "$1" "$2" | head -n "$diff_limit"

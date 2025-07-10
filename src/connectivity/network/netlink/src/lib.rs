@@ -490,7 +490,7 @@ mod tests {
         let (mut client_sink, client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<FakeProtocolFamily>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[],
+                std::iter::empty(),
             );
         let join_handle = fasync::Task::spawn(async_work_drain_task);
 
@@ -548,7 +548,7 @@ mod tests {
         let (mut _client_sink1, client1, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<FakeProtocolFamily>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[],
+                std::iter::empty(),
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut req_sender1, req_receiver1) = mpsc::channel(0);
@@ -560,7 +560,7 @@ mod tests {
         let (mut client_sink2, client2, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<FakeProtocolFamily>(
                 crate::client::testutil::CLIENT_ID_2,
-                &[],
+                std::iter::empty(),
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut req_sender2, req_receiver2) = mpsc::channel(0);

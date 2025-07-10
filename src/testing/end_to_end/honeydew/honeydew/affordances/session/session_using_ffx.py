@@ -43,7 +43,6 @@ class SessionUsingFfx(session.Session):
         Raises:
             NotSupportedError: Session affordance is not supported by Fuchsia device.
         """
-        # TODO(http://b/409624056): Implement the method logic
 
     def start(self) -> None:
         """Start session.

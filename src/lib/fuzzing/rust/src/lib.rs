@@ -172,7 +172,9 @@ pub fn fuzz(_attr: TokenStream, item: TokenStream) -> TokenStream {
             // This function wraps the fuzz target function above to create input parameters and
             // ensure the correct return value is used.
             #[cfg(fuzz_target = #name)]
-            #[no_mangle]
+            // SAFETY: This symbol is only exported once because we only compile
+            // one fuzz target at a time.
+            #[unsafe(no_mangle)]
             #(#attrs)*
             pub extern "C" fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32 {
                 #fuzz_target

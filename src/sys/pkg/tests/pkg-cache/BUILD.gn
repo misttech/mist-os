@@ -65,6 +65,7 @@ rustc_test("driver") {
     "src/inspect.rs",
     "src/lib.rs",
     "src/pkgfs.rs",
+    "src/retained_blobs.rs",
     "src/retained_packages.rs",
     "src/space.rs",
     "src/sync.rs",

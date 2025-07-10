@@ -31,6 +31,7 @@ static_library("unwinder") {
     "fp_unwinder.cc",
     "frame.h",
     "memory.cc",
+    "module.cc",
     "plt_unwinder.cc",
     "plt_unwinder.h",
     "registers.cc",

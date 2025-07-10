@@ -132,8 +132,7 @@ mod tests {
         let en = tempfile::NamedTempFile::new()?;
         write!(
             en.as_file(),
-            r#"
-               <?xml version="1.0" encoding="utf-8"?>
+            r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -148,8 +147,7 @@ mod tests {
 
         write!(
             fr.as_file(),
-            r#"
-               <?xml version="1.0" encoding="utf-8"?>
+            r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -191,8 +189,7 @@ mod tests {
         let tests = vec![
             TestCase {
                 name: "there is a wrong comment in en",
-                en: r#"
-               <!-- comment not allowed here -->
+                en: r#"<!-- comment not allowed here -->
                <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
@@ -214,8 +211,7 @@ mod tests {
             },
             TestCase {
                 name: "there is a wrong comment in fr",
-                en: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                en: r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -224,8 +220,7 @@ mod tests {
                </resources>
 
             "#,
-                fr: r#"
-               <!-- comment not allowed here -->
+                fr: r#"<!-- comment not allowed here -->
                <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->

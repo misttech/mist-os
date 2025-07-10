@@ -1218,24 +1218,27 @@ pub fn unix_stream_connect(
 }
 
 /// Updates the SELinux thread group state on exec.
-/// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` LSM hooks.
-pub fn update_state_on_exec<L>(
+/// Corresponds to the `exec_binprm` function described in the SELinux Notebook.
+///
+/// Resets state that should not be inherited during an `exec` domain transition. Then updates the
+/// current task's SID based on the security state of the resolved executable.
+pub fn exec_binprm<L>(
     locked: &mut Locked<L>,
     current_task: &CurrentTask,
     elf_security_state: &ResolvedElfState,
 ) where
     L: LockBefore<ThreadGroupLimits>,
 {
-    track_hook_duration!(c"security.hooks.update_state_on_exec");
+    track_hook_duration!(c"security.hooks.exec_binprm");
     if_selinux_else(
         current_task,
         |security_server| {
-            selinux_hooks::task::update_state_on_exec(
+            selinux_hooks::task::exec_binprm(
                 locked,
                 security_server,
                 current_task,
                 elf_security_state,
-            );
+            )
         },
         || (),
     );
@@ -1998,7 +2001,7 @@ mod tests {
             assert!(selinux_hooks::task_effective_sid(current_task) != target_sid);
 
             let before_hook_sid = selinux_hooks::task_effective_sid(current_task);
-            update_state_on_exec(locked, current_task, &elf_state);
+            exec_binprm(locked, current_task, &elf_state);
             assert_eq!(selinux_hooks::task_effective_sid(current_task), before_hook_sid);
             assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid)
         })
@@ -2013,7 +2016,7 @@ mod tests {
             let elf_sid = InitialSid::Unlabeled.into();
             let elf_state = ResolvedElfState { sid: Some(elf_sid) };
             assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
-            update_state_on_exec(locked, current_task, &elf_state);
+            exec_binprm(locked, current_task, &elf_state);
             assert_eq!(*current_task.security_state.lock(), initial_state);
         })
     }
@@ -2030,7 +2033,7 @@ mod tests {
                     .expect("invalid security context");
                 let elf_state = ResolvedElfState { sid: Some(elf_sid) };
                 assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
-                update_state_on_exec(locked, current_task, &elf_state);
+                exec_binprm(locked, current_task, &elf_state);
                 assert_eq!(selinux_hooks::task_effective_sid(current_task), elf_sid);
                 assert_eq!(current_task.security_state.lock().current_sid, elf_sid);
             },

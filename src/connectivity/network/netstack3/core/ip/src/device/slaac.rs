@@ -1798,7 +1798,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                     temp_preferred_lifetime,
                     temp_idgen_retries,
                 } => {
-                    let per_attempt_random_seed: u64 = bindings_ctx.rng().gen();
+                    let per_attempt_random_seed: u64 = bindings_ctx.rng().r#gen();
 
                     // Per RFC 8981 Section 3.4.4:
                     //    When creating a temporary address, DESYNC_FACTOR MUST be computed
@@ -2590,7 +2590,7 @@ mod tests {
         // Consider the address we will generate as already assigned without
         // SLAAC.
         let mut dup_rng = bindings_ctx.rng().deep_clone();
-        let seed = dup_rng.gen();
+        let seed = dup_rng.r#gen();
         let first_attempt =
             generate_global_temporary_address(&SUBNET, &IID, seed, &TEMP_SECRET_KEY);
         core_ctx.state.slaac_addrs.non_slaac_addrs = vec![first_attempt.addr()];
@@ -2651,7 +2651,7 @@ mod tests {
         );
 
         let mut dup_rng = bindings_ctx.rng().deep_clone();
-        let mut seed = dup_rng.gen();
+        let mut seed = dup_rng.r#gen();
 
         let link_local_subnet =
             Subnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), REQUIRED_PREFIX_BITS).unwrap();
@@ -3357,7 +3357,7 @@ mod tests {
                           config_greater_than_ra_desync_factor_offset| {
             let valid_until = creation_time + Duration::from_secs(expected_vl_addr.into());
             let addr_sub =
-                generate_global_temporary_address(&SUBNET, &IID, rng.gen(), &TEMP_SECRET_KEY);
+                generate_global_temporary_address(&SUBNET, &IID, rng.r#gen(), &TEMP_SECRET_KEY);
             let desync_factor =
                 desync_factor(rng, NonZeroDuration::new(pl_config).unwrap(), regen_advance)
                     .unwrap();

@@ -8,7 +8,7 @@ import("//tools/cmc/build/expect_includes.gni")
 rustc_library("lib") {
   testonly = true
   name = "netemul"
-  edition = "2021"
+  edition = "2024"
 
   deps = [
     ":lib_includes",

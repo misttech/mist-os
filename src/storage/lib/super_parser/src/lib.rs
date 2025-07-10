@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_super_parser() {
+    async fn test_super_parser_get_used_regions() {
         let device = open_image(std::path::Path::new(IMAGE_PATH));
         let super_parser = SuperParser::new(device.clone()).await.expect("SuperParser::new failed");
         let used_regions = super_parser.used_regions_in_bytes();

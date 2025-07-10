@@ -76,7 +76,7 @@ void stack_canary_write(const StackType& type, void* base) {
 void stack_canary_check(const StackType& type, void* base) {
   const size_t off = stack_canary_offset(type);
   if (static_cast<unsigned char*>(base)[off] != kStackCanary) {
-    KERNEL_OOPS("Canary at offset %zu in stack %s as base %p of size %zu was corrupted.", off,
+    KERNEL_OOPS("Canary at offset %zu in stack %s as base %p of size %zu was corrupted.\n", off,
                 type.name, base, type.size);
   }
 }

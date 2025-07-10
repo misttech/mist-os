@@ -1647,7 +1647,7 @@ mod tests {
         let _ = session.multiplexer().find_or_create_session_channel(user_dlci);
         assert!(session
             .multiplexer()
-            .set_flow_control(user_dlci, FlowControlMode::CreditBased(Credits::new(100, 100)))
+            .set_flow_control(user_dlci, FlowControlMode::CreditBased(Credits::new(7, 7)))
             .is_ok());
         let mut profile_client_channel = {
             let mut establish_fut = Box::pin(session.establish_session_channel(user_dlci));
@@ -1664,7 +1664,7 @@ mod tests {
                 Role::Initiator,
                 user_dlci,
                 UserData { information: pattern.clone() },
-                Some(10), // Random amount of credits.
+                Some(2), // Random amount of credits.
             );
             let mut handle_fut = Box::pin(session.handle_frame(user_data_frame));
             assert!(exec.run_until_stalled(&mut handle_fut).is_ready());
@@ -1676,6 +1676,10 @@ mod tests {
                 }
                 x => panic!("Expected user data but got {:?}", x),
             }
+
+            // Because the remote credit count is sufficiently above the LOW_CREDIT_WATER_MARK, we
+            // don't expect any outgoing credit refresh frame.
+            poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
         }
 
         // Profile client responds with it's own data.
@@ -1687,7 +1691,7 @@ mod tests {
             &mut exec,
             &mut outgoing_frames,
             UserData { information: response },
-            Some(156), // CREDIT_HIGH_WATER_MARK - (100 (initial credits) - 1 (received frames))
+            Some(10), // HIGH_CREDIT_WATER_MARK - (7 (initial) - 1 (received))
         );
     }
 

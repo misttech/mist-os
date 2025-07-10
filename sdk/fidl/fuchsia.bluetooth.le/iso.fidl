@@ -268,6 +268,21 @@ open protocol IsochronousStream {
     }) -> () error zx.Status;
 };
 
+
+/// The "BIGInfo" parameters describing an LE Audio Broadcast Isochronous Group (BIG).
+/// Missing fields to be added as part of fxbug.dev/429213165.
+@available(added=NEXT)
+type BroadcastIsochronousGroupInfo = table {
+    /// The number of Broadcast Isochronous Streams in this group.
+    1: streams_count uint8;
+    /// The maximum size of an isochronous SDU.
+    2: max_sdu_size uint16;
+    /// The PHY used for transmission of data.
+    3: phy PhysicalLayer;
+    /// Indicates whether the BIG is encrypted.
+    4: encryption bool;
+};
+
 @available(added=27)
 open protocol ConnectedIsochronousGroup {
     /// Connect one or more Isochronous streams. Each CIS is established with the peer specified

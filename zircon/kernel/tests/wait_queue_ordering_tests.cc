@@ -10,6 +10,7 @@
 
 #include <kernel/scheduler_state.h>
 #include <kernel/thread.h>
+#include <ktl/algorithm.h>
 #include <ktl/array.h>
 #include <ktl/unique_ptr.h>
 
@@ -54,6 +55,13 @@ struct WaitQueueOrderingTests {
       }
     });
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    // Sort the thread array by address to simplify tests that involve address
+    // based tie breaking.
+    ktl::stable_sort(threads.begin(), threads.end(),
+                     [](const auto& a, const auto& b) { return a.get() < b.get(); });
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+
     // Aliases to reduce the typing just a bit.
     Thread& t0 = *threads[0];
     Thread& t1 = *threads[1];
@@ -62,6 +70,51 @@ struct WaitQueueOrderingTests {
 
     SchedTime now{ZX_SEC(300)};
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    // The wait queue is empty.
+    ASSERT_NULL(wqc->Peek(now.raw_value()));
+
+    // Add a fair thread to the collection, which is at the front of the queue
+    // by definition.
+    ResetFair(t0, kDefaultWeight, now);
+    wqc->Insert(&t0);
+    ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
+
+    // Add a higher weight thread with the same start time to the collection.
+    // The thread selected should have a lower address, since the finish times
+    // are the same.
+    ResetFair(t1, kHighWeight, now);
+    wqc->Insert(&t1);
+    ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
+
+    // Reduce the start and finish times of the thread we just added and try
+    // again. The thread with the earlier finish time should be selected.
+    wqc->Remove(&t1);
+    ResetFair(t1, kLowWeight, now - SchedNs(1));
+    wqc->Insert(&t1);
+    ASSERT_EQ(&t1, wqc->Peek(now.raw_value()));
+
+    // Add a deadline thread whose absolute deadline is far in the future.
+    // The thread with the earliest finish time should be selected.
+    ResetDeadline(t2, kLongDeadline, now);
+    wqc->Insert(&t2);
+    ASSERT_EQ(&t1, wqc->Peek(now.raw_value()));
+
+    // Add another deadline thread with a shorter relative deadline. This
+    // should become the new choice.
+    ResetDeadline(t3, kShortDeadline, now);
+    wqc->Insert(&t3);
+    ASSERT_EQ(&t3, wqc->Peek(now.raw_value()));
+
+    // Finally, unwind by "unblocking" all of the threads from the queue and
+    // making sure that the come out in the order we expect.
+    ktl::array expected_order{&t3, &t1, &t0, &t2};
+    for (Thread* expected_thread : expected_order) {
+      Thread* actual_thread = wqc->Peek(now.raw_value());
+      ASSERT_EQ(expected_thread, actual_thread);
+      wqc->Remove(actual_thread);
+    }
+#else
     // No one in in the queue right now.  If we Peek it, we should get back
     // nullptr.
     ASSERT_NULL(wqc->Peek(now.raw_value()));
@@ -115,7 +168,7 @@ struct WaitQueueOrderingTests {
       ASSERT_EQ(t, wqc->Peek(now.raw_value()));
       wqc->Remove(t);
     }
-
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
     // And the queue should finally be empty now.
     ASSERT_NULL(wqc->Peek(now.raw_value()));
 
@@ -128,7 +181,11 @@ struct WaitQueueOrderingTests {
   static constexpr SchedWeight kHighWeight = SchedWeight{40};
 
   static constexpr SchedDuration kShortDeadline = SchedUs(500);
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  static constexpr SchedDuration kLongDeadline = SchedMs(20);
+#else
   static constexpr SchedDuration kLongDeadline = kShortDeadline * 10;
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
   static void ResetFair(Thread& t, SchedWeight weight,
                         SchedTime start_time) __TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -169,6 +226,8 @@ struct WaitQueueOrderingTests {
     ss.effective_profile_.SetDeadline(ss.base_profile_.deadline);
 
     ss.start_time_ = start_time;
+    ss.time_slice_ns_ = ss.effective_profile().deadline().capacity_ns;
+    ss.time_slice_used_ns_ = SchedDuration{0};
     ss.finish_time_ = ss.start_time_ + ss.effective_profile_.deadline().deadline_ns;
   }
 };

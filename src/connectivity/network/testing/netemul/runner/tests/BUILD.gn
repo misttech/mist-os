@@ -7,7 +7,7 @@ import("//build/rust/rustc_test.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 rustc_library("lib") {
-  edition = "2021"
+  edition = "2024"
   testonly = true
   name = "netemul_runner_tests"
   deps = [
@@ -28,7 +28,7 @@ expect_includes("test_includes") {
 }
 
 rustc_test("netemul_runner_test") {
-  edition = "2021"
+  edition = "2024"
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
@@ -52,7 +52,7 @@ fuchsia_unittest_package("netemul-runner-tests") {
 }
 
 rustc_test("netemul_runner_errors_test") {
-  edition = "2021"
+  edition = "2024"
   deps = [
     ":lib",
     "//src/lib/fuchsia-async",

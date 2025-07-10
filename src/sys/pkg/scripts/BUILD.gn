@@ -2,7 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    public_deps = [ "gen_eager_package_config:host_tests" ]
+  }
+}
+
+group("all_tests") {
   testonly = true
-  deps = [ "gen_eager_package_config:tests" ]
+  public_deps = [ ":host_tests($host_toolchain)" ]
 }

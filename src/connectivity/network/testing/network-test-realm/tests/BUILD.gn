@@ -8,7 +8,7 @@ import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 rustc_test("network-test-realm") {
-  edition = "2021"
+  edition = "2024"
   output_name = "network_test_realm_integration_test"
   deps = [
     "unreliable-echo:lib",

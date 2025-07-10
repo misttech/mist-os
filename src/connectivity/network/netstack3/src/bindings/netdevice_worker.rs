@@ -403,7 +403,7 @@ impl DeviceHandler {
     ) -> Result<
         (
             BindingId,
-            impl futures::Stream<Item = netdevice_client::Result<netdevice_client::PortStatus>>,
+            impl futures::Stream<Item = netdevice_client::Result<netdevice_client::PortStatus>> + use<>,
             fasync::scope::ScopeActiveGuard,
             TxTask,
         ),

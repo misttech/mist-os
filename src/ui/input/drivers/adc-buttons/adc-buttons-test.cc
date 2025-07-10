@@ -4,8 +4,7 @@
 
 #include "adc-buttons.h"
 
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
@@ -33,10 +32,10 @@ class FakeAdcServer : public fidl::Server<fuchsia_hardware_adc::Device> {
     completer.Reply(fit::ok(normalized_sample_));
   }
 
-  fuchsia_hardware_adc::Service::InstanceHandler GetInstanceHandler() {
+  fuchsia_hardware_adc::Service::InstanceHandler GetInstanceHandler(
+      async_dispatcher_t* dispatcher) {
     return fuchsia_hardware_adc::Service::InstanceHandler({
-        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                          fidl::kIgnoreBindingClosure),
+        .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
     });
   }
 
@@ -51,42 +50,52 @@ class FakeAdcServer : public fidl::Server<fuchsia_hardware_adc::Device> {
 class TestEnv : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Initialize(component::kDefaultInstance);
+    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
     // Serve metadata.
-    auto func_types = std::vector<fuchsia_input_report::ConsumerControlButton>{
+    std::vector<fuchsia_input_report::ConsumerControlButton> func_types = {
         fuchsia_input_report::ConsumerControlButton::kFunction};
-    auto func_adc_config = fuchsia_buttons::AdcButtonConfig()
-                               .channel_idx(kChannel)
-                               .release_threshold(kReleaseThreshold)
-                               .press_threshold(kPressThreshold);
+    fuchsia_buttons::AdcButtonConfig func_adc_config{{
+        .channel_idx = kChannel,
+        .release_threshold = kReleaseThreshold,
+        .press_threshold = kPressThreshold,
+    }};
     auto func_config = fuchsia_buttons::ButtonConfig::WithAdc(std::move(func_adc_config));
-    auto func_button = fuchsia_buttons::Button()
-                           .types(std::move(func_types))
-                           .button_config(std::move(func_config));
-    std::vector<fuchsia_buttons::Button> buttons;
-    buttons.emplace_back(std::move(func_button));
+    std::vector<fuchsia_buttons::Button> buttons = {
+        {{.types = std::move(func_types), .button_config = std::move(func_config)}}};
 
-    auto metadata =
-        fuchsia_buttons::Metadata().polling_rate_usec(kPollingRateUsec).buttons(std::move(buttons));
+    fuchsia_buttons::Metadata metadata{
+        {.polling_rate_usec = kPollingRateUsec, .buttons = std::move(buttons)}};
+    zx_status_t status =
+        pdev_.AddFidlMetadata(fuchsia_buttons::Metadata::kSerializableName, metadata);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
 
-    fit::result metadata_bytes = fidl::Persist(metadata);
-    EXPECT_TRUE(metadata_bytes.is_ok());
-    auto status = device_server_.AddMetadata(DEVICE_METADATA_BUTTONS, metadata_bytes->data(),
-                                             metadata_bytes->size());
-    EXPECT_EQ(ZX_OK, status);
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+          pdev_.GetInstanceHandler(dispatcher), "pdev");
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
 
-    device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_adc::Service>(
+          fake_adc_server_.GetInstanceHandler(dispatcher), "adc-2");
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
 
-    auto result = to_driver_vfs.AddService<fuchsia_hardware_adc::Service>(
-        fake_adc_server_.GetInstanceHandler(), "adc-2");
-    return result;
+    return zx::ok();
   }
 
   void FakeAdcSetSample(uint32_t sample) { fake_adc_server_.set_sample(sample); }
 
  private:
-  compat::DeviceServer device_server_;
   FakeAdcServer fake_adc_server_;
+  fdf_fake::FakePDev pdev_;
 };
 
 class TestConfig final {

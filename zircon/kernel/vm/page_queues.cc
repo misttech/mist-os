@@ -788,7 +788,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
     uint64_t loop_iterations = 0;
     while (current) {
       if (loop_iterations++ == max_isolate_iterations) {
-        KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max isolate loop iterations %" PRIu64 "",
+        KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max isolate loop iterations %" PRIu64 "\n",
                     __FUNCTION__, max_isolate_iterations);
       }
 
@@ -885,7 +885,7 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
   VM_KTRACE_DURATION(2, "ProcessLruQueue");
   while (true) {
     if (loop_iterations++ == max_lru_iterations) {
-      KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max LRU loop iterations %" PRIu64 "",
+      KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max LRU loop iterations %" PRIu64 "\n",
                   __FUNCTION__, max_lru_iterations);
     }
 
@@ -1457,7 +1457,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekIsolate(size_t lowest_que
       return result;
     }
     if (loop_iterations++ > kMaxIterations) {
-      KERNEL_OOPS("[pq]: %s iterated more than %u times", __FUNCTION__, kMaxIterations);
+      KERNEL_OOPS("[pq]: %s iterated more than %u times\n", __FUNCTION__, kMaxIterations);
     }
 
     SynchronizeWithAging();

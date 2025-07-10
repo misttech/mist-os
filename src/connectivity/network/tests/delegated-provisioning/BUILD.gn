@@ -13,7 +13,7 @@ fuchsia_test_component("test-component") {
 }
 
 rustc_library("delegated-provisioning-constants") {
-  edition = "2021"
+  edition = "2024"
   name = "delegated_provisioning_constants"
   source_root = "src/constants.rs"
   sources = [ "src/constants.rs" ]
@@ -25,7 +25,7 @@ rustc_library("delegated-provisioning-constants") {
 }
 
 rustc_test("test-bin") {
-  edition = "2021"
+  edition = "2024"
   name = "test_bin"
   deps = [
     ":delegated-provisioning-constants",
@@ -50,7 +50,7 @@ fuchsia_component("bootstrap-dhcpd-component") {
 }
 
 rustc_binary("bootstrap-dhcpd-bin") {
-  edition = "2021"
+  edition = "2024"
   name = "bootstrap_dhcpd_bin"
   deps = [
     ":delegated-provisioning-constants",

@@ -8,7 +8,7 @@ import(
     "//src/connectivity/network/netstack3/core/rustc_library_with_features.gni")
 
 rustc_library_with_features("netstack3-tcp") {
-  edition = "2021"
+  edition = "2024"
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   check_cfgs = [ "test" ]
   sources = [

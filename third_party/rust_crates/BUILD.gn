@@ -1253,7 +1253,7 @@ if (current_os == "fuchsia") {
 }
 
 group("xml-rs") {
-  public_deps = [ ":xml-rs-v0_8_0" ]
+  public_deps = [ ":xml-rs-v0_8_26" ]
 }
 
 group("zerocopy") {
@@ -13981,39 +13981,35 @@ rustc_library("redox_syscall-v0_4_1") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("redox_termios-v0_1_1.license") {
+license("redox_termios-v0_1_3.license") {
   public_package_name = "redox_termios"
   license_files =
-      [ "//third_party/rust_crates/vendor/redox_termios-0.1.1/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/redox_termios-0.1.3/LICENSE" ]
 }
 
-rustc_library("redox_termios-v0_1_1") {
+rustc_library("redox_termios-v0_1_3") {
   crate_name = "redox_termios"
   source_root =
-      "//third_party/rust_crates/vendor/redox_termios-0.1.1/src/lib.rs"
-  output_name = "redox_termios-961497fce38cbc39"
-  edition = "2015"
+      "//third_party/rust_crates/vendor/redox_termios-0.1.3/src/lib.rs"
+  output_name = "redox_termios-84c41a36092d681"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":redox_syscall-v0_1_51" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=961497fce38cbc39",
-    "-Cextra-filename=-961497fce38cbc39",
+    "-Cmetadata=84c41a36092d681",
+    "-Cextra-filename=-84c41a36092d681",
   ]
 
-  aliased_deps = {
-    syscall = ":redox_syscall-v0_1_51.actual"
-  }
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":redox_termios-v0_1_1.license" ]
+  applicable_licenses = [ ":redox_termios-v0_1_3.license" ]
 }
 
 license("ref-cast-v1_0_24.license") {
@@ -17556,7 +17552,7 @@ rustc_library("termion-v1_5_3") {
   }
   if (false) {
     deps += [ ":redox_syscall-v0_1_51" ]
-    deps += [ ":redox_termios-v0_1_1" ]
+    deps += [ ":redox_termios-v0_1_3" ]
   }
 
   rustenv = []
@@ -20664,16 +20660,16 @@ rustc_library("xattr-v0_2_3") {
   applicable_licenses = [ ":xattr-v0_2_3.license" ]
 }
 
-license("xml-rs-v0_8_0.license") {
+license("xml-rs-v0_8_26.license") {
   public_package_name = "xml"
-  license_files = [ "//third_party/rust_crates/vendor/xml-rs-0.8.0/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/xml-rs-0.8.26/LICENSE" ]
 }
 
-rustc_library("xml-rs-v0_8_0") {
+rustc_library("xml-rs-v0_8_26") {
   crate_name = "xml"
-  source_root = "//third_party/rust_crates/vendor/xml-rs-0.8.0/src/lib.rs"
-  output_name = "xml-9187c9c232fb3a0e"
-  edition = "2015"
+  source_root = "//third_party/rust_crates/vendor/xml-rs-0.8.26/src/lib.rs"
+  output_name = "xml-3a87947d219317bc"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -20684,13 +20680,13 @@ rustc_library("xml-rs-v0_8_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=9187c9c232fb3a0e",
-    "-Cextra-filename=-9187c9c232fb3a0e",
+    "-Cmetadata=3a87947d219317bc",
+    "-Cextra-filename=-3a87947d219317bc",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":xml-rs-v0_8_0.license" ]
+  applicable_licenses = [ ":xml-rs-v0_8_26.license" ]
 }
 
 license("zerocopy-v0_7_35.license") {

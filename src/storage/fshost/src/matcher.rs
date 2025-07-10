@@ -613,7 +613,7 @@ mod tests {
         LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
     use crate::device::{DeviceTag, Parent, RegisteredDevices};
-    use crate::environment::Filesystem;
+    use crate::environment::{Filesystem, SinglePublisher};
     use crate::matcher::config_matcher::ConfigMatcher;
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
@@ -1740,6 +1740,33 @@ mod tests {
             .expect("match_device failed for managed device"));
     }
 
+    struct MockPublisher {
+        should_publish: Mutex<bool>,
+    }
+
+    impl MockPublisher {
+        fn new(should_publish: bool) -> Self {
+            Self { should_publish: Mutex::new(should_publish) }
+        }
+    }
+
+    impl SinglePublisher for MockPublisher {
+        fn publish(self: Box<Self>, _device: &dyn Device) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.should_publish.lock()),
+                true,
+                "Unexpected call to launch_storage_host"
+            );
+            Ok(())
+        }
+    }
+
+    impl Drop for MockPublisher {
+        fn drop(&mut self) {
+            assert!(!*self.should_publish.lock());
+        }
+    }
+
     #[fuchsia::test]
     async fn test_config_matcher() {
         let mut matchers = Matchers::new_with_extra_matchers(
@@ -1748,6 +1775,7 @@ mod tests {
                 String::from("fts-semantic"),
                 String::from("fts-partition"),
                 Parent::SystemPartitionTable,
+                Box::new(MockPublisher::new(true)),
             )],
         );
 
@@ -1781,7 +1809,7 @@ mod tests {
             .set_partition_type([0x01; 16])
             .set_partition_label("fts-partition")
             .set_parent(Parent::SystemPartitionTable);
-        let mut env3 = MockEnv::new().expect_publish_device("fts-semantic");
+        let mut env3 = MockEnv::new(); // No expectations
         assert!(matchers
             .match_device(Box::new(device3), &mut env3)
             .await

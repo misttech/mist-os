@@ -7,14 +7,15 @@ use crate::security::selinux_hooks::{
     fs_node_set_label_with_task, has_file_permissions, permissions_from_flags,
     task_consistent_attrs, task_effective_sid, todo_check_permission, todo_has_fs_node_permissions,
     Auditable, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs, TaskAttrsOverride,
+    NO_PERMISSIONS,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::{FsNode, FsStr};
 use crate::TODO_DENY;
 use selinux::{
-    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, InitialSid,
-    KernelClass, NullessByteStr, SystemPermission,
+    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, ForClass,
+    InitialSid, KernelClass, NullessByteStr, SystemPermission,
 };
 use starnix_sync::{LockBefore, Locked, ThreadGroupLimits};
 use starnix_types::ownership::TempRef;
@@ -25,9 +26,11 @@ use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::{errno, error, rlimit};
 
-/// Updates the SELinux thread group state on exec, using the security ID associated with the
-/// resolved elf.
-pub(in crate::security) fn update_state_on_exec<L>(
+/// Corresponds to the `exec_binprm` function described in the SELinux Notebook.
+///
+/// Resets state that should not be inherited during an `exec` domain transition. Then updates the
+/// current task's SID based on the security state of the resolved executable.
+pub(in crate::security) fn exec_binprm<L>(
     locked: &mut Locked<L>,
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
@@ -35,11 +38,14 @@ pub(in crate::security) fn update_state_on_exec<L>(
 ) where
     L: LockBefore<ThreadGroupLimits>,
 {
-    let (new_sid, old_sid) = {
+    let new_sid = elf_security_state.sid.expect("SELinux enabled but missing resolved elf state");
+    let previous_sid = task_consistent_attrs(current_task).current_sid;
+
+    bprm_committing_creds(locked, security_server, current_task, previous_sid, new_sid);
+
+    {
+        // Commit the new SID to the current task's metadata.
         let mut task_attrs = task_consistent_attrs(current_task);
-        let previous_sid = task_attrs.current_sid;
-        let new_sid =
-            elf_security_state.sid.expect("SELinux enabled but missing resolved elf state");
         *task_attrs = TaskAttrs {
             current_sid: new_sid,
             effective_sid: new_sid,
@@ -49,19 +55,34 @@ pub(in crate::security) fn update_state_on_exec<L>(
             keycreate_sid: None,
             sockcreate_sid: None,
         };
-        (new_sid, previous_sid)
-    };
-    if new_sid == old_sid {
+    }
+
+    // TODO(https://fxbug.dev/378655436): Call the `bprm_committed_creds` hook here once it is implemented.
+}
+
+/// If the task SID is changing during `exec`, enforces permissions that relate to inheritance of
+/// the calling task's file descriptor access and resource limits by the callee:
+/// 1. Revoke access to any file descriptors that `current_task` is not permitted to access.
+/// 2. Reset resource limits if `current_task` is not permitted to inherit rlimits.
+/// 3. TODO(https://fxbug.dev/378655436): Reset signal state if `current task` is not
+///    permitted to inherit the parent task's signal state? Or should this happen in a separate hook,
+///    `bprm_committed_creds`, after the task SID is updated?
+/// 4. TODO(https://fxbug.dev/331815418): Wake the parent task if waiting on `current_task`.
+///    (Also move this to `bprm_committed_creds`?)
+fn bprm_committing_creds<L>(
+    locked: &mut Locked<L>,
+    security_server: &Arc<SecurityServer>,
+    current_task: &CurrentTask,
+    previous_sid: SecurityId,
+    new_sid: SecurityId,
+) where
+    L: LockBefore<ThreadGroupLimits>,
+{
+    if new_sid == previous_sid {
         return;
     }
-    // Do the work of the `selinux_bprm_post_apply_creds` hook:
-    // 1. Revoke access to any file descriptors that `current_task` is not permitted to access.
-    // 2. Reset resource limits if `current_task` is not permitted to inherit rlimits.
-    // 3. TODO(https://fxbug.dev/378655436): Reset signal state if `current task` is not
-    //    permitted to inherit the parent task's signal state.
-    // 4. TODO(https://fxbug.dev/331815418): Wake the parent task if waiting on `current_task`.
     close_inaccessible_file_descriptors(security_server, current_task, new_sid);
-    maybe_reset_rlimits(locked, security_server, current_task, old_sid, new_sid);
+    maybe_reset_rlimits(locked, security_server, current_task, previous_sid, new_sid);
 }
 
 /// "Closes" file descriptors that `current_task` does not have permission to access by remapping
@@ -94,7 +115,7 @@ fn close_inaccessible_file_descriptors(
             current_task.kernel(),
             source_sid,
             file,
-            &[],
+            NO_PERMISSIONS,
             audit_context.into(),
         );
         if !permissions.is_empty() {
@@ -125,7 +146,7 @@ fn maybe_reset_rlimits<L>(
     locked: &mut Locked<L>,
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
-    old_sid: SecurityId,
+    previous_sid: SecurityId,
     new_sid: SecurityId,
 ) where
     L: LockBefore<ThreadGroupLimits>,
@@ -135,7 +156,7 @@ fn maybe_reset_rlimits<L>(
     if check_permission(
         &permission_check,
         current_task.kernel(),
-        old_sid,
+        previous_sid,
         new_sid,
         ProcessPermission::RlimitInh,
         audit_context,
@@ -868,9 +889,9 @@ pub(in crate::security) fn run_with_effective_sid<R>(
 mod tests {
 
     use super::*;
+    use crate::security::exec_binprm;
     use crate::security::selinux_hooks::testing::create_test_executable;
     use crate::security::selinux_hooks::{testing, InitialSid, TaskAttrs};
-    use crate::security::update_state_on_exec;
     use crate::testing::create_task;
     use starnix_uapi::signals::SIGTERM;
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
@@ -1123,11 +1144,8 @@ mod tests {
                     .expect("invalid security context");
                 assert_ne!(elf_sid, initial_state.current_sid);
 
-                update_state_on_exec(
-                    locked,
-                    &current_task,
-                    &ResolvedElfState { sid: Some(elf_sid) },
-                );
+                exec_binprm(locked, &current_task, &ResolvedElfState { sid: Some(elf_sid) });
+
                 assert_eq!(
                     *current_task.security_state.lock(),
                     TaskAttrs {
@@ -1184,16 +1202,14 @@ mod tests {
                 }
 
                 // Simulate exec of the grandchild task into a new domain.
-                let old_sid = { child_task.security_state.lock().current_sid };
+                let previous_sid = { child_task.security_state.lock().current_sid };
                 let new_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_valid_t:s0".into())
                     .expect("invalid security context");
-                assert_ne!(old_sid, new_sid);
-                update_state_on_exec(
-                    locked,
-                    &grandchild_task,
-                    &ResolvedElfState { sid: Some(new_sid) },
-                );
+
+                assert_ne!(previous_sid, new_sid);
+
+                exec_binprm(locked, &grandchild_task, &ResolvedElfState { sid: Some(new_sid) });
 
                 let post_exec_limits =
                     { grandchild_task.thread_group().limits.lock(locked).clone() };
@@ -1211,11 +1227,13 @@ mod tests {
 
                 // rlimits are not reset when the task SID does not change.
                 let same_domain_task = child_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
-                update_state_on_exec(
+
+                exec_binprm(
                     locked,
                     &same_domain_task,
-                    &ResolvedElfState { sid: Some(old_sid) },
+                    &ResolvedElfState { sid: Some(previous_sid) },
                 );
+
                 let same_domain_limits =
                     { same_domain_task.thread_group().limits.lock(locked).clone() };
                 {

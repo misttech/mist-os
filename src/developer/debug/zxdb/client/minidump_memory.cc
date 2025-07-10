@@ -154,8 +154,8 @@ std::vector<unwinder::Module> MinidumpMemory::GetUnwinderModules() {
   std::vector<unwinder::Module> res;
   res.reserve(debug_modules_.size());
   for (auto& [addr, entry] : debug_modules_) {
-    unwinder::Memory* binary_memory;
-    unwinder::Memory* debug_info_memory;
+    unwinder::Memory* binary_memory = nullptr;
+    unwinder::Memory* debug_info_memory = nullptr;
 
     if (entry.binary) {
       binary_memory = &entry.binary.value();

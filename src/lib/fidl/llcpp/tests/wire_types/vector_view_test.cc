@@ -4,11 +4,17 @@
 
 #include <lib/fidl/cpp/wire/vector_view.h>
 
+#include <array>
+#include <vector>
+
 #include <gtest/gtest.h>
+
+namespace {
 
 TEST(VectorView, DefaultConstructor) {
   fidl::VectorView<int32_t> vv;
-  EXPECT_EQ(vv.count(), 0ULL);
+  EXPECT_EQ(vv.size(), 0u);
+  EXPECT_EQ(vv.count(), 0u);
   EXPECT_TRUE(vv.empty());
   EXPECT_EQ(vv.data(), nullptr);
 }
@@ -30,7 +36,8 @@ TEST(VectorView, PointerConstructor) {
   DestructableObject arr[3] = {&ds[0], &ds[1], &ds[2]};
   {
     auto vv = fidl::VectorView<DestructableObject>::FromExternal(arr, 2);
-    EXPECT_EQ(vv.count(), 2ULL);
+    EXPECT_EQ(vv.size(), 2u);
+    EXPECT_EQ(vv.count(), 2u);
     EXPECT_FALSE(vv.empty());
     EXPECT_EQ(vv.data(), arr);
   }
@@ -39,25 +46,124 @@ TEST(VectorView, PointerConstructor) {
   EXPECT_FALSE(ds[1].destructor_called);
 }
 
-TEST(VectorView, MoveConstructorUnowned) {
-  std::vector<int32_t> vec{1, 2, 3};
-  auto vv = fidl::VectorView<int32_t>::FromExternal(vec);
-  fidl::VectorView<int32_t> moved_vv(std::move(vv));
-  EXPECT_EQ(vv.count(), 3ULL);
-  EXPECT_EQ(vv.data(), vec.data());
-  EXPECT_EQ(moved_vv.count(), 3ULL);
-  EXPECT_EQ(moved_vv.data(), vec.data());
+// Used as container element type to ensure that VectorView does not attempt to
+// copy or move the unowned container's elements.
+struct NoCopyNoMove {
+  int data;
+
+  explicit constexpr NoCopyNoMove(int data) : data(data) {}
+  constexpr ~NoCopyNoMove() = default;
+
+  NoCopyNoMove(const NoCopyNoMove&) = delete;
+  NoCopyNoMove& operator=(const NoCopyNoMove&) = delete;
+};
+
+TEST(VectorView, CopyConstructor) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto copy_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  fidl::VectorView<NoCopyNoMove> copy_target(copy_source);
+  EXPECT_EQ(copy_target.size(), 3u);
+  EXPECT_EQ(copy_target.count(), 3u);
+  EXPECT_EQ(copy_target.data(), array.data());
+  EXPECT_EQ(copy_source.size(), 3u);
+  EXPECT_EQ(copy_source.count(), 3u);
+  EXPECT_EQ(copy_source.data(), array.data());
 }
 
-TEST(VectorView, MoveAssigmentUnowned) {
-  std::vector<int32_t> vec{1, 2, 3};
-  auto vv = fidl::VectorView<int32_t>::FromExternal(vec);
-  fidl::VectorView<int32_t> moved_vv;
-  moved_vv = std::move(vv);
-  EXPECT_EQ(vv.count(), 3ULL);
-  EXPECT_EQ(vv.data(), vec.data());
-  EXPECT_EQ(moved_vv.count(), 3ULL);
-  EXPECT_EQ(moved_vv.data(), vec.data());
+TEST(VectorView, CopyAssignment) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto copy_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  fidl::VectorView<NoCopyNoMove> copy_target = copy_source;
+  EXPECT_EQ(copy_target.size(), 3u);
+  EXPECT_EQ(copy_target.count(), 3u);
+  EXPECT_EQ(copy_target.data(), array.data());
+  EXPECT_EQ(copy_source.size(), 3u);
+  EXPECT_EQ(copy_source.count(), 3u);
+  EXPECT_EQ(copy_source.data(), array.data());
+}
+
+TEST(VectorView, CopyConstructorWithConst) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto copy_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  fidl::VectorView<const NoCopyNoMove> copy_target(copy_source);
+  EXPECT_EQ(copy_target.size(), 3u);
+  EXPECT_EQ(copy_target.count(), 3u);
+  EXPECT_EQ(copy_target.data(), array.data());
+  EXPECT_EQ(copy_source.size(), 3u);
+  EXPECT_EQ(copy_source.count(), 3u);
+  EXPECT_EQ(copy_source.data(), array.data());
+}
+
+TEST(VectorView, CopyAssignmentWithConst) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto copy_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  fidl::VectorView<const NoCopyNoMove> copy_target = copy_source;
+  EXPECT_EQ(copy_target.size(), 3u);
+  EXPECT_EQ(copy_target.count(), 3u);
+  EXPECT_EQ(copy_target.data(), array.data());
+  EXPECT_EQ(copy_source.size(), 3u);
+  EXPECT_EQ(copy_source.count(), 3u);
+  EXPECT_EQ(copy_source.data(), array.data());
+}
+
+TEST(VectorView, MoveConstructor) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto move_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  // NOLINTNEXTLINE(performance-move-const-arg): Testing that move works.
+  fidl::VectorView<NoCopyNoMove> move_target = std::move(move_source);
+  EXPECT_EQ(move_target.size(), 3u);
+  EXPECT_EQ(move_target.count(), 3u);
+  EXPECT_EQ(move_target.data(), array.data());
+  EXPECT_EQ(move_source.size(), 3u);
+  EXPECT_EQ(move_source.count(), 3u);
+  EXPECT_EQ(move_source.data(), array.data());
+}
+
+TEST(VectorView, MoveAssignment) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto move_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  // NOLINTNEXTLINE(performance-move-const-arg): Testing that move works.
+  fidl::VectorView<NoCopyNoMove> move_target = std::move(move_source);
+  EXPECT_EQ(move_target.size(), 3u);
+  EXPECT_EQ(move_target.count(), 3u);
+  EXPECT_EQ(move_target.data(), array.data());
+  EXPECT_EQ(move_source.size(), 3u);
+  EXPECT_EQ(move_source.count(), 3u);
+  EXPECT_EQ(move_source.data(), array.data());
+}
+
+TEST(VectorView, MoveConstructorWithConst) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto move_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  // NOLINTNEXTLINE(performance-move-const-arg): Testing that move works.
+  fidl::VectorView<const NoCopyNoMove> move_target = std::move(move_source);
+  EXPECT_EQ(move_target.size(), 3u);
+  EXPECT_EQ(move_target.count(), 3u);
+  EXPECT_EQ(move_target.data(), array.data());
+  EXPECT_EQ(move_source.size(), 3u);
+  EXPECT_EQ(move_source.count(), 3u);
+  EXPECT_EQ(move_source.data(), array.data());
+}
+
+TEST(VectorView, MoveAssignmentWithConst) {
+  std::array<NoCopyNoMove, 3> array{NoCopyNoMove(1), NoCopyNoMove(2), NoCopyNoMove(3)};
+  auto move_source = fidl::VectorView<NoCopyNoMove>::FromExternal(array);
+
+  // NOLINTNEXTLINE(performance-move-const-arg): Testing that move works.
+  fidl::VectorView<const NoCopyNoMove> move_target = std::move(move_source);
+  EXPECT_EQ(move_target.size(), 3u);
+  EXPECT_EQ(move_target.count(), 3u);
+  EXPECT_EQ(move_target.data(), array.data());
+  EXPECT_EQ(move_source.size(), 3u);
+  EXPECT_EQ(move_source.count(), 3u);
+  EXPECT_EQ(move_source.data(), array.data());
 }
 
 TEST(VectorView, Iteration) {
@@ -82,10 +188,11 @@ TEST(VectorView, Indexing) {
 TEST(VectorView, Mutations) {
   std::vector<int32_t> vec{1, 2, 3};
   auto vv = fidl::VectorView<int32_t>::FromExternal(vec);
-  vv.set_count(2);
+  vv.set_size(2);
   *vv.data() = 4;
   vv[1] = 5;
-  EXPECT_EQ(vv.count(), 2ULL);
+  EXPECT_EQ(vv.size(), 2u);
+  EXPECT_EQ(vv.count(), 2u);
   EXPECT_EQ(vv.data(), vec.data());
   EXPECT_EQ(vv[0], 4);
   EXPECT_EQ(vv[1], 5);
@@ -100,7 +207,8 @@ TEST(VectorView, CopyFromStdVector) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -114,7 +222,8 @@ TEST(VectorView, CopyFromStdSpan) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -128,7 +237,8 @@ TEST(VectorView, CopyFromConstStdSpan) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -142,7 +252,8 @@ TEST(VectorView, CopyFromIterators) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -156,7 +267,8 @@ TEST(VectorView, CopyFromConstIterators) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -168,3 +280,5 @@ TEST(VectorView, BadIterators) {
   fidl::VectorView<int32_t> vv{arena, 1, 2};
 }
 #endif
+
+}  // namespace

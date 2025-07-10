@@ -230,7 +230,7 @@ where
                             return false;
                         }
                         match action {
-                            Action::Forward(ref mut targets) => {
+                            Action::Forward(targets) => {
                                 // If all targets reference the device, we should
                                 // discard the route entirely.
                                 if targets.iter().all(|target| dev == &target.output_interface) {

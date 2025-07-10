@@ -618,6 +618,9 @@ async fn index_updated_mid_package_write() {
                         },
                     },
                 },
+                "retained-blobs" : {
+                    "blobs-count": 0u64,
+                },
                 "writing" : {},
             }
         }

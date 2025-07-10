@@ -2757,10 +2757,10 @@ mod tests {
     }
 
     fn random_ipv4_generator() -> Ipv4Addr {
-        let octet1: u8 = rand::thread_rng().gen();
-        let octet2: u8 = rand::thread_rng().gen();
-        let octet3: u8 = rand::thread_rng().gen();
-        let octet4: u8 = rand::thread_rng().gen();
+        let octet1: u8 = rand::thread_rng().r#gen();
+        let octet2: u8 = rand::thread_rng().r#gen();
+        let octet3: u8 = rand::thread_rng().r#gen();
+        let octet4: u8 = rand::thread_rng().r#gen();
         Ipv4Addr::new(octet1, octet2, octet3, octet4)
     }
 
