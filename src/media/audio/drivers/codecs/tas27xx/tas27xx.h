@@ -9,7 +9,6 @@
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/simple-codec/simple-codec-server.h>
 #include <threads.h>
 
@@ -17,6 +16,8 @@
 
 #include <ddktl/device.h>
 #include <ti/ti-audio.h>
+
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace audio {
 static constexpr uint8_t SW_RESET = 0x01;  // sw reset

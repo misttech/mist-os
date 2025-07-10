@@ -13,7 +13,6 @@
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/debug.h>
 #include <lib/device-protocol/display-panel.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -23,6 +22,8 @@
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
+
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace touch {
 

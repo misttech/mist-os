@@ -9,7 +9,6 @@
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/simple-codec/simple-codec-server.h>
@@ -21,6 +20,7 @@
 #include <fbl/mutex.h>
 #include <ti/ti-audio.h>
 
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "tas58xx-inspect.h"
 
 namespace audio {

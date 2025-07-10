@@ -54,7 +54,7 @@ source_set("common") {
   public_deps = [
     ":fuchsia.hardware.adhoc.lp8556_cpp",
     ":metadata",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/device-protocol-display",
     "//src/lib/ddktl",

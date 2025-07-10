@@ -9,7 +9,6 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <math.h>
 
@@ -20,6 +19,7 @@
 #include <fbl/alloc_checker.h>
 #include <pretty/hexdump.h>
 
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "ti-lp8556Metadata.h"
 
 namespace ti {

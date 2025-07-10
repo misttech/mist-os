@@ -9,7 +9,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -21,6 +20,8 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
+
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 namespace stm {
 zx_status_t StmMcu::Create(void* ctx, zx_device_t* parent) {

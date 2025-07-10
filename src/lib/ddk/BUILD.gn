@@ -175,7 +175,7 @@ static_library("ddk") {
     "//src/devices/gpio/lib/fuchsia.hardware.gpio:*",
     "//src/devices/i2c/drivers/i2c:*",
     "//src/devices/i2c/drivers/intel-i2c:*",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel:*",
+    "//src/devices/i2c/lib/i2c-channel-legacy:*",
     "//src/devices/lib/acpi:*",
     "//src/devices/lib/acpi/mock:*",
     "//src/devices/lib/acpi/test:*",

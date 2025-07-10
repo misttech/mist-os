@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_I2C_LIB_DEVICE_PROTOCOL_I2C_CHANNEL_INCLUDE_LIB_DEVICE_PROTOCOL_I2C_CHANNEL_H_
-#define SRC_DEVICES_I2C_LIB_DEVICE_PROTOCOL_I2C_CHANNEL_INCLUDE_LIB_DEVICE_PROTOCOL_I2C_CHANNEL_H_
+#ifndef SRC_DEVICES_I2C_LIB_I2C_CHANNEL_LEGACY_I2C_CHANNEL_H_
+#define SRC_DEVICES_I2C_LIB_I2C_CHANNEL_LEGACY_I2C_CHANNEL_H_
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <lib/ddk/driver.h>
@@ -173,4 +173,4 @@ class I2cChannel {
 
 }  // namespace ddk
 
-#endif  // SRC_DEVICES_I2C_LIB_DEVICE_PROTOCOL_I2C_CHANNEL_INCLUDE_LIB_DEVICE_PROTOCOL_I2C_CHANNEL_H_
+#endif  // SRC_DEVICES_I2C_LIB_I2C_CHANNEL_LEGACY_I2C_CHANNEL_H_

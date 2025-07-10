@@ -52,7 +52,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/lib/fit-promise",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//zircon/system/ulib/driver-unit-test",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",

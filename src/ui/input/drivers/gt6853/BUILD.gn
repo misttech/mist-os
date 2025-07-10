@@ -50,7 +50,7 @@ group("common") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/input_report_reader",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/graphics/display/lib/device-protocol-display",

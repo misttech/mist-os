@@ -5,7 +5,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <zircon/errors.h>
 
@@ -15,6 +14,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {

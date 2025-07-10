@@ -402,7 +402,7 @@ group("deprecated_zx_wrapper_allowlist") {
     "//src/devices/block/lib/scsi:*",
     "//src/devices/bus/lib/virtio:*",
     "//src/devices/bus/testing/mock-sdio:*",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel:*",
+    "//src/devices/i2c/lib/i2c-channel-legacy:*",
     "//src/devices/i2c/testing/fake-i2c:*",
     "//src/devices/i2c/testing/mock-i2c:*",
     "//src/devices/lib/amlogic:*",

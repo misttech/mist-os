@@ -7,7 +7,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <zircon/errors.h>
 
@@ -17,6 +16,7 @@
 #include <gtest/gtest.h>
 #include <hwreg/bitfields.h>
 
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace audio::alc5663 {

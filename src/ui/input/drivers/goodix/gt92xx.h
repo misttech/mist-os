@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -26,6 +25,8 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/mutex.h>
 #include <fbl/vector.h>
+
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 
 // clang-format off
 #define GT_REG_DSP_CONTROL      0x4010
