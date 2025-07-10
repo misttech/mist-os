@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
   <imports>
-    <localimport file="bazel_modules"/>
     <localimport file="chromium/chromium"/>
     <localimport file="dart"/>
     <localimport file="goldfish-opengl"/>
