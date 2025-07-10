@@ -27,6 +27,7 @@ driver_manager
 ?fshost
 ftdi
 ?fvm
+?fvm2
 ?fxfs
 ?fxfs-crypt
 gpio
