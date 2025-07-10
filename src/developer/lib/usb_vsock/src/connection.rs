@@ -3,17 +3,20 @@
 // found in the LICENSE file.
 
 use futures::channel::{mpsc, oneshot};
-use futures::lock::Mutex;
+use futures::lock::{Mutex, OwnedMutexGuard};
 use log::{debug, trace, warn};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::future::Future;
 use std::io::{Error, ErrorKind};
 use std::ops::DerefMut;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{ready, Context, Poll, Waker};
 
 use fuchsia_async::Scope;
 use futures::io::{ReadHalf, WriteHalf};
-use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, SinkExt, StreamExt};
+use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, SinkExt, StreamExt};
 
 use crate::connection::overflow_writer::OverflowHandleFut;
 use crate::{
@@ -42,6 +45,52 @@ impl PausePacket {
             PausePacket::Pause => [1],
             PausePacket::UnPause => [0],
         }
+    }
+}
+
+/// A connection that has been established with the other end and now just needs
+/// a socket to start transmitting.
+pub struct ReadyConnect<B, S> {
+    connections: Arc<std::sync::Mutex<HashMap<Address, VsockConnection<S>>>>,
+    packet_filler: Arc<UsbPacketFiller<B>>,
+    address: Address,
+    connection_state: ConnectionState,
+}
+
+impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> ReadyConnect<B, S> {
+    /// Finish establishing the connection by providing a socket for data transfer.
+    pub async fn finish_connect(self, socket: S) -> ConnectionState {
+        let (read_socket, write_socket) = socket.split();
+        let writer = {
+            let conns = self.connections.lock().unwrap();
+            let Some(conn) = conns.get(&self.address) else {
+                warn!("Connection state was missing after connection success!");
+                return self.connection_state;
+            };
+            let VsockConnectionState::Connected { writer, reader_scope, pause_state, .. } =
+                &conn.state
+            else {
+                warn!("Connection state was invalid after connection success!");
+                return self.connection_state;
+            };
+            reader_scope.spawn(Connection::<B, S>::run_socket(
+                read_socket,
+                self.address,
+                self.packet_filler,
+                Arc::clone(pause_state),
+            ));
+            Arc::clone(writer)
+        };
+        let mut writer = writer.lock().await;
+        let ConnectionStateWriter::NotYetAvailable(wakers) = std::mem::replace(
+            &mut *writer,
+            ConnectionStateWriter::Available(OverflowWriter::new(write_socket)),
+        ) else {
+            unreachable!("Connection completed multiple times!")
+        };
+
+        wakers.into_iter().for_each(Waker::wake);
+        self.connection_state
     }
 }
 
@@ -172,19 +221,34 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
     /// rejected the connection, and the returned [`ConnectionState`] handle can be used to wait
     /// for the connection to be closed.
     pub async fn connect(&self, addr: Address, socket: S) -> Result<ConnectionState, Error> {
-        let (read_socket, write_socket) = socket.split();
-        let write_socket = Arc::new(Mutex::new(OverflowWriter::new(write_socket)));
+        let ready = self.connect_late(addr).await?;
+        Ok(ready.finish_connect(socket).await)
+    }
+
+    /// Same as [`connect`] but doesn't require the socket to be passed. Instead
+    /// we return a [`ReadyConnect`] which can be given the socket later. This
+    /// shouldn't be deferred very long but it is useful if the socket is
+    /// starting out speaking a different protocol and needs to execute a
+    /// protocol switch, but needs to know the connection status before doing
+    /// that switch.
+    pub async fn connect_late(&self, addr: Address) -> Result<ReadyConnect<B, S>, Error> {
         let (connected_tx, connected_rx) = oneshot::channel();
 
-        self.set_connection(
-            addr.clone(),
-            VsockConnectionState::ConnectingOutgoing(write_socket, read_socket, connected_tx),
-        )?;
+        self.set_connection(addr.clone(), VsockConnectionState::ConnectingOutgoing(connected_tx))?;
 
         let header = &mut Header::new(PacketType::Connect);
         header.set_address(&addr);
         self.packet_filler.write_vsock_packet(&Packet { header, payload: &[] }).await.unwrap();
-        connected_rx.await.map_err(|_| Error::other("Accept was never received for {addr:?}"))?
+        let Ok(conn_state) = connected_rx.await else {
+            return Err(Error::other("Accept was never received for {addr:?}"));
+        };
+
+        Ok(ReadyConnect {
+            connections: Arc::clone(&self.connections),
+            packet_filler: Arc::clone(&self.packet_filler),
+            address: addr,
+            connection_state: conn_state,
+        })
     }
 
     /// Sends a request for the other end to close the connection.
@@ -205,6 +269,17 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
         request: ConnectionRequest,
         socket: S,
     ) -> Result<ConnectionState, Error> {
+        let ready = self.accept_late(request).await?;
+        Ok(ready.finish_connect(socket).await)
+    }
+
+    /// Accepts a connection for which an outstanding connection request has been made, and
+    /// provides a socket to read and write data packets to and from. The returned [`ConnectionState`]
+    /// can be used to wait for the connection to be closed.
+    pub async fn accept_late(
+        &self,
+        request: ConnectionRequest,
+    ) -> Result<ReadyConnect<B, S>, Error> {
         let address = request.address;
         let notify_closed_rx;
         if let Some(conn) = self.connections.lock().unwrap().get_mut(&address) {
@@ -214,24 +289,16 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
                 )));
             };
 
-            let (read_socket, write_socket) = socket.split();
-            let writer = Arc::new(Mutex::new(OverflowWriter::new(write_socket)));
             let notify_closed = mpsc::channel(2);
             notify_closed_rx = notify_closed.1;
             let notify_closed = notify_closed.0;
             let pause_state = PauseState::new();
 
-            let reader_task = Scope::new_with_name("connection-reader");
-            reader_task.spawn(Self::run_socket(
-                read_socket,
-                address,
-                self.packet_filler.clone(),
-                Arc::clone(&pause_state),
-            ));
+            let reader_scope = Scope::new_with_name("connection-reader");
 
             conn.state = VsockConnectionState::Connected {
-                writer,
-                _reader_scope: reader_task,
+                writer: Arc::new(Mutex::new(ConnectionStateWriter::NotYetAvailable(Vec::new()))),
+                reader_scope,
                 notify_closed,
                 pause_state,
             };
@@ -243,7 +310,12 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
         let header = &mut Header::new(PacketType::Accept);
         header.set_address(&address);
         self.packet_filler.write_vsock_packet(&Packet { header, payload: &[] }).await.unwrap();
-        Ok(ConnectionState(notify_closed_rx))
+        Ok(ReadyConnect {
+            connections: Arc::clone(&self.connections),
+            packet_filler: Arc::clone(&self.packet_filler),
+            address,
+            connection_state: ConnectionState(notify_closed_rx),
+        })
     }
 
     /// Rejects a pending connection request from the other side.
@@ -297,8 +369,12 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
                 warn!("Received data packet for connection that didn't exist at {address:?}");
                 return Ok(());
             }
-            let mut socket_guard = payload_socket.lock().await;
-            match socket_guard.write_all(payload) {
+            let mut socket_guard =
+                ConnectionStateWriter::wait_available(Arc::clone(&payload_socket)).await;
+            let ConnectionStateWriter::Available(socket) = &mut *socket_guard else {
+                unreachable!("wait_available didn't wait until socket was available!");
+            };
+            match socket.write_all(payload) {
                 Err(err) => {
                     debug!(
                         "Write to socket address {address:?} failed, \
@@ -385,29 +461,22 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
     async fn handle_accept_packet(&self, address: Address) -> Result<(), Error> {
         if let Some(conn) = self.connections.lock().unwrap().get_mut(&address) {
             let state = std::mem::replace(&mut conn.state, VsockConnectionState::Invalid);
-            let VsockConnectionState::ConnectingOutgoing(writer, read_socket, connected_tx) = state
-            else {
+            let VsockConnectionState::ConnectingOutgoing(connected_tx) = state else {
                 warn!("Received accept packet for connection in unexpected state for {address:?}");
                 return Ok(());
             };
             let (notify_closed, notify_closed_rx) = mpsc::channel(2);
-            if connected_tx.send(Ok(ConnectionState(notify_closed_rx))).is_err() {
+            if connected_tx.send(ConnectionState(notify_closed_rx)).is_err() {
                 warn!(
                     "Accept packet received for {address:?} but connect caller stopped waiting for it"
                 );
             }
             let pause_state = PauseState::new();
 
-            let reader_task = Scope::new_with_name("connection-reader");
-            reader_task.spawn(Self::run_socket(
-                read_socket,
-                address,
-                self.packet_filler.clone(),
-                Arc::clone(&pause_state),
-            ));
+            let reader_scope = Scope::new_with_name("connection-reader");
             conn.state = VsockConnectionState::Connected {
-                writer,
-                _reader_scope: reader_task,
+                writer: Arc::new(Mutex::new(ConnectionStateWriter::NotYetAvailable(Vec::new()))),
+                reader_scope,
                 notify_closed,
                 pause_state,
             };
@@ -487,13 +556,13 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
             } else {
                 debug!(
                     "Received reset packet for connection that wasn't in a connecting or \
-                     disconnected state on address {address:?}."
+                    disconnected state on address {address:?}."
                 );
             }
         } else {
             warn!(
                 "Received reset packet for connection that didn't \
-                 exist on address {address:?}. Ignoring"
+                exist on address {address:?}. Ignoring"
             );
         }
 
@@ -597,18 +666,54 @@ async fn reset<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static>(
     Ok(())
 }
 
+/// A writer inside of a [`ConnectionState`]. This is essentially an
+/// option-monad around an [`OverflowWriter`], but unlike
+/// [`std::option::Option`] the empty variant stores wakers that by convention
+/// will be woken when we replace it with the occupied variant.
+enum ConnectionStateWriter<S> {
+    NotYetAvailable(Vec<Waker>),
+    Available(OverflowWriter<S>),
+}
+
+impl<S> ConnectionStateWriter<S> {
+    /// Wait for the given `ConnectionStateWriter` to contain an actual writer.
+    fn wait_available(this: Arc<Mutex<ConnectionStateWriter<S>>>) -> ConnectionStateWriterFut<S> {
+        ConnectionStateWriterFut { writer: this, lock_fut: None }
+    }
+}
+
+/// Future returned by [`ConnectionStateWriter::wait_available`].
+struct ConnectionStateWriterFut<S> {
+    writer: Arc<Mutex<ConnectionStateWriter<S>>>,
+    lock_fut: Option<futures::lock::OwnedMutexLockFuture<ConnectionStateWriter<S>>>,
+}
+
+impl<S> Future for ConnectionStateWriterFut<S> {
+    type Output = OwnedMutexGuard<ConnectionStateWriter<S>>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let writer = Arc::clone(&self.writer);
+        let lock_fut = self.lock_fut.get_or_insert_with(|| writer.lock_owned());
+        let mut lock = ready!(lock_fut.poll_unpin(cx));
+        self.lock_fut = None;
+        match &mut *lock {
+            ConnectionStateWriter::Available(_) => Poll::Ready(lock),
+            ConnectionStateWriter::NotYetAvailable(queue) => {
+                queue.push(cx.waker().clone());
+                Poll::Pending
+            }
+        }
+    }
+}
+
 enum VsockConnectionState<S> {
-    ConnectingOutgoing(
-        Arc<Mutex<OverflowWriter<S>>>,
-        ReadHalf<S>,
-        oneshot::Sender<Result<ConnectionState, Error>>,
-    ),
+    ConnectingOutgoing(oneshot::Sender<ConnectionState>),
     ConnectingIncoming,
     Connected {
-        writer: Arc<Mutex<OverflowWriter<S>>>,
+        writer: Arc<Mutex<ConnectionStateWriter<S>>>,
         notify_closed: mpsc::Sender<Result<(), Error>>,
         pause_state: Arc<PauseState>,
-        _reader_scope: Scope,
+        reader_scope: Scope,
     },
     Invalid,
 }

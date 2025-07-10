@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 use futures::io::WriteHalf;
-use futures::lock::{Mutex, OwnedMutexLockFuture};
+use futures::lock::Mutex;
 use futures::{AsyncWrite, FutureExt};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::io::{Error, ErrorKind, IoSlice};
 use std::sync::Weak;
 use std::task::{ready, Context, Poll, Waker};
+
+use crate::connection::{ConnectionStateWriter, ConnectionStateWriterFut};
 
 /// A wrapper around the write half of a socket that never fails due to the
 /// socket being full. Instead it puts an infinitely-growing buffer in front of
@@ -84,13 +86,13 @@ impl<S: AsyncWrite + Send + 'static> OverflowWriter<S> {
 
 /// Future that drains any backlogged data from an OverflowWriter.
 pub struct OverflowHandleFut<S> {
-    writer: Weak<Mutex<OverflowWriter<S>>>,
-    guard_storage: Option<OwnedMutexLockFuture<OverflowWriter<S>>>,
+    writer: Weak<Mutex<ConnectionStateWriter<S>>>,
+    guard_storage: Option<ConnectionStateWriterFut<S>>,
 }
 
 impl<S> OverflowHandleFut<S> {
     /// Create a new future to drain all backlogged data from the given writer.
-    pub fn new(writer: Weak<Mutex<OverflowWriter<S>>>) -> Self {
+    pub fn new(writer: Weak<Mutex<ConnectionStateWriter<S>>>) -> Self {
         OverflowHandleFut { writer, guard_storage: None }
     }
 }
@@ -105,12 +107,15 @@ impl<S: AsyncWrite + Send + 'static> Future for OverflowHandleFut<S> {
             let Some(payload_socket) = self.writer.upgrade() else {
                 return std::task::Poll::Ready(Ok(()));
             };
-            self.guard_storage.insert(payload_socket.lock_owned())
+            self.guard_storage.insert(ConnectionStateWriter::wait_available(payload_socket))
         };
 
         let mut lock = ready!(lock_fut.poll_unpin(ctx));
         let lock = &mut *lock;
         self.guard_storage = None;
+        let ConnectionStateWriter::Available(lock) = &mut *lock else {
+            unreachable!("ConnectionStateWriterFut didn't wait until writer was available!");
+        };
 
         while !lock.overflow.is_empty() {
             let (data_a, data_b) = lock.overflow.as_slices();
