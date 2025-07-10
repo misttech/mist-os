@@ -5,7 +5,7 @@
 use crate::connector::Connectable;
 use crate::fidl::registry;
 use crate::{Connector, ConversionError, DirEntry, RemotableCapability};
-use fidl::handle::Status;
+use fidl::handle::{Channel, Status};
 use std::sync::Arc;
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
@@ -35,15 +35,12 @@ impl From<DirEntry> for fsandbox::Capability {
 
 impl Connectable for DirEntry {
     fn send(&self, message: crate::Message) -> Result<(), ()> {
-        const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
-        FLAGS.to_object_request(message.channel).handle(|request| {
-            self.open_entry(OpenRequest::new(
-                ExecutionScope::new(),
-                FLAGS,
-                vfs::Path::dot(),
-                request,
-            ))
-        });
+        self.open(
+            ExecutionScope::new(),
+            fio::OpenFlags::empty(),
+            vfs::path::Path::dot(),
+            message.channel,
+        );
         Ok(())
     }
 }
@@ -70,7 +67,24 @@ impl DirEntry {
         self.entry
     }
 
-    /// Opens the corresponding entry by forwarding `open_request`.
+    /// Opens the corresponding entry.
+    ///
+    /// If `path` fails validation, the `server_end` will be closed with a corresponding
+    /// epitaph and optionally an event.
+    pub fn open(
+        &self,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: impl ValidatePath,
+        server_end: Channel,
+    ) {
+        flags.to_object_request(server_end).handle(|object_request| {
+            let path = path.validate()?;
+            self.entry.clone().open_entry(OpenRequest::new(scope, flags, path, object_request))
+        });
+    }
+
+    /// Forwards the open request.
     pub fn open_entry(&self, open_request: OpenRequest<'_>) -> Result<(), Status> {
         self.entry.clone().open_entry(open_request)
     }
@@ -85,6 +99,28 @@ impl From<Connector> for DirEntry {
         Self::new(vfs::service::endpoint(move |_scope, server_end| {
             let _ = connector.send_channel(server_end.into_zx_channel().into());
         }))
+    }
+}
+
+pub trait ValidatePath {
+    fn validate(self) -> Result<vfs::path::Path, Status>;
+}
+
+impl ValidatePath for vfs::path::Path {
+    fn validate(self) -> Result<vfs::path::Path, Status> {
+        Ok(self)
+    }
+}
+
+impl ValidatePath for String {
+    fn validate(self) -> Result<vfs::path::Path, Status> {
+        vfs::path::Path::validate_and_split(self)
+    }
+}
+
+impl ValidatePath for &str {
+    fn validate(self) -> Result<vfs::path::Path, Status> {
+        vfs::path::Path::validate_and_split(self)
     }
 }
 
@@ -150,12 +186,17 @@ mod tests {
 
         assert_eq!(mock_dir.0.get(), 0);
         let scope = ExecutionScope::new();
-        const FLAGS: fio::Flags = fio::PERM_READABLE;
+        let flags = fio::OpenFlags::DIRECTORY;
         let (_client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let mut object_request = FLAGS.to_object_request(server);
+        let mut object_request = flags.to_object_request(server);
         let dir_entry = dir_entry.clone().try_into_directory_entry(scope.clone()).unwrap();
         dir_entry
-            .open_entry(OpenRequest::new(scope.clone(), FLAGS, Path::dot(), &mut object_request))
+            .open_entry(OpenRequest::new(
+                scope.clone(),
+                fio::OpenFlags::empty(),
+                Path::dot(),
+                &mut object_request,
+            ))
             .unwrap();
         assert_eq!(mock_dir.0.get(), 1);
     }

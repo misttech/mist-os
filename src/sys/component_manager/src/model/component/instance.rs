@@ -518,12 +518,12 @@ impl ResolvedInstanceState {
         impl sandbox::Connectable for OutgoingConnector {
             fn send(&self, message: sandbox::Message) -> Result<(), ()> {
                 let scope = ExecutionScope::new();
-                const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
-                FLAGS.to_object_request(message.channel).handle(|object_request| {
+                let flags = fio::OpenFlags::empty();
+                flags.to_object_request(message.channel).handle(|object_request| {
                     let path = vfs::path::Path::dot();
                     self.node.clone().open_entry(OpenRequest::new(
                         scope,
-                        FLAGS,
+                        flags,
                         path,
                         object_request,
                     ))
@@ -1470,13 +1470,13 @@ impl Routable<Dict> for ProgramDictionaryRouter {
         let dir_entry = component.get_outgoing();
 
         let (inner_router, server_end) = create_proxy::<fsandbox::DictionaryRouterMarker>();
-        const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
-        let path = vfs::Path::validate_and_split(self.source_path.to_string())
-            .expect("path must be valid");
-        FLAGS.to_object_request(server_end.into_channel()).handle(|request| {
-            dir_entry.open_entry(OpenRequest::new(ExecutionScope::new(), FLAGS, path, request))
-        });
-
+        dir_entry.open(
+            ExecutionScope::new(),
+            fio::OpenFlags::empty(),
+            vfs::path::Path::validate_and_split(self.source_path.to_string())
+                .expect("path must be valid"),
+            server_end.into_channel(),
+        );
         let resp = inner_router
             .route(request.into())
             .await

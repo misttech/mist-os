@@ -179,13 +179,13 @@ impl LaunchTaskOnReceive {
                                 .await
                             {
                                 let mut object_request =
-                                    fio::Flags::PROTOCOL_SERVICE.to_object_request(channel);
+                                    fio::OpenFlags::empty().to_object_request(channel);
                                 provider
                                     .open(
                                         component.nonblocking_task_group(),
                                         OpenRequest::new(
                                             component.execution_scope.clone(),
-                                            fio::Flags::PROTOCOL_SERVICE,
+                                            fio::OpenFlags::empty(),
                                             Path::dot(),
                                             &mut object_request,
                                         ),
@@ -620,12 +620,12 @@ pub mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
         assert_eq!(route_counter.count(), 0);
 
-        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         conn.try_into_directory_entry(scope.clone())
             .unwrap()
             .open_entry(OpenRequest::new(
                 scope.clone(),
-                fio::Flags::PROTOCOL_SERVICE,
+                fio::OpenFlags::empty(),
                 Path::dot(),
                 &mut object_request,
             ))
@@ -670,12 +670,12 @@ pub mod tests {
             panic!();
         };
 
-        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         conn.try_into_directory_entry(scope.clone())
             .unwrap()
             .open_entry(OpenRequest::new(
                 scope.clone(),
-                fio::Flags::PROTOCOL_SERVICE,
+                fio::OpenFlags::empty(),
                 Path::dot(),
                 &mut object_request,
             ))

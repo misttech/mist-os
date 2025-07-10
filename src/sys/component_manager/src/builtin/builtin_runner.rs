@@ -27,7 +27,6 @@ use thiserror::Error;
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::service::endpoint;
-use vfs::ToObjectRequest;
 use zx::{AsHandleRef, HandleBased, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
@@ -555,15 +554,12 @@ impl ElfRunnerProgram {
         let output = self.output.clone();
         let dir_entry =
             DirEntry::new(output.try_into_directory_entry(self.execution_scope.clone()).unwrap());
-        const FLAGS: fio::Flags = fio::PERM_READABLE;
-        FLAGS.to_object_request(outgoing_dir.into_channel()).handle(|request| {
-            dir_entry.open_entry(OpenRequest::new(
-                self.execution_scope.clone(),
-                FLAGS,
-                vfs::Path::dot(),
-                request,
-            ))
-        });
+        dir_entry.open(
+            self.execution_scope.clone(),
+            fio::OpenFlags::RIGHT_READABLE,
+            ".".to_string(),
+            outgoing_dir.into_channel(),
+        );
     }
 
     async fn wait_for_shutdown(self, lifecycle: ServerEnd<fprocess_lifecycle::LifecycleMarker>) {
@@ -801,14 +797,14 @@ mod tests {
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
             .clone()
             .get_scoped_runner(
                 make_scoped_policy_checker(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::Flags::PROTOCOL_SERVICE,
+                    fio::OpenFlags::empty(),
                     VfsPath::dot(),
                     &mut object_request,
                 ),
@@ -865,14 +861,14 @@ mod tests {
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
             .clone()
             .get_scoped_runner(
                 make_scoped_policy_checker(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::Flags::PROTOCOL_SERVICE,
+                    fio::OpenFlags::empty(),
                     VfsPath::dot(),
                     &mut object_request,
                 ),
@@ -940,14 +936,14 @@ mod tests {
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
             .clone()
             .get_scoped_runner(
                 make_scoped_policy_checker(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::Flags::PROTOCOL_SERVICE,
+                    fio::OpenFlags::empty(),
                     VfsPath::dot(),
                     &mut object_request,
                 ),
@@ -1015,14 +1011,14 @@ mod tests {
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
+        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
             .clone()
             .get_scoped_runner(
                 make_scoped_policy_checker(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::Flags::PROTOCOL_SERVICE,
+                    fio::OpenFlags::empty(),
                     VfsPath::dot(),
                     &mut object_request,
                 ),

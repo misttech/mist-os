@@ -52,13 +52,9 @@ mod tests {
     use fidl::endpoints::ClientEnd;
     use fidl::{AsHandleRef, Channel};
     use futures::StreamExt;
-    use vfs::directory::entry::OpenRequest;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::ToObjectRequest as _;
     use zx::Status;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
-
-    const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
 
     #[fuchsia::test]
     async fn test_connector_into_open() {
@@ -66,9 +62,7 @@ mod tests {
         let scope = ExecutionScope::new();
         let dir_entry = DirEntry::new(sender.try_into_directory_entry(scope.clone()).unwrap());
         let (client_end, server_end) = Channel::create();
-        FLAGS.to_object_request(server_end).handle(|request| {
-            dir_entry.open_entry(OpenRequest::new(scope, FLAGS, vfs::Path::dot(), request))
-        });
+        dir_entry.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
         let msg = receiver.receive().await.unwrap();
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
@@ -84,10 +78,7 @@ mod tests {
         let scope = ExecutionScope::new();
         let dir_entry = DirEntry::new(sender.try_into_directory_entry(scope.clone()).unwrap());
         let (client_end, server_end) = Channel::create();
-        let path = vfs::Path::validate_and_split("foo").unwrap();
-        FLAGS
-            .to_object_request(server_end)
-            .handle(|request| dir_entry.open_entry(OpenRequest::new(scope, FLAGS, path, request)));
+        dir_entry.open(scope, fio::OpenFlags::empty(), "foo".to_owned(), server_end);
 
         let mut fut = std::pin::pin!(receiver.receive());
         assert!(ex.run_until_stalled(&mut fut).is_pending());
@@ -112,10 +103,7 @@ mod tests {
         let scope = ExecutionScope::new();
         let dir_entry = DirEntry::new(dict.try_into_directory_entry(scope.clone()).unwrap());
         let (client_end, server_end) = Channel::create();
-        let path = vfs::Path::validate_and_split("echo").unwrap();
-        FLAGS
-            .to_object_request(server_end)
-            .handle(|request| dir_entry.open_entry(OpenRequest::new(scope, FLAGS, path, request)));
+        dir_entry.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
 
         let msg = receiver.receive().await.unwrap();
         assert_eq!(
@@ -136,10 +124,7 @@ mod tests {
         let scope = ExecutionScope::new();
         let dir_entry = DirEntry::new(dict.try_into_directory_entry(scope.clone()).unwrap());
         let (client_end, server_end) = Channel::create();
-        let path = vfs::Path::validate_and_split("echo/foo").unwrap();
-        FLAGS
-            .to_object_request(server_end)
-            .handle(|request| dir_entry.open_entry(OpenRequest::new(scope, FLAGS, path, request)));
+        dir_entry.open(scope, fio::OpenFlags::empty(), "echo/foo".to_owned(), server_end);
 
         let mut fut = std::pin::pin!(receiver.receive());
         assert!(ex.run_until_stalled(&mut fut).is_pending());
