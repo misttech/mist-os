@@ -34,7 +34,7 @@ namespace skipblock = fuchsia_hardware_skipblock;
 
 zx::result<std::unique_ptr<SkipBlockPartitionClient>> SkipBlockDevicePartitioner::FindPartition(
     const Uuid& type) const {
-  zx::result partition = OpenSkipBlockPartition(devices_, type, ZX_SEC(5));
+  zx::result partition = OpenSkipBlockPartition(skip_block_devices_, type, ZX_SEC(5));
   if (partition.is_error()) {
     return partition.take_error();
   }

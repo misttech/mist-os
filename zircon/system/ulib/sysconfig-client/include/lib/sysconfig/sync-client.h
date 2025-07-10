@@ -39,6 +39,7 @@ class __EXPORT SyncClient {
   };
 
   static zx::result<SyncClient> Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev);
+  static SyncClient Create(fidl::ClientEnd<skipblock::SkipBlock> skip_block);
 
   // Provides write access for the partition specified. Always writes full partition.
   //

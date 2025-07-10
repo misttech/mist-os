@@ -193,6 +193,29 @@ zx::result<BlockDevices> BlockDevices::CreateFromPartitionService(
   return zx::ok(BlockDevices(std::move(partition_dir), Variant::kPartitionService));
 }
 
+zx::result<BlockDevices> BlockDevices::CreateFromSkipBlockService(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  auto [client, server] = std::move(*endpoints);
+  if (zx_status_t status = fdio_open3_at(
+          svc_root.handle()->get(), "fuchsia.hardware.skipblock.Service",
+          static_cast<uint64_t>(fuchsia_io::wire::kPermReadable), server.TakeChannel().release());
+      status != ZX_OK) {
+    ERROR("Failed to open skip block service: %s\n", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  fbl::unique_fd skip_block_dir;
+  if (zx_status_t status =
+          fdio_fd_create(client.TakeChannel().release(), skip_block_dir.reset_and_get_address());
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(BlockDevices(std::move(skip_block_dir), Variant::kSkipBlockService));
+}
+
 BlockDevices BlockDevices::CreateEmpty() { return BlockDevices({}, {}); }
 
 BlockDevices BlockDevices::Duplicate() const { return BlockDevices(root_.duplicate(), variant_); }
@@ -275,6 +298,15 @@ zx::result<std::vector<std::unique_ptr<VolumeConnector>>> BlockDevices::OpenAllP
         connector = std::make_unique<PartitionServiceBasedVolumeConnector>(*std::move(fd));
         break;
       }
+      case Variant::kSkipBlockService: {
+        zx::result fd = open_in_dir(dir_fd.get(), filename);
+        if (fd.is_error()) {
+          return fd.take_error();
+        }
+        connector =
+            std::make_unique<DirBasedVolumeConnector>(*std::move(fd), std::string("skipblock"));
+        break;
+      }
     }
     zx::result partition = connector->Connect();
     if (partition.is_error()) {
@@ -338,6 +370,15 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::WaitForPartition(
           return fd.status_value();
         }
         connector = std::make_unique<PartitionServiceBasedVolumeConnector>(*std::move(fd));
+        break;
+      }
+      case Variant::kSkipBlockService: {
+        zx::result fd = open_in_dir(dirfd, filename);
+        if (fd.is_error()) {
+          return fd.status_value();
+        }
+        connector =
+            std::make_unique<DirBasedVolumeConnector>(*std::move(fd), std::string("skipblock"));
         break;
       }
     }

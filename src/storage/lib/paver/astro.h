@@ -56,7 +56,7 @@ class AstroPartitioner : public DevicePartitioner {
         svc_root_(std::move(svc_root)),
         context_(std::move(context)) {}
 
-  static zx::result<> InitializeContext(const paver::BlockDevices& devices,
+  static zx::result<> InitializeContext(const paver::BlockDevices& skip_block_devices,
                                         AbrWearLevelingOption abr_wear_leveling_opt,
                                         Context* context);
 

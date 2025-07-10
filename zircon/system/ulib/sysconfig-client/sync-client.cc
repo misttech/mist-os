@@ -259,6 +259,10 @@ zx::result<SyncClient> SyncClient::Create(fidl::UnownedClientEnd<fuchsia_io::Dir
   return zx::ok(SyncClient(fidl::WireSyncClient(std::move(skip_block.value()))));
 }
 
+SyncClient SyncClient::Create(fidl::ClientEnd<skipblock::SkipBlock> skip_block) {
+  return SyncClient(fidl::WireSyncClient(std::move(skip_block)));
+}
+
 zx::result<std::reference_wrapper<const sysconfig_header>> SyncClient::GetHeader() {
   if (!header_.has_value()) {
     if (zx_status_t status = LoadFromStorage(); status != ZX_OK) {
