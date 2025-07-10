@@ -63,26 +63,6 @@
 	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/system/libbase
 	name = third_party/android.googlesource.com/platform/system/libbase
 	ignore = all
-[submodule "third_party/bazel_rules_cc"]
-	path = third_party/bazel_rules_cc
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_cc
-	name = third_party/bazel_rules_cc
-	ignore = all
-[submodule "third_party/bazel_rules_go"]
-	path = third_party/bazel_rules_go
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_go
-	name = third_party/bazel_rules_go
-	ignore = all
-[submodule "third_party/bazel_rules_rust"]
-	path = third_party/bazel_rules_rust
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_rust
-	name = third_party/bazel_rules_rust
-	ignore = all
-[submodule "third_party/bazel_skylib"]
-	path = third_party/bazel_skylib
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/bazel-skylib
-	name = third_party/bazel_skylib
-	ignore = all
 [submodule "third_party/bcmdhd"]
 	path = third_party/bcmdhd
 	url = https://fuchsia.googlesource.com/third_party/bcmdhd
@@ -433,21 +413,6 @@
 	url = https://fuchsia.googlesource.com/third_party/zstd
 	name = third_party/zstd
 	ignore = all
-[submodule "third_party/bazel_rules_license"]
-	path = third_party/bazel_rules_license
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_license
-	name = third_party/bazel_rules_license
-	ignore = all
-[submodule "third_party/bazel_platforms"]
-	path = third_party/bazel_platforms
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/platforms
-	name = third_party/bazel_platforms
-	ignore = all
-[submodule "third_party/bazel_rules_python"]
-	path = third_party/bazel_rules_python
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_python
-	name = third_party/bazel_rules_python
-	ignore = all
 [submodule "third_party/mobly/src"]
 	path = third_party/mobly/src
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/mobly
@@ -552,11 +517,6 @@
 	path = third_party/pigweed/src
 	url = https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed
 	name = third_party/pigweed
-	ignore = all
-[submodule "third_party/bazel_rules_proto"]
-	path = third_party/bazel_rules_proto
-	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_proto
-	name = third_party/bazel_rules_proto
 	ignore = all
 [submodule "third_party/Vulkan-Utility-Libraries/src"]
 	path = third_party/Vulkan-Utility-Libraries/src
