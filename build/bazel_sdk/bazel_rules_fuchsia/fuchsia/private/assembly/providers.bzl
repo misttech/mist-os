@@ -136,7 +136,8 @@ FuchsiaUpdatePackageInfo = provider(
 FuchsiaProductAssemblyInfo = provider(
     doc = "Info populated by product assembly",
     fields = {
-        "product_assembly_out": "product assembly out directory",
+        "product_assembly_out": "Product assembly out directory",
+        "product_assembly_inputs": "Inputs referenced by the product assembly",
         "platform_aibs": "platform aibs file listing path to platform AIBS",
         "build_type": "The build type of the product",
         "build_id_dirs": "Directories containing the debug symbols",

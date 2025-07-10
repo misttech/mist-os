@@ -163,6 +163,7 @@ def _fuchsia_product_assembly_impl(ctx):
         ),
         FuchsiaProductAssemblyInfo(
             product_assembly_out = out_dir,
+            product_assembly_inputs = depset(inputs_also_needed_by_create_system),
             platform_aibs = platform_aibs_file,
             build_type = build_type,
             build_id_dirs = build_id_dirs,
@@ -270,13 +271,16 @@ def _fuchsia_product_create_system_impl(ctx):
             build_type = build_type,
             build_id_dirs = build_id_dirs,
         ),
+        # Also provide the product assembly info, so that the intermediate rule for the
+        # product assembly step doesn't need to be exposed.
+        ctx.attr.product_assembly[FuchsiaProductAssemblyInfo],
     ]
 
 _fuchsia_product_create_system = rule(
     doc = """Declares a target to generate the images for a Fuchsia product.""",
     implementation = _fuchsia_product_create_system_impl,
     toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
-    provides = [FuchsiaProductImageInfo],
+    provides = [FuchsiaProductImageInfo, FuchsiaProductAssemblyInfo],
     attrs = {
         "product_assembly": attr.label(
             doc = "A fuchsia_product_assembly target.",
