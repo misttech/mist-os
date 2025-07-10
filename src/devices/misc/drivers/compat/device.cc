@@ -896,20 +896,21 @@ fpromise::promise<void, zx_status_t> Device::WaitForInitToComplete() {
 }
 
 zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* service_name,
-                                        const char* protocol_name, zx::channel request) {
+                                        const char* protocol_name, zx::channel request,
+                                        bool zircon_transport) {
   if (std::string_view(fragment_name) != "default") {
-    bool fragment_exists = false;
-    for (auto& fragment : fragments_) {
-      if (fragment == fragment_name) {
-        fragment_exists = true;
-        break;
+    if (zircon_transport) {
+      if (!driver_->service_validator().IsValidZirconServiceInstance(service_name, fragment_name)) {
+        logger_->log(fdf::WARN, "Tried to connect to instance '{}' but it's not available",
+                     fragment_name);
+        return ZX_ERR_NOT_FOUND;
       }
-    }
-    if (!fragment_exists) {
-      logger_->log(fdf::ERROR,
-                   "Tried to connect to fragment '{}' but it's not in the fragment list",
-                   fragment_name);
-      return ZX_ERR_NOT_FOUND;
+    } else {
+      if (!driver_->service_validator().IsValidDriverServiceInstance(service_name, fragment_name)) {
+        logger_->log(fdf::WARN, "Tried to connect to instance '{}' but it's not available",
+                     fragment_name);
+        return ZX_ERR_NOT_FOUND;
+      }
     }
   }
 
@@ -978,7 +979,8 @@ zx_status_t Device::ConnectFragmentRuntime(const char* fragment_name, const char
     return status;
   }
 
-  return ConnectFragmentFidl(fragment_name, service_name, protocol_name, std::move(server_token));
+  return ConnectFragmentFidl(fragment_name, service_name, protocol_name, std::move(server_token),
+                             false);
 }
 
 zx_status_t Device::ConnectNsProtocol(const char* protocol_name, zx::channel request) {

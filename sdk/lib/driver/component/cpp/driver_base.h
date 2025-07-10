@@ -148,6 +148,14 @@ class DriverBase {
     return node.value();
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
+  const std::vector<fuchsia_driver_framework::Offer>& node_offers() {
+    auto& node_offers = start_args_.node_offers();
+    ZX_ASSERT(node_offers.has_value());
+    return node_offers.value();
+  }
+#endif
+
   template <typename StructuredConfig>
   StructuredConfig take_config() {
     static_assert(component::IsStructuredConfigV<StructuredConfig>,

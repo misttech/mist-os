@@ -347,6 +347,8 @@ Driver::~Driver() {
 }
 
 void Driver::Start(fdf::StartCompleter completer) {
+  service_validator_.emplace(node_offers());
+
   zx::result driver_vmo = LoadVmo(*incoming(), driver_path_.c_str(), kOpenFlags);
   if (driver_vmo.is_error()) {
     logger_->log(fdf::ERROR, "Failed to open driver vmo: {}", driver_vmo);

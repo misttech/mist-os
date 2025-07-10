@@ -759,6 +759,7 @@ class DriverTest : public testing::Test {
         .outgoing_dir = std::move(outgoing_dir_endpoints->server),
         .config = std::nullopt,
         .node_name = "node",
+        .node_offers = fuchsia_driver_framework::NodeOffersVector{},
     });
 
     // Start driver.
