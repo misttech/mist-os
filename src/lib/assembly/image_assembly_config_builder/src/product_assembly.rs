@@ -277,15 +277,16 @@ impl ProductAssembly {
         builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
 
         // Add product-specified packages and configuration
-        if product.bootfs_files_package.is_some() {
+        if product.bootfs_files_package.is_some() || !product.packages.bootfs.is_empty() {
             match platform.feature_set_level {
                 FeatureSetLevel::TestNoPlatform
                 | FeatureSetLevel::Embeddable
-                | FeatureSetLevel::Bootstrap => {
+                | FeatureSetLevel::Bootstrap
+                | FeatureSetLevel::Utility => {
                     // these are the only valid feature set levels for adding these files.
                 }
                 _ => {
-                    bail!("bootfs files can only be added to the 'empty', 'embeddable', or 'bootstrap' feature set levels");
+                    bail!("bootfs packages and files can only be added to the 'empty', 'embeddable', or 'bootstrap', or 'utility' feature set levels");
                 }
             }
         }
