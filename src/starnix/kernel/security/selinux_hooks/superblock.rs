@@ -4,14 +4,13 @@
 
 use super::fs_node::fs_node_init_with_dentry;
 use super::{
-    check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
-    FileSystemLabel, FileSystemState, FsNodeSidAndClass,
+    check_permission, fs_node_effective_sid_and_class, task_effective_sid, FileSystemLabel,
+    FileSystemState, FsNodeSidAndClass,
 };
 
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{FileSystem, FileSystemHandle, FsStr, Mount, NamespaceNode, OutputBuffer};
-use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
     CommonFilePermission, FileSystemMountOptions, FileSystemPermission, ForClass, FsNodeClass,
@@ -193,8 +192,7 @@ pub(in crate::security) fn sb_mount(
             panic!("sb_mount on non-file-like class")
         };
         let audit_context = [current_task.into(), node.into()];
-        todo_check_permission(
-            TODO_DENY!("https://fxbug.dev/380230897", "Check mounton permission."),
+        check_permission(
             permission_check,
             current_task.kernel(),
             source_sid,
