@@ -81,7 +81,7 @@ class FakeTransportDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::
       // The command opcode is the first two bytes.
       std::vector<uint8_t>& packet = request.command().value();
       uint16_t opcode = static_cast<uint16_t>(packet[1] << 8) | static_cast<uint16_t>(packet[0]);
-      received_opcodes_.insert(opcode);
+      received_packets_.insert({opcode, packet});
     }
 
     std::vector<uint8_t> reply;
@@ -113,7 +113,15 @@ class FakeTransportDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::
 
   void SetSerialPid(uint16_t serial_pid) { serial_pid_ = serial_pid; }
 
-  const std::unordered_set<uint16_t>& GetReceivedOpCodes() { return received_opcodes_; }
+  bool HasReceivedOpCode(uint16_t opcode) const { return received_packets_.contains(opcode); }
+
+  std::optional<const std::vector<uint8_t>> LastPacketByOpCode(uint16_t opcode) const {
+    auto it = received_packets_.find(opcode);
+    if (it == received_packets_.end()) {
+      return {};
+    }
+    return it->second;
+  }
 
   // fuchsia_hardware_serialimpl::Device FIDL request handler implementation.
   void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override {
@@ -158,7 +166,8 @@ class FakeTransportDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::
  private:
   std::optional<std::vector<uint8_t>> customized_reply_;
   uint16_t serial_pid_ = PDEV_PID_BCM43458;
-  std::unordered_set<uint16_t> received_opcodes_;
+  // The last command received for each opcode is stored.
+  std::unordered_map<uint16_t, std::vector<uint8_t>> received_packets_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_binding_group_;
   fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_group_;
@@ -379,7 +388,29 @@ TEST_F(BtHciBroadcomTest, SendsPowerCapWhenNeeded) {
   ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    ASSERT_TRUE(env.transport_device_.GetReceivedOpCodes().contains(kBcmSetPowerCapCmdOpCode));
+    ASSERT_TRUE(env.transport_device_.HasReceivedOpCode(kBcmSetPowerCapCmdOpCode));
+  });
+}
+
+TEST_F(BtHciBroadcomTest, EnablesLowPowerMode) {
+  SetMacAddressMetadata();
+  //  Respond to SetInfo command with a controller where LowPowerMode is enabled
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.transport_device_.SetSerialPid(PDEV_PID_BCM4381A1); });
+  // Ensure loading the firmware succeeds.
+  SetFirmware();
+
+  // Initialization should succeed
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
+
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    auto packet = env.transport_device_.LastPacketByOpCode(kBcmWriteSleepModeCmdOpCode);
+    ASSERT_TRUE(packet.has_value());
+    // We should have calculated the sleep ticks correctly - this is 300ms / 12.5ms
+    BcmWriteSleepModeCmd sleep_cmd;
+    std::memcpy(&sleep_cmd, packet->data(), sizeof(BcmWriteSleepModeCmd));
+    ASSERT_EQ(sleep_cmd.idle_threshold_device, 24);
+    ASSERT_EQ(sleep_cmd.idle_threshold_host, 24);
   });
 }
 

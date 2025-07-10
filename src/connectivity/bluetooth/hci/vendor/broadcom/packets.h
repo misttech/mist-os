@@ -152,6 +152,56 @@ constexpr BcmSetPowerCapCmd kDefaultPowerCapCmd = {
         },
 };
 
+enum class BcmSleepMode : uint8_t {
+  kDisabled = 0,
+  kUart = 1,
+  kReserved = 2,
+  kUsb = 3,
+};
+
+// Write Sleep Mode Command
+struct BcmWriteSleepModeCmd {
+  HciCommandHeader header;
+  BcmSleepMode mode;
+  // Idle threshold for host, in 12.5ms units.
+  uint8_t idle_threshold_host;
+  // Idle threshold for device, in 12.5ms units.
+  uint8_t idle_threshold_device;
+  // Wake polarity for the device pin
+  uint8_t bt_wake_polarity;
+  // Wake polarity for the host pin
+  uint8_t host_wake_polarity;
+  // Allow host to sleep during SCO
+  uint8_t sleep_during_sco;
+  // Combine sleep mode and LPM
+  uint8_t combine_sleep_and_lpm;
+  // Whether to tri-state the UART before sleep
+  uint8_t tri_state_uart_before_sleep;
+  // USB flags (unused here)
+  uint8_t usb_flags[3];
+  // Pulsed HOST_WAKE
+  uint8_t pulsed_host_wake;
+} __PACKED;
+
+constexpr uint16_t kBcmWriteSleepModeCmdOpCode = 0xfc27;
+constexpr uint8_t kBcmWriteSleepModeParamSize =
+    sizeof(BcmWriteSleepModeCmd) - sizeof(HciCommandHeader);
+
+constexpr BcmWriteSleepModeCmd kDisableLowPowerModeCmd = {
+    .header = {.opcode = kBcmWriteSleepModeCmdOpCode,
+               .parameter_total_size = kBcmWriteSleepModeParamSize},
+    .mode = BcmSleepMode::kDisabled,
+    .idle_threshold_host = 0,
+    .idle_threshold_device = 0,
+    .bt_wake_polarity = 0,
+    .host_wake_polarity = 0,
+    .sleep_during_sco = 0,
+    .combine_sleep_and_lpm = 0,
+    .tri_state_uart_before_sleep = 0,
+    .usb_flags = {0, 0, 0},
+    .pulsed_host_wake = 0,
+};
+
 }  // namespace bt_hci_broadcom
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_PACKETS_H_
