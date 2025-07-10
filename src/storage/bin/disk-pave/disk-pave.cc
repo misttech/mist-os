@@ -65,13 +65,13 @@ void PrintUsage() {
 
 // Unless noted specifically, these all map to the equivalent command in fuchsia.paver.
 enum class Command {
-  // fuchsia.fshost.Recovery.WipeStorage
+  // fuchsia.fshost.Admin.WipeStorage
   kWipe,
   kWipePartitionTables,
   kInitPartitionTables,
   kAsset,
   kBootloader,
-  // fuchsia.fshost.Recovery.WriteDataFile
+  // fuchsia.fshost.Admin.WriteDataFile
   kDataFile,
   kFvm,
 };
@@ -241,9 +241,9 @@ zx_status_t RealMain(Flags flags) {
     return paver_svc.error_value();
   }
   auto paver_client = fidl::WireSyncClient(std::move(*paver_svc));
-  auto fshost_svc = component::Connect<fuchsia_fshost::Recovery>();
+  auto fshost_svc = component::Connect<fuchsia_fshost::Admin>();
   if (!fshost_svc.is_ok()) {
-    ERROR("Unable to open /svc/fuchsia.fshost.Recovery.\n");
+    ERROR("Unable to open /svc/fuchsia.fshost.Admin.\n");
     return fshost_svc.error_value();
   }
   auto fshost_client = fidl::WireSyncClient(std::move(*fshost_svc));

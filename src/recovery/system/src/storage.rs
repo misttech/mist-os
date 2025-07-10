@@ -5,18 +5,18 @@
 use anyhow::{Context, Error};
 use fdr_lib::execute_reset;
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_fshost::RecoveryMarker;
+use fidl_fuchsia_fshost::AdminMarker;
 use fidl_fuchsia_io as fio;
 
 // Wipe and re-provision FVM. This will wipe both data and blobfs. This should only
 // be used in OTA flows, since wiping blobfs will result in an unusable primary system.
 // TODO(b/253096159): Add integration test for wipe_storage
 pub async fn wipe_storage() -> Result<fio::DirectoryProxy, Error> {
-    let fshost_recovery = fuchsia_component::client::connect_to_protocol::<RecoveryMarker>()
-        .context("Connecting to fshost Recovery service.")?;
+    let fshost_admin = fuchsia_component::client::connect_to_protocol::<AdminMarker>()
+        .context("Connecting to fshost Admin service.")?;
 
     let (blobfs_client, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    fshost_recovery
+    fshost_admin
         .wipe_storage(Some(blobfs_server), None)
         .await
         .context("Wiping storage")?

@@ -108,6 +108,7 @@
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.feedback.DataProvider",
+                "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.InfoResource",
@@ -133,11 +134,6 @@
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
-        },
-        {
-            // Recovery functionality is not present in all configurations.
-            protocol: "fuchsia.fshost.Recovery",
-            availability: "optional",
         },
         {
             // Virtualization is not present in all configurations.

@@ -38,7 +38,7 @@
 #include "src/bringup/bin/netsvc/paver.h"
 #include "src/storage/testing/fake-paver.h"
 
-class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Recovery> {
+class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
  public:
   FakeFshost() = default;
   FakeFshost(const FakeFshost&) = delete;
@@ -51,7 +51,7 @@ class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Recovery> 
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FAIL("Unexpected call to fuchsia.fshost.Recovery: %s", name.c_str());
+    FAIL("Unexpected call to fuchsia.fshost.Admin: %s", name.c_str());
   }
 
   const std::string& data_file_path() const { return data_file_path_; }
@@ -72,8 +72,8 @@ class FakeSvc {
           [&fake_paver, dispatcher](fidl::ServerEnd<fuchsia_paver::Paver> server_end) mutable {
             fake_paver.Connect(dispatcher, std::move(server_end));
           }));
-      ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_fshost::Recovery>(
-          [&fake_fshost, dispatcher](fidl::ServerEnd<fuchsia_fshost::Recovery> server_end) {
+      ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_fshost::Admin>(
+          [&fake_fshost, dispatcher](fidl::ServerEnd<fuchsia_fshost::Admin> server_end) {
             fidl::BindServer(dispatcher, std::move(server_end), &fake_fshost);
           }));
       zx::result result = outgoing.Serve(std::move(server_end));

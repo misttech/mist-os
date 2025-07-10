@@ -1179,13 +1179,13 @@ class FastbootFshostTest : public FastbootDownloadTest {
     mutable fbl::Mutex lock_;
   };
 
-  class MockFshostRecovery : public fidl::testing::WireTestBase<fuchsia_fshost::Recovery> {
+  class MockFshostAdmin : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
    public:
-    explicit MockFshostRecovery(async_dispatcher_t* dispatcher,
-                                const std::shared_ptr<TestState>& state)
+    explicit MockFshostAdmin(async_dispatcher_t* dispatcher,
+                             const std::shared_ptr<TestState>& state)
         : dispatcher_(dispatcher), state_(state) {}
 
-    fidl::ProtocolHandler<fuchsia_fshost::Recovery> Publish() {
+    fidl::ProtocolHandler<fuchsia_fshost::Admin> Publish() {
       return admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
     }
 
@@ -1211,7 +1211,7 @@ class FastbootFshostTest : public FastbootDownloadTest {
 
     async_dispatcher_t* dispatcher_;
     std::shared_ptr<TestState> state_;
-    fidl::ServerBindingGroup<fuchsia_fshost::Recovery> admin_bindings_;
+    fidl::ServerBindingGroup<fuchsia_fshost::Admin> admin_bindings_;
   };
 
   class MockComponent {
@@ -1221,14 +1221,14 @@ class FastbootFshostTest : public FastbootDownloadTest {
         : dispatcher_(async_get_default_dispatcher()),
           outgoing_(dispatcher_),
           server_(dispatcher_, state) {
-      ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_fshost::Recovery>(server_.Publish()));
+      ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_fshost::Admin>(server_.Publish()));
       ASSERT_OK(outgoing_.Serve(std::move(directory)));
     }
 
    private:
     async_dispatcher_t* dispatcher_;
     component::OutgoingDirectory outgoing_;
-    MockFshostRecovery server_;
+    MockFshostAdmin server_;
   };
 
   FastbootFshostTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {

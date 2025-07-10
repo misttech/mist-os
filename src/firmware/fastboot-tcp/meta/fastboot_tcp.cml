@@ -30,7 +30,7 @@
         {
             protocol: [
                 "fuchsia.buildinfo.Provider",
-                "fuchsia.fshost.Recovery",
+                "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
                 "fuchsia.posix.socket.Provider",

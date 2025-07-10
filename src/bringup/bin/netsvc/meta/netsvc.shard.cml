@@ -48,7 +48,7 @@
             to: "#netsvc",
         },
         {
-            protocol: "fuchsia.fshost.Recovery",
+            protocol: "fuchsia.fshost.Admin",
             from: "#fshost",
             to: "#netsvc",
         },

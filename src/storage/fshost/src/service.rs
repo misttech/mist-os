@@ -848,13 +848,75 @@ pub fn fshost_volume_provider(
 pub fn fshost_admin(
     environment: Arc<Mutex<dyn Environment>>,
     config: Arc<fshost_config::Config>,
+    ramdisk_prefix: Option<String>,
+    launcher: Arc<FilesystemLauncher>,
+    matcher_lock: Arc<Mutex<HashSet<String>>>,
 ) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::AdminRequestStream| {
         let env = environment.clone();
         let config = config.clone();
+        let ramdisk_prefix = ramdisk_prefix.clone();
+        let launcher = launcher.clone();
+        let matcher_lock = matcher_lock.clone();
         async move {
             while let Some(request) = stream.next().await {
                 match request {
+                    Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
+                        log::info!(filename:?; "admin write data file called");
+                        let res = match write_data_file(
+                            &env,
+                            &config,
+                            ramdisk_prefix.clone(),
+                            &launcher,
+                            &filename,
+                            payload,
+                        )
+                        .await
+                        {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                log::error!("admin service: write_data_file failed: {:?}", e);
+                                Err(zx::Status::INTERNAL.into_raw())
+                            }
+                        };
+                        responder.send(res).unwrap_or_else(|e| {
+                            log::error!("failed to send WriteDataFile response. error: {:?}", e);
+                        });
+                    }
+                    Ok(fshost::AdminRequest::WipeStorage {
+                        responder,
+                        blobfs_root,
+                        blob_creator,
+                    }) => {
+                        log::info!("admin wipe storage called");
+                        let res = if !config.ramdisk_image {
+                            log::warn!(
+                                "Can't WipeStorage from a non-recovery build; \
+                                ramdisk_image must be set."
+                            );
+                            Err(zx::Status::NOT_SUPPORTED.into_raw())
+                        } else {
+                            match wipe_storage(
+                                &env,
+                                &config,
+                                &launcher,
+                                &matcher_lock,
+                                blobfs_root,
+                                blob_creator,
+                            )
+                            .await
+                            {
+                                Ok(()) => Ok(()),
+                                Err(e) => {
+                                    log::warn!(e:?; "admin service: wipe_storage failed");
+                                    Err(zx::Status::INTERNAL.into_raw())
+                                }
+                            }
+                        };
+                        responder.send(res).unwrap_or_else(|e| {
+                            log::error!(e:?; "failed to send WipeStorage response");
+                        });
+                    }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         log::info!("admin shred data volume called");
                         let res = match shred_data_volume(&env, &config).await {
@@ -880,7 +942,7 @@ pub fn fshost_admin(
                         });
                     }
                     Err(e) => {
-                        log::error!("admin service failed: {:?}", e);
+                        log::error!("admin server failed: {:?}", e);
                         return;
                     }
                 }
@@ -889,79 +951,16 @@ pub fn fshost_admin(
     })
 }
 
-/// Make a new vfs service node that implements fuchsia.fshost.Recovery
 pub fn fshost_recovery(
     environment: Arc<Mutex<dyn Environment>>,
     config: Arc<fshost_config::Config>,
-    ramdisk_prefix: Option<String>,
-    launcher: Arc<FilesystemLauncher>,
-    matcher_lock: Arc<Mutex<HashSet<String>>>,
 ) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::RecoveryRequestStream| {
         let env = environment.clone();
         let config = config.clone();
-        let ramdisk_prefix = ramdisk_prefix.clone();
-        let launcher = launcher.clone();
-        let matcher_lock = matcher_lock.clone();
         async move {
             while let Some(request) = stream.next().await {
                 match request {
-                    Ok(fshost::RecoveryRequest::WriteDataFile { responder, payload, filename }) => {
-                        log::info!(filename:?; "recovery write data file called");
-                        let res = match write_data_file(
-                            &env,
-                            &config,
-                            ramdisk_prefix.clone(),
-                            &launcher,
-                            &filename,
-                            payload,
-                        )
-                        .await
-                        {
-                            Ok(()) => Ok(()),
-                            Err(e) => {
-                                log::error!("recovery service: write_data_file failed: {:?}", e);
-                                Err(zx::Status::INTERNAL.into_raw())
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            log::error!("failed to send WriteDataFile response. error: {:?}", e);
-                        });
-                    }
-                    Ok(fshost::RecoveryRequest::WipeStorage {
-                        responder,
-                        blobfs_root,
-                        blob_creator,
-                    }) => {
-                        log::info!("recovery wipe storage called");
-                        let res = if !config.ramdisk_image {
-                            log::warn!(
-                                "Can't WipeStorage from a non-recovery build; \
-                                ramdisk_image must be set."
-                            );
-                            Err(zx::Status::NOT_SUPPORTED.into_raw())
-                        } else {
-                            match wipe_storage(
-                                &env,
-                                &config,
-                                &launcher,
-                                &matcher_lock,
-                                blobfs_root,
-                                blob_creator,
-                            )
-                            .await
-                            {
-                                Ok(()) => Ok(()),
-                                Err(e) => {
-                                    log::warn!(e:?; "recovery service: wipe_storage failed");
-                                    Err(zx::Status::INTERNAL.into_raw())
-                                }
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            log::error!(e:?; "failed to send WipeStorage response");
-                        });
-                    }
                     Ok(fshost::RecoveryRequest::InitSystemPartitionTable {
                         partitions,
                         responder,
@@ -986,7 +985,7 @@ pub fn fshost_recovery(
                         });
                     }
                     Err(e) => {
-                        log::error!("recovery service failed: {:?}", e);
+                        log::error!("admin server failed: {:?}", e);
                         return;
                     }
                 }

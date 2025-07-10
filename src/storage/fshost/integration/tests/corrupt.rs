@@ -79,10 +79,10 @@ async fn wipe_storage_handles_corrupt_fvm() {
     let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
-    let recovery: fshost::RecoveryProxy =
+    let admin: fshost::AdminProxy =
         fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    recovery
+    admin
         .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
         .await
         .unwrap()

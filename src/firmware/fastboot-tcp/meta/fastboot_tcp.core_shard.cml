@@ -17,7 +17,7 @@
         },
         {
             protocol: [
-                "fuchsia.fshost.Recovery",
+                "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
             ],
