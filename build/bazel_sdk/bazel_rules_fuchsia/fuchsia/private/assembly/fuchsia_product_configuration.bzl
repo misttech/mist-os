@@ -16,6 +16,7 @@ load(
     "FuchsiaAssembledPackageInfo",
     "FuchsiaOmahaOtaConfigInfo",
     "FuchsiaProductConfigInfo",
+    "FuchsiaProductInputBundleInfo",
 )
 load(
     ":utils.bzl",
@@ -174,10 +175,14 @@ def _fuchsia_product_configuration_impl(ctx):
     if repo:
         args += ["--repo", repo]
 
+    for pib in ctx.attr.product_input_bundles:
+        directory = pib[FuchsiaProductInputBundleInfo].directory
+        args += ["--product-input-bundles", directory]
+
     ctx.actions.run(
         executable = sdk.assembly_config,
         arguments = args,
-        inputs = input_files + ctx.files.product_config_labels + ctx.files.deps,
+        inputs = input_files + ctx.files.product_config_labels + ctx.files.product_input_bundles + ctx.files.deps,
         outputs = [product_config_dir],
         progress_message = "Creating product config for %s" % ctx.label.name,
         mnemonic = "FuchsiaProductConfig",
@@ -261,6 +266,11 @@ _fuchsia_product_configuration = rule(
         "base_driver_packages": attr.label_list(
             doc = "Base-driver packages to include in product.",
             providers = [FuchsiaPackageInfo],
+            default = [],
+        ),
+        "product_input_bundles": attr.label_list(
+            doc = "Product input bundles to include.",
+            providers = [FuchsiaProductInputBundleInfo],
             default = [],
         ),
         "ota_configuration": attr.label(
@@ -382,11 +392,15 @@ def _fuchsia_hybrid_product_configuration_impl(ctx):
     for package_manifest in replace_packages:
         args += ["--replace-package", package_manifest]
 
+    for pib in ctx.attr.product_input_bundles:
+        directory = pib[FuchsiaProductInputBundleInfo].directory
+        args += ["--product-input-bundles", directory]
+
     sdk = get_fuchsia_sdk_toolchain(ctx)
     ctx.actions.run(
         executable = sdk.assembly_config,
         arguments = args,
-        inputs = ctx.files.packages + ctx.files.product_configuration,
+        inputs = ctx.files.packages + ctx.files.product_configuration + ctx.files.product_input_bundles,
         outputs = [product_config_dir],
         mnemonic = "HybridProductConfig",
         **LOCAL_ONLY_ACTION_KWARGS
@@ -413,7 +427,14 @@ fuchsia_hybrid_product_configuration = rule(
             mandatory = True,
         ),
         "packages": attr.label_list(
-            doc = "List of packages to replace. The packages are replace by their name.",
+            doc = "List of packages to replace. The packages are replaced by their name.",
+            providers = [FuchsiaPackageInfo],
+            default = [],
+        ),
+        "product_input_bundles": attr.label_list(
+            doc = "List of product input bundles to replace. The PIBs are replaced by their name.",
+            providers = [FuchsiaProductInputBundleInfo],
+            default = [],
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

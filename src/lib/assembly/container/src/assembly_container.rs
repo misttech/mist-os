@@ -9,6 +9,7 @@ use assembly_package_copy::PackageCopier;
 use camino::{Utf8Path, Utf8PathBuf};
 use depfile::Depfile;
 use pathdiff::diff_paths;
+use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -327,10 +328,16 @@ where
     }
 }
 
+pub fn path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut schema: schemars::schema::SchemaObject = <String>::json_schema(gen).into();
+    schema.format = Some("Utf8PathBuf".to_owned());
+    schema.into()
+}
+
 /// A path to a directory that should be copied wholesale inside an
 /// AssemblyContainer.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
-pub struct DirectoryPathBuf(Utf8PathBuf);
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash, JsonSchema)]
+pub struct DirectoryPathBuf(#[schemars(schema_with = "path_schema")] Utf8PathBuf);
 
 impl WalkPaths for DirectoryPathBuf {
     fn walk_paths_with_dest<F: WalkPathsFn>(

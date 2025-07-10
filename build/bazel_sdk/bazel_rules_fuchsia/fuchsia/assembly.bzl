@@ -96,6 +96,11 @@ load(
     _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_product_input_bundle.bzl",
+    _fuchsia_prebuilt_product_input_bundle = "fuchsia_prebuilt_product_input_bundle",
+    _fuchsia_product_input_bundle = "fuchsia_product_input_bundle",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_product_ota_config.bzl",
     _fuchsia_product_ota_config = "fuchsia_product_ota_config",
     _ota_realm = "ota_realm",
@@ -143,6 +148,8 @@ fuchsia_package_with_configs = _fuchsia_package_with_configs
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_prebuilt_product_configuration = _fuchsia_prebuilt_product_configuration
 fuchsia_prebuilt_product_configuration_extract_package = _fuchsia_prebuilt_product_configuration_extract_package
+fuchsia_product_input_bundle = _fuchsia_product_input_bundle
+fuchsia_prebuilt_product_input_bundle = _fuchsia_prebuilt_product_input_bundle
 fuchsia_product_ota_config = _fuchsia_product_ota_config
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration

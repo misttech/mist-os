@@ -12,6 +12,7 @@ mod board_input_bundle_set;
 mod common;
 mod partitions_config;
 mod product_config;
+mod product_input_bundle;
 
 use anyhow::Result;
 use argh::FromArgs;
@@ -49,6 +50,9 @@ struct GenerateCommand {
 enum GenerateSubcommand {
     /// generate a product config.
     Product(ProductArgs),
+
+    /// generate a product input bundle.
+    ProductInputBundle(ProductInputBundleArgs),
 
     /// generate a product config using an input product config as a template.
     HybridProduct(HybridProductArgs),
@@ -102,9 +106,63 @@ struct ProductArgs {
     #[argh(option)]
     repo_file: Option<Utf8PathBuf>,
 
+    /// paths to product input bundles to include.
+    #[argh(option)]
+    product_input_bundles: Vec<Utf8PathBuf>,
+
     /// the directory to write the product config to.
     #[argh(option)]
     output: Utf8PathBuf,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
+}
+
+/// Arguments to generate a product input bundle.
+#[derive(FromArgs)]
+#[argh(subcommand, name = "product-input-bundle")]
+struct ProductInputBundleArgs {
+    /// the name of the product input bundle.
+    #[argh(option)]
+    name: String,
+
+    /// a set of base package manifests to include.
+    #[argh(option)]
+    base_packages: Vec<Utf8PathBuf>,
+
+    /// a set of cache package manifests to include.
+    #[argh(option)]
+    cache_packages: Vec<Utf8PathBuf>,
+
+    /// a set of flexible package manifests to include.
+    #[argh(option)]
+    flexible_packages: Vec<Utf8PathBuf>,
+
+    /// a set of package manifests to include that will only be included in the
+    /// final images if a product config references it.
+    #[argh(option)]
+    packages_for_product_config: Vec<Utf8PathBuf>,
+
+    /// the directory to write the product input bundle to.
+    #[argh(option)]
+    output: Utf8PathBuf,
+
+    /// release version that this BIB corresponds to.
+    #[argh(option)]
+    version: Option<String>,
+
+    /// path to a file containing the release version that this BIB matches.
+    #[argh(option)]
+    version_file: Option<Utf8PathBuf>,
+
+    /// name of repository where this board is released.
+    #[argh(option)]
+    repo: Option<String>,
+
+    /// path to a file containing the repository information.
+    #[argh(option)]
+    repo_file: Option<Utf8PathBuf>,
 
     /// a depfile to write.
     #[argh(option)]
@@ -122,6 +180,10 @@ struct HybridProductArgs {
     /// a package to replace in the input.
     #[argh(option)]
     replace_package: Vec<Utf8PathBuf>,
+
+    /// a product input bundle to replace in the input.
+    #[argh(option)]
+    product_input_bundles: Vec<Utf8PathBuf>,
 
     /// the directory to write the product config to.
     #[argh(option)]
@@ -389,6 +451,7 @@ fn main() -> Result<()> {
     match args.command {
         Subcommand::Generate(args) => match args.subcommand {
             GenerateSubcommand::Product(args) => product_config::new(&args),
+            GenerateSubcommand::ProductInputBundle(args) => product_input_bundle::new(&args),
             GenerateSubcommand::HybridProduct(args) => product_config::hybrid(&args),
             GenerateSubcommand::BoardInputBundle(args) => board_input_bundle::new(&args),
             GenerateSubcommand::BoardInputBundleSet(args) => board_input_bundle_set::new(&args),

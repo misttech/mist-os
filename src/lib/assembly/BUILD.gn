@@ -37,6 +37,7 @@ standardized_test_groups("tests") {
     "//src/lib/assembly/partitions_config:partitions_config_test",
     "//src/lib/assembly/platform_configuration:platform_configuration_test",
     "//src/lib/assembly/product_bundle:product_bundle_test",
+    "//src/lib/assembly/product_input_bundle:product_input_bundle_test",
     "//src/lib/assembly/shell_commands:shell_commands_test",
     "//src/lib/assembly/structured_config/tests/malformed_fail",
     "//src/lib/assembly/structured_config/tests/repackaging_pass",

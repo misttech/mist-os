@@ -689,6 +689,24 @@ build_api_module("products") {
   deps = assembly_product_configs
 }
 
+# Lists the product input bundles that are defined in this build.
+#
+# Type: list (scope)
+#
+#  label
+#    Required: The GN label for the product_input_bundle target
+#
+#  outdir
+#    Required: The path (relative to the root out dir) of the directory that
+#    contains the product input bundle.
+#
+build_api_module("product_input_bundles") {
+  testonly = true
+  data_keys = [ "product_input_bundles" ]
+  walk_keys = [ "product_input_bundle_barrier" ]
+  deps = assembly_product_configs
+}
+
 # Lists the board input bundle sets that are defined in this build.
 #
 # Type: list (scope)

@@ -235,8 +235,8 @@ impl ProductAssembly {
         // Add the configuration capabilities.
         builder.add_configuration_capabilities(configuration.configuration_capabilities)?;
 
-        // Add the board's Board Input Bundles, if it has them.
         if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+            // Add the board's Board Input Bundles, if it has them.
             for (bundle_path, bundle) in board_input_bundles {
                 builder
                     .add_board_input_bundle(
@@ -245,6 +245,12 @@ impl ProductAssembly {
                             || platform.feature_set_level == FeatureSetLevel::Embeddable,
                     )
                     .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
+            }
+            // Add the product's Product Input Bundles, if it has them.
+            for bundle in self.product_config.product_input_bundles.values() {
+                builder.add_product_input_bundle(bundle).with_context(|| {
+                    format!("Adding product input bundle: {}", &bundle.release_info.name)
+                })?;
             }
         }
 

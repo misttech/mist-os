@@ -39,6 +39,7 @@ rustc_library("config_schema") {
     "//src/lib/assembly/image_assembly_config",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/package_utils",
+    "//src/lib/assembly/product_input_bundle",
     "//src/lib/assembly/release_info",
     "//src/lib/diagnostics/log/types",
     "//src/lib/fuchsia-url",

@@ -45,6 +45,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use image_assembly_config::{BoardDriverArguments, ImageAssemblyConfig, KernelConfig};
 use itertools::Itertools;
+use product_input_bundle::ProductInputBundle;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -402,6 +403,36 @@ impl ImageAssemblyConfigBuilder {
 
         self.add_kernel_args(bundle.kernel_boot_args)?;
 
+        Ok(())
+    }
+
+    /// Add a Product input Bundle to the builder, using the path to the
+    /// folder that contains it.
+    ///
+    /// If any of the items it's trying to add are duplicates (either of itself
+    /// or others, this will return an error).
+    pub fn add_product_input_bundle(&mut self, bundle: &ProductInputBundle) -> Result<()> {
+        for package in bundle.packages.base.values() {
+            self.add_package_from_path(
+                &package.manifest,
+                PackageOrigin::Product,
+                &PackageSet::Base,
+            )?;
+        }
+        for package in bundle.packages.cache.values() {
+            self.add_package_from_path(
+                &package.manifest,
+                PackageOrigin::Product,
+                &PackageSet::Cache,
+            )?;
+        }
+        for package in bundle.packages.flexible.values() {
+            self.add_package_from_path(
+                &package.manifest,
+                PackageOrigin::Product,
+                &PackageSet::Flexible,
+            )?;
+        }
         Ok(())
     }
 

@@ -33,6 +33,14 @@ FuchsiaProductConfigInfo = provider(
     },
 )
 
+FuchsiaProductInputBundleInfo = provider(
+    doc = "A product input bundle info used to contain the product input bundle directory",
+    fields = {
+        "directory": "Directory of the product input bundle container",
+        "build_id_dirs": "Directories containing the debug symbols",
+    },
+)
+
 FuchsiaBoardInputBundleInfo = provider(
     doc = "A board input bundle info used to containing the board input bundle directory",
     fields = {
