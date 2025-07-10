@@ -22,8 +22,8 @@ use net_types::ip::{
     GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
 };
 use net_types::{
-    MulticastAddr, MulticastAddress, NonMappedAddr, NonMulticastAddr, SpecifiedAddr,
-    SpecifiedAddress as _, Witness,
+    LinkLocalAddress, MulticastAddr, MulticastAddress, NonMappedAddr, NonMulticastAddr,
+    SpecifiedAddr, SpecifiedAddress as _, Witness,
 };
 use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
@@ -3999,6 +3999,8 @@ pub enum DropReason {
     UnspecifiedDestination,
     /// Cannot forward a packet with unspecified source address.
     ForwardUnspecifiedSource,
+    /// Cannot forward a packet with link-local source or destination address.
+    ForwardLinkLocal,
     /// Packet should be forwarded but packet's inbound interface has forwarding
     /// disabled.
     ForwardingDisabledInboundIface,
@@ -4331,6 +4333,28 @@ fn receive_ip_packet_action_common<
                 internal_forwarding: InternalForwarding::Used(outbound_device),
             };
         }
+    }
+
+    // For IPv4, RFC 3927 Section 2.7 states:
+    //
+    //   An IPv4 packet whose source and/or destination address is in the
+    //   169.254/16 prefix MUST NOT be sent to any router for forwarding, and
+    //   any network device receiving such a packet MUST NOT forward it,
+    //   regardless of the TTL in the IPv4 header.
+    //
+    // However, to maintain behavioral similarity to both gVisor/Netstack2 and
+    // Linux, we omit this check.
+    //
+    // For IPv6, RFC 4291 Section 2.5.6 states:
+    //
+    //   Routers must not forward any packets with Link-Local source or
+    //   destination addresses to other links.
+    if I::map_ip_in(
+        &packet,
+        |_| false,
+        |packet| packet.src_ip().is_link_local() || packet.dst_ip().is_link_local(),
+    ) {
+        return ReceivePacketAction::Drop { reason: DropReason::ForwardLinkLocal };
     }
 
     match lookup_route_table(
