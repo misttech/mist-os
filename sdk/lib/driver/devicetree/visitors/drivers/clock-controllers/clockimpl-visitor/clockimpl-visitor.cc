@@ -55,8 +55,18 @@ ClockImplVisitor::ClockImplVisitor() {
   clock_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
 }
 
-bool ClockImplVisitor::is_match(std::string_view name) {
-  return name.find("clock-controller") != std::string::npos;
+bool ClockImplVisitor::is_match(const fdf_devicetree::Node& node) {
+  auto clock_cells = node.properties().find(kClockCells);
+  if (clock_cells == node.properties().end()) {
+    return false;
+  }
+
+  auto cells = clock_cells->second.AsUint32();
+  if (!cells) {
+    return false;
+  }
+
+  return *cells == 1;
 }
 
 uint32_t ClockImplVisitor::GetNextUniqueId() { return next_unique_id_++; }
@@ -91,7 +101,7 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
 
     for (uint32_t index = 0; index < count; index++) {
       auto reference = (*parser_output)[kClockReference][index].AsReference();
-      if (reference && is_match(reference->first.name())) {
+      if (reference && is_match(*reference->first.GetNode())) {
         auto result =
             ParseReferenceChild(node, reference->first, reference->second, clock_names[index]);
         if (result.is_error()) {
@@ -138,7 +148,7 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
     std::set<uint32_t> init_controllers;
     for (uint32_t index = 0; index < count; index++) {
       auto reference = (*parser_output)[kAssignedClocks][index].AsReference();
-      if (reference && is_match(reference->first.name())) {
+      if (reference && is_match(*reference->first.GetNode())) {
         auto result = ParseInitChild(node, reference->first, reference->second, clock_rates[index],
                                      clock_parents[index]);
         if (result.is_error()) {
@@ -290,7 +300,7 @@ zx::result<> ClockImplVisitor::ParseInitChild(
 
 zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   // Check that it is indeed a clock-controller that we support.
-  if (!is_match(node.name())) {
+  if (!is_match(node)) {
     return zx::ok();
   }
 

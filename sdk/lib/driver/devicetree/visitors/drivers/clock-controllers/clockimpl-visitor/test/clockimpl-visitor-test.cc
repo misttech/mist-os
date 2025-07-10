@@ -53,7 +53,7 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
     auto node =
         clock_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
 
-    if (node.name()->find("clock-controller-ffffa000") != std::string::npos) {
+    if (node.name()->find("my-clock-device") != std::string::npos) {
       auto metadata = clock_tester->env()
                           .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i)
                           .metadata();
