@@ -135,9 +135,12 @@ func (*Service) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
+const ModeTypeMask uint32 = 1044480
+const ModeTypeService uint32 = 65536
+
 func (*Service) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:      uint32(io.ModeTypeService),
+		Mode:      ModeTypeService,
 		Id:        io.InoUnknown,
 		LinkCount: 1,
 	}, nil
@@ -324,7 +327,7 @@ func (*directoryState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 
 func (*directoryState) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:      uint32(io.ModeTypeDirectory) | uint32(fdio.VtypeIRUSR),
+		Mode:      uint32(fdio.VtypeDir | fdio.VtypeIRUSR),
 		Id:        io.InoUnknown,
 		LinkCount: 1,
 	}, nil
@@ -445,12 +448,12 @@ func (dirState *directoryState) ReadDirents(ctx fidl.Context, maxOut uint64) (in
 				Ino:  attr.Id,
 				Size: uint8(len(name)),
 				Type: uint8(func() io.DirentType {
-					switch modeType := attr.Mode & io.ModeTypeMask; modeType {
-					case io.ModeTypeDirectory:
+					switch modeType := attr.Mode & ModeTypeMask; modeType {
+					case uint32(fdio.VtypeDir):
 						return io.DirentTypeDirectory
-					case io.ModeTypeFile:
+					case uint32(fdio.VtypeFile):
 						return io.DirentTypeFile
-					case io.ModeTypeService:
+					case ModeTypeService:
 						return io.DirentTypeService
 					default:
 						panic(fmt.Sprintf("unknown mode type: %b", modeType))
@@ -729,7 +732,7 @@ func (*fileState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 
 func (fState *fileState) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:        uint32(io.ModeTypeFile) | uint32(fdio.VtypeIRUSR),
+		Mode:        uint32(fdio.VtypeFile | fdio.VtypeIRUSR),
 		Id:          io.InoUnknown,
 		ContentSize: fState.size,
 		LinkCount:   1,

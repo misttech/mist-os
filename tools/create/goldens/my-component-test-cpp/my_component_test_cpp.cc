@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 #include <fuchsia/sys2/cpp/fidl.h>
-#include <gtest/gtest.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
 #include <lib/diagnostics/reader/cpp/archive_reader.h>
+#include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
+
+#include <gtest/gtest.h>
 
 namespace my_component_test_cpp {
 
@@ -19,7 +20,6 @@ class MyComponentTestCppIntegrationTest : public testing::Test {
   void SetUp() {
     // Code here will be called immediately before each test
   }
-
 
   void TearDown() {
     // Code here will be called immediately after each test
@@ -34,28 +34,21 @@ TEST_F(MyComponentTestCppIntegrationTest, TestMethod) {
   // protocol.
   // If your component exposes another capability, you connect to it directly.
   // ```
-  //  fidl::SynchronousInterfacePtr<fuchsia::sys2::Realm> realm;
-  //  std::string realm_service = std::string("/svc/")
-  //      + fuchsia::sys2::Realm::Name_;
-  //  EXPECT_EQ(ZX_OK,
-  //          fdio_service_connect(
-  //              realm_service.c_str(),
-  //              realm.NewRequest().TakeChannel().get()));
-  //
+  // fidl::SynchronousInterfacePtr<fuchsia::component::Realm> realm;
+  // std::string realm_service = std::string("/svc/") + fuchsia::component::Realm::Name_;
+  // EXPECT_EQ(ZX_OK,
+  //           fdio_service_connect(realm_service.c_str(), realm.NewRequest().TakeChannel().get()));
+
   // fidl::SynchronousInterfacePtr<fuchsia::io::Directory> exposed_dir;
-  // fuchsia::sys2::Realm_OpenExposedDir_Result result;
-  // realm->OpenExposedDir(fuchsia::sys2::ChildRef{.name = "hello-world"},
-  //    exposed_dir.NewRequest(), &result);
-  // EXPECT_EQ(exposed_dir->Open("fuchsia.component.Binder"), ZX_OK);
+  // fuchsia::component::Realm_OpenExposedDir_Result result;
+  // realm->OpenExposedDir(fuchsia::component::decl::ChildRef{.name = "hello-world"},
+  //                       exposed_dir.NewRequest(), &result);
   // zx::channel handle, request;
   // EXPECT_EQ(zx::channel::create(0, &handle, &request), ZX_OK);
-  // EXPECT_EQ(exposed_dir->Open(fuchsia::io::OpenFlags::DIRECTORY |
-  // fuchsia::io::OpenFlags::RIGHT_READABLE,
-  //                   fuchsia::io::MODE_TYPE_DIRECTORY, fuchsia::component::Binder::Name_,
-  //                   fidl::InterfaceRequest<fuchsia::component::Binder>(std::move(request)))),
-  //                   ZX_OK);
+  // EXPECT_EQ(exposed_dir->Open(fuchsia::component::Binder::Name_, fuchsia::io::Flags(),
+  //                             fuchsia::io::Options(), std::move(request)),
+  //           ZX_OK);
   // ```
-
 
   // Use the ArchiveReader to access inspect data, e.g.
   // ```
@@ -71,7 +64,6 @@ TEST_F(MyComponentTestCppIntegrationTest, TestMethod) {
   //
   // reader.SnapshotInspectUntilPresent({kComponentSelector}).then(...);
   // ```
-
 
   // Add test conditions here, e.g.
   // ```

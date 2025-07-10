@@ -329,7 +329,7 @@ const fn approximate_posix_mode(
             }
             mode
         }
-        fio::NodeProtocolKinds::CONNECTOR => fio::MODE_TYPE_SERVICE | libc::S_IRUSR | libc::S_IWUSR,
+        fio::NodeProtocolKinds::CONNECTOR => 0,
         #[cfg(fuchsia_api_level_at_least = "HEAD")]
         fio::NodeProtocolKinds::SYMLINK => libc::S_IFLNK | libc::S_IRUSR,
         _ => 0,

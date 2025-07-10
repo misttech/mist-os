@@ -1542,42 +1542,6 @@
         "value": "8192"
     },
     {
-        "kind": "const",
-        "name": "fuchsia.io/MODE_PROTECTION_MASK",
-        "type": "uint32",
-        "value": "4095"
-    },
-    {
-        "kind": "const",
-        "name": "fuchsia.io/MODE_TYPE_BLOCK_DEVICE",
-        "type": "uint32",
-        "value": "24576"
-    },
-    {
-        "kind": "const",
-        "name": "fuchsia.io/MODE_TYPE_DIRECTORY",
-        "type": "uint32",
-        "value": "16384"
-    },
-    {
-        "kind": "const",
-        "name": "fuchsia.io/MODE_TYPE_FILE",
-        "type": "uint32",
-        "value": "32768"
-    },
-    {
-        "kind": "const",
-        "name": "fuchsia.io/MODE_TYPE_MASK",
-        "type": "uint32",
-        "value": "1044480"
-    },
-    {
-        "kind": "const",
-        "name": "fuchsia.io/MODE_TYPE_SERVICE",
-        "type": "uint32",
-        "value": "65536"
-    },
-    {
         "kind": "bits/member",
         "name": "fuchsia.io/ModeType.DO_NOT_USE",
         "value": "2147483648"

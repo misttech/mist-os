@@ -10,9 +10,8 @@ use crate::{
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
 use futures::StreamExt;
+use libc::{S_IFREG, S_IRUSR};
 use zx_status::Status;
-
-const S_IRUSR: u32 = libc::S_IRUSR as u32;
 
 /// Verify that [`SimpleFile::read_only`] works with static and owned data. Compile-time test.
 #[test]
@@ -188,7 +187,7 @@ async fn get_attr_read_only() {
     assert_get_attr!(
         proxy,
         fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE | S_IRUSR,
+            mode: S_IFREG | S_IRUSR,
             id: fio::INO_UNKNOWN,
             content_size: 7,
             storage_size: 7,

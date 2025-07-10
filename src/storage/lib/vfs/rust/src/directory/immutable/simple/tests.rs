@@ -25,15 +25,12 @@ use fuchsia_fs::directory::{
 };
 use fuchsia_sync::Mutex;
 use futures::StreamExt as _;
+use libc::{S_IFDIR, S_IRUSR, S_IXUSR};
 use static_assertions::assert_eq_size;
 use std::path::PathBuf;
 use std::sync::Arc;
 use vfs_macros::pseudo_directory;
 use zx_status::Status;
-
-// Redefine these constants as a u32 as in macos they are u16
-const S_IRUSR: u32 = libc::S_IRUSR as u32;
-const S_IXUSR: u32 = libc::S_IXUSR as u32;
 
 async fn assert_open_file_err(
     root: &fio::DirectoryProxy,
@@ -75,7 +72,7 @@ async fn empty_directory_get_attr() {
     assert_get_attr!(
         root,
         fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IXUSR,
+            mode: S_IFDIR | S_IRUSR | S_IXUSR,
             id: fio::INO_UNKNOWN,
             content_size: 0,
             storage_size: 0,
@@ -94,7 +91,7 @@ async fn empty_directory_with_custom_inode_get_attr() {
     assert_get_attr!(
         root,
         fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IXUSR,
+            mode: S_IFDIR | S_IRUSR | S_IXUSR,
             id: 12345,
             content_size: 0,
             storage_size: 0,
