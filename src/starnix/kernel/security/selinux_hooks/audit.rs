@@ -11,6 +11,7 @@ use starnix_logging::{
     log_warn, BugRef, __track_stub_inner, trace_instant, CATEGORY_STARNIX_SECURITY,
 };
 use std::fmt::{Display, Error};
+use std::num::NonZeroU64;
 
 /// Container for a reference to kernel state from which to include details when emitting audit
 /// logging.  [`Auditable`] instances are created from references to objects via `into()`, e.g:
@@ -37,6 +38,7 @@ use std::fmt::{Display, Error};
 pub(super) enum Auditable<'a> {
     // keep-sorted start
     AuditContext(&'a [Auditable<'a>]),
+    Bug(u64),
     CurrentTask,
     FileObject(&'a FileObject),
     FileSystem(&'a FileSystem),
@@ -45,6 +47,12 @@ pub(super) enum Auditable<'a> {
     Name(&'a FsStr),
     Task(&'a Task),
     // keep-sorted end
+}
+
+impl Auditable<'_> {
+    fn from_bug(bug_id: u64) -> Self {
+        Auditable::Bug(bug_id)
+    }
 }
 
 impl<'a> From<&'a CurrentTask> for Auditable<'a> {
@@ -116,6 +124,7 @@ pub(super) fn audit_decision(
         },
         fuchsia_trace::Scope::Thread
     );
+
     let decision = if let Some(todo_bug) = result.todo_bug {
         // If `todo_bug` is set then this check is being granted to accommodate errata, rather than
         // the denial being enforced.
@@ -144,6 +153,12 @@ pub(super) fn audit_decision(
             "denied"
         }
     };
+
+    // If there is an associated bug then add it to the audit context.
+    let audit_data_with_bug =
+        [Auditable::from_bug(result.todo_bug.map(NonZeroU64::get).unwrap_or(0)), audit_data];
+    let audit_data =
+        if result.todo_bug.is_some() { (&audit_data_with_bug).into() } else { audit_data };
 
     let tclass = permission.class().name();
     let permission_name = permission.name();
@@ -182,6 +197,9 @@ impl Display for Auditable<'_> {
                     item.fmt(f)?;
                 }
                 Ok(())
+            }
+            Auditable::Bug(bug_id) => {
+                write!(f, " bug={}", bug_id)
             }
             Auditable::CurrentTask => Ok(()),
             Auditable::FileObject(file) => {
