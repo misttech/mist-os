@@ -376,13 +376,14 @@ void Dwc3::ReleaseResources() {
   }
 
   // Now go ahead and release any buffers we may have pinned.
-  Ep0Reset();
+  ep0_.out.enabled = false;
+  ep0_.in.enabled = false;
   ep0_.buffer.reset();
   ep0_.shared_fifo.Release();
 
   for (UserEndpoint& uep : user_endpoints_) {
-    UserEpReset(uep);
     uep.fifo.Release();
+    uep.ep.enabled = false;
   }
 
   event_fifo_.Release();
@@ -492,36 +493,29 @@ void Dwc3::ResetConfiguration() {
   DALEPENA::Get().FromValue(0).EnableEp(kEp0Out).EnableEp(kEp0In).WriteTo(mmio);
 
   for (UserEndpoint& uep : user_endpoints_) {
-    // Disabled above.
-    uep.ep.enabled = false;
-    uep.ep.stalled = false;
-    UserEpReset(uep);
-  }
-
-  if (dci_intf_.is_valid()) {
-    fidl::Arena arena;
-    dci_intf_.buffer(arena)->SetConnected(true).Then(
-        [](fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::SetConnected>&
-               result) {
-          if (!result.ok()) {
-            FDF_LOG(ERROR, "(framework) SetConnected(): %s", result.status_string());
-          } else if (result->is_error()) {
-            FDF_LOG(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
-          }
-        });
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
+    uep.ep.got_not_ready = false;
+    EpSetStall(uep.ep, false);
   }
 }
 
 void Dwc3::HandleResetEvent() {
   FDF_LOG(INFO, "Dwc3::HandleResetEvent");
 
-  ResetEndpoints();
+  Ep0Reset();
+
+  for (UserEndpoint& uep : user_endpoints_) {
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
+    uep.ep.got_not_ready = false;
+    EpSetStall(uep.ep, false);
+  }
+
   SetDeviceAddress(0);
   Ep0Start();
 
   if (dci_intf_.is_valid()) {
     fidl::Arena arena;
-    dci_intf_.buffer(arena)->SetConnected(false).Then(
+    dci_intf_.buffer(arena)->SetConnected(true).Then(
         [](fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::SetConnected>&
                result) {
           if (!result.ok()) {
@@ -590,6 +584,9 @@ void Dwc3::HandleConnectionDoneEvent() {
 void Dwc3::HandleDisconnectedEvent() {
   FDF_LOG(INFO, "Dwc3::HandleDisconnectedEvent");
 
+  CmdEpEndTransfer(ep0_.out);
+  ep0_.state = Ep0::State::None;
+
   if (dci_intf_.is_valid()) {
     fidl::Arena arena;
     dci_intf_.buffer(arena)->SetConnected(false).Then(
@@ -603,7 +600,11 @@ void Dwc3::HandleDisconnectedEvent() {
         });
   }
 
-  ResetEndpoints();
+  for (UserEndpoint& uep : user_endpoints_) {
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
+    uep.ep.got_not_ready = false;
+    EpSetStall(uep.ep, false);
+  }
 }
 
 void Dwc3::Stop() {
@@ -646,7 +647,12 @@ void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
 }
 
 void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
-  ResetEndpoints();
+  Ep0Reset();
+  ep0_.Reset();
+  for (UserEndpoint& uep : user_endpoints_) {
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
+    uep.Reset();
+  }
 
   irq_handler_.Cancel();
 
@@ -680,7 +686,6 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
 
   if (uep->ep.enabled) {
     // Endpoint already configured, nothing to do.
-    FDF_LOG(ERROR, "Endpoint(%d) already configured!", uep->ep.ep_num);
     completer.Reply(zx::ok());
     return;
   }
@@ -696,8 +701,13 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
   uep->ep.interval = request.ep_descriptor().b_interval();
   // TODO(voydanoff) USB3 support
 
+  uep->ep.enabled = true;
   EpSetConfig(uep->ep, true);
-  UserEpQueueNext(*uep);
+
+  // TODO(johngro): What protects this configured_ state from a locking/threading perspective?
+  if (configured_) {
+    UserEpQueueNext(*uep);
+  }
 
   completer.Reply(zx::ok());
 }
@@ -713,7 +723,7 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
   }
 
   uep->server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-  EpSetConfig(uep->ep, false);
+  uep->ep.enabled = false;
 
   completer.Reply(zx::ok());
 }
@@ -825,40 +835,14 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
     queued_reqs.emplace(std::move(freq));
   }
 
-  dwc3_->UserEpQueueNext(*uep_);
+  if (dwc3_->configured_) {
+    dwc3_->UserEpQueueNext(*uep_);
+  }
 }
 
 void Dwc3::EpServer::CancelAll(CancelAllCompleter::Sync& completer) {
   CancelAll(ZX_ERR_IO_NOT_PRESENT);
   completer.Reply(zx::ok());
-}
-
-void Dwc3::EpReset(Endpoint& ep) {
-  EpSetStall(ep, false);
-  EpSetConfig(ep, false);
-  ep.got_not_ready = false;
-}
-
-void Dwc3::UserEpReset(UserEndpoint& uep) {
-  uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-  EpReset(uep.ep);
-}
-
-void Dwc3::Ep0Reset() {
-  ep0_.cur_setup = {};
-  ep0_.cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
-  ep0_.state = Ep0::State::None;
-  CmdEpEndTransfer(ep0_.out);
-  EpReset(ep0_.out);
-  EpReset(ep0_.in);
-  ep0_.shared_fifo.Clear();
-}
-
-void Dwc3::ResetEndpoints() {
-  Ep0Reset();
-  for (UserEndpoint& uep : user_endpoints_) {
-    UserEpReset(uep);
-  }
 }
 
 }  // namespace dwc3

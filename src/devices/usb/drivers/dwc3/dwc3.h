@@ -137,6 +137,12 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     bool IsOutput() const { return IsOutput(ep_num); }
     bool IsInput() const { return IsInput(ep_num); }
 
+    void Reset() {
+      enabled = false;
+      got_not_ready = false;
+      stalled = false;
+    }
+
     uint32_t rsrc_id{0};  // resource ID for current_req
 
     const uint8_t ep_num{0};
@@ -156,6 +162,8 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     UserEndpoint& operator=(const UserEndpoint&) = delete;
     UserEndpoint(UserEndpoint&&) = delete;
     UserEndpoint& operator=(UserEndpoint&&) = delete;
+
+    void Reset() { ep.Reset(); }
 
     TrbFifo fifo;
     Endpoint ep;
@@ -210,6 +218,13 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     Ep0& operator=(const Ep0&) = delete;
     Ep0(Ep0&&) = delete;
     Ep0& operator=(Ep0&&) = delete;
+
+    void Reset() {
+      cur_setup = {};
+      cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
+      out.Reset();
+      in.Reset();
+    }
 
     enum class State {
       None,
@@ -280,18 +295,14 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   void HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage);
 
   // General EP stuff
-  void EpEnable(Endpoint& ep, bool enable);
+  void EpEnable(const Endpoint& ep, bool enable);
   void EpSetConfig(Endpoint& ep, bool enable);
   zx_status_t EpSetStall(Endpoint& ep, bool stall);
   void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer,
                        size_t length);
-  void EpReset(Endpoint& ep);
 
   // Methods specific to user endpoints
-  void UserEpReset(UserEndpoint& uep);
   void UserEpQueueNext(UserEndpoint& uep);
-
-  void ResetEndpoints();
 
   // Commands
   void CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id);
@@ -325,6 +336,10 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   Ep0 ep0_;
   UserEndpointCollection user_endpoints_;
+
+  // TODO(johngro): What lock protects this?  Right now, it is effectively
+  // endpoints_[0].lock(), but how do we express this?
+  bool configured_ = false;
 
   std::unique_ptr<PlatformExtension> platform_extension_;
 
