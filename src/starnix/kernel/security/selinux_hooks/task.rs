@@ -5,7 +5,7 @@
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
     fs_node_set_label_with_task, has_file_permissions, permissions_from_flags,
-    task_consistent_attrs, task_effective_sid, todo_check_permission, todo_has_fs_node_permissions,
+    task_consistent_attrs, task_effective_sid, todo_has_fs_node_permissions,
     Auditable, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs, TaskAttrsOverride,
     NO_PERMISSIONS,
 };
@@ -299,8 +299,7 @@ pub(in crate::security) fn check_exec_access(
         // it was created with e.g. `CLONE_FILES`, etc).
         if current_task.thread_group().read().is_sharing {
             // TODO: https://fxbug.dev/412581419 - SIGKILL the process on failure.
-            todo_check_permission(
-                TODO_DENY!("https://fxbug.dev/380076748", "Restrict processes with shared state."),
+            check_permission(
                 &permission_check,
                 current_task.kernel(),
                 current_sid,
