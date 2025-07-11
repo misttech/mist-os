@@ -107,6 +107,8 @@ type TouchEvent = table {
     /// A description of the pointer device, sufficient to correctly interpret
     /// the capabilities and usage intent of the device.
     /// - It is issued once per device.
+    // TODO(https://fxbug.dev/430088531): This should be replaced with
+    // [`fuchsia.ui.input/TouchDeviceInfo`].
     3: device_info TouchDeviceInfo;
 
     /// A description of each sampled data point in an interaction of touch
@@ -124,6 +126,8 @@ type TouchEvent = table {
 };
 
 /// Information about a device that issues touch event streams.
+// TODO(https://fxbug.dev/430088531): This should be replaced with
+// [`fuchsia.ui.input/TouchDeviceInfo`].
 type TouchDeviceInfo = table {
     /// An identifier for the touch device that issues touch event streams.
     /// A device may own multiple pointers, each with its own pointer id and its

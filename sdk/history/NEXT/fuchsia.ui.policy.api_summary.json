@@ -16,6 +16,14 @@
         "request": "fuchsia.ui.policy/DeviceListenerRegistryRegisterMediaButtonsListenerRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistry.RegisterTouchButtonsListener",
+        "strictness": "strict",
+        "ordinal": "1595755362982148171",
+        "direction": "two_way",
+        "request": "fuchsia.ui.policy/DeviceListenerRegistryRegisterTouchButtonsListenerRequest"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.ui.policy/DeviceListenerRegistry",
         "openness": "closed",
@@ -41,6 +49,17 @@
     {
         "kind": "struct",
         "name": "fuchsia.ui.policy/DeviceListenerRegistryRegisterMediaButtonsListenerRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistryRegisterTouchButtonsListenerRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.ui.policy/TouchButtonsListener"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistryRegisterTouchButtonsListenerRequest",
         "resourceness": "resource"
     },
     {
@@ -108,6 +127,30 @@
     {
         "kind": "struct",
         "name": "fuchsia.ui.policy/MediaButtonsListenerOnMediaButtonsEventRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.policy/TouchButtonsListener.OnEvent",
+        "strictness": "strict",
+        "ordinal": "5146299982580821906",
+        "direction": "two_way",
+        "request": "fuchsia.ui.policy/TouchButtonsListenerOnEventRequest"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.policy/TouchButtonsListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/TouchButtonsListenerOnEventRequest.event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/TouchButtonsEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/TouchButtonsListenerOnEventRequest"
     },
     {
         "kind": "library",
