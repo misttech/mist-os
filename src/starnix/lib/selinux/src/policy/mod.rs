@@ -712,7 +712,7 @@ impl<
 
     fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let num_bytes = bytes.len();
-        let (data, tail) = PS::parse::<T>(bytes).ok_or(ParseError::MissingData {
+        let (data, tail) = PS::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
             type_name: std::any::type_name::<T>(),
             type_size: std::mem::size_of::<T>(),
             num_bytes,
@@ -861,11 +861,12 @@ impl<
 
     fn parse(bytes: ByRef<B>) -> Result<(Self, ByRef<B>), Self::Error> {
         let num_bytes = bytes.len();
-        let (data, tail) = ByRef::<B>::parse::<T>(bytes).ok_or(ParseError::MissingData {
-            type_name: std::any::type_name::<T>(),
-            type_size: std::mem::size_of::<T>(),
-            num_bytes,
-        })?;
+        let (data, tail) =
+            ByRef::<B>::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
+                type_name: std::any::type_name::<T>(),
+                type_size: std::mem::size_of::<T>(),
+                num_bytes,
+            })?;
 
         Ok((data, tail))
     }
@@ -884,13 +885,14 @@ impl<
     /// via `Ref::deref`.
     fn parse_slice(bytes: ByRef<B>, count: usize) -> Result<(Self, ByRef<B>), Self::Error> {
         let num_bytes = bytes.len();
-        let (data, tail) =
-            ByRef::<B>::parse_slice::<T>(bytes, count).ok_or(ParseError::MissingSliceData {
+        let (data, tail) = ByRef::<B>::parse_slice::<T>(bytes, count).ok_or_else(|| {
+            ParseError::MissingSliceData {
                 type_name: std::any::type_name::<T>(),
                 type_size: std::mem::size_of::<T>(),
                 num_items: count,
                 num_bytes,
-            })?;
+            }
+        })?;
 
         Ok((data, tail))
     }

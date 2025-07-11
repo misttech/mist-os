@@ -532,7 +532,7 @@ mod tests {
     // Make a QueueConfig for a given queue size offset in guest memory. Also returns the offset at
     // which the queue ends.
     fn make_queue_config(queue: u16, size: u16, offset: u64) -> (QueueConfig, u64) {
-        let round_up = |val| (val + (16 - (val % 16)));
+        let round_up = |val| val + (16 - (val % 16));
         let desc = round_up(offset);
         let desc_len = std::mem::size_of::<u16>() as u64 * size as u64;
         let avail = round_up(desc + desc_len);

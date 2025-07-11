@@ -649,7 +649,7 @@ impl VolumesDirectory {
     ) -> Result<(), Error> {
         let mut guard = self.lock().await;
         let crypt =
-            mount_options.crypt.map(|crypt| (Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>));
+            mount_options.crypt.map(|crypt| Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>);
         let as_blob = mount_options.as_blob.unwrap_or(false);
         let volume = guard.create_or_mount_volume(&name, crypt, true, as_blob).await?;
         self.serve_volume(&volume, outgoing_directory_server_end, as_blob)
@@ -809,8 +809,7 @@ impl VolumesDirectory {
         options: MountOptions,
     ) -> Result<(), Error> {
         info!(name:%, store_id:%, options:?; "Received mount request");
-        let crypt =
-            options.crypt.map(|crypt| (Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>));
+        let crypt = options.crypt.map(|crypt| Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>);
         let as_blob = options.as_blob.unwrap_or(false);
         let mut guard = self.lock().await;
         let volume = guard

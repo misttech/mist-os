@@ -175,7 +175,7 @@ impl<T: AsRef<[u8]>> CursorExtras for Cursor<T> {
         let primitive = self.get_byte_slice(1)?[0];
         self.consume(1);
 
-        EnumType::from_u8(primitive).ok_or(Error::UnknownEnumValue {
+        EnumType::from_u8(primitive).ok_or_else(|| Error::UnknownEnumValue {
             primitive,
             enum_name: std::any::type_name::<EnumType>(),
         })

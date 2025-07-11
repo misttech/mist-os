@@ -369,7 +369,7 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVectorRule<PS> {
 
         let num_bytes = tail.len();
         let (metadata, tail) =
-            PS::parse::<AccessVectorRuleMetadata>(tail).ok_or(ParseError::MissingData {
+            PS::parse::<AccessVectorRuleMetadata>(tail).ok_or_else(|| ParseError::MissingData {
                 type_name: std::any::type_name::<AccessVectorRuleMetadata>(),
                 type_size: std::mem::size_of::<AccessVectorRuleMetadata>(),
                 num_bytes,
@@ -839,13 +839,13 @@ where
             .context("parsing filename for deprecated filename transition")?;
 
         let num_bytes = tail.len();
-        let (metadata, tail) = PS::parse::<DeprecatedFilenameTransitionMetadata>(tail).ok_or(
+        let (metadata, tail) = PS::parse::<DeprecatedFilenameTransitionMetadata>(tail).ok_or({
             ParseError::MissingData {
                 type_name: "DeprecatedFilenameTransition::metadata",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
-            },
-        )?;
+            }
+        })?;
 
         Ok((Self { filename, metadata }, tail))
     }

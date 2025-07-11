@@ -810,8 +810,8 @@ mod tests {
         });
         net.collect_frames();
         assert_eq!(net.iter_pending_frames().count(), 2);
-        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| (x.dst_context == 2)));
-        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| (x.dst_context == 3)));
+        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| x.dst_context == 2));
+        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| x.dst_context == 3));
         net.drop_pending_frames();
 
         // Only 1 should get packets sent by 2.
@@ -820,7 +820,7 @@ mod tests {
         });
         net.collect_frames();
         assert_eq!(net.iter_pending_frames().count(), 1);
-        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| (x.dst_context == 1)));
+        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| x.dst_context == 1));
         net.drop_pending_frames();
 
         // No one receives packets sent by 3.

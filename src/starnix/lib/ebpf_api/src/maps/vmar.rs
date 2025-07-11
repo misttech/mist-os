@@ -26,7 +26,7 @@ impl AllocatedVmar {
         size: usize,
         flags: zx::VmarFlags,
     ) -> Result<Self, zx::Status> {
-        parent.allocate(offset, size, flags).map(|(vmar, base)| (Self { vmar, base }))
+        parent.allocate(offset, size, flags).map(|(vmar, base)| Self { vmar, base })
     }
 
     pub fn base(&self) -> usize {
