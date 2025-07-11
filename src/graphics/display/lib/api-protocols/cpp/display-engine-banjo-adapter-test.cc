@@ -246,6 +246,53 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
             engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
 }
 
+TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerSuccess) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr size_t kNumLayers(2);
+
+  static constexpr layer_t banjo_layers[kNumLayers] = {kAcceptableLayer.ToBanjo(),
+                                                       kAcceptableLayer.ToBanjo()};
+  static constexpr display_config_t kBanjoDisplayConfig = {
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .layer_list = banjo_layers,
+      .layer_count = kNumLayers,
+  };
+
+  mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     cpp20::span<const display::DriverLayer> layers) {
+    EXPECT_EQ(kDisplayId, display_id);
+    EXPECT_EQ(display::ModeId(1), display_mode_id);
+    EXPECT_EQ(kNumLayers, layers.size());
+    EXPECT_THAT(layers, ::testing::ElementsAre(kAcceptableLayer, kAcceptableLayer));
+    return display::ConfigCheckResult::kOk;
+  });
+
+  EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
+}
+
+// We pass too many layers to the display engine, causing the banjo adapter to fail.
+TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerError) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr size_t kNumLayers(display::EngineInfo::kMaxAllowedMaxLayerCount + 1);
+
+  static constexpr layer_t banjo_layers[kNumLayers] = {
+      kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(),
+      kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(),
+      kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo()};
+  static constexpr display_config_t kBanjoDisplayConfig = {
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .layer_list = banjo_layers,
+      .layer_count = kNumLayers,
+  };
+
+  // We don't load an expected call into the mock, because the mock should never be called;
+  // The CheckConfiguration should fail at the banjo adapter layer.
+
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig.ToBanjo(),
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
+}
+
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
   static constexpr display::DisplayId kDisplayId(42);
 
@@ -303,6 +350,36 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
     EXPECT_THAT(layers, ::testing::ElementsAre(kAcceptableLayer));
+    EXPECT_EQ(kConfigStamp, config_stamp);
+  });
+  engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
+}
+
+TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationMultiLayer) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr display::DriverConfigStamp kConfigStamp(4242);
+
+  static constexpr size_t kNumLayers(4);
+
+  static constexpr layer_t banjo_layers[kNumLayers] = {
+      kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(),
+      kAcceptableLayer.ToBanjo()};
+  static constexpr display_config_t kBanjoDisplayConfig = {
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .layer_list = banjo_layers,
+      .layer_count = kNumLayers,
+  };
+  static constexpr config_stamp_t kBanjoConfigStamp =
+      display::ToBanjoDriverConfigStamp(kConfigStamp);
+
+  mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     cpp20::span<const display::DriverLayer> layers,
+                                     display::DriverConfigStamp config_stamp) {
+    EXPECT_EQ(kDisplayId, display_id);
+    EXPECT_EQ(display::ModeId(1), display_mode_id);
+    EXPECT_EQ(kNumLayers, layers.size());
+    EXPECT_THAT(layers, ::testing::ElementsAre(kAcceptableLayer, kAcceptableLayer, kAcceptableLayer,
+                                               kAcceptableLayer));
     EXPECT_EQ(kConfigStamp, config_stamp);
   });
   engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);

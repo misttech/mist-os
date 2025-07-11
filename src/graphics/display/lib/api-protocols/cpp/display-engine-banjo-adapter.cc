@@ -13,8 +13,12 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <array>
+#include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <utility>
 
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
@@ -27,6 +31,61 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+
+namespace {
+
+// Array whose size is determined at construction time.
+//
+// BoundedArray uses a placement new to initialize its elements one at a time
+// without using heap allocation.  The BoundedArray's capacity (maximum size) is set at compilation
+// time, but the number of elements is decided when the array is constructed.  This provides a
+// variable length array behavior without dynamic allocations.
+template <typename T, size_t Capacity>
+class BoundedArray {
+ public:
+  template <typename U>
+    requires std::constructible_from<T, const U>
+  BoundedArray(const U* elements, size_t count) : elements_buffer_{}, count_{count} {
+    ZX_DEBUG_ASSERT(count <= Capacity);
+    for (size_t i = 0; i < count; i++) {
+      new (&elements_buffer_[i].value) T(elements[i]);
+    }
+  }
+
+  template <typename U>
+    requires std::constructible_from<T, const U>
+  explicit BoundedArray(const cpp20::span<U> elements)
+      : BoundedArray(elements.data(), elements.size()) {}
+
+  ~BoundedArray() {
+    for (size_t i = 0; i < count_; i++) {
+      elements_buffer_[i].value.~T();
+    }
+  }
+
+  BoundedArray(const BoundedArray&) = delete;
+  BoundedArray& operator=(const BoundedArray&) = delete;
+  BoundedArray(BoundedArray&&) = delete;
+  BoundedArray& operator=(BoundedArray&&) = delete;
+
+  cpp20::span<T> elements() { return {&elements_buffer_[0].value, count_}; }
+
+ private:
+  struct Empty {};
+
+  union Element {
+    constexpr ~Element() {}  // Suppress automatic destruction that could cause UB.
+
+    Empty empty{};
+    T value;
+  };
+
+  std::array<Element, Capacity> elements_buffer_;
+  // The first `count_` elements store instances of T.
+  const size_t count_;
+};
+
+}  // anonymous namespace
 
 namespace display {
 
@@ -126,9 +185,7 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     return display::ConfigCheckResult::kOk.ToBanjo();
   }
 
-  // This adapter does not currently support multi-layer configurations. This
-  // restriction will be lifted in the near future.
-  if (banjo_layers.size() > 1) {
+  if (banjo_layers.size() > display::EngineInfo::kMaxAllowedMaxLayerCount) {
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
@@ -137,14 +194,21 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
-  if (!display::DriverLayer::IsValid(banjo_layers[0])) {
-    // TODO(costan): Add an error code that indicates invalid input.
-    return display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo();
+  for (const auto& banjo_layer : banjo_layers) {
+    if (!display::DriverLayer::IsValid(banjo_layer)) {
+      // TODO(costan): Add an error code that indicates invalid input.
+      ZX_DEBUG_ASSERT_MSG(false, "Display coordinator checked invalid layer config");
+      return display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo();
+    }
   }
-  display::DriverLayer layer0(banjo_layers[0]);
-  cpp20::span<const display::DriverLayer> layers(&layer0, 1);
-  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
-      display::ToDisplayId(banjo_display_config->display_id), display::ModeId(1), layers);
+
+  BoundedArray<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount> layers(
+      banjo_layers);
+
+  display::ConfigCheckResult config_check_result =
+      engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config->display_id),
+                                 display::ModeId(1), layers.elements());
+
   return config_check_result.ToBanjo();
 }
 
@@ -159,24 +223,25 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
     return;
   }
 
-  // This adapter does not currently support multi-layer configurations. This
-  // restriction will be lifted in the near future.
-  ZX_DEBUG_ASSERT_MSG(banjo_layers.size() == 1,
-                      "Display coordinator applied rejected multi-layer config");
+  ZX_DEBUG_ASSERT_MSG(banjo_layers.size() <= display::EngineInfo::kMaxAllowedMaxLayerCount,
+                      "Display coordinator applied rejected config with too many layers");
 
   // This adapter does not currently support color correction.
   ZX_DEBUG_ASSERT_MSG(banjo_display_config->cc_flags == 0,
                       "Display coordinator applied rejected color-correction config");
 
-  if (!display::DriverLayer::IsValid(banjo_layers[0])) {
-    ZX_DEBUG_ASSERT_MSG(false, "Display coordinator applied rejected invalid layer config");
-    return;
+  for (const auto& banjo_layer : banjo_layers) {
+    if (!display::DriverLayer::IsValid(banjo_layer)) {
+      ZX_DEBUG_ASSERT_MSG(false, "Display coordinator applied rejected invalid layer config");
+      return;
+    }
   }
-  display::DriverLayer layer(banjo_layers[0]);
-  cpp20::span<const display::DriverLayer> layers(&layer, 1);
+
+  BoundedArray<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount> layers(
+      banjo_layers);
 
   engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config->display_id),
-                             display::ModeId(1), layers,
+                             display::ModeId(1), layers.elements(),
                              display::ToDriverConfigStamp(*banjo_config_stamp));
 }
 
