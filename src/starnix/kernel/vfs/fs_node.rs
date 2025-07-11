@@ -1430,7 +1430,7 @@ impl FsNode {
         self.ops().lookup(locked, self, current_task, name)
     }
 
-    pub fn mknod<L>(
+    pub fn create_node<L>(
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
@@ -1455,7 +1455,8 @@ impl FsNode {
             security::check_fs_node_create_access(current_task, self, mode, name)?;
         } else if mode.is_dir() {
             // Even though the man page for mknod(2) says that mknod "cannot be used to create
-            // directories" in starnix the mkdir syscall (`sys_mkdirat`) ends up calling mknod.
+            // directories" in starnix the mkdir syscall (`sys_mkdirat`) ends up calling
+            //create_node.
             security::check_fs_node_mkdir_access(current_task, self, mode, name)?;
         } else if !matches!(
             mode.fmt(),

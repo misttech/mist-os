@@ -188,7 +188,7 @@ impl ActiveEntry {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.create_entry(locked, current_task, name, |locked, dir, mount, name| {
-            dir.mknod(
+            dir.create_node(
                 locked,
                 current_task,
                 mount,
@@ -373,7 +373,7 @@ impl OverlayNode {
                                 current_task,
                                 name,
                                 |locked, dir_node, mount, name| {
-                                    dir_node.mknod(
+                                    dir_node.create_node(
                                         locked,
                                         current_task,
                                         mount,
@@ -394,7 +394,15 @@ impl OverlayNode {
                         current_task,
                         name.as_ref(),
                         |locked, dir, mount, name| {
-                            dir.mknod(locked, current_task, mount, name, info.mode, info.rdev, cred)
+                            dir.create_node(
+                                locked,
+                                current_task,
+                                mount,
+                                name,
+                                info.mode,
+                                info.rdev,
+                                cred,
+                            )
                         },
                     )
                 }
@@ -653,7 +661,15 @@ impl FsNodeOps for OverlayNodeOps {
                     current_task,
                     temp_name,
                     |locked, dir_node, mount, name| {
-                        dir_node.mknod(locked, current_task, mount, name, mode, dev, owner.clone())
+                        dir_node.create_node(
+                            locked,
+                            current_task,
+                            mount,
+                            name,
+                            mode,
+                            dev,
+                            owner.clone(),
+                        )
                     },
                 )
             })?;
@@ -676,7 +692,7 @@ impl FsNodeOps for OverlayNodeOps {
                     current_task,
                     temp_name,
                     |locked, dir_node, mount, name| {
-                        dir_node.mknod(
+                        dir_node.create_node(
                             locked,
                             current_task,
                             mount,

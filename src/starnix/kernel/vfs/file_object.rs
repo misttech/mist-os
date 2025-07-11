@@ -2276,7 +2276,7 @@ mod tests {
                 &mount,
                 "test".into(),
                 |locked, dir, mount, name| {
-                    dir.mknod(
+                    dir.create_node(
                         locked,
                         &current_task,
                         mount,

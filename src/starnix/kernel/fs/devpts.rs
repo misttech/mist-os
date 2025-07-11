@@ -1089,7 +1089,7 @@ mod tests {
         let pts = fs
             .root()
             .create_entry(locked, &task, &mount, "custom_pts".into(), |locked, dir, mount, name| {
-                dir.mknod(
+                dir.create_node(
                     locked,
                     &task,
                     mount,

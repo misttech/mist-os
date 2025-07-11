@@ -1079,7 +1079,7 @@ impl NamespaceNode {
         let mode = current_task.fs().apply_umask(mode);
         let create_fn =
             |locked: &mut Locked<L>, dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
-                dir.mknod(locked, current_task, mount, name, mode, dev, owner)
+                dir.create_node(locked, current_task, mount, name, mode, dev, owner)
             };
         let entry = if flags.contains(OpenFlags::EXCL) {
             self.entry.create_entry(locked, current_task, &self.mount, name, create_fn)
@@ -1117,7 +1117,7 @@ impl NamespaceNode {
             &self.mount,
             name,
             |locked, dir, mount, name| {
-                dir.mknod(locked, current_task, mount, name, mode, dev, owner)
+                dir.create_node(locked, current_task, mount, name, mode, dev, owner)
             },
         )?;
         Ok(self.with_new_entry(entry))
@@ -1214,7 +1214,7 @@ impl NamespaceNode {
             &self.mount,
             name,
             |locked, dir, mount, name| {
-                let node = dir.mknod(
+                let node = dir.create_node(
                     locked,
                     current_task,
                     mount,

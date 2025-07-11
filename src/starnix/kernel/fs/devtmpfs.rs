@@ -154,7 +154,7 @@ where
         &MountInfo::detached(),
         dir_name,
         |locked, dir, mount, name| {
-            dir.mknod(
+            dir.create_node(
                 locked,
                 current_task,
                 mount,
@@ -187,7 +187,7 @@ fn devtmpfs_create_device_node(
         &MountInfo::detached(),
         device_name,
         |locked, dir, mount, name| {
-            dir.mknod(locked, current_task, mount, name, mode, device_type, FsCred::root())
+            dir.create_node(locked, current_task, mount, name, mode, device_type, FsCred::root())
         },
     )?;
     Ok(())
