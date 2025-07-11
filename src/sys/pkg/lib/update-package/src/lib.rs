@@ -11,6 +11,7 @@ mod epoch;
 mod hash;
 mod image;
 pub mod images;
+pub mod manifest;
 mod name;
 mod packages;
 mod update_mode;

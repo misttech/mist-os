@@ -19618,6 +19618,7 @@ rustc_library("url-v2_3_1") {
   deps += [ ":form_urlencoded-v1_1_0" ]
   deps += [ ":idna-v0_3_0" ]
   deps += [ ":percent-encoding-v2_2_0" ]
+  deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
 
@@ -19626,6 +19627,7 @@ rustc_library("url-v2_3_1") {
     "-Cmetadata=e3e32e41f41a4ac0",
     "-Cextra-filename=-e3e32e41f41a4ac0",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"serde\"",
   ]
 
   visibility = [ ":*" ]
