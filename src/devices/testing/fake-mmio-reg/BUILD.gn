@@ -9,11 +9,14 @@ group("tests") {
   deps = [ "test:fake-mmio-reg-test" ]
 }
 
-zx_library("fake-mmio-reg") {
-  sdk = "source"
-  sdk_publishable = "internal"
+config("headers.config") {
+  include_dirs = [ "include" ]
+}
+
+sdk_source_set("fake-mmio-reg") {
+  category = "internal"
   sdk_name = "fake-mmio-reg"
-  sdk_headers = [ "fake-mmio-reg/fake-mmio-reg.h" ]
+  public = [ "include/fake-mmio-reg/fake-mmio-reg.h" ]
   public_deps = [
     "//sdk/lib/fit",
     "//src/devices/lib/mmio",
@@ -21,4 +24,5 @@ zx_library("fake-mmio-reg") {
     "//zircon/system/ulib/mmio-ptr",
   ]
   sources = []
+  public_configs = [ ":headers.config" ]
 }
