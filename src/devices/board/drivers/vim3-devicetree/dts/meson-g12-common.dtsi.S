@@ -227,7 +227,7 @@
 			saradc: adc@9000 {
 				compatible = "amlogic,meson-g12a-saradc";
 				reg = <0x0 0x9000 0x0 0x1000>,
-					<0x0 0x0 0x0 0x100000>;
+					<0x0 0x0 0x0 0x1000>;
 				interrupts = <GIC_SPI 200 GIC_IRQ_MODE_EDGE_RISING>;
 				#io-channel-cells = <1>;
 			};
