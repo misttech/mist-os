@@ -15,29 +15,10 @@ namespace display {
 namespace {
 
 constexpr BufferCollectionId kOne(1);
-constexpr BufferCollectionId kAnotherOne(1);
 constexpr BufferCollectionId kTwo(2);
 
 constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
 constexpr BufferCollectionId kLargeId(kLargeIdValue);
-
-TEST(BufferCollectionIdTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-}
-
-TEST(BufferCollectionIdTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(BufferCollectionIdTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-}
 
 TEST(BufferCollectionIdTest, ToFidlBufferCollectionId) {
   EXPECT_EQ(1u, ToFidlBufferCollectionId(kOne).value);

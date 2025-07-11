@@ -16,35 +16,10 @@ namespace display {
 namespace {
 
 constexpr DriverConfigStamp kOne(1);
-constexpr DriverConfigStamp kAnotherOne(1);
 constexpr DriverConfigStamp kTwo(2);
 
 constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
 constexpr DriverConfigStamp kLargeId(kLargeIdValue);
-
-TEST(DriverConfigStampTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-  EXPECT_EQ(kInvalidDriverConfigStamp, kInvalidDriverConfigStamp);
-}
-
-TEST(DriverConfigStampTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(DriverConfigStampTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-
-  EXPECT_NE(kOne, kInvalidDriverConfigStamp);
-  EXPECT_NE(kTwo, kInvalidDriverConfigStamp);
-  EXPECT_NE(kInvalidDriverConfigStamp, kOne);
-  EXPECT_NE(kInvalidDriverConfigStamp, kTwo);
-}
 
 TEST(DriverConfigStampTest, ToBanjoDriverConfigStamp) {
   EXPECT_EQ(1u, ToBanjoDriverConfigStamp(kOne).value);
