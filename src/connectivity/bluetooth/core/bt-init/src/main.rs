@@ -11,8 +11,10 @@ use fidl_fuchsia_bluetooth_snoop::SnoopMarker;
 use fidl_fuchsia_bluetooth_sys::PairingMarker;
 use fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::{
-    Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, StartupMode,
+    Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, DependencyType, Offer,
+    OfferDirectory, ParentRef, Ref, StartupMode,
 };
+use fidl_fuchsia_io::Operations;
 use fuchsia_bluetooth::constants::{
     BT_HOST, BT_HOST_COLLECTION, BT_HOST_URL, DEV_DIR, HCI_DEVICE_DIR,
 };
@@ -77,7 +79,7 @@ async fn create_bt_host(realm: &RealmProxy, filename: String) -> Result<(), Erro
     let device_path = format!("{DEV_DIR}/{HCI_DEVICE_DIR}/{filename}");
     let collection_ref = CollectionRef { name: BT_HOST_COLLECTION.to_owned() };
 
-    info!("Creating component with device_path: {:?}", device_path,);
+    info!("Creating component with device_path: {:?}", device_path);
 
     // TODO(b/308664865): Structured config launches dynamic child component with InstanceCannotResolve error. See bug description for temporary hack.
     let child_decl = Child {
@@ -86,13 +88,33 @@ async fn create_bt_host(realm: &RealmProxy, filename: String) -> Result<(), Erro
         startup: Some(StartupMode::Lazy),
         config_overrides: Some(vec![ConfigOverride {
             key: Some("device_path".to_string()),
-            value: Some(ConfigValue::Single(ConfigSingleValue::String(device_path.to_string()))),
+            value: Some(ConfigValue::Single(ConfigSingleValue::String(device_path))),
             ..ConfigOverride::default()
         }]),
         ..Default::default()
     };
+
+    let bt_host_offer = Offer::Directory(OfferDirectory {
+        source: Some(Ref::Parent(ParentRef)),
+        source_name: Some("dev-bt-hci".to_owned()),
+        target_name: Some("dev-bt-hci-instance".to_owned()),
+        subdir: Some(filename),
+        dependency_type: Some(DependencyType::Strong),
+        rights: Some(
+            Operations::READ_BYTES
+                | Operations::CONNECT
+                | Operations::GET_ATTRIBUTES
+                | Operations::TRAVERSE
+                | Operations::ENUMERATE,
+        ),
+        ..Default::default()
+    });
     realm
-        .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
+        .create_child(
+            &collection_ref,
+            &child_decl,
+            CreateChildArgs { dynamic_offers: Some(vec![bt_host_offer]), ..Default::default() },
+        )
         .await?
         .map_err(|e| format_err!("{e:?}"))?;
     Ok(())
