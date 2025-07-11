@@ -5,30 +5,22 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_TRANSACTION_BUFFERED_OPERATIONS_BUILDER_H_
 #define SRC_STORAGE_LIB_VFS_CPP_TRANSACTION_BUFFERED_OPERATIONS_BUILDER_H_
 
-#include <fuchsia/hardware/block/driver/c/banjo.h>
-#include <zircon/types.h>
+#include <zircon/assert.h>
 
-#include <cstddef>
-#include <cstdint>
 #include <vector>
 
+#include <fbl/macros.h>
 #include <storage/buffer/block_buffer.h>
 #include <storage/operation/operation.h>
-
 #ifdef __Fuchsia__
-#include <utility>
-
 #include <storage/buffer/owned_vmoid.h>
-#else
-#include <zircon/assert.h>
 #endif
 
 namespace fs {
 namespace internal {
 
-// TODO(https://fxbug.dev/42124749): This interface needs tidying up. For now, add a class here
-// which stops the proliferation of BorrowedBuffer classes, which don't fully support the
-// BlockBuffer interface.
+// TODO(https://fxbug.dev/42124749): This interface needs tidying up. For now, add a class here which stops the
+// proliferation of BorrowedBuffer classes, which don't fully support the BlockBuffer interface.
 class BorrowedBuffer : public storage::BlockBuffer {
  public:
 #ifdef __Fuchsia__

@@ -4,19 +4,6 @@
 
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
-#include <fuchsia/hardware/block/driver/c/banjo.h>
-#include <zircon/assert.h>
-#include <zircon/errors.h>
-#include <zircon/types.h>
-
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <vector>
-
-#include <storage/operation/operation.h>
-
-#include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/storage/lib/trace/trace.h"
 
 namespace fs {

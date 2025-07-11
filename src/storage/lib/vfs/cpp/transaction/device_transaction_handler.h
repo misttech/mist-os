@@ -5,12 +5,6 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_TRANSACTION_DEVICE_TRANSACTION_HANDLER_H_
 #define SRC_STORAGE_LIB_VFS_CPP_TRANSACTION_DEVICE_TRANSACTION_HANDLER_H_
 
-#include <zircon/types.h>
-
-#include <vector>
-
-#include <storage/operation/operation.h>
-
 #include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
