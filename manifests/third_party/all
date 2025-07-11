@@ -45,7 +45,7 @@
     <project name="third_party/android.googlesource.com/platform/frameworks/native"
              path="third_party/android/platform/frameworks/native"
              remote="https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/frameworks/native"
-             revision="12ad17aaa308a3bf4683d74df98366a846e2ed8c"/>
+             revision="889aaed858e2c7e8b506d07d52ee38fe7c3e54e2"/>
     <project name="third_party/android.googlesource.com/platform/system/logging"
              path="third_party/android/platform/system/logging"
              remote="https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/system/logging"
@@ -499,7 +499,7 @@
              path="third_party/spirv-tools/src"
              remote="https://fuchsia.googlesource.com/third_party/spirv-tools"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="e2089320fed89e2b25fd3c97dd947bd99c2942c7"/>
+             revision="09be116271cd5a8c5b5cbbb2e82db7830e9c34e7"/>
     <project name="third_party/syzkaller"
              path="third_party/syzkaller"
              remote="https://fuchsia.googlesource.com/third_party/syzkaller"
