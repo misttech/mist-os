@@ -113,16 +113,6 @@ impl FileOps for KgslFile {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        // Special ioctl to signal container to use kgsl.
-        // TODO(b/429239527): remove after transitioned
-        const IOCTL_KGSL_ENABLE: u32 = 42;
-        if request == IOCTL_KGSL_ENABLE {
-            if cfg!(not(feature = "starnix-kgsl-enable")) {
-                log_info!("kgsl: suppressing further use of kgsl");
-                return error!(ENXIO);
-            }
-            return Ok(SUCCESS);
-        }
         match request {
             IOCTL_KGSL_DEVICE_GETPROPERTY => {
                 let user_params = UserRef::<kgsl_device_getproperty>::from(arg);

@@ -4,22 +4,11 @@
 
 import("//build/rust/rustc_library.gni")
 
-declare_args() {
-  # This flag affects the return value of a signal ioctl used by certain container
-  # binaries to direct them to use kgsl-based or magma-based drivers. It does not
-  # affect the availability of the kgsl device within the container.
-  starnix_kgsl_enable = false
-}
-
 rustc_library("kgsl") {
   name = "starnix-modules-kgsl"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
-
-  if (starnix_kgsl_enable) {
-    features = [ "starnix-kgsl-enable" ]
-  }
 
   sources = [
     "file.rs",
