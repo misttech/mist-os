@@ -131,7 +131,7 @@ class MockBufferCollection : public MockBufferCollectionBase {
     size_t expected_format_constraints_count = 0u;
     const cpp20::span<const fuchsia_sysmem2::wire::ImageFormatConstraints> image_format_constraints(
         constraints.image_format_constraints().data(),
-        constraints.image_format_constraints().count());
+        constraints.image_format_constraints().size());
 
     const bool has_bgra =
         std::find(supported_pixel_format_types_.begin(), supported_pixel_format_types_.end(),
@@ -173,7 +173,7 @@ class MockBufferCollection : public MockBufferCollectionBase {
       EXPECT_TRUE(image_constraints_contains_rgba32_and_afbc_16x16);
     }
 
-    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints().count());
+    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints().size());
   }
 
   void VerifyName(const std::string& name) override { EXPECT_EQ(name, "Display"); }
@@ -203,7 +203,7 @@ class MockBufferCollectionForCapture : public MockBufferCollectionBase {
     EXPECT_EQ(64u, constraints.image_format_constraints().at(0).bytes_per_row_divisor());
 
     size_t expected_format_constraints_count = 1u;
-    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints().count());
+    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints().size());
 
     const auto& image_format_constraints = constraints.image_format_constraints();
     EXPECT_EQ(image_format_constraints.at(0).pixel_format(),

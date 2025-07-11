@@ -552,11 +552,11 @@ pub fn serve_telemetry(
                     telemetry.handle_periodic_telemetry().await;
 
                     interval_tick += 1;
-                    if interval_tick % INTERVAL_TICKS_PER_DAY == 0 {
+                    if interval_tick.is_multiple_of(INTERVAL_TICKS_PER_DAY) {
                         telemetry.log_daily_cobalt_metrics().await;
                     }
 
-                    if interval_tick % (5 * INTERVAL_TICKS_PER_MINUTE) == 0 {
+                    if interval_tick.is_multiple_of(5 * INTERVAL_TICKS_PER_MINUTE) {
                         telemetry.persist_client_stats_counters().await;
                     }
 
@@ -565,7 +565,7 @@ pub fn serve_telemetry(
                     // ease of testing. Additionally, logging to Cobalt before sliding
                     // the window ensures that Cobalt uses the last 24 hours of data
                     // rather than 23 hours.
-                    if interval_tick % INTERVAL_TICKS_PER_HR == 0 {
+                    if interval_tick.is_multiple_of(INTERVAL_TICKS_PER_HR) {
                         telemetry.signal_hr_passed().await;
                     }
                 }

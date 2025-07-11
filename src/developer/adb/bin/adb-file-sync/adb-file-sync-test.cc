@@ -79,7 +79,7 @@ class FakeFile : public fidl::testing::WireTestBase<fuchsia_io::File> {
   void Write(fuchsia_io::wire::WritableWriteRequest* request,
              WriteCompleter::Sync& completer) override {
     std::copy(request->data.begin(), request->data.end(), std::back_inserter(data_));
-    completer.ReplySuccess(request->data.count());
+    completer.ReplySuccess(request->data.size());
   }
 
   void set_data(std::vector<uint8_t> data) { data_ = std::move(data); }

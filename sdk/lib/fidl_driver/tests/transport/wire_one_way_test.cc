@@ -28,7 +28,7 @@ std::array<uint8_t, 10> kRequestPayload = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 struct TestServer : public fdf::WireServer<test_transport::OneWayTest> {
   void OneWay(OneWayRequestView request, fdf::Arena& arena,
               OneWayCompleter::Sync& completer) override {
-    ASSERT_EQ(kRequestPayload.size(), request->payload.count());
+    ASSERT_EQ(kRequestPayload.size(), request->payload.size());
     ASSERT_BYTES_EQ(kRequestPayload.data(), request->payload.data(), kRequestPayload.size());
     ASSERT_EQ(fdf_request_arena, arena.get());
 

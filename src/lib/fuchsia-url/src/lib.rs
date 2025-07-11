@@ -69,20 +69,26 @@ struct UrlParts {
 
 impl UrlParts {
     fn parse(input: &str) -> Result<Self, ParseError> {
-        let (scheme, url) = match url::Url::parse(input) {
-            Ok(url) => (
-                Some(match url.scheme() {
-                    builtin_url::SCHEME => Scheme::Builtin,
-                    repository_url::SCHEME => Scheme::FuchsiaPkg,
-                    boot_url::SCHEME => Scheme::FuchsiaBoot,
-                    _ => return Err(ParseError::InvalidScheme),
-                }),
-                url,
-            ),
-            Err(url::ParseError::RelativeUrlWithoutBase) => (None, RELATIVE_BASE.join(input)?),
+        match url::Url::parse(input) {
+            Ok(url) => Self::from_url(&url),
+            Err(url::ParseError::RelativeUrlWithoutBase) => {
+                Self::from_scheme_and_url(None, &RELATIVE_BASE.join(input)?)
+            }
             Err(e) => Err(e)?,
-        };
-
+        }
+    }
+    fn from_url(url: &url::Url) -> Result<Self, ParseError> {
+        Self::from_scheme_and_url(
+            Some(match url.scheme() {
+                builtin_url::SCHEME => Scheme::Builtin,
+                repository_url::SCHEME => Scheme::FuchsiaPkg,
+                boot_url::SCHEME => Scheme::FuchsiaBoot,
+                _ => return Err(ParseError::InvalidScheme),
+            }),
+            url,
+        )
+    }
+    fn from_scheme_and_url(scheme: Option<Scheme>, url: &url::Url) -> Result<Self, ParseError> {
         if url.port().is_some() {
             return Err(ParseError::CannotContainPort);
         }

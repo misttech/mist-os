@@ -3,9 +3,10 @@
 
 use crate::PublishOptions;
 use diagnostics_log_types::Severity;
-use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_logger::LogSinkMarker;
 use fuchsia_async as fasync;
-use fuchsia_component_client::connect_to_protocol;
+use fuchsia_component_client::connect::connect_to_protocol;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
@@ -44,7 +45,7 @@ pub struct PublisherOptions<'t> {
     blocking: bool,
     pub(crate) interest: Interest,
     listen_for_interest_updates: bool,
-    log_sink_proxy: Option<LogSinkProxy>,
+    log_sink_client: Option<ClientEnd<LogSinkMarker>>,
     pub(crate) metatags: HashSet<Metatag>,
     pub(crate) tags: &'t [&'t str],
     wait_for_initial_interest: bool,
@@ -57,7 +58,7 @@ impl Default for PublisherOptions<'_> {
             blocking: false,
             interest: Interest::default(),
             listen_for_interest_updates: true,
-            log_sink_proxy: None,
+            log_sink_client: None,
             metatags: HashSet::new(),
             tags: &[],
             wait_for_initial_interest: true,
@@ -78,7 +79,7 @@ impl PublisherOptions<'_> {
             blocking: false,
             interest: Interest::default(),
             listen_for_interest_updates: false,
-            log_sink_proxy: None,
+            log_sink_client: None,
             metatags: HashSet::new(),
             tags: &[],
             wait_for_initial_interest: false,
@@ -126,9 +127,9 @@ macro_rules! publisher_options {
                 /// Sets the `LogSink` that will be used.
                 ///
                 /// Default: the `fuchsia.logger.LogSink` available in the incoming namespace.
-                pub fn use_log_sink(mut $self, proxy: LogSinkProxy) -> Self {
+                pub fn use_log_sink(mut $self, client: ClientEnd<LogSinkMarker>) -> Self {
                     let this = &mut $self$(.$self_arg)*;
-                    this.log_sink_proxy = Some(proxy);
+                    this.log_sink_client = Some(client);
                     $self
                 }
 
@@ -150,7 +151,7 @@ publisher_options!((PublisherOptions, self,), (PublishOptions, self, publisher))
 
 fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishError> {
     let publisher = Publisher::new(opts.publisher)?;
-    log::set_boxed_logger(Box::new(publisher.clone()))?;
+    publisher.register_logger()?;
     if opts.install_panic_hook {
         crate::install_panic_hook(opts.panic_prefix);
     }
@@ -214,7 +215,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
                 interest,
                 metatags,
                 listen_for_interest_updates,
-                log_sink_proxy,
+                log_sink_client,
                 tags,
                 wait_for_initial_interest,
                 always_log_file_line,
@@ -231,7 +232,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
                 metatags,
                 tags: &tags.iter().map(String::as_ref).collect::<Vec<_>>(),
                 listen_for_interest_updates,
-                log_sink_proxy,
+                log_sink_client,
                 wait_for_initial_interest,
                 blocking,
                 always_log_file_line,
@@ -286,14 +287,14 @@ impl Publisher {
     ///
     /// Should be called only once.
     pub fn new(opts: PublisherOptions<'_>) -> Result<Self, PublishError> {
-        let proxy = match opts.log_sink_proxy {
+        let client = match opts.log_sink_client {
             Some(log_sink) => log_sink,
-            None => connect_to_protocol::<LogSinkMarker>()
+            None => connect_to_protocol()
                 .map_err(|e| e.to_string())
                 .map_err(PublishError::LogSinkConnect)?,
         };
         let sink = Sink::new(
-            &proxy,
+            &client,
             SinkConfig {
                 tags: opts.tags.iter().map(|s| s.to_string()).collect(),
                 metatags: opts.metatags,
@@ -302,7 +303,7 @@ impl Publisher {
             },
         )?;
         let (filter, on_change) =
-            InterestFilter::new(proxy, opts.interest, opts.wait_for_initial_interest);
+            InterestFilter::new(client, opts.interest, opts.wait_for_initial_interest);
         let interest_listening_task = if opts.listen_for_interest_updates {
             Mutex::new(Some(fasync::Task::spawn(on_change)))
         } else {
@@ -331,9 +332,23 @@ impl Publisher {
     fn take_interest_listening_task(&mut self) -> Option<fasync::Task<()>> {
         self.inner.interest_listening_task.lock().unwrap().take()
     }
+
+    /// Sets the global logger to this publisher. This function may only be called once in the
+    /// lifetime of a program.
+    pub fn register_logger(&self) -> Result<(), PublishError> {
+        // SAFETY: This leaks which guarantees the publisher remains alive for the lifetime of the
+        // program.
+        unsafe {
+            let ptr = Arc::into_raw(self.inner.clone());
+            log::set_logger(&*ptr).inspect_err(|_| {
+                let _ = Arc::from_raw(ptr);
+            })?;
+        }
+        Ok(())
+    }
 }
 
-impl log::Log for Publisher {
+impl log::Log for InnerPublisher {
     fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
         // NOTE: we handle minimum severity directly through the log max_level. So we call,
         // log::set_max_level, log::max_level where appropriate.
@@ -341,10 +356,27 @@ impl log::Log for Publisher {
     }
 
     fn log(&self, record: &log::Record<'_>) {
-        self.inner.sink.record_log(record);
+        self.sink.record_log(record);
     }
 
     fn flush(&self) {}
+}
+
+impl log::Log for Publisher {
+    #[inline]
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        self.inner.enabled(metadata)
+    }
+
+    #[inline]
+    fn log(&self, record: &log::Record<'_>) {
+        self.inner.log(record)
+    }
+
+    #[inline]
+    fn flush(&self) {
+        self.inner.flush()
+    }
 }
 
 /// Errors arising while forwarding a diagnostics stream to the environment.

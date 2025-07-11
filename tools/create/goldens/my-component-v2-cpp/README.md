@@ -5,7 +5,7 @@ TODO: Brief overview of the component.
 ## Building
 
 To add this component to your build, append
-`--with-base tools/create/goldens/my-component-v2-cpp`
+`--with //tools/create/goldens/my-component-v2-cpp`
 to the `fx set` invocation.
 
 ## Running

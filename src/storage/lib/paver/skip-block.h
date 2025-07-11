@@ -22,7 +22,9 @@ class SkipBlockPartitionClient;
 // ZIRCON-R).
 class SkipBlockDevicePartitioner {
  public:
-  explicit SkipBlockDevicePartitioner(paver::BlockDevices devices) : devices_(std::move(devices)) {}
+  explicit SkipBlockDevicePartitioner(paver::BlockDevices devices,
+                                      paver::BlockDevices skip_block_devices)
+      : devices_(std::move(devices)), skip_block_devices_(std::move(skip_block_devices)) {}
 
   zx::result<std::unique_ptr<SkipBlockPartitionClient>> FindPartition(const uuid::Uuid& type) const;
 
@@ -34,6 +36,7 @@ class SkipBlockDevicePartitioner {
 
  private:
   BlockDevices devices_;
+  BlockDevices skip_block_devices_;
 };
 
 class SkipBlockPartitionClient : public PartitionClient {

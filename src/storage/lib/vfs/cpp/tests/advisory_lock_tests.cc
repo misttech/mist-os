@@ -7,16 +7,25 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/namespace.h>
-#include <lib/file-lock/file-lock.h>
-#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <algorithm>
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
 #include <future>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include <fbl/unique_fd.h>
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "src/lib/fxl/strings/substitute.h"

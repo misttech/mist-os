@@ -157,11 +157,11 @@ fn create_sparse_image(
         .with_context(|| format!("Failed to create {:?}", sparse_output_image_path))?;
     sparse::builder::SparseImageBuilder::new()
         .set_block_size(block_size)
-        .add_chunk(sparse::builder::DataSource::Reader {
+        .add_source(sparse::builder::DataSource::Reader {
             reader: Box::new(image),
             size: actual_size,
         })
-        .add_chunk(sparse::builder::DataSource::Skip(target_size - actual_size))
+        .add_source(sparse::builder::DataSource::Skip(target_size - actual_size))
         .build(&mut output)
 }
 

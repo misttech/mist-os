@@ -226,7 +226,8 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
           {{fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
                                bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION,
-                               "fuchsia.gpio.FUNCTION." + std::string(PIN1_NAME))}},
+                               "fuchsia.gpio.FUNCTION." + std::string(PIN1_NAME)),
+            fdf::MakeProperty2(bind_fuchsia_gpio::NAME, std::string(PIN1_NAME))}},
           (*mgr_request.parents2())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
@@ -240,7 +241,8 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
           {{fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
                                bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION,
-                               "fuchsia.gpio.FUNCTION." + std::string(PIN2_NAME))}},
+                               "fuchsia.gpio.FUNCTION." + std::string(PIN2_NAME)),
+            fdf::MakeProperty2(bind_fuchsia_gpio::NAME, std::string(PIN2_NAME))}},
           (*mgr_request.parents2())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,

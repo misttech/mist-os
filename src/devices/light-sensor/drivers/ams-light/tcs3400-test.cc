@@ -192,13 +192,13 @@ class Tcs3400Test : public inspect::InspectTestHelper, public zxtest::Test {
     ASSERT_TRUE(report.has_reporting_state());
 
     ASSERT_TRUE(report.has_sensitivity());
-    ASSERT_EQ(report.sensitivity().count(), 1);
+    ASSERT_EQ(report.sensitivity().size(), 1);
 
     ASSERT_TRUE(report.has_threshold_high());
-    ASSERT_EQ(report.threshold_high().count(), 1);
+    ASSERT_EQ(report.threshold_high().size(), 1);
 
     ASSERT_TRUE(report.has_threshold_low());
-    ASSERT_EQ(report.threshold_low().count(), 1);
+    ASSERT_EQ(report.threshold_low().size(), 1);
 
     ASSERT_TRUE(report.has_sampling_rate());
 
@@ -324,7 +324,7 @@ TEST_F(Tcs3400Test, GetInputReport) {
 
     ASSERT_TRUE(report.has_sensor());
     ASSERT_TRUE(report.sensor().has_values());
-    ASSERT_EQ(report.sensor().values().count(), 4);
+    ASSERT_EQ(report.sensor().values().size(), 4);
 
     EXPECT_EQ(report.sensor().values()[0], 0x1772);
     EXPECT_EQ(report.sensor().values()[1], 0x95fa);
@@ -417,10 +417,10 @@ TEST_F(Tcs3400Test, GetInputReports) {
 
     const auto& reports = response->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     ASSERT_TRUE(reports[0].has_sensor());
     ASSERT_TRUE(reports[0].sensor().has_values());
-    ASSERT_EQ(reports[0].sensor().values().count(), 4);
+    ASSERT_EQ(reports[0].sensor().values().size(), 4);
 
     EXPECT_EQ(reports[0].sensor().values()[0], 0x00f8);
     EXPECT_EQ(reports[0].sensor().values()[1], 0xe79d);
@@ -445,10 +445,10 @@ TEST_F(Tcs3400Test, GetInputReports) {
 
     const auto& reports = response->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     ASSERT_TRUE(reports[0].has_sensor());
     ASSERT_TRUE(reports[0].sensor().has_values());
-    ASSERT_EQ(reports[0].sensor().values().count(), 4);
+    ASSERT_EQ(reports[0].sensor().values().size(), 4);
 
     EXPECT_EQ(reports[0].sensor().values()[0], 0xa5df);
     EXPECT_EQ(reports[0].sensor().values()[1], 0x0101);
@@ -481,7 +481,7 @@ TEST_F(Tcs3400Test, GetInputReports) {
     for (const auto& report : response->value()->reports) {
       ASSERT_TRUE(report.has_sensor());
       ASSERT_TRUE(report.sensor().has_values());
-      ASSERT_EQ(report.sensor().values().count(), 4);
+      ASSERT_EQ(report.sensor().values().size(), 4);
 
       EXPECT_EQ(report.sensor().values()[0], 0x1772);
       EXPECT_EQ(report.sensor().values()[1], 0x95fa);
@@ -537,7 +537,7 @@ TEST_F(Tcs3400Test, GetMultipleInputReports) {
     for (const auto& report : response->value()->reports) {
       ASSERT_TRUE(report.has_sensor());
       ASSERT_TRUE(report.sensor().has_values());
-      ASSERT_EQ(report.sensor().values().count(), 4);
+      ASSERT_EQ(report.sensor().values().size(), 4);
 
       EXPECT_EQ(report.sensor().values()[0], kExpectedLightValues[i][0]);
       EXPECT_EQ(report.sensor().values()[1], kExpectedLightValues[i][1]);
@@ -587,10 +587,10 @@ TEST_F(Tcs3400Test, GetInputReportsMultipleReaders) {
 
     const auto& reports = response->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     ASSERT_TRUE(reports[0].has_sensor());
     ASSERT_TRUE(reports[0].sensor().has_values());
-    ASSERT_EQ(reports[0].sensor().values().count(), 4);
+    ASSERT_EQ(reports[0].sensor().values().size(), 4);
 
     EXPECT_EQ(reports[0].sensor().values()[0], 0x00f8);
     EXPECT_EQ(reports[0].sensor().values()[1], 0xe79d);
@@ -640,10 +640,10 @@ TEST_F(Tcs3400Test, InputReportSaturatedSensor) {
 
   const auto& reports = response->value()->reports;
 
-  ASSERT_EQ(reports.count(), 1);
+  ASSERT_EQ(reports.size(), 1);
   ASSERT_TRUE(reports[0].has_sensor());
   ASSERT_TRUE(reports[0].sensor().has_values());
-  ASSERT_EQ(reports[0].sensor().values().count(), 4);
+  ASSERT_EQ(reports[0].sensor().values().size(), 4);
 
   EXPECT_EQ(reports[0].sensor().values()[0], 65085);
   EXPECT_EQ(reports[0].sensor().values()[1], 21067);
@@ -664,9 +664,9 @@ TEST_F(Tcs3400Test, GetDescriptor) {
   ASSERT_TRUE(response.value().descriptor.has_device_information());
   ASSERT_TRUE(response.value().descriptor.has_sensor());
   ASSERT_TRUE(response.value().descriptor.sensor().has_input());
-  ASSERT_EQ(response.value().descriptor.sensor().input().count(), 1);
+  ASSERT_EQ(response.value().descriptor.sensor().input().size(), 1);
   ASSERT_TRUE(response.value().descriptor.sensor().input()[0].has_values());
-  ASSERT_EQ(response.value().descriptor.sensor().input()[0].values().count(), 4);
+  ASSERT_EQ(response.value().descriptor.sensor().input()[0].values().size(), 4);
 
   EXPECT_EQ(response.value().descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
@@ -688,20 +688,20 @@ TEST_F(Tcs3400Test, GetDescriptor) {
   }
 
   ASSERT_TRUE(response.value().descriptor.sensor().has_feature());
-  ASSERT_EQ(response.value().descriptor.sensor().feature().count(), 1);
+  ASSERT_EQ(response.value().descriptor.sensor().feature().size(), 1);
   const auto& feature_descriptor = response.value().descriptor.sensor().feature()[0];
 
   ASSERT_TRUE(feature_descriptor.has_report_interval());
   ASSERT_TRUE(feature_descriptor.has_supports_reporting_state());
 
   ASSERT_TRUE(feature_descriptor.has_sensitivity());
-  ASSERT_EQ(feature_descriptor.sensitivity().count(), 1);
+  ASSERT_EQ(feature_descriptor.sensitivity().size(), 1);
 
   ASSERT_TRUE(feature_descriptor.has_threshold_high());
-  ASSERT_EQ(feature_descriptor.threshold_high().count(), 1);
+  ASSERT_EQ(feature_descriptor.threshold_high().size(), 1);
 
   ASSERT_TRUE(feature_descriptor.has_threshold_low());
-  ASSERT_EQ(feature_descriptor.threshold_low().count(), 1);
+  ASSERT_EQ(feature_descriptor.threshold_low().size(), 1);
 
   EXPECT_EQ(feature_descriptor.report_interval().range.min, 0);
   EXPECT_EQ(feature_descriptor.report_interval().unit.type,

@@ -11,6 +11,7 @@ use fidl_fuchsia_scheduler::{
 use fidl_test_rolemanager as ftest;
 use fuchsia_component::client::connect_to_protocol;
 use realm_proxy_client::RealmProxyClient;
+use zx::HandleBased;
 
 async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
@@ -23,7 +24,9 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> 
 }
 
 fn get_test_thread_handle() -> Result<zx::Thread> {
-    Ok(fuchsia_runtime::thread_self().duplicate(zx::Rights::SAME_RIGHTS)?)
+    fuchsia_runtime::with_thread_self(
+        |thread| Ok(thread.duplicate_handle(zx::Rights::SAME_RIGHTS)?),
+    )
 }
 
 fn get_test_vmar_handle() -> Result<zx::Vmar> {

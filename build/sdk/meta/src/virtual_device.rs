@@ -34,9 +34,6 @@ pub enum VirtualDevice {
 impl VirtualDevice {
     /// Load a VirtualDevice from a path on disk.
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
-        let name = path.as_ref().file_stem().with_context(|| {
-            format!("Can't determine device name based on provided path: '{}'", path.as_ref())
-        })?;
         if !path.as_ref().is_file() {
             bail!("Value '{}' doesn't appear to be a valid file.", path.as_ref());
         }
@@ -46,13 +43,7 @@ impl VirtualDevice {
         let helper: SerializationHelper =
             serde_json::from_reader(file).context("parsing virtual device")?;
         let device = match helper {
-            SerializationHelper::V1 { schema_id: _, mut data } => {
-                // Use the filename as the device name instead of the name
-                // originally in the file.
-                // TODO: Why are we doing this?
-                data.name = name.to_string();
-                VirtualDevice::V1(data)
-            }
+            SerializationHelper::V1 { schema_id: _, data } => VirtualDevice::V1(data),
         };
         Ok(device)
     }
@@ -163,6 +154,6 @@ mod tests {
         .unwrap();
         let vd = VirtualDevice::try_load_from(vd_path).unwrap();
         assert!(matches!(vd, VirtualDevice::V1 { .. }));
-        assert_eq!(vd.name(), "virtual_device");
+        assert_eq!(vd.name(), "generic-x64");
     }
 }

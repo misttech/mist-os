@@ -144,7 +144,7 @@ void Device::HandleGetDataRequest(fdf_dispatcher_t* dispatcher, fdf::Arena arena
 // Sets the test data that will be retrieved by |HandleGetDataRequest|.
 void Device::SetTestData(SetTestDataRequestView request, SetTestDataCompleter::Sync& completer) {
   auto ptr = request->in.data();
-  data_size_ = request->in.count();
+  data_size_ = request->in.size();
   memcpy(data_, ptr, data_size_);
   completer.ReplySuccess();
 }

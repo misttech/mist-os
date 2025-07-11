@@ -4,7 +4,9 @@
 
 use super::super::timer::Timers;
 use super::atomic_future::{AtomicFutureHandle, AttemptPollResult};
-use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
+use super::packets::{
+    PacketReceiver, PacketReceiverMap, RawReceiverRegistration, ReceiverRegistration,
+};
 use super::scope::ScopeHandle;
 use super::time::{BootInstant, MonotonicInstant};
 use crossbeam::queue::SegQueue;
@@ -15,6 +17,7 @@ use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::Context;
@@ -93,7 +96,7 @@ pub(crate) struct Executor {
     boot_timers: Arc<Timers<BootInstant>>,
     pub(super) done: AtomicBool,
     is_local: bool,
-    receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
+    pub(crate) receivers: PacketReceiverMap,
     task_count: AtomicUsize,
     pub(super) ready_tasks: SegQueue<TaskHandle>,
     time: ExecutorTime,
@@ -112,29 +115,19 @@ impl Executor {
         #[cfg(test)]
         ACTIVE_EXECUTORS.fetch_add(1, Ordering::Relaxed);
 
-        let mut receivers: PacketReceiverMap<Arc<dyn PacketReceiver>> = PacketReceiverMap::new();
-
         // Is this a fake-time executor?
         let is_fake = matches!(
             time,
             ExecutorTime::FakeTime { mono_reading_ns: _, mono_to_boot_offset_ns: _ }
         );
-        let monotonic_timers = receivers.insert(|key| {
-            let timers = Arc::new(Timers::<MonotonicInstant>::new(key, is_fake));
-            (timers.clone(), timers)
-        });
-        let boot_timers = receivers.insert(|key| {
-            let timers = Arc::new(Timers::<BootInstant>::new(key, is_fake));
-            (timers.clone(), timers)
-        });
 
         Executor {
             port: zx::Port::create(),
-            monotonic_timers,
-            boot_timers,
+            monotonic_timers: Arc::new(Timers::<MonotonicInstant>::new(is_fake)),
+            boot_timers: Arc::new(Timers::<BootInstant>::new(is_fake)),
             done: AtomicBool::new(false),
             is_local,
-            receivers: Mutex::new(receivers),
+            receivers: PacketReceiverMap::new(),
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
             ready_tasks: SegQueue::new(),
             time,
@@ -246,17 +239,6 @@ impl Executor {
             // TODO: logging
             eprintln!("Failed to queue notify in port: {e:?}");
         }
-    }
-
-    pub fn deliver_packet(&self, key: u64, packet: zx::Packet) {
-        let receiver = match self.receivers.lock().get(key) {
-            // Clone the `Arc` so that we don't hold the lock
-            // any longer than absolutely necessary.
-            // The `receive_packet` impl may be arbitrarily complex.
-            Some(receiver) => receiver.clone(),
-            None => return,
-        };
-        receiver.receive_packet(packet);
     }
 
     /// Returns the current reading of the monotonic clock.
@@ -428,9 +410,9 @@ impl Executor {
         // Drop all of the uncompleted tasks
         while self.ready_tasks.pop().is_some() {}
 
-        // Unregister the timer receivers so that we can perform the check below.
-        self.receivers.lock().remove(self.monotonic_timers.port_key());
-        self.receivers.lock().remove(self.boot_timers.port_key());
+        // Deregister the timer receivers so that we can perform the check below.
+        self.monotonic_timers.deregister();
+        self.boot_timers.deregister();
 
         // Do not allow any receivers to outlive the executor. That's very likely a bug waiting to
         // happen. See discussion above.
@@ -452,10 +434,7 @@ impl Executor {
         // - Storing channel and FIDL objects in static variables.
         //
         // - fuchsia_async::unblock calls that move channels or FIDL objects to another thread.
-        assert!(
-            self.receivers.lock().mapping.is_empty(),
-            "receivers must not outlive their executor"
-        );
+        assert!(self.receivers.is_empty(), "receivers must not outlive their executor");
 
         // Remove the thread-local executor set in `new`.
         EHandle::rm_local();
@@ -466,6 +445,10 @@ impl Executor {
     // LINT.IfChange
     pub fn worker_lifecycle<const UNTIL_STALLED: bool>(self: &Arc<Executor>) {
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
+
+        self.monotonic_timers.register(self);
+        self.boot_timers.register(self);
+
         loop {
             // Keep track of whether we are considered asleep.
             let mut sleeping = false;
@@ -544,9 +527,7 @@ impl Executor {
             }
 
             match work {
-                Work::Packet(packet) => {
-                    self.deliver_packet(packet.key(), packet);
-                }
+                Work::Packet(packet) => self.receivers.receive_packet(packet.key(), packet),
                 Work::None => {}
                 Work::Stalled => return,
             }
@@ -690,28 +671,26 @@ impl EHandle {
 
     /// Registers a `PacketReceiver` with the executor and returns a registration.
     /// The `PacketReceiver` will be deregistered when the `Registration` is dropped.
-    pub fn register_receiver<T>(&self, receiver: Arc<T>) -> ReceiverRegistration<T>
-    where
-        T: PacketReceiver,
-    {
-        self.inner().receivers.lock().insert(|key| {
-            (receiver.clone(), ReceiverRegistration { ehandle: self.clone(), key, receiver })
-        })
+    pub fn register_receiver<T: PacketReceiver>(&self, receiver: T) -> ReceiverRegistration<T> {
+        self.inner().receivers.register(self.inner().clone(), receiver)
+    }
+
+    /// Registers a pinned `RawPacketReceiver` with the executor.
+    ///
+    /// The registration will be deregistered when dropped.
+    ///
+    /// NOTE: Unlike with `register_receiver`, `receive_packet` will be called whilst a lock is
+    /// held, so it is not safe to register or unregister receivers at that time.
+    pub fn register_pinned<T: PacketReceiver>(
+        &self,
+        raw_registration: Pin<&mut RawReceiverRegistration<T>>,
+    ) {
+        self.inner().receivers.register_pinned(self.clone(), raw_registration);
     }
 
     #[inline(always)]
     pub(crate) fn inner(&self) -> &Arc<Executor> {
         self.root_scope.executor()
-    }
-
-    pub(crate) fn deregister_receiver(&self, key: u64) {
-        let mut lock = self.inner().receivers.lock();
-        if lock.contains(key) {
-            lock.remove(key);
-        } else {
-            // The executor is shutting down and already removed the entry.
-            assert!(self.inner().done.load(Ordering::SeqCst), "Missing receiver to deregister");
-        }
     }
 
     /// Spawn a new task to be run on this executor.
@@ -795,6 +774,7 @@ impl TaskHandle {
 mod tests {
     use super::{EHandle, ACTIVE_EXECUTORS};
     use crate::SendExecutor;
+    use crossbeam::epoch;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
@@ -802,7 +782,10 @@ mod tests {
     fn test_no_leaks() {
         std::thread::spawn(|| SendExecutor::new(1).run(async {})).join().unwrap();
 
-        assert_eq!(ACTIVE_EXECUTORS.load(Ordering::Relaxed), 0);
+        // This seems like the only way to force crossbeam to do a collection.
+        while ACTIVE_EXECUTORS.load(Ordering::Relaxed) != 0 {
+            epoch::pin().defer(|| {});
+        }
     }
 
     #[test]

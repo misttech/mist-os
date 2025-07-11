@@ -334,7 +334,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
       wait_response.value()->buffer_collection_info();
 
   if (!collection_info.settings().has_image_format_constraints() ||
-      index >= collection_info.buffers().count()) {
+      index >= collection_info.buffers().size()) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -831,7 +831,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImageForCapture(
       wait_response->buffer_collection_info();
 
   if (!collection_info.settings().has_image_format_constraints() ||
-      index >= collection_info.buffers().count()) {
+      index >= collection_info.buffers().size()) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 

@@ -167,6 +167,28 @@ impl<T> OwnedRef<T> {
     fn inner(this: &Self) -> &Arc<RefInner<T>> {
         this.inner.as_ref().expect("OwnedRef has been released.")
     }
+
+    fn re_own(inner: Arc<RefInner<T>>) -> Option<Self> {
+        let mut owned_refs = inner.owned_refs_count.load(Ordering::Relaxed);
+        loop {
+            if owned_refs == 0 {
+                return None;
+            }
+            match inner.owned_refs_count.compare_exchange(
+                owned_refs,
+                owned_refs + 1,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    return Some(Self { inner: Some(inner), drop_guard: Default::default() });
+                }
+                Err(v) => {
+                    owned_refs = v;
+                }
+            }
+        }
+    }
 }
 
 impl<T: Releasable> OwnedRef<T> {
@@ -331,6 +353,12 @@ impl<T> WeakRef<T> {
         None
     }
 
+    /// Try to upgrade the `WeakRef` into a `OwnedRef`. This will fail as soon as the last
+    /// `OwnedRef` is released.
+    pub fn re_own(&self) -> Option<OwnedRef<T>> {
+        self.0.upgrade().and_then(OwnedRef::re_own)
+    }
+
     /// Returns a raw pointer to the object T pointed to by this WeakRef<T>.
     ///
     /// See `Weak::as_ptr`
@@ -462,6 +490,12 @@ impl<'a, T> TempRef<'a, T> {
     /// the returned `TempRef` is not kept around while doing blocking calls.
     pub fn into_static(this: Self) -> TempRef<'static, T> {
         TempRef::new(this.0.clone())
+    }
+
+    /// Try to upgrade the `WeakRef` into a `OwnedRef`. This will fail as soon as the last
+    /// `OwnedRef` is released.
+    pub fn re_own(&self) -> Option<OwnedRef<T>> {
+        OwnedRef::re_own(Arc::clone(&self.0))
     }
 }
 
@@ -1037,5 +1071,60 @@ mod test {
         assert_eq!(OwnedRef::as_ptr(&value), TempRef::as_ptr(&temp));
         std::mem::drop(temp);
         value.release(());
+    }
+
+    #[::fuchsia::test]
+    fn test_re_own() {
+        let data = Data::default();
+        let owned = OwnedRef::new(data);
+        let weak = WeakRef::from(&owned);
+
+        let re_owned = weak.re_own();
+        assert!(re_owned.is_some());
+
+        // Release the original owned ref.
+        owned.release(());
+
+        // The re_owned ref is still alive.
+        let re_owned_again = weak.re_own();
+        assert!(re_owned_again.is_some());
+        re_owned_again.release(());
+
+        // Now release the first re-owned ref.
+        re_owned.release(());
+
+        // Now that all owned refs are released, re_own should fail.
+        let re_owned_finally = weak.re_own();
+        assert!(re_owned_finally.is_none());
+    }
+
+    #[::fuchsia::test]
+    fn test_re_own_concurrent() {
+        let owned = OwnedRef::new(Data::default());
+        let weak = WeakRef::from(&owned);
+        let num_threads = 10;
+
+        let mut handles = vec![];
+        for _ in 0..num_threads {
+            let weak = weak.clone();
+            let handle = std::thread::spawn(move || {
+                loop {
+                    if let Some(re_owned) = weak.re_own() {
+                        re_owned.release(());
+                    } else {
+                        return;
+                    }
+                }
+            });
+            handles.push(handle);
+        }
+
+        owned.release(());
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert!(weak.re_own().is_none());
     }
 }

@@ -498,7 +498,7 @@ TEST_F(HandleCloseTest, VectorStruct) {
 
     ASSERT_TRUE(result.ok()) << result.error();
 
-    for (uint32_t i = 0; i < result.value().value.v.count(); ++i) {
+    for (uint32_t i = 0; i < result.value().value.v.size(); ++i) {
       checker.AddEvent(result.value().value.v[i].h);
     }
   }
@@ -955,7 +955,7 @@ TEST_F(HandleCloseTest, VectorOfHandle) {
 
     ASSERT_TRUE(result.ok()) << result.error();
 
-    for (uint32_t i = 0; i < result.value().value.count(); ++i) {
+    for (uint32_t i = 0; i < result.value().value.size(); ++i) {
       checker.AddEvent(result.value().value[i]);
     }
   }
@@ -975,8 +975,8 @@ TEST_F(HandleCloseTest, VectorOfVectorOfHandle) {
 
     ASSERT_TRUE(result.ok()) << result.error();
 
-    for (uint32_t i = 0; i < result.value().value.count(); ++i) {
-      for (uint32_t j = 0; j < result.value().value[i].count(); ++j) {
+    for (uint32_t i = 0; i < result.value().value.size(); ++i) {
+      for (uint32_t j = 0; j < result.value().value[i].size(); ++j) {
         checker.AddEvent(result.value().value[i][j]);
       }
     }
@@ -998,9 +998,9 @@ TEST_F(HandleCloseTest, VectorOfVectorOfVectorOfHandle) {
 
     ASSERT_TRUE(result.ok()) << result.error();
 
-    for (uint32_t i = 0; i < result.value().value.count(); ++i) {
-      for (uint32_t j = 0; j < result.value().value[i].count(); ++j) {
-        for (uint32_t k = 0; k < result.value().value[i][j].count(); ++k) {
+    for (uint32_t i = 0; i < result.value().value.size(); ++i) {
+      for (uint32_t j = 0; j < result.value().value[i].size(); ++j) {
+        for (uint32_t k = 0; k < result.value().value[i][j].size(); ++k) {
           checker.AddEvent(result.value().value[i][j][k]);
         }
       }
@@ -1021,7 +1021,7 @@ TEST_F(HandleCloseTest, VectorOfHandleStruct) {
 
     ASSERT_TRUE(result.ok()) << result.error();
 
-    for (uint32_t i = 0; i < result.value().value.count(); ++i) {
+    for (uint32_t i = 0; i < result.value().value.size(); ++i) {
       checker.AddEvent(result.value().value[i].h);
     }
   }
@@ -1041,8 +1041,8 @@ TEST_F(HandleCloseTest, VectorOfVectorOfHandleStruct) {
 
     ASSERT_TRUE(result.ok()) << result.error();
 
-    for (uint32_t i = 0; i < result.value().value.count(); ++i) {
-      for (uint32_t j = 0; j < result.value().value[i].count(); ++j) {
+    for (uint32_t i = 0; i < result.value().value.size(); ++i) {
+      for (uint32_t j = 0; j < result.value().value[i].size(); ++j) {
         checker.AddEvent(result.value().value[i][j].h);
       }
     }
@@ -1065,9 +1065,9 @@ TEST_F(HandleCloseTest, VectorOfVectorOfVectorOfHandleStruct) {
 
     ASSERT_TRUE(result.ok()) << result.error();
 
-    for (uint32_t i = 0; i < result.value().value.count(); ++i) {
-      for (uint32_t j = 0; j < result.value().value[i].count(); ++j) {
-        for (uint32_t k = 0; k < result.value().value[i][j].count(); ++k) {
+    for (uint32_t i = 0; i < result.value().value.size(); ++i) {
+      for (uint32_t j = 0; j < result.value().value[i].size(); ++j) {
+        for (uint32_t k = 0; k < result.value().value[i][j].size(); ++k) {
           checker.AddEvent(result.value().value[i][j][k].h);
         }
       }

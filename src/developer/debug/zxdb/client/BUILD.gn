@@ -191,6 +191,11 @@ static_library("client") {
     "//third_party/zstd",
   ]
 
+  # TODO(https://fxbug.dev/430278476): Don't build on mac.
+  if (is_mac) {
+    deps += [ "//src/developer/debug/shared:elf_h_on_mac" ]
+  }
+
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }

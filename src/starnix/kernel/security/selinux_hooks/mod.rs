@@ -114,8 +114,8 @@ fn has_file_permissions(
 /// `permissions` to the underlying [`crate::vfs::FsNode`], with "todo_deny" on denial.
 fn todo_has_file_permissions(
     bug: BugRef,
-    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     file: &FileObject,
     permissions: &[impl ForClass<FsNodeClass>],
@@ -129,8 +129,8 @@ fn todo_has_file_permissions(
         let audit_context = [audit_context, file.into(), node.into()];
         todo_check_permission(
             bug.clone(),
-            kernel,
             permission_check,
+            kernel,
             subject_sid,
             file_sid,
             FdPermission::Use,
@@ -143,8 +143,8 @@ fn todo_has_file_permissions(
         let audit_context = [audit_context, file.into()];
         todo_has_fs_node_permissions(
             bug.clone(),
-            kernel,
             permission_check,
+            kernel,
             subject_sid,
             file.node(),
             permissions,
@@ -272,8 +272,8 @@ fn has_fs_node_permissions(
 /// Checks that `current_task` has `permissions` to `node`, with "todo_deny" on denial.
 fn todo_has_fs_node_permissions(
     bug: BugRef,
-    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     fs_node: &FsNode,
     permissions: &[impl ForClass<FsNodeClass>],
@@ -290,8 +290,8 @@ fn todo_has_fs_node_permissions(
     for permission in permissions {
         todo_check_permission(
             bug.clone(),
-            kernel,
             permission_check,
+            kernel,
             subject_sid,
             target.sid,
             permission.for_class(target.class),
@@ -353,8 +353,8 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
 /// the audit output, without actually denying access.
 fn todo_check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     bug: BugRef,
-    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,

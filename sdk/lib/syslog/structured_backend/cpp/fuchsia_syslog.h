@@ -38,6 +38,13 @@ struct LogBufferData {
 
 }  // namespace internal
 
+// Configuration for flushing a log record.
+struct FlushConfig {
+  // If true, the call to flush will block if the socket is full.
+  // If false, the call to flush will return immediately if the socket is full.
+  bool block_if_full = false;
+};
+
 // Opaque structure representing the backend encode state.
 // This structure only has meaning to the backend and application code shouldn't
 // touch these values.
@@ -86,7 +93,7 @@ class LogBuffer final {
   void WriteKeyValue(std::string_view key, bool value);
 
   // Writes the LogBuffer to the socket.
-  bool FlushRecord();
+  bool FlushRecord(FlushConfig flush_config = {});
 
  private:
   void EndRecord();

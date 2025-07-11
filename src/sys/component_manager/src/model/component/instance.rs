@@ -39,7 +39,6 @@ use async_trait::async_trait;
 use async_utils::async_once::Once;
 use clonable_error::ClonableError;
 use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
-use cm_logger::scoped::ScopedLogger;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
     FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
@@ -300,7 +299,7 @@ pub struct ResolvedInstanceState {
     weak_component: WeakComponentInstance,
 
     /// The component's execution scope, shared with [ComponentInstance::execution_scope].
-    execution_scope: ExecutionScope,
+    pub execution_scope: ExecutionScope,
 
     /// Caches an instance token.
     instance_token_state: InstanceTokenState,
@@ -519,12 +518,12 @@ impl ResolvedInstanceState {
         impl sandbox::Connectable for OutgoingConnector {
             fn send(&self, message: sandbox::Message) -> Result<(), ()> {
                 let scope = ExecutionScope::new();
-                let flags = fio::OpenFlags::empty();
-                flags.to_object_request(message.channel).handle(|object_request| {
+                const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+                FLAGS.to_object_request(message.channel).handle(|object_request| {
                     let path = vfs::path::Path::dot();
                     self.node.clone().open_entry(OpenRequest::new(
                         scope,
-                        flags,
+                        FLAGS,
                         path,
                         object_request,
                     ))
@@ -1248,11 +1247,6 @@ pub struct StartedInstanceState {
     /// This stores the hook for notifying an ExecutionController about stop events for this
     /// component.
     execution_controller_task: Option<controller::ExecutionControllerTask>,
-
-    /// Logger attributed to this component.
-    ///
-    /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
-    pub logger: Option<Arc<ScopedLogger>>,
 }
 
 impl StartedInstanceState {
@@ -1265,7 +1259,6 @@ impl StartedInstanceState {
         component: WeakComponentInstance,
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
-        logger: Option<ScopedLogger>,
     ) -> Self {
         let timestamp = zx::BootInstant::get();
         let timestamp_monotonic = zx::MonotonicInstant::get();
@@ -1276,7 +1269,6 @@ impl StartedInstanceState {
             binder_server_ends: vec![],
             start_reason,
             execution_controller_task,
-            logger: logger.map(Arc::new),
         }
     }
 
@@ -1478,13 +1470,13 @@ impl Routable<Dict> for ProgramDictionaryRouter {
         let dir_entry = component.get_outgoing();
 
         let (inner_router, server_end) = create_proxy::<fsandbox::DictionaryRouterMarker>();
-        dir_entry.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::empty(),
-            vfs::path::Path::validate_and_split(self.source_path.to_string())
-                .expect("path must be valid"),
-            server_end.into_channel(),
-        );
+        const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+        let path = vfs::Path::validate_and_split(self.source_path.to_string())
+            .expect("path must be valid");
+        FLAGS.to_object_request(server_end.into_channel()).handle(|request| {
+            dir_entry.open_entry(OpenRequest::new(ExecutionScope::new(), FLAGS, path, request))
+        });
+
         let resp = inner_router
             .route(request.into())
             .await

@@ -179,19 +179,13 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     /// Attempts to connect the given server end to the `first_member` member.
     fn connect_to_first_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error>;
 
     /// Attempts to connect the given server end to the `second_member` member.
     fn connect_to_second_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::SecondProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::SecondProtocol, Self::Transport>,
     ) -> Result<(), Self::Error>;
 }
 
@@ -205,20 +199,14 @@ where
 
     fn connect_to_first_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("first_member", server_end.into_untyped())
     }
 
     fn connect_to_second_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::SecondProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::SecondProtocol, Self::Transport>,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("second_member", server_end.into_untyped())
     }
@@ -244,19 +232,13 @@ pub trait MultiHomogeneousMemberServiceInstance {
     /// Attempts to connect the given server end to the `first_member` member.
     fn connect_to_first_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error>;
 
     /// Attempts to connect the given server end to the `second_member` member.
     fn connect_to_second_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error>;
 }
 
@@ -270,20 +252,14 @@ where
 
     fn connect_to_first_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("first_member", server_end.into_untyped())
     }
 
     fn connect_to_second_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("second_member", server_end.into_untyped())
     }
@@ -441,10 +417,7 @@ pub trait SingleMemberServiceInstance {
     /// Attempts to connect the given server end to the `single_member` member.
     fn connect_to_single_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error>;
 }
 
@@ -457,10 +430,7 @@ where
 
     fn connect_to_single_member(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::FirstProtocol, Self::Transport>,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("single_member", server_end.into_untyped())
     }

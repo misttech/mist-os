@@ -1783,14 +1783,14 @@ alias(
 )
 
 alias(
-    name = "pathdiff-0.2.1",
-    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.1:pathdiff",
+    name = "pathdiff-0.2.3",
+    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.3:pathdiff",
     tags = ["manual"],
 )
 
 alias(
     name = "pathdiff",
-    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.1:pathdiff",
+    actual = "//third_party/rust_crates/vendor/pathdiff-0.2.3:pathdiff",
     tags = ["manual"],
 )
 
@@ -2587,14 +2587,14 @@ alias(
 )
 
 alias(
-    name = "siphasher-0.3.10",
-    actual = "//third_party/rust_crates/vendor/siphasher-0.3.10:siphasher",
+    name = "siphasher-0.3.11",
+    actual = "//third_party/rust_crates/vendor/siphasher-0.3.11:siphasher",
     tags = ["manual"],
 )
 
 alias(
     name = "siphasher",
-    actual = "//third_party/rust_crates/vendor/siphasher-0.3.10:siphasher",
+    actual = "//third_party/rust_crates/vendor/siphasher-0.3.11:siphasher",
     tags = ["manual"],
 )
 
@@ -2959,14 +2959,14 @@ alias(
 )
 
 alias(
-    name = "tracing-mutex-0.3.0",
-    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.0:tracing_mutex",
+    name = "tracing-mutex-0.3.1",
+    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.1:tracing_mutex",
     tags = ["manual"],
 )
 
 alias(
     name = "tracing-mutex",
-    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.0:tracing_mutex",
+    actual = "//third_party/rust_crates/vendor/tracing-mutex-0.3.1:tracing_mutex",
     tags = ["manual"],
 )
 

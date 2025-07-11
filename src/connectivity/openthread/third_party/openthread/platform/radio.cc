@@ -213,7 +213,7 @@ ot::Posix::RcpCapsDiag &GetRcpCapsDiag(void) { return sRadio.GetRcpCapsDiag(); }
 
 extern "C" void platformRadioDeinit(void) { sRadio.Deinit(); }
 
-void platformRadioHandleStateChange(otInstance *aInstance, otChangedFlags aFlags) {
+extern "C" void platformRadioHandleStateChange(otInstance *aInstance, otChangedFlags aFlags) {
   if (OT_CHANGED_THREAD_NETIF_STATE & aFlags) {
     GetRadioSpinel().SetTimeSyncState(otIp6IsEnabled(aInstance));
   }

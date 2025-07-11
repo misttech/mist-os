@@ -369,8 +369,9 @@ TEST_F(GraphServerTest, CreateProducerFailsBadFields) {
 TEST_F(GraphServerTest, CreateProducerFailsUnknownDataSource) {
   using ProducerDataSource = ::fuchsia_audio_mixer::wire::ProducerDataSource;
 
-  // TODO(https://fxbug.dev/42060867): When this bug is fixed, this code can be simplified, and possibly
-  // merged with CreateProducerFailsBadFields. For now we must create an "unknown" variant manually.
+  // TODO(https://fxbug.dev/42060867): When this bug is fixed, this code can be simplified, and
+  // possibly merged with CreateProducerFailsBadFields. For now we must create an "unknown" variant
+  // manually.
   struct RawProducerDataSource {
     fidl_xunion_tag_t ordinal;
     FIDL_ALIGNDECL fidl::UntypedEnvelope envelope;
@@ -1034,8 +1035,8 @@ TEST_F(GraphServerTest, CreateCustomSucceeds) {
   ASSERT_FALSE(result->is_error()) << result->error_value();
   EXPECT_TRUE(result->value()->has_id());
   ASSERT_TRUE(result->value()->has_node_properties());
-  EXPECT_EQ(result->value()->node_properties().source_ids().count(), 1ul);
-  EXPECT_EQ(result->value()->node_properties().dest_ids().count(), 1ul);
+  EXPECT_EQ(result->value()->node_properties().source_ids().size(), 1ul);
+  EXPECT_EQ(result->value()->node_properties().dest_ids().size(), 1ul);
 }
 
 //
@@ -1134,9 +1135,9 @@ TEST_F(GraphServerTest, DeleteCustomNodeSucceeds) {
     ASSERT_TRUE(result->value()->has_id());
     custom_id = result->value()->id();
     ASSERT_TRUE(result->value()->has_node_properties());
-    ASSERT_EQ(result->value()->node_properties().source_ids().count(), 1ul);
+    ASSERT_EQ(result->value()->node_properties().source_ids().size(), 1ul);
     custom_child_source_id = result->value()->node_properties().source_ids().at(0);
-    ASSERT_EQ(result->value()->node_properties().dest_ids().count(), 1ul);
+    ASSERT_EQ(result->value()->node_properties().dest_ids().size(), 1ul);
     custom_child_dest_id = result->value()->node_properties().dest_ids().at(0);
   }
 
@@ -1421,7 +1422,7 @@ TEST_F(GraphServerTest, CreateEdgeSucceedsMixerSource) {
     ASSERT_FALSE(result->is_error()) << result->error_value();
     ASSERT_TRUE(result->value()->has_node_properties());
     ASSERT_TRUE(result->value()->node_properties().has_source_ids());
-    ASSERT_EQ(result->value()->node_properties().source_ids().count(), 1ul);
+    ASSERT_EQ(result->value()->node_properties().source_ids().size(), 1ul);
     custom_source_id = result->value()->node_properties().source_ids().at(0);
   }
 

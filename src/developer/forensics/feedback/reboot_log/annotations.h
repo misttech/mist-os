@@ -14,6 +14,7 @@ namespace forensics::feedback {
 std::string LastRebootReasonAnnotation(const RebootLog& reboot_log);
 ErrorOrString LastRebootUptimeAnnotation(const RebootLog& reboot_log);
 ErrorOrString LastRebootRuntimeAnnotation(const RebootLog& reboot_log);
+ErrorOrString LastRebootTotalSuspendedTimeAnnotation(const RebootLog& reboot_log);
 
 }  // namespace forensics::feedback
 

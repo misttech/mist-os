@@ -809,18 +809,12 @@ __all__ = ["cpu", "elf_info", "elf_note", "get_elf_accessor", "get_elf_info"]
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    mode_group = parser.add_mutually_exclusive_group(required=True)
-    mode_group.add_argument(
+    parser.add_argument(
         "--assembly-dir",
         help="Path to an assembled-system container directory",
         type=Path,
         metavar="DIR",
-    )
-    mode_group.add_argument(
-        "--product-bundle-dir",
-        help="Path to a product bundle container directory",
-        type=Path,
-        metavar="DIR",
+        required=True,
     )
     parser.add_argument(
         "--zbi-tool",
@@ -849,54 +843,23 @@ def main() -> int:
     zbi = None
     # The json description of blobfs/fxblob (described below)
     contents = None
-    # Directory that contains the blobs
-    blobstore = None
 
-    if args.product_bundle_dir:
-        # Open the 'product_bundle.json' manifest that describes the
-        # bundle, and use that to locate the zbi and contents of
-        # blobfs/fxblob for system A.
-        with open(args.product_bundle_dir / "product_bundle.json") as f:
-            bundle = json.load(f)
-            for image in bundle["system_a"]:
-                if image["type"] == "zbi":
-                    if zbi:
-                        raise ValueError("Found multiple ZBI images.")
-                    zbi = args.product_bundle_dir / image["path"]
-                else:
-                    if "contents" in image:
-                        if contents:
-                            raise ValueError(
-                                "Found multiple images with 'contents'"
-                            )
-                        contents = image["contents"]
-                        blobstore = args.product_bundle_dir / "blobs"
-    else:
-        # Open the 'assembled_system.json' manifest that describes the
-        # assembled system's output, and use that to locate the zbi and
-        # the contents of the blobfs/fxblob image.
-        with open(args.assembly_dir / "assembled_system.json") as f:
-            assembled_system = json.load(f)
-            for image in assembled_system["images"]:
-                if image["type"] == "zbi":
-                    if zbi:
-                        raise ValueError("Found multiple ZBI images.")
-                    zbi = args.assembly_dir / image["path"]
-                else:
-                    if "contents" in image:
-                        if contents:
-                            raise ValueError(
-                                "Found multiple images with 'contents'"
-                            )
-                        contents = image["contents"]
-                        blobstore = args.assembly_dir / "blobs"
+    # Open the 'assembled_system.json' manifest that describes the
+    # assembled system's output, and use that to locate the zbi and
+    # the contents of the blobfs/fxblob image.
+    with open(args.assembly_dir / "assembled_system.json") as f:
+        assembled_system = json.load(f)
+        for image in assembled_system["images"]:
+            if image["type"] == "zbi":
+                zbi = args.assembly_dir / image["path"]
+            else:
+                if "contents" in image:
+                    contents = image["contents"]
 
     if not zbi:
-        raise ValueError("Unable to find ZBI")
+        raise ValueError("Unable to find ZBI in assembled_system.json")
     if not contents:
-        raise ValueError("Unable to find packages")
-    if not blobstore:
-        raise ValueError("Unable to find blobs")
+        raise ValueError("Unable to find packages in assembled_system.json")
 
     # Extract the zbi into a scratch directory, so that all of the files
     # within it can processed.
@@ -948,7 +911,7 @@ def main() -> int:
     #
     # Theinfo needed from this are the merkles and their sizes in blobfs,
     # as the individual package blobs can be found in:
-    #   '<blobstore>/<merkle>'
+    #   '<args.assembly_dir>/blobs/<merkle>'
     #
 
     # This is a map of all blobs in the fxfs/blobfs image, by merkle and their
@@ -962,7 +925,9 @@ def main() -> int:
                 if merkle not in blobs_map:
                     blobs_map[merkle] = blob["used_space_in_blobfs"]
 
-    files += [str(blobstore / merkle) for merkle in blobs_map.keys()]
+    files += [
+        str(args.assembly_dir / "blobs" / merkle) for merkle in blobs_map.keys()
+    ]
 
     # Now that all the files have been found, get the elf info for each one
     # if it is an ELF file, ignoring those that aren't.

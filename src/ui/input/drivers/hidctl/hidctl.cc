@@ -47,9 +47,9 @@ void HidCtl::MakeHidDevice(MakeHidDeviceRequestView request,
   }
 
   // Create the fake HID device.
-  uint8_t* report_desc_data = new uint8_t[request->rpt_desc.count()];
-  memcpy(report_desc_data, request->rpt_desc.data(), request->rpt_desc.count());
-  fbl::Array<const uint8_t> report_desc(report_desc_data, request->rpt_desc.count());
+  uint8_t* report_desc_data = new uint8_t[request->rpt_desc.size()];
+  memcpy(report_desc_data, request->rpt_desc.data(), request->rpt_desc.size());
+  fbl::Array<const uint8_t> report_desc(report_desc_data, request->rpt_desc.size());
   auto hiddev = std::make_unique<hidctl::HidDevice>(zxdev(), request->config,
                                                     std::move(report_desc), std::move(local));
 

@@ -131,7 +131,6 @@ mod tests {
     use anyhow::{format_err, Context, Error};
     use fuchsia_component::client as fclient;
     use futures::TryStreamExt;
-    use std::sync::Arc;
     use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime};
 
     #[fasync::run_singlethreaded(test)]
@@ -150,10 +149,10 @@ mod tests {
         // Set up a new library loader and provide it to the loader service
         let (ll_client_chan, ll_service_chan) = zx::Channel::create();
         library_loader::start(
-            Arc::new(fuchsia_fs::directory::open_in_namespace(
+            fuchsia_fs::directory::open_in_namespace(
                 "/pkg/lib",
                 fio::PERM_READABLE | fio::PERM_EXECUTABLE,
-            )?),
+            )?,
             ll_service_chan,
         );
         let handle_infos = vec![fprocess::HandleInfo {

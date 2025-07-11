@@ -42,7 +42,7 @@ uint32_t PipelineConfig::OutputChannels(EffectsLoaderV2* effects_loader_v2) cons
       return default_output_channels;
     }
     auto& config = config_result->value()->processor_configuration;
-    if (!config.has_outputs() || config.outputs().count() != 1 ||
+    if (!config.has_outputs() || config.outputs().size() != 1 ||
         !config.outputs()[0].has_format()) {
       FX_LOGS(ERROR) << "V2 effect '" << name << "'"
                      << "must have exactly one output with a defined format";

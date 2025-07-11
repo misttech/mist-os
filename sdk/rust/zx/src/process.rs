@@ -639,7 +639,8 @@ mod tests {
 
     #[test]
     fn threads_contain_self() {
-        let current_thread_koid = fuchsia_runtime::thread_self().get_koid().unwrap();
+        let current_thread_koid =
+            fuchsia_runtime::with_thread_self(|thread| thread.get_koid().unwrap());
         let threads_koids = fuchsia_runtime::process_self().threads().unwrap();
         assert!(threads_koids.contains(&current_thread_koid));
         let thread_handle = fuchsia_runtime::process_self()

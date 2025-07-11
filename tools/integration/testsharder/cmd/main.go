@@ -444,6 +444,9 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 			return err
 		}
 		testsharder.GetBotDimensions(s, params)
+		if err := testsharder.GetBotanistConfig(s, flags.buildDir, m.Tools()); err != nil {
+			return err
+		}
 	}
 
 	if flags.depsFile != "" {

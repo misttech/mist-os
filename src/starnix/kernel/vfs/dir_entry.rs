@@ -171,6 +171,7 @@ impl DirEntry {
             let _l1 = result.children.read();
             let _l2 = result.state.read();
         }
+        result.node.fs().did_create_dir_entry(&result);
         result
     }
 
@@ -206,6 +207,18 @@ impl DirEntry {
             NamespaceNode::new_anonymous(self.clone()),
             flags,
         )
+    }
+
+    /// Set the children of this DirEntry to the given `children`. This should only ever be called
+    /// when children is empty.
+    pub fn set_children(self: &DirEntryHandle, children: BTreeMap<FsString, DirEntryHandle>) {
+        let mut dir_entry_children = self.lock_children();
+        assert!(dir_entry_children.children.is_empty());
+        for (name, child) in children.into_iter() {
+            let mut state = child.state.write();
+            state.parent = Some(self.clone());
+            dir_entry_children.children.insert(name, Arc::downgrade(&child));
+        }
     }
 
     fn lock_children<'a>(self: &'a DirEntryHandle) -> DirEntryLockedChildren<'a> {
@@ -1105,7 +1118,6 @@ impl<'a> DirEntryLockedChildren<'a> {
 
         security::fs_node_init_with_dentry(locked, current_task, &child)?;
 
-        child.node.fs().did_create_dir_entry(&child);
         Ok((child, create_result))
     }
 }

@@ -257,7 +257,7 @@ void IntelI2cController::GetAcpiConfiguration(const char* name, uint16_t* scl_hc
   }
 
   auto& obj = maybe_encoded->object();
-  if (obj.is_package_val() && obj.package_val().value.count() == 3) {
+  if (obj.is_package_val() && obj.package_val().value.size() == 3) {
     auto& package = obj.package_val().value;
     *scl_hcnt = package[0].integer_val();
     *scl_lcnt = package[1].integer_val();
@@ -278,7 +278,7 @@ void IntelI2cController::DdkInit(ddk::InitTxn txn) {
 
 void IntelI2cController::Transact(TransactRequestView request, fdf::Arena& arena,
                                   TransactCompleter::Sync& completer) {
-  if (request->op.count() == 0) {
+  if (request->op.size() == 0) {
     return completer.buffer(arena).ReplySuccess({});
   }
 
@@ -296,13 +296,13 @@ void IntelI2cController::Transact(TransactRequestView request, fdf::Arena& arena
   IntelI2cSubordinateSegment segs[MAX_RW_OPS];
   fuchsia_hardware_i2cimpl::wire::ReadData read_buffers[MAX_RW_OPS];
 
-  if (request->op.count() > std::size(segs)) {
+  if (request->op.size() > std::size(segs)) {
     zxlogf(ERROR, "Too many ops in request; only %zu are supported", std::size(segs));
     return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
   size_t read_count = 0;
-  for (size_t i = 0; i < request->op.count(); ++i) {
+  for (size_t i = 0; i < request->op.size(); ++i) {
     if (request->op[i].type.is_read_size()) {
       segs[i].type = IntelI2cSubordinateSegment::kRead;
       segs[i].buf = fidl::VectorView<uint8_t>(arena, request->op[i].type.read_size());
@@ -315,7 +315,7 @@ void IntelI2cController::Transact(TransactRequestView request, fdf::Arena& arena
     }
   }
 
-  zx_status_t status = subordinate->Transfer(segs, request->op.count());
+  zx_status_t status = subordinate->Transfer(segs, request->op.size());
   if (status != ZX_OK) {
     zxlogf(ERROR, "intel-i2c-controller: subordinate transfer failed with: %d\n", status);
     Reset();

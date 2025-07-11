@@ -159,7 +159,7 @@ cargo_build_script(
     version = "1.9.2",
     visibility = ["//visibility:private"],
     deps = [
-        "//third_party/rust_crates/vendor/autocfg-1.1.0:autocfg",
+        "//third_party/rust_crates/vendor/autocfg-1.5.0:autocfg",
     ],
 )
 

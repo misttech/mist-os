@@ -8,7 +8,6 @@
 // clang-format on
 
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
-#include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/cksum.h>
 #include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -59,56 +58,39 @@ constexpr size_t kAstroPageSize = 4 * kKilobyte;
 
 constexpr zx_vm_option_t kVmoRw = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
 
-zx::result<fidl::WireSyncClient<skipblock::SkipBlock>> FindSysconfigPartition(
+zx::result<fidl::ClientEnd<skipblock::SkipBlock>> FindSysconfigPartition(
     fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
   zx::result directory = component::OpenDirectoryAt(dev, "class/skip-block");
   if (directory.is_error()) {
     return directory.take_error();
   }
-  zx::result watch_result = device_watcher::WatchDirectoryForItems<
-      zx::result<fidl::WireSyncClient<skipblock::SkipBlock>>>(
-      *directory,
-      [&directory](std::string_view filename)
-          -> std::optional<zx::result<fidl::WireSyncClient<skipblock::SkipBlock>>> {
-        zx::result client = component::ConnectAt<skipblock::SkipBlock>(*directory, filename);
-        if (client.is_error()) {
-          return client.take_error();
-        }
-        fidl::WireSyncClient skip_block(std::move(client.value()));
-        const fidl::WireResult result = skip_block->GetPartitionInfo();
-        if (zx_status_t status = result.ok() ? result.value().status : result.status();
-            status != ZX_OK) {
-          return zx::error(status);
-        }
-        const auto& response = result.value();
-        const uint8_t type[] = GUID_SYS_CONFIG_VALUE;
-        if (memcmp(response.partition_info.partition_guid.data(), type,
-                   skipblock::wire::kGuidLen) != 0) {
-          return {};
-        }
-        return zx::ok(std::move(skip_block));
-      });
+  zx::result watch_result =
+      device_watcher::WatchDirectoryForItems<zx::result<fidl::ClientEnd<skipblock::SkipBlock>>>(
+          *directory,
+          [&directory](std::string_view filename)
+              -> std::optional<zx::result<fidl::ClientEnd<skipblock::SkipBlock>>> {
+            zx::result client = component::ConnectAt<skipblock::SkipBlock>(*directory, filename);
+            if (client.is_error()) {
+              return client.take_error();
+            }
+            fidl::WireSyncClient skip_block(std::move(client.value()));
+            const fidl::WireResult result = skip_block->GetPartitionInfo();
+            if (zx_status_t status = result.ok() ? result.value().status : result.status();
+                status != ZX_OK) {
+              return zx::error(status);
+            }
+            const auto& response = result.value();
+            const uint8_t type[] = GUID_SYS_CONFIG_VALUE;
+            if (memcmp(response.partition_info.partition_guid.data(), type,
+                       skipblock::wire::kGuidLen) != 0) {
+              return {};
+            }
+            return zx::ok(skip_block.TakeClientEnd());
+          });
   if (watch_result.is_error()) {
     return watch_result.take_error();
   }
   return std::move(watch_result.value());
-}
-
-zx_status_t CheckIfAstro(fidl::UnownedClientEnd<fuchsia_io::Directory> svc) {
-  zx::result sysinfo = component::ConnectAt<fuchsia_sysinfo::SysInfo>(svc);
-  if (sysinfo.is_error()) {
-    return sysinfo.error_value();
-  }
-  const fidl::WireResult result = fidl::WireCall(sysinfo.value())->GetBoardName();
-  zx_status_t status = result.ok() ? result.value().status : result.status();
-  if (status != ZX_OK) {
-    return status;
-  }
-  if (result.value().name.get() == "astro") {
-    return ZX_OK;
-  }
-
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 sysconfig_subpartition GetSubpartitionInfo(const sysconfig_header& header,
@@ -269,32 +251,16 @@ void UpdateSysconfigLayout(void* start, size_t len, const sysconfig_header& curr
 
 }  // namespace
 
-zx::result<SyncClient> SyncClient::Create() {
-  zx::result dev = component::OpenServiceRoot("/dev");
-  if (dev.is_error()) {
-    return dev.take_error();
-  }
-  zx::result svc = component::OpenServiceRoot("/svc");
-  if (svc.is_error()) {
-    return dev.take_error();
-  }
-  return Create(dev.value(), svc.value());
-}
-
-zx::result<SyncClient> SyncClient::Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev,
-                                          fidl::UnownedClientEnd<fuchsia_io::Directory> svc) {
-  // TODO(surajmalhotra): This is just a temporary measure to allow us to hardcode constants into
-  // this library safely. For future products, the library should be updated to use some sort of
-  // configuration file to determine partition layout.
-  if (zx_status_t status = CheckIfAstro(svc); status != ZX_OK) {
-    return zx::error(status);
-  }
-
+zx::result<SyncClient> SyncClient::Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
   zx::result skip_block = FindSysconfigPartition(dev);
   if (skip_block.is_error()) {
     return skip_block.take_error();
   }
-  return zx::ok(SyncClient(std::move(skip_block.value())));
+  return zx::ok(SyncClient(fidl::WireSyncClient(std::move(skip_block.value()))));
+}
+
+SyncClient SyncClient::Create(fidl::ClientEnd<skipblock::SkipBlock> skip_block) {
+  return SyncClient(fidl::WireSyncClient(std::move(skip_block)));
 }
 
 zx::result<std::reference_wrapper<const sysconfig_header>> SyncClient::GetHeader() {

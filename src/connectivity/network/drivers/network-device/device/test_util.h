@@ -113,9 +113,9 @@ class RxFidlReturn : public fbl::DoublyLinkedListable<std::unique_ptr<RxFidlRetu
   // requiring the unique pointer to be passed enforces the buffer ownership semantics. Also
   // RxBuffers usually sit in the available queue as a pointer already.
   void PushPart(std::unique_ptr<RxBuffer> buffer) {
-    ZX_ASSERT(buffer_.data.count() < parts_.size());
-    parts_[buffer_.data.count()] = buffer->return_part();
-    buffer_.data.set_count(buffer_.data.count() + 1);
+    ZX_ASSERT(buffer_.data.size() < parts_.size());
+    parts_[buffer_.data.size()] = buffer->return_part();
+    buffer_.data.set_size(buffer_.data.size() + 1);
   }
 
   const fuchsia_hardware_network_driver::wire::RxBuffer& buffer() const { return buffer_; }

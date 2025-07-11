@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include <memory>
+#include <vector>
 
 #include "msd_intel_register_io.h"
 #include "types.h"

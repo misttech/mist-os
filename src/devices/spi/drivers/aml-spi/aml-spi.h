@@ -80,7 +80,7 @@ class SpiRequest {
   uint32_t cs() const { return cs_; }
   fidl::VectorView<const uint8_t> txdata() const { return txdata_; }
   fidl::VectorView<uint8_t> rxdata() const { return rxdata_; }
-  size_t size() const { return std::max(txdata_.count(), rxdata_.count()); }
+  size_t size() const { return std::max(txdata_.size(), rxdata_.size()); }
 
   // Transfers ownership of registered VMOs to this request. They will automatically be released
   // when the request completes.

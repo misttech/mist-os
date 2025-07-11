@@ -3185,7 +3185,7 @@ mod tests {
             let _ = phy_manager.phys.insert(phy_id, PhyContainer::new(fake_mac_roles.clone()));
 
             // Give the 0th and 2nd PHYs have client interfaces.
-            if phy_id % 2 == 0 {
+            if phy_id.is_multiple_of(2) {
                 let phy_container = phy_manager.phys.get_mut(&phy_id).expect("missing PHY");
                 let _ = phy_container.client_ifaces.insert(phy_id);
             }

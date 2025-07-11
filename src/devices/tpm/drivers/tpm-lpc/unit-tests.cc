@@ -25,7 +25,7 @@
 
 class FakeMmio {
  public:
-  FakeMmio() : mmio_(sizeof(uint32_t), kRegArrayLength)  {}
+  FakeMmio() : mmio_(sizeof(uint32_t), kRegArrayLength) {}
 
   fdf::MmioBuffer MmioBuffer() { return fdf::MmioBuffer(mmio_.GetMmioBuffer()); }
 
@@ -80,7 +80,7 @@ TEST_F(TpmLpcTest, TestTpmRead) {
   ASSERT_TRUE(read.ok());
   ASSERT_TRUE(read->is_ok());
   auto& view = read->value()->data;
-  ASSERT_EQ(view.count(), expected.size());
+  ASSERT_EQ(view.size(), expected.size());
   ASSERT_BYTES_EQ(view.data(), expected.data(), expected.size());
 }
 

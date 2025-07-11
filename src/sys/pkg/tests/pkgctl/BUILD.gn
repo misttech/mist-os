@@ -62,7 +62,7 @@ fuchsia_test_package("pkgctl-integration-tests") {
   ]
 }
 
-group("tests") {
+group("non_hermetic_tests") {
   testonly = true
   public_deps = [ ":pkgctl-integration-tests" ]
 }

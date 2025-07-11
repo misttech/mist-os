@@ -117,6 +117,49 @@ TEST(InheritTest, FdUseDeniedFdRemappedToNull) {
   }));
 }
 
+// Under the parent domain, open a test file twice such that the child domain does not have the
+// `fd { use }` permission on the file descriptor, so that the two open file descriptors should
+// be remapped to the selinuxfs null node during exec. Then exec into the child domain via an
+// intermediate domain. The child program checks that the two file descriptors are duplicates:
+// they have independent file descriptor flag state, but refer to the same file description.
+TEST(InheritTest, NullFileDescriptorIsDuplicated) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kBridgeSecurityContext[] = "test_u:test_r:test_inherit_bridge_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_use_fd_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    auto tmp_file_path = CreateTmpFile();
+    ASSERT_TRUE(tmp_file_path.is_ok());
+
+    int no_use_fd_1 = open(tmp_file_path.value().data(), O_RDONLY);
+    ASSERT_TRUE(no_use_fd_1 >= 0);
+    std::string no_use_fd_1_str = std::to_string(no_use_fd_1);
+
+    int no_use_fd_2 = open(tmp_file_path.value().data(), O_RDONLY);
+    ASSERT_TRUE(no_use_fd_2 >= 0);
+    std::string no_use_fd_2_str = std::to_string(no_use_fd_2);
+
+    ASSERT_TRUE(RunSubprocessAs(kBridgeSecurityContext, [&] {
+      // Exec the `is_duplicated_fd` binary and expect that `no_use_fd_1` and
+      // `no_use_fd_2` are remapped to the same file description (for the null node).
+      std::string path_for_exec = "data/bin/is_duplicated_fd_bin";
+      std::string expect_null_inode = std::to_string(int(true));
+      char* args[] = {basename(path_for_exec.data()), no_use_fd_1_str.data(),
+                      no_use_fd_2_str.data(), NULL};
+
+      auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+      ASSERT_TRUE(set_exec_context.is_ok());
+
+      if (execv(path_for_exec.data(), args) < 0) {
+        perror("exec into child domain failed");
+        FAIL();
+      }
+    }));
+  }));
+}
+
 // Under the parent domain, open a test file such that the child domain does has the `fd { use }`
 // permission on the file descriptor, but does not have the `read` permission on the file. Then exec
 // into the child domain. The child program checks that the test file descriptor was remapped to the

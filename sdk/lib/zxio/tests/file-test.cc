@@ -293,13 +293,13 @@ class TestServerChannel final : public CloseCountingFileServer {
       return;
     }
 
-    if (request->data.count() > fio::wire::kMaxBuf) {
+    if (request->data.size() > fio::wire::kMaxBuf) {
       completer.Close(ZX_ERR_OUT_OF_RANGE);
       return;
     }
     zx_iovec_t vec = {
         .buffer = request->data.data(),
-        .capacity = request->data.count(),
+        .capacity = request->data.size(),
     };
     size_t actual = 0u;
     status = stream_.writev(0, &vec, 1, &actual);
@@ -317,13 +317,13 @@ class TestServerChannel final : public CloseCountingFileServer {
       return;
     }
 
-    if (request->data.count() > fio::wire::kMaxBuf) {
+    if (request->data.size() > fio::wire::kMaxBuf) {
       completer.Close(ZX_ERR_OUT_OF_RANGE);
       return;
     }
     zx_iovec_t vec = {
         .buffer = request->data.data(),
-        .capacity = request->data.count(),
+        .capacity = request->data.size(),
     };
     size_t actual = 0u;
     status = stream_.writev_at(0, request->offset, &vec, 1, &actual);

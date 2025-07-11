@@ -250,7 +250,7 @@ zx::result<size_t> DeviceAdapter::WriteRxFrame(
     PortAdapter& port, fuchsia_hardware_network::wire::FrameType frame_type,
     const fidl::VectorView<uint8_t>& data,
     const std::optional<fuchsia_net_tun::wire::FrameMetadata>& meta) {
-  return WriteRxFrame(port, frame_type, data.data(), data.count(), meta);
+  return WriteRxFrame(port, frame_type, data.data(), data.size(), meta);
 }
 
 zx::result<size_t> DeviceAdapter::WriteRxFrame(

@@ -615,10 +615,7 @@ impl LoopDeviceRegistry {
     }
 
     fn get(&self, minor: u32) -> Result<Arc<LoopDevice>, Errno> {
-        match self.devices.lock().entry(minor) {
-            Entry::Occupied(e) => Ok(e.get().clone()),
-            Entry::Vacant(_) => return error!(ENODEV),
-        }
+        self.devices.lock().get(&minor).ok_or_else(|| errno!(ENODEV)).cloned()
     }
 
     fn get_or_create<L>(

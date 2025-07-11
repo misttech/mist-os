@@ -173,7 +173,7 @@ impl WireEnvelope {
     ) -> Result<Option<usize>, DecodeError> {
         if **flags & Self::IS_INLINE_BIT == 0 {
             let num_bytes = **maybe_num_bytes;
-            if num_bytes as usize % CHUNK_SIZE != 0 {
+            if !(num_bytes as usize).is_multiple_of(CHUNK_SIZE) {
                 return Err(DecodeError::InvalidEnvelopeSize(num_bytes));
             }
             if num_bytes <= INLINE_SIZE as u32 {

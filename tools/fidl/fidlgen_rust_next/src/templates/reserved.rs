@@ -5,8 +5,6 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-use crate::ir::Id;
-
 pub fn escape(mut name: String) -> String {
     if is_reserved(&name) {
         name.push('_');
@@ -14,19 +12,8 @@ pub fn escape(mut name: String) -> String {
     name
 }
 
-pub fn escape_compat(mut name: String, id: &Id) -> String {
-    if is_compat_reserved(id.non_canonical()) {
-        name.push('_');
-    }
-    name
-}
-
-fn is_reserved(name: &str) -> bool {
+pub fn is_reserved(name: &str) -> bool {
     KEYWORDS.contains(name)
-}
-
-fn is_compat_reserved(name: &str) -> bool {
-    is_reserved(name) || COMPAT_RESERVED_SUFFIX_LIST.iter().any(|suffix| name.ends_with(suffix))
 }
 
 static KEYWORDS: LazyLock<HashSet<String>> =
@@ -86,6 +73,3 @@ const KEYWORDS_LIST: &[&str] = &[
     "while",
     "yield",
 ];
-
-const COMPAT_RESERVED_SUFFIX_LIST: &[&str] =
-    &["Impl", "Marker", "Proxy", "ProxyProtocol", "ControlHandle", "Responder", "Server"];

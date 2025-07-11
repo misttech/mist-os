@@ -53,7 +53,7 @@ fuchsia_test_package("update-integration-tests") {
   deps = [ ":update-binary" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":update-integration-tests" ]
 }

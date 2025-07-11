@@ -332,7 +332,7 @@ void ConsoleDevice::Read(ReadRequestView request, ReadCompleter::Sync& completer
 void ConsoleDevice::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   zxlogf(TRACE, "entry");
 
-  uint64_t count = request->data.count();
+  uint64_t count = request->data.size();
   if (count > UINT32_MAX)
     count = UINT32_MAX;
 

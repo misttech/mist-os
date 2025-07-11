@@ -33,7 +33,7 @@ where
         let stream_len = source.get_size().await.map_err(Error::GetSize)?;
 
         // Read directory entries
-        if dir_index.length.get() % DIRECTORY_ENTRY_LEN != 0 {
+        if !dir_index.length.get().is_multiple_of(DIRECTORY_ENTRY_LEN) {
             return Err(Error::InvalidDirectoryChunkLen(dir_index.length.get()));
         }
         let mut directory_entries =
@@ -50,7 +50,9 @@ where
         let directory_entries = directory_entries.into_boxed_slice();
 
         // Read path data
-        if dir_name_index.length.get() % 8 != 0 || dir_name_index.length.get() > stream_len {
+        if !dir_name_index.length.get().is_multiple_of(8)
+            || dir_name_index.length.get() > stream_len
+        {
             return Err(Error::InvalidDirectoryNamesChunkLen(dir_name_index.length.get()));
         }
         let path_data_length = dir_name_index
@@ -80,7 +82,7 @@ where
         source.read_at_exact(0, index.as_mut_bytes()).await.map_err(Error::Read)?;
         if index.magic != MAGIC_INDEX_VALUE {
             Err(Error::InvalidMagic(index.magic))
-        } else if index.length.get() % INDEX_ENTRY_LEN != 0
+        } else if !index.length.get().is_multiple_of(INDEX_ENTRY_LEN)
             || INDEX_LEN.checked_add(index.length.get()).is_none()
         {
             Err(Error::InvalidIndexEntriesLen(index.length.get()))

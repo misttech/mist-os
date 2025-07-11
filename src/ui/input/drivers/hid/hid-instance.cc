@@ -196,9 +196,9 @@ void HidInstance::GetReport(GetReportRequestView request, GetReportCompleter::Sy
 
 void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) {
   size_t needed = base_->GetReportSizeById(request->id, request->type);
-  if (needed != request->report.count()) {
+  if (needed != request->report.size()) {
     FDF_LOG(ERROR, "Tried to set Report %d (size 0x%lx) with 0x%lx bytes\n", request->id, needed,
-            request->report.count());
+            request->report.size());
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }

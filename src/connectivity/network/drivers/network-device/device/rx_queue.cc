@@ -215,13 +215,13 @@ void RxQueue::CompleteRxList(
     const fidl::VectorView<::fuchsia_hardware_network_driver::wire::RxBuffer>& rx_buffer_list) {
   fbl::AutoLock lock(&parent_->rx_lock());
   SharedAutoLock control_lock(&parent_->control_lock());
-  device_buffer_count_ -= rx_buffer_list.count();
+  device_buffer_count_ -= rx_buffer_list.size();
   for (const auto& rx_buffer : rx_buffer_list.get()) {
     // Always increment frame index for anything the device sends us. Sessions
     // get their local indices for frames that make their way through.
     rx_completed_frame_index_++;
-    ZX_ASSERT_MSG(rx_buffer.data.count() <= MAX_BUFFER_PARTS,
-                  "too many buffer parts in rx buffer: %ld", rx_buffer.data.count());
+    ZX_ASSERT_MSG(rx_buffer.data.size() <= MAX_BUFFER_PARTS,
+                  "too many buffer parts in rx buffer: %ld", rx_buffer.data.size());
     std::array<SessionRxBuffer, MAX_BUFFER_PARTS> session_parts;
     auto session_parts_iter = session_parts.begin();
     bool drop_frame = false;
@@ -249,7 +249,7 @@ void RxQueue::CompleteRxList(
         LOGF_WARN(
             "dropping chained frame with %ld buffers spanning different sessions: "
             "%s, %s",
-            rx_buffer.data.count(), primary_session->name(), in_flight_buffer.session->name());
+            rx_buffer.data.size(), primary_session->name(), in_flight_buffer.session->name());
         drop_frame = true;
       }
       ZX_DEBUG_ASSERT(in_flight_buffer.session != nullptr);

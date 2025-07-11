@@ -412,7 +412,7 @@ TEST_F(NetDeviceTest, TestEcho) {
           }
           EXPECT_EQ(result->value()->frame.frame_type(), netdev::wire::FrameType::kEthernet);
           EXPECT_FALSE(result->value()->frame.has_meta());
-          if (size_t count = result->value()->frame.data().count(); count != sizeof(uint32_t)) {
+          if (size_t count = result->value()->frame.data().size(); count != sizeof(uint32_t)) {
             ADD_FAILURE() << "Unexpected data size " << count;
           } else {
             uint32_t payload;

@@ -31,7 +31,7 @@ fuchsia_unittest_package("mock-boot-arguments-tests") {
   deps = [ ":lib_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":mock-boot-arguments-tests" ]
 }

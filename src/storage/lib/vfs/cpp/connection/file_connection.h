@@ -9,15 +9,26 @@
 #error "Fuchsia-only header"
 #endif
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
+#include <lib/fit/function.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
+#include <lib/zx/stream.h>
+#include <lib/zx/vmo.h>
 #include <zircon/availability.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <cstdint>
+#include <optional>
 
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs::internal {

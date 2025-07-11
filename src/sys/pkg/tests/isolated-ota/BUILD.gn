@@ -72,7 +72,7 @@ fuchsia_test_package("isolated-ota-integration-tests") {
   }
 }
 
-group("tests") {
+group("non_hermetic_tests") {
   testonly = true
   public_deps = [
     ":isolated-ota-integration-tests",

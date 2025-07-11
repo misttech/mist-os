@@ -892,7 +892,7 @@ TestFidlClient::SysmemTokenDuplicateSync(
   fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncResponse& fidl_result =
       fidl_status.value();
   ZX_ASSERT(fidl_result.has_tokens());
-  ZX_ASSERT(fidl_result.tokens().count() == 1);
+  ZX_ASSERT(fidl_result.tokens().size() == 1);
 
   return zx::ok(std::move(fidl_result.tokens()[0]));
 }
@@ -943,7 +943,7 @@ zx::result<size_t> TestFidlClient::SysmemWaitForAllBuffersAllocated(
                       "Sysmem deviated from its contract");
   ZX_DEBUG_ASSERT_MSG(fidl_result->buffer_collection_info().has_buffers(),
                       "Sysmem deviated from its contract");
-  return zx::ok(fidl_result->buffer_collection_info().buffers().count());
+  return zx::ok(fidl_result->buffer_collection_info().buffers().size());
 }
 
 zx::result<> TestFidlClient::SetSysmemConstraintsForImage(
@@ -2644,6 +2644,59 @@ TEST_F(IntegrationTest, CheckConfigLargeLayer) {
   zx::result<display::ConfigCheckResult> check_config_result = primary_client->CheckConfig();
   ASSERT_OK(check_config_result);
   EXPECT_EQ(display::ConfigCheckResult::kInvalidConfig, check_config_result.value());
+}
+
+TEST_F(IntegrationTest, CheckConfigRepeatedLayer) {
+  // Create and bind primary client.
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  zx::result<display::LayerId> create_layer_result = primary_client->CreateLayer();
+  ASSERT_OK(create_layer_result);
+  display::LayerId layer_id = create_layer_result.value();
+  ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(),
+                                             {{.layer_id = layer_id}, {.layer_id = layer_id}}));
+
+  // TODO(https://fxbug.dev/42068661): This test would be easier to understand
+  // if the fake display resolution was hardcoded into the test.
+  const display::ImageMetadata image_metadata = primary_client->state().FullscreenImageMetadata();
+  ASSERT_OK(primary_client->SetLayerPrimaryConfig(layer_id, image_metadata));
+
+  zx::result<display::ConfigCheckResult> check_config_result = primary_client->CheckConfig();
+  EXPECT_STATUS(zx::error(ZX_ERR_PEER_CLOSED), check_config_result);
+}
+
+TEST_F(IntegrationTest, CheckConfigTooManyLayers) {
+  // Create and bind primary client.
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateLayer();
+  ASSERT_OK(create_layer1_result);
+  display::LayerId layer1_id = create_layer1_result.value();
+
+  zx::result<display::LayerId> create_layer2_result = primary_client->CreateLayer();
+  ASSERT_OK(create_layer2_result);
+  display::LayerId layer2_id = create_layer2_result.value();
+
+  ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(),
+                                             {{.layer_id = layer1_id}, {.layer_id = layer2_id}}));
+
+  // TODO(https://fxbug.dev/42068661): This test would be easier to understand
+  // if the fake display resolution was hardcoded into the test.
+  const display::ImageMetadata image_metadata = primary_client->state().FullscreenImageMetadata();
+  ASSERT_OK(primary_client->SetLayerPrimaryConfig(layer1_id, image_metadata));
+  ASSERT_OK(primary_client->SetLayerPrimaryConfig(layer2_id, image_metadata));
+
+  zx::result<display::ConfigCheckResult> check_config_result = primary_client->CheckConfig();
+  ASSERT_OK(check_config_result);
+
+  // The fake-display driver is configured to advertise support for one layer.
+  // TODO(https://fxbug.dev/430139349): The fake-display single-layer
+  // configuration should be expressed in this test.
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, check_config_result.value());
 }
 
 }  // namespace display_coordinator

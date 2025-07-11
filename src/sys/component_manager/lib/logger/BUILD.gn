@@ -21,6 +21,7 @@ rustc_library("logger") {
     "//sdk/rust/zx",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
   ]

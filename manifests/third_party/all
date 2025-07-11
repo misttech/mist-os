@@ -301,7 +301,7 @@
     <project name="llvm-project/libc"
              path="third_party/llvm-libc/src"
              remote="https://llvm.googlesource.com/llvm-project/libc"
-             revision="d10186da1dc54d64052b672b1870972e8df4ea97"/>
+             revision="4d813268ccd5982a0cc180bba15ea68a9cbce595"/>
     <project name="third_party/luci-go"
              path="third_party/luci-go"
              revision="fd977bf9e01d199a529f28af6dc10fe0fa35d9e7"
@@ -341,7 +341,7 @@
              path="third_party/mobly/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/mobly"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="da7d0e60dd28ede70f80b18c20d9658ebf8a0f76"/>
+             revision="4c1002ad86307d5511ce9bef30b703bbf7a26816"/>
     <project name="third_party/github.com/google/snippet-uiautomator"
              path="third_party/snippet-uiautomator/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/snippet-uiautomator"
@@ -414,14 +414,14 @@
              revision="de6301a419ef87cf30964f4b72c73d6d5b37a740"/>
     <project name="third_party/perfetto"
              path="third_party/perfetto"
-             remote="https://github.com/google/perfetto"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/google/perfetto"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="6564d7f2a04aafc4084ec9e583a1757df8e5781b" />
+             revision="40b529923598b739b2892a536a7692eedbed5685" />
     <project name="third_party/pigweed"
              path="third_party/pigweed/src"
              remote="https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="b09f9a1fedf049162a35012104bff953cec2cbf5"/>
+             revision="7ab9a27beaed20f078016276d4a6f043bb77d976"/>
     <project name="third_party/github.com/google/python_portpicker"
              path="third_party/python_portpicker/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/python_portpicker"
@@ -476,7 +476,7 @@
     <project name="scudo"
              path="third_party/scudo/src"
              remote="https://llvm.googlesource.com/scudo"
-             revision="dbc816cc772a5cfe0acfd7789c1e054d14716f00"/>
+             revision="8695ad12b793f9a832bef986ac77670a4612e64c"/>
     <project name="gwp-asan"
              path="third_party/scudo/gwp_asan"
              remote="https://llvm.googlesource.com/gwp-asan"
@@ -533,7 +533,7 @@
              path="third_party/openthread"
              remote="https://fuchsia.googlesource.com/third_party/openthread"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="758b260f06fe2e48842db3fe832b9c181b1590b4"/>
+             revision="c050c7a7c0e68dcd338bdaea70f04827405e18ae"/>
     <project name="third_party/openweave-core"
              path="third_party/openweave-core"
              remote="https://fuchsia.googlesource.com/third_party/openweave-core"
@@ -553,7 +553,7 @@
              path="third_party/vulkan-cts"
              remote="https://fuchsia.googlesource.com/third_party/vulkan-cts"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="aca76e750e0b1eb3879b920a72a70f65bfb4c22c"
+             revision="fea31b95b5574e151a8aecb04674b577754209e0"
              attributes="vulkan-cts"/>
     <project name="third_party/Vulkan-Headers"
              path="third_party/Vulkan-Headers/src"
@@ -563,7 +563,7 @@
     <project name="third_party/Vulkan-Loader"
              path="third_party/Vulkan-Loader/src"
              remote="https://fuchsia.googlesource.com/third_party/Vulkan-Loader"
-             revision="804d061b2e17c0a98c35b0e3aa64d4997d2d42b7"
+             revision="56faf5ba00f0d15b3987324a1a049f1d42179ad4"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="third_party/Vulkan-ValidationLayers"
              path="third_party/Vulkan-ValidationLayers/src"

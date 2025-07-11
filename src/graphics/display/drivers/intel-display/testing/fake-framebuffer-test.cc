@@ -61,7 +61,7 @@ TEST(FakeFramebuffer, Ok) {
         ASSERT_STATUS(result.status(), ZX_OK);
         ASSERT_TRUE(result->is_ok());
         auto& items = result->value()->retrieved_items;
-        ASSERT_GE(items.count(), 1ul);
+        ASSERT_GE(items.size(), 1ul);
         zbi_swfb_t fb;
         ASSERT_GE(items[0].length, sizeof(fb));
         ASSERT_OK(items[0].payload.read(&fb, 0, sizeof(fb)));

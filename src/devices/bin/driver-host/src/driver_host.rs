@@ -364,8 +364,10 @@ fn get_process_info(
         fuchsia_runtime::job_default().get_koid().map_err(zx::Status::into_raw)?.raw_koid();
     let process_koid =
         fuchsia_runtime::process_self().get_koid().map_err(Status::into_raw)?.raw_koid();
-    let main_thread_koid =
-        fuchsia_runtime::thread_self().get_koid().map_err(zx::Status::into_raw)?.raw_koid();
+    let main_thread_koid = fuchsia_runtime::with_thread_self(|thread| {
+        thread.get_koid().map_err(zx::Status::into_raw)
+    })?
+    .raw_koid();
     static THREAD_INFO: [fdh::ThreadInfo; 0] = [];
     static DISPATCHER_INFO: [fdh::DispatcherInfo; 0] = [];
     Ok((job_koid, process_koid, main_thread_koid, &THREAD_INFO, &DISPATCHER_INFO))

@@ -296,12 +296,19 @@ pub fn take_startup_handle(info: HandleInfo) -> Option<Handle> {
     }
 }
 
-/// Get a reference to the handle of the current thread.
-pub fn thread_self() -> Unowned<'static, Thread> {
-    unsafe {
-        let handle = zx_thread_self();
-        Unowned::from_raw_handle(handle)
-    }
+/// Provides temporary scoped access to the current thread's handle.
+///
+/// Callers who need to store a thread handle or to send it to another thread should duplicate the
+/// handle to ensure it can outlive the current thread.
+pub fn with_thread_self<F, R>(f: F) -> R
+where
+    F: for<'a> FnOnce(&Thread) -> R,
+{
+    // SAFETY: The handle returned by zx_thread_self() is guaranteed to be valid for the duration of
+    // the calling thread's execution and by creating this on our stack we prevent it from outliving
+    // this thread.
+    let thread = unsafe { Unowned::from_raw_handle(zx_thread_self()) };
+    f(&thread)
 }
 
 /// Get a reference to the handle of the current process.

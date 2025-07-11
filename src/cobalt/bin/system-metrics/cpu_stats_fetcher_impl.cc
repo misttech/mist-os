@@ -47,9 +47,9 @@ bool CpuStatsFetcherImpl::FetchCpuStats() {
     return false;
   }
   cpu_stats_ = &result->stats;
-  if (cpu_stats_->actual_num_cpus < cpu_stats_->per_cpu_stats.count()) {
+  if (cpu_stats_->actual_num_cpus < cpu_stats_->per_cpu_stats.size()) {
     FX_LOGS(WARNING) << "CpuStatsFetcherImpl:  actual CPUs reported " << cpu_stats_->actual_num_cpus
-                     << " is less than available CPUs " << cpu_stats_->per_cpu_stats.count();
+                     << " is less than available CPUs " << cpu_stats_->per_cpu_stats.size();
     return false;
   }
   if (num_cpu_cores_ == 0) {

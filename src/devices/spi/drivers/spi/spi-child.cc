@@ -62,9 +62,9 @@ void SpiChild::ReceiveVector(ReceiveVectorRequestView request,
               FDF_LOG(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s",
                       zx_status_get_string(status));
               request_data.completer.Reply(status, {});
-            } else if (result->value()->data.count() != request_data.size) {
+            } else if (result->value()->data.size() != request_data.size) {
               FDF_LOG(ERROR, "Expected %u bytes != received %zu bytes", request_data.size,
-                      result->value()->data.count());
+                      result->value()->data.size());
               request_data.completer.Reply(ZX_ERR_INTERNAL, {});
             } else {
               request_data.completer.Reply(ZX_OK, result->value()->data);
@@ -77,7 +77,7 @@ void SpiChild::ExchangeVector(ExchangeVectorRequestView request,
   struct {
     size_t txdata_count;
     ExchangeVectorCompleter::Async completer;
-  } request_data{request->txdata.count(), completer.ToAsync()};
+  } request_data{request->txdata.size(), completer.ToAsync()};
 
   fdf::Arena arena('SPI_');
   spi_.buffer(arena)
@@ -90,9 +90,9 @@ void SpiChild::ExchangeVector(ExchangeVectorRequestView request,
               FDF_LOG(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s",
                       zx_status_get_string(status));
               request_data.completer.Reply(status, {});
-            } else if (result->value()->rxdata.count() != request_data.txdata_count) {
+            } else if (result->value()->rxdata.size() != request_data.txdata_count) {
               FDF_LOG(ERROR, "Expected %zu bytes != received %zu bytes", request_data.txdata_count,
-                      result->value()->rxdata.count());
+                      result->value()->rxdata.size());
               request_data.completer.Reply(ZX_ERR_INTERNAL, {});
             } else {
               request_data.completer.Reply(ZX_OK, result->value()->rxdata);

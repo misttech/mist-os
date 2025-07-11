@@ -126,13 +126,13 @@ class ClosedTargetServer : public TargetServer<fidl_serversuite::ClosedTarget> {
   void ByteVectorSize(ByteVectorSizeRequestView request,
                       ByteVectorSizeCompleter::Sync& completer) override {
     FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: ByteVectorSize";
-    completer.Reply(static_cast<uint32_t>(request->vec.count()));
+    completer.Reply(static_cast<uint32_t>(request->vec.size()));
   }
 
   void HandleVectorSize(HandleVectorSizeRequestView request,
                         HandleVectorSizeCompleter::Sync& completer) override {
     FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: HandleVectorSize";
-    completer.Reply(static_cast<uint32_t>(request->vec.count()));
+    completer.Reply(static_cast<uint32_t>(request->vec.size()));
   }
 
   void CreateNByteVector(CreateNByteVectorRequestView request,

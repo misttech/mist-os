@@ -9,4 +9,4 @@ pub static PLACEHOLDER_TEXT: LazyLock<String> = LazyLock::new(|| "x".repeat(3200
 pub static PROCESS_ID: LazyLock<zx::Koid> =
     LazyLock::new(|| fuchsia_runtime::process_self().get_koid().unwrap());
 pub static THREAD_ID: LazyLock<zx::Koid> =
-    LazyLock::new(|| fuchsia_runtime::thread_self().get_koid().unwrap());
+    LazyLock::new(|| fuchsia_runtime::with_thread_self(|thread| thread.get_koid().unwrap()));

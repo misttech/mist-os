@@ -45,7 +45,6 @@ bitflags! {
         const OBJECT_20     = ZX_OBJECT_SIGNAL_20;
         const OBJECT_21     = ZX_OBJECT_SIGNAL_21;
         const OBJECT_22     = ZX_OBJECT_SIGNAL_22;
-        const OBJECT_HANDLE_CLOSED = ZX_OBJECT_HANDLE_CLOSED;
         const USER_0        = ZX_USER_SIGNAL_0;
         const USER_1        = ZX_USER_SIGNAL_1;
         const USER_2        = ZX_USER_SIGNAL_2;

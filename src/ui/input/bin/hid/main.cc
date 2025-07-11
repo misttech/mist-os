@@ -76,10 +76,10 @@ struct input_args_t {
 };
 
 static std::mutex print_lock;
-#define lprintf(fmt...)            \
-  do {                             \
+#define lprintf(fmt...)               \
+  do {                                \
     std::lock_guard lock(print_lock); \
-    printf(fmt);                   \
+    printf(fmt);                      \
   } while (0)
 
 static void print_hex(const uint8_t* buf, size_t len) {
@@ -153,13 +153,13 @@ static zx_status_t print_report_desc(input_args_t* args) {
     return result.status();
   }
 
-  lprintf("hid: %s report descriptor len=%zu\n", args->devpath, result.value().desc.count());
+  lprintf("hid: %s report descriptor len=%zu\n", args->devpath, result.value().desc.size());
 
   std::lock_guard lock(print_lock);
   printf("hid: %s report descriptor:\n", args->devpath);
-  print_hex(result.value().desc.data(), result.value().desc.count());
+  print_hex(result.value().desc.data(), result.value().desc.size());
   if (verbose) {
-    print_report_descriptor(result.value().desc.data(), result.value().desc.count());
+    print_report_descriptor(result.value().desc.data(), result.value().desc.size());
   }
   return ZX_OK;
 }
@@ -181,7 +181,7 @@ static zx_status_t print_hid_status(input_args_t* args) {
       return result.status();
     }
     auto parse_result = hid::ParseReportDescriptor(result.value().desc.data(),
-                                                   result.value().desc.count(), &dev_desc);
+                                                   result.value().desc.size(), &dev_desc);
     if (parse_result != hid::ParseResult::kParseOk) {
       return ZX_ERR_INTERNAL;
     }
@@ -232,12 +232,12 @@ static zx_status_t hid_input_read_report(input_args_t* args, const zx::event& re
     if (!result.value()->has_buf()) {
       return ZX_ERR_INTERNAL;
     }
-    if (result.value()->buf().count() > report_size) {
+    if (result.value()->buf().size() > report_size) {
       return ZX_ERR_BUFFER_TOO_SMALL;
     }
 
-    *returned_size = result.value()->buf().count();
-    memcpy(report_data, result.value()->buf().data(), result.value()->buf().count());
+    *returned_size = result.value()->buf().size();
+    memcpy(report_data, result.value()->buf().data(), result.value()->buf().size());
 
     return ZX_OK;
   }
@@ -357,8 +357,8 @@ int get_report(input_args_t* args) {
     return -1;
   }
 
-  printf("hid: got %zu bytes\n", result.value()->report.count());
-  print_hex(result.value()->report.data(), result.value()->report.count());
+  printf("hid: got %zu bytes\n", result.value()->report.size());
+  print_hex(result.value()->report.data(), result.value()->report.size());
   return 0;
 }
 

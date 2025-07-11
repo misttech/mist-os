@@ -11,7 +11,7 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use zx::MonotonicDuration;
 
-const CPU_DRIVER_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(5);
+const CPU_DRIVER_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(30);
 
 pub async fn get_cpu_ctrl_proxy(
     node_info: &str,

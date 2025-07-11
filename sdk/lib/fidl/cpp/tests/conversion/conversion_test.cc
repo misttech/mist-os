@@ -178,18 +178,18 @@ TEST(WireToNaturalConversion, Vector) {
 TEST(NaturalToWireConversion, Vector) {
   fidl::Arena arena;
   fidl::VectorView<uint32_t> vec = fidl::ToWire(arena, std::vector<uint32_t>{1, 2, 3});
-  EXPECT_EQ(3u, vec.count());
+  EXPECT_EQ(3u, vec.size());
   EXPECT_EQ(1u, vec[0]);
   EXPECT_EQ(2u, vec[1]);
   EXPECT_EQ(3u, vec[2]);
   EXPECT_TRUE(fidl_testing::ArenaChecker::IsPointerInArena(vec.data(), arena));
 
   fidl::VectorView<uint32_t> empty_vec = fidl::ToWire(arena, std::vector<uint32_t>({}));
-  EXPECT_EQ(0u, empty_vec.count());
+  EXPECT_EQ(0u, empty_vec.size());
   EXPECT_NE(nullptr, empty_vec.data());
 
   fidl::VectorView<uint32_t> null_vec = fidl::ToWire(arena, std::vector<uint32_t>());
-  EXPECT_EQ(0u, null_vec.count());
+  EXPECT_EQ(0u, null_vec.size());
   EXPECT_NE(nullptr, null_vec.data());
 }
 
@@ -204,7 +204,7 @@ TEST(NaturalToWireConversion, OptionalVector) {
   fidl::Arena arena;
   fidl::VectorView<uint32_t> vec =
       fidl::ToWire(arena, std::optional(std::vector<uint32_t>{1, 2, 3}));
-  EXPECT_EQ(3u, vec.count());
+  EXPECT_EQ(3u, vec.size());
   EXPECT_EQ(1u, vec[0]);
   EXPECT_EQ(2u, vec[1]);
   EXPECT_EQ(3u, vec[2]);
@@ -212,16 +212,16 @@ TEST(NaturalToWireConversion, OptionalVector) {
 
   fidl::VectorView<uint32_t> empty_vec =
       fidl::ToWire(arena, std::optional(std::vector<uint32_t>({})));
-  EXPECT_EQ(0u, empty_vec.count());
+  EXPECT_EQ(0u, empty_vec.size());
   EXPECT_NE(nullptr, empty_vec.data());
 
   fidl::VectorView<uint32_t> null_vec = fidl::ToWire(arena, std::optional(std::vector<uint32_t>()));
-  EXPECT_EQ(0u, null_vec.count());
+  EXPECT_EQ(0u, null_vec.size());
   EXPECT_NE(nullptr, null_vec.data());
 
   fidl::VectorView<uint32_t> nullopt_vec =
       fidl::ToWire(arena, std::optional<std::vector<uint32_t>>());
-  EXPECT_EQ(0u, nullopt_vec.count());
+  EXPECT_EQ(0u, nullopt_vec.size());
   EXPECT_EQ(nullptr, nullopt_vec.data());
 }
 

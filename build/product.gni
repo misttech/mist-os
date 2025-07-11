@@ -24,12 +24,6 @@ declare_args() {
   # The product assembly config used to configure the Zedboot image.
   zedboot_product_assembly_config_label = false
 
-  # TODO(https://fxbug.dev/42175904): move to board definitions.
-  # Adds a prefix to the start of the virtual device name. Used to distinguish
-  # between similar virtual device's using different configuration's such as
-  # `emu_window_size`.
-  virtual_device_name_prefix = ""
-
   # Configuration to override the default window size for the virtual device in pixels.
   emu_window_size_width = false
   emu_window_size_height = false

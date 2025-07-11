@@ -10,7 +10,6 @@
 #include <lib/zx/time.h>
 #include <zircon/compiler.h>
 
-#include <array>
 #include <cstdint>
 #include <mutex>
 

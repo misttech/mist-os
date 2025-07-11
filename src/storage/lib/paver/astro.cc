@@ -8,6 +8,7 @@
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
+#include <zircon/types.h>
 
 #include <algorithm>
 #include <iterator>
@@ -106,26 +107,27 @@ bool AstroPartitioner::CanSafelyUpdateLayout(std::shared_ptr<Context> context) {
   return true;
 }
 
-zx::result<> AstroPartitioner::InitializeContext(
-    const paver::BlockDevices& devices, AbrWearLevelingOption abr_wear_leveling_opt,
-    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Context* context) {
+zx::result<> AstroPartitioner::InitializeContext(const paver::BlockDevices& skip_block_devices,
+                                                 AbrWearLevelingOption abr_wear_leveling_opt,
+                                                 Context* context) {
   return context->Initialize<AstroPartitionerContext>(
       [&]() -> zx::result<std::unique_ptr<AstroPartitionerContext>> {
-        // TODO(https://fxbug.dev/339491886): Support sysconfig client in storage-host
-        fdio_cpp::UnownedFdioCaller caller(devices.devfs_root());
-        zx::result client = sysconfig::SyncClient::Create(caller.directory(), svc_root);
-        if (client.is_error()) {
-          ERROR("Failed to create sysconfig client. %s\n", client.status_string());
-          return client.take_error();
+        zx::result partition = OpenSkipBlockPartition(skip_block_devices, GUID_SYS_CONFIG_VALUE,
+                                                      zx_duration_from_sec(5));
+        if (partition.is_error()) {
+          return partition.take_error();
         }
+        auto client =
+            sysconfig::SyncClient::Create(fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>(
+                partition->Connect()->TakeChannel()));
 
         std::unique_ptr<::sysconfig::SyncClientBuffered> sysconfig_client;
         if (abr_wear_leveling_opt == AbrWearLevelingOption::OFF) {
-          sysconfig_client = std::make_unique<::sysconfig::SyncClientBuffered>(*std::move(client));
+          sysconfig_client = std::make_unique<::sysconfig::SyncClientBuffered>(std::move(client));
           LOG("Using SyncClientBuffered\n");
         } else if (abr_wear_leveling_opt == AbrWearLevelingOption::ON) {
           sysconfig_client =
-              std::make_unique<::sysconfig::SyncClientAbrWearLeveling>(*std::move(client));
+              std::make_unique<::sysconfig::SyncClientAbrWearLeveling>(std::move(client));
           LOG("Using SyncClientAbrWearLeveling\n");
         } else {
           ZX_ASSERT_MSG(false, "Unknown AbrWearLevelingOption %d\n",
@@ -146,6 +148,12 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
     return status.take_error();
   }
 
+  zx::result<BlockDevices> skip_block_devices = BlockDevices::CreateFromSkipBlockService(svc_root);
+  if (skip_block_devices.is_error()) {
+    ERROR("Failed to open skip block service. %s\n", skip_block_devices.status_string());
+    return skip_block_devices.take_error();
+  }
+
   // Enable abr wear-leveling only when we see an explicitly defined boot argument
   // "astro.sysconfig.abr-wear-leveling".
   AbrWearLevelingOption option =
@@ -153,7 +161,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
           ? AbrWearLevelingOption::ON
           : AbrWearLevelingOption::OFF;
 
-  if (auto status = InitializeContext(devices, option, svc_root, context.get());
+  if (auto status = InitializeContext(skip_block_devices.value(), option, context.get());
       status.is_error()) {
     ERROR("Failed to initialize context. %s\n", status.status_string());
     return status.take_error();
@@ -173,7 +181,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
 
   LOG("Successfully initialized AstroPartitioner Device Partitioner\n");
   std::unique_ptr<SkipBlockDevicePartitioner> skip_block(
-      new SkipBlockDevicePartitioner(devices.Duplicate()));
+      new SkipBlockDevicePartitioner(devices.Duplicate(), std::move(*skip_block_devices)));
 
   return zx::ok(new AstroPartitioner(std::move(skip_block), component::MaybeClone(svc_root),
                                      std::move(context)));

@@ -3,31 +3,45 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/markers.h>
-#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/wire/arena.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <stdio.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <set>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <fbl/array.h>
-#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <zstd/zstd.h>
 
+#include "src/lib/files/file.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/fs_test/fs_test.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
-#include "src/storage/testing/fvm.h"
 
 namespace fs_test {
 namespace {
@@ -67,10 +81,15 @@ struct MountedSystem {
 
   fidl::ClientEnd<fuchsia_io::Directory> blobfs_export_root;
   fs_management::NamespaceBinding blobfs_binding;
-  fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> blob_creator;
+  blobfs::BlobCreatorWrapper blob_creator;
 
   fidl::ClientEnd<fuchsia_io::Directory> minfs_export_root;
   fs_management::NamespaceBinding minfs_binding;
+};
+
+struct Snapshot {
+  zx::vmo image;
+  zx::vmo wear_info;
 };
 
 class WearSimulator {
@@ -85,6 +104,9 @@ class WearSimulator {
 
   // Mounts the partitions and sets everything up. Must be called exactly once before anything else.
   void Init();
+
+  // Bring up the system by reading the image and wear_info into their vmos, and then rebooting.
+  void InitFromImage(std::string image_path, std::string wear_info_path);
 
   // Simulates a number of operations or "cycles" in minfs.
   void SimulateMinfs(int cycles);
@@ -104,6 +126,13 @@ class WearSimulator {
   // Tears down the current system and remounts everything.
   void Reboot();
 
+  // Return a snapshot of the nand image and the nand wear info. The two snapshots are not perfectly
+  // atomic, and may be slightly our of sync from each other.
+  zx::result<Snapshot> Snapshot();
+
+  // Write out the images to the custom_artifacts directory.
+  void ExportImage();
+
  private:
   zx::vmo vmo_;
   zx::vmo wear_vmo_;
@@ -111,7 +140,6 @@ class WearSimulator {
   std::unique_ptr<MountedSystem> mount_;
   std::vector<size_t> cycle_files_;
 };
-
 void InitMinfs(const char* root_path, const SystemConfig& config, std::vector<size_t>* file_sizes) {
   constexpr size_t kMaxWritePages = 64ul;
   constexpr size_t kMaxWriteSize = kMaxWritePages * kPageSize;
@@ -249,10 +277,34 @@ void WearSimulator::Init() {
       .ramnand = std::move(ramnand),
       .blobfs_export_root = blobfs->Release(),
       .blobfs_binding = std::move(blobfs_bind),
-      .blob_creator = std::move(blob_creator),
+      .blob_creator = blobfs::BlobCreatorWrapper(std::move(blob_creator)),
       .minfs_export_root = minfs->Release(),
       .minfs_binding = std::move(minfs_bind),
   });
+}
+
+void WearSimulator::InitFromImage(std::string image_path, std::string wear_info_path) {
+  {
+    std::vector<uint8_t> compressed;
+    ASSERT_TRUE(files::ReadFileToVector(image_path, &compressed));
+    ASSERT_EQ(zx::vmo::create(NandSize(config_.block_count), 0, &vmo_), ZX_OK);
+    fzl::VmoMapper image_mapper;
+    ASSERT_EQ(image_mapper.Map(vmo_, 0, NandSize(config_.block_count)), ZX_OK);
+
+    size_t decompressed = ZSTD_decompress(image_mapper.start(), NandSize(config_.block_count),
+                                          compressed.data(), compressed.size());
+    ASSERT_FALSE(ZSTD_isError(decompressed));
+    ASSERT_EQ(decompressed, NandSize(config_.block_count)) << "Image ws not expected size";
+  }
+
+  {
+    std::vector<uint8_t> wear_data;
+    ASSERT_TRUE(files::ReadFileToVector(wear_info_path, &wear_data));
+    ASSERT_EQ(wear_data.size(), WearSize(config_.block_count));
+    ASSERT_EQ(zx::vmo::create(WearSize(config_.block_count), 0, &wear_vmo_), ZX_OK);
+    ASSERT_EQ(wear_vmo_.write(wear_data.data(), 0, wear_data.size()), ZX_OK);
+  }
+  Reboot();
 }
 
 void WearSimulator::SimulateMinfs(int cycles) {
@@ -333,8 +385,9 @@ void WearSimulator::FillBlobfs(size_t space) {
 
     // Don't compress the delivery blob, this way the blob will fill asmich space as needed for the
     // test, but can be well compressed for image import/export.
-    ASSERT_NO_FATAL_FAILURE(blobfs::CreateUncompressedBlob(
-        std::span<uint8_t>(blob.begin(), blob.end()), mount_->blob_creator));
+    auto delivery_blob =
+        blobfs::TestDeliveryBlob::CreateUncompressed(std::span<uint8_t>(blob.begin(), blob.end()));
+    ASSERT_TRUE(mount_->blob_creator.CreateAndWriteBlob(delivery_blob).is_ok());
     space -= size;
   }
 }
@@ -358,34 +411,18 @@ void WearSimulator::ReduceBlobfsBy(size_t* space) {
 }
 
 zx::result<RamDevice> WearSimulator::RemountFtl() {
-  if (!mount_) {
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
   mount_.reset();
 
-  // Taking a snapshot when remounting to ensure that the new component doesn't come up before the
-  // old one dies and end up with two components modifying the device at once.
-  zx::vmo vmo_snapshot;
-  if (zx_status_t s =
-          vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, NandSize(config_.block_count), &vmo_snapshot);
-      s != ZX_OK) {
-    return zx::error(s);
-  }
-  // The two snapshots won't be atomic, but it won't matter much in the aggregate. Due to racing
-  // with the ramnand component the erase and wear count increment will never be perfectly in sync
-  // anyways, so it will always be racy.
-  zx::vmo wear_snapshot;
-  if (zx_status_t s = wear_vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0,
-                                             WearSize(config_.block_count), &wear_snapshot);
-      s != ZX_OK) {
-    return zx::error(s);
+  auto snapshot = Snapshot();
+  if (snapshot.is_error()) {
+    return snapshot.take_error();
   }
 
   RamDevice ramnand = CreateRamDevice({
                                           .use_ram_nand = true,
-                                          .vmo = vmo_snapshot.borrow(),
+                                          .vmo = snapshot->image.borrow(),
                                           .use_existing_fvm = true,
-                                          .nand_wear_vmo = wear_snapshot.borrow(),
+                                          .nand_wear_vmo = snapshot->wear_info.borrow(),
                                           .device_block_size = kPageSize,
                                           .device_block_count = 0,
                                           .fvm_slice_size = config_.fvm_slice_size,
@@ -394,7 +431,7 @@ zx::result<RamDevice> WearSimulator::RemountFtl() {
 
   {
     fzl::VmoMapper mapper;
-    if (zx_status_t s = mapper.Map(wear_snapshot); s != ZX_OK) {
+    if (zx_status_t s = mapper.Map(snapshot->wear_info); s != ZX_OK) {
       return zx::error(s);
     }
 
@@ -407,12 +444,14 @@ zx::result<RamDevice> WearSimulator::RemountFtl() {
     }
     printf("Max wear: %u, Min wear: %u\n", max, min);
   }
-  vmo_ = std::move(vmo_snapshot);
-  wear_vmo_ = std::move(wear_snapshot);
+  vmo_ = std::move(snapshot->image);
+  wear_vmo_ = std::move(snapshot->wear_info);
   return zx::ok(std::move(ramnand));
 }
 
 void WearSimulator::Reboot() {
+  ASSERT_TRUE(vmo_.is_valid()) << "No image vmo to snapshot";
+  ASSERT_TRUE(wear_vmo_.is_valid()) << "No wear info to snapshot";
   RamDevice ramnand = RemountFtl().value();
 
   fidl::Arena arena;
@@ -456,10 +495,87 @@ void WearSimulator::Reboot() {
       .ramnand = std::move(ramnand),
       .blobfs_export_root = blobfs->Release(),
       .blobfs_binding = std::move(blobfs_bind),
-      .blob_creator = std::move(blob_creator),
+      .blob_creator = blobfs::BlobCreatorWrapper(std::move(blob_creator)),
       .minfs_export_root = minfs->Release(),
       .minfs_binding = std::move(minfs_bind),
   });
+}
+
+zx::result<Snapshot> WearSimulator::Snapshot() {
+  struct Snapshot snapshot;
+
+  // Taking a snapshot when remounting to ensure that the new component doesn't come up before the
+  // old one dies and end up with two components modifying the device at once.
+  zx::vmo vmo_snapshot;
+  if (zx_status_t s = vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, NandSize(config_.block_count),
+                                        &snapshot.image);
+      s != ZX_OK) {
+    return zx::error(s);
+  }
+  // The two snapshots won't be atomic, but it won't matter much in the aggregate. Due to racing
+  // with the ramnand component the erase and wear count increment will never be perfectly in sync
+  // anyways, so it will always be racy.
+  zx::vmo wear_snapshot;
+  if (zx_status_t s = wear_vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0,
+                                             WearSize(config_.block_count), &snapshot.wear_info);
+      s != ZX_OK) {
+    return zx::error(s);
+  }
+
+  return zx::ok(std::move(snapshot));
+}
+
+void WearSimulator::ExportImage() {
+  auto snapshot = Snapshot();
+  ASSERT_TRUE(snapshot.is_ok());
+
+  // Write out the data vmo. Compressed with zstd.
+  {
+    fzl::OwnedVmoMapper compressed_mapper;
+    size_t compressed_max_size = ZSTD_compressBound(NandSize(config_.block_count));
+    ASSERT_EQ(compressed_mapper.CreateAndMap(compressed_max_size, "compressed_image"), ZX_OK);
+    fzl::OwnedVmoMapper image_mapper;
+    ASSERT_EQ(image_mapper.Map(std::move(snapshot->image), 0, NandSize(config_.block_count),
+                               ZX_VM_PERM_READ),
+              ZX_OK);
+
+    size_t compressed_size;
+    compressed_size = ZSTD_compress(compressed_mapper.start(), compressed_max_size,
+                                    image_mapper.start(), NandSize(config_.block_count), 17);
+    ASSERT_FALSE(ZSTD_isError(compressed_size)) << ZSTD_getErrorName(compressed_size);
+
+    int f = open("custom_artifacts/nand.zstd", O_WRONLY | O_CREAT, 0644);
+    ASSERT_GE(f, 0) << errno;
+    uint8_t* offset = reinterpret_cast<uint8_t*>(compressed_mapper.start());
+    while (compressed_size > 0) {
+      ssize_t written = write(f, offset, compressed_size);
+      ASSERT_GT(written, 0) << errno;
+      compressed_size -= written;
+      offset += written;
+    }
+    ASSERT_EQ(close(f), 0) << errno;
+  }
+
+  // Write out the wear info. No need to compress, it should be relatively small.
+  {
+    fzl::OwnedVmoMapper mapper;
+    ASSERT_EQ(mapper.Map(std::move(snapshot->wear_info), 0, WearSize(config_.block_count),
+                         ZX_VM_PERM_READ),
+              ZX_OK);
+
+    size_t size = WearSize(config_.block_count);
+
+    int f = open("custom_artifacts/wear_info.bin", O_WRONLY | O_CREAT, 0644);
+    ASSERT_GE(f, 0) << errno;
+    uint8_t* offset = reinterpret_cast<uint8_t*>(mapper.start());
+    while (size > 0) {
+      ssize_t written = write(f, offset, size);
+      ASSERT_GT(written, 0) << errno;
+      size -= written;
+      offset += written;
+    }
+    ASSERT_EQ(close(f), 0) << errno;
+  }
 }
 
 // Test disabled because it isn't meant to run as part of CI. Meant for local experimentation.
@@ -517,7 +633,20 @@ TEST(Wear, MinimalSimulator) {
   sim.FillBlobfs(1ul * 1024 * 1024 - reduce_by);
   sim.SimulateMinfs(100);
 
+  // The image compresses to ~40K in the test. So leave it in.
+  sim.ExportImage();
   ASSERT_TRUE(sim.RemountFtl().is_ok());
+}
+
+TEST(Wear, ImageImport) {
+  // Must match the size settings from MinimalSimulator which generated this image.
+  WearSimulator sim = WearSimulator({
+      .fvm_slice_size = 32ul * 1024,
+      .block_count = 100,
+      .blobfs_partition_size = 10ul * 1024 * 1024,
+      .minfs_partition_size = 10ul * 1024 * 1024,
+  });
+  sim.InitFromImage("pkg/testdata/nand.zstd", "pkg/testdata/wear_info.bin");
 }
 
 }  // namespace

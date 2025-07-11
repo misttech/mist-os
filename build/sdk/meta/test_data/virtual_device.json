@@ -37,6 +37,6 @@
             "mdns": 5353,
             "ssh": 22
         },
-        "start_up_args_template": "device_1.json.template"
+        "start_up_args_template": "device.json.template"
     }
 }

@@ -4,9 +4,17 @@
 
 #include "src/storage/lib/vfs/cpp/connection/advisory_lock.h"
 
-namespace fs {
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/file-lock/file-lock.h>
+#include <lib/fit/function.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-namespace internal {
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/lib/vfs/cpp/vnode.h"
+
+namespace fs::internal {
 
 void advisory_lock(zx_koid_t owner, fbl::RefPtr<fs::Vnode> vnode, bool range_ok,
                    ::fuchsia_io::wire::AdvisoryLockRequest& request,
@@ -49,6 +57,4 @@ void advisory_lock(zx_koid_t owner, fbl::RefPtr<fs::Vnode> vnode, bool range_ok,
   lock->Lock(owner, req, callback);
 }
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal

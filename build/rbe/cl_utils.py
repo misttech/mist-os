@@ -113,27 +113,33 @@ def copy_preserve_subpath(src: Path, dest_dir: Path) -> None:
       'save/stuff/here/foo/bar/baz.txt'
 
     Args:
-      src: path to file, relative to working dir.
+      src: path to file or dir, relative to working dir.
       dest_dir: root directory to copy to (can be absolute or relative to
         working dir).
     """
     assert (
         not src.is_absolute()
-    ), f"source file to be copied should be relative, but got: {src}"
-    dest_subdir = dest_dir / src.parent
-    dest_subdir.mkdir(parents=True, exist_ok=True)
-    dest_file = dest_subdir / src.name
-    if dest_file.exists():
-        # If files are identical, don't copy again.
-        # This helps if dest_file is not write-able.
-        if not filecmp.cmp(src, dest_file, shallow=True):
-            # files are different, keep the existing copy.
-            msg(
-                f"[copy_preserve_subpath()] Warning: Files {src} and {dest_file} are different.  Not copying to the latter."
-            )
-        return
+    ), f"source path to be copied should be relative, but got: {src}"
 
-    shutil.copy2(src, dest_subdir)
+    if src.is_dir():
+        # copytree() already creates intermediate parent dirs,
+        # existing files in dest_dir will be overwritten.
+        shutil.copytree(src, dest_dir / src, dirs_exist_ok=True)
+    else:
+        dest_subdir = dest_dir / src.parent
+        dest_subdir.mkdir(parents=True, exist_ok=True)
+        dest_file = dest_subdir / src.name
+        if dest_file.exists():
+            # If files are identical, don't copy again.
+            # This helps if dest_file is not write-able.
+            if not filecmp.cmp(src, dest_file, shallow=True):
+                # files are different, keep the existing copy.
+                msg(
+                    f"[copy_preserve_subpath()] Warning: Files {src} and {dest_file} are different.  Not copying to the latter."
+                )
+            return
+
+        shutil.copy2(src, dest_subdir)
 
 
 # TODO: move this to library for abstract data operations

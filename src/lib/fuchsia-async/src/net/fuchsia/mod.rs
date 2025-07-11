@@ -20,7 +20,6 @@ use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::task::Poll;
 use std::{fmt, mem};
 
@@ -144,19 +143,18 @@ where
     /// closed until the returned `EventedFd` is dropped.
     pub unsafe fn new(inner: T) -> io::Result<Self> {
         let fdio = syscall::fdio_unsafe_fd_to_io(inner.as_raw_fd());
-        let signal_receiver =
-            EHandle::local().register_receiver(Arc::new(EventedFdPacketReceiver {
-                fdio,
-                // Optimistically assume that the fd is readable and writable.
-                // Reads and writes will be attempted before queueing a packet.
-                // This makes fds slightly faster to read/write the first time
-                // they're accessed after being created, provided they start off as
-                // readable or writable. In return, there will be an extra wasted
-                // syscall per read/write if the fd is not readable or writable.
-                signals: AtomicUsize::new(READABLE | WRITABLE),
-                read_task: AtomicWaker::new(),
-                write_task: AtomicWaker::new(),
-            }));
+        let signal_receiver = EHandle::local().register_receiver(EventedFdPacketReceiver {
+            fdio,
+            // Optimistically assume that the fd is readable and writable.
+            // Reads and writes will be attempted before queueing a packet.
+            // This makes fds slightly faster to read/write the first time
+            // they're accessed after being created, provided they start off as
+            // readable or writable. In return, there will be an extra wasted
+            // syscall per read/write if the fd is not readable or writable.
+            signals: AtomicUsize::new(READABLE | WRITABLE),
+            read_task: AtomicWaker::new(),
+            write_task: AtomicWaker::new(),
+        });
 
         let evented_fd =
             EventedFd { inner, fdio, signal_receiver: mem::ManuallyDrop::new(signal_receiver) };

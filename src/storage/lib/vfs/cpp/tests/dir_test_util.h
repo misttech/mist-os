@@ -7,6 +7,10 @@
 
 #include <lib/fdio/vfs.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+
 #include <gtest/gtest.h>
 
 namespace fs {
@@ -24,10 +28,9 @@ namespace fs {
 //
 class DirentChecker {
  public:
-  DirentChecker(const uint8_t* buffer, size_t length)
-      : current_(reinterpret_cast<const uint8_t*>(buffer)), remaining_(length) {}
+  DirentChecker(const uint8_t* buffer, size_t length) : current_(buffer), remaining_(length) {}
 
-  void ExpectEnd() { EXPECT_EQ(0u, remaining_); }
+  void ExpectEnd() const { EXPECT_EQ(0u, remaining_); }
 
   void ExpectEntry(const char* name, uint32_t vtype) {
     ASSERT_NE(0u, remaining_);

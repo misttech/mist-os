@@ -8,7 +8,6 @@ use bounded_node::BoundedNode;
 use fidl_fuchsia_paver::{BootManagerProxy, DataSinkProxy};
 use fidl_fuchsia_update_installer_ext::{Options, State};
 use fuchsia_inspect as inspect;
-use fuchsia_url::AbsolutePackageUrl;
 use futures::prelude::*;
 use log::warn;
 use serde::{Deserialize, Serialize};
@@ -45,7 +44,7 @@ pub struct UpdateAttempt {
     options: Options,
 
     #[serde(rename = "url")]
-    update_url: AbsolutePackageUrl,
+    update_url: String,
 
     #[serde(rename = "start", with = "serde_system_time")]
     start_time: SystemTime,
@@ -81,7 +80,7 @@ impl UpdateAttempt {
             options.write_to_inspect(n);
         });
 
-        node.record_string("update_url", update_url.to_string());
+        node.record_string("update_url", update_url);
         node.record_string(
             "start_time",
             chrono::DateTime::<chrono::Utc>::from(start_time.to_owned()).to_rfc3339(),
@@ -99,7 +98,7 @@ pub struct PendingAttempt {
     attempt_id: String,
     source_version: Version,
     options: Options,
-    update_url: AbsolutePackageUrl,
+    update_url: String,
     start_time: SystemTime,
 }
 
@@ -158,7 +157,7 @@ impl UpdateHistory {
     pub fn start_update_attempt<'a>(
         &self,
         options: Options,
-        update_url: AbsolutePackageUrl,
+        update_url: &'a url::Url,
         start_time: SystemTime,
         data_sink: &'a DataSinkProxy,
         boot_manager: &'a BootManagerProxy,
@@ -179,7 +178,13 @@ impl UpdateHistory {
                 SOURCE_EPOCH_RAW,
             )
             .await;
-            PendingAttempt { attempt_id, source_version, options, update_url, start_time }
+            PendingAttempt {
+                attempt_id,
+                source_version,
+                options,
+                update_url: update_url.to_string(),
+                start_time,
+            }
         }
     }
 
@@ -390,7 +395,7 @@ mod tests {
         let update_attempt = history
             .start_update_attempt(
                 opts,
-                "fuchsia-pkg://fuchsia.test/update".parse().unwrap(),
+                &"fuchsia-pkg://fuchsia.test/update".parse().unwrap(),
                 SystemTime::UNIX_EPOCH + Duration::from_nanos(i as u64),
                 &data_sink,
                 &boot_manager,
@@ -855,7 +860,7 @@ mod tests {
                         allow_attach_to_existing_attempt: false,
                         should_write_recovery: true,
                     },
-                    "fuchsia-pkg://fuchsia.test/update".parse().unwrap(),
+                    &"fuchsia-pkg://fuchsia.test/update".parse().unwrap(),
                     SystemTime::UNIX_EPOCH + Duration::from_nanos(42),
                     &data_sink,
                     &boot_manager,

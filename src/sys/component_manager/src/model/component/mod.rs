@@ -13,6 +13,7 @@ use crate::model::actions::{
 };
 use crate::model::context::ModelContext;
 use crate::model::environment::Environment;
+use crate::model::logger::LoggerCache;
 use crate::model::routing::{self, RoutingError};
 use crate::model::start::Start;
 use ::namespace::Entry as NamespaceEntry;
@@ -47,8 +48,7 @@ use futures::future::{join_all, BoxFuture};
 use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
 use hooks::{Event, EventPayload, Hooks};
 use instance::{
-    InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
-    UnresolvedInstanceState,
+    InstanceState, ResolvedInstanceState, ShutdownInstanceState, UnresolvedInstanceState,
 };
 use log::{debug, error, warn};
 use manager::ComponentManagerInstance;
@@ -325,6 +325,12 @@ pub struct ComponentInstance {
     /// to tie their life-time to that of the component. Tasks can block component destruction by
     /// using `active_guard()`.
     pub execution_scope: ExecutionScope,
+}
+
+impl Drop for ComponentInstance {
+    fn drop(&mut self) {
+        LoggerCache::purge(self);
+    }
 }
 
 impl ComponentInstance {
@@ -1165,12 +1171,15 @@ impl ComponentInstance {
         for key_value in key_values {
             builder.key_values(key_value);
         }
-        match state.get_started_state() {
-            Some(StartedInstanceState { logger: Some(ref logger), .. }) => {
-                let logger = logger.clone() as Arc<dyn log::Log + Send + Sync>;
-                logger.log(&builder.args(format_args!("{}", message)).build());
-            }
-            _ => log::logger().log(&builder.args(format_args!("{}", message)).build()),
+
+        if let Some(resolved_instance_state) = state.get_resolved_state() {
+            LoggerCache::log(
+                &self.moniker,
+                resolved_instance_state,
+                &builder.args(format_args!("{}", message)).build(),
+            );
+        } else {
+            log::logger().log(&builder.args(format_args!("{}", message)).build());
         }
     }
 
@@ -1562,7 +1571,7 @@ pub mod tests {
     use fasync::TestExecutor;
     use fidl::endpoints::DiscoverableProtocolMarker;
     use futures::channel::mpsc;
-    use futures::{FutureExt, StreamExt, TryStreamExt};
+    use futures::{FutureExt, StreamExt};
     use hooks::EventType;
     use instance::UnresolvedInstanceState;
     use routing_test_helpers::component_id_index::make_index_file;
@@ -2500,24 +2509,13 @@ pub mod tests {
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
 
         let (connect_tx, mut connect_rx) = mpsc::unbounded();
-        let serve_logsink = move |mut stream: flogger::LogSinkRequestStream| {
-            let connect_tx = connect_tx.clone();
+        let serve_logsink = move |stream: flogger::LogSinkRequestStream| {
+            connect_tx.unbounded_send(()).unwrap();
             async move {
-                while let Some(request) = stream.try_next().await.expect("failed to serve") {
-                    match request {
-                        flogger::LogSinkRequest::Connect { .. } => {
-                            unimplemented!()
-                        }
-                        flogger::LogSinkRequest::ConnectStructured { .. } => {
-                            connect_tx.unbounded_send(()).unwrap();
-                        }
-                        flogger::LogSinkRequest::WaitForInterestChange { .. } => {
-                            // It's expected that the log publisher calls this, but it's not
-                            // necessary to implement it.
-                        }
-                        flogger::LogSinkRequest::_UnknownMethod { .. } => unimplemented!(),
-                    }
-                }
+                // There are other tests that check the actual logs. We just need to test that
+                // there's a connection.
+                let _stream = stream;
+                let () = std::future::pending().await;
             }
         };
 

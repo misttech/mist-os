@@ -13,3 +13,14 @@ set = {2, 1, 0}
 span = {'b', 'c'}
 sv = "abc"
 up = (*)?? ➔ {Parent = {a = 0}, b = 1}
+
+[zxdb] set integer-format hex
+Set process 1 integer-format = hex
+
+[zxdb] locals
+map = {{first = (0x61), second = 0x1}, {first = (0x62), second = 0x2}}
+p = (*)0x?? ➔ {Parent = {a = 0x0}, b = 0x1}
+set = {0x2, 0x1, 0x0}
+span = {0x62, 0x63}
+sv = (0x61, 0x62, 0x63)
+up = (*)0x?? ➔ {Parent = {a = 0x0}, b = 0x1}

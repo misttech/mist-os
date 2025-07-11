@@ -23,10 +23,24 @@ pub enum DataSource {
     Vmo { vmo: zx::Vmo, size: u64, offset: u64 },
 }
 
+impl DataSource {
+    /// The size of the source in bytes.
+    fn data_size(&self) -> u64 {
+        match &self {
+            DataSource::Buffer(buf) => buf.len() as u64,
+            DataSource::Reader { reader: _, size } => *size,
+            DataSource::Skip(size) => *size,
+            DataSource::Fill(_, count) => *count * std::mem::size_of::<u32>() as u64,
+            #[cfg(target_os = "fuchsia")]
+            DataSource::Vmo { vmo: _, size, offset: _ } => *size,
+        }
+    }
+}
+
 /// Builds sparse image files from a set of input DataSources.
 pub struct SparseImageBuilder {
     block_size: u32,
-    chunks: Vec<DataSource>,
+    sources: Vec<DataSource>,
 
     // The `total_sz` field in the chunk's header is 32 bits and includes the 12 bytes for the
     // header itself. The chunk size must be a multiple of the block size so the maximum chunk size
@@ -38,7 +52,7 @@ pub struct SparseImageBuilder {
 
 impl SparseImageBuilder {
     pub fn new() -> Self {
-        Self { block_size: BLK_SIZE, chunks: vec![], max_chunk_size: u32::MAX - BLK_SIZE + 1 }
+        Self { block_size: BLK_SIZE, sources: vec![], max_chunk_size: u32::MAX - BLK_SIZE + 1 }
     }
 
     pub fn set_block_size(mut self, block_size: u32) -> Self {
@@ -52,17 +66,42 @@ impl SparseImageBuilder {
         self
     }
 
-    pub fn add_chunk(mut self, source: DataSource) -> Self {
-        self.chunks.push(source);
+    /// Adds the given data `source` to the image. `source` may be encoded as one or more chunks.
+    pub fn add_source(mut self, source: DataSource) -> Self {
+        self.sources.push(source);
         self
+    }
+
+    /// Calculates total amount of space required to build the sparse image given the current set of
+    /// data sources.
+    pub fn built_size(&self) -> u64 {
+        let mut built_size = SPARSE_HEADER_SIZE as u64;
+        for source in &self.sources {
+            for size in ChunkedRange::new(0..source.data_size(), self.max_chunk_size) {
+                let size = size as u64;
+                // We only need the encoded size for each chunk once it complies with max chunk size
+                // so we can ignore start offset.
+                let start = 0;
+                let chunk = match &source {
+                    DataSource::Buffer(..) => Chunk::Raw { start, size },
+                    DataSource::Reader { .. } => Chunk::Raw { start, size },
+                    DataSource::Skip(..) => Chunk::DontCare { start, size },
+                    DataSource::Fill(..) => Chunk::Fill { start, size, value: 0 },
+                    #[cfg(target_os = "fuchsia")]
+                    DataSource::Vmo { .. } => Chunk::Raw { start, size },
+                };
+                built_size += chunk.chunk_data_len() as u64;
+            }
+        }
+        built_size
     }
 
     pub fn build<W: Write + Seek>(self, output: &mut W) -> Result<()> {
         // We'll fill the header in later.
         output.seek(SeekFrom::Start(SPARSE_HEADER_SIZE as u64))?;
         let mut chunk_writer = ChunkWriter::new(self.block_size, output);
-        for input_chunk in self.chunks {
-            match input_chunk {
+        for source in self.sources {
+            match source {
                 DataSource::Buffer(buf) => {
                     ensure!(
                         buf.len() % self.block_size as usize == 0,
@@ -237,10 +276,10 @@ mod tests {
         buf.extend_from_slice(&part1);
         buf.extend_from_slice(&part2);
         let mut output = vec![];
-        builder
-            .add_chunk(DataSource::Buffer(buf.into_boxed_slice()))
-            .build(&mut Cursor::new(&mut output))
-            .unwrap();
+        let builder = builder.add_source(DataSource::Buffer(buf.into_boxed_slice()));
+        let expected_size = builder.built_size() as usize;
+        builder.build(&mut Cursor::new(&mut output)).unwrap();
+        assert_eq!(output.len(), expected_size);
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
@@ -284,14 +323,15 @@ mod tests {
         let mut reader2 = Cursor::new(buf);
         reader2.seek(SeekFrom::Start(BLK_SIZE as u64)).unwrap();
 
-        builder
-            .add_chunk(DataSource::Reader {
+        let builder = builder
+            .add_source(DataSource::Reader {
                 reader: Box::new(reader1),
                 size: (BLK_SIZE * 2) as u64,
             })
-            .add_chunk(DataSource::Reader { reader: Box::new(reader2), size: BLK_SIZE as u64 })
-            .build(&mut Cursor::new(&mut output))
-            .unwrap();
+            .add_source(DataSource::Reader { reader: Box::new(reader2), size: BLK_SIZE as u64 });
+        let expected_size = builder.built_size() as usize;
+        builder.build(&mut Cursor::new(&mut output)).unwrap();
+        assert_eq!(output.len(), expected_size);
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
@@ -333,10 +373,10 @@ mod tests {
         let mut builder = SparseImageBuilder::new();
         builder.max_chunk_size = BLK_SIZE;
         let mut output = vec![];
-        builder
-            .add_chunk(DataSource::Skip((BLK_SIZE * 2) as u64))
-            .build(&mut Cursor::new(&mut output))
-            .unwrap();
+        let builder = builder.add_source(DataSource::Skip((BLK_SIZE * 2) as u64));
+        let expected_size = builder.built_size() as usize;
+        builder.build(&mut Cursor::new(&mut output)).unwrap();
+        assert_eq!(output.len(), expected_size);
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
@@ -353,10 +393,10 @@ mod tests {
         let mut builder = SparseImageBuilder::new();
         builder.max_chunk_size = BLK_SIZE;
         let mut output = vec![];
-        builder
-            .add_chunk(DataSource::Fill(0xAB, (BLK_SIZE / 2) as u64))
-            .build(&mut Cursor::new(&mut output))
-            .unwrap();
+        let builder = builder.add_source(DataSource::Fill(0xAB, (BLK_SIZE / 2) as u64));
+        let expected_size = builder.built_size() as usize;
+        builder.build(&mut Cursor::new(&mut output)).unwrap();
+        assert_eq!(output.len(), expected_size);
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
@@ -390,7 +430,7 @@ mod tests {
 
         let result = SparseImageBuilder::new()
             .set_block_size(16)
-            .add_chunk(DataSource::Skip(u64::MAX - 15))
+            .add_source(DataSource::Skip(u64::MAX - 15))
             .build(&mut Sink);
         assert!(result.is_err());
     }
@@ -408,15 +448,16 @@ mod tests {
         vmo.write(&PART_2, BLK_SIZE as u64).unwrap();
         // We add two separate data sources sharing the same VMO but with a different offset.
         let mut output = vec![];
-        builder
-            .add_chunk(DataSource::Vmo {
+        let builder = builder
+            .add_source(DataSource::Vmo {
                 vmo: vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                 size: BLK_SIZE as u64,
                 offset: 0,
             })
-            .add_chunk(DataSource::Vmo { vmo, size: BLK_SIZE as u64, offset: BLK_SIZE as u64 })
-            .build(&mut Cursor::new(&mut output))
-            .unwrap();
+            .add_source(DataSource::Vmo { vmo, size: BLK_SIZE as u64, offset: BLK_SIZE as u64 });
+        let expected_size = builder.built_size() as usize;
+        builder.build(&mut Cursor::new(&mut output)).unwrap();
+        assert_eq!(output.len(), expected_size);
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(

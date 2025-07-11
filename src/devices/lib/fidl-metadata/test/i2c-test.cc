@@ -27,7 +27,7 @@ static void check_encodes(const uint32_t bus_id,
   EXPECT_EQ(metadata.bus_id(), bus_id);
   ASSERT_TRUE(metadata.has_channels());
   auto channels = metadata.channels();
-  ASSERT_EQ(channels.count(), i2c_channels.size());
+  ASSERT_EQ(channels.size(), i2c_channels.size());
 
   for (size_t i = 0; i < i2c_channels.size(); i++) {
     ASSERT_TRUE(channels[i].has_address());

@@ -6,9 +6,11 @@
 #define LIB_C_DLFCN_DLFCN_ABI_H_
 
 #include <lib/ld/dl-phdr-info.h>
+#include <zircon/compiler.h>
 
 #include <type_traits>
 
+#include "../weak.h"
 #include "src/__support/macros/config.h"
 #include "src/link/dl_iterate_phdr.h"
 
@@ -22,6 +24,18 @@
 namespace LIBC_NAMESPACE_DECL {
 extern "C" {
 
+// **Calls from libc into libdl**
+
+// The libdl entrypoints do their own locking for the most part.  But in some
+// places libc needs to exclude libdl (dlopen) changes while doing other things
+// before or after it calls into a _dlfcn_* hook to have libdl do something.
+extern "C" [[gnu::weak]] void _dlfcn_lock();
+extern "C" [[gnu::weak]] void _dlfcn_unlock();
+
+// This is used as the only way to call those, so thread-safety annotations
+// always describe it for static checking.
+inline constexpr WeakLock<_dlfcn_lock, _dlfcn_unlock> kDlfcnLock{};
+
 // The compiler calls ld::DlPhdrInfoCounts an "incompatible with C" type just
 // because it has explicit member initializers even though they're trivial.
 // It's actually perfectly compatible with C in its ABI and semantics (just not
@@ -31,7 +45,9 @@ extern "C" {
 static_assert(std::is_trivially_copyable_v<ld::DlPhdrInfoCounts>);
 static_assert(std::is_trivially_destructible_v<ld::DlPhdrInfoCounts>);
 #pragma GCC diagnostic push
+#ifdef __clang__
 #pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
+#endif
 
 // This returns the .dlpi_adds, .dlpi_subs values that dl_iterate_phdr will use
 // in the callbacks it makes for startup modules.  If it's undefined, values
@@ -42,7 +58,7 @@ static_assert(std::is_trivially_destructible_v<ld::DlPhdrInfoCounts>);
 // give to its callbacks from the ones returned here, so be it.  Note that
 // after this returns, _dlfcn_iterate_phdr will not necessarily be called at
 // all (if the user's callback bailed out early).
-[[gnu::weak]] ld::DlPhdrInfoCounts _dlfcn_phdr_info_counts();
+[[gnu::weak]] ld::DlPhdrInfoCounts _dlfcn_phdr_info_counts() __TA_EXCLUDES(kDlfcnLock);
 
 #pragma GCC diagnostic pop
 
@@ -53,7 +69,7 @@ static_assert(std::is_trivially_destructible_v<ld::DlPhdrInfoCounts>);
 // paired with the preceding _dlfcn_phdr_info_counts() call on the same thread.
 // This is tail-called by libc's dl_iterate_phdr after reporting the startup
 // modules.  If it's undefined, dl_iterate_phdr just returns zero instead.
-[[gnu::weak]] decltype(dl_iterate_phdr) _dlfcn_iterate_phdr;
+[[gnu::weak]] decltype(dl_iterate_phdr) _dlfcn_iterate_phdr __TA_EXCLUDES(kDlfcnLock);
 
 }  // extern "C"
 }  // namespace LIBC_NAMESPACE_DECL

@@ -19,7 +19,7 @@ Error PltUnwinder::Step(Memory* stack, const Registers& current, Registers& next
     case Registers::Arch::kX64:
       return StepX64(stack, current, next);
     case Registers::Arch::kArm32:
-      return Error("Not implemented yet");
+      return StepArm32(stack, current, next);
     case Registers::Arch::kArm64:
       return StepArm64(stack, current, next);
     case Registers::Arch::kRiscv64:
@@ -57,6 +57,46 @@ Error PltUnwinder::StepX64(Memory* stack, const Registers& current, Registers& n
   next = current;
   next.SetPC(ra);
   next.SetSP(sp);
+  return Success();
+}
+
+Error PltUnwinder::StepArm32(Memory* stack, const Registers& current, Registers& next) {
+  // The PLT stub looks like
+  //
+  // 000ce930 <printf@plt>:
+  //   ce930: e28fc600      add     r12, pc, #0, #12
+  //   ce934: e28cca24      add     r12, r12, #36, #20
+  //   ce938: e5bcf44c      ldr     pc, [r12, #0x44c]!
+  //   ce93c: d4 d4 d4 d4   .word   0xd4d4d4d4
+
+  uint64_t lr;
+  if (auto err = current.GetReturnAddress(lr); err.has_err()) {
+    return err;
+  }
+  uint64_t pc;
+  if (auto err = current.GetPC(pc); err.has_err()) {
+    return err;
+  }
+
+  // Check whether the machine instruction is a PLT entry to avoid false positives. The compiler
+  // inserts an invalid instruction encoded as d4d4d4d4 represented in little endian that we use as
+  // a signature.
+  CfiModuleInfo* cfi_module;
+  if (auto err = cfi_unwinder_->GetCfiModuleInfoForPc(lr, &cfi_module); err.has_err()) {
+    return err;
+  }
+  uint32_t instruction;
+  if (auto err = cfi_module->binary->memory()->Read((pc & ~0xf) | 0xc, instruction);
+      err.has_err()) {
+    return err;
+  }
+  if (instruction != 0xd4d4d4d4) {
+    return Error("It doesn't look like a PLT trampoline");
+  }
+
+  next = current;
+  next.SetPC(lr);
+  next.Unset(RegisterID::kArm32_lr);
   return Success();
 }
 

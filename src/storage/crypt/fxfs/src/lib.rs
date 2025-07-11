@@ -115,7 +115,6 @@ impl CryptService {
         match inner.ciphers.entry(wrapping_key_id) {
             Entry::Occupied(_) => Err(zx::Status::ALREADY_EXISTS.into_raw()),
             Entry::Vacant(vacant) => {
-                info!(wrapping_key_id; "Adding wrapping key");
                 vacant.insert(Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&key[..])));
                 Ok(())
             }
@@ -140,7 +139,6 @@ impl CryptService {
     }
 
     fn forget_wrapping_key(&self, wrapping_key_id: u128) -> CryptManagementForgetWrappingKeyResult {
-        info!(wrapping_key_id; "Removing wrapping key");
         let mut inner = self.inner.lock();
         if let Some(id) = &inner.active_data_key {
             if *id == wrapping_key_id {

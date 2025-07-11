@@ -138,7 +138,7 @@ TEST(Table, TableVectorOfStruct) {
   ASSERT_FALSE(table.has_x());
   ASSERT_FALSE(table.has_y());
   ASSERT_TRUE(table.has_vector_of_struct());
-  ASSERT_EQ(table.vector_of_struct().count(), 2UL);
+  ASSERT_EQ(table.vector_of_struct().size(), 2UL);
   ASSERT_EQ(table.vector_of_struct()[0].x, 30);
   ASSERT_EQ(table.vector_of_struct()[1].x, 42);
   EXPECT_FALSE(table.HasUnknownData());

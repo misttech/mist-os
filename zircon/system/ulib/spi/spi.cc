@@ -27,10 +27,10 @@ zx_status_t spilib_receive(fidl::UnownedClientEnd<fuchsia_hardware_spi::Device> 
   if (zx_status_t status = response.status; status != ZX_OK) {
     return status;
   }
-  if (response.data.count() > length) {
+  if (response.data.size() > length) {
     return ZX_ERR_IO_OVERRUN;
   }
-  memcpy(data, response.data.data(), response.data.count());
+  memcpy(data, response.data.data(), response.data.size());
   return ZX_OK;
 }
 
@@ -48,9 +48,9 @@ zx_status_t spilib_exchange(fidl::UnownedClientEnd<fuchsia_hardware_spi::Device>
   if (zx_status_t status = response.status; status != ZX_OK) {
     return status;
   }
-  if (response.rxdata.count() > length) {
+  if (response.rxdata.size() > length) {
     return ZX_ERR_IO_OVERRUN;
   }
-  memcpy(rxdata, response.rxdata.data(), response.rxdata.count());
+  memcpy(rxdata, response.rxdata.data(), response.rxdata.size());
   return ZX_OK;
 }

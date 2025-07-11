@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/lib/vfs/cpp/watcher.h"
-
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/zx/time.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <zircon/errors.h>
-#include <zircon/types.h>
+
+#include <utility>
 
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace {
 

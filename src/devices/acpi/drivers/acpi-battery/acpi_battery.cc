@@ -163,7 +163,7 @@ zx_status_t AcpiBattery::CheckAcpiBatteryInformation() {
   fidl::WireOptional<facpi::EncodedObject>& maybe_encoded = result->value()->result;
   if (!maybe_encoded.has_value() || !maybe_encoded->is_object() ||
       !maybe_encoded->object().is_package_val() ||
-      maybe_encoded->object().package_val().value.count() < BifFields::kBifMax) {
+      maybe_encoded->object().package_val().value.size() < BifFields::kBifMax) {
     zxlogf(ERROR, "Unexpected response from EvaluateObject");
     return ZX_ERR_INTERNAL;
   }
@@ -223,7 +223,7 @@ zx_status_t AcpiBattery::CheckAcpiBatteryState() {
   fidl::WireOptional<facpi::EncodedObject>& maybe_encoded = result->value()->result;
   if (!maybe_encoded.has_value() || !maybe_encoded->is_object() ||
       !maybe_encoded->object().is_package_val() ||
-      maybe_encoded->object().package_val().value.count() < BstFields::kBstMax) {
+      maybe_encoded->object().package_val().value.size() < BstFields::kBstMax) {
     zxlogf(ERROR, "Unexpected response from EvaluateObject");
     return ZX_ERR_INTERNAL;
   }

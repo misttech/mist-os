@@ -61,9 +61,18 @@ function main {
   fi
 
   for dir in "${directories[@]}"; do
+    build_bazel="${FUCHSIA_DIR}/${dir}/BUILD.bazel"
     build_gn="${FUCHSIA_DIR}/${dir}/BUILD.gn"
+
+    # Format the input BUILD.bazel file first to ensure consistent output.
+    #
+    # For example, buildifier can reorder attributes of targets in BUILD.bazel,
+    # resulting in different BUILD.gn outputs since `gn format` doesn't care
+    # about field order. This can cause confusing failures if users run
+    # `fx format-code` after `fx bazel2gn`.
+    "${PREBUILT_BUILDIFIER}" -mode=fix "${build_bazel}"
     "${BAZEL2GN_BIN}" \
-      --bazel_input_path "${FUCHSIA_DIR}/${dir}/BUILD.bazel" \
+      --bazel_input_path "${build_bazel}" \
       --gn_output_path "${build_gn}" \
       --gn_bin "${PREBUILT_GN}"
   done

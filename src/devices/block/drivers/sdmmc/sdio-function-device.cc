@@ -575,7 +575,7 @@ zx::result<> SdioFunctionDevice::DoRwTxn(
       .addr = request->txn.addr,
       .incr = request->txn.incr,
       .write = request->txn.write,
-      .buffers = {request->txn.buffers.data(), request->txn.buffers.count()},
+      .buffers = {request->txn.buffers.data(), request->txn.buffers.size()},
   };
   return zx::make_result(sdio_parent_->SdioDoRwTxn(function_, txn));
 }

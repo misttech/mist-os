@@ -536,7 +536,7 @@ void AuthTest::OnSaeFrameRx(const wlan_fullmac_wire::SaeFrame* frame) {
     EXPECT_EQ(frame->status_code(), wlan_ieee80211::StatusCode::kSuccess);
 
     ASSERT_TRUE(frame->has_sae_fields());
-    EXPECT_EQ(frame->sae_fields().count(), kCommitSaeFieldsLen);
+    EXPECT_EQ(frame->sae_fields().size(), kCommitSaeFieldsLen);
     EXPECT_BYTES_EQ(frame->sae_fields().data(), kCommitSaeFields, kCommitSaeFieldsLen);
 
     fidl::Array<uint8_t, 6> peer_sta_address;
@@ -560,7 +560,7 @@ void AuthTest::OnSaeFrameRx(const wlan_fullmac_wire::SaeFrame* frame) {
     EXPECT_EQ(frame->status_code(), wlan_ieee80211::StatusCode::kSuccess);
 
     ASSERT_TRUE(frame->has_sae_fields());
-    EXPECT_EQ(frame->sae_fields().count(), kConfirmSaeFieldsLen);
+    EXPECT_EQ(frame->sae_fields().size(), kConfirmSaeFieldsLen);
     EXPECT_EQ(memcmp(frame->sae_fields().data(), kConfirmSaeFields, kConfirmSaeFieldsLen), 0);
 
     if (sae_ignore_confirm)

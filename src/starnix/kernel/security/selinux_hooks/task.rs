@@ -128,8 +128,8 @@ fn close_inaccessible_file_descriptors(
                     "https://fxbug.dev/322843830",
                     "Check FsNode permissions for open files upon exec."
                 ),
-                current_task.kernel(),
                 &permission_check,
+                current_task.kernel(),
                 source_sid,
                 file.node(),
                 &permissions,
@@ -301,8 +301,8 @@ pub(in crate::security) fn check_exec_access(
             // TODO: https://fxbug.dev/412581419 - SIGKILL the process on failure.
             todo_check_permission(
                 TODO_DENY!("https://fxbug.dev/380076748", "Restrict processes with shared state."),
-                current_task.kernel(),
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 new_sid,
                 ProcessPermission::Share,
@@ -465,7 +465,7 @@ pub(in crate::security) fn check_signal_access(
     }
 }
 
-pub(in crate::security) fn check_syslog(
+pub(in crate::security) fn check_syslog_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     action: SyslogAction,
@@ -483,10 +483,9 @@ pub(in crate::security) fn check_syslog(
         | SyslogAction::Clear
         | SyslogAction::SizeUnread => SystemPermission::SyslogMod,
     };
-    todo_check_permission(
-        TODO_DENY!("https://fxbug.dev/425873800", "Enforce syslog permissions."),
-        current_task.kernel(),
+    check_permission(
         permission_check,
+        current_task.kernel(),
         sid,
         InitialSid::Kernel.into(),
         required_permission,

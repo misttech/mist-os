@@ -219,6 +219,36 @@ TEST(FcntlTest, FdDup) {
   ASSERT_LT(new_fd, 1000);
 }
 
+TEST(FcntlTest, SetFdAfterFdDup) {
+  int fd = OpenTestFile();
+  int new_fd = SAFE_SYSCALL(dup(fd));
+
+  int new_fd_flags_before = SAFE_SYSCALL(fcntl(new_fd, F_GETFD));
+  int flags = SAFE_SYSCALL(fcntl(fd, F_GETFD));
+  ASSERT_EQ(SAFE_SYSCALL(fcntl(fd, F_SETFD, flags ^ FD_CLOEXEC)), 0);
+
+  // `F_SETFD` sets per-FD flags, in contrast to `F_SETFL`, which modifies file "status" flags which
+  // are per file-description, and therefore shared by duplicated files. Changing `FD_CLOEXEC` on
+  // one of the duplicated descriptors has no effect on the other.
+  int new_fd_flags = SAFE_SYSCALL(fcntl(new_fd, F_GETFD));
+  EXPECT_EQ(new_fd_flags, new_fd_flags_before);
+}
+
+TEST(FcntlTest, SetFlAfterFdDup) {
+  int fd = OpenTestFile();
+  int new_fd = SAFE_SYSCALL(dup(fd));
+
+  int new_fd_flags_before = SAFE_SYSCALL(fcntl(new_fd, F_GETFL));
+  int flags = SAFE_SYSCALL(fcntl(fd, F_GETFL));
+  EXPECT_EQ(new_fd_flags_before, flags);
+  ASSERT_EQ(SAFE_SYSCALL(fcntl(fd, F_SETFL, flags ^ O_NONBLOCK)), 0);
+
+  // `F_SETFL` sets per-description file "status" flags, which are common to all FDs sharing the
+  // same file description. Changing `O_NONBLOCK` for an FD affects any duplicates.
+  int new_fd_flags = SAFE_SYSCALL(fcntl(new_fd, F_GETFL));
+  EXPECT_EQ(new_fd_flags, new_fd_flags_before ^ O_NONBLOCK);
+}
+
 TEST(FcntlTest, Noatime) {
   int fd = OpenTestFile();
 

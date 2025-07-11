@@ -153,7 +153,7 @@ CloneConfigAndTakeHandles(fidl::AnyArena& arena,
 
   if (src.has_inputs()) {
     std::vector<fuchsia_audio_effects::wire::InputConfiguration> inputs;
-    for (size_t k = 0; k < src.inputs().count(); k++) {
+    for (size_t k = 0; k < src.inputs().size(); k++) {
       auto& src_input = src.inputs()[k];
       auto dst_input = fuchsia_audio_effects::wire::InputConfiguration::Builder(arena);
       if (src_input.has_format()) {
@@ -170,7 +170,7 @@ CloneConfigAndTakeHandles(fidl::AnyArena& arena,
   if (src.has_outputs()) {
     std::vector<fuchsia_audio_effects::wire::OutputConfiguration> outputs;
 
-    for (size_t k = 0; k < src.outputs().count(); k++) {
+    for (size_t k = 0; k < src.outputs().size(); k++) {
       auto& src_output = src.outputs()[k];
       auto dst_output = fuchsia_audio_effects::wire::OutputConfiguration::Builder(arena);
 
@@ -276,11 +276,11 @@ fpromise::result<std::shared_ptr<EffectsStageV2>, zx_status_t> EffectsStageV2::C
     FX_LOGS(ERROR) << "ProcessorConfiguration missing field 'processor'";
     return fpromise::error(ZX_ERR_INVALID_ARGS);
   }
-  if (!config.has_inputs() || config.inputs().count() != 1) {
+  if (!config.has_inputs() || config.inputs().size() != 1) {
     FX_LOGS(ERROR) << "ProcessorConfiguration must have exactly one input stream";
     return fpromise::error(ZX_ERR_INVALID_ARGS);
   }
-  if (!config.has_outputs() || config.outputs().count() != 1) {
+  if (!config.has_outputs() || config.outputs().size() != 1) {
     FX_LOGS(ERROR) << "ProcessorConfiguration must have exactly one input stream";
     return fpromise::error(ZX_ERR_INVALID_ARGS);
   }
@@ -623,7 +623,7 @@ void EffectsStageV2::CallProcess(ReadLockContext& ctx, StreamUsageMask source_us
 
   // On success, update our metrics.
   auto& server_metrics = result->value()->per_stage_metrics;
-  for (size_t k = 0; k < server_metrics.count(); k++) {
+  for (size_t k = 0; k < server_metrics.size(); k++) {
     StageMetrics metrics;
     if (server_metrics[k].has_name()) {
       metrics.name.Append(server_metrics[k].name().get());

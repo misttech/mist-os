@@ -74,7 +74,7 @@ ssize_t LogExporter::LogMessage(fuchsia_logger::wire::LogMessage message) {
   RETURN_IF_ERROR(fprintf(output_file_, "[%05ld.%06ld][%lu][%lu]", GetSeconds(message.time),
                           GetNanoSeconds(message.time), message.pid, message.tid));
   RETURN_IF_ERROR(fputs("[", output_file_));
-  for (size_t i = 0; i < message.tags.count(); ++i) {
+  for (size_t i = 0; i < message.tags.size(); ++i) {
     if (i != 0) {
       RETURN_IF_ERROR(fputs(", ", output_file_));
     }
@@ -110,7 +110,7 @@ ssize_t LogExporter::LogMessage(fuchsia_logger::wire::LogMessage message) {
       RETURN_IF_ERROR(fprintf(output_file_, "[%05ld.%06ld][%lu][%lu]", GetSeconds(message.time),
                               GetNanoSeconds(message.time), message.pid, message.tid));
       RETURN_IF_ERROR(fputs("[", output_file_));
-      for (size_t i = 0; i < message.tags.count(); ++i) {
+      for (size_t i = 0; i < message.tags.size(); ++i) {
         if (i != 0) {
           RETURN_IF_ERROR(fputs(", ", output_file_));
         }

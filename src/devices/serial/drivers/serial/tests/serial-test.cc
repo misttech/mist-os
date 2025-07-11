@@ -65,7 +65,7 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
     for (i = 0; i < kBufferLength && read_buffer_[i]; ++i) {
       buffer[i] = read_buffer_[i];
     }
-    buffer.set_count(i);
+    buffer.set_size(i);
 
     completer.buffer(arena).ReplySuccess(buffer);
   }
@@ -74,7 +74,7 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
              WriteCompleter::Sync& completer) override {
     size_t i;
 
-    for (i = 0; i < request->data.count() && i < kBufferLength; ++i) {
+    for (i = 0; i < request->data.size() && i < kBufferLength; ++i) {
       write_buffer_[i] = request->data[i];
     }
 

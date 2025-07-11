@@ -83,6 +83,11 @@ where
             self.on_nat64_translator_state_changed();
         }
 
+        {
+            let driver_state = self.driver_state.lock();
+            driver_state.ot_instance.on_radio_handle_state_change(flags);
+        }
+
         Ok(())
     }
 

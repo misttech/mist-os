@@ -191,9 +191,9 @@ void NetworkDeviceShim::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest
   buffer_region_t regions[netdriver::kMaxTxBuffers * netdriver::kMaxBufferParts];
   size_t current_region = 0;
 
-  for (size_t i = 0; i < request->buffers.count(); ++i) {
+  for (size_t i = 0; i < request->buffers.size(); ++i) {
     const netdriver::wire::TxBuffer& fidl_buffer = request->buffers.at(i);
-    const size_t num_regions = fidl_buffer.data.count();
+    const size_t num_regions = fidl_buffer.data.size();
     if (num_regions > netdriver::kMaxBufferParts) {
       LOGF_ERROR("Number of regions %zu exceeds maximum value of %u", num_regions,
                  netdriver::kMaxBufferParts);
@@ -224,13 +224,13 @@ void NetworkDeviceShim::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest
     current_region += num_regions;
   }
 
-  impl_.QueueTx(buffers, request->buffers.count());
+  impl_.QueueTx(buffers, request->buffers.size());
 }
 
 void NetworkDeviceShim::QueueRxSpace(netdriver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
                                      fdf::Arena& arena, QueueRxSpaceCompleter::Sync& completer) {
   rx_space_buffer_t buffers[netdriver::kMaxRxSpaceBuffers];
-  for (size_t i = 0; i < request->buffers.count(); ++i) {
+  for (size_t i = 0; i < request->buffers.size(); ++i) {
     const netdriver::wire::RxSpaceBuffer& fidl_buffer = request->buffers.at(i);
     buffers[i] = {
         .id = fidl_buffer.id,
@@ -243,7 +243,7 @@ void NetworkDeviceShim::QueueRxSpace(netdriver::wire::NetworkDeviceImplQueueRxSp
     };
   }
 
-  impl_.QueueRxSpace(buffers, request->buffers.count());
+  impl_.QueueRxSpace(buffers, request->buffers.size());
 }
 
 void NetworkDeviceShim::PrepareVmo(netdriver::wire::NetworkDeviceImplPrepareVmoRequest* request,

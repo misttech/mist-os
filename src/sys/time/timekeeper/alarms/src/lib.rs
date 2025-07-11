@@ -458,6 +458,9 @@ async fn handle_request(
             // less to schedule the next alarm.
             log_long_op!(handle_cancel(alarm_id, cid, &mut cmd));
         }
+        fta::WakeAlarmsRequest::Set { .. } => {
+            // TODO(https://fxbug.dev/424009669): Finish implementation
+        }
         fta::WakeAlarmsRequest::_UnknownMethod { .. } => {}
     };
 }

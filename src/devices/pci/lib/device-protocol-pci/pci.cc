@@ -189,7 +189,7 @@ zx_status_t Pci::GetFirstCapability(fpci::CapabilityId id, uint8_t* out_offset) 
     return result.status();
   }
 
-  if (result.value().offsets.count() == 0) {
+  if (result.value().offsets.size() == 0) {
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -204,7 +204,7 @@ zx_status_t Pci::GetNextCapability(fpci::CapabilityId id, uint8_t start_offset,
     return result.status();
   }
   fidl::VectorView<uint8_t> offsets = result.value().offsets;
-  for (uint64_t i = 0; i < offsets.count() - 1; i++) {
+  for (uint64_t i = 0; i < offsets.size() - 1; i++) {
     if (offsets[i] == start_offset) {
       *out_offset = offsets[i + 1];
       return ZX_OK;
@@ -220,7 +220,7 @@ zx_status_t Pci::GetFirstExtendedCapability(fpci::ExtendedCapabilityId id,
     return result.status();
   }
 
-  if (result.value().offsets.count() == 0) {
+  if (result.value().offsets.size() == 0) {
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -235,7 +235,7 @@ zx_status_t Pci::GetNextExtendedCapability(fpci::ExtendedCapabilityId id, uint16
     return result.status();
   }
   auto offsets = result.value().offsets;
-  for (uint64_t i = 0; i < offsets.count() - 1; i++) {
+  for (uint64_t i = 0; i < offsets.size() - 1; i++) {
     if (offsets[i] == start_offset) {
       *out_offset = offsets[i + 1];
       return ZX_OK;

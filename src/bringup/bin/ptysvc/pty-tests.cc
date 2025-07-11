@@ -196,7 +196,7 @@ TEST_F(PtyTestCase, ServerWithNoClientsInitialConditions) {
       const fit::result response = result.value();
       ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
       const fidl::VectorView data = response.value()->data;
-      ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
+      ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
                 std::string_view());
     }
 
@@ -279,7 +279,7 @@ TEST_F(PtyTestCase, ServerEmpty0ByteRead) {
   const fit::result response = result.value();
   ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
   const fidl::VectorView data = response.value()->data;
-  ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
+  ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
             std::string_view());
 }
 
@@ -742,7 +742,7 @@ TEST_F(PtyTestCase, ServerClosesWhenClientPresent) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
+    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
               std::string_view(reinterpret_cast<char*>(kTestData), std::size(kTestData)));
   }
 
@@ -794,7 +794,7 @@ TEST_F(PtyTestCase, ServerReadClientCooked) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
+    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
               std::string_view(reinterpret_cast<const char*>(kExpectedReadback),
                                std::size(kExpectedReadback)));
   }
@@ -835,7 +835,7 @@ TEST_F(PtyTestCase, ServerWriteClientCooked) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
+    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
               std::string_view(reinterpret_cast<const char*>(kExpectedReadbackWithNul),
                                std::size(kExpectedReadbackWithNul) - 1));
   }
@@ -878,7 +878,7 @@ TEST_F(PtyTestCase, ServerReadClientRaw) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
+    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
               std::string_view(reinterpret_cast<char*>(kTestData), std::size(kTestData)));
   }
   // Nothing left to read
@@ -922,7 +922,7 @@ TEST_F(PtyTestCase, ServerWriteClientRaw) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
+    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
               std::string_view(reinterpret_cast<char*>(kTestData), std::size(kTestData)));
   }
   // Nothing left to read
@@ -983,10 +983,10 @@ TEST_F(PtyTestCase, ServerFillsClientFifo) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(data.count(), std::min(std::size(kTestString) - 1, total_written - total_read));
-    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
-              std::string_view(reinterpret_cast<char*>(kTestString), data.count()));
-    total_read += data.count();
+    ASSERT_EQ(data.size(), std::min(std::size(kTestString) - 1, total_written - total_read));
+    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
+              std::string_view(reinterpret_cast<char*>(kTestString), data.size()));
+    total_read += data.size();
   }
 
   ASSERT_STATUS(client_event.wait_one(
@@ -1038,10 +1038,10 @@ TEST_F(PtyTestCase, ClientFillsServerFifo) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(data.count(), std::min(std::size(kTestString) - 1, total_written - total_read));
-    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()),
-              std::string_view(reinterpret_cast<char*>(kTestString), data.count()));
-    total_read += data.count();
+    ASSERT_EQ(data.size(), std::min(std::size(kTestString) - 1, total_written - total_read));
+    ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()),
+              std::string_view(reinterpret_cast<char*>(kTestString), data.size()));
+    total_read += data.size();
   }
 
   ASSERT_STATUS(server_event.wait_one(
@@ -1123,7 +1123,7 @@ TEST_F(PtyTestCase, ClientsHaveIndependentFifos) {
     const fit::result response = result.value();
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fidl::VectorView data = response.value()->data;
-    ASSERT_EQ(data.count(), 1);
+    ASSERT_EQ(data.size(), 1);
     ASSERT_EQ(data.data()[0], expected_value);
 
     ASSERT_STATUS(

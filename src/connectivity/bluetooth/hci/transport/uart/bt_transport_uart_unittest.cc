@@ -91,7 +91,7 @@ class FakeSerialDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::Dev
   void Write(WriteRequestView request, fdf::Arena& arena,
              WriteCompleter::Sync& completer) override {
     ASSERT_FALSE(write_request_);
-    std::vector<uint8_t> buffer(request->data.data(), request->data.data() + request->data.count());
+    std::vector<uint8_t> buffer(request->data.data(), request->data.data() + request->data.size());
     writes_.emplace_back(std::move(buffer));
     write_request_.emplace(WriteRequest{std::move(arena), completer.ToAsync()});
     MaybeRespondToWrite();

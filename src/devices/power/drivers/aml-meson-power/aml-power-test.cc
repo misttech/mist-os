@@ -25,8 +25,7 @@ namespace {
 bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
                 const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
   return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
-         (lhs.duty_cycle == rhs.duty_cycle) &&
-         (lhs.mode_config.count() == rhs.mode_config.count()) &&
+         (lhs.duty_cycle == rhs.duty_cycle) && (lhs.mode_config.size() == rhs.mode_config.size()) &&
          (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config.data())->mode ==
           reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config.data())->mode);
 }
@@ -74,12 +73,11 @@ class FakePwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   void Enable(EnableCompleter::Sync& completer) override { completer.ReplySuccess(); }
 
   void ExpectSetConfig(fuchsia_hardware_pwm::wire::PwmConfig config) {
-    std::unique_ptr<uint8_t[]> mode_config =
-        std::make_unique<uint8_t[]>(config.mode_config.count());
-    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.count());
+    std::unique_ptr<uint8_t[]> mode_config = std::make_unique<uint8_t[]>(config.mode_config.size());
+    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.size());
     auto copy = config;
     copy.mode_config =
-        fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.count());
+        fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.size());
     expect_configs_.push_back(std::move(copy));
     mode_config_buffers_.push_back(std::move(mode_config));
   }

@@ -123,6 +123,8 @@ void RunVerbDisplay(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
   options.verbosity = ConsoleFormatOptions::Verbosity::kMinimal;
   options.wrapping = ConsoleFormatOptions::Wrapping::kSmart;
   options.pointer_expand_depth = 2;
+  options.num_format = GetNumberFormatForTarget(cmd.target());
+
   cmd_context->Output(
       FormatExpressionsForConsole({new_expression}, options, GetEvalContextForCommand(cmd)));
 }

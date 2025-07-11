@@ -8,6 +8,7 @@ use cm_rust::CapabilityTypeName;
 use cm_types::{Name, NamespacePath};
 use dispatcher_config::Config;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use fuchsia_component::client::connect::connect_to_protocol_at_dir_root;
 use fuchsia_component::directory::AsRefDirectory;
 use fuchsia_component::server;
 use futures::{FutureExt, StreamExt};
@@ -21,7 +22,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_internal as finternal, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
+    fidl_fuchsia_io as fio,
 };
 
 fn scoped_log(scoped_logger: &ScopedLogger, error: anyhow::Error) {
@@ -56,17 +57,15 @@ impl Dispatcher {
             return;
         };
         let svc_dir_proxy = svc_dir.into_proxy();
-        let (log_sink_proxy, server) = fidl::endpoints::create_proxy::<flogger::LogSinkMarker>();
-        if let Err(e) = svc_dir_proxy.as_ref_directory().open(
-            flogger::LogSinkMarker::PROTOCOL_NAME,
-            fio::Flags::PROTOCOL_SERVICE,
-            server.into_channel().into(),
-        ) {
-            log::error!("failed to open logsink for dispatcher component: {e:?}");
-            return;
-        }
-        let Ok(logger) = ScopedLogger::create(log_sink_proxy) else {
-            log::error!("failed to create scoped logge for dispatcher component");
+        let log_sink_client = match connect_to_protocol_at_dir_root(&svc_dir_proxy) {
+            Ok(log_sink_client) => log_sink_client,
+            Err(error) => {
+                log::error!(error:?; "failed to open logsink for dispatcher component");
+                return;
+            }
+        };
+        let Ok(logger) = ScopedLogger::create(log_sink_client) else {
+            log::error!("failed to create scoped logger for dispatcher component");
             return;
         };
         if let Err(err) = Self::run_inner(svc_dir_proxy, outgoing_dir, config, logger.clone()).await

@@ -1,0 +1,16 @@
+{{ denylist }}
+impl ::core::convert::From<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
+    #[inline]
+    fn from(from: crate::{{ name }}) -> Self {
+        match crate::{{ name }}::from(from) {
+            {% for member in enm.members %}
+                crate::{{ name }}::{{ member.name|camel }} =>
+                    Self::{{ member.name|compat_camel }},
+            {% endfor %}
+            {% if !enm.is_strict %}
+                crate::{{ name }}::UnknownOrdinal_(value) =>
+                    Self::__SourceBreaking { unknown_ordinal: value },
+            {% endif %}
+        }
+    }
+}

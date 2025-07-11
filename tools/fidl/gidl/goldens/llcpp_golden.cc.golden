@@ -278,7 +278,7 @@ var2[0] = uint8_t(1ull);
 var2[1] = uint8_t(2ull);
 var2[2] = uint8_t(3ull);
 var2[3] = uint8_t(4ull);
-for (size_t offset = 0; offset < var2.count(); offset += 4) {
+for (size_t offset = 0; offset < var2.size(); offset += 4) {
 memcpy(var2.data() + offset, var2.data(), 4);
 }
 var1.v = std::move(var2);
@@ -742,7 +742,7 @@ TEST(Conformance, GoldenByteVectorStruct_V2_Decode) {
     [[maybe_unused]] const auto& f1 = actual;
 [[maybe_unused]] const auto& f2 = f1.v;
 
-    return ((f2.count() == 12 && (f2[0] == uint8_t(1ull)) && (f2[1] == uint8_t(2ull)) && (f2[2] == uint8_t(3ull)) && (f2[3] == uint8_t(4ull)) && (f2[4] == uint8_t(1ull)) && (f2[5] == uint8_t(2ull)) && (f2[6] == uint8_t(3ull)) && (f2[7] == uint8_t(4ull)) && (f2[8] == uint8_t(1ull)) && (f2[9] == uint8_t(2ull)) && (f2[10] == uint8_t(3ull)) && (f2[11] == uint8_t(4ull))));
+    return ((f2.size() == 12 && (f2[0] == uint8_t(1ull)) && (f2[1] == uint8_t(2ull)) && (f2[2] == uint8_t(3ull)) && (f2[3] == uint8_t(4ull)) && (f2[4] == uint8_t(1ull)) && (f2[5] == uint8_t(2ull)) && (f2[6] == uint8_t(3ull)) && (f2[7] == uint8_t(4ull)) && (f2[8] == uint8_t(1ull)) && (f2[9] == uint8_t(2ull)) && (f2[10] == uint8_t(3ull)) && (f2[11] == uint8_t(4ull))));
   };
   EXPECT_TRUE(llcpp_conformance_utils::DecodeSuccess<test_conformance::wire::GoldenByteVectorStruct>(
     ::fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles), std::move(equality_check)));
@@ -761,7 +761,7 @@ TEST(Conformance, GoldenByteNullableVectorStructNonNull_V2_Decode) {
     [[maybe_unused]] const auto& f1 = actual;
 [[maybe_unused]] const auto& f2 = f1.v;
 
-    return ((f2.count() == 4 && (f2[0] == uint8_t(1ull)) && (f2[1] == uint8_t(2ull)) && (f2[2] == uint8_t(3ull)) && (f2[3] == uint8_t(4ull))));
+    return ((f2.size() == 4 && (f2[0] == uint8_t(1ull)) && (f2[1] == uint8_t(2ull)) && (f2[2] == uint8_t(3ull)) && (f2[3] == uint8_t(4ull))));
   };
   EXPECT_TRUE(llcpp_conformance_utils::DecodeSuccess<test_conformance::wire::GoldenNullableByteVectorStruct>(
     ::fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles), std::move(equality_check)));
@@ -799,7 +799,7 @@ TEST(Conformance, GoldenStructVectorStruct_V2_Decode) {
 [[maybe_unused]] const auto& f3 = f2[0];
 [[maybe_unused]] const auto& f4 = f2[1];
 
-    return ((f2.count() == 2 && ((f3.v == int16_t(1ull))) && ((f4.v == int16_t(2ull)))));
+    return ((f2.size() == 2 && ((f3.v == int16_t(1ull))) && ((f4.v == int16_t(2ull)))));
   };
   EXPECT_TRUE(llcpp_conformance_utils::DecodeSuccess<test_conformance::wire::GoldenStructVectorStruct>(
     ::fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles), std::move(equality_check)));

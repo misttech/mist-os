@@ -24,7 +24,7 @@ rustc_library("mock-reboot") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":mock-reboot-tests" ]
 }

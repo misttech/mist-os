@@ -36,6 +36,8 @@ class PciSdhci final : public DeviceType, public fdf::WireServer<fuchsia_hardwar
   void HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) override;
   void VendorSetBusClock(VendorSetBusClockRequestView request, fdf::Arena& arena,
                          VendorSetBusClockCompleter::Sync& completer) override;
+  void VendorPerformTuning(VendorPerformTuningRequestView request, fdf::Arena& arena,
+                           VendorPerformTuningCompleter::Sync& completer) override;
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();

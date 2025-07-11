@@ -4,23 +4,39 @@
 
 #include "src/storage/lib/vfs/cpp/connection/directory_connection.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/object_view.h>
+#include <lib/fidl/cpp/wire/status.h>
+#include <lib/fidl/cpp/wire/string_view.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
+#include <lib/file-lock/file-lock.h>
+#include <lib/fit/function.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/event.h>
 #include <lib/zx/handle.h>
+#include <lib/zx/result.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <memory>
+#include <optional>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
-#include <fbl/string_buffer.h>
+#include <fbl/ref_ptr.h>
 
-#include "fidl/fuchsia.io/cpp/common_types.h"
-#include "fidl/fuchsia.io/cpp/wire_types.h"
 #include "src/storage/lib/vfs/cpp/connection/advisory_lock.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/debug.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"

@@ -40,10 +40,6 @@ type RunCommand struct {
 	// ConfigFile is the path to the target configurations.
 	configFile string
 
-	// DownloadManifest is the path we should write the package server's
-	// download manifest to.
-	downloadManifest string
-
 	// ImageManifest is a path to an image manifest.
 	imageManifest string
 
@@ -70,13 +66,6 @@ type RunCommand struct {
 
 	// serialLogDir, if nonempty, is the directory in which system serial logs will be written.
 	serialLogDir string
-
-	// RepoURL specifies the URL of a package repository.
-	repoURL string
-
-	// BlobURL optionally specifies the URL of where a package repository's blobs may be served from.
-	// Defaults to $repoURL/blobs.
-	blobURL string
 
 	// localRepo specifies the path to a local package repository. If set,
 	// botanist will spin up a package server to serve packages from this
@@ -133,12 +122,8 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.DurationVar(&r.timeout, "timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will not impose a timeout.")
 	f.StringVar(&r.syslogDir, "syslog-dir", "", "the directory to write all system logs to.")
 	f.StringVar(&r.serialLogDir, "serial-log-dir", "", "the directory to write all serial logs to.")
-	// TODO(https://fxbug.dev/407117303): Remove `repo` and `blobs` flag after recipes no longer sets it.
-	f.StringVar(&r.repoURL, "repo", "", "URL at which to configure a package repository; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
-	f.StringVar(&r.blobURL, "blobs", "", "URL at which to serve a package repository's blobs; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
 	f.StringVar(&r.localRepo, "local-repo", "", "path to a local package repository; the repo and blobs flags are ignored when this is set")
 	f.StringVar(&r.ffxPath, "ffx", "", "Path to the ffx tool.")
-	f.StringVar(&r.downloadManifest, "download-manifest", "", "Path to a manifest containing all package server downloads")
 	f.Var(&r.experiments, "experiment", fmt.Sprintf("The name of an experiment to enable. Supported experiments are: %v.", botanist.SupportedExperiments))
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
 	f.DurationVar(&r.bootupTimeout, "bootup-timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will fall back to the default.")
@@ -453,6 +438,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		ExpectsSSH:    r.expectsSSH,
 		SSHKey:        sshKey,
 		AuthorizedKey: authorizedKey,
+		SerialLogDir:  r.serialLogDir,
 	})
 	if err != nil {
 		return err

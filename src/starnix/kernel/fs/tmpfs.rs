@@ -6,9 +6,10 @@ use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::memory_directory::MemoryDirectoryFile;
 use crate::vfs::{
-    fs_args, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, MemoryRegularNode, MemoryXattrStorage, SymlinkNode, XattrStorage as _,
+    fs_args, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode, DirEntry,
+    DirEntryHandle, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryRegularNode,
+    MemoryXattrStorage, SymlinkNode, XattrStorage as _,
 };
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
@@ -20,6 +21,7 @@ use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::{error, gid_t, statfs, uid_t, TMPFS_MAGIC};
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -60,8 +62,8 @@ impl FileSystemOps for Arc<TmpFs> {
             // The following cast are safe, unless something is seriously wrong:
             // - The filesystem should not be asked to rename node that it doesn't handle.
             // - Parents in a rename operation need to be directories.
-            // - TmpfsDirectory is the ops for directories in this filesystem.
-            &node.downcast_ops::<TmpfsDirectory>().unwrap().child_count
+            // - TmpFsDirectory is the ops for directories in this filesystem.
+            &node.downcast_ops::<TmpFsDirectory>().unwrap().child_count
         }
         if let Some(replaced) = replaced {
             if replaced.is_dir() {
@@ -197,7 +199,7 @@ impl TmpFs {
         let root_ino = fs.allocate_ino();
         let mut info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred { uid, gid });
         info.chmod(mode);
-        fs.create_root_with_info(root_ino, TmpfsDirectory::new(), info);
+        fs.create_root_with_info(root_ino, TmpFsDirectory::new(), info);
 
         if !mount_options.is_empty() {
             track_stub!(
@@ -209,16 +211,72 @@ impl TmpFs {
 
         Ok(fs)
     }
+
+    pub fn set_initial_content(fs: &FileSystemHandle, data: TmpFsData) {
+        fn create_dir_entry_from_data(
+            fs: &FileSystemHandle,
+            data: TmpFsData,
+            this: Option<DirEntryHandle>,
+            name: FsString,
+        ) -> DirEntryHandle {
+            match data.node_type {
+                TmpFsNodeType::Link(target) => {
+                    assert!(this.is_none());
+                    let node = TmpFsDirectory::new_symlink(fs, target.as_ref(), data.owner);
+                    DirEntry::new(node, None, name)
+                }
+                TmpFsNodeType::Directory(children) => {
+                    let this = this.unwrap_or_else(|| {
+                        let info = FsNodeInfo::new(mode!(IFDIR, data.perm), data.owner);
+                        let node = fs.create_node_and_allocate_node_id(TmpFsDirectory::new(), info);
+                        DirEntry::new(node, None, name.clone())
+                    });
+                    this.node
+                        .downcast_ops::<TmpFsDirectory>()
+                        .expect("directory must be from tmpfs")
+                        .child_count
+                        .fetch_add(children.len() as u32, Ordering::Release);
+                    let children = children
+                        .into_iter()
+                        .map(|(name, data)| {
+                            let child = create_dir_entry_from_data(fs, data, None, name.clone());
+                            (name, child)
+                        })
+                        .collect::<BTreeMap<_, _>>();
+                    this.set_children(children);
+                    this
+                }
+            }
+        }
+
+        create_dir_entry_from_data(fs, data, Some(Arc::clone(fs.root())), "".into());
+    }
 }
 
-pub struct TmpfsDirectory {
+pub enum TmpFsNodeType {
+    Link(FsString),
+    Directory(BTreeMap<FsString, TmpFsData>),
+}
+
+pub struct TmpFsData {
+    pub owner: FsCred,
+    pub perm: u32,
+    pub node_type: TmpFsNodeType,
+}
+
+pub struct TmpFsDirectory {
     xattrs: MemoryXattrStorage,
     child_count: AtomicU32,
 }
 
-impl TmpfsDirectory {
+impl TmpFsDirectory {
     pub fn new() -> Self {
         Self { xattrs: MemoryXattrStorage::default(), child_count: AtomicU32::new(0) }
+    }
+
+    fn new_symlink(fs: &Arc<FileSystem>, target: &FsStr, owner: FsCred) -> FsNodeHandle {
+        let (link, info) = SymlinkNode::new(target, owner);
+        fs.create_node_and_allocate_node_id(link, info)
     }
 }
 
@@ -231,7 +289,7 @@ fn create_child_node(
     let ops: Box<dyn FsNodeOps> = match mode.fmt() {
         FileMode::IFREG => Box::new(MemoryRegularNode::new()?),
         FileMode::IFIFO | FileMode::IFBLK | FileMode::IFCHR | FileMode::IFSOCK => {
-            Box::new(TmpfsSpecialNode::new())
+            Box::new(TmpFsSpecialNode::new())
         }
         _ => return error!(EACCES),
     };
@@ -247,7 +305,7 @@ fn create_child_node(
     Ok(child)
 }
 
-impl FsNodeOps for TmpfsDirectory {
+impl FsNodeOps for TmpFsDirectory {
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
     fn create_file_ops(
@@ -275,7 +333,7 @@ impl FsNodeOps for TmpfsDirectory {
         self.child_count.fetch_add(1, Ordering::Release);
         Ok(node
             .fs()
-            .create_node_and_allocate_node_id(TmpfsDirectory::new(), FsNodeInfo::new(mode, owner)))
+            .create_node_and_allocate_node_id(TmpFsDirectory::new(), FsNodeInfo::new(mode, owner)))
     }
 
     fn mknod(
@@ -303,8 +361,7 @@ impl FsNodeOps for TmpfsDirectory {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         self.child_count.fetch_add(1, Ordering::Release);
-        let (link, info) = SymlinkNode::new(target, owner);
-        Ok(node.fs().create_node_and_allocate_node_id(link, info))
+        Ok(Self::new_symlink(&node.fs(), target, owner))
     }
 
     fn create_tmpfile(
@@ -345,9 +402,9 @@ impl FsNodeOps for TmpfsDirectory {
             // The following cast is safe, unless something is seriously wrong:
             // - The filesystem should not be asked to unlink a node that it doesn't handle.
             // - The child has already been determined to be a directory.
-            // - TmpfsDirectory is the ops for directories in this filesystem.
+            // - TmpFsDirectory is the ops for directories in this filesystem.
             let child_count =
-                &child_to_unlink.downcast_ops::<TmpfsDirectory>().unwrap().child_count;
+                &child_to_unlink.downcast_ops::<TmpFsDirectory>().unwrap().child_count;
             if child_count.load(Ordering::Relaxed) != 0 {
                 return error!(ENOTEMPTY);
             }
@@ -364,17 +421,17 @@ impl FsNodeOps for TmpfsDirectory {
     }
 }
 
-struct TmpfsSpecialNode {
+struct TmpFsSpecialNode {
     xattrs: MemoryXattrStorage,
 }
 
-impl TmpfsSpecialNode {
+impl TmpFsSpecialNode {
     pub fn new() -> Self {
         Self { xattrs: MemoryXattrStorage::default() }
     }
 }
 
-impl FsNodeOps for TmpfsSpecialNode {
+impl FsNodeOps for TmpFsSpecialNode {
     fs_node_impl_not_dir!();
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 

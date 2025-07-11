@@ -36,7 +36,7 @@ TEST(ConsumerControlTest, HidButtonsTest) {
   EXPECT_TRUE(descriptor.consumer_control().has_input());
 
   // Test the descriptor.
-  EXPECT_EQ(descriptor.consumer_control().input().buttons().count(), 5U);
+  EXPECT_EQ(descriptor.consumer_control().input().buttons().size(), 5U);
   EXPECT_EQ(descriptor.consumer_control().input().buttons()[0],
             fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
   EXPECT_EQ(descriptor.consumer_control().input().buttons()[1],
@@ -61,7 +61,7 @@ TEST(ConsumerControlTest, HidButtonsTest) {
             consumer_control.ParseInputReport(reinterpret_cast<uint8_t*>(&report), sizeof(report),
                                               report_allocator, input_report));
 
-  EXPECT_EQ(input_report.consumer_control().pressed_buttons().count(), 3U);
+  EXPECT_EQ(input_report.consumer_control().pressed_buttons().size(), 3U);
   EXPECT_EQ(input_report.consumer_control().pressed_buttons()[0],
             fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
   EXPECT_EQ(input_report.consumer_control().pressed_buttons()[1],

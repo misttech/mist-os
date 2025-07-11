@@ -65,16 +65,7 @@ open protocol WakeAlarms {
         deadline zx.InstantBoot;
 
         /// Optional mode that allows the API to support a number of use cases.
-        mode @generated_name("SetMode") flexible resource union {
-            /// This lease is dropped as immediately after the alarm is scheduled
-            /// (or an error occurs during scheduling), thus guaranteeing that the
-            /// alarm is scheduled before the system is suspended.
-            1: keep_alive fuchsia.power.system.LeaseToken;
-            /// The callee signals this event (with ZX_EVENT_SIGNALED) once the alarm
-            /// is scheduled. This indicates that the caller can drop any pending wake
-            /// leases related to this call.
-            2: notify_setup_done zx.Handle:EVENT;
-        };
+        mode SetMode;
 
         /// Set to a nonempty value to identify the alarm. A unique value
         /// of [AlarmId] must be picked per each unique alarm within a
@@ -105,6 +96,90 @@ open protocol WakeAlarms {
         /// The caller must handle such an event gracefully.
         alarm_id AlarmId;
     });
+
+    /// Sets a wake alarm with the provided parameters.
+    ///
+    /// The caller may request multiple alarms concurrently. Re-requesting
+    /// an alarm that has the same `alarm_id` as an already scheduled alarm
+    /// causes that scheduled alarm to be canceled before the same alarm
+    /// is scheduled again.
+    ///
+    /// ## Return value
+    ///
+    /// This method will return when the alarm is scheduled.
+    ///
+    /// ## Protocol Errors
+    ///
+    /// * [UNSPECIFIED] you are observing a new failure mode which has not
+    ///   been assigned an error code yet. Expect this failure mode to be
+    ///   assigned a more specific error code in future versions of this API.
+    ///   This is not a bug, but an indication that you may need to update the
+    ///   API version.
+    /// * [INTERNAL] is a bug: an internal fallible call (which is expected
+    ///   to be unlikely to fail) has failed somehow. Please report this for
+    ///   investigation.
+    Set(@generated_name("SetArgs") resource struct {
+        /// Notifier to call when the alarm fires. When the server_end to
+        /// this channel is dropped, the alarm will be canceled.
+        notifier client_end:Notifier;
+
+        /// The deadline at which the timer is supposed to fire. This
+        /// corresponds to a time instant on the boot timeline.
+        deadline zx.InstantBoot;
+
+        /// Optional mode that allows the API to support a number of use cases.
+        mode SetMode;
+
+        /// Set to a nonempty value to identify the alarm. A unique value
+        /// of [AlarmId] must be picked per each unique alarm within a
+        /// single FIDL connection's scope.
+        ///
+        /// Supplying an alarm_id for an already scheduled alarm reschedules
+        /// that alarm.
+        alarm_id AlarmId;
+    }) -> () error WakeAlarmsError;
+};
+
+/// [Notifier] is used to notify when a wake alarm fires.
+///
+/// A client-end channel of this protocol will be provided to the implementor of
+/// [WakeAlarms.Set].
+///
+/// Dropping the server-end will cancel all alarms scheduled with [WakeAlarms.Set]
+/// associated with this server instance.
+open protocol Notifier {
+    /// Notifies when an alarm previously set by [WakeAlarms.Set] fires.
+    Notify(resource struct {
+        /// Identifier of the alarm that fired.
+        alarm_id AlarmId;
+
+        /// Used to ensure a minimum time slice for useful work, before the
+        /// system may suspend again.
+        keep_alive fuchsia.power.system.LeaseToken;
+    });
+
+    /// Notifies when an alarm previously set by [WakeAlarms.Set] is unable to
+    /// fire due to an error.
+    NotifyError(resource struct {
+        /// Identifier of the alarm that fired.
+        alarm_id AlarmId;
+
+        /// Error preventing the alarm from firing.
+        error WakeAlarmsError;
+    });
+};
+
+/// A mode of notification for when an alarm has been scheduled.
+type SetMode = flexible resource union {
+    /// This lease is dropped as immediately after the alarm is scheduled
+    /// (or an error occurs during scheduling), thus guaranteeing that the
+    /// alarm is scheduled before the system is suspended.
+    1: keep_alive fuchsia.power.system.LeaseToken;
+
+    /// The callee signals this event (with ZX_EVENT_SIGNALED) once the alarm
+    /// is scheduled. This indicates that the caller can drop any pending wake
+    /// leases related to this call.
+    2: notify_setup_done zx.Handle:EVENT;
 };
 
 /// WakeAlarmsError describes the error code that can be returned from wake

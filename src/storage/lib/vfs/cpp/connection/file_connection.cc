@@ -4,19 +4,35 @@
 
 #include "src/storage/lib/vfs/cpp/connection/file_connection.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
-#include <lib/zx/handle.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/object_view.h>
+#include <lib/fidl/cpp/wire/status.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
+#include <lib/file-lock/file-lock.h>
+#include <lib/fit/function.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/event.h>
+#include <lib/zx/result.h>
+#include <lib/zx/stream.h>
+#include <lib/zx/vmo.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <sys/stat.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/types.h>
 
-#include <memory>
+#include <optional>
+#include <string_view>
 #include <utility>
 
-#include <fbl/string_buffer.h>
+#include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/connection/advisory_lock.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/debug.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"

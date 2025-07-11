@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.sdhci/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/fidl.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -18,7 +19,6 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
-#include <zircon/threads.h>
 
 #include <mutex>
 #include <optional>
@@ -56,6 +56,7 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   Sdhci(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
+        irq_handler_{this},
         registered_vmo_stores_{
             // SdmmcVmoStore does not have a default constructor, so construct each one using an
             // empty Options (do not map or pin automatically upon VMO registration).
@@ -72,8 +73,6 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
         } {}
 
   zx::result<> Start() override;
-
-  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);
   zx_status_t SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) TA_EXCL(mtx_);
@@ -133,7 +132,7 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   // Override to inject dependency for unit testing.
   virtual zx_status_t InitMmio();
   virtual zx_status_t WaitForReset(SoftwareReset mask);
-  virtual zx_status_t WaitForInterrupt() { return irq_.wait(nullptr); }
+  async_dispatcher_t* irq_dispatcher() const { return irq_dispatcher_.async_dispatcher(); }
 
   std::optional<fdf::MmioBuffer> regs_mmio_buffer_;
 
@@ -204,9 +203,9 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   zx_status_t WaitForInhibit(PresentState mask) const;
   zx_status_t WaitForInternalClockStable() const;
 
-  int IrqThread() TA_EXCL(mtx_);
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt) TA_EXCL(mtx_);
   void HandleTransferInterrupt(InterruptStatus status) TA_REQ(mtx_);
-  void SetSchedulerRole(const std::string& role);
 
   zx::result<PendingRequest> StartRequest(const sdmmc_req_t& request,
                                           DmaDescriptorBuilder<OwnedVmoInfo>& builder) TA_REQ(mtx_);
@@ -229,9 +228,10 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   zx_status_t SetBusClock(uint32_t frequency_hz);
 
+  zx_status_t PerformVendorTuningIfNeeded(uint32_t cmd_idx);
+
   zx::interrupt irq_;
-  thrd_t irq_thread_;
-  bool irq_thread_started_ = false;
+  async::IrqMethod<Sdhci, &Sdhci::HandleIrq> irq_handler_;
 
   fdf::WireSyncClient<fuchsia_hardware_sdhci::Device> sdhci_;
   fdf::Arena arena_{'SDHC'};
@@ -267,6 +267,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   compat::BanjoServer sdmmc_server_{ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
   compat::SyncInitializedDeviceServer compat_server_;
   fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_;
+
+  fdf::Dispatcher irq_dispatcher_;
 };
 
 }  // namespace sdhci

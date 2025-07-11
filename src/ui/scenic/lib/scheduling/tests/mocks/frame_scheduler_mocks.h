@@ -7,6 +7,7 @@
 
 #include <deque>
 #include <unordered_map>
+#include <vector>
 
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
 #include "src/ui/scenic/lib/scheduling/vsync_timing.h"

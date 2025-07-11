@@ -23,6 +23,12 @@ pub struct PlatformStarnixConfig {
     // RtnetlinkTreatmentOfIbf0Interface::NoProvideFake the default behavior.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub rtnetlink_ifb0: RtnetlinkTreatmentOfIfb0Interface,
+
+    // Whether the network manager feature should be enabled.
+    // Should be enabled alongside `SocketMarkTreatment` and
+    // the `include_socket_proxy` assembly argument.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub network_manager: NetworkManagerTreatment,
 }
 
 /// How starnix treats socket marks.
@@ -44,8 +50,20 @@ pub enum SocketMarkTreatment {
 pub enum RtnetlinkTreatmentOfIfb0Interface {
     /// Provide a fake implementation of that interface such that common netlink commands work
     /// against it (e.g. installing and listing addresses).
-    #[derivative(Default)]
     ProvideFake,
     /// Do not provide any fake interface implementation.
+    #[derivative(Default)]
     NoProvideFake,
+}
+
+/// Whether the network manager feature should be included in the Starnix container.
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkManagerTreatment {
+    /// Do not include the network manager feature.
+    #[derivative(Default)]
+    Disabled,
+    /// Include the network manager feature.
+    Enabled,
 }

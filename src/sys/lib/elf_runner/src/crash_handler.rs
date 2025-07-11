@@ -79,7 +79,6 @@ mod tests {
     use super::*;
     use anyhow::{Context as _, Error};
     use fuchsia_component::client as fclient;
-    use std::sync::Arc;
     use zx::HandleBased;
     use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime};
 
@@ -100,10 +99,10 @@ mod tests {
         // Set up a new library loader and provide it to the loader service
         let (ll_client_chan, ll_service_chan) = zx::Channel::create();
         library_loader::start(
-            Arc::new(fuchsia_fs::directory::open_in_namespace(
+            fuchsia_fs::directory::open_in_namespace(
                 "/pkg/lib",
                 fio::PERM_READABLE | fio::PERM_EXECUTABLE,
-            )?),
+            )?,
             ll_service_chan,
         );
         let handle_infos = vec![fprocess::HandleInfo {

@@ -152,15 +152,15 @@ void DevicePort::GetInitialPortInfo(fit::callback<void(zx_status_t)>&& on_comple
           return;
         }
 
-        if (result->info.rx_types().count() > netdev::wire::kMaxFrameTypes) {
-          LOGF_ERROR("too many port rx types: %ld > %d", result->info.rx_types().count(),
+        if (result->info.rx_types().size() > netdev::wire::kMaxFrameTypes) {
+          LOGF_ERROR("too many port rx types: %ld > %d", result->info.rx_types().size(),
                      netdev::wire::kMaxFrameTypes);
           on_complete(ZX_ERR_INVALID_ARGS);
           return;
         }
 
-        if (result->info.tx_types().count() > netdev::wire::kMaxFrameTypes) {
-          LOGF_ERROR("too many port tx types: %ld > %d", result->info.tx_types().count(),
+        if (result->info.tx_types().size() > netdev::wire::kMaxFrameTypes) {
+          LOGF_ERROR("too many port tx types: %ld > %d", result->info.tx_types().size(),
                      netdev::wire::kMaxFrameTypes);
           on_complete(ZX_ERR_INVALID_ARGS);
           return;

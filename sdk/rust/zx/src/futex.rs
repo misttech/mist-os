@@ -165,8 +165,12 @@ mod tests {
     #[test]
     fn basic_wait_wake() {
         // SAFETY: converting between versions of the same types, the handle is valid
-        let main_thread =
-            unsafe { Unowned::from_raw_handle(fuchsia_runtime::thread_self().raw_handle()) };
+        let main_thread = unsafe {
+            Unowned::from_raw_handle(fuchsia_runtime::with_thread_self(|thread| {
+                // Need the raw_handle method from fuchsia_runtime's dependency.
+                zx::AsHandleRef::raw_handle(thread)
+            }))
+        };
         let futex = Futex::new(0);
         std::thread::scope(|s| {
             s.spawn(|| futex.wait(0, Some(&*main_thread), MonotonicInstant::INFINITE).unwrap());

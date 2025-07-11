@@ -288,7 +288,8 @@ ParseCreateEdgeOptions(
   Node::CreateEdgeOptions options;
   if (request->has_mixer_sampler()) {
     if (dest.type() == Node::Type::kMixer && request->mixer_sampler().is_sinc_sampler()) {
-      // TODO(https://fxbug.dev/42065670): Make use of `fuchsia_audio_mixer::wire::SincSampler` parameters.
+      // TODO(https://fxbug.dev/42065670): Make use of `fuchsia_audio_mixer::wire::SincSampler`
+      // parameters.
       options.sampler_type = Sampler::Type::kSincSampler;
     } else {
       return fpromise::error(fuchsia_audio_mixer::CreateEdgeError::kUnsupportedOption);
@@ -298,7 +299,7 @@ ParseCreateEdgeOptions(
     if (source.type() != Node::Type::kMixer && dest.type() != Node::Type::kMixer) {
       return fpromise::error(fuchsia_audio_mixer::CreateEdgeError::kUnsupportedOption);
     }
-    options.gain_ids.reserve(request->gain_controls().count());
+    options.gain_ids.reserve(request->gain_controls().size());
     for (const auto& gain_id : request->gain_controls()) {
       if (gain_controls.count(gain_id) == 0) {
         return fpromise::error(fuchsia_audio_mixer::CreateEdgeError::kInvalidGainControl);
@@ -534,8 +535,8 @@ void GraphServer::CreateProducer(CreateProducerRequestView request,
       return;
     }
 
-    // TODO(https://fxbug.dev/42066191): each time the producer's downstream delay changes, validate that
-    // consumer_frames >= downstream delay.
+    // TODO(https://fxbug.dev/42066191): each time the producer's downstream delay changes, validate
+    // that consumer_frames >= downstream delay.
 
     source = std::move(result.value().ring_buffer);
     format = result.value().format;
@@ -783,8 +784,8 @@ void GraphServer::CreateMixer(CreateMixerRequestView request,
     completer.ReplyError(fuchsia_audio_mixer::CreateNodeError::kInvalidParameter);
     return;
   }
-  // TODO(https://fxbug.dev/42065679): This check blelow is not a strict FIDL API requirement, but an
-  // enforcement by the underlying `MixerStage`. Revisit if we want to support non-float types.
+  // TODO(https://fxbug.dev/42065679): This check blelow is not a strict FIDL API requirement, but
+  // an enforcement by the underlying `MixerStage`. Revisit if we want to support non-float types.
   if (format.value().sample_type() != fuchsia_audio::wire::SampleType::kFloat32) {
     FX_LOGS(WARNING) << "CreateMixer: destination format must use float";
     completer.ReplyError(fuchsia_audio_mixer::CreateNodeError::kInvalidParameter);

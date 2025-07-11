@@ -69,7 +69,7 @@ void RuntimeTest::ParentSetTestData(const void* data_to_send, size_t size) {
   fidl::Arena arena;
   fidl::VectorView<uint8_t> data(arena, size);
   memcpy(data.data(), data_to_send, size);
-  data.set_count(size);
+  data.set_size(size);
 
   auto response = fidl::WireCall(parent_chan)->SetTestData(std::move(data));
   ASSERT_EQ(ZX_OK, response.status());
@@ -92,7 +92,7 @@ void RuntimeTest::GetParentDataOverRuntimeChannel(bool sync, const void* want_da
   ASSERT_EQ(call_status, ZX_OK);
 
   auto data = response->value()->out;
-  ASSERT_EQ(data.count(), want_size);
+  ASSERT_EQ(data.size(), want_size);
   ASSERT_EQ(memcmp(data.data(), want_data, want_size), 0);
 }
 

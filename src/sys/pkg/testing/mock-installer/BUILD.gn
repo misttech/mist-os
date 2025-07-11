@@ -27,7 +27,7 @@ rustc_library("mock-installer") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":mock-installer-tests" ]
 }

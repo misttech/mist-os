@@ -19,14 +19,14 @@ type VmoKeyMap = HashMap<String, (i32, Option<zx::Vmo>)>;
 #[derive(Debug)]
 pub struct LibraryLoaderCache {
     /// Proxy to /pkg/lib
-    lib_proxy: Arc<fio::DirectoryProxy>,
+    lib_proxy: fio::DirectoryProxy,
 
     /// Mapping of config key with loaded VMOs map.
     load_response_map: FutMutex<HashMap<String, Arc<FutMutex<VmoKeyMap>>>>,
 }
 
 impl LibraryLoaderCache {
-    pub fn new(lib_proxy: Arc<fio::DirectoryProxy>) -> Arc<Self> {
+    pub fn new(lib_proxy: fio::DirectoryProxy) -> Arc<Self> {
         return Arc::new(Self { lib_proxy, load_response_map: FutMutex::new(HashMap::new()) });
     }
 }
@@ -77,7 +77,7 @@ fn serve_lib_loader(
             let mut stream = loader.into_stream();
             let (mut search_dirs, mut current_response_map) = match lib_loader_cache.upgrade() {
                 Some(obj) => (
-                    vec![obj.lib_proxy.clone()],
+                    vec![Clone::clone(&obj.lib_proxy)],
                     obj.load_response_map.lock().await.entry("".to_string()).or_default().clone(),
                 ),
                 None => return Ok(()),
@@ -114,7 +114,7 @@ fn serve_lib_loader(
                     }
                     LoaderRequest::Config { config, responder } => {
                         match library_loader::parse_config_string(
-                            &vec![lib_loader_cache.lib_proxy.clone()],
+                            &vec![Clone::clone(&lib_loader_cache.lib_proxy)],
                             &config,
                         ) {
                             Ok(new_search_path) => {

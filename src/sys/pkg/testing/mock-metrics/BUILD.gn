@@ -28,7 +28,7 @@ fuchsia_unittest_package("mock-metrics-tests") {
   deps = [ ":mock-metrics_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":mock-metrics-tests" ]
 }

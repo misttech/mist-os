@@ -5,7 +5,7 @@
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use crate::OnSignalsRef;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::task::{ready, Context, Poll, Waker};
 use zx::{self as zx, AsHandleRef};
 
@@ -209,7 +209,7 @@ where
         );
         assert!(!S::WRITABLE_SIGNALS.intersects(S::READABLE_SIGNALS), "signals may not intersect");
         let initial_signals = S::WRITABLE_SIGNALS | S::READABLE_SIGNALS;
-        let receiver = ehandle.register_receiver(Arc::new(RWPacketReceiver {
+        let receiver = ehandle.register_receiver(RWPacketReceiver {
             inner: Mutex::new(Inner {
                 // Optimistically assume that the handle is readable and writable.
                 // Reads and writes will be attempted before queueing a packet.
@@ -222,7 +222,7 @@ where
                 write_task: None,
             }),
             _marker: PhantomData,
-        }));
+        });
 
         RWHandle { handle, receiver }
     }

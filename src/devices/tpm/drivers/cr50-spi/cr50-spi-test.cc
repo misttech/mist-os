@@ -66,10 +66,10 @@ class Cr50SpiTest : public zxtest::Test,
 
   void Exchange(fidl::VectorView<uint8_t> transmit, fidl::VectorView<uint8_t>* receive) {
     SpiMessage next = messages_.front();
-    ASSERT_EQ(transmit.count(), next.tx.size());
+    ASSERT_EQ(transmit.size(), next.tx.size());
     ASSERT_BYTES_EQ(transmit.data(), next.tx.data(), next.tx.size());
     if (receive) {
-      ASSERT_EQ(receive->count(), next.rx.size());
+      ASSERT_EQ(receive->size(), next.rx.size());
       memcpy(receive->data(), next.rx.data(), next.rx.size());
     } else {
       ASSERT_EQ(next.rx.size(), 0);
@@ -92,7 +92,7 @@ class Cr50SpiTest : public zxtest::Test,
   void ExchangeVector(ExchangeVectorRequestView request,
                       ExchangeVectorCompleter::Sync& completer) override {
     fidl::Arena<> alloc;
-    fidl::VectorView<uint8_t> out(alloc, request->txdata.count());
+    fidl::VectorView<uint8_t> out(alloc, request->txdata.size());
     ASSERT_NO_FATAL_FAILURE(Exchange(request->txdata, &out));
     completer.Reply(ZX_OK, out);
   }
@@ -216,7 +216,7 @@ TEST_F(Cr50SpiTest, TestTpmRead) {
   ASSERT_TRUE(read.ok());
   ASSERT_TRUE(read->is_ok());
   auto& view = read->value()->data;
-  ASSERT_EQ(view.count(), expected.size());
+  ASSERT_EQ(view.size(), expected.size());
   ASSERT_BYTES_EQ(view.data(), expected.data(), expected.size());
   ASSERT_EQ(messages_.size(), 0);
 }

@@ -62,8 +62,8 @@ TEST_F(EffectsLoaderV2Test, CreateEffect) {
   auto& config = config_result->value()->processor_configuration;
   ASSERT_TRUE(config.has_inputs());
   ASSERT_TRUE(config.has_outputs());
-  EXPECT_EQ(config.inputs().count(), 1u);
-  EXPECT_EQ(config.outputs().count(), 1u);
+  EXPECT_EQ(config.inputs().size(), 1u);
+  EXPECT_EQ(config.outputs().size(), 1u);
   EXPECT_EQ(config.inputs()[0].format().channel_count, 1u);
   EXPECT_EQ(config.outputs()[0].format().channel_count, 1u);
   EXPECT_EQ(config.outputs()[0].latency_frames(), 0u);

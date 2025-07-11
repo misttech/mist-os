@@ -32,8 +32,12 @@ impl Validation {
 
         info!("checking if any of the {} base package blobs are missing", base_blobs.len());
 
-        let mut missing =
-            self.blobfs.filter_to_missing_blobs(base_blobs).await.into_iter().collect::<Vec<_>>();
+        let mut missing = self
+            .blobfs
+            .filter_to_missing_blobs(base_blobs.iter().copied())
+            .await
+            .into_iter()
+            .collect::<Vec<_>>();
         missing.sort();
 
         if missing.is_empty() {
@@ -129,9 +133,9 @@ impl vfs::directory::entry_container::Directory for Validation {
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
-        sink: Box<(dyn vfs::directory::dirents_sink::Sink + 'static)>,
+        sink: Box<dyn vfs::directory::dirents_sink::Sink + 'static>,
     ) -> Result<
-        (TraversalPosition, Box<(dyn vfs::directory::dirents_sink::Sealed + 'static)>),
+        (TraversalPosition, Box<dyn vfs::directory::dirents_sink::Sealed + 'static>),
         zx::Status,
     > {
         vfs::directory::read_dirents::read_dirents(

@@ -171,11 +171,13 @@ template("fshost_integration_test_component") {
 # executed.
 #
 #   enable_migration_tests (default: true)
-#   enable_write_data_file_tests (default: true)
+#     [bool] Include migration tests in the integration test package.
+#
 #   enable_wipe_storage_tests (default: true)
-#   enable_corrupt_tests (default: true)
-#     [bool] Enable additional fshost integration tests for more specific things. Default to
-#            enabled, but some configurations don't support them.
+#     [bool] Include wipe storage tests in the integration test package.
+#
+#   enable_corruption_tests (default: true)
+#     [bool] Include corruption tests in the integration test package.
 #
 #   data_filesystem_variant (optional)
 #     [string] A variant string passed to the integration test harness. Defaults to the
@@ -202,14 +204,11 @@ template("fshost_integration_test_package") {
   if (!defined(invoker.enable_migration_tests)) {
     invoker.enable_migration_tests = true
   }
-  if (!defined(invoker.enable_write_data_file_tests)) {
-    invoker.enable_write_data_file_tests = true
-  }
   if (!defined(invoker.enable_wipe_storage_tests)) {
     invoker.enable_wipe_storage_tests = true
   }
-  if (!defined(invoker.enable_corrupt_tests)) {
-    invoker.enable_corrupt_tests = true
+  if (!defined(invoker.enable_corruption_tests)) {
+    invoker.enable_corruption_tests = true
   }
   if (!defined(fshost_options.data_filesystem_format)) {
     # data_filesystem_format is implied from fxblob.
@@ -231,6 +230,11 @@ template("fshost_integration_test_package") {
     _extra_features = [ "storage-host" ]
   }
 
+  _test_packages = []
+
+  #
+  # General Integration Tests
+  #
   _integration_component_target = "${target_name}_general"
   _test_components = [ ":$_integration_component_target" ]
   fshost_integration_test_component(_integration_component_target) {
@@ -276,6 +280,9 @@ template("fshost_integration_test_package") {
     }
   }
 
+  #
+  # Migration Tests
+  #
   if (invoker.enable_migration_tests) {
     _migration_component_target = "${target_name}_migration"
     _test_components += [ ":$_migration_component_target" ]
@@ -288,6 +295,9 @@ template("fshost_integration_test_package") {
     }
   }
 
+  #
+  # Wipe Storage Tests
+  #
   if (invoker.enable_wipe_storage_tests) {
     _wipe_storage_component_target = "${target_name}_wipe_storage"
     _test_components += [ ":$_wipe_storage_component_target" ]
@@ -313,31 +323,29 @@ template("fshost_integration_test_package") {
     }
   }
 
-  if (invoker.enable_write_data_file_tests) {
-    _write_data_file_component_target = "${target_name}_write_data_file"
-    _test_components += [ ":$_write_data_file_component_target" ]
-    fshost_integration_test_component(_write_data_file_component_target) {
-      fshost_target = _fshost_target
-      data_filesystem_format = fshost_options.data_filesystem_format
-      data_filesystem_variant = invoker.data_filesystem_variant
-      extra_features = _extra_features
-      source_root = "tests/write_data_file.rs"
-      deps = [
-        "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
-        "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-        "//sdk/rust/zx",
-        "//src/lib/fuchsia-fs",
-      ]
-    }
+  #
+  # Write Data File Tests
+  #
+  _write_data_file_component_target = "${target_name}_write_data_file"
+  _test_components += [ ":$_write_data_file_component_target" ]
+  fshost_integration_test_component(_write_data_file_component_target) {
+    fshost_target = _fshost_target
+    data_filesystem_format = fshost_options.data_filesystem_format
+    data_filesystem_variant = invoker.data_filesystem_variant
+    extra_features = _extra_features
+    source_root = "tests/write_data_file.rs"
+    deps = [
+      "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+      "//sdk/rust/zx",
+      "//src/lib/fuchsia-fs",
+    ]
   }
 
-  _test_packages = []
-
-  # TODO(https://fxbug.dev/394970436): this test is flaky on devfs. Once we are fully on storage
-  # host we can remove this todo and the storage-host requirement, because the flaky configuration
-  # will no longer exist.
-  if (invoker.enable_corrupt_tests && defined(fshost_options.storage_host) &&
-      fshost_options.storage_host) {
+  #
+  # Corruption Tests
+  #
+  if (invoker.enable_corruption_tests) {
     _corrupt_component_target = "${target_name}_corrupt"
     fshost_integration_test_component(_corrupt_component_target) {
       fshost_target = _fshost_target
@@ -411,6 +419,10 @@ template("fshost_integration_test_package") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_fxfs") {
+  # TODO(https://fxbug.dev/394970436): The corruption tests are flaky on devfs. Once we are fully on
+  # storage host, we can remove this todo and the storage-host requirement, because the flaky
+  # configuration will no longer exist.
+  enable_corruption_tests = false
   enable_migration_tests = false
   data_filesystem_variant = "fxblob"
   options = {
@@ -474,6 +486,10 @@ fshost_integration_test_package(
 }
 
 fshost_integration_test_package("fshost_integration_tests_fxfs_no_fxblob") {
+  # TODO(https://fxbug.dev/394970436): The corruption tests are flaky on devfs. Once we are fully on
+  # storage host, we can remove this todo and the storage-host requirement, because the flaky
+  # configuration will no longer exist.
+  enable_corruption_tests = false
   options = {
     data_filesystem_format = "fxfs"
     fxfs_blob = false
@@ -481,6 +497,10 @@ fshost_integration_test_package("fshost_integration_tests_fxfs_no_fxblob") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_f2fs") {
+  # TODO(https://fxbug.dev/394970436): The corruption tests are flaky on devfs. Once we are fully on
+  # storage host, we can remove this todo and the storage-host requirement, because the flaky
+  # configuration will no longer exist.
+  enable_corruption_tests = false
   options = {
     data_filesystem_format = "f2fs"
     fxfs_blob = false
@@ -488,6 +508,10 @@ fshost_integration_test_package("fshost_integration_tests_f2fs") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_minfs") {
+  # TODO(https://fxbug.dev/394970436): The corruption tests are flaky on devfs. Once we are fully on
+  # storage host, we can remove this todo and the storage-host requirement, because the flaky
+  # configuration will no longer exist.
+  enable_corruption_tests = false
   options = {
     data_filesystem_format = "minfs"
     fxfs_blob = false
@@ -495,6 +519,10 @@ fshost_integration_test_package("fshost_integration_tests_minfs") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_f2fs_no_zxcrypt") {
+  # TODO(https://fxbug.dev/394970436): The corruption tests are flaky on devfs. Once we are fully on
+  # storage host, we can remove this todo and the storage-host requirement, because the flaky
+  # configuration will no longer exist.
+  enable_corruption_tests = false
   data_filesystem_variant = "f2fs-no-zxcrypt"
   options = {
     no_zxcrypt = true
@@ -504,6 +532,10 @@ fshost_integration_test_package("fshost_integration_tests_f2fs_no_zxcrypt") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_minfs_no_zxcrypt") {
+  # TODO(https://fxbug.dev/394970436): The corruption tests are flaky on devfs. Once we are fully on
+  # storage host, we can remove this todo and the storage-host requirement, because the flaky
+  # configuration will no longer exist.
+  enable_corruption_tests = false
   data_filesystem_variant = "minfs-no-zxcrypt"
   options = {
     no_zxcrypt = true

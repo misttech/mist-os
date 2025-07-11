@@ -29,8 +29,9 @@ use sandbox::{
 };
 use std::cmp::Ordering;
 use std::sync::Arc;
-use vfs::directory::entry::SubNode;
+use vfs::directory::entry::{OpenRequest, SubNode};
 use vfs::execution_scope::ExecutionScope;
+use vfs::ToObjectRequest;
 
 #[derive(Debug, Clone)]
 enum AnonymizedOrFiltered {
@@ -248,12 +249,15 @@ impl AggregateRouter {
                 }
             };
             let (source_dir_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-            source_dir.open(
-                self.scope.clone(),
-                fio::OpenFlags::RIGHT_READABLE,
-                ".",
-                server_end.into_channel(),
-            );
+            const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::Flags::PROTOCOL_DIRECTORY);
+            FLAGS.to_object_request(server_end.into_channel()).handle(|request| {
+                source_dir.open_entry(OpenRequest::new(
+                    self.scope.clone(),
+                    FLAGS,
+                    vfs::Path::dot(),
+                    request,
+                ))
+            });
             // Renames have already been applied by the `with_service_renames_and_filter` function
             // in `source_dir`, so we don't need to do any remappings here.
             let parent_dir = source_dir.try_into_directory_entry(self.scope.clone()).unwrap();

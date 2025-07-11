@@ -96,6 +96,11 @@ class BlockDevices {
   static zx::result<BlockDevices> CreateFromPartitionService(
       fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
 
+  // Creates an instance that searches for skip-block devices as instances of
+  // fuchsia.hardware.skipblock.Service. `svc_root` should contain this service.
+  static zx::result<BlockDevices> CreateFromSkipBlockService(
+      fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
+
   // Creates an empty BlockDevices instance which never yields any partitions.  Useful for tests
   // which need a valid instance but don't actually use it.
   static BlockDevices CreateEmpty();
@@ -140,6 +145,7 @@ class BlockDevices {
     kDevfs,
     kFshostBlockDir,
     kPartitionService,
+    kSkipBlockService,
   };
 
   BlockDevices(fbl::unique_fd root, Variant variant);

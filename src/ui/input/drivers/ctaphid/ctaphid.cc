@@ -60,7 +60,7 @@ zx_status_t CtapHidDriver::Start() {
 
   hid::DeviceDescriptor* dev_desc = nullptr;
   hid::ParseResult parse_res =
-      hid::ParseReportDescriptor(result->desc.data(), result->desc.count(), &dev_desc);
+      hid::ParseReportDescriptor(result->desc.data(), result->desc.size(), &dev_desc);
   if (parse_res != hid::ParseResult::kParseOk) {
     zxlogf(ERROR, "hid-parser: parsing report descriptor failed with error %d", int(parse_res));
     return ZX_ERR_INTERNAL;
@@ -247,7 +247,7 @@ void CtapHidDriver::HandleReports(
 
   for (const auto& report : result->value()->reports) {
     fbl::AutoLock _(&lock_);
-    HandleReport(cpp20::span<uint8_t>(report.buf().data(), report.buf().count()),
+    HandleReport(cpp20::span<uint8_t>(report.buf().data(), report.buf().size()),
                  zx::time(report.timestamp()));
   }
 }

@@ -87,9 +87,6 @@ type EmulatorConfig struct {
 	// Path to the vbmeta signing key metadata. Required if 'uefi' is true.
 	VbmetaMetadata string `json:"vbmeta_metadata,omitempty"`
 
-	// Logfile saves emulator standard output to a file if set.
-	Logfile string `json:"logfile"`
-
 	// EDK2Dir is a path to a directory of EDK II (UEFI) prebuilts.
 	EDK2Dir string `json:"edk2_dir"`
 
@@ -299,20 +296,23 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 			logger.Debugf(ctx, "failed to close %s", serialLog.Name())
 		}
 	}
-	if t.config.Logfile != "" {
-		logfile, err := filepath.Abs(t.config.Logfile)
+	// If t.config.Serial, the serial output will be captured through the CaptureSerialLog()
+	// function. Otherwise copy the emulator output.
+	if !t.config.Serial && t.opts.SerialLogDir != "" {
+		logfile := filepath.Join(t.opts.SerialLogDir, "serial_log.txt")
+		logfileAbsPath, err := filepath.Abs(logfile)
 		if err != nil {
-			return fmt.Errorf("cannot get absolute path for %q: %w", t.config.Logfile, err)
+			return fmt.Errorf("cannot get absolute path for %q: %w", logfile, err)
 		}
-		if err := os.MkdirAll(filepath.Dir(logfile), os.ModePerm); err != nil {
-			return fmt.Errorf("failed to make parent dirs of %q: %w", logfile, err)
+		if err := os.MkdirAll(filepath.Dir(logfileAbsPath), os.ModePerm); err != nil {
+			return fmt.Errorf("failed to make parent dirs of %q: %w", logfileAbsPath, err)
 		}
-		serialLog, err := os.Create(logfile)
+		serialLog, err := os.Create(logfileAbsPath)
 		if err != nil {
-			return fmt.Errorf("failed to create %s", logfile)
+			return fmt.Errorf("failed to create %s", logfileAbsPath)
 		}
-		if err := os.Setenv(constants.SerialLogEnvKey, logfile); err != nil {
-			logger.Debugf(ctx, "failed to set %s to %s", constants.SerialLogEnvKey, logfile)
+		if err := os.Setenv(constants.SerialLogEnvKey, logfileAbsPath); err != nil {
+			logger.Debugf(ctx, "failed to set %s to %s", constants.SerialLogEnvKey, logfileAbsPath)
 		}
 		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(serialLog), "")
 		stdout = io.MultiWriter(stdout, serialWriter)
@@ -354,6 +354,15 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 		t.c <- err
 	}()
 	return nil
+}
+
+func (t *Emulator) CaptureSerialLog(filename string) error {
+	if !t.config.Serial {
+		// Don't do anything here. We'll copy the output from
+		// the emulator instead.
+		return nil
+	}
+	return t.genericFuchsiaTarget.CaptureSerialLog(filename)
 }
 
 // Stop stops the emulator target.

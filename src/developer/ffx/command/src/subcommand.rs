@@ -254,7 +254,7 @@ impl ToolSuite for ExternalSubToolSuite {
     async fn try_from_args(
         &self,
         ffx_cmd: &FfxCommandLine,
-    ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
+    ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
         // look in the workspace first
         if let Some(cmd) = self.find_workspace_tool(ffx_cmd) {
             log::info!("Found workspace tool {cmd:?}");

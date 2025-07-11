@@ -1,4 +1,4 @@
-include /zircon/system/ulib/trace-engine/OWNERS
+include /src/performance/OWNERS
 adamperry@google.com
 dalesat@google.com
 dhobsd@google.com

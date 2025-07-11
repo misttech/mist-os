@@ -6,11 +6,10 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::task::Poll;
-use std::fmt;
+use std::{fmt, mem};
 
-use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
+use crate::runtime::{EHandle, PacketReceiver, RawReceiverRegistration};
 use futures::task::{AtomicWaker, Context};
 use zx::{self as zx, AsHandleRef};
 
@@ -54,19 +53,25 @@ impl PacketReceiver for OnSignalsReceiver {
     }
 }
 
-/// A future that completes when some set of signals become available on a Handle.
-#[must_use = "futures do nothing unless polled"]
-pub struct OnSignals<'a, H: AsHandleRef> {
-    handle: H,
-    signals: zx::Signals,
-    registration: Option<ReceiverRegistration<OnSignalsReceiver>>,
-    phantom: PhantomData<&'a H>,
+pin_project_lite::pin_project! {
+    /// A future that completes when some set of signals become available on a Handle.
+    #[must_use = "futures do nothing unless polled"]
+    pub struct OnSignalsFuture<'a, H: AsHandleRef> {
+        handle: H,
+        signals: zx::Signals,
+        #[pin]
+        registration: RawReceiverRegistration<OnSignalsReceiver>,
+        phantom: PhantomData<&'a H>,
+    }
+
+    impl<'a, H: AsHandleRef> PinnedDrop for OnSignalsFuture<'a, H> {
+        fn drop(mut this: Pin<&mut Self>) {
+            this.unregister();
+        }
+    }
 }
 
-/// Alias for the common case where OnSignals is used with zx::HandleRef.
-pub type OnSignalsRef<'a> = OnSignals<'a, zx::HandleRef<'a>>;
-
-impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
+impl<'a, H: AsHandleRef + 'a> OnSignalsFuture<'a, H> {
     /// Creates a new `OnSignals` object which will receive notifications when
     /// any signals in `signals` occur on `handle`.
     pub fn new(handle: H, signals: zx::Signals) -> Self {
@@ -81,75 +86,89 @@ impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
         // difference (and on a single-threaded executor, a notification is unlikely to be processed
         // before the first poll anyway).  The way we have it now means we don't have to register at
         // all if the signals are already set, which will be a win some of the time.
-        OnSignals { handle, signals, registration: None, phantom: PhantomData }
+        OnSignalsFuture {
+            handle,
+            signals,
+            registration: RawReceiverRegistration::new(OnSignalsReceiver {
+                maybe_signals: AtomicUsize::new(0),
+                task: AtomicWaker::new(),
+            }),
+            phantom: PhantomData,
+        }
     }
 
     /// Takes the handle.
-    pub fn take_handle(mut self) -> H
+    pub fn take_handle(mut self: Pin<&mut Self>) -> H
     where
         H: zx::HandleBased,
     {
-        self.unregister();
-        std::mem::replace(&mut self.handle, zx::Handle::invalid().into())
+        if self.registration.is_registered() {
+            self.as_mut().unregister();
+        }
+        mem::replace(self.project().handle, zx::Handle::invalid().into())
     }
 
     fn register(
-        &self,
+        mut registration: Pin<&mut RawReceiverRegistration<OnSignalsReceiver>>,
+        handle: &H,
+        signals: zx::Signals,
         cx: Option<&mut Context<'_>>,
-    ) -> Result<ReceiverRegistration<OnSignalsReceiver>, zx::Status> {
-        let registration = EHandle::local().register_receiver(Arc::new(OnSignalsReceiver {
-            maybe_signals: AtomicUsize::new(0),
-            task: AtomicWaker::new(),
-        }));
+    ) -> Result<(), zx::Status> {
+        registration.as_mut().register(EHandle::local());
 
         // If a context has been supplied, we must register it now before calling
         // `wait_async_handle` below to avoid races.
         if let Some(cx) = cx {
-            registration.task.register(cx.waker());
+            registration.receiver().task.register(cx.waker());
         }
 
-        self.handle.wait_async_handle(
-            registration.port(),
-            registration.key(),
-            self.signals,
+        handle.wait_async_handle(
+            registration.port().unwrap(),
+            registration.key().unwrap(),
+            signals,
             zx::WaitAsyncOpts::empty(),
         )?;
 
-        Ok(registration)
+        Ok(())
     }
 
-    fn unregister(&mut self) {
-        if let Some(registration) = self.registration.take() {
-            if registration.receiver().maybe_signals.load(Ordering::SeqCst) == 0 {
+    fn unregister(self: Pin<&mut Self>) {
+        let mut this = self.project();
+        if let Some((ehandle, key)) = this.registration.as_mut().unregister() {
+            if this.registration.receiver().maybe_signals.load(Ordering::SeqCst) == 0 {
                 // Ignore the error from zx_port_cancel, because it might just be a race condition.
                 // If the packet is handled between the above maybe_signals check and the port
                 // cancel, it will fail with ZX_ERR_NOT_FOUND, and we can't do anything about it.
-                let _ = registration.port().cancel(&self.handle, registration.key());
+                let _ = ehandle.port().cancel(this.handle, key);
             }
         }
     }
 }
 
-impl<H: AsHandleRef + Unpin> Future for OnSignals<'_, H> {
+impl<H: AsHandleRef> Future for OnSignalsFuture<'_, H> {
     type Output = Result<zx::Signals, zx::Status>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match &self.registration {
-            None => {
-                match self
-                    .handle
-                    .wait_handle(self.signals, zx::MonotonicInstant::INFINITE_PAST)
-                    .to_result()
-                {
-                    Ok(signals) => Poll::Ready(Ok(signals)),
-                    Err(zx::Status::TIMED_OUT) => {
-                        let registration = self.register(Some(cx))?;
-                        self.get_mut().registration = Some(registration);
-                        Poll::Pending
-                    }
-                    Err(e) => Poll::Ready(Err(e)),
+        if !self.registration.is_registered() {
+            match self
+                .handle
+                .wait_handle(self.signals, zx::MonotonicInstant::INFINITE_PAST)
+                .to_result()
+            {
+                Ok(signals) => Poll::Ready(Ok(signals)),
+                Err(zx::Status::TIMED_OUT) => {
+                    let mut this = self.project();
+                    Self::register(
+                        this.registration.as_mut(),
+                        this.handle,
+                        *this.signals,
+                        Some(cx),
+                    )?;
+                    Poll::Pending
                 }
+                Err(e) => Poll::Ready(Err(e)),
             }
-            Some(r) => match r.receiver().get_signals(cx) {
+        } else {
+            match self.registration.receiver().get_signals(cx) {
                 Poll::Ready(signals) => Poll::Ready(Ok(signals)),
                 Poll::Pending => {
                     // We haven't received a notification for the signals, but we still want to poll
@@ -170,8 +189,55 @@ impl<H: AsHandleRef + Unpin> Future for OnSignals<'_, H> {
                         Err(_) => Poll::Pending,
                     }
                 }
-            },
+            }
         }
+    }
+}
+
+impl<H: AsHandleRef> fmt::Debug for OnSignalsFuture<'_, H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OnSignals")
+    }
+}
+
+impl<H: AsHandleRef> AsHandleRef for OnSignalsFuture<'_, H> {
+    fn as_handle_ref(&self) -> zx::HandleRef<'_> {
+        self.handle.as_handle_ref()
+    }
+}
+
+impl<H: AsHandleRef> AsRef<H> for OnSignalsFuture<'_, H> {
+    fn as_ref(&self) -> &H {
+        &self.handle
+    }
+}
+
+/// A future that completes when some set of signals become available on a Handle.
+#[must_use = "futures do nothing unless polled"]
+pub struct OnSignals<'a, H: AsHandleRef> {
+    future: Pin<Box<OnSignalsFuture<'a, H>>>,
+}
+
+impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
+    /// Creates a new `OnSignals` object which will receive notifications when
+    /// any signals in `signals` occur on `handle`.
+    pub fn new(handle: H, signals: zx::Signals) -> Self {
+        Self { future: Box::pin(OnSignalsFuture::new(handle, signals)) }
+    }
+
+    /// Takes the handle.
+    pub fn take_handle(mut self) -> H
+    where
+        H: zx::HandleBased,
+    {
+        self.future.as_mut().take_handle()
+    }
+}
+
+impl<H: AsHandleRef> Future for OnSignals<'_, H> {
+    type Output = Result<zx::Signals, zx::Status>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::into_inner(self).future.as_mut().poll(cx)
     }
 }
 
@@ -181,23 +247,20 @@ impl<H: AsHandleRef> fmt::Debug for OnSignals<'_, H> {
     }
 }
 
-impl<H: AsHandleRef> Drop for OnSignals<'_, H> {
-    fn drop(&mut self) {
-        self.unregister();
-    }
-}
-
 impl<H: AsHandleRef> AsHandleRef for OnSignals<'_, H> {
     fn as_handle_ref(&self) -> zx::HandleRef<'_> {
-        self.handle.as_handle_ref()
+        self.future.as_handle_ref()
     }
 }
 
 impl<H: AsHandleRef> AsRef<H> for OnSignals<'_, H> {
     fn as_ref(&self) -> &H {
-        &self.handle
+        &self.future.handle
     }
 }
+
+/// Alias for the common case where OnSignals is used with zx::HandleRef.
+pub type OnSignalsRef<'a> = OnSignals<'a, zx::HandleRef<'a>>;
 
 #[cfg(test)]
 mod test {
@@ -207,6 +270,7 @@ mod test {
     use futures::future::{pending, FutureExt};
     use futures::task::{waker, ArcWake};
     use std::pin::pin;
+    use std::sync::Arc;
 
     #[test]
     fn wait_for_event() -> Result<(), zx::Status> {
@@ -243,7 +307,7 @@ mod test {
             let event = zx::Event::create();
             let mut signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED);
             assert_eq!(futures::poll!(&mut signals), Poll::Pending);
-            let key = signals.registration.as_ref().unwrap().key();
+            let key = signals.future.registration.key().unwrap();
 
             std::mem::drop(signals);
             assert!(ehandle.port().cancel(&event, key) == Err(zx::Status::NOT_FOUND));

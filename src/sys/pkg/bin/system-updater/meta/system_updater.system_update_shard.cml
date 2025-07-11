@@ -35,6 +35,7 @@
         {
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.net.http.Loader",
                 "fuchsia.paver.Paver",
             ],
             from: "parent",

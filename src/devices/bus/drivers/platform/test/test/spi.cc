@@ -93,7 +93,7 @@ class TestSpiDriver : public fdf::DriverBase,
                      fdf::Arena& arena, ReceiveVectorCompleter::Sync& completer) override {
     fidl::VectorView<uint8_t> rxdata(arena, request->size);
     // RX only, fill with pattern
-    for (size_t i = 0; i < rxdata.count(); i++) {
+    for (size_t i = 0; i < rxdata.size(); i++) {
       rxdata[i] = i & 0xff;
     }
     completer.buffer(arena).ReplySuccess(rxdata);
@@ -101,9 +101,9 @@ class TestSpiDriver : public fdf::DriverBase,
 
   void ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVectorRequest* request,
                       fdf::Arena& arena, ExchangeVectorCompleter::Sync& completer) override {
-    fidl::VectorView<uint8_t> rxdata(arena, request->txdata.count());
+    fidl::VectorView<uint8_t> rxdata(arena, request->txdata.size());
     // Both TX and RX; copy
-    memcpy(rxdata.data(), request->txdata.data(), request->txdata.count());
+    memcpy(rxdata.data(), request->txdata.data(), request->txdata.size());
     completer.buffer(arena).ReplySuccess(rxdata);
   }
 

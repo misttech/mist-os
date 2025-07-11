@@ -15,7 +15,10 @@ llvm_libc_source_set("dlfcn") {
 
 source_set("dlfcn-abi") {
   public = [ "dlfcn-abi.h" ]
-  public_deps = [ "//sdk/lib/ld:headers" ]
+  public_deps = [
+    "..:weak",
+    "//sdk/lib/ld:headers",
+  ]
 }
 
 source_set("dl_phdr_info") {

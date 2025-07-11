@@ -41,8 +41,8 @@ use netstack3_base::{
     TimerContext, TimerHandler, TxMetadataBindingsTypes, WorkQueueReport,
 };
 use netstack3_device::ethernet::{
-    EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
-    RecvEthernetFrameMeta,
+    EthernetCreationProperties, EthernetDeviceEvent, EthernetDeviceId, EthernetLinkDevice,
+    EthernetWeakDeviceId, RecvEthernetFrameMeta,
 };
 use netstack3_device::loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
 use netstack3_device::pure_ip::{PureIpDeviceId, PureIpWeakDeviceId};
@@ -1443,6 +1443,7 @@ pub enum DispatchedEvent {
     NeighborIpv4(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>),
     NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>),
     RouterAdvertisement(RouterAdvertisementEvent<WeakDeviceId<FakeBindingsCtx>>),
+    EthernetDevice(EthernetDeviceEvent<EthernetWeakDeviceId<FakeBindingsCtx>>),
 }
 
 /// A tuple of device ID and IP version.
@@ -1485,6 +1486,13 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     ) -> DispatchedEvent {
         let e = e.map_device(|d| d.downgrade());
         I::map_ip(e, |e| DispatchedEvent::NeighborIpv4(e), |e| DispatchedEvent::NeighborIpv6(e))
+    }
+}
+
+impl From<EthernetDeviceEvent<EthernetDeviceId<FakeBindingsCtx>>> for DispatchedEvent {
+    fn from(e: EthernetDeviceEvent<EthernetDeviceId<FakeBindingsCtx>>) -> DispatchedEvent {
+        let e = e.map_device(|d| d.downgrade());
+        DispatchedEvent::EthernetDevice(e)
     }
 }
 

@@ -590,7 +590,7 @@ TEST_F(E1000Test, NetworkDeviceImplQueueTxWhenStarted) {
   fidl::VectorView<netdriver::wire::TxBuffer> tx_buffer_extra(arena_, e1000::kTxDepth);
 
   fidl::VectorView<netdriver::wire::BufferRegion> region_list_extra(arena_, e1000::kTxDepth);
-  for (size_t i = 0; i < region_list_extra.count(); ++i) {
+  for (size_t i = 0; i < region_list_extra.size(); ++i) {
     region_list_extra[i].vmo = kVmoId;
     region_list_extra[i].offset = 0;
     region_list_extra[i].length = kFirstRegionLength + i;
@@ -598,7 +598,7 @@ TEST_F(E1000Test, NetworkDeviceImplQueueTxWhenStarted) {
 
   // Send a list of buffer with the count equals to kEthTxDescRingCount, so that the ring buffer
   // index will circle back to the same index.
-  for (size_t i = 0; i < tx_buffer_extra.count(); i++) {
+  for (size_t i = 0; i < tx_buffer_extra.size(); i++) {
     fidl::VectorView<netdriver::wire::BufferRegion> region(arena_, 1u);
     region[0].vmo = kVmoId;
     region[0].offset = 0;
@@ -725,7 +725,7 @@ TEST_F(E1000Test, InterruptCompletesTx) {
   // First mark all buffers as completed.
   driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     // Indicate that all TX buffer descriptors are written back.
-    for (size_t i = 0; i < tx_buffers.count(); ++i) {
+    for (size_t i = 0; i < tx_buffers.size(); ++i) {
       shadow_tx_ring_.Desc(i).upper.fields.status = E1000_TXD_STAT_DD;
     }
   });
@@ -949,11 +949,11 @@ TEST_F(E1000Test, NetworkPortGetInfo) {
 
   EXPECT_EQ(info.port_class(), netdev::wire::PortClass::kEthernet);
   EXPECT_EQ(info.rx_types()[0], netdev::wire::FrameType::kEthernet);
-  EXPECT_EQ(info.rx_types().count(), 1U);
+  EXPECT_EQ(info.rx_types().size(), 1U);
   EXPECT_EQ(info.tx_types()[0].type, netdev::wire::FrameType::kEthernet);
   EXPECT_EQ(info.tx_types()[0].features, netdev::wire::kFrameFeaturesRaw);
   EXPECT_EQ(info.tx_types()[0].supported_flags, netdev::wire::TxFlags{});
-  EXPECT_EQ(info.tx_types().count(), 1U);
+  EXPECT_EQ(info.tx_types().size(), 1U);
 }
 
 TEST_F(E1000Test, NetworkPortGetStatus) {

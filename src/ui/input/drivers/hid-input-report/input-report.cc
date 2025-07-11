@@ -72,7 +72,7 @@ void InputReport::HandleReports(
       wake_lease_.DepositWakeLease(std::move(report.wake_lease()),
                                    zx::deadline_after(kLeaseTimeout));
     }
-    HandleReport(cpp20::span<uint8_t>(report.buf().data(), report.buf().count()),
+    HandleReport(cpp20::span<uint8_t>(report.buf().data(), report.buf().size()),
                  report.has_timestamp() ? zx::time(report.timestamp()) : time);
   }
 
@@ -155,7 +155,7 @@ void InputReport::SendInitialConsumerControlReport(InputReportsReader* reader) {
         continue;
       }
       reader->ReceiveReport(
-          cpp20::span(result.value()->report.data(), result.value()->report.count()),
+          cpp20::span(result.value()->report.data(), result.value()->report.size()),
           zx::clock::get_monotonic(), device.get());
     }
   }
@@ -316,8 +316,8 @@ void InputReport::GetFeatureReport(GetFeatureReportCompleter::Sync& completer) {
     }
     const fidl::VectorView<uint8_t>& feature_report = feature_report_result.value()->report;
 
-    auto result = device->ParseFeatureReport(feature_report.data(), feature_report.count(),
-                                             allocator, report);
+    auto result =
+        device->ParseFeatureReport(feature_report.data(), feature_report.size(), allocator, report);
     if (result != hid_input_report::ParseResult::kOk &&
         result != hid_input_report::ParseResult::kNotImplemented) {
       FDF_LOG(ERROR, "ParseFeatureReport failed with %u", static_cast<unsigned int>(result));
@@ -410,7 +410,7 @@ void InputReport::GetInputReport(GetInputReportRequestView request,
       return;
     }
 
-    if (device->ParseInputReport(result.value()->report.data(), result.value()->report.count(),
+    if (device->ParseInputReport(result.value()->report.data(), result.value()->report.size(),
                                  allocator, report) != hid_input_report::ParseResult::kOk) {
       FDF_LOG(ERROR, "GetInputReport: Device failed to parse report correctly");
       completer.ReplyError(ZX_ERR_INTERNAL);
@@ -437,7 +437,7 @@ zx_status_t InputReport::Start() {
 
   hid::DeviceDescriptor* dev_desc = nullptr;
   hid::ParseResult parse_res =
-      hid::ParseReportDescriptor(result->desc.data(), result->desc.count(), &dev_desc);
+      hid::ParseReportDescriptor(result->desc.data(), result->desc.size(), &dev_desc);
   if (parse_res != hid::ParseResult::kParseOk) {
     FDF_LOG(ERROR, "hid-parser: parsing report descriptor failed with error %d", int(parse_res));
     return ZX_ERR_INTERNAL;

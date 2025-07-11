@@ -96,7 +96,6 @@ source_set("netsvc_common") {
     "//src/bringup/lib/mexec",
     "//src/lib/zbitl",
     "//src/storage/gpt",
-    "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
   ]
   public_deps = [
     ":inet6",

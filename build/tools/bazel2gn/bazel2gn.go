@@ -14,7 +14,10 @@ import (
 )
 
 // indentPrefix is the string value used to indent a line by one level.
-const indentPrefix = "  "
+//
+// NOTE: This prefix is only used by the internal representation of this package.
+// The final output is formatted by `gn format`.
+const indentPrefix = "\t"
 
 // bazelRuleToGNTemplate maps from Bazel rule names to GN template names. They can
 // be the same if Bazel and GN shared the same template name.
@@ -22,18 +25,28 @@ const indentPrefix = "  "
 // This map is also used to check known Bazel rules that can be converted to GN.
 // i.e. Bazel rules not found in this map is not supported by bazel2gn yet.
 var bazelRuleToGNTemplate = map[string]string{
-	"go_binary":             "go_binary",
-	"go_library":            "go_library",
-	"go_test":               "go_test",
+	// Go
+	"go_binary":  "go_binary",
+	"go_library": "go_library",
+	"go_test":    "go_test",
+
+	// Rust
+	"rust_binary":     "rustc_binary",
+	"rust_library":    "rustc_library",
+	"rustc_binary":    "rustc_binary",
+	"rustc_library":   "rustc_library",
+	"rust_proc_macro": "rustc_macro",
+
+	// C++
+	"cc_library": "source_set",
+
+	// IDK & SDK
 	"idk_cc_source_library": "sdk_source_set",
-	"install_host_tools":    "install_host_tools",
-	"package":               "package",
-	"rust_binary":           "rustc_binary",
-	"rust_library":          "rustc_library",
-	"rustc_binary":          "rustc_binary",
-	"rustc_library":         "rustc_library",
-	"rust_proc_macro":       "rustc_macro",
 	"sdk_host_tool":         "sdk_host_tool",
+
+	// Other
+	"install_host_tools": "install_host_tools",
+	"package":            "package",
 }
 
 // attrsToOmitByRules stores a mapping from known Bazel rules to attributes to
@@ -53,24 +66,41 @@ var commonAttrMap = map[string]string{
 	"hdrs": "public",
 }
 
-// Rust specific attributes that use different names in GN.
+// ccAttrMap maps from attribute names in Bazel CC rules to GN parameter names.
+// This map only includes attributes that have different names in Bazel and GN.
+var ccAttrMap = map[string]string{
+	"copts":               "configs",
+	"deps":                "public_deps",
+	"implementation_deps": "deps",
+}
+
+// rustAttrMap maps from attribute name in Bazel Rust rules to GN parameter names.
+// This map only includes attributes that have different names in Bazel and GN.
 var rustAttrMap = map[string]string{
 	"crate_features": "features",
 }
 
-// IDK specific attributes that use different names in GN.
+// idkAttrMap maps from attribute name in Bazel IDK rules to GN parameter names.
+// This map only includes attributes that have different names in Bazel and GN.
 var idkAttrMap = map[string]string{
+	"api_area": "sdk_area",
 	"idk_name": "sdk_name",
 }
 
 // A mapping from Bazel rule names to attribute mappings.
 // Attribute mappings map from Bazel rule attributes that use different names in GN.
 var attrMapsByRules = map[string]map[string]string{
-	"rust_binary":           rustAttrMap,
-	"rust_library":          rustAttrMap,
-	"rust_proc_macro":       rustAttrMap,
-	"rustc_binary":          rustAttrMap,
-	"rustc_library":         rustAttrMap,
+	// C++
+	"cc_library": ccAttrMap,
+
+	// Rust
+	"rust_binary":     rustAttrMap,
+	"rust_library":    rustAttrMap,
+	"rust_proc_macro": rustAttrMap,
+	"rustc_binary":    rustAttrMap,
+	"rustc_library":   rustAttrMap,
+
+	// IDK
 	"idk_cc_source_library": idkAttrMap,
 }
 
@@ -93,6 +123,22 @@ var bazelConstraintsToGNConditions = map[string]string{
 }
 
 var thirdPartyRustCrateRE = regexp.MustCompile(`^"\/\/third_party\/rust_crates.+:`)
+
+// coptToConfig maps from Bazel copt values to configs to use in GN.
+var coptToConfig = map[string]string{
+	"-Wno-implicit-fallthrough": "//build/config:Wno-implicit-fallthrough",
+}
+
+// attrGNAssignmentOps maps from GN attribute names to the assignment operators to use in GN.
+//
+// NOTE: Entries in this map should be clearly documented.
+var attrGNAssignmentOps = map[string]string{
+	// `configs` in GN are rarely (never?) empty lists because we set them in BUILDCONFIG.gn.
+	// Trying to overwrite a non-empty list in GN with a non-empty value will fail.
+	// Simply replacing assignment with `+=` works for the initial use cases we need.
+	// More complex mechanism may be required if we need to selectively overwrite config assignments.
+	"configs": "+=",
+}
 
 // indent indents input lines by input levels.
 func indent(lines []string, level int) []string {
@@ -209,6 +255,21 @@ func bazelVisibilityToGN(expr syntax.Expr) (syntax.Expr, error) {
 		// This is a Bazel visibility on a package group, it should stay unchanged.
 		// In GN there should be a target matching the path of this package group.
 	}
+	return lit, nil
+}
+
+// bazelCOptToGNConfig converts Bazel copts values to GN configs.
+func bazelCOptToGNConfig(expr syntax.Expr) (syntax.Expr, error) {
+	lit, ok := expr.(*syntax.Literal)
+	if !ok {
+		return expr, nil
+	}
+	coptWithoutQuotes := lit.Raw[1 : len(lit.Raw)-1]
+	config, ok := coptToConfig[coptWithoutQuotes]
+	if !ok {
+		return nil, fmt.Errorf("unexpected copt %s", coptWithoutQuotes)
+	}
+	lit.Raw = fmt.Sprintf(`"%s"`, config)
 	return lit, nil
 }
 
@@ -343,17 +404,24 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 	}
 	attrName := convertAttrName(lhs.Name, bazelRule)
 
+	op, ok := attrGNAssignmentOps[attrName]
+	if !ok {
+		op = "="
+	}
+
 	var transformers []transformer
 	switch attrName {
 	case "visibility":
 		transformers = append(transformers, bazelVisibilityToGN)
-	case "deps", "test_deps":
+	case "deps", "public_deps", "test_deps":
 		transformers = append(transformers, bazelDepToGN)
+	case "configs":
+		transformers = append(transformers, bazelCOptToGNConfig)
 	}
 
 	// This is a simple `attr = select(...)`, convert in-place.
 	if isSelectCall(expr.Y) {
-		return selectToGN(attrName, "=", expr.Y.(*syntax.CallExpr), transformers)
+		return selectToGN(attrName, op, expr.Y.(*syntax.CallExpr), transformers)
 	}
 
 	// It is not a simple `select` call on the RHS, and `select`s are found in
@@ -368,7 +436,7 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 		}
 		// Start with an empty list so it's easy to += new elements from later
 		// conversions.
-		return append([]string{fmt.Sprintf("%s = []", attrName)}, lc...), nil
+		return append([]string{fmt.Sprintf("%s %s []", attrName, op)}, lc...), nil
 	}
 
 	rhs, err := exprToGN(expr.Y, transformers)
@@ -379,7 +447,7 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 		return nil, errors.New("rhs hand side of binary expression is unexpectedly empty")
 	}
 
-	ret := []string{fmt.Sprintf("%s = %s", attrName, rhs[0])}
+	ret := []string{fmt.Sprintf("%s %s %s", attrName, op, rhs[0])}
 	ret = append(ret, rhs[1:]...)
 	return ret, nil
 }

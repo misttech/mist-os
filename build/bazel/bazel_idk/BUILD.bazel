@@ -15,7 +15,10 @@ filegroup(
     name = "partner_idk_source_sets_allowlist",
     visibility = [
         "//build/bazel/bazel_idk/tests:__subpackages__",
+        "//sdk/lib/fit:__pkg__",
         "//sdk/lib/magma_common:__pkg__",
+        "//sdk/lib/media/cpp:__subpackages__",  # ":no_converters"
+        "//sdk/lib/stdcompat:__pkg__",
     ],
 )
 

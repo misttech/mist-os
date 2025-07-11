@@ -46,7 +46,6 @@ use netlink_packet_route::link::{
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 
 use crate::client::{ClientTable, InternalClient};
-use crate::errors::WorkerInitializationError;
 use crate::logging::{log_debug, log_error, log_warn};
 use crate::messaging::Sender;
 use crate::multicast_groups::ModernGroup;
@@ -277,31 +276,6 @@ pub(crate) struct InterfacesWorkerState<
     pub(crate) all_accept_ra_rt_table: AcceptRaRtTable,
 }
 
-/// FIDL errors from the interfaces worker.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum InterfacesFidlError {
-    /// Error in the FIDL event stream.
-    #[error("event stream: {0}")]
-    EventStream(fidl::Error),
-    /// Error in getting interface event stream from state.
-    #[error("watcher creation: {0}")]
-    WatcherCreation(fnet_interfaces_ext::WatcherCreationError),
-}
-
-/// Netstack errors from the interfaces worker.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum InterfacesNetstackError {
-    /// Event stream ended unexpectedly.
-    #[error("event stream ended")]
-    EventStreamEnded,
-    /// Unexpected event was received from interface watcher.
-    #[error("unexpected event: {0:?}")]
-    UnexpectedEvent(fnet_interfaces::Event),
-    /// Inconsistent state between Netstack and interface properties.
-    #[error("update: {0}")]
-    Update(fnet_interfaces_ext::UpdateError),
-}
-
 /// This models the `accept_ra_rt_table` sysctl.
 ///
 /// The sysctl behaves as follows:
@@ -407,64 +381,41 @@ pub(crate) struct PendingRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::Inn
 impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
     InterfacesWorkerState<H, S>
 {
+    /// Create the Netlink Interfaces Worker.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an unexpected error is encountered on one of the FIDL
+    /// connections with the netstack.
     pub(crate) async fn create(
         mut interfaces_handler: H,
         route_clients: ClientTable<NetlinkRoute, S>,
         interfaces_proxy: fnet_root::InterfacesProxy,
         interfaces_state_proxy: fnet_interfaces::StateProxy,
         feature_flags: &FeatureFlags,
-    ) -> Result<
-        (
-            Self,
-            impl futures::Stream<
-                    Item = Result<
-                        fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
-                        fidl::Error,
-                    >,
-                > + 'static,
-        ),
-        WorkerInitializationError<InterfacesFidlError, InterfacesNetstackError>,
-    > {
+    ) -> (
+        Self,
+        impl futures::Stream<
+                Item = Result<
+                    fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
+                    fidl::Error,
+                >,
+            > + 'static,
+    ) {
         let mut if_event_stream = Box::pin(
             fnet_interfaces_ext::event_stream_from_state(
                 &interfaces_state_proxy,
                 fnet_interfaces_ext::IncludedAddresses::All,
             )
-            .map_err(|err| {
-                WorkerInitializationError::Fidl(InterfacesFidlError::WatcherCreation(err))
-            })?,
+            .expect("connecting to fuchsia.net.interfaces.State FIDL should succeed"),
         );
 
-        let mut interface_properties = {
-            match fnet_interfaces_ext::existing(
-                if_event_stream.by_ref(),
-                BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState, _>>::new(),
-            )
-            .await
-            {
-                Ok(props) => props,
-                Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEnd { .. }) => {
-                    return Err(WorkerInitializationError::Netstack(
-                        InterfacesNetstackError::EventStreamEnded,
-                    ));
-                }
-                Err(fnet_interfaces_ext::WatcherOperationError::EventStream(e)) => {
-                    return Err(WorkerInitializationError::Fidl(InterfacesFidlError::EventStream(
-                        e,
-                    )));
-                }
-                Err(fnet_interfaces_ext::WatcherOperationError::Update(e)) => {
-                    return Err(WorkerInitializationError::Netstack(
-                        InterfacesNetstackError::Update(e),
-                    ));
-                }
-                Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEvent(event)) => {
-                    return Err(WorkerInitializationError::Netstack(
-                        InterfacesNetstackError::UnexpectedEvent(event),
-                    ));
-                }
-            }
-        };
+        let mut interface_properties = fnet_interfaces_ext::existing(
+            if_event_stream.by_ref(),
+            BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState, _>>::new(),
+        )
+        .await
+        .expect("determining already installed interfaces should succeed");
 
         if !feature_flags.assume_ifb0_existence {
             assert_matches!(
@@ -502,7 +453,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
         interfaces_handler.handle_idle_event();
 
-        Ok((
+        (
             InterfacesWorkerState {
                 interfaces_handler,
                 interfaces_proxy,
@@ -512,23 +463,25 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 all_accept_ra_rt_table: Default::default(),
             },
             if_event_stream,
-        ))
+        )
     }
 
     /// Handles events observed from the interface watcher by updating the
     /// table of discovered interfaces.
     ///
-    /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
-    /// `UpdateError` when updates are not consistent with the current state.
+    /// # Panics
+    ///
+    /// Panics if an unexpected Interface Watcher Event is published by the
+    /// Netstack.
     pub(crate) async fn handle_interface_watcher_event(
         &mut self,
         event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
         feature_flags: &FeatureFlags,
-    ) -> Result<(), InterfaceEventHandlerError> {
-        let update = match self.interface_properties.update(event) {
-            Ok(update) => update,
-            Err(e) => return Err(InterfaceEventHandlerError::Update(e.into())),
-        };
+    ) {
+        let update = self
+            .interface_properties
+            .update(event)
+            .expect("Netstack interface event resulted in an invalid update");
 
         match update {
             fnet_interfaces_ext::UpdateResult::Added {
@@ -659,11 +612,10 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 log_debug!("processed interface remove event for id {}", properties.id);
             }
             fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
-                return Err(InterfaceEventHandlerError::ExistingEventReceived(properties.clone()));
+                panic!("Netstack reported the addition of an existing interface: {properties:?}");
             }
             fnet_interfaces_ext::UpdateResult::NoChange => {}
         }
-        Ok(())
     }
 
     /// Checks whether a `PendingRequest` can be marked completed given the current state of the
@@ -1114,15 +1066,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     }
 }
 
-/// Errors related to handling interface events.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum InterfaceEventHandlerError {
-    #[error("interface event handler updated the map with an event, but received an unexpected response: {0:?}")]
-    Update(fnet_interfaces_ext::UpdateError),
-    #[error("interface event handler attempted to process an event for an interface that already existed: {0:?}")]
-    ExistingEventReceived(fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>),
-}
-
 fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
     existing_addresses: &mut BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
     updated_addresses: BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
@@ -1539,6 +1482,7 @@ fn interface_properties_to_address_messages(
 pub(crate) mod testutil {
     use super::*;
 
+    use std::convert::Infallible as Never;
     use std::sync::{Arc, Mutex};
 
     use futures::channel::mpsc;
@@ -1676,10 +1620,8 @@ pub(crate) mod testutil {
 
     pub(crate) fn setup_with_route_clients(
         route_clients: ClientTable<NetlinkRoute, FakeSender<RouteNetlinkMessage>>,
-    ) -> Setup<
-        impl Future<Output = Result<std::convert::Infallible, anyhow::Error>>,
-        impl Stream<Item = fnet_interfaces::WatcherRequest>,
-    > {
+    ) -> Setup<impl Future<Output = Never>, impl Stream<Item = fnet_interfaces::WatcherRequest>>
+    {
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_handler, interfaces_handler_sink) = FakeInterfacesHandler::new();
         let (interfaces_proxy, interfaces) =
@@ -1732,7 +1674,7 @@ pub(crate) mod testutil {
                         rules_v6: EventLoopComponent::Absent(Optional),
                         nduseropt: EventLoopComponent::Absent(Optional),
                     })
-                    .await?;
+                    .await;
                 event_loop.run().await
             },
             watcher_stream,
@@ -1741,13 +1683,6 @@ pub(crate) mod testutil {
             interfaces_handler_sink,
             _async_work_sink: async_work_sink,
         }
-    }
-
-    pub(crate) fn setup() -> Setup<
-        impl Future<Output = Result<std::convert::Infallible, anyhow::Error>>,
-        impl Stream<Item = fnet_interfaces::WatcherRequest>,
-    > {
-        setup_with_route_clients(ClientTable::default())
     }
 
     pub(crate) async fn respond_to_watcher<S: Stream<Item = fnet_interfaces::WatcherRequest>>(
@@ -1864,7 +1799,6 @@ mod tests {
     use fnet_interfaces::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
 
-    use assert_matches::assert_matches;
     use futures::sink::SinkExt as _;
     use futures::stream::Stream;
     use futures::FutureExt as _;
@@ -1935,188 +1869,6 @@ mod tests {
                 create_address_message(interface_id, TEST_V6_ADDR, interface_name, flags),
             ),
         ])
-    }
-
-    fn get_fake_interface(
-        id: u64,
-        name: &'static str,
-        port_class: fnet_interfaces_ext::PortClass,
-    ) -> fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest> {
-        fnet_interfaces_ext::Properties {
-            id: id.try_into().unwrap(),
-            name: name.to_string(),
-            port_class,
-            online: true,
-            addresses: Vec::new(),
-            has_default_ipv4_route: false,
-            has_default_ipv6_route: false,
-        }
-    }
-
-    async fn respond_to_watcher_with_interfaces<
-        S: Stream<Item = fnet_interfaces::WatcherRequest>,
-    >(
-        stream: S,
-        existing_interfaces: impl IntoIterator<
-            Item = fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>,
-        >,
-        new_interfaces: Option<(
-            impl IntoIterator<Item = fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>>,
-            fn(fnet_interfaces::Properties) -> fnet_interfaces::Event,
-        )>,
-    ) {
-        let map_fn = |fnet_interfaces_ext::Properties {
-                          id,
-                          name,
-                          port_class,
-                          online,
-                          addresses,
-                          has_default_ipv4_route,
-                          has_default_ipv6_route,
-                      }| {
-            fnet_interfaces::Properties {
-                id: Some(id.get()),
-                name: Some(name),
-                port_class: Some(port_class.into()),
-                online: Some(online),
-                addresses: Some(
-                    addresses.into_iter().map(fnet_interfaces::Address::from).collect(),
-                ),
-                has_default_ipv4_route: Some(has_default_ipv4_route),
-                has_default_ipv6_route: Some(has_default_ipv6_route),
-                ..Default::default()
-            }
-        };
-        respond_to_watcher(
-            stream,
-            existing_interfaces
-                .into_iter()
-                .map(|properties| fnet_interfaces::Event::Existing(map_fn(properties)))
-                .chain(std::iter::once(fnet_interfaces::Event::Idle(fnet_interfaces::Empty)))
-                .chain(
-                    new_interfaces
-                        .map(|(new_interfaces, event_fn)| {
-                            new_interfaces
-                                .into_iter()
-                                .map(move |properties| event_fn(map_fn(properties)))
-                        })
-                        .into_iter()
-                        .flatten(),
-                ),
-        )
-        .await
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_event_loop_errors_stream_ended() {
-        let Setup {
-            event_loop_fut,
-            watcher_stream,
-            request_sink: _,
-            interfaces_request_stream,
-            interfaces_handler_sink: _,
-            _async_work_sink: _,
-        } = setup();
-        let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
-        let watcher_fut =
-            respond_to_watcher_with_interfaces(watcher_stream, interfaces, None::<(Option<_>, _)>);
-        let root_interfaces_fut = expect_only_get_mac_root_requests_fut(interfaces_request_stream);
-
-        let (err, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
-        assert_matches!(
-            err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
-            crate::eventloop::EventStreamError::Interfaces(fidl::Error::ClientChannelClosed { .. })
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_event_loop_errors_duplicate_events() {
-        let Setup {
-            event_loop_fut,
-            watcher_stream,
-            request_sink: _,
-            interfaces_request_stream: _,
-            interfaces_handler_sink: _,
-            _async_work_sink: _,
-        } = setup();
-        let interfaces =
-            vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
-        let watcher_fut =
-            respond_to_watcher_with_interfaces(watcher_stream, interfaces, None::<(Option<_>, _)>);
-
-        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
-        // The event being sent again as existing has interface id 1.
-        assert_matches!(
-            err.unwrap_err()
-                .downcast::<WorkerInitializationError<InterfacesFidlError, InterfacesNetstackError>>()
-                .unwrap(),
-            WorkerInitializationError::Netstack(
-                InterfacesNetstackError::Update(
-                    fnet_interfaces_ext::UpdateError::DuplicateExisting(properties)
-                )
-            )
-            if properties.id.unwrap() == 1
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_event_loop_errors_duplicate_adds() {
-        let Setup {
-            event_loop_fut,
-            watcher_stream,
-            request_sink: _,
-            interfaces_request_stream,
-            interfaces_handler_sink: _,
-            _async_work_sink: _,
-        } = setup();
-        let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
-        let interfaces_new = vec![get_fake_interface(1, "lo", LOOPBACK)];
-        let watcher_fut = respond_to_watcher_with_interfaces(
-            watcher_stream,
-            interfaces_existing,
-            Some((interfaces_new, fnet_interfaces::Event::Added)),
-        );
-        let root_interfaces_fut = expect_only_get_mac_root_requests_fut(interfaces_request_stream);
-
-        let (result, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
-        // The properties that are being added again has interface id 1.
-        assert_matches!(
-            result.unwrap_err()
-                .downcast::<InterfaceEventHandlerError>().unwrap(),
-            InterfaceEventHandlerError::Update(
-                fnet_interfaces_ext::UpdateError::DuplicateAdded(properties)
-            ) if properties.id.unwrap() == 1
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_event_loop_errors_existing_after_add() {
-        let Setup {
-            event_loop_fut,
-            watcher_stream,
-            request_sink: _,
-            interfaces_request_stream,
-            interfaces_handler_sink: _,
-            _async_work_sink: _,
-        } = setup();
-        let interfaces_existing =
-            vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
-        let interfaces_new = vec![get_fake_interface(3, "eth002", ETHERNET)];
-        let watcher_fut = respond_to_watcher_with_interfaces(
-            watcher_stream,
-            interfaces_existing,
-            Some((interfaces_new, fnet_interfaces::Event::Existing)),
-        );
-        let root_interfaces_fut = expect_only_get_mac_root_requests_fut(interfaces_request_stream);
-
-        let (result, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
-        // The second existing properties has interface id 3.
-        assert_matches!(
-            result.unwrap_err()
-                .downcast::<InterfaceEventHandlerError>().unwrap(),
-            InterfaceEventHandlerError::ExistingEventReceived(properties)
-                if properties.id.get() == 3
-        );
     }
 
     #[test_case(ETHERNET, false, 0, ARPHRD_ETHER)]
@@ -2205,32 +1957,27 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_deliver_updates() {
-        let scope = fasync::Scope::new();
-        let (mut link_sink, link_client, async_work_drain_task) =
+        let (mut link_sink, link_client, _async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
                 [ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
             );
-        let _join_handle = scope.spawn(async_work_drain_task);
-        let (mut addr4_sink, addr4_client, async_work_drain_task) =
+        let (mut addr4_sink, addr4_client, _async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_2,
                 [ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR)],
             );
-        let _join_handle = scope.spawn(async_work_drain_task);
-        let (mut addr6_sink, addr6_client, async_work_drain_task) =
+        let (mut addr6_sink, addr6_client, _async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_3,
                 [ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR)],
             );
-        let _join_handle = scope.spawn(async_work_drain_task);
-        let (mut other_sink, other_client, async_work_drain_task) =
+        let (mut other_sink, other_client, _async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_4,
                 [ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE)],
             );
-        let _join_handle = scope.spawn(async_work_drain_task);
-        let (mut all_sink, all_client, async_work_drain_task) =
+        let (mut all_sink, all_client, _async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_5,
                 [
@@ -2239,7 +1986,6 @@ mod tests {
                     ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
                 ],
             );
-        let _join_handle = scope.spawn(async_work_drain_task);
         let Setup {
             event_loop_fut,
             mut watcher_stream,
@@ -2333,13 +2079,8 @@ mod tests {
         assert_eq!(&other_sink.take_messages()[..], &[]);
         assert_eq!(&all_sink.take_messages()[..], &[]);
 
-        // Note that we provide the stream by value so that it is dropped/closed
-        // after this round of updates is sent to the event loop. We wait for
-        // the eventloop to terminate below to indicate that all updates have
-        // been received and handled so that we can properly assert the sent
-        // messages.
         let watcher_stream_fut = respond_to_watcher(
-            watcher_stream,
+            watcher_stream.by_ref(),
             [
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(WLAN_INTERFACE_ID),
@@ -2388,12 +2129,20 @@ mod tests {
                 }),
             ],
         );
-        let ((), (), err) =
-            futures::future::join3(watcher_stream_fut, root_interfaces_fut, event_loop_fut).await;
-        assert_matches!(
-            err.unwrap_err().downcast::<crate::eventloop::EventStreamError>().unwrap(),
-            crate::eventloop::EventStreamError::Interfaces(fidl::Error::ClientChannelClosed { .. })
-        );
+
+        futures::select! {
+            () = watcher_stream_fut.fuse() => {},
+            () = root_interfaces_fut => {
+                unreachable!("root interfaces request stream should never end")
+            }
+            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+        }
+
+        // Poll the event loop to ensure it's had the opportunity to process the
+        // events from the watcher. The event loop can never finish, so we
+        // must see `None`.
+        assert_matches!(event_loop_fut.now_or_never(), None);
+
         assert_eq!(
             interfaces_handler_sink.take_handled(),
             [
@@ -2547,7 +2296,6 @@ mod tests {
             ],
         );
         assert_eq!(&other_sink.take_messages()[..], &[]);
-        scope.join().await;
     }
 
     const LO_MAC: Option<fnet::MacAddress> = None;

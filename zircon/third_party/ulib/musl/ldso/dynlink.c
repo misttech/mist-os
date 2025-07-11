@@ -205,8 +205,8 @@ struct r_debug* _dl_debug_addr = &debug;
 // post-processing the h/w trace.
 static bool trace_maps = false;
 
-void _dl_rdlock(void) { pthread_rwlock_rdlock(&lock); }
-void _dl_unlock(void) { pthread_rwlock_unlock(&lock); }
+void _dlfcn_lock(void) { pthread_rwlock_rdlock(&lock); }
+void _dlfcn_unlock(void) { pthread_rwlock_unlock(&lock); }
 static void _dl_wrlock(void) { pthread_rwlock_wrlock(&lock); }
 
 NO_ASAN LIBC_NO_SAFESTACK static int dl_strcmp(const char* l, const char* r) {
@@ -2321,7 +2321,7 @@ static void* dlopen_internal(zx_handle_t vmo, const char* file, int mode) {
     error("Error loading shared library %s: %s", file, _zx_status_get_string(status));
   fail:
     __thread_allocation_release();
-    _dl_unlock();
+    _dlfcn_unlock();
     return NULL;
   }
 
@@ -2400,7 +2400,7 @@ static void* dlopen_internal(zx_handle_t vmo, const char* file, int mode) {
   // head up through new_tail.  Most fields will never change again.
   atomic_store_explicit(&unlogged_tail, (uintptr_t)new_tail, memory_order_release);
 
-  _dl_unlock();
+  _dlfcn_unlock();
 
   if (log_libs)
     _dl_log_unlogged();
@@ -2437,7 +2437,7 @@ zx_handle_t dl_set_loader_service(zx_handle_t new_svc) {
   _dl_wrlock();
   old_svc = loader_svc;
   loader_svc = new_svc;
-  _dl_unlock();
+  _dlfcn_unlock();
   return old_svc;
 }
 
@@ -2527,9 +2527,9 @@ failed:
 int dladdr(const void* addr, Dl_info* info) {
   struct dso* p;
 
-  _dl_rdlock();
+  _dlfcn_lock();
   p = addr2dso((size_t)addr);
-  _dl_unlock();
+  _dlfcn_unlock();
 
   if (!p)
     return 0;
@@ -2564,7 +2564,7 @@ void* dlsym(void* restrict p, const char* restrict s) {
   void* res;
   _dl_wrlock();
   res = do_dlsym(p, s, __builtin_return_address(0));
-  _dl_unlock();
+  _dlfcn_unlock();
   return res;
 }
 
@@ -2580,9 +2580,9 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info* info, size_t size, void
     if (ret != 0)
       break;
 
-    _dl_rdlock();
+    _dlfcn_lock();
     current = dso_next(current);
-    _dl_unlock();
+    _dlfcn_unlock();
   }
   return ret;
 }
@@ -2786,9 +2786,9 @@ zx_status_t __sanitizer_change_code_protection(uintptr_t addr, size_t len, bool 
   }
 
   struct dso* p;
-  _dl_rdlock();
+  _dlfcn_lock();
   p = addr2dso((size_t)__builtin_return_address(0));
-  _dl_unlock();
+  _dlfcn_unlock();
 
   if (!p) {
     return ZX_ERR_OUT_OF_RANGE;

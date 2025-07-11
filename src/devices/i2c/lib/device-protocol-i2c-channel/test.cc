@@ -60,13 +60,13 @@ class I2cDevice : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
     fidl::Arena arena;
     fidl::ObjectView<fuchsia_hardware_i2c::wire::DeviceTransferResponse> response(arena);
 
-    stop_.reserve(transactions.count());
+    stop_.reserve(transactions.size());
 
     const size_t write_size = std::accumulate(
         transactions.cbegin(), transactions.cend(), 0,
         [](size_t a, const fuchsia_hardware_i2c::wire::Transaction& b) {
           return a +
-                 (b.data_transfer().is_write_data() ? b.data_transfer().write_data().count() : 0);
+                 (b.data_transfer().is_write_data() ? b.data_transfer().write_data().size() : 0);
         });
     tx_data_.resize(write_size);
 
@@ -91,18 +91,18 @@ class I2cDevice : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
         auto& read_data = response->read_data[rx_transaction++];
         read_data = {arena, read_size};
 
-        if (rx_offset + read_data.count() > rx_data_.size()) {
+        if (rx_offset + read_data.size() > rx_data_.size()) {
           completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
           return;
         }
 
-        memcpy(read_data.data(), &rx_data_[rx_offset], read_data.count());
+        memcpy(read_data.data(), &rx_data_[rx_offset], read_data.size());
         rx_offset += transaction.data_transfer().read_size();
       } else {
         // Serialize and store the write transaction.
         const auto& write_data = transaction.data_transfer().write_data();
-        memcpy(&tx_data_[tx_offset], write_data.data(), write_data.count());
-        tx_offset += write_data.count();
+        memcpy(&tx_data_[tx_offset], write_data.data(), write_data.size());
+        tx_offset += write_data.size();
       }
 
       *stop_it++ = transaction.has_stop() ? transaction.stop() : false;

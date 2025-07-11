@@ -132,7 +132,9 @@ mod tests {
     use std::io::Write;
     use tempfile::TempDir;
 
-    const VIRTUAL_DEVICE_VALID: &str = include_str!("../../test_data/virtual_device.json");
+    const VIRTUAL_DEVICE_1: &str = include_str!("../../test_data/virtual_device.json");
+    const VIRTUAL_DEVICE_2: &str = include_str!("../../test_data/virtual_device2.json");
+    const VIRTUAL_DEVICE_3: &str = include_str!("../../test_data/virtual_device3.json");
     const VIRTUAL_DEVICE_MANIFEST_SINGLE: &str =
         include_str!("../../test_data/single_vd_manifest.json");
 
@@ -236,8 +238,8 @@ mod tests {
         create_dir_all(&vd_dir.join("extra/path")).expect("make_dir extra/path/");
         let mut file3 = File::create(&vd_file_path3).expect("create device3.json");
 
-        file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-        file3.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        file1.write_all(VIRTUAL_DEVICE_1.as_bytes())?;
+        file3.write_all(VIRTUAL_DEVICE_3.as_bytes())?;
 
         let manifest = VirtualDeviceManifest {
             recommended: None,
@@ -283,9 +285,9 @@ mod tests {
         create_dir_all(&vd_dir.join("extra/path")).expect("make_dir extra/path/");
         let mut file3 = File::create(&vd_file_path3).expect("create device3.json");
 
-        file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        file1.write_all(VIRTUAL_DEVICE_1.as_bytes())?;
         // Don't write the device contents to file2
-        file3.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        file3.write_all(VIRTUAL_DEVICE_3.as_bytes())?;
 
         let manifest = VirtualDeviceManifest {
             recommended: None,
@@ -331,9 +333,9 @@ mod tests {
         create_dir_all(&vd_dir.join("extra/path")).expect("make_dir extra/path/");
         let mut file3 = File::create(&vd_file_path3).expect("create device3.json");
 
-        file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-        file2.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-        file3.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        file1.write_all(VIRTUAL_DEVICE_1.as_bytes())?;
+        file2.write_all(VIRTUAL_DEVICE_2.as_bytes())?;
+        file3.write_all(VIRTUAL_DEVICE_3.as_bytes())?;
 
         let manifest = VirtualDeviceManifest {
             recommended: None,
@@ -407,9 +409,9 @@ mod tests {
         create_dir_all(&vd_dir.join("extra/path")).expect("make_dir extra/path/");
         let mut file3 = File::create(&vd_file_path3).expect("create device3.json");
 
-        file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-        file2.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-        file3.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        file1.write_all(VIRTUAL_DEVICE_1.as_bytes())?;
+        file2.write_all(VIRTUAL_DEVICE_2.as_bytes())?;
+        file3.write_all(VIRTUAL_DEVICE_3.as_bytes())?;
 
         let manifest = VirtualDeviceManifest {
             recommended: Some("device2".to_string()),

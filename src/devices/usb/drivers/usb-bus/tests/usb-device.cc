@@ -590,7 +590,7 @@ TEST_F(DeviceTest, FidlGetConfigurationDescriptor) {
   auto result = fidl->GetConfigurationDescriptor(1);
   ASSERT_TRUE(result.ok());
   ASSERT_OK(result.value().s);
-  ASSERT_EQ(result.value().desc.count(), sizeof(*descriptor));
+  ASSERT_EQ(result.value().desc.size(), sizeof(*descriptor));
   descriptor = reinterpret_cast<const usb_configuration_descriptor_t*>(result.value().desc.data());
   ASSERT_EQ(descriptor->b_configuration_value, 1);
   ASSERT_EQ(descriptor->w_total_length, sizeof(*descriptor));

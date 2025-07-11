@@ -400,7 +400,7 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
         break;
     }
 
-    buffer->data.set_count(0);
+    buffer->data.set_size(0);
 
     *buffer = {
         .data = buffer->data,
@@ -427,7 +427,7 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
     uint32_t total_length = 0;
     for (;;) {
       buffer_descriptor_t& part_desc = *part_iter;
-      auto* cur = &buffer->data.data()[buffer->data.count()];
+      auto* cur = &buffer->data.data()[buffer->data.size()];
       if (add_head_space) {
         *cur = {
             .vmo = vmo_id_,
@@ -445,7 +445,7 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
         cur->length += buffer->tail_length;
       }
       total_length += part_desc.data_length;
-      buffer->data.set_count(buffer->data.count() + 1);
+      buffer->data.set_size(buffer->data.size() + 1);
 
       add_head_space = false;
       if (expect_chain == 0) {
@@ -619,7 +619,7 @@ bool Session::OnPortDestroyed(uint8_t port_id) {
 
 void Session::Attach(AttachRequestView request, AttachCompleter::Sync& completer) {
   zx_status_t status =
-      AttachPort(request->port, cpp20::span(request->rx_frames.data(), request->rx_frames.count()));
+      AttachPort(request->port, cpp20::span(request->rx_frames.data(), request->rx_frames.size()));
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {

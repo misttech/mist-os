@@ -41,6 +41,7 @@ if (is_host) {
 
 sdk_source_set("memory_barriers") {
   public = [ "include/lib/memory_barriers/memory_barriers.h" ]
+  sdk_area = "Media"
   category = "partner"
   sdk_name = "memory_barriers"
   public_configs = [ ":memory_barriers_include" ]

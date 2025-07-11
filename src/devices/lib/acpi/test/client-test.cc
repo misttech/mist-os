@@ -34,7 +34,7 @@ class AcpiClientTest : public zxtest::Test {
                                      MockAcpiDevice::EvaluateObjectCompleter::Sync &sync) {
       ASSERT_BYTES_EQ(request->path.data(), "_DSM", request->path.size());
       ASSERT_EQ(request->mode, facpi::EvaluateObjectMode::kPlainObject);
-      ASSERT_EQ(request->parameters.count(), 4);
+      ASSERT_EQ(request->parameters.size(), 4);
       auto &params = request->parameters;
 
       ASSERT_TRUE(params[0].is_buffer_val());

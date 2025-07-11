@@ -171,7 +171,7 @@ once_cell = "1.20.2"
 overload = "0.1.1"
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
 paste = "1.0.15"
-pathdiff = { version = "0.2.1", features = ["camino"] }
+pathdiff = { version = "0.2.3", features = ["camino"] }
 pem = "0.8.3"
 percent-encoding = "2.1"
 pest = "2.7.8"
@@ -217,7 +217,7 @@ signature =  "1.4.0"
 # TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
 # targetting fuchsia.
 simplelog = "0.10.2"
-siphasher = "0.3.10"
+siphasher = "0.3.11"
 slab = "0.4.9"
 smallvec = {version= "1.14.0", features = ["const_generics", "const_new", "union"]}
 socket2 = { version = "0.5.9", features = ["all"] }
@@ -239,7 +239,7 @@ toml_edit = "0.2.1"
 tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes", "log"] }
 tracing-core = "0.1.32"
 tracing-log = "0.2.0"
-tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
+tracing-mutex = { version = "0.3.1", features = ["experimental", "lockapi", "parkinglot"] }
 tuf = { version = "=0.3.0-beta13", default-features = false, features = ["hyper"] }
 typed-builder = "0.10.0"
 unic-char-range = "0.9"
@@ -404,7 +404,6 @@ windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }
 windows-sys-0_59_0 = { package = "windows-sys", path = "empty/windows-sys-0.59.0" }
 windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-targets-0.48.5" }
-windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
 # keep-sorted end
 
 ### Forks: vendored crates whose code doesn't match the upstream version
@@ -1121,6 +1120,9 @@ rustflags = [
 
 [gn.package.tracing."0.1.40"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_visibility" }
+
+[gn.package.tracing-mutex."0.3.1"]
+# Has build script but no config needed.
 
 [gn.package.tracing-subscriber."0.3.18"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_subscriber_visibility" }

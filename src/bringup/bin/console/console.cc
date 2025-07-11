@@ -74,7 +74,7 @@ void Console::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
     }
     span = span.subspan(count);
   }
-  return completer.ReplySuccess(request->data.count());
+  return completer.ReplySuccess(request->data.size());
 }
 
 void Console::Describe(DescribeCompleter::Sync& completer) {

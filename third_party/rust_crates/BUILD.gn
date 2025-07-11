@@ -659,7 +659,7 @@ group("paste") {
 }
 
 group("pathdiff") {
-  public_deps = [ ":pathdiff-v0_2_1" ]
+  public_deps = [ ":pathdiff-v0_2_3" ]
 }
 
 group("pem") {
@@ -979,7 +979,7 @@ group("simplelog") {
 }
 
 group("siphasher") {
-  public_deps = [ ":siphasher-v0_3_10" ]
+  public_deps = [ ":siphasher-v0_3_11" ]
 }
 
 group("slab") {
@@ -1133,7 +1133,7 @@ group("tracing-log") {
 }
 
 group("tracing-mutex") {
-  public_deps = [ ":tracing-mutex-v0_3_0" ]
+  public_deps = [ ":tracing-mutex-v0_3_1" ]
 }
 
 group("tracing-subscriber") {
@@ -10023,7 +10023,7 @@ rustc_library("mockall-v0_9_0") {
   deps += [ ":fragile-v1_0_0" ]
   deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":mockall_derive-v0_9_0($host_toolchain)" ]
-  deps += [ ":predicates-tree-v1_0_2" ]
+  deps += [ ":predicates-tree-v1_0_12" ]
   deps += [ ":predicates-v1_0_8" ]
   deps += [ "//build/validate:non_production_tag" ]
   rustenv = []
@@ -11708,18 +11708,18 @@ rustc_macro("paste-v1_0_15") {
   applicable_licenses = [ ":paste-v1_0_15.license" ]
 }
 
-license("pathdiff-v0_2_1.license") {
+license("pathdiff-v0_2_3.license") {
   public_package_name = "pathdiff"
   license_files = [
-    "//third_party/rust_crates/vendor/pathdiff-0.2.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/pathdiff-0.2.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/pathdiff-0.2.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/pathdiff-0.2.3/LICENSE-MIT",
   ]
 }
 
-rustc_library("pathdiff-v0_2_1") {
+rustc_library("pathdiff-v0_2_3") {
   crate_name = "pathdiff"
-  source_root = "//third_party/rust_crates/vendor/pathdiff-0.2.1/src/lib.rs"
-  output_name = "pathdiff-f92b819d1f19c4a5"
+  source_root = "//third_party/rust_crates/vendor/pathdiff-0.2.3/src/lib.rs"
+  output_name = "pathdiff-136957d711c6ad4f"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -11732,14 +11732,14 @@ rustc_library("pathdiff-v0_2_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=f92b819d1f19c4a5",
-    "-Cextra-filename=-f92b819d1f19c4a5",
+    "-Cmetadata=136957d711c6ad4f",
+    "-Cextra-filename=-136957d711c6ad4f",
     "--cfg=feature=\"camino\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":pathdiff-v0_2_1.license" ]
+  applicable_licenses = [ ":pathdiff-v0_2_3.license" ]
 }
 
 license("pem-v0_8_3.license") {
@@ -12594,7 +12594,7 @@ rustc_library("predicates-v1_0_8") {
   deps += [ ":difference-v2_0_0" ]
   deps += [ ":float-cmp-v0_8_0" ]
   deps += [ ":normalize-line-endings-v0_3_0" ]
-  deps += [ ":predicates-core-v1_0_2" ]
+  deps += [ ":predicates-core-v1_0_9" ]
   deps += [ ":regex-v1_7_3" ]
 
   rustenv = []
@@ -12615,20 +12615,20 @@ rustc_library("predicates-v1_0_8") {
   applicable_licenses = [ ":predicates-v1_0_8.license" ]
 }
 
-license("predicates-core-v1_0_2.license") {
+license("predicates-core-v1_0_9.license") {
   public_package_name = "predicates_core"
   license_files = [
-    "//third_party/rust_crates/vendor/predicates-core-1.0.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/predicates-core-1.0.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/predicates-core-1.0.9/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/predicates-core-1.0.9/LICENSE-MIT",
   ]
 }
 
-rustc_library("predicates-core-v1_0_2") {
+rustc_library("predicates-core-v1_0_9") {
   crate_name = "predicates_core"
   source_root =
-      "//third_party/rust_crates/vendor/predicates-core-1.0.2/src/lib.rs"
-  output_name = "predicates_core-9278ecd8b23c9da2"
-  edition = "2018"
+      "//third_party/rust_crates/vendor/predicates-core-1.0.9/src/lib.rs"
+  output_name = "predicates_core-eec89fe69e30e302"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -12639,48 +12639,48 @@ rustc_library("predicates-core-v1_0_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=9278ecd8b23c9da2",
-    "-Cextra-filename=-9278ecd8b23c9da2",
+    "-Cmetadata=eec89fe69e30e302",
+    "-Cextra-filename=-eec89fe69e30e302",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":predicates-core-v1_0_2.license" ]
+  applicable_licenses = [ ":predicates-core-v1_0_9.license" ]
 }
 
-license("predicates-tree-v1_0_2.license") {
+license("predicates-tree-v1_0_12.license") {
   public_package_name = "predicates_tree"
   license_files = [
-    "//third_party/rust_crates/vendor/predicates-tree-1.0.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/predicates-tree-1.0.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/predicates-tree-1.0.12/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/predicates-tree-1.0.12/LICENSE-MIT",
   ]
 }
 
-rustc_library("predicates-tree-v1_0_2") {
+rustc_library("predicates-tree-v1_0_12") {
   crate_name = "predicates_tree"
   source_root =
-      "//third_party/rust_crates/vendor/predicates-tree-1.0.2/src/lib.rs"
-  output_name = "predicates_tree-2fdd83d7979f6648"
-  edition = "2018"
+      "//third_party/rust_crates/vendor/predicates-tree-1.0.12/src/lib.rs"
+  output_name = "predicates_tree-2edfa1533b69257a"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":predicates-core-v1_0_2" ]
-  deps += [ ":treeline-v0_1_0" ]
+  deps += [ ":predicates-core-v1_0_9" ]
+  deps += [ ":termtree-v0_5_1" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=2fdd83d7979f6648",
-    "-Cextra-filename=-2fdd83d7979f6648",
+    "-Cmetadata=2edfa1533b69257a",
+    "-Cextra-filename=-2edfa1533b69257a",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":predicates-tree-v1_0_2.license" ]
+  applicable_licenses = [ ":predicates-tree-v1_0_12.license" ]
 }
 
 license("pretty-v0_5_2.license") {
@@ -16545,16 +16545,16 @@ rustc_library("siphasher-v0_2_3") {
   applicable_licenses = [ ":siphasher-v0_2_3.license" ]
 }
 
-license("siphasher-v0_3_10.license") {
+license("siphasher-v0_3_11.license") {
   public_package_name = "siphasher"
   license_files =
-      [ "//third_party/rust_crates/vendor/siphasher-0.3.10/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/siphasher-0.3.11/LICENSE" ]
 }
 
-rustc_library("siphasher-v0_3_10") {
+rustc_library("siphasher-v0_3_11") {
   crate_name = "siphasher"
-  source_root = "//third_party/rust_crates/vendor/siphasher-0.3.10/src/lib.rs"
-  output_name = "siphasher-e2ef53c2b88c1cff"
+  source_root = "//third_party/rust_crates/vendor/siphasher-0.3.11/src/lib.rs"
+  output_name = "siphasher-b2fe7abda7dc9c8c"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -16566,15 +16566,15 @@ rustc_library("siphasher-v0_3_10") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=e2ef53c2b88c1cff",
-    "-Cextra-filename=-e2ef53c2b88c1cff",
+    "-Cmetadata=b2fe7abda7dc9c8c",
+    "-Cextra-filename=-b2fe7abda7dc9c8c",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":siphasher-v0_3_10.license" ]
+  applicable_licenses = [ ":siphasher-v0_3_11.license" ]
 }
 
 license("slab-v0_4_9.license") {
@@ -18525,19 +18525,19 @@ rustc_library("tracing-log-v0_2_0") {
   applicable_licenses = [ ":tracing-log-v0_2_0.license" ]
 }
 
-license("tracing-mutex-v0_3_0.license") {
+license("tracing-mutex-v0_3_1.license") {
   public_package_name = "tracing_mutex"
   license_files = [
-    "//third_party/rust_crates/vendor/tracing-mutex-0.3.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/tracing-mutex-0.3.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/tracing-mutex-0.3.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/tracing-mutex-0.3.1/LICENSE-MIT",
   ]
 }
 
-rustc_library("tracing-mutex-v0_3_0") {
+rustc_library("tracing-mutex-v0_3_1") {
   crate_name = "tracing_mutex"
   source_root =
-      "//third_party/rust_crates/vendor/tracing-mutex-0.3.0/src/lib.rs"
-  output_name = "tracing_mutex-8efa01ae111d5f99"
+      "//third_party/rust_crates/vendor/tracing-mutex-0.3.1/src/lib.rs"
+  output_name = "tracing_mutex-7b252f5df2d7b093"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
@@ -18551,19 +18551,19 @@ rustc_library("tracing-mutex-v0_3_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=8efa01ae111d5f99",
-    "-Cextra-filename=-8efa01ae111d5f99",
+    "-Cmetadata=7b252f5df2d7b093",
+    "-Cextra-filename=-7b252f5df2d7b093",
     "--cfg=feature=\"backtraces\"",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"experimental\"",
     "--cfg=feature=\"lock_api\"",
     "--cfg=feature=\"lockapi\"",
-    "--cfg=feature=\"parking_lot\"",
     "--cfg=feature=\"parkinglot\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tracing-mutex-v0_3_0.license" ]
+  applicable_licenses = [ ":tracing-mutex-v0_3_1.license" ]
 }
 
 license("tracing-subscriber-v0_3_18.license") {
@@ -18621,35 +18621,6 @@ rustc_library("tracing-subscriber-v0_3_18") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":tracing-subscriber-v0_3_18.license" ]
-}
-
-license("treeline-v0_1_0.license") {
-  public_package_name = "treeline"
-  license_files = [ "//third_party/rust_crates/vendor/treeline-0.1.0/LICENSE" ]
-}
-
-rustc_library("treeline-v0_1_0") {
-  crate_name = "treeline"
-  source_root = "//third_party/rust_crates/vendor/treeline-0.1.0/src/lib.rs"
-  output_name = "treeline-73b2c02cee81d97b"
-  edition = "2015"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=73b2c02cee81d97b",
-    "-Cextra-filename=-73b2c02cee81d97b",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":treeline-v0_1_0.license" ]
 }
 
 license("trust-dns-proto-v0_22_0.license") {

@@ -917,9 +917,25 @@ TEST(PortStressTest, CloseWaitRace) {
     while (args->ready_count->load() < kTotalThreads) {
     }
     while (args->keep_running->load()) {
+      // We're racing with another thread that is closing the port we're about to use.  There are
+      // three expected cases for the wait_async call below.
+      //
+      // First, if we "win" the race and
+      // complete our wait_async before the other thread closes the port, then we'll see ZX_OK.
+      //
+      // Second, if the other thread "wins" and closes the port, then we might see
+      // ZX_ERR_BAD_HANDLE.
+      //
+      // The third case is less obvious.  Let's say the other thread closes the port just after our
+      // wait_async returns ZX_OK.  However, it hasn't gotten around to replacing the port handle
+      // value with ZX_HANDLE_INVALID.  We continue on, see that the num_waits value has exceeded
+      // the threshold and so we create another event.  It's possible that the handle value chosen
+      // for this new event is the recycle port handle value that's still sitting in args->port.  If
+      // that happens, then in the subsequent iteration zx_object_wait_async will return
+      // ZX_ERR_WRONG_TYPE because unlikely events, ports aren't waitable.
       zx_status_t status =
           zx_object_wait_async(event.get(), args->port->load(), 0, ZX_EVENT_SIGNALED, 0);
-      if (status != ZX_OK && status != ZX_ERR_BAD_HANDLE) {
+      if (status != ZX_OK && status != ZX_ERR_BAD_HANDLE && status != ZX_ERR_WRONG_TYPE) {
         args->status = status;
         return;
       }

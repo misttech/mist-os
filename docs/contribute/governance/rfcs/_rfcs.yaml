@@ -3556,3 +3556,16 @@
   reviewers: ['eieio@google.com', 'fmil@google.com', 'jmatt@google.com']
   submitted: '2025-05-23'
   reviewed: '2025-06-24'
+
+- name: 'RFC-0273'
+  title: 'Handle specific information calls'
+  short_description: 'Provide replacements for handle topics in object_get_info call.'
+  authors: ['jamesr@google.com']
+  file: '0273_handle_information_calls.md'
+  area: ['Zircon']
+  issue: ['']
+  gerrit_change_id: ['1280416']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'maniscalco@google.com', 'mcgrathr@google.com']
+  submitted: '2025-05-19'
+  reviewed: '2025-07-08'

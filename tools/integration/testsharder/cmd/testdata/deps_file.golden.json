@@ -69,6 +69,7 @@
             }
         },
         "deps": [
+            "AEMU.botanist.json",
             "AEMU_tests.json",
             "host_x64/bootserver_new",
             "host_x64/botanist",
@@ -108,6 +109,7 @@
             "os": "Debian",
             "pool": ""
         },
+        "botanist_config": "./AEMU.botanist.json",
         "tests_json": "AEMU_tests.json",
         "base_command": [
             "./host_x64/botanist",

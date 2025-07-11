@@ -41,7 +41,7 @@ void IsolatedDevMgrTestDriver::GetMetadata(GetMetadataRequestView request,
     completer.Close(result->error_value());
   }
   const auto& metadata = result.value()->metadata;
-  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(metadata.data(), metadata.count()));
+  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(metadata.data(), metadata.size()));
 }
 
 zx_status_t IsolatedDevMgrTestDriver::Bind() {

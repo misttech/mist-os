@@ -135,7 +135,7 @@ zx::result<> SetEncodedConfig(fidl::WireTableBuilder<fdf::wire::DriverStartArgs>
     return zx::ok();
   }
 
-  auto vmo_size = start_info.encoded_config().bytes().count();
+  auto vmo_size = start_info.encoded_config().bytes().size();
   zx::vmo vmo;
 
   auto status = zx::vmo::create(vmo_size, ZX_RIGHT_TRANSFER | ZX_RIGHT_READ, &vmo);
@@ -207,12 +207,12 @@ void DriverHostComponent::Start(
 
   // TODO(b/361852885): Remove this once we stop supporting the deprecated dictionary.
   fuchsia_driver_framework::wire::NodePropertyDictionary deprecated_dictionary(
-      arena, node_properties.count());
+      arena, node_properties.size());
   size_t entry_index = 0;
   for (auto& entry : node_properties) {
     fuchsia_driver_framework::wire::NodePropertyVector deprecated_properties(
-        arena, entry.properties.count());
-    for (size_t i = 0; i < entry.properties.count(); i++) {
+        arena, entry.properties.size());
+    for (size_t i = 0; i < entry.properties.size(); i++) {
       deprecated_properties[i] = ToDeprecatedProperty(arena, entry.properties[i]);
     }
     deprecated_dictionary[entry_index] = fuchsia_driver_framework::wire::NodePropertyEntry{

@@ -5,26 +5,34 @@
 #include "src/storage/blobfs/test/blob_utils.h"
 
 #include <fcntl.h>
+#include <fidl/fuchsia.fxfs/cpp/common_types.h>
 #include <fidl/fuchsia.fxfs/cpp/markers.h>
 #include <fidl/fuchsia.fxfs/cpp/wire_messaging.h>
-#include <lib/fdio/io.h>
 #include <lib/fidl/cpp/wire/array.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
-#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
 #include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <limits>
 #include <memory>
 #include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include <fbl/algorithm.h>
-#include <fbl/array.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <safemath/safe_conversions.h>
@@ -34,6 +42,7 @@
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/delivery_blob.h"
+#include "src/storage/blobfs/format.h"
 
 namespace blobfs {
 namespace {
@@ -156,48 +165,6 @@ std::string GetBlobLayoutFormatNameForTests(BlobLayoutFormat format) {
   }
 }
 
-void CreateUncompressedBlob(std::span<uint8_t> data,
-                            fidl::WireSyncClient<fuchsia_fxfs::BlobCreator>& creator) {
-  zx::result<fbl::Array<uint8_t>> delivery_blob = GenerateDeliveryBlobType1(data, false);
-  ASSERT_TRUE(delivery_blob.is_ok())
-      << "Failed to create delivery blob: " << delivery_blob.status_string();
-
-  zx::result<Digest> merkle_root = CalculateDeliveryBlobDigest(*delivery_blob);
-  ASSERT_TRUE(merkle_root.is_ok())
-      << "Failed to generate blob Merkle root: " << merkle_root.status_string();
-
-  fidl::WireSyncClient<fuchsia_fxfs::BlobWriter> writer;
-  {
-    fidl::Array<uint8_t, 32> hash;
-    merkle_root->CopyTo(hash.data_);
-    auto result = creator->Create(hash, false);
-    ASSERT_TRUE(result.ok()) << "Fidl error: " << result.status_string();
-    ASSERT_TRUE(result->is_ok()) << "Blob creator: " << result.status_string();
-    writer = fidl::WireSyncClient<fuchsia_fxfs::BlobWriter>{std::move((*result)->writer)};
-  }
-
-  zx::vmo vmo;
-  {
-    auto result = writer->GetVmo(delivery_blob->size());
-    ASSERT_TRUE(result.ok()) << "Fidl error: " << result.status_string();
-    ASSERT_TRUE(result->is_ok()) << "BlobWriter::GetVmo: " << result.status_string();
-    vmo = std::move((*result)->vmo);
-  }
-
-  size_t vmo_size;
-  ASSERT_EQ(vmo.get_size(&vmo_size), ZX_OK);
-
-  uint64_t bytes_written = 0;
-  while (bytes_written < delivery_blob->size()) {
-    uint64_t bytes_to_write = std::min(vmo_size, delivery_blob->size() - bytes_written);
-    ASSERT_EQ(vmo.write(delivery_blob->data() + bytes_written, 0, bytes_to_write), ZX_OK);
-    auto result = writer->BytesReady(bytes_to_write);
-    ASSERT_TRUE(result.ok()) << "Fidl error: " << result.status_string();
-    ASSERT_TRUE(result->is_ok()) << "BlobWriter::BytesReady: " << result.status_string();
-    bytes_written += bytes_to_write;
-  }
-}
-
 std::unique_ptr<MerkleTreeInfo> CreateMerkleTree(const uint8_t* data, uint64_t data_size,
                                                  bool use_compact_format) {
   auto merkle_tree_info = std::make_unique<MerkleTreeInfo>();
@@ -221,5 +188,135 @@ std::unique_ptr<MerkleTreeInfo> CreateMerkleTree(const uint8_t* data, uint64_t d
 }
 
 std::string BlobInfo::GetMerkleRoot() const { return std::filesystem::path(path).filename(); }
+
+TestDeliveryBlob TestDeliveryBlob::CreateCompressed(uint64_t size) {
+  auto buf = std::make_unique<uint8_t[]>(size);
+  memset(buf.get(), 0xAB, size);
+  return CreateCompressed(std::span(buf.get(), size));
+}
+
+TestDeliveryBlob TestDeliveryBlob::CreateCompressed(std::span<uint8_t> blob_data) {
+  auto delivery_blob = GenerateDeliveryBlobType1(blob_data, /*compress=*/true);
+  ZX_ASSERT(delivery_blob.is_ok());
+  auto digest = CalculateDeliveryBlobDigest(*delivery_blob);
+  ZX_ASSERT(digest.is_ok());
+  return TestDeliveryBlob{
+      .digest = std::move(*digest),
+      .delivery_blob = std::move(*delivery_blob),
+  };
+}
+
+TestDeliveryBlob TestDeliveryBlob::CreateUncompressed(uint64_t size) {
+  auto buf = std::make_unique<uint8_t[]>(size);
+  memset(buf.get(), 0xAB, size);
+  return CreateUncompressed(std::span(buf.get(), size));
+}
+
+TestDeliveryBlob TestDeliveryBlob::CreateUncompressed(std::span<uint8_t> blob_data) {
+  auto delivery_blob = GenerateDeliveryBlobType1(blob_data, /*compress=*/false);
+  ZX_ASSERT(delivery_blob.is_ok());
+  auto digest = CalculateDeliveryBlobDigest(*delivery_blob);
+  ZX_ASSERT(digest.is_ok());
+  return TestDeliveryBlob{
+      .digest = std::move(*digest),
+      .delivery_blob = std::move(*delivery_blob),
+  };
+}
+
+BlobReaderWrapper::BlobReaderWrapper(fidl::WireSyncClient<fuchsia_fxfs::BlobReader> reader)
+    : reader_(std::move(reader)) {}
+
+zx::result<zx::vmo> BlobReaderWrapper::GetVmo(const Digest& digest) const {
+  fidl::Array<uint8_t, 32> hash;
+  digest.CopyTo(hash.data_);
+  auto result = reader_->GetVmo(hash);
+  ZX_ASSERT(result.ok());
+  if (result->is_error()) {
+    return zx::error(result->error_value());
+  }
+  return zx::ok(std::move((*result)->vmo));
+}
+
+BlobWriterWrapper::BlobWriterWrapper(fidl::WireSyncClient<fuchsia_fxfs::BlobWriter> writer)
+    : writer_(std::move(writer)) {}
+
+zx::result<> BlobWriterWrapper::BytesReady(uint64_t bytes_written) {
+  auto result = writer_->BytesReady(bytes_written);
+  ZX_ASSERT(result.ok());
+  if (result->is_error()) {
+    return zx::error(result->error_value());
+  }
+  return zx::ok();
+}
+
+zx::result<zx::vmo> BlobWriterWrapper::GetVmo(uint64_t size) {
+  auto result = writer_->GetVmo(size);
+  ZX_ASSERT(result.ok());
+  if (result->is_error()) {
+    return zx::error(result->error_value());
+  }
+  return zx::ok(std::move((*result)->vmo));
+}
+
+zx::result<> BlobWriterWrapper::WriteBlob(const TestDeliveryBlob& blob) {
+  uint64_t payload_size = blob.delivery_blob.size();
+  auto vmo = GetVmo(payload_size);
+  if (vmo.is_error()) {
+    return vmo.take_error();
+  }
+
+  uint64_t bytes_written = 0;
+  while (bytes_written < payload_size) {
+    uint64_t bytes_to_write = std::min(kRingBufferSize, payload_size - bytes_written);
+    if (zx_status_t status =
+            vmo->write(blob.delivery_blob.get() + bytes_written, 0, bytes_to_write);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    if (zx::result result = BytesReady(bytes_to_write); result.is_error()) {
+      return result.take_error();
+    }
+    bytes_written += bytes_to_write;
+  }
+  return zx::ok();
+}
+
+BlobCreatorWrapper::BlobCreatorWrapper(fidl::WireSyncClient<fuchsia_fxfs::BlobCreator> creator)
+    : creator_(std::move(creator)) {}
+
+zx::result<BlobWriterWrapper> BlobCreatorWrapper::Create(const Digest& digest) const {
+  return Create(digest, false);
+}
+
+zx::result<BlobWriterWrapper> BlobCreatorWrapper::CreateExisting(const Digest& digest) const {
+  return Create(digest, true);
+}
+
+zx::result<> BlobCreatorWrapper::CreateAndWriteBlob(const TestDeliveryBlob& blob) const {
+  auto writer = Create(blob.digest);
+  if (writer.is_error()) {
+    return writer.take_error();
+  }
+
+  return writer->WriteBlob(blob);
+}
+
+zx::result<BlobWriterWrapper> BlobCreatorWrapper::Create(const Digest& digest,
+                                                         bool allow_existing) const {
+  fidl::Array<uint8_t, 32> hash;
+  digest.CopyTo(hash.data_);
+  auto result = creator_->Create(hash, allow_existing);
+  ZX_ASSERT(result.ok());
+  if (result->is_error()) {
+    switch (result->error_value()) {
+      case fuchsia_fxfs::CreateBlobError::kAlreadyExists:
+        return zx::error(ZX_ERR_ALREADY_EXISTS);
+      case fuchsia_fxfs::CreateBlobError::kInternal:
+        return zx::error(ZX_ERR_INTERNAL);
+    }
+  }
+  return zx::ok(BlobWriterWrapper(
+      fidl::WireSyncClient<fuchsia_fxfs::BlobWriter>(std::move((*result)->writer))));
+}
 
 }  // namespace blobfs

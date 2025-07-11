@@ -1042,7 +1042,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_blk_len(req_blk_len).WriteTo(&*mmio_);
 
   std::vector<fzl::PinnedVmo> pinned_vmos;
-  pinned_vmos.reserve(req.buffers.count());
+  pinned_vmos.reserve(req.buffers.size());
 
   aml_sdmmc_desc_t* desc = cur_desc;
   SdmmcVmoStore& vmos = registered_vmos_[req.client_id];
@@ -1693,7 +1693,7 @@ template <typename T>
 void AmlSdmmc::DoRequestAndComplete(fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs,
                                     fdf::Arena& arena, T& completer) {
   fidl::Array<uint32_t, 4> response;
-  for (size_t i = 0; i < reqs.count(); i++) {
+  for (size_t i = 0; i < reqs.size(); i++) {
     zx_status_t status = RequestImpl(reqs[i], response.data());
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);

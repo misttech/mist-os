@@ -37,7 +37,7 @@ impl FfxMain for PeerTool {
             PeerSubCommand::List(ref mut cmd) => {
                 writer.line(get_peer_list(
                     &peers,
-                    cmd.filter.get_or_insert("".to_string()),
+                    cmd.filter.get_or_insert_with(|| "".to_string()),
                     cmd.details,
                 ))?;
             }

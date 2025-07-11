@@ -618,22 +618,22 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   // wstats_counters is fully supported in sim firmware we can test for the expected noise floor,
   // RSSI, and rate buckets.
 
-  ASSERT_EQ(stats.noise_floor_histograms().count(), 1U);
+  ASSERT_EQ(stats.noise_floor_histograms().size(), 1U);
   EXPECT_EQ(stats.noise_floor_histograms().data()[0].hist_scope, expected_hist_scope);
   EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
   EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id->index, expected_antenna_index);
 
-  ASSERT_EQ(stats.rssi_histograms().count(), 1U);
+  ASSERT_EQ(stats.rssi_histograms().size(), 1U);
   EXPECT_EQ(stats.rssi_histograms().data()[0].hist_scope, expected_hist_scope);
   EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
   EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id->index, expected_antenna_index);
 
-  ASSERT_EQ(stats.rx_rate_index_histograms().count(), 1U);
+  ASSERT_EQ(stats.rx_rate_index_histograms().size(), 1U);
   EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].hist_scope, expected_hist_scope);
   EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
   EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id->index, expected_antenna_index);
 
-  ASSERT_EQ(stats.snr_histograms().count(), 1U);
+  ASSERT_EQ(stats.snr_histograms().size(), 1U);
   EXPECT_EQ(stats.snr_histograms().data()[0].hist_scope, expected_hist_scope);
   EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
   EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id->index, expected_antenna_index);
@@ -641,7 +641,7 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   uint64_t empty_snr_samples_count = 0;
   uint64_t snr_bucket_index = 0;
   uint64_t snr_bucket_num_samples = 0;
-  for (uint64_t i = 0; i < stats.snr_histograms().data()[0].snr_samples.count(); ++i) {
+  for (uint64_t i = 0; i < stats.snr_histograms().data()[0].snr_samples.size(); ++i) {
     if (stats.snr_histograms().data()[0].snr_samples.data()[i].num_samples > 0) {
       ++snr_samples_count;
       snr_bucket_index = stats.snr_histograms().data()[0].snr_samples.data()[i].bucket_index;

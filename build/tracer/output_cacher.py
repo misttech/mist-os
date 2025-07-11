@@ -571,7 +571,7 @@ def verify_files_match(
     if different_files:
         label_text = ""
         if label:
-            label_text = " for target [{label}]"
+            label_text = f" for target [{label}]"
 
         renamed_text = ""
         if renamed:

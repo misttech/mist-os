@@ -38,6 +38,10 @@ impl AbsolutePackageUrl {
         Self::from_parts(UrlParts::parse(url)?)
     }
 
+    pub fn from_url(url: &url::Url) -> Result<Self, ParseError> {
+        Self::from_parts(UrlParts::from_url(url)?)
+    }
+
     /// Create an AbsolutePackageUrl from its component parts and a &str `path` that will be
     /// validated.
     pub fn new_with_path(

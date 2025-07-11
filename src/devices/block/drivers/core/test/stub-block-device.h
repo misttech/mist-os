@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
+#include <vector>
 
 constexpr uint32_t kBlockSize = 1024;
 constexpr uint64_t kBlockCount = 4096;

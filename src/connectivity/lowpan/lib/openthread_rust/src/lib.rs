@@ -14,6 +14,8 @@
 pub mod ot;
 pub use openthread_sys as otsys;
 
+mod bindings;
+
 #[cfg(target_os = "fuchsia")]
 mod otfuchsia;
 
@@ -31,6 +33,7 @@ pub type OtMessageBox<'a> = ot::Box<ot::Message<'a>>;
 pub mod prelude {
     #![allow(unused_imports)]
 
+    pub use crate::bindings::*;
     pub use crate::{ot, otsys, OtBox, OtInstanceBox, OtMessageBox};
     pub use ot::{
         BackboneRouter as _, BorderRouter as _, Boxable as _, Dnssd as _, DnssdExt as _,

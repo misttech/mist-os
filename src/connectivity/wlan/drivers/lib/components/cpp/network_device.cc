@@ -188,7 +188,7 @@ void NetworkDevice::CompleteRx(FrameContainer&& frames) {
     }
     if (count > 0) [[likely]] {
       // The number of buffers might have changed as some frames should not be completed.
-      buffers.set_count(count);
+      buffers.set_size(count);
       auto status = netdev_ifc_.buffer(fdf_arena)->CompleteRx(buffers);
       if (!status.ok()) {
         LOGF(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
@@ -212,7 +212,7 @@ void NetworkDevice::CompleteTx(cpp20::span<Frame> frames, zx_status_t status) {
 
   fidl::VectorView<netdriver::wire::TxResult> results(arena, kTxBuffersPerBatch);
 
-  const size_t results_to_fill = std::min(results.count(), frames.size());
+  const size_t results_to_fill = std::min(results.size(), frames.size());
   for (auto frame = frames.begin(); frame != frames.end();) {
     size_t count = 0;
     for (; count < results_to_fill && frame != frames.end(); ++frame) {
@@ -227,7 +227,7 @@ void NetworkDevice::CompleteTx(cpp20::span<Frame> frames, zx_status_t status) {
       ++count;
     }
     if (count > 0) [[unlikely]] {
-      results.set_count(count);
+      results.set_size(count);
       auto status = netdev_ifc_.buffer(fdf_arena)->CompleteTx(results);
       if (!status.ok()) {
         LOGF(ERROR, "Failed to complete TX: %s", status.FormatDescription().c_str());
@@ -279,8 +279,8 @@ void NetworkDevice::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* re
     // stopped. For threading reasons the Network Device cannot hold locks when its calling into
     // our implementation so it's possible that it will attempt to queue TX after it has called
     // stop. These buffers will need to be completed with an error status.
-    fidl::VectorView<netdriver::wire::TxResult> results(arena, request->buffers.count());
-    for (size_t i = 0; i < request->buffers.count(); ++i) {
+    fidl::VectorView<netdriver::wire::TxResult> results(arena, request->buffers.size());
+    for (size_t i = 0; i < request->buffers.size(); ++i) {
       const netdriver::wire::TxBuffer& buffer = request->buffers[i];
       results[i].id = buffer.id;
       results[i].status = ZX_ERR_UNAVAILABLE;
@@ -292,8 +292,8 @@ void NetworkDevice::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* re
     }
     return;
   }
-  tx_frames_.reserve(request->buffers.count());
-  for (size_t i = 0; i < request->buffers.count(); ++i) {
+  tx_frames_.reserve(request->buffers.size());
+  for (size_t i = 0; i < request->buffers.size(); ++i) {
     const netdriver::wire::TxBuffer& buffer = request->buffers[i];
     const netdriver::wire::BufferRegion& region = buffer.data[0];
     tx_frames_.emplace_back(nullptr, region.vmo, region.offset, buffer.id,

@@ -33,7 +33,7 @@ wlan_tap::SetKeyArgs ToSetKeyArgs(const wlan_softmac::WlanKeyConfiguration& conf
           },
   };
   set_key_args.config.key = fidl::VectorView<uint8_t>::FromExternal(
-      const_cast<uint8_t*>(config.key().begin()), config.key().count());
+      const_cast<uint8_t*>(config.key().begin()), config.key().size());
   return set_key_args;
 }
 
@@ -100,7 +100,7 @@ void WlantapPhy::Shutdown(ShutdownCompleter::Sync& completer) {
 }
 
 void WlantapPhy::Rx(RxRequestView request, RxCompleter::Sync& completer) {
-  FDF_LOG(INFO, "%s: Rx(%zu bytes)", name_.c_str(), request->data.count());
+  FDF_LOG(INFO, "%s: Rx(%zu bytes)", name_.c_str(), request->data.size());
   if (!wlan_softmac_ifc_client_.is_valid()) {
     FDF_LOG(ERROR, "%s: No WlantapMac present.", name_.c_str());
     return;
@@ -207,7 +207,7 @@ void WlantapPhy::WlantapMacStart(fdf::ClientEnd<fuchsia_wlan_softmac::WlanSoftma
 void WlantapPhy::WlantapMacStop() { FDF_LOG(INFO, "%s: WlantapMacStop", name_.c_str()); }
 
 void WlantapPhy::WlantapMacQueueTx(const fuchsia_wlan_softmac::wire::WlanTxPacket& pkt) {
-  size_t pkt_size = pkt.mac_frame.count();
+  size_t pkt_size = pkt.mac_frame.size();
   if (!phy_config_->quiet || report_tx_status_count_ < 32) {
     FDF_LOG(INFO, "%s: WlantapMacQueueTx, size=%zu, tx_report_count=%zu", name_.c_str(), pkt_size,
             report_tx_status_count_);

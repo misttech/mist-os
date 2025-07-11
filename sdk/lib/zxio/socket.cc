@@ -2283,7 +2283,7 @@ struct socket_with_event {
       auto const& out = result.value()->data;
 
       const uint8_t* data = out.begin();
-      size_t remaining = out.count();
+      size_t remaining = out.size();
       for (int i = 0; remaining != 0 && i < msg->msg_iovlen; ++i) {
         iovec const& iov = msg->msg_iov[i];
         if (iov.iov_base != nullptr) {
@@ -2301,7 +2301,7 @@ struct socket_with_event {
           return ZX_OK;
         }
       }
-      *out_actual = set_trunc_flags_and_return_out_actual(*msg, out.count() - remaining,
+      *out_actual = set_trunc_flags_and_return_out_actual(*msg, out.size() - remaining,
                                                           result.value()->truncated, flags);
     }
 

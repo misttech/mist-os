@@ -113,11 +113,11 @@ std::optional<CustomStage::Args> ValidateAndParseArgs(CustomNode::Args args) {
     FX_LOGS(WARNING) << "ProcessorConfiguration missing field 'processor'";
     return std::nullopt;
   }
-  if (!config.has_inputs() || config.inputs().count() != 1) {
+  if (!config.has_inputs() || config.inputs().size() != 1) {
     FX_LOGS(WARNING) << "ProcessorConfiguration must have exactly one input stream";
     return std::nullopt;
   }
-  if (!config.has_outputs() || config.outputs().count() != 1) {
+  if (!config.has_outputs() || config.outputs().size() != 1) {
     FX_LOGS(WARNING) << "ProcessorConfiguration must have exactly one output stream";
     return std::nullopt;
   }
@@ -312,8 +312,9 @@ void CustomNode::InitializeChildNodes(PipelineStagePtr pipeline_stage, NodePtr p
                                       GraphDetachedThreadPtr detached_thread,
                                       const Format& source_format,
                                       zx::duration presentation_delay) {
-  // TODO(https://fxbug.dev/42065529): This is currently hardcoded for the 1 x 1 `CustomStage` implementation.
-  // Refactor this to use `CustomNodeProperties` instead once M x N edges are supported.
+  // TODO(https://fxbug.dev/42065529): This is currently hardcoded for the 1 x 1 `CustomStage`
+  // implementation. Refactor this to use `CustomNodeProperties` instead once M x N edges are
+  // supported.
   SetBuiltInChildren(
       std::vector<NodePtr>{
           std::make_shared<ChildSourceNode>(std::string(parent->name()) + "ChildSource",

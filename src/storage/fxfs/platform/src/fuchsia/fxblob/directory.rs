@@ -356,12 +356,9 @@ impl BlobDirectory {
     ) {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
-                BlobVolumeWriterRequest::Write {
-                    payload: fidl_fuchsia_mem::Buffer { vmo, size },
-                    responder,
-                } => {
+                BlobVolumeWriterRequest::Write { payload, responder } => {
                     let response = crate::fuchsia::fxblob::volume_writer::write_new_blob_volume(
-                        &self, vmo, size,
+                        &self, payload,
                     )
                     .await;
                     responder.send(response.map_err(map_to_raw_status)).unwrap_or_else(|error| {

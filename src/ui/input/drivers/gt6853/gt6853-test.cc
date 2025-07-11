@@ -498,7 +498,7 @@ TEST_F(Gt6853Test, GetDescriptor) {
   ASSERT_TRUE(response.value().descriptor.touch().input().has_contacts());
   ASSERT_TRUE(response.value().descriptor.touch().input().has_max_contacts());
   ASSERT_TRUE(response.value().descriptor.touch().input().has_touch_type());
-  ASSERT_EQ(response.value().descriptor.touch().input().contacts().count(), 10);
+  ASSERT_EQ(response.value().descriptor.touch().input().contacts().size(), 10);
 
   EXPECT_EQ(response.value().descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
@@ -550,10 +550,10 @@ TEST_F(Gt6853Test, ReadReport) {
 
   const auto& reports = response->value()->reports;
 
-  ASSERT_EQ(reports.count(), 1);
+  ASSERT_EQ(reports.size(), 1);
   ASSERT_TRUE(reports[0].has_touch());
   ASSERT_TRUE(reports[0].touch().has_contacts());
-  ASSERT_EQ(reports[0].touch().contacts().count(), 4);
+  ASSERT_EQ(reports[0].touch().contacts().size(), 4);
 
   EXPECT_EQ(reports[0].touch().contacts()[0].contact_id(), 0);
   EXPECT_EQ(reports[0].touch().contacts()[0].position_x(), 0x005a);
@@ -781,7 +781,7 @@ TEST_F(Gt6853Test, LatencyMeasurements) {
   for (size_t reports = 0; reports < 5;) {
     const auto response = reader->ReadInputReports();
     if (response.ok() && response->is_ok()) {
-      reports += response->value()->reports.count();
+      reports += response->value()->reports.size();
     }
   }
 

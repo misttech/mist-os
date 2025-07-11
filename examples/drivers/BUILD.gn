@@ -11,6 +11,7 @@ group("drivers") {
     "bind/fidl_bindlib_codegen",
     "driver_test_realm/sample_driver",
     "metadata:drivers",
+    "power/rust:pkg",
     "simple/dfv1:pkg",
     "simple/dfv2:bazel_package",
     "simple/rust:pkg",

@@ -915,11 +915,11 @@ async fn do_if_config_set(
                     })?;
                     config
                         .ipv6
-                        .get_or_insert(Default::default())
+                        .get_or_insert_default()
                         .ndp
-                        .get_or_insert(Default::default())
+                        .get_or_insert_default()
                         .slaac
-                        .get_or_insert(Default::default())
+                        .get_or_insert_default()
                         .temporary_address = Some(enabled);
                 }
                 "ipv6.ndp.dad.transmits" => {
@@ -928,11 +928,11 @@ async fn do_if_config_set(
                     })?;
                     config
                         .ipv6
-                        .get_or_insert(Default::default())
+                        .get_or_insert_default()
                         .ndp
-                        .get_or_insert(Default::default())
+                        .get_or_insert_default()
                         .dad
-                        .get_or_insert(Default::default())
+                        .get_or_insert_default()
                         .transmits = Some(transmits);
                 }
                 unknown_property => {

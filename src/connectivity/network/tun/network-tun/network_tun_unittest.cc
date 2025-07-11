@@ -371,8 +371,8 @@ class SimpleClient {
   }
 
   static void ValidateData(const fidl::VectorView<uint8_t>& data, uint16_t didx) {
-    ASSERT_EQ(data.count(), kBufferSize);
-    for (uint32_t i = 0; i < data.count(); i++) {
+    ASSERT_EQ(data.size(), kBufferSize);
+    for (uint32_t i = 0; i < data.size(); i++) {
       ASSERT_EQ(data[i], static_cast<uint8_t>(i + didx)) << "Data mismatch at position " << i;
     }
   }
@@ -732,14 +732,14 @@ TEST_F(TunTest, InvalidPortConfigs) {
   // Empty Rx frames
   {
     auto config = DefaultDevicePortConfig();
-    config.base().rx_types().set_count(0);
+    config.base().rx_types().set_size(0);
     ASSERT_STATUS(wait_for_error(std::move(config)), ZX_ERR_INVALID_ARGS);
   }
 
   // Empty Tx frames
   {
     auto config = DefaultDevicePortConfig();
-    config.base().tx_types().set_count(0);
+    config.base().tx_types().set_size(0);
     ASSERT_STATUS(wait_for_error(std::move(config)), ZX_ERR_INVALID_ARGS);
   }
 }
@@ -918,7 +918,7 @@ TEST_F(TunTest, Mac) {
               fuchsia_hardware_network::wire::MacFilterMode::kMulticastFilter);
     std::vector<fuchsia_net::wire::MacAddress> multicast_filters;
     std::copy_n(internal_state.mac().multicast_filters().data(),
-                internal_state.mac().multicast_filters().count(),
+                internal_state.mac().multicast_filters().size(),
                 std::back_inserter(multicast_filters));
     ASSERT_THAT(multicast_filters, ::testing::Pointwise(MacEq(), {multicast}));
   }
@@ -934,7 +934,7 @@ TEST_F(TunTest, Mac) {
               fuchsia_hardware_network::wire::MacFilterMode::kPromiscuous);
     std::vector<fuchsia_net::wire::MacAddress> multicast_filters;
     std::copy_n(internal_state.mac().multicast_filters().data(),
-                internal_state.mac().multicast_filters().count(),
+                internal_state.mac().multicast_filters().size(),
                 std::back_inserter(multicast_filters));
     ASSERT_THAT(multicast_filters, ::testing::IsEmpty());
   }
@@ -1010,7 +1010,7 @@ TEST_F(TunTest, SimpleRxTx) {
     if (read_frame_result.is_error()) {
       ASSERT_STATUS(read_frame_result.error_value(), ZX_ERR_SHOULD_WAIT);
     } else {
-      GTEST_FAIL() << "Got frame with " << read_frame_result.value()->frame.data().count()
+      GTEST_FAIL() << "Got frame with " << read_frame_result.value()->frame.data().size()
                    << "bytes, expected error";
     }
     ASSERT_STATUS(signals.wait_one(static_cast<uint32_t>(fuchsia_net_tun::wire::Signals::kReadable),

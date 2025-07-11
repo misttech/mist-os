@@ -96,7 +96,7 @@ TEST(MouseTest, BootMouse) {
 
   EXPECT_TRUE(descriptor.mouse().input().has_buttons());
   constexpr uint8_t kNumButtons = 3;
-  EXPECT_EQ(kNumButtons, descriptor.mouse().input().buttons().count());
+  EXPECT_EQ(kNumButtons, descriptor.mouse().input().buttons().size());
 
   EXPECT_EQ(0, mouse.InputReportId());
 
@@ -123,7 +123,7 @@ TEST(MouseTest, BootMouse) {
   EXPECT_EQ(kYTestVal, input_report.mouse().movement_y());
 
   EXPECT_TRUE(input_report.mouse().has_pressed_buttons());
-  EXPECT_EQ(kNumButtons, input_report.mouse().pressed_buttons().count());
+  EXPECT_EQ(kNumButtons, input_report.mouse().pressed_buttons().size());
   EXPECT_EQ(1, input_report.mouse().pressed_buttons()[0]);
   EXPECT_EQ(2, input_report.mouse().pressed_buttons()[1]);
   EXPECT_EQ(3, input_report.mouse().pressed_buttons()[2]);

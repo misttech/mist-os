@@ -13,7 +13,8 @@ mod time;
 
 pub use atomic_future::spawnable_future::SpawnableFuture;
 pub use common::EHandle;
+pub(crate) use common::Executor;
 pub use local::{LocalExecutor, TestExecutor};
-pub use packets::{PacketReceiver, ReceiverRegistration};
+pub use packets::{PacketReceiver, RawReceiverRegistration, ReceiverRegistration};
 pub use send::SendExecutor;
 pub use time::{BootInstant, MonotonicDuration, MonotonicInstant};

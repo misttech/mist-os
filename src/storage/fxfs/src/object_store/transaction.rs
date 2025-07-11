@@ -593,7 +593,7 @@ pub trait AssociatedObject: Send + Sync {
 
 pub enum AssocObj<'a> {
     None,
-    Borrowed(&'a (dyn AssociatedObject)),
+    Borrowed(&'a dyn AssociatedObject),
     Owned(Box<dyn AssociatedObject>),
 }
 

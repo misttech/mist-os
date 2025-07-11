@@ -32,7 +32,7 @@ zx_status_t Message::TryInitializeParameters(
     size_t starting_param_index, fidl::VectorView<fuchsia_tee::wire::Parameter> parameter_set,
     SharedMemoryManager::ClientMemoryPool* temp_memory_pool) {
   zx_status_t status = ZX_OK;
-  for (size_t i = 0; i < parameter_set.count(); i++) {
+  for (size_t i = 0; i < parameter_set.size(); i++) {
     MessageParam& optee_param = params()[starting_param_index + i];
     fuchsia_tee::wire::Parameter& zx_param = parameter_set[i];
 
@@ -349,7 +349,7 @@ fpromise::result<OpenSessionMessage, zx_status_t> OpenSessionMessage::TryCreate(
   ZX_DEBUG_ASSERT(message_pool != nullptr);
   ZX_DEBUG_ASSERT(temp_memory_pool != nullptr);
 
-  const size_t num_params = parameter_set.count() + kNumFixedOpenSessionParams;
+  const size_t num_params = parameter_set.size() + kNumFixedOpenSessionParams;
   ZX_DEBUG_ASSERT(num_params <= std::numeric_limits<uint32_t>::max());
 
   SharedMemoryPtr memory;
@@ -411,7 +411,7 @@ fpromise::result<InvokeCommandMessage, zx_status_t> InvokeCommandMessage::TryCre
     uint32_t command_id, fidl::VectorView<fuchsia_tee::wire::Parameter> parameter_set) {
   ZX_DEBUG_ASSERT(message_pool != nullptr);
 
-  const size_t num_params = parameter_set.count();
+  const size_t num_params = parameter_set.size();
 
   SharedMemoryPtr memory;
   zx_status_t status = message_pool->Allocate(CalculateSize(num_params), &memory);

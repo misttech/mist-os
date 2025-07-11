@@ -1,5 +1,61 @@
 [
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.time.alarms/Notifier.Notify",
+        "strictness": "flexible",
+        "ordinal": "2580873961848793044",
+        "direction": "one_way",
+        "request": "fuchsia.time.alarms/NotifierNotifyRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.time.alarms/Notifier.NotifyError",
+        "strictness": "flexible",
+        "ordinal": "7127251082861941737",
+        "direction": "one_way",
+        "request": "fuchsia.time.alarms/NotifierNotifyErrorRequest"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.time.alarms/Notifier",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/NotifierNotifyErrorRequest.alarm_id",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/NotifierNotifyErrorRequest.error",
+        "ordinal": "2",
+        "type": "fuchsia.time.alarms/WakeAlarmsError"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.time.alarms/NotifierNotifyErrorRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/NotifierNotifyRequest.alarm_id",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/NotifierNotifyRequest.keep_alive",
+        "ordinal": "2",
+        "type": "zx/Handle:<EVENTPAIR,zx.DUPLICATE,zx.TRANSFER,zx.WAIT>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.time.alarms/NotifierNotifyRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "struct/member",
         "name": "fuchsia.time.alarms/SetAndWaitArgs.alarm_id",
         "ordinal": "3",
@@ -20,6 +76,35 @@
     {
         "kind": "struct",
         "name": "fuchsia.time.alarms/SetAndWaitArgs",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/SetArgs.alarm_id",
+        "ordinal": "4",
+        "type": "string:128"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/SetArgs.deadline",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/SetArgs.mode",
+        "ordinal": "3",
+        "type": "fuchsia.time.alarms/SetMode"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.time.alarms/SetArgs.notifier",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.time.alarms/Notifier"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.time.alarms/SetArgs",
         "resourceness": "resource"
     },
     {
@@ -47,6 +132,16 @@
         "ordinal": "8873122015139456348",
         "direction": "one_way",
         "request": "fuchsia.time.alarms/WakeAlarmsCancelRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.time.alarms/WakeAlarms.Set",
+        "strictness": "flexible",
+        "ordinal": "2238579663369656108",
+        "direction": "two_way",
+        "request": "fuchsia.time.alarms/SetArgs",
+        "response": "fuchsia.time.alarms/WakeAlarms_Set_Response",
+        "error": "fuchsia.time.alarms/WakeAlarmsError"
     },
     {
         "kind": "protocol/member",

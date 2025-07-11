@@ -177,7 +177,7 @@ where
     }
 }
 
-type MappingFn = Box<dyn FnOnce(&(dyn Any)) -> String>;
+type MappingFn = Box<dyn FnOnce(&dyn Any) -> String>;
 type TypeErasedData = dyn Any;
 type TypeErasedLoader = dyn Any;
 
@@ -365,7 +365,7 @@ impl DeviceStorage {
             T::KEY,
             new_value.serialize_to(),
             Box::new(new_value.clone()) as Box<TypeErasedData>,
-            Box::new(|any: &(dyn Any)| {
+            Box::new(|any: &dyn Any| {
                 // Attempt to downcast the `dyn Any` to its original type. If `T` was not its
                 // original type, then we want to panic because there's a compile-time issue
                 // with overlapping keys.

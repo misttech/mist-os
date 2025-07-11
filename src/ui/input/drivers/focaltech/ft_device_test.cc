@@ -311,7 +311,7 @@ void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descri
 
   EXPECT_FALSE(descriptor.touch().input().has_buttons());
   EXPECT_TRUE(descriptor.touch().input().has_contacts());
-  EXPECT_EQ(descriptor.touch().input().contacts().count(), size_t(10));
+  EXPECT_EQ(descriptor.touch().input().contacts().size(), size_t(10));
 
   for (const auto& c : descriptor.touch().input().contacts()) {
     EXPECT_TRUE(c.has_position_x());
@@ -478,7 +478,7 @@ TEST_F(FocaltechTest, Touch) {
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(size_t(1), reports.count());
+    ASSERT_EQ(size_t(1), reports.size());
     auto report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -486,7 +486,7 @@ TEST_F(FocaltechTest, Touch) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), size_t(2));
+    ASSERT_EQ(touch_report.contacts().size(), size_t(2));
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), uint32_t(0));
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x001);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x013);

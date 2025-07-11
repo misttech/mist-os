@@ -4,8 +4,11 @@
 
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/socket.h>
 
+#include <atomic>
 #include <cstring>
 #include <thread>
 #include <vector>
@@ -139,6 +142,65 @@ TEST(StructuredLogging, LOGS) {
   str.resize(1000 * 5000);
   memset(str.data(), 's', str.size() - 1);
   FX_LOGS(INFO) << str;
+}
+
+TEST(StructuredLogging, SocketLimit) {
+  zx::socket local, remote;
+  ASSERT_EQ(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote), ZX_OK);
+
+  std::atomic<bool> writer_finished = false;
+  const size_t kNumMessages = 5000;
+  constexpr std::string_view kTestMessage = "test message";
+
+  std::thread writer_thread([&]() {
+    for (size_t i = 0; i < kNumMessages; ++i) {
+      fuchsia_syslog::LogBuffer buffer;
+      buffer.BeginRecord(fuchsia_logging::LogSeverity::Info, {}, 0, kTestMessage,
+                         zx::unowned_socket(remote), 0, 0, 0);
+      if (!buffer.FlushRecord({.block_if_full = true})) {
+        break;
+      }
+    }
+    writer_finished = true;
+  });
+
+  // Give the writer a chance to fill the buffer and block.
+  zx::nanosleep(zx::deadline_after(zx::msec(250)));
+  ASSERT_FALSE(writer_finished.load());
+
+  size_t total_bytes_read = 0;
+  std::vector<char> read_buffer(65536);
+
+  // Read from the socket until the writer is done.
+  while (!writer_finished.load()) {
+    size_t bytes_read;
+    zx_status_t status = local.read(0, read_buffer.data(), read_buffer.size(), &bytes_read);
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      local.wait_one(ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED, zx::deadline_after(zx::msec(200)),
+                     nullptr);
+      continue;
+    }
+    ASSERT_EQ(status, ZX_OK);
+    total_bytes_read += bytes_read;
+  }
+
+  writer_thread.join();
+
+  // Drain any remaining messages.
+  while (true) {
+    size_t bytes_read;
+    zx_status_t status = local.read(0, read_buffer.data(), read_buffer.size(), &bytes_read);
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      break;
+    }
+    if (status != ZX_OK) {
+      ASSERT_EQ(status, ZX_ERR_PEER_CLOSED);
+      break;
+    }
+    total_bytes_read += bytes_read;
+  }
+  // 100KB should far exceed the capacity in a datagram socket.
+  EXPECT_GE(total_bytes_read, kNumMessages * kTestMessage.size());
 }
 
 }  // namespace fuchsia_logging

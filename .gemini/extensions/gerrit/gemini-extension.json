@@ -1,0 +1,11 @@
+{
+  "name": "gerrit",
+  "version": "1.0.0",
+  "description": "A tool for interacting with the Gerrit Code Review system.",
+  "mcpServers": {
+    "gerrit": {
+      "httpUrl": "http://localhost:6322/mcp"
+    }
+  },
+  "contextFileName": "gerrit/README.md"
+}

@@ -34,7 +34,6 @@ rustc_library("netlink") {
     "//src/starnix/lib/third_party/rust_netlink/netlink_packet_core",
     "//src/starnix/lib/third_party/rust_netlink/netlink_packet_route",
     "//src/starnix/lib/third_party/rust_netlink/netlink_packet_utils",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
 
     # TODO(https://github.com/rust-lang/rust/issues/91611): Replace this with
@@ -47,7 +46,6 @@ rustc_library("netlink") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:log",
-    "//third_party/rust_crates:thiserror",
   ]
 
   test_deps = [
@@ -66,7 +64,6 @@ rustc_library("netlink") {
 
   sources = [
     "src/client.rs",
-    "src/errors.rs",
     "src/eventloop.rs",
     "src/interfaces.rs",
     "src/lib.rs",

@@ -103,7 +103,7 @@ fuchsia_test_package("pkg-cache-integration-tests") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   if (!is_coverage) {
     # TODO(https://fxbug.dev/42158909): Re-enable this test when this test does

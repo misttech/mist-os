@@ -31,8 +31,7 @@
 bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
                 const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
   return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
-         (lhs.duty_cycle == rhs.duty_cycle) &&
-         (lhs.mode_config.count() == rhs.mode_config.count()) &&
+         (lhs.duty_cycle == rhs.duty_cycle) && (lhs.mode_config.size() == rhs.mode_config.size()) &&
          (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config.data())->mode ==
           reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config.data())->mode);
 }
@@ -57,9 +56,9 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
     calls_["SetConfig"] = true;
 
     EXPECT_TRUE(request->config.mode_config.data());
-    EXPECT_EQ(request->config.mode_config.count(), sizeof(mode_config_));
+    EXPECT_EQ(request->config.mode_config.size(), sizeof(mode_config_));
     if (request->config.mode_config.data() == nullptr ||
-        request->config.mode_config.count() != sizeof(mode_config_)) {
+        request->config.mode_config.size() != sizeof(mode_config_)) {
       return completer.ReplyError(ZX_ERR_INVALID_ARGS);
     }
 

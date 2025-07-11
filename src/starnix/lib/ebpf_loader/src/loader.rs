@@ -5,7 +5,8 @@
 use bstr::{BStr, BString};
 use ebpf::{EbpfInstruction, EbpfMapType, MapSchema};
 use num_derive::FromPrimitive;
-use std::collections::{hash_map, HashMap};
+use starnix_ext::map_ext::EntryExt;
+use std::collections::HashMap;
 use std::io::Read;
 use std::{fs, io, mem};
 use thiserror::Error;
@@ -357,42 +358,36 @@ pub fn load_ebpf_program_from_file(
 
             // Insert map index to the code. The actual map address is inserted
             // later, when the program is linked.
-            let map_index = match map_indices.entry(sym_index) {
-                hash_map::Entry::Occupied(e) => *e.get(),
-                hash_map::Entry::Vacant(e) => {
-                    let (schema, flags) = if is_from_map_section {
-                        let (def, _) = bpf_map_def::ref_from_prefix(sym.data)
-                            .map_err(|_| Error::ElfParse("Failed to load map definition"))?;
-                        (
-                            MapSchema {
-                                map_type: def.map_type,
-                                key_size: def.key_size,
-                                value_size: def.value_size,
-                                max_entries: def.max_entries,
-                            },
-                            def.flags,
-                        )
-                    } else {
-                        (
-                            MapSchema {
-                                map_type: linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY,
-                                key_size: 4,
-                                value_size: sym.section.size as u32,
-                                max_entries: 1,
-                            },
-                            0,
-                        )
+            let map_index = map_indices.entry(sym_index).or_insert_with_fallible(|| {
+                let (schema, flags) = if is_from_map_section {
+                    let Ok((def, _)) = bpf_map_def::ref_from_prefix(sym.data) else {
+                        return Err(Error::ElfParse("Failed to load map definition"));
                     };
-                    maps.push(MapDefinition {
-                        name: sym.name.map(|x| x.to_owned()),
-                        schema,
-                        flags,
-                    });
-                    *e.insert(maps.len() - 1)
-                }
-            };
+                    (
+                        MapSchema {
+                            map_type: def.map_type,
+                            key_size: def.key_size,
+                            value_size: def.value_size,
+                            max_entries: def.max_entries,
+                        },
+                        def.flags,
+                    )
+                } else {
+                    (
+                        MapSchema {
+                            map_type: linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY,
+                            key_size: 4,
+                            value_size: sym.section.size as u32,
+                            max_entries: 1,
+                        },
+                        0,
+                    )
+                };
+                maps.push(MapDefinition { name: sym.name.map(|x| x.to_owned()), schema, flags });
+                Ok(maps.len() - 1)
+            })?;
 
-            code[pc].set_imm(map_index as i32);
+            code[pc].set_imm(*map_index as i32);
         }
     }
 

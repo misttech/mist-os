@@ -166,31 +166,6 @@ class TA_CAP("mutex") Mutex
   ktl::atomic<cpu_num_t> maybe_acquired_on_cpu_{INVALID_CPU};
   ktl::atomic<uintptr_t> val_{STATE_FREE};
   OwnedWaitQueue wait_;
-
-  // Mutations of the contested flag require holding the contested flag lock
-  // (previously protected by the thread lock).
-  //
-  // TODO(johngro): Look into eliminating this lock.  We should be able to use
-  // the OWQ's lock to serve the same purpose, but to use it effectively, we
-  // would need to make the OWQ locking helpers a bit more flexible.
-  // Specifically, we would want to be able to:
-  //
-  // AcquireContested
-  // 1) Lock OWQ itself
-  // 2) Check the contested flag to see if the lock has been released
-  // 3) Grab the lock and bail early if it has been.
-  // 4) Proceed to acquire the rest of the locks needed to block in the queue,
-  //    restarting the operation if needed.
-  //
-  // ReleaseContested
-  // 1) Obtain all of the locks needed to wake and assign owner, but don't
-  //    actually perform the operation yet.
-  // 2) Now that we know who the owner is going to be, and whether or not there
-  //    are going to be any waiters in the queue when we are finished, update the
-  //    state flag.
-  // 3) Wake the thread, finishing the operation and dropping the locks in the
-  //    process.
-  DECLARE_SPINLOCK(Mutex) contested_flag_lock_;
 };
 
 // TimeslicExtension specializations for Mutex::Acquire and

@@ -170,7 +170,7 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
         EXPECT_EQ(result_bssid.Cmp(kDefaultBssid), 0);
 
         // Verify SSID.
-        auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.count());
+        auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.size());
         EXPECT_EQ(ssid, kDefaultSsid);
 
         // Verify channel
@@ -246,7 +246,7 @@ TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
         EXPECT_EQ(result_bssid.Cmp(kDefaultBssid), 0);
 
         // Verify that SSID is empty, since there was no SSID IE.
-        auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.count());
+        auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.size());
         EXPECT_EQ(ssid.size(), 0u);
 
         // Verify channel

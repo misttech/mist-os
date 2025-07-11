@@ -183,7 +183,7 @@ void KeyboardReport::ToFidlInputReport(
     }
     keys3[idx++] = *key;
   }
-  keys3.set_count(idx);
+  keys3.set_size(idx);
 
   auto keyboard_report =
       fuchsia_input_report::wire::KeyboardInputReport::Builder(allocator).pressed_keys3(keys3);

@@ -6,7 +6,7 @@ use crate::product_bundle::ProductBundle;
 use crate::v2::{ProductBundleV2, Repository};
 
 use anyhow::{anyhow, ensure, Context, Result};
-use assembled_system::{AssembledSystem, Image, PackagesMetadata};
+use assembled_system::{AssembledSystem, BlobfsContents, Image, PackagesMetadata};
 use assembly_container::AssemblyContainer;
 use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
 use assembly_release_info::ProductBundleReleaseInfo;
@@ -442,72 +442,71 @@ fn write_assembled_system(
         // Make sure `out_dir` is created.
         std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
 
-        // Extract packages and validate that there are most one zbi and vbmeta images
+        // Filter out the base package, and the blobfs contents.
+        let mut images = Vec::new();
+        let mut packages = Vec::new();
+        let mut extract_packages = |packages_metadata| -> Result<()> {
+            let PackagesMetadata { base, cache } = packages_metadata;
+            let all_packages = [base.metadata, cache.metadata].concat();
+            for package in all_packages {
+                let manifest = PackageManifest::try_load_from(&package.manifest)
+                    .with_context(|| format!("reading package manifest: {}", package.manifest))?;
+                packages.push((Some(package.manifest), manifest));
+            }
+            Ok(())
+        };
         let mut has_zbi = false;
         let mut has_vbmeta = false;
         let mut has_dtbo = false;
-        let mut packages_metadata: Option<&PackagesMetadata> = None;
-        for image in system.images.iter() {
+        for image in system.images.into_iter() {
             match image {
-                Image::FxfsSparse { contents, .. } => {
-                    if packages_metadata.is_some() {
-                        anyhow::bail!(
-                            "Found more than one set of 'contents' in the assembled system"
-                        );
-                    }
-                    packages_metadata = Some(&contents.packages);
+                Image::BasePackage(..) => {}
+                Image::FxfsSparse { path, contents } => {
+                    extract_packages(contents.packages)?;
+                    images.push(Image::FxfsSparse { path, contents: BlobfsContents::default() });
                 }
-                Image::BlobFS { contents, .. } => {
-                    if packages_metadata.is_some() {
-                        anyhow::bail!(
-                            "Found more than one set of 'contents' in the assembled system"
-                        );
-                    }
-                    packages_metadata = Some(&contents.packages);
+                Image::BlobFS { path, contents } => {
+                    extract_packages(contents.packages)?;
+                    images.push(Image::BlobFS { path, contents: BlobfsContents::default() });
                 }
                 Image::ZBI { .. } => {
                     if has_zbi {
                         anyhow::bail!("Found more than one ZBI");
                     }
+                    images.push(image);
                     has_zbi = true;
                 }
                 Image::VBMeta(_) => {
                     if has_vbmeta {
                         anyhow::bail!("Found more than one VBMeta");
                     }
+                    images.push(image);
                     has_vbmeta = true;
                 }
                 Image::Dtbo(_) => {
                     if has_dtbo {
                         anyhow::bail!("Found more than one Dtbo");
                     }
+                    images.push(image);
                     has_dtbo = true;
                 }
-                _ => {}
-            }
-        }
 
-        let mut packages = Vec::new();
-        if let Some(packages_metadata) = packages_metadata {
-            for package in packages_metadata
-                .base
-                .metadata
-                .iter()
-                .chain(packages_metadata.cache.metadata.iter())
-            {
-                let manifest = PackageManifest::try_load_from(&package.manifest)
-                    .with_context(|| format!("reading package manifest: {}", package.manifest))?;
-                packages.push((Some(package.manifest.clone()), manifest));
+                Image::Fxfs(_)
+                | Image::FVM(_)
+                | Image::FVMSparse(_)
+                | Image::FVMFastboot(_)
+                | Image::QemuKernel(_) => {
+                    images.push(image);
+                }
             }
         }
 
         // Copy the images to the `out_dir`.
         let mut new_images = Vec::<Image>::new();
-        for image in system.images.iter() {
+        for mut image in images.into_iter() {
             let dest = copy_file(image.source(), &out_dir)?;
-            let mut new_image = image.clone();
-            new_image.set_source(dest);
-            new_images.push(new_image);
+            image.set_source(dest);
+            new_images.push(image);
         }
 
         Ok((Some(AssembledSystem { images: new_images, ..system }), packages))
@@ -583,7 +582,9 @@ fn write_virtual_devices(
             .with_context(|| format!("Writing virtual device: {}", device_file_path))?;
 
         // Add the virtual device to the manifest.
-        manifest.device_paths.insert(name, device_file_name);
+        if let Some(_) = manifest.device_paths.insert(name.clone(), device_file_name) {
+            anyhow::bail!("Multiple virtual device entries for: {}", name);
+        }
     }
 
     // Write the manifest into the directory.
@@ -768,13 +769,12 @@ mod test {
         assert_eq!(expected, product_bundle);
 
         // Fetch the VD by name.
-        // Yes... vd_file_name is correct although unexpected.
         let virtual_device = product_bundle.get_device(&Some("my_virtual_device".into())).unwrap();
-        assert_eq!("vd_file_name", virtual_device.name.as_str());
+        assert_eq!("my_virtual_device", virtual_device.name.as_str());
 
         // Fetch the VD as the default/recommended.
         let virtual_device = product_bundle.get_device(&None).unwrap();
-        assert_eq!("vd_file_name", virtual_device.name.as_str());
+        assert_eq!("my_virtual_device", virtual_device.name.as_str());
 
         // Check the size report.
         let size_report_file = std::fs::File::open(size_report_path).unwrap();

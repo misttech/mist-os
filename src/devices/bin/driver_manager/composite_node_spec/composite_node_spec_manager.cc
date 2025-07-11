@@ -100,11 +100,11 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
     }
 
     auto check_parents = [&](auto parents) {
-      if (index >= parents.count()) {
+      if (index >= parents.size()) {
         LOGF(WARNING, "CompositeParent index is out of bounds.");
         return true;
       }
-      if (matched_driver.parent_names().count() != parents.count()) {
+      if (matched_driver.parent_names().size() != parents.size()) {
         LOGF(WARNING, "Parent names count does not match the spec parent count.");
         return true;
       }

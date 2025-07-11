@@ -6,7 +6,8 @@ use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, TestRecord, WriteEventParams,
 };
 use diagnostics_log_encoding::{Argument, Metatag, RawSeverity};
-use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_logger::{LogSinkMarker, LogSinkSynchronousProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -25,9 +26,9 @@ pub(crate) struct SinkConfig {
 thread_local! {
     static PROCESS_ID: zx::Koid =
         rt::process_self().get_koid().unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX));
-    static THREAD_ID: zx::Koid = rt::thread_self()
-        .get_koid()
-        .unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX));
+    static THREAD_ID: zx::Koid = rt::with_thread_self(|thread| {
+        thread.get_koid().unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX))
+    });
 }
 
 pub(crate) struct Sink {
@@ -37,8 +38,12 @@ pub(crate) struct Sink {
 }
 
 impl Sink {
-    pub fn new(log_sink: &LogSinkProxy, config: SinkConfig) -> Result<Self, PublishError> {
+    pub fn new(
+        log_sink: &ClientEnd<LogSinkMarker>,
+        config: SinkConfig,
+    ) -> Result<Self, PublishError> {
         let (socket, remote_socket) = zx::Socket::create_datagram();
+        let log_sink = zx::Unowned::<LogSinkSynchronousProxy>::new(log_sink.channel());
         log_sink.connect_structured(remote_socket).map_err(PublishError::SendSocket)?;
         Ok(Self { socket, config, num_events_dropped: AtomicU32::new(0) })
     }
@@ -237,7 +242,7 @@ mod tests {
     use diagnostics_log_encoding::parse::parse_record;
     use diagnostics_log_encoding::{Argument, Record};
     use diagnostics_log_types::Severity;
-    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::endpoints::create_request_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
     use futures::stream::StreamExt;
     use futures::AsyncReadExt;
@@ -274,8 +279,8 @@ mod tests {
     }
 
     async fn init_sink(config: SinkConfig) -> fidl::Socket {
-        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
-        let sink = Sink::new(&proxy, config).unwrap();
+        let (client, mut requests) = create_request_stream::<LogSinkMarker>();
+        let sink = Sink::new(&client, config).unwrap();
         log::set_boxed_logger(Box::new(TestLogger::new(sink))).expect("set logger");
         log::set_max_level(log::LevelFilter::Info);
 
@@ -294,11 +299,11 @@ mod tests {
         // 160 writes so we write 5 MB given that we write 32K each write. Without enabling
         // retrying, this would lead to dropped logs.
         const TOTAL_WRITES: usize = 32 * 5;
-        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
+        let (client, mut requests) = create_request_stream::<LogSinkMarker>();
         // Writes a megabyte of data to the Sink.
         std::thread::spawn(move || {
             let sink = Sink::new(
-                &proxy,
+                &client,
                 SinkConfig { retry_on_buffer_full: true, ..SinkConfig::default() },
             )
             .unwrap();

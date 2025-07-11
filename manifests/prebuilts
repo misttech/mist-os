@@ -502,7 +502,7 @@
     <!-- SHAC static analysis tooling -->
     <package name="fuchsia/shac/${platform}"
              path="prebuilt/tools/shac"
-             version="git_revision:28c0266d9df7334844a162e48cb6f96a97b35f6e"
+             version="git_revision:ad84ec8dd63868e1d210eca3f527f282404c4b6d"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"/>
 
     <!-- keep-sorted tool -->
@@ -646,20 +646,20 @@
     <!-- Starnix test binaries -->
     <package name="fuchsia/starnix/tests/syscalls/linux-amd64"
              path="prebuilt/starnix/tests/syscalls/linux-amd64"
-             version="g3-revision:fuchsia_starnix_tests_20250702_03_RC00"/>
+             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"/>
 
     <package name="fuchsia/starnix/tests/syscalls/linux-arm64"
              path="prebuilt/starnix/tests/syscalls/linux-arm64"
-             version="g3-revision:fuchsia_starnix_tests_20250702_03_RC00"/>
+             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"/>
 
     <package name="fuchsia/starnix/tests/syscalls/linux-debug-symbols-amd64"
              path="prebuilt/.build-id"
-             version="g3-revision:fuchsia_starnix_tests_20250702_03_RC00"
+             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"
              attributes="debug-symbols,debug-symbols-x64"/>
 
     <package name="fuchsia/starnix/tests/syscalls/linux-debug-symbols-arm64"
              path="prebuilt/.build-id"
-             version="g3-revision:fuchsia_starnix_tests_20250702_03_RC00"
+             version="g3-revision:fuchsia_starnix_tests_20250708_02_RC00"
              attributes="debug-symbols,debug-symbols-arm64"/>
 
     <!-- ARM Mali Vulkan ICDs -->
@@ -687,10 +687,10 @@
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/drivers/wlan/intel/iwlwifi/x86_64"
              path="prebuilt/drivers/wlan/intel/iwlwifi"
-             version="git_revision:174b08e5473087660c2a099c3770fced4b7aea06"/>
+             version="git_revision:50b681ecc94973b8f2ac00e540ed753b5f5594d1"/>
     <package name="fuchsia/drivers/wlan/intel/iwlwifi/debug-symbols-x86_64"
              path="prebuilt/.build-id"
-             version="git_revision:174b08e5473087660c2a099c3770fced4b7aea06"
+             version="git_revision:50b681ecc94973b8f2ac00e540ed753b5f5594d1"
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/drivers/rtc/pcf8563/arm64"
              path="prebuilt/drivers/rtc/pcf8563"
@@ -720,45 +720,45 @@
      <!-- Components built OOT -->
     <package name="fuchsia/prebuilt/bt-host/arm64"
              path="prebuilt/connectivity/bluetooth/bt-host/arm64"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"/>
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
     <package name="fuchsia/prebuilt/bt-host/debug-symbols-arm64"
              path="prebuilt/.build-id"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
              attributes="debug-symbols,debug-symbols-arm64"/>
     <package name="fuchsia/prebuilt/bt-host/x86_64"
              path="prebuilt/connectivity/bluetooth/bt-host/x64"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"/>
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
     <package name="fuchsia/prebuilt/bt-host/debug-symbols-x86_64"
              path="prebuilt/.build-id"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/prebuilt/bt-host/riscv64"
              path="prebuilt/connectivity/bluetooth/bt-host/riscv64"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"/>
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
     <package name="fuchsia/prebuilt/bt-host/debug-symbols-riscv64"
              path="prebuilt/.build-id"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
              attributes="debug-symbols,debug-symbols-riscv64"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/arm64"
              path="prebuilt/connectivity/bluetooth/bt-hci-virtual/arm64"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"/>
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/debug-symbols-arm64"
              path="prebuilt/.build-id"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
              attributes="debug-symbols,debug-symbols-arm64"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/x86_64"
              path="prebuilt/connectivity/bluetooth/bt-hci-virtual/x64"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"/>
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/debug-symbols-x86_64"
              path="prebuilt/.build-id"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
              attributes="debug-symbols,debug-symbols-x64"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/riscv64"
              path="prebuilt/connectivity/bluetooth/bt-hci-virtual/riscv64"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"/>
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"/>
     <package name="fuchsia/prebuilt/bt-hci-virtual/debug-symbols-riscv64"
              path="prebuilt/.build-id"
-             version="git_revision:3ba5797d7bc4351fec151fc316a5cd767ecf4019"
+             version="git_revision:81fe863dd0bf043fbcc4ec3db76df3e1ffcee54a"
              attributes="debug-symbols,debug-symbols-riscv64"/>
   </packages>
 </manifest>

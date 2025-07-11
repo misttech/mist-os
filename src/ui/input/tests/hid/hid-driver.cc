@@ -174,7 +174,7 @@ TEST_F(HidDriverTest, BootMouseTest) {
     auto response = client->ReadReport();
     ASSERT_TRUE(response.ok());
     ASSERT_TRUE(response->is_ok());
-    ASSERT_EQ(response.value()->buf().count(), sizeof(test_report));
+    ASSERT_EQ(response.value()->buf().size(), sizeof(test_report));
 
     memcpy(&test_report, response.value()->buf().data(), sizeof(test_report));
     ASSERT_EQ(mouse_report.rel_x, test_report.rel_x);
@@ -185,7 +185,7 @@ TEST_F(HidDriverTest, BootMouseTest) {
   {
     auto response = client->GetReportDesc();
     ASSERT_OK(response.status());
-    ASSERT_EQ(response.value().desc.count(), sizeof(kBootMouseReportDesc));
+    ASSERT_EQ(response.value().desc.size(), sizeof(kBootMouseReportDesc));
     for (size_t i = 0; i < sizeof(kBootMouseReportDesc); i++) {
       if (kBootMouseReportDesc[i] != response.value().desc[i]) {
         printf("Index %ld of the report descriptor doesn't match\n", i);
@@ -238,7 +238,7 @@ TEST_F(HidDriverTest, BootMouseTestInputReport) {
   auto response = reader->ReadInputReports();
   ASSERT_OK(response.status());
   ASSERT_OK(response.status());
-  ASSERT_EQ(1, response->value()->reports.count());
+  ASSERT_EQ(1, response->value()->reports.size());
   ASSERT_EQ(50, response->value()->reports[0].mouse().movement_x());
   ASSERT_EQ(100, response->value()->reports[0].mouse().movement_y());
 }

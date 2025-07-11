@@ -10,6 +10,7 @@ group("benchmarks") {
   deps = [
     ":kernel_boot_benchmarks",
     "//src/tests/benchmarks/fidl:benchmarks",
+    "//src/tests/benchmarks/ipc/comparison:benchmarks",
   ]
 }
 

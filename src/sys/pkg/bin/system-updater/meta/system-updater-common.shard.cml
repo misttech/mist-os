@@ -18,6 +18,7 @@
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.net.http.Loader",
                 "fuchsia.paver.Paver",
                 "fuchsia.pkg.PackageCache",
                 "fuchsia.pkg.PackageResolver",
@@ -45,5 +46,8 @@
     config: {
         // The maximum number of outstanding package resolution requests.
         concurrent_package_resolves: { type: "uint16" },
+
+        // Whether to allow the new package-less update attempt flow.
+        enable_attempt_v2: { type: "bool" },
     },
 }

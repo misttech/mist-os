@@ -2,18 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 
+#include <memory>
 #include <utility>
 
+#include <fbl/intrusive_double_list.h>
+#include <fbl/ref_ptr.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <sanitizer/lsan_interface.h>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
+
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer) || \
+    __has_feature(hwaddress_sanitizer)
+#include <sanitizer/lsan_interface.h>
+#endif
 
 namespace {
 

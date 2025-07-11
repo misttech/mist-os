@@ -125,6 +125,25 @@ class CopyPreserveSubpathTests(unittest.TestCase):
                     cl_utils.copy_preserve_subpath(src_file, dest_dir)
                 mock_copy.assert_not_called()
 
+    def test_src_is_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as wd:
+            wdp = Path(wd)
+            src_subdir = Path("srcs/a/b")  # relative
+            dest_subdir = Path("dest_dir/x/y")
+            dest_dir = wdp / dest_subdir
+            with cl_utils.chdir_cm(wdp):  # working directory
+                src_subdir.mkdir(parents=True)
+                src_file = src_subdir / "cdef.txt"
+                src_file.write_text("nothing to see\n")
+                expected_dest_file = dest_dir / src_subdir / "cdef.txt"
+                self.assertFalse(expected_dest_file.exists())
+
+                cl_utils.copy_preserve_subpath(src_subdir, dest_dir)
+                self.assertTrue(expected_dest_file.exists())
+                self.assertEqual(
+                    src_file.read_text(), expected_dest_file.read_text()
+                )
+
 
 class PartitionSequenceTests(unittest.TestCase):
     def test_empty(self) -> None:

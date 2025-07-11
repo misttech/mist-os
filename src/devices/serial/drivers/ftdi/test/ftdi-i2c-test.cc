@@ -217,8 +217,8 @@ TEST_F(FtdiI2cTest, ReadTest) {
       .Then([](fdf::WireUnownedResult<fuchsia_hardware_i2cimpl::Device::Transact>& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        ASSERT_EQ(result->value()->read.count(), 1u);
-        ASSERT_EQ(result->value()->read[0].data.count(), 1u);
+        ASSERT_EQ(result->value()->read.size(), 1u);
+        ASSERT_EQ(result->value()->read[0].data.size(), 1u);
         EXPECT_EQ(result->value()->read[0].data[0], 0xDE);
         mock_ddk::GetDriverRuntime()->Quit();
       });

@@ -713,6 +713,9 @@ Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
         continue;
       }
 
+      // TODO(b/430139320): Disabled until root cause of x64 pessimization is
+      // understood and addressed.
+#if 0
       // Only attempt to steal from CPUs that have more than one task, avoiding
       // unnecessary overhead when a task was just added to an idle CPU but the
       // CPU has not started running the new task (i.e. when this CPU wins the
@@ -721,6 +724,7 @@ Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
       if (scheduler->runnable_task_count() <= 1) {
         continue;
       }
+#endif
 
       // Note that in the lambdas below we will be making use of both the
       // MarkHasSchedulerAccess (but only on |queue|) and
@@ -2052,8 +2056,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   // Almost done, we need to handle the actual context switch (if any).
   if (current_thread != next_thread) {
     LOCAL_KTRACE(
-        DETAILED, "switch_threads",
-        ("total threads", runnable_task_count()),
+        DETAILED, "switch_threads", ("total threads", runnable_task_count()),
         ("total weight", weight_total_.raw_value()),
         ("current thread time slice", current_thread->scheduler_state().remaining_time_slice_ns()),
         ("next thread time slice", next_thread->scheduler_state().remaining_time_slice_ns()));

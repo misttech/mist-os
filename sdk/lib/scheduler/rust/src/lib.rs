@@ -75,7 +75,7 @@ pub fn set_role_for_thread(thread: &Thread, role_name: &str) -> Result<(), Error
 }
 
 pub fn set_role_for_this_thread(role_name: &str) -> Result<(), Error> {
-    set_role_for_thread(&fuchsia_runtime::thread_self(), role_name)
+    fuchsia_runtime::with_thread_self(|thread| set_role_for_thread(thread, role_name))
 }
 
 pub fn set_role_for_vmar(vmar: &Vmar, role_name: &str) -> Result<(), Error> {

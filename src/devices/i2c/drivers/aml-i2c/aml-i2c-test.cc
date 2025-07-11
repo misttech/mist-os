@@ -299,7 +299,7 @@ TEST_F(AmlI2cTest, SmallWrite) {
 
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
-  EXPECT_EQ(transact_result->value()->read.count(), 0);
+  EXPECT_EQ(transact_result->value()->read.size(), 0);
 
   const std::vector transfers = controller().GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -340,7 +340,7 @@ TEST_F(AmlI2cTest, BigWrite) {
 
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
-  EXPECT_EQ(transact_result->value()->read.count(), 0);
+  EXPECT_EQ(transact_result->value()->read.size(), 0);
 
   const std::vector transfers = controller().GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -397,8 +397,8 @@ TEST_F(AmlI2cTest, SmallRead) {
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
   const auto& read = transact_result->value()->read;
-  ASSERT_EQ(read.count(), 1);
-  EXPECT_EQ(read[0].data.count(), kExpectedReadData.size());
+  ASSERT_EQ(read.size(), 1);
+  EXPECT_EQ(read[0].data.size(), kExpectedReadData.size());
   EXPECT_THAT(kExpectedReadData, ::testing::ElementsAreArray(read[0].data));
 
   const std::vector transfers = controller().GetTransfers();
@@ -437,8 +437,8 @@ TEST_F(AmlI2cTest, BigRead) {
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
   const auto& read = transact_result->value()->read;
-  ASSERT_EQ(read.count(), 1);
-  EXPECT_EQ(read[0].data.count(), kExpectedReadData.size());
+  ASSERT_EQ(read.size(), 1);
+  EXPECT_EQ(read[0].data.size(), kExpectedReadData.size());
   EXPECT_THAT(kExpectedReadData, ::testing::ElementsAreArray(read[0].data));
 
   const std::vector transfers = controller().GetTransfers();
@@ -493,7 +493,7 @@ TEST_F(AmlI2cTest, EmptyRead) {
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
   const auto& read = transact_result->value()->read;
-  ASSERT_EQ(read.count(), 1);
+  ASSERT_EQ(read.size(), 1);
   EXPECT_TRUE(read[0].data.empty());
 
   const std::vector transfers = controller().GetTransfers();
@@ -571,14 +571,14 @@ TEST_F(AmlI2cTest, ManyTransactions) {
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
   const auto& read = transact_result->value()->read;
-  ASSERT_EQ(read.count(), 2);
+  ASSERT_EQ(read.size(), 2);
 
-  EXPECT_EQ(read[0].data.count(), kReadCount1);
+  EXPECT_EQ(read[0].data.size(), kReadCount1);
   std::vector<uint8_t> expected1 = {kExpectedReadData.begin(),
                                     kExpectedReadData.begin() + kReadCount1};
   EXPECT_THAT(expected1, ::testing::ElementsAreArray(read[0].data));
 
-  EXPECT_EQ(read[1].data.count(), kReadCount2);
+  EXPECT_EQ(read[1].data.size(), kReadCount2);
   std::vector<uint8_t> expected2 = {kExpectedReadData.begin() + kReadCount1,
                                     kExpectedReadData.end()};
   EXPECT_THAT(expected2, ::testing::ElementsAreArray(read[1].data));
@@ -627,7 +627,7 @@ TEST_F(AmlI2cTest, ManyTransactions) {
   });
 
   EXPECT_EQ(transfers[2].target_addr, 0x3e);
-  ASSERT_EQ(transfers[2].write_data.size(), write_buffer_2.count());
+  ASSERT_EQ(transfers[2].write_data.size(), write_buffer_2.size());
   std::vector<uint8_t> expected = {kExpectedWriteData.begin() + 1, kExpectedWriteData.end()};
   EXPECT_THAT(expected, ::testing::ElementsAreArray(transfers[2].write_data));
   transfers[2].ExpectTokenListEq({
@@ -671,7 +671,7 @@ TEST_F(AmlI2cTest, WriteTransactionTooBig) {
 
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
-  EXPECT_EQ(transact_result->value()->read.count(), 0);
+  EXPECT_EQ(transact_result->value()->read.size(), 0);
 
   fidl::VectorView<uint8_t> buffer2{arena_, 513};
   std::vector<fuchsia_hardware_i2cimpl::wire::I2cImplOp> op2 = {
@@ -697,7 +697,7 @@ TEST_F(AmlI2cTest, ReadTransactionTooBig) {
 
   ASSERT_OK(transact_result.status());
   ASSERT_FALSE(transact_result->is_error());
-  EXPECT_EQ(transact_result->value()->read.count(), 1);
+  EXPECT_EQ(transact_result->value()->read.size(), 1);
 
   std::vector<fuchsia_hardware_i2cimpl::wire::I2cImplOp> op2 = {
       {0x00, fuchsia_hardware_i2cimpl::wire::I2cImplOpType::WithReadSize(513), true}};

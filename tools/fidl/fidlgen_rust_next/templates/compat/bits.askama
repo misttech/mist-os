@@ -1,0 +1,7 @@
+{{ denylist }}
+impl ::core::convert::From<crate::{{ name }}> for ::{{ compat.crate_name }}::{{ compat_name }} {
+    #[inline]
+    fn from(from: crate::{{ name }}) -> Self {
+        Self::from_bits_retain(from.bits())
+    }
+}

@@ -94,9 +94,9 @@ impl<'a> Borrow<dyn InsensitiveStringRef + 'a> for InsensitiveString {
     }
 }
 
-impl<'a> Eq for (dyn InsensitiveStringRef + 'a) {}
+impl<'a> Eq for dyn InsensitiveStringRef + 'a {}
 
-impl<'a> PartialEq for (dyn InsensitiveStringRef + 'a) {
+impl<'a> PartialEq for dyn InsensitiveStringRef + 'a {
     fn eq(&self, other: &dyn InsensitiveStringRef) -> bool {
         self.as_str()
             .chars()
@@ -105,7 +105,7 @@ impl<'a> PartialEq for (dyn InsensitiveStringRef + 'a) {
     }
 }
 
-impl<'a> Hash for (dyn InsensitiveStringRef + 'a) {
+impl<'a> Hash for dyn InsensitiveStringRef + 'a {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         for c in self.as_str().chars().flat_map(|c| c.to_uppercase()) {
             hasher.write_u32(c as u32);

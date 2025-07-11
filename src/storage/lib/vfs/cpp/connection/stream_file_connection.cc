@@ -4,31 +4,29 @@
 
 #include "src/storage/lib/vfs/cpp/connection/stream_file_connection.h"
 
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/zx/handle.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/zx/result.h>
+#include <lib/zx/stream.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
 #include <zircon/assert.h>
-#include <zircon/rights.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <utility>
 
-#include <fbl/string_buffer.h>
+#include <fbl/ref_ptr.h>
 
-#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/connection/file_connection.h"
 #include "src/storage/lib/vfs/cpp/debug.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 StreamFileConnection::StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                            fuchsia_io::Rights rights, bool append,
@@ -116,7 +114,7 @@ zx_status_t StreamFileConnection::WriteInternal(const void* data, size_t len, si
 
 void StreamFileConnection::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   size_t actual = 0u;
-  zx_status_t status = WriteInternal(request->data.data(), request->data.count(), &actual);
+  zx_status_t status = WriteInternal(request->data.data(), request->data.size(), &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {
@@ -144,7 +142,7 @@ zx_status_t StreamFileConnection::WriteAtInternal(const void* data, size_t len, 
 void StreamFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter::Sync& completer) {
   size_t actual = 0;
   zx_status_t status =
-      WriteAtInternal(request->data.data(), request->data.count(), request->offset, &actual);
+      WriteAtInternal(request->data.data(), request->data.size(), request->offset, &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {
@@ -188,6 +186,4 @@ zx::result<> StreamFileConnection::SetAppend(bool append) {
   return zx::ok();
 }
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal

@@ -8,23 +8,26 @@
 
 // clang-format on
 
-#include <fidl/fuchsia.sysinfo/cpp/wire_test_base.h>
+#include <fuchsia/driver/test/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver-integration-test/fixture.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
+#include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/zx/channel.h>
 #include <zircon/hw/gpt.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <ramdevice-client-test/ramnandctl.h>
 #include <zxtest/zxtest.h>
 
-#include "fidl/fuchsia.sysinfo/cpp/markers.h"
+#include "lib/sys/component/cpp/testing/realm_builder.h"
 
 namespace {
 
@@ -95,16 +98,21 @@ class SkipBlockDevice {
 
   ~SkipBlockDevice() = default;
 
-  SkipBlockDevice(driver_integration_test::IsolatedDevmgr devmgr,
+  SkipBlockDevice(std::unique_ptr<async::Loop> loop,
+                  std::unique_ptr<component_testing::RealmRoot> realm, fbl::unique_fd devfs_root,
                   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl,
                   ramdevice_client::RamNand ram_nand, fzl::VmoMapper mapper)
-      : devmgr_(std::move(devmgr)),
+      : loop_(std::move(loop)),
+        realm_(std::move(realm)),
+        devfs_root_(std::move(devfs_root)),
         ctl_(std::move(ctl)),
         ram_nand_(std::move(ram_nand)),
         mapper_(std::move(mapper)) {}
 
  private:
-  driver_integration_test::IsolatedDevmgr devmgr_;
+  std::unique_ptr<async::Loop> loop_;
+  std::unique_ptr<component_testing::RealmRoot> realm_;
+  fbl::unique_fd devfs_root_;
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl_;
   ramdevice_client::RamNand ram_nand_;
   fzl::VmoMapper mapper_;
@@ -130,6 +138,8 @@ void CreateBadBlockMap(void* buffer) {
 
 void SkipBlockDevice::Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
                              std::optional<SkipBlockDevice>* device) {
+  auto loop = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop->StartThread();
   fzl::VmoMapper mapper;
   zx::vmo vmo;
   ASSERT_OK(mapper.CreateAndMap((kPageSize + kOobSize) * kPagesPerBlock * kNumBlocks,
@@ -138,16 +148,37 @@ void SkipBlockDevice::Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
   CreateBadBlockMap(mapper.start());
   ASSERT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &nand_info.vmo));
 
-  driver_integration_test::IsolatedDevmgr::Args args;
-  driver_integration_test::IsolatedDevmgr devmgr;
-  ASSERT_OK(driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr));
+  auto realm_builder = component_testing::RealmBuilder::Create();
+  driver_test_realm::Setup(realm_builder);
+  auto realm =
+      std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop->dispatcher()));
+  fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
+  ASSERT_OK(realm->component().Connect(driver_test_realm.NewRequest()));
+  fuchsia::driver::test::Realm_Start_Result realm_result;
+  auto realm_args = fuchsia::driver::test::RealmArgs();
+  realm_args.set_root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
+  realm_args.set_software_devices(std::vector{
+      fuchsia::driver::test::SoftwareDevice{
+          .device_name = "ram-nand",
+          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+      },
+  });
+  ASSERT_OK(driver_test_realm->Start(std::move(realm_args), &realm_result));
+  ASSERT_TRUE(realm_result.is_response());
+  fidl::InterfaceHandle<fuchsia::io::Node> dev;
+  ASSERT_OK(realm->component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                               dev.NewRequest().TakeChannel()));
+
+  fbl::unique_fd devfs_root;
+  ASSERT_OK(fdio_fd_create(dev.TakeChannel().release(), devfs_root.reset_and_get_address()));
+
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl;
-  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(devmgr.devfs_root().duplicate(), &ctl));
+  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(devfs_root.duplicate(), &ctl));
   std::optional<ramdevice_client::RamNand> ram_nand;
   ASSERT_OK(ctl->CreateRamNand(std::move(nand_info), &ram_nand));
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform")
-                .status_value());
-  device->emplace(std::move(devmgr), std::move(ctl), *std::move(ram_nand), std::move(mapper));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root.get(), "sys/platform").status_value());
+  device->emplace(std::move(loop), std::move(realm), std::move(devfs_root), std::move(ctl),
+                  *std::move(ram_nand), std::move(mapper));
 }
 
 void CreatePayload(size_t size, zx::vmo* out, uint8_t data = 0x4a) {
@@ -166,50 +197,9 @@ void ValidateBuffer(void* buffer, size_t size, uint8_t expected = 0x5c) {
   }
 }
 
-class FakeSysinfo : public fidl::testing::WireTestBase<fuchsia_sysinfo::SysInfo> {
- public:
-  FakeSysinfo() = default;
-
-  void GetBoardName(GetBoardNameCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK, "astro");
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    ZX_PANIC("Unexpected call to sysinfo: %s", name.c_str());
-  }
-
-  fidl::ProtocolHandler<fuchsia_sysinfo::SysInfo> Handler(async_dispatcher_t* dispatcher) {
-    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
-  }
-
- private:
-  fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> bindings_;
-};
-
-struct IncomingNamespace {
-  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
-  FakeSysinfo fake_sysinfo;
-};
-
 class SyncClientTest : public zxtest::Test {
  protected:
-  SyncClientTest() {
-    ASSERT_NO_FATAL_FAILURE(SkipBlockDevice::Create(NandInfo(), &device_));
-
-    loop_.StartThread();
-    svc_dir_ = ns_.SyncCall([](IncomingNamespace* ns) {
-      ZX_ASSERT(ns->outgoing
-                    .AddUnmanagedProtocol<fuchsia_sysinfo::SysInfo>(
-                        ns->fake_sysinfo.Handler(async_get_default_dispatcher()))
-                    .is_ok());
-      auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
-      zx::result svc_local = component::OpenDirectoryAt(client_end, "svc");
-      ZX_ASSERT(svc_local.is_ok());
-      ZX_ASSERT(ns->outgoing.Serve(std::move(server_end)).is_ok());
-      return std::move(svc_local.value());
-    });
-  }
+  SyncClientTest() { ASSERT_NO_FATAL_FAILURE(SkipBlockDevice::Create(NandInfo(), &device_)); }
 
   void ValidateWritten(size_t offset, size_t size, uint8_t expected = 0x4a) {
     for (size_t block = 4; block < 5; block++) {
@@ -242,17 +232,11 @@ class SyncClientTest : public zxtest::Test {
   void TestLayoutUpdate(std::optional<sysconfig_header> current_header,
                         const sysconfig_header& target_header);
 
-  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir() const { return svc_dir_.borrow(); }
-
-  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<IncomingNamespace> ns_{loop_.dispatcher(), std::in_place};
-  fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;
-
   std::optional<SkipBlockDevice> device_;
 };
 
 TEST_F(SyncClientTest, CreateAstro) {
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir()));
+  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root()));
 }
 
 using PartitionType = sysconfig::SyncClient::PartitionType;
@@ -260,7 +244,7 @@ using PartitionType = sysconfig::SyncClient::PartitionType;
 constexpr size_t kKilobyte = 1 << 10;
 
 TEST_F(SyncClientTest, WritePartitionSysconfig) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   zx::vmo vmo;
@@ -272,7 +256,7 @@ TEST_F(SyncClientTest, WritePartitionSysconfig) {
 }
 
 TEST_F(SyncClientTest, WritePartitionAbrMetadata) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   zx::vmo vmo;
@@ -285,7 +269,7 @@ TEST_F(SyncClientTest, WritePartitionAbrMetadata) {
 }
 
 TEST_F(SyncClientTest, WritePartitionVbMetaA) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   zx::vmo vmo;
@@ -298,7 +282,7 @@ TEST_F(SyncClientTest, WritePartitionVbMetaA) {
 }
 
 TEST_F(SyncClientTest, WritePartitionVbMetaB) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   zx::vmo vmo;
@@ -311,7 +295,7 @@ TEST_F(SyncClientTest, WritePartitionVbMetaB) {
 }
 
 TEST_F(SyncClientTest, WritePartitionVbMetaR) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   zx::vmo vmo;
@@ -323,7 +307,7 @@ TEST_F(SyncClientTest, WritePartitionVbMetaR) {
 }
 
 TEST_F(SyncClientTest, ReadPartitionSysconfig) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
@@ -335,7 +319,7 @@ TEST_F(SyncClientTest, ReadPartitionSysconfig) {
 }
 
 TEST_F(SyncClientTest, ReadPartitionAbrMetadata) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
@@ -347,7 +331,7 @@ TEST_F(SyncClientTest, ReadPartitionAbrMetadata) {
 }
 
 TEST_F(SyncClientTest, ReadPartitionVbMetaA) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
@@ -359,7 +343,7 @@ TEST_F(SyncClientTest, ReadPartitionVbMetaA) {
 }
 
 TEST_F(SyncClientTest, ReadPartitionVbMetaB) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
@@ -371,7 +355,7 @@ TEST_F(SyncClientTest, ReadPartitionVbMetaB) {
 }
 
 TEST_F(SyncClientTest, ReadPartitionVbMetaR) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
@@ -383,7 +367,7 @@ TEST_F(SyncClientTest, ReadPartitionVbMetaR) {
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeSysconfig) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   size_t size;
@@ -392,7 +376,7 @@ TEST_F(SyncClientTest, GetPartitionSizeSysconfig) {
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeAbrMetadata) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   size_t size;
@@ -401,7 +385,7 @@ TEST_F(SyncClientTest, GetPartitionSizeAbrMetadata) {
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeVbMetaA) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   size_t size;
@@ -410,7 +394,7 @@ TEST_F(SyncClientTest, GetPartitionSizeVbMetaA) {
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeVbMetaB) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   size_t size;
@@ -419,7 +403,7 @@ TEST_F(SyncClientTest, GetPartitionSizeVbMetaB) {
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeVbMetaR) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   size_t size;
@@ -462,7 +446,7 @@ TEST(SysconfigHeaderTest, InvalidCrc) {
 }
 
 TEST_F(SyncClientTest, HeaderNotPageAligned) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   auto not_page_alinged = GetNonLegacyHeaderForTest();
@@ -473,7 +457,7 @@ TEST_F(SyncClientTest, HeaderNotPageAligned) {
 }
 
 TEST_F(SyncClientTest, HeaderInvalidOffset) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   auto invalid_offset = GetNonLegacyHeaderForTest();
@@ -484,7 +468,7 @@ TEST_F(SyncClientTest, HeaderInvalidOffset) {
 }
 
 TEST_F(SyncClientTest, HeaderInvalidSize) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   auto invalid_size = GetNonLegacyHeaderForTest();
@@ -495,7 +479,7 @@ TEST_F(SyncClientTest, HeaderInvalidSize) {
 }
 
 TEST_F(SyncClientTest, HeaderInvalidSizePlusOffset) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   auto invalid_size_offset = GetNonLegacyHeaderForTest();
@@ -506,7 +490,7 @@ TEST_F(SyncClientTest, HeaderInvalidSizePlusOffset) {
 }
 
 TEST_F(SyncClientTest, HeaderOverlapSubpart) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   auto overlap_subpart = GetNonLegacyHeaderForTest();
@@ -517,7 +501,7 @@ TEST_F(SyncClientTest, HeaderOverlapSubpart) {
 }
 
 TEST_F(SyncClientTest, HeaderPage0NotReserved) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   auto page0_not_reserved = GetNonLegacyHeaderForTest();
@@ -529,7 +513,7 @@ TEST_F(SyncClientTest, HeaderPage0NotReserved) {
 
 void SyncClientTest::TestLayoutUpdate(const std::optional<sysconfig_header> current_header,
                                       const sysconfig_header& target_header) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   auto memory = static_cast<uint8_t*>(device_->mapper().start()) + 4 * kBlockSize;
@@ -729,7 +713,7 @@ class SyncClientBufferedTest : public SyncClientTest {
 };
 
 void SyncClientBufferedTest::TestWrite(const std::vector<PartitionInfo>& parts_to_test_write) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   sysconfig::SyncClientBuffered sync_client_buffered(*std::move(client));
@@ -794,7 +778,7 @@ TEST_F(SyncClientBufferedTest, WriteAllPartitions) {
 }
 
 void SyncClientBufferedTest::TestRead(const std::vector<PartitionInfo>& parts_to_test_read) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   sysconfig::SyncClientBuffered sync_client_buffered(*std::move(client));
@@ -882,7 +866,7 @@ sysconfig_subpartition GetSubpartitionInfo(const sysconfig_header& header,
 
 void SyncClientBufferedTest::TestWriteWithHeader(
     const std::vector<PartitionInfo>& parts_to_test_write) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   sysconfig::SyncClientBuffered sync_client_buffered(*std::move(client));
@@ -978,7 +962,7 @@ void VerifyAbrMetaDataPage(const abr_metadata_ext& abr_data, uint8_t value,
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLevelingUnsupportedLayout) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
 
@@ -1010,7 +994,7 @@ sysconfig_header WriteHeaderSupportingAbrWearLeveling(void* memory) {
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLeveling) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
@@ -1073,7 +1057,7 @@ TEST_F(SyncClientBufferedTest, AbrWearLeveling) {
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLevelingMultiplePartitionsModifiedInCache) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
@@ -1142,7 +1126,7 @@ TEST_F(SyncClientBufferedTest, AbrWearLevelingMultiplePartitionsModifiedInCache)
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLevelingDefaultToFirstPage) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
@@ -1167,7 +1151,7 @@ TEST_F(SyncClientBufferedTest, AbrWearLevelingDefaultToFirstPage) {
 }
 
 TEST_F(SyncClientBufferedTest, ValidateAbrMetadataInStorageFail) {
-  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root(), svc_dir());
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
   ASSERT_OK(client);
 
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));

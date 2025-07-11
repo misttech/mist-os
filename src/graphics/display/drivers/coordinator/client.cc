@@ -514,7 +514,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
       return;
     }
   }
-  display_config.draft_.layer_count = static_cast<int32_t>(request->layer_ids.count());
+  display_config.draft_.layer_count = static_cast<int32_t>(request->layer_ids.size());
   draft_display_config_was_validated_ = false;
 
   // One-way call. No reply required.
@@ -1341,7 +1341,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
 
     fidl_display_info.pixel_format = fidl::VectorView<fuchsia_images2::wire::PixelFormat>(
         arena, display_config.pixel_formats_.size());
-    for (size_t pixel_format_index = 0; pixel_format_index < fidl_display_info.pixel_format.count();
+    for (size_t pixel_format_index = 0; pixel_format_index < fidl_display_info.pixel_format.size();
          ++pixel_format_index) {
       fidl_display_info.pixel_format[pixel_format_index] =
           display_config.pixel_formats_[pixel_format_index].ToFidl();

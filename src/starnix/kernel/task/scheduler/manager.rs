@@ -24,18 +24,20 @@ impl SchedulerManager {
     /// Create a new SchedulerManager which will apply any provided `role_overrides` before
     /// computing a role name based on a Task's scheduler state.
     pub fn new(role_overrides: RoleOverrides) -> SchedulerManager {
-        let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
-        let role_manager = if let Err(e) = Self::set_thread_role_inner(
-            &role_manager,
-            &*fuchsia_runtime::thread_self(),
-            SchedulerState::default().role_name(),
-        ) {
-            log_debug!("Setting thread role failed ({e:?}), will not set thread priority.");
-            None
-        } else {
-            log_debug!("Thread role set successfully, scheduler manager initialized.");
-            Some(role_manager)
-        };
+        let role_manager = fuchsia_runtime::with_thread_self(|thread| {
+            let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
+            if let Err(e) = Self::set_thread_role_inner(
+                &role_manager,
+                thread,
+                SchedulerState::default().role_name(),
+            ) {
+                log_debug!("Setting thread role failed ({e:?}), will not set thread priority.");
+                None
+            } else {
+                log_debug!("Thread role set successfully, scheduler manager initialized.");
+                Some(role_manager)
+            }
+        });
 
         SchedulerManager { role_manager, role_overrides }
     }

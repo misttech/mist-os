@@ -44,7 +44,7 @@ pub mod net;
 #[cfg(target_os = "fuchsia")]
 pub use self::handle::{
     fifo::{Fifo, FifoEntry},
-    on_signals::OnSignals,
+    on_signals::{OnSignals, OnSignalsFuture},
     rwhandle::{
         DefaultRWHandleSpec, RWHandle, RWHandleSpec, ReadableHandle, ReadableState, WritableHandle,
         WritableState,

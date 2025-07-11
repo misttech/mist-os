@@ -994,7 +994,7 @@ impl<'a> MetricState<'a> {
     fn apply_boolean_function(
         &self,
         namespace: &str,
-        function: &dyn (Fn(&MetricValue, &MetricValue) -> bool),
+        function: &dyn Fn(&MetricValue, &MetricValue) -> bool,
         operands: &[ExpressionTree],
     ) -> MetricValue {
         if operands.len() != 2 {
@@ -1017,7 +1017,7 @@ impl<'a> MetricState<'a> {
     fn fold_bool(
         &self,
         namespace: &str,
-        function: &dyn (Fn(bool, bool) -> bool),
+        function: &dyn Fn(bool, bool) -> bool,
         operands: &[ExpressionTree],
         short_circuit_behavior: ShortCircuitBehavior,
     ) -> MetricValue {

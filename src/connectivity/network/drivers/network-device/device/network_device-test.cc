@@ -421,10 +421,9 @@ TEST_F(NetworkDeviceTest, GetInfo) {
   EXPECT_EQ(base_info.min_tx_buffer_head(), impl_.info().tx_head_length);
   ASSERT_TRUE(base_info.has_buffer_alignment());
   EXPECT_EQ(base_info.buffer_alignment(), impl_.info().buffer_alignment);
-  ASSERT_TRUE(base_info.has_tx_accel());
-  EXPECT_EQ(base_info.tx_accel().count(), impl_.info().tx_accel.size());
+  EXPECT_EQ(base_info.tx_accel().size(), impl_.info().tx_accel.size());
   ASSERT_TRUE(base_info.has_rx_accel());
-  EXPECT_EQ(base_info.rx_accel().count(), impl_.info().rx_accel.size());
+  EXPECT_EQ(base_info.rx_accel().size(), impl_.info().rx_accel.size());
 }
 
 TEST_F(NetworkDeviceTest, OptionalMaxBufferLength) {
@@ -707,14 +706,14 @@ TEST_F(NetworkDeviceTest, TxBufferBuild) {
   // load the buffers from the fake device implementation and check them.
   std::unique_ptr tx = impl_.PopTxBuffer();
   ASSERT_TRUE(tx);
-  ASSERT_EQ(tx->buffer().data.count(), 1u);
+  ASSERT_EQ(tx->buffer().data.size(), 1u);
   ASSERT_EQ(tx->buffer().data[0].offset, session.descriptor(kDescriptorIndex0).offset);
   ASSERT_EQ(tx->buffer().data[0].length, kDefaultBufferLength);
   return_session.Enqueue(std::move(tx));
   // check second descriptor:
   tx = impl_.PopTxBuffer();
   ASSERT_TRUE(tx);
-  ASSERT_EQ(tx->buffer().data.count(), 1u);
+  ASSERT_EQ(tx->buffer().data.size(), 1u);
   {
     buffer_descriptor_t& desc = session.descriptor(kDescriptorIndex1);
     ASSERT_EQ(tx->buffer().data[0].offset, desc.offset + desc.head_length);
@@ -726,7 +725,7 @@ TEST_F(NetworkDeviceTest, TxBufferBuild) {
   // check third descriptor:
   tx = impl_.PopTxBuffer();
   ASSERT_TRUE(tx);
-  ASSERT_EQ(tx->buffer().data.count(), 3u);
+  ASSERT_EQ(tx->buffer().data.size(), 3u);
   {
     uint16_t descriptor = 2;
     for (const fuchsia_hardware_network_driver::wire::BufferRegion& region :
@@ -2088,13 +2087,13 @@ TEST_F(NetworkDeviceTest, PortGetInfo) {
   EXPECT_EQ(base_info.port_class(),
             static_cast<netdev::wire::PortClass>(port13_.port_info().port_class));
   ASSERT_TRUE(base_info.has_rx_types());
-  EXPECT_EQ(base_info.rx_types().count(), impl_info.rx_types.size());
-  for (size_t i = 0; i < base_info.rx_types().count(); i++) {
+  EXPECT_EQ(base_info.rx_types().size(), impl_info.rx_types.size());
+  for (size_t i = 0; i < base_info.rx_types().size(); i++) {
     EXPECT_EQ(base_info.rx_types()[i], static_cast<netdev::wire::FrameType>(impl_info.rx_types[i]));
   }
   ASSERT_TRUE(base_info.has_tx_types());
-  EXPECT_EQ(base_info.tx_types().count(), impl_info.tx_types.size());
-  for (size_t i = 0; i < base_info.tx_types().count(); i++) {
+  EXPECT_EQ(base_info.tx_types().size(), impl_info.tx_types.size());
+  for (size_t i = 0; i < base_info.tx_types().size(); i++) {
     EXPECT_EQ(base_info.tx_types()[i].type,
               static_cast<netdev::wire::FrameType>(impl_info.tx_types[i].type));
     EXPECT_EQ(base_info.tx_types()[i].features, impl_info.tx_types[i].features);

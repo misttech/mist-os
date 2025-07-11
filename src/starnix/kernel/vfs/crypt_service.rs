@@ -14,7 +14,7 @@ use fuchsia_sync::Mutex;
 use futures::stream::StreamExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use rand::{thread_rng, Rng};
-use starnix_logging::{log_error, log_info};
+use starnix_logging::log_error;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::collections::hash_map::{Entry, HashMap};
@@ -156,7 +156,6 @@ impl CryptService {
                 Ok(())
             }
             Entry::Vacant(vacant) => {
-                log_info!("Adding wrapping key with id: {:?}", &wrapping_key_id);
                 vacant.insert(KeyInfo {
                     users: vec![uid],
                     cipher: Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&key[..])),
@@ -171,7 +170,6 @@ impl CryptService {
         wrapping_key_id: [u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize],
         uid: u32,
     ) -> Result<(), Errno> {
-        log_info!("Removing wrapping key with id: {:?}", &wrapping_key_id);
         let mut inner = self.inner.lock();
         match inner.ciphers.entry(EncryptionKeyId::from(wrapping_key_id)) {
             Entry::Occupied(mut e) => {

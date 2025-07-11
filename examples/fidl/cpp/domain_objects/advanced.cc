@@ -27,7 +27,7 @@ TEST(WireTypes, BorrowExternalVector) {
   // |vv| is a view that borrows the vector contents of |vec|.
   // Destroying the contents in |vec| will invalidate |vv|.
   fidl::VectorView<uint32_t> vv = fidl::VectorView<uint32_t>::FromExternal(vec);
-  ASSERT_EQ(vv.count(), 4UL);
+  ASSERT_EQ(vv.size(), 4UL);
 }
 // [END wire-external-vector]
 

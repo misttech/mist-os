@@ -958,7 +958,7 @@ static zx_status_t brcmf_escan_prep(
   params_le->home_time = -1;
 
   /* Copy channel array if applicable */
-  n_channels = request->channels().count();
+  n_channels = request->channels().size();
   BRCMF_DBG(SCAN, "### List of channelspecs to scan ### %d", n_channels);
   if (n_channels == 0) {
     BRCMF_ERR("Scan request contains empty channel list.");
@@ -982,7 +982,7 @@ static zx_status_t brcmf_escan_prep(
     BRCMF_DBG(SCAN, "No ssids field in the request.");
   } else {
     /* Set SSID fields as applicable */
-    n_ssids = request->ssids().count();
+    n_ssids = request->ssids().size();
     BRCMF_DBG(SCAN, "### List of SSIDs to scan ### %d", n_ssids);
 
     /* Copy ssids_list if non-empty */
@@ -992,14 +992,14 @@ static zx_status_t brcmf_escan_prep(
       struct brcmf_ssid_le* ssid_le =
           reinterpret_cast<struct brcmf_ssid_le*>(reinterpret_cast<char*>(params_le) + offset);
       for (uint32_t i = 0; i < n_ssids; i++, ssid_le++) {
-        if (request->ssids().data()[i].count() > fuchsia_wlan_ieee80211::kMaxSsidByteLen) {
+        if (request->ssids().data()[i].size() > fuchsia_wlan_ieee80211::kMaxSsidByteLen) {
           BRCMF_ERR("SSID in scan request SSID list too long(no longer than %hhu bytes)",
                     fuchsia_wlan_ieee80211::kMaxSsidByteLen);
           return ZX_ERR_INVALID_ARGS;
         }
-        ssid_le->SSID_len = request->ssids().data()[i].count();
+        ssid_le->SSID_len = request->ssids().data()[i].size();
         memcpy(&ssid_le->SSID, request->ssids().data()[i].data(),
-               request->ssids().data()[i].count());
+               request->ssids().data()[i].size());
         if (ssid_le->SSID_len == 0) {
           BRCMF_DBG(SCAN, "%d: Broadcast scan", i);
         } else {
@@ -1061,9 +1061,9 @@ static zx_status_t brcmf_run_escan(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  size_t ssids_count = request->has_ssids() ? request->ssids().count() : 0;
+  size_t ssids_count = request->has_ssids() ? request->ssids().size() : 0;
   // Calculate space needed for parameters
-  size_t params_size = brcmf_escan_params_size(request->channels().count(), ssids_count);
+  size_t params_size = brcmf_escan_params_size(request->channels().size(), ssids_count);
 
   // Validate command size
   size_t total_cmd_size = params_size + sizeof("escan");
@@ -2891,12 +2891,12 @@ static zx_status_t brcmf_cfg80211_add_key(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (req->key().count() == 0) {
+  if (req->key().size() == 0) {
     return brcmf_cfg80211_del_key(ndev, key_idx);
   }
 
-  if (req->key().count() > sizeof(key->data)) {
-    BRCMF_ERR("Too long key length (%zu)", req->key().count());
+  if (req->key().size() > sizeof(key->data)) {
+    BRCMF_ERR("Too long key length (%zu)", req->key().size());
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -2913,7 +2913,7 @@ static zx_status_t brcmf_cfg80211_add_key(
   if ((ext_key) && (!address_is_multicast(mac_addr))) {
     memcpy((char*)&key->ea, (void*)mac_addr, ETH_ALEN);
   }
-  key->len = req->key().count();
+  key->len = req->key().size();
   key->index = key_idx;
   memcpy(key->data, req->key().data(), key->len);
   if (!ext_key) {
@@ -3128,7 +3128,7 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
   BRCMF_DBG(SCAN, "Returning scan result id: %lu, channel: %d, dbm: %d", ndev->scan_txn_id, channel,
             bss.rssi_dbm);
 #if !defined(NDEBUG)
-  auto ssid = brcmf_find_ssid_in_ies(bss.ies.data(), bss.ies.count());
+  auto ssid = brcmf_find_ssid_in_ies(bss.ies.data(), bss.ies.size());
   BRCMF_DBG(SCAN, "  ssid: " FMT_SSID, FMT_SSID_VECT(ssid));
 #endif /* !defined(NDEBUG) */
   ndev->scan_num_results++;
@@ -3723,8 +3723,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   BRCMF_DBG(TRACE,
             "ssid: " FMT_SSID "  beacon period: %d  dtim_period: %d  channel: %d  rsne_len: %zd",
-            FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()), req->beacon_period(),
-            req->dtim_period(), req->channel(), req->has_rsne() ? req->rsne().count() : 0);
+            FMT_SSID_BYTES(req->ssid().data(), req->ssid().size()), req->beacon_period(),
+            req->dtim_period(), req->channel(), req->has_rsne() ? req->rsne().size() : 0);
 
   uint16_t chanspec = 0;
   zx_status_t status;
@@ -3732,8 +3732,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   struct brcmf_ssid_le ssid_le;
   memset(&ssid_le, 0, sizeof(ssid_le));
-  memcpy(ssid_le.SSID, req->ssid().data(), req->ssid().count());
-  ssid_le.SSID_len = req->ssid().count();
+  memcpy(ssid_le.SSID, req->ssid().data(), req->ssid().size());
+  ssid_le.SSID_len = req->ssid().size();
 
   brcmf_enable_mpc(ifp, 0);
 
@@ -3747,7 +3747,7 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
   }
 
   // Configure RSN IE
-  if (req->has_rsne() && req->rsne().count() != 0) {
+  if (req->has_rsne() && req->rsne().size() != 0) {
     struct brcmf_vs_tlv* tmp_ie = (struct brcmf_vs_tlv*)req->rsne().data();
     status = brcmf_configure_wpaie(ifp, tmp_ie, true, true);
     if (status != ZX_OK) {
@@ -3846,8 +3846,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   cfg->ap_started = true;
   // Save the SSID for checking when SoftAP is stopped.
-  ifp->saved_softap_ssid.resize(req->ssid().count());
-  memcpy(ifp->saved_softap_ssid.data(), req->ssid().data(), req->ssid().count());
+  ifp->saved_softap_ssid.resize(req->ssid().size());
+  memcpy(ifp->saved_softap_ssid.data(), req->ssid().data(), req->ssid().size());
   return fuchsia_wlan_fullmac_wire::StartResult::kSuccess;
 
 fail:
@@ -4011,7 +4011,7 @@ void brcmf_if_connect_req(net_device* ndev,
   zx_status_t status;
 
   auto ssid =
-      brcmf_find_ssid_in_ies(req->selected_bss().ies.data(), req->selected_bss().ies.count());
+      brcmf_find_ssid_in_ies(req->selected_bss().ies.data(), req->selected_bss().ies.size());
 
   // Saving the request as FIDL natural type.
   // Note that below this point, `req` and `ifp->connect_req` refer to the same connect request and
@@ -4031,7 +4031,7 @@ void brcmf_if_connect_req(net_device* ndev,
       status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
     }
-    if (req->wep_key().key().count() > 0 &&
+    if (req->wep_key().key().size() > 0 &&
         !(req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey ||
           req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem)) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unexpected WEP key in request");
@@ -4039,9 +4039,9 @@ void brcmf_if_connect_req(net_device* ndev,
       goto fail;
     }
 
-    if (req->wep_key().key().count() > MAX_SUPPORTED_WEP_KEY_LEN) {
+    if (req->wep_key().key().size() > MAX_SUPPORTED_WEP_KEY_LEN) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: WEP key len %zu larger than %d",
-                req->wep_key().key().count(), MAX_SUPPORTED_WEP_KEY_LEN);
+                req->wep_key().key().size(), MAX_SUPPORTED_WEP_KEY_LEN);
       status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
     }
@@ -4068,7 +4068,7 @@ void brcmf_if_connect_req(net_device* ndev,
   }
 
   if (req->has_wep_key_desc() && req->wep_key_desc().has_key() &&
-      req->wep_key_desc().key().count() > 0) {
+      req->wep_key_desc().key().size() > 0) {
     auto add_key_result = brcmf_cfg80211_add_key(ndev, &req->wep_key_desc());
     if (add_key_result != ZX_OK) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unable to set WEP key");
@@ -4363,9 +4363,9 @@ void brcmf_if_start_req(net_device* ndev,
     return;
   }
   BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u",
-              req->has_rsne() ? req->rsne().count() : 0, req->channel());
+              req->has_rsne() ? req->rsne().size() : 0, req->channel());
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().size()));
 #endif /* !defined(NDEBUG) */
 
   fuchsia_wlan_fullmac_wire::StartResult result_code = brcmf_cfg80211_start_ap(ndev, req);
@@ -4393,12 +4393,12 @@ void brcmf_if_stop_req(net_device* ndev,
     goto done;
   }
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().size()));
 #endif /* !defined(NDEBUG) */
-  if ((req->ssid().count() != ifp->saved_softap_ssid.size()) ||
-      (memcmp(req->ssid().data(), ifp->saved_softap_ssid.data(), req->ssid().count()) != 0)) {
+  if ((req->ssid().size() != ifp->saved_softap_ssid.size()) ||
+      (memcmp(req->ssid().data(), ifp->saved_softap_ssid.data(), req->ssid().size()) != 0)) {
     BRCMF_ERR("SSID does not match running SoftAP, req SSID: " FMT_SSID, " current SSID: " FMT_SSID,
-              FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()),
+              FMT_SSID_BYTES(req->ssid().data(), req->ssid().size()),
               FMT_SSID_BYTES(ifp->saved_softap_ssid.data(), ifp->saved_softap_ssid.size()));
     result_code = fuchsia_wlan_fullmac_wire::StopResult::kInternalError;
     goto done;
@@ -4432,12 +4432,12 @@ done:
 std::vector<zx_status_t> brcmf_if_set_keys_req(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplSetKeysRequest* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu",
-              req->key_descriptors().count());
+              req->key_descriptors().size());
   zx_status_t result;
 
   std::vector<zx_status_t> statuslist;
-  statuslist.reserve(req->key_descriptors().count());
-  for (size_t i = 0; i < req->key_descriptors().count(); i++) {
+  statuslist.reserve(req->key_descriptors().size());
+  for (size_t i = 0; i < req->key_descriptors().size(); i++) {
     result = brcmf_cfg80211_add_key(ndev, &req->key_descriptors().data()[i]);
     if (result != ZX_OK) {
       BRCMF_WARN("Error setting key %zu: %s.", i, zx_status_get_string(result));
@@ -4487,7 +4487,7 @@ static void brcmf_populate_eapol_eth_header(
   memcpy(dest, req->dst_addr().data(), ETH_ALEN);
   memcpy(dest + ETH_ALEN, req->src_addr().data(), ETH_ALEN);
   *reinterpret_cast<uint16_t*>(dest + 2 * ETH_ALEN) = EAPOL_ETHERNET_TYPE_UINT16;
-  memcpy(dest + 2 * ETH_ALEN + sizeof(uint16_t), req->data().data(), req->data().count());
+  memcpy(dest + 2 * ETH_ALEN + sizeof(uint16_t), req->data().data(), req->data().size());
 }
 
 static void brcmf_if_eapol_req_netdev(
@@ -4523,12 +4523,12 @@ void brcmf_if_eapol_req(net_device* ndev,
     return;
   }
 
-  BRCMF_IFDBG(WLANIF, ndev, "EAPOL xmit request from SME. data_len: %zu", req->data().count());
+  BRCMF_IFDBG(WLANIF, ndev, "EAPOL xmit request from SME. data_len: %zu", req->data().size());
 
   int packet_length;
 
   // Ethernet header length + EAPOL PDU length
-  packet_length = 2 * ETH_ALEN + sizeof(uint16_t) + req->data().count();
+  packet_length = 2 * ETH_ALEN + sizeof(uint16_t) + req->data().size();
 
   brcmf_if_eapol_req_netdev(ndev, req, packet_length);
 }
@@ -5921,7 +5921,7 @@ void brcmf_if_roam_req(net_device* ndev,
                   .selected_bssid(selected_bssid);
 
   auto ssid =
-      brcmf_find_ssid_in_ies(req->selected_bss().ies.data(), req->selected_bss().ies.count());
+      brcmf_find_ssid_in_ies(req->selected_bss().ies.data(), req->selected_bss().ies.size());
 
   if (ssid.empty()) {
     BRCMF_DBG(WLANIF, "Roam request from SME exited: no SSID in BSS description");
@@ -6061,7 +6061,7 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
 
   // Mac header(24 bytes) + Auth frame header(6 bytes) + sae_fields length.
   uint32_t frame_size =
-      sizeof(wlan::MgmtFrameHeader) + sizeof(wlan::Authentication) + frame->sae_fields().count();
+      sizeof(wlan::MgmtFrameHeader) + sizeof(wlan::Authentication) + frame->sae_fields().size();
   // Carry the SAE authentication frame in the last field of assoc_mgr_cmd.
   uint32_t cmd_buf_len = sizeof(assoc_mgr_cmd_t) + frame_size;
   uint8_t cmd_buf[cmd_buf_len];
@@ -6098,7 +6098,7 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
             sae_frame->auth_hdr.status_code);
 
   // Attach SAE payload after authentication frame header.
-  memcpy(sae_frame->sae_payload, frame->sae_fields().data(), frame->sae_fields().count());
+  memcpy(sae_frame->sae_payload, frame->sae_fields().data(), frame->sae_fields().size());
 
   err = brcmf_fil_iovar_data_set(ifp, "assoc_mgr_cmd", cmd_buf, cmd_buf_len, &fw_err);
   if (err != ZX_OK) {

@@ -291,8 +291,8 @@ zx::result<> Cr50SpiDevice::FlowControl() {
       return zx::error(result.value().status);
     }
 
-    if (result.value().data.count() != 1) {
-      zxlogf(ERROR, "spi returned incorrect number of bytes: %zu", result.value().data.count());
+    if (result.value().data.size() != 1) {
+      zxlogf(ERROR, "spi returned incorrect number of bytes: %zu", result.value().data.size());
       return zx::error(ZX_ERR_INTERNAL);
     }
     ready = result.value().data[0] & 0x1;
@@ -309,7 +309,7 @@ zx::result<> Cr50SpiDevice::DoSpiWrite(fidl::VectorView<uint8_t> &buf) {
 }
 
 zx::result<> Cr50SpiDevice::DoSpiRead(fidl::VectorView<uint8_t> &buf) {
-  auto ret_vec = spi_->ReceiveVector(buf.count());
+  auto ret_vec = spi_->ReceiveVector(buf.size());
   if (!ret_vec.ok()) {
     return zx::error(ret_vec.status());
   }
@@ -318,13 +318,13 @@ zx::result<> Cr50SpiDevice::DoSpiRead(fidl::VectorView<uint8_t> &buf) {
   }
 
   // Put returned data in the output buffer.
-  memcpy(buf.data(), ret_vec.value().data.data(), ret_vec.value().data.count());
+  memcpy(buf.data(), ret_vec.value().data.data(), ret_vec.value().data.size());
   return zx::ok();
 }
 
 zx::result<> Cr50SpiDevice::DoXfer(uint16_t address, fidl::VectorView<uint8_t> &buf,
                                    bool do_write) {
-  zxlogf(DEBUG, "%sing %zu bytes at 0x%x", do_write ? "writ" : "read", buf.count(), address);
+  zxlogf(DEBUG, "%sing %zu bytes at 0x%x", do_write ? "writ" : "read", buf.size(), address);
   WakeUp();
   auto assert = spi_->AssertCs();
   if (!assert.ok() || assert.value().status != ZX_OK) {
@@ -334,7 +334,7 @@ zx::result<> Cr50SpiDevice::DoXfer(uint16_t address, fidl::VectorView<uint8_t> &
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   auto deasserter = fit::defer([this]() { (void)spi_->DeassertCs(); });
 
-  auto status = SendHeader(address, buf.count(), do_write);
+  auto status = SendHeader(address, buf.size(), do_write);
   if (status.is_error()) {
     return status.take_error();
   }

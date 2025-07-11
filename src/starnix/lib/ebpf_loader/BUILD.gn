@@ -22,6 +22,7 @@ rustc_library("ebpf_loader") {
   deps = [
     "//src/starnix/lib/ebpf",
     "//src/starnix/lib/linux_uapi",
+    "//src/starnix/lib/starnix_ext",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",

@@ -255,24 +255,6 @@
             subdir: "battery",
         },
         {
-            service: [
-                "fuchsia.gpu.magma.Service", // replaces /dev/class/gpu
-                "fuchsia.hardware.backlight.Service", // replaces /dev/class/backlight
-                "fuchsia.hardware.bluetooth.Service", // replaces /dev/class/bt-hci
-                "fuchsia.hardware.haptics.Service",
-                "fuchsia.hardware.hrtimer.Service", // replaces /dev/class/hrtimer
-                "fuchsia.hardware.light.LightService", // replaces /dev/class/light
-                "fuchsia.hardware.power.sensor.Service", // replaces /dev/class/power-sensor
-                "fuchsia.hardware.radar.Service", // replaces /dev/class/radar
-                "fuchsia.hardware.temperature.Service", // replaces /dev/class/temperature
-                "fuchsia.hardware.thermal.Service", // replaces /dev/class/thermal
-                "fuchsia.hardware.trippoint.TripPointService", // replaces /dev/class/trippoint
-                "fuchsia.input.report.Service", // replaces /dev/class/input-report
-            ],
-            from: "parent",
-            to: "#session-manager",
-        },
-        {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.hardware.power.statecontrol.Admin",
@@ -297,28 +279,16 @@
             availability: "same_as_target",
         },
         {
-            service: [
-                "fuchsia.hardware.gnss.Service",
-                "fuchsia.hardware.nfc.Service",
-                "fuchsia.power.broker.ElementInfoProviderService",
-                "fuchsia.storage.ftl.Service",
-            ],
+            service: "fuchsia.power.broker.ElementInfoProviderService",
             from: "parent",
             to: "#session-manager",
             availability: "same_as_target",
         },
         {
-            // replaces /dev/class/battery
-            service: [ "fuchsia.power.battery.InfoService" ],
+            dictionary: "driver-services-for-session",
             from: "parent",
+            as: "driver-services",
             to: "#session-manager",
-            availability: "same_as_target",
-        },
-        {
-            service: [ "google.powerstats.Service" ],
-            from: "parent",
-            to: "#session-manager",
-            availability: "same_as_target",
         },
         {
             storage: [

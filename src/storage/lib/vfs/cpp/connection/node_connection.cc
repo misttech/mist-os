@@ -4,16 +4,29 @@
 
 #include "src/storage/lib/vfs/cpp/connection/node_connection.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/zx/handle.h>
-#include <stdlib.h>
-#include <sys/stat.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/object_view.h>
+#include <lib/fidl/cpp/wire/status.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
+#include <lib/fit/function.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
+#include <optional>
+#include <string_view>
 #include <utility>
 
-#include <fbl/string_buffer.h>
+#include <fbl/ref_ptr.h>
 
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 

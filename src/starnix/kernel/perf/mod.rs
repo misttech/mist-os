@@ -2,10 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context;
+use fuchsia_component::client::connect_to_protocol;
+use {fidl_fuchsia_cpu_profiler as profiler, fuchsia_async};
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
-use starnix_logging::track_stub;
+use starnix_logging::{log_info, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::arch32::{
@@ -27,6 +32,8 @@ use starnix_uapi::{
 use zx::sys::zx_system_get_page_size;
 
 static READ_FORMAT_ID_GENERATOR: AtomicU64 = AtomicU64::new(0);
+// Default sample period of one sample per millisecond.
+static DEFAULT_SAMPLE_PERIOD: u64 = 1000000;
 
 uapi::check_arch_independent_layout! {
     perf_event_attr {
@@ -71,6 +78,7 @@ struct PerfEventFileState {
     rf_id: u64,
     _rf_lost: u64,
     disabled: u64,
+    samples_collected: u64,
 }
 
 struct PerfEventFile {
@@ -339,10 +347,100 @@ impl FileOps for PerfEventFile {
     }
 }
 
+async fn set_up_profiler() -> Result<profiler::SessionProxy, Errno> {
+    // Configuration for how we want to sample.
+    let sample = profiler::Sample {
+        callgraph: Some(profiler::CallgraphConfig {
+            strategy: Some(profiler::CallgraphStrategy::FramePointer),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let sampling_config = profiler::SamplingConfig {
+        period: Some(DEFAULT_SAMPLE_PERIOD),
+        timebase: Some(profiler::Counter::PlatformIndependent(profiler::CounterId::Nanoseconds)),
+        sample: Some(sample),
+        ..Default::default()
+    };
+
+    let tasks = vec![
+        // Should return a value around 1000-5000 for 5 seconds.
+        profiler::Task::SystemWide(profiler::SystemWide {}),
+    ];
+    let targets = profiler::TargetConfig::Tasks(tasks);
+    let config = profiler::Config {
+        configs: Some(vec![sampling_config]),
+        target: Some(targets),
+        ..Default::default()
+    };
+    let (_, server) = fidl::Socket::create_stream();
+    let configure = profiler::SessionConfigureRequest {
+        output: Some(server),
+        config: Some(config),
+        ..Default::default()
+    };
+
+    let proxy = connect_to_protocol::<profiler::SessionMarker>()
+        .context("Error connecting to Profiler protocol");
+    let session_proxy: profiler::SessionProxy = match proxy {
+        Ok(p) => p.clone(),
+        Err(e) => return error!(EINVAL, e),
+    };
+
+    // Must configure before sampling start().
+    let config_request = session_proxy.configure(configure).await;
+    match config_request {
+        Ok(_) => Ok(session_proxy),
+        Err(e) => return error!(EINVAL, e),
+    }
+}
+
+async fn collect_sample(
+    session_proxy: profiler::SessionProxy,
+    seconds: Duration,
+) -> Result<u64, Errno> {
+    let start_request = profiler::SessionStartRequest {
+        buffer_results: Some(true),
+        buffer_size_mb: Some(8 as u64),
+        ..Default::default()
+    };
+    let _ = session_proxy.start(&start_request).await.expect("Failed to start profiling");
+
+    // Hardcode a duration so that samples can be collected. This is currently solely used to
+    // demonstrate that an E2E implementation of sample collection works.
+    track_stub!(
+        TODO("https://fxbug.dev/428974888"),
+        "[perf_event_open] don't hardcode sleep; test/user should decide sample duration"
+    );
+    let _ = fuchsia_async::Timer::new(seconds).await;
+
+    let stats = session_proxy.stop().await;
+    let samples_collected = match stats {
+        Ok(stats) => stats.samples_collected.unwrap(),
+        Err(e) => return error!(EINVAL, e),
+    };
+
+    track_stub!(
+        TODO("https://fxbug.dev/422502681"),
+        "[perf_event_open] symbolize sample output and delete the println"
+    );
+    log_info!("profiler samples_collected: {:?}", samples_collected);
+    let reset_status = session_proxy.reset().await;
+    return match reset_status {
+        Ok(_) => Ok(samples_collected),
+        Err(e) => {
+            log_warn!("Failed to reset profiler session due to {}", e);
+            Ok(samples_collected)
+        }
+    };
+}
+
 pub fn sys_perf_event_open(
     locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     attr: UserRef<perf_event_attr>,
+    // Note that this is pid in Linux docs.
     tid: tid_t,
     cpu: i32,
     group_fd: FdNumber,
@@ -370,6 +468,25 @@ pub fn sys_perf_event_open(
         rf_value: 0,
         ..Default::default()
     };
+
+    // If we are sampling, invoke the profiler and collect a sample.
+    // Currently this is an example sample collection.
+    track_stub!(
+        TODO("https://fxbug.dev/398914921"),
+        "[perf_event_open] implement full sampling features"
+    );
+    unsafe {
+        if perf_event_attrs.__bindgen_anon_1.sample_period > 0 {
+            let mut executor = fuchsia_async::LocalExecutor::new();
+            executor.run_singlethreaded(async {
+                let session_proxy =
+                    set_up_profiler().await.expect("Failed to get session proxy for profiler");
+                let samples_collected = collect_sample(session_proxy, Duration::from_secs(5)).await;
+                perf_event_file.samples_collected =
+                    samples_collected.expect("Failed to collecte samples");
+            });
+        }
+    }
 
     let read_format = perf_event_attrs.read_format;
 

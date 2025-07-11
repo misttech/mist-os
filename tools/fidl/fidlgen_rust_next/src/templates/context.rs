@@ -99,10 +99,6 @@ pub trait Contextual<'a> {
     fn rust_next_denylist(&self, ident: &CompId) -> Denylist {
         Denylist::for_ident(self.context().schema, ident, &["rust_next"])
     }
-
-    fn rust_or_rust_next_denylist(&self, ident: &CompId) -> Denylist {
-        Denylist::for_ident(self.context().schema, ident, &["rust", "rust_next"])
-    }
 }
 
 impl<'a> Contextual<'a> for Context<'a> {

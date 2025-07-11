@@ -9,8 +9,24 @@
 #include <cstdint>
 #include <span>
 
+#include "../dlfcn/dlfcn-abi.h"
 #include "dynlink.h"
+#include "writable-segments.h"
 
+namespace LIBC_NAMESPACE_DECL {
+
+// The legacy dynlink.c code defines the underlying function.  It just iterates
+// over the modules calling _dl_phdr_report_globals, below.
+void WritableSegmentsMemorySnapshot(sanitizer_memory_snapshot_callback_t* callback,
+                                    void* callback_arg) {
+  // The lock probably isn't really necessary here, but it's cheap enough.
+  std::lock_guard lock(kDlfcnLock);
+  _dl_locked_report_globals(callback, callback_arg);
+}
+
+}  // namespace LIBC_NAMESPACE_DECL
+
+__TA_REQUIRES(LIBC_NAMESPACE::kDlfcnLock)
 void _dl_phdr_report_globals(sanitizer_memory_snapshot_callback_t* callback, void* callback_arg,
                              size_t load_bias, const Phdr* phdrs, size_t phnum) {
   using ElfPhdr = elfldltl::Elf<>::Phdr;

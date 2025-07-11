@@ -6,7 +6,6 @@ library fuchsia.fxfs;
 
 using fuchsia.io;
 using fuchsia.hardware.block.volume;
-using fuchsia.mem;
 using zx;
 
 type EmptyStruct = struct {};
@@ -317,18 +316,17 @@ closed protocol FileBackedVolumeProvider {
 @discoverable
 closed protocol BlobVolumeWriter {
     /// Writes the blob volume from `payload` into this partition. `payload` must be an fxfs
-    /// partition containing a single volume named "blob". `payload` may be truncated to exclude
-    /// unused blocks.
+    /// partition containing a single volume named "blob" in the Android sparse format.
     ///
     /// *WARNING*: The system may not boot if this process is interrupted.
     ///
     // TODO(https://fxbug.dev/415300916): Split this method up into separate steps so we can report
     // more detailed logs from fastboot (e.g. first wipe all existing blobs, then stream payload to
     // disk, and finally post-process the blobs).
-    // TODO(https://fxbug.dev/415300916): We need to change this interface so that we can
-    // incrementally stream the sparse image into fxfs. Currently, we assume the whole image has
-    // been buffered in `payload`.
+    // TODO(https://fxbug.dev/425951926): We need to change this interface so that we can
+    // incrementally process the sparse image chunk-by-chunk. Currently, we assume the whole image
+    // has been buffered in `payload`.
     strict Write(resource struct {
-        payload fuchsia.mem.Buffer;
+        payload zx.Handle:VMO;
     }) -> () error zx.Status;
 };

@@ -12,20 +12,23 @@
 //!       all ffx UI.
 
 use anyhow::Result;
-use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
-use std::io::{stdout, BufRead, BufReader, Read, Write};
+use std::io::{stdout, BufRead, BufReader, IsTerminal, Read, Write};
+use std::sync::Mutex;
 use unicode_segmentation::UnicodeSegmentation;
 
-// Magic terminal escape codes.
-const CLEAR_TO_EOL: &'static str = "\x1b[J";
+// An ANSI escape sequence to clear from the cursor position to the end of the
+// screen.
+// See the "Erase in Display" table entry in
+// https://en.wikipedia.org/wiki/ANSI_escape_code for details.
+const CLEAR_TO_END_OF_SCREEN: &'static str = "\x1b[J";
 
-/// Move the terminal cursor 'up' N rows.
-fn cursor_move_up<W: ?Sized>(output: &mut W, rows: usize) -> Result<()>
+/// Move the terminal cursor 'up' and clear N rows.
+fn clear_rows<W: ?Sized>(output: &mut W, rows: usize) -> Result<()>
 where
     W: Write + Send + Sync,
 {
-    write!(output, "\x1b[{}A", rows)?;
+    write!(output, "\x1b[{}A{}", rows, CLEAR_TO_END_OF_SCREEN)?;
     Ok(())
 }
 
@@ -359,22 +362,13 @@ pub struct InnerTextUi<'a> {
     /// Some text UI overwrites itself at each iteration other than the first.
     /// Track how many lines to overwrite.
     overwrite_line_count: usize,
-}
 
-cfg_if! {
-    if #[cfg(test)] {
-        fn is_tty(_t: impl std::io::IsTerminal) -> bool {
-            true
-        }
-    } else {
-        fn is_tty(t: impl std::io::IsTerminal) -> bool {
-            t.is_terminal()
-        }
-    }
+    /// Whether the output device is a TTY.
+    is_tty: bool,
 }
 
 pub struct TextUi<'a> {
-    inner: std::sync::Mutex<InnerTextUi<'a>>,
+    inner: Mutex<InnerTextUi<'a>>,
 }
 
 impl<'a> TextUi<'a> {
@@ -385,54 +379,92 @@ impl<'a> TextUi<'a> {
         E: Write + 'a,
     {
         Self {
-            inner: std::sync::Mutex::new(InnerTextUi {
+            inner: Mutex::new(InnerTextUi {
                 input,
                 output,
                 error_output,
                 overwrite_line_count: 0,
+                is_tty: stdout().is_terminal(),
             }),
         }
     }
 
-    fn present_progress(&self, progress: &Progress) -> Result<Response> {
-        // We only print the progress text if it's going to a TTY terminal,
-        // since the shell control sequences don't make sense otherwise.
-        if !is_tty(stdout()) {
-            return Ok(Response::Default);
+    /// Alternate constructor for tests allowing TTY to be mocked.
+    ///
+    /// This allows features such as progress bars and prompts to behave
+    /// consistently when tests are run locally/interactively versus in
+    /// infrastructure.
+    pub fn new_for_test<R, W, E>(
+        input: &'a mut R,
+        output: &'a mut W,
+        error_output: &'a mut E,
+        is_tty: bool,
+    ) -> Self
+    where
+        R: Read + Send + Sync + 'a,
+        W: Write + Send + Sync + 'a,
+        E: Write + 'a,
+    {
+        Self {
+            inner: Mutex::new(InnerTextUi {
+                input,
+                output,
+                error_output,
+                overwrite_line_count: 0,
+                is_tty,
+            }),
         }
-        let mut inner = self.inner.lock().expect("present_progress lock");
-        // Move back to overwrite the previous progress rendering.
-        let mut lines_to_overwrite = inner.overwrite_line_count;
+    }
+
+    /// Clears the current progress text.
+    ///
+    /// This can be used before printing to append output that appears directly
+    /// above the next `Progress` presentation update.
+    /// Otherwise, the next `Progress` presentation will overwrite printed lines
+    /// when attempting to clobber the previous progress element.
+    pub fn clear_progress(&self) -> Result<()> {
+        let mut inner = self.inner.lock().expect("clear_progress lock");
+        // We only clear the progress presentation if it's going to a TTY
+        // terminal, since the shell control sequences don't make sense
+        // otherwise.
+        if !inner.is_tty {
+            return Ok(());
+        }
+        // Move back to clear the previous presentation.
+        let lines_to_overwrite = inner.overwrite_line_count;
         if lines_to_overwrite > 0 {
-            cursor_move_up(inner.output, lines_to_overwrite)?;
+            clear_rows(inner.output, lines_to_overwrite)?;
         }
         inner.overwrite_line_count = 0;
-        write!(inner.output, "Progress for \"{}\"{}\n", progress.title, CLEAR_TO_EOL)?;
+        Ok(())
+    }
+
+    fn present_progress(&self, progress: &Progress) -> Result<Response> {
+        // Move back to overwrite the previous progress rendering.
+        self.clear_progress()?;
+
+        let mut inner = self.inner.lock().expect("present_progress lock");
+        // We only print the progress text if it's going to a TTY terminal,
+        // since the shell control sequences don't make sense otherwise.
+        if !inner.is_tty {
+            return Ok(Response::Default);
+        }
+        write!(inner.output, "Progress for \"{}\"\n", progress.title)?;
         inner.overwrite_line_count += 1;
         let term_width = termion::terminal_size().unwrap_or((80, 40)).0 as usize;
         const MARGINS: usize = /*indent=*/ 2 + /*right_side=*/ 1;
         let limit = term_width.saturating_sub(MARGINS);
         for entry in &progress.entries {
+            write!(inner.output, "  {}\n", ellipsis(&entry.name, limit, Some('/')),)?;
             write!(
                 inner.output,
-                "  {}{}\n",
-                ellipsis(&entry.name, limit, Some('/')),
-                CLEAR_TO_EOL
-            )?;
-            write!(
-                inner.output,
-                "    {} of {} {} ({:.2}%){}\n",
+                "    {} of {} {} ({:.2}%)\n",
                 entry.at,
                 entry.of,
                 entry.units,
                 progress_percentage(entry.at, entry.of),
-                CLEAR_TO_EOL
             )?;
             inner.overwrite_line_count += 2;
-        }
-        while lines_to_overwrite > inner.overwrite_line_count {
-            write!(inner.output, "{}\n", CLEAR_TO_EOL)?;
-            lines_to_overwrite -= 1;
         }
         Ok(Response::Default)
     }
@@ -449,12 +481,12 @@ impl<'a> TextUi<'a> {
     }
 
     fn present_string_prompt(&self, element: &SimplePresentation) -> Result<Response> {
+        let mut inner = self.inner.lock().expect("present_string_prompt lock");
         // If the terminal is non-interactive, it's not reasonable to prompt
         // the user.
-        if !is_tty(stdout()) {
+        if !inner.is_tty {
             return Ok(Response::NoChoice);
         }
-        let mut inner = self.inner.lock().expect("present_string_prompt lock");
         if let Some(title) = &element.title {
             writeln!(inner.output, "{}", title)?;
         }
@@ -598,12 +630,12 @@ mod tests {
         let mut input = "".as_bytes();
         let mut output: Vec<u8> = Vec::new();
         let mut err_out: Vec<u8> = Vec::new();
-        let ui = TextUi::new(&mut input, &mut output, &mut err_out);
+        let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, false);
         let mut notice = Notice::builder();
         notice.title("foo");
         notice.message("Test message for notice.");
         ui.present(&Presentation::Notice(notice)).expect("present notice");
-        let output = String::from_utf8(output).expect("string form utf8");
+        let output = String::from_utf8(output).expect("string from utf8");
         assert!(output.contains("foo"));
         assert!(output.contains("Test message for notice"));
         assert!(output.contains("notice"));
@@ -614,13 +646,13 @@ mod tests {
         let mut input = "".as_bytes();
         let mut output: Vec<u8> = Vec::new();
         let mut err_out: Vec<u8> = Vec::new();
-        let ui = TextUi::new(&mut input, &mut output, &mut err_out);
+        let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, true);
         let mut progress = Progress::builder();
         progress.title("foo");
         progress.entry("bushel", /*at=*/ 20, /*of=*/ 100, "pieces");
         progress.entry("apple", /*at=*/ 5, /*of=*/ 10, "bites");
         ui.present(&Presentation::Progress(progress)).expect("present progress");
-        let output = String::from_utf8(output).expect("string form utf8");
+        let output = String::from_utf8(output).expect("string from utf8");
         assert!(output.contains("foo"));
         assert!(output.contains("bushel"));
         assert!(output.contains("apple"));
@@ -629,11 +661,107 @@ mod tests {
     }
 
     #[test]
+    fn test_clear_progress() {
+        let present = {
+            let mut input = "".as_bytes();
+            let mut output: Vec<u8> = Vec::new();
+            let mut err_out: Vec<u8> = Vec::new();
+            let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, true);
+            let mut progress = Progress::builder();
+            progress.title("foo");
+            progress.entry("bushel", /*at=*/ 20, /*of=*/ 100, "pieces");
+            progress.entry("apple", /*at=*/ 5, /*of=*/ 10, "bites");
+            ui.present(&Presentation::Progress(progress)).expect("present progress");
+            String::from_utf8(output).expect("string from utf8")
+        };
+
+        let present_and_clear = {
+            let mut input = "".as_bytes();
+            let mut output: Vec<u8> = Vec::new();
+            let mut err_out: Vec<u8> = Vec::new();
+            let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, true);
+            let mut progress = Progress::builder();
+            progress.title("foo");
+            progress.entry("bushel", /*at=*/ 20, /*of=*/ 100, "pieces");
+            progress.entry("apple", /*at=*/ 5, /*of=*/ 10, "bites");
+            ui.present(&Presentation::Progress(progress)).expect("present progress");
+            ui.clear_progress().expect("clear progress");
+            String::from_utf8(output).expect("string from utf8")
+        };
+
+        let present_and_clear_and_clear = {
+            let mut input = "".as_bytes();
+            let mut output: Vec<u8> = Vec::new();
+            let mut err_out: Vec<u8> = Vec::new();
+            let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, true);
+            let mut progress = Progress::builder();
+            progress.title("foo");
+            progress.entry("bushel", /*at=*/ 20, /*of=*/ 100, "pieces");
+            progress.entry("apple", /*at=*/ 5, /*of=*/ 10, "bites");
+            ui.present(&Presentation::Progress(progress)).expect("present progress");
+            ui.clear_progress().expect("clear progress");
+            ui.clear_progress().expect("clear progress");
+            String::from_utf8(output).expect("string from utf8")
+        };
+
+        let present_and_present = {
+            let mut input = "".as_bytes();
+            let mut output: Vec<u8> = Vec::new();
+            let mut err_out: Vec<u8> = Vec::new();
+            let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, true);
+            let mut progress = Progress::builder();
+            progress.title("foo");
+            progress.entry("bushel", /*at=*/ 20, /*of=*/ 100, "pieces");
+            progress.entry("apple", /*at=*/ 5, /*of=*/ 10, "bites");
+            ui.present(&Presentation::Progress(progress.clone())).expect("present progress #1");
+            ui.present(&Presentation::Progress(progress)).expect("present progress #2");
+            String::from_utf8(output).expect("string from utf8")
+        };
+
+        let present_and_clear_and_present = {
+            let mut input = "".as_bytes();
+            let mut output: Vec<u8> = Vec::new();
+            let mut err_out: Vec<u8> = Vec::new();
+            let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, true);
+            let mut progress = Progress::builder();
+            progress.title("foo");
+            progress.entry("bushel", /*at=*/ 20, /*of=*/ 100, "pieces");
+            progress.entry("apple", /*at=*/ 5, /*of=*/ 10, "bites");
+            ui.present(&Presentation::Progress(progress.clone())).expect("present progress #1");
+            ui.clear_progress().expect("clear progress");
+            ui.present(&Presentation::Progress(progress)).expect("present progress #2");
+            String::from_utf8(output).expect("string from utf8")
+        };
+
+        // TextUI::clear_output() should write extra ANSI characters to output.
+        assert!(present.len() < present_and_clear.len());
+
+        // A TextUI::clear_output() invoked immediately after
+        // TextUI::clear_output() should be noop.
+        assert_eq!(present_and_clear, present_and_clear_and_clear);
+
+        // A TextUI::present() invoked immediately after TextUI::present()
+        // should write ANSI characters to clear output before the second
+        // progress message.
+        assert!(present_and_present.starts_with(&present_and_clear));
+
+        // A TextUI::present() invoked after TextUI::present() shouldn't write
+        // any extra ANSI characters to clear output if TextUI::clear_output()
+        // has already been invoked in between.
+        assert_eq!(present_and_present, present_and_clear_and_present);
+
+        // The second TextUI::present() output should be equivalent to
+        // TextUI::clear_output() concatenated with the first TextUI::present()
+        // output.
+        assert_eq!(present_and_present, present_and_clear.clone() + &present);
+    }
+
+    #[test]
     fn test_table() {
         let mut input = "".as_bytes();
         let mut output: Vec<u8> = Vec::new();
         let mut err_out: Vec<u8> = Vec::new();
-        let ui = TextUi::new(&mut input, &mut output, &mut err_out);
+        let ui = TextUi::new_for_test(&mut input, &mut output, &mut err_out, false);
         let mut table = TableRows::builder();
         table.title("foo");
         table.header(vec!["type", "count", "notes"]);
@@ -641,7 +769,7 @@ mod tests {
         table.row_with_id(/*id=*/ "a", vec!["car", "10", "red"]);
         table.note("bar");
         ui.present(&Presentation::Table(table)).expect("present table");
-        let output = String::from_utf8(output).expect("string form utf8");
+        let output = String::from_utf8(output).expect("string from utf8");
         println!("{}", output);
         assert!(output.contains("foo"));
         assert!(output.contains("bar"));

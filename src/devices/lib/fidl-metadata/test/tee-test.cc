@@ -31,7 +31,7 @@ static void check_encodes(
   ASSERT_EQ(metadata.default_thread_count(), thread_count);
 
   auto configs = metadata.custom_threads();
-  ASSERT_EQ(configs.count(), thread_configs.size());
+  ASSERT_EQ(configs.size(), thread_configs.size());
 
   for (size_t i = 0; i < thread_configs.size(); i++) {
     ASSERT_TRUE(configs[i].has_role());
@@ -40,7 +40,7 @@ static void check_encodes(
     ASSERT_EQ(configs[i].count(), thread_configs[i].count);
 
     ASSERT_TRUE(configs[i].has_trusted_apps());
-    ASSERT_EQ(configs[i].trusted_apps().count(), thread_configs[i].trusted_apps.size());
+    ASSERT_EQ(configs[i].trusted_apps().size(), thread_configs[i].trusted_apps.size());
 
     auto trusted_apps = configs[i].trusted_apps();
     for (size_t j = 0; j < thread_configs[i].trusted_apps.size(); ++j) {

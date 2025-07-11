@@ -44,10 +44,10 @@ zx::result<sdmmc_req_t> FidlToBanjoReq(const fuchsia_hardware_sdmmc::wire::Sdmmc
       .suppress_error_messages = wire_req.suppress_error_messages,
       .client_id = wire_req.client_id,
       .buffers_list = buffer_region_ptr,
-      .buffers_count = wire_req.buffers.count(),
+      .buffers_count = wire_req.buffers.size(),
   };
 
-  for (size_t i = 0; i < wire_req.buffers.count(); i++) {
+  for (size_t i = 0; i < wire_req.buffers.size(); i++) {
     if (wire_req.buffers[i].buffer.is_vmo_id()) {
       buffer_region_ptr->type = SDMMC_BUFFER_TYPE_VMO_ID;
       buffer_region_ptr->buffer.vmo_id = wire_req.buffers[i].buffer.vmo_id();

@@ -123,11 +123,11 @@ zx::result<> Fusb302Fifos::FifoI2cRead(cpp20::span<uint8_t> read_output) {
   if (response.value().is_error()) {
     return zx::error_result(response.value().error_value());
   }
-  if (response.value().value()->read_data.count() != 1) {
+  if (response.value().value()->read_data.size() != 1) {
     FDF_LOG(ERROR, "I2C Read request succeeded, but returned an incorrect item count");
     return zx::error_result(ZX_ERR_BAD_STATE);
   }
-  if (response.value().value()->read_data[0].count() != read_output.size()) {
+  if (response.value().value()->read_data[0].size() != read_output.size()) {
     FDF_LOG(ERROR, "I2C Read request succeeded, but returned an incorrect byte count");
     return zx::error_result(ZX_ERR_BAD_STATE);
   }

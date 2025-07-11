@@ -123,6 +123,7 @@ test_names = [
 # List of programs launched by "inherit" tests.
 inherit_test_executable_names = [
   # keep-sorted start
+  "is_duplicated_fd",
   "is_itimer_real_reset",
   "is_selinux_null_inode",
   "true",

@@ -375,7 +375,7 @@ zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverMod
   // We expect the |init_result| vector to be the same size as the number of |initial_modules|.
   // This includes the driver module, the two preloaded modules (driver host and vdso),
   // and any additional root modules.
-  size_t expected_init_result_size = 3u + additional_root_modules.count();
+  size_t expected_init_result_size = 3u + additional_root_modules.size();
   ZX_ASSERT_MSG(init_result->size() == expected_init_result_size,
                 "Linker.Init returned an unexpected number of elements, want %lu got %lu",
                 expected_init_result_size, init_result->size());

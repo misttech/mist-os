@@ -36,7 +36,7 @@ fuchsia_unittest_package("mock-resolver-tests") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":mock-resolver-tests" ]
 }

@@ -97,7 +97,7 @@ TEST_F(VirtioInputTest, MultiTouchReportDescriptor) {
   EXPECT_EQ(descriptor.touch().input().touch_type(), fuchsia_input_report::TouchType::kTouchscreen);
   EXPECT_FALSE(descriptor.touch().input().has_buttons());
   ASSERT_TRUE(descriptor.touch().input().has_contacts());
-  ASSERT_EQ(descriptor.touch().input().contacts().count(), kMaxTouchPoints);
+  ASSERT_EQ(descriptor.touch().input().contacts().size(), kMaxTouchPoints);
   for (const auto& contact : descriptor.touch().input().contacts()) {
     EXPECT_FALSE(contact.has_contact_height());
     EXPECT_FALSE(contact.has_contact_width());
@@ -135,7 +135,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -143,7 +143,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 1);
+    ASSERT_EQ(touch_report.contacts().size(), 1);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
     EXPECT_EQ(touch_report.contacts()[0].position_x(),
               X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
@@ -166,7 +166,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -174,7 +174,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 2);
+    ASSERT_EQ(touch_report.contacts().size(), 2);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
     EXPECT_EQ(touch_report.contacts()[0].position_x(),
               X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
@@ -200,7 +200,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -208,7 +208,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 1);
+    ASSERT_EQ(touch_report.contacts().size(), 1);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
     EXPECT_EQ(touch_report.contacts()[0].position_x(),
               X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
@@ -237,7 +237,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -245,7 +245,7 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 1);
+    ASSERT_EQ(touch_report.contacts().size(), 1);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
     EXPECT_EQ(touch_report.contacts()[0].position_x(),
               X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
@@ -309,7 +309,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -317,7 +317,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     auto& mouse_report = report.mouse();
 
     ASSERT_TRUE(mouse_report.has_pressed_buttons());
-    ASSERT_EQ(mouse_report.pressed_buttons().count(), 1);
+    ASSERT_EQ(mouse_report.pressed_buttons().size(), 1);
     EXPECT_EQ(mouse_report.pressed_buttons()[0], 1);
 
     input_report_loop_.Quit();
@@ -340,7 +340,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -348,7 +348,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     auto& mouse_report = report.mouse();
 
     ASSERT_TRUE(mouse_report.has_pressed_buttons());
-    ASSERT_EQ(mouse_report.pressed_buttons().count(), 2);
+    ASSERT_EQ(mouse_report.pressed_buttons().size(), 2);
     EXPECT_EQ(mouse_report.pressed_buttons()[0], 1);
     EXPECT_EQ(mouse_report.pressed_buttons()[1], 2);
 
@@ -372,7 +372,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -380,7 +380,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     auto& mouse_report = report.mouse();
 
     ASSERT_TRUE(mouse_report.has_pressed_buttons());
-    ASSERT_EQ(mouse_report.pressed_buttons().count(), 1);
+    ASSERT_EQ(mouse_report.pressed_buttons().size(), 1);
     EXPECT_EQ(mouse_report.pressed_buttons()[0], 2);
 
     input_report_loop_.Quit();
@@ -403,7 +403,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -411,7 +411,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     auto& mouse_report = report.mouse();
 
     ASSERT_TRUE(mouse_report.has_pressed_buttons());
-    ASSERT_EQ(mouse_report.pressed_buttons().count(), 2);
+    ASSERT_EQ(mouse_report.pressed_buttons().size(), 2);
     EXPECT_EQ(mouse_report.pressed_buttons()[0], 2);
     EXPECT_EQ(mouse_report.pressed_buttons()[1], 3);
 
@@ -435,7 +435,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -465,7 +465,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -495,7 +495,7 @@ TEST_F(VirtioInputTest, MouseTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -589,7 +589,7 @@ TEST_F(VirtioInputTest, KeyboardTest) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.size(), 1);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -597,7 +597,7 @@ TEST_F(VirtioInputTest, KeyboardTest) {
     auto& keyboard_report = report.keyboard();
 
     ASSERT_TRUE(keyboard_report.has_pressed_keys3());
-    ASSERT_EQ(keyboard_report.pressed_keys3().count(), 4);
+    ASSERT_EQ(keyboard_report.pressed_keys3().size(), 4);
     EXPECT_EQ(keyboard_report.pressed_keys3()[0], fuchsia_input::wire::Key::kLeftShift);
     EXPECT_EQ(keyboard_report.pressed_keys3()[1], fuchsia_input::wire::Key::kA);
     EXPECT_EQ(keyboard_report.pressed_keys3()[2], fuchsia_input::wire::Key::kRightAlt);

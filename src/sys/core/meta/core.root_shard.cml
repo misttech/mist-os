@@ -274,6 +274,11 @@
             ],
         },
         {
+            dictionary: "driver-services-for-session",
+            from: "#bootstrap",
+            to: "#core",
+        },
+        {
             service: [
                 "fuchsia.hardware.gnss.Service",
                 "fuchsia.hardware.google.nanohub.Service",

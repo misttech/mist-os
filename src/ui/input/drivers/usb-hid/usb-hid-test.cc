@@ -24,8 +24,10 @@
 #include <zircon/syscalls.h>
 
 #include <fbl/string.h>
+#include <gtest/gtest.h>
 #include <usb/usb.h>
-#include <zxtest/zxtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace usb_virtual_bus {
 namespace {
@@ -34,11 +36,11 @@ namespace fhidbus = fuchsia_hardware_hidbus;
 
 using usb_virtual::BusLauncher;
 
-class UsbHidTest : public zxtest::Test {
+class UsbHidTest : public ::testing::Test {
  public:
   void SetUp() override {
-    auto bus = BusLauncher::Create();
-    ASSERT_OK(bus.status_value());
+    zx::result bus = BusLauncher::Create();
+    ASSERT_OK(bus);
     bus_ = std::move(bus.value());
 
     auto usb_hid_function_desc = GetConfigDescriptor();
@@ -49,7 +51,9 @@ class UsbHidTest : public zxtest::Test {
         component::ConnectAt<fuchsia_hardware_input::Controller>(caller.directory(), devpath_);
     ASSERT_OK(controller);
     auto [device, server] = fidl::Endpoints<fuchsia_hardware_input::Device>::Create();
-    ASSERT_OK(fidl::WireCall(controller.value())->OpenSession(std::move(server)));
+
+    fidl::OneWayStatus status = fidl::WireCall(controller.value())->OpenSession(std::move(server));
+    ASSERT_OK(status.status());
 
     sync_client_ = fidl::WireSyncClient<fuchsia_hardware_input::Device>(std::move(device));
   }
@@ -113,8 +117,8 @@ TEST_F(UsbOneEndpointTest, GetDeviceIdsVidPid) {
   auto result = sync_client_->Query();
   ASSERT_OK(result.status());
   ASSERT_TRUE(result->is_ok());
-  EXPECT_EQ(0x18d1, result.value()->info.vendor_id());
-  EXPECT_EQ(0xaf10, result.value()->info.product_id());
+  EXPECT_EQ(0x18d1u, result.value()->info.vendor_id());
+  EXPECT_EQ(0xaf10u, result.value()->info.product_id());
 }
 
 TEST_F(UsbOneEndpointTest, SetAndGetReport) {
@@ -130,7 +134,7 @@ TEST_F(UsbOneEndpointTest, SetAndGetReport) {
   ASSERT_TRUE(get_result.ok());
   ASSERT_TRUE(get_result->is_ok());
 
-  ASSERT_EQ(get_result.value()->report.count(), sizeof(hid_boot_mouse_report_t));
+  ASSERT_EQ(get_result.value()->report.size(), sizeof(hid_boot_mouse_report_t));
   ASSERT_EQ(0xab, get_result.value()->report[0]);
   ASSERT_EQ(0xbc, get_result.value()->report[1]);
   ASSERT_EQ(0xde, get_result.value()->report[2]);
@@ -160,7 +164,7 @@ TEST_F(UsbTwoEndpointTest, SetAndGetReport) {
   ASSERT_TRUE(get_result.ok());
   ASSERT_TRUE(get_result->is_ok());
 
-  ASSERT_EQ(get_result.value()->report.count(), sizeof(hid_boot_mouse_report_t));
+  ASSERT_EQ(get_result.value()->report.size(), sizeof(hid_boot_mouse_report_t));
   ASSERT_EQ(0xab, get_result.value()->report[0]);
   ASSERT_EQ(0xbc, get_result.value()->report[1]);
   ASSERT_EQ(0xde, get_result.value()->report[2]);

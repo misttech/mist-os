@@ -88,7 +88,7 @@ void RuntimeTest::GetParentDataOverDriverTransport(const void* want_data, size_t
   ASSERT_EQ(call_status, ZX_OK);
 
   auto data = response->value()->out;
-  ASSERT_EQ(data.count(), want_size);
+  ASSERT_EQ(data.size(), want_size);
   ASSERT_EQ(memcmp(data.data(), want_data, want_size), 0);
 }
 

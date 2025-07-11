@@ -107,7 +107,7 @@ group("bin-host") {
   public_deps = [ ":bin($host_toolchain)" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":mock-omaha-server-lib-tests" ]
 }

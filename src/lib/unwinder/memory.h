@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <vector>
 
 #include "sdk/lib/fit/include/lib/fit/function.h"
 #include "src/lib/unwinder/error.h"

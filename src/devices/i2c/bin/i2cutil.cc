@@ -249,7 +249,7 @@ static zx_status_t transact(fidl::WireSyncClient<fuchsia_hardware_i2c::Device> c
     printf("Writes:");
     for (size_t i = 0; i < n_writes; ++i) {
       printf(" ");
-      for (size_t j = 0; j < write_data[i].count(); ++j) {
+      for (size_t j = 0; j < write_data[i].size(); ++j) {
         printf("0x%02X ", write_data[i].data()[j]);
       }
     }
@@ -262,11 +262,11 @@ static zx_status_t transact(fidl::WireSyncClient<fuchsia_hardware_i2c::Device> c
       return ZX_ERR_INTERNAL;
     } else {
       auto& read_data = read->value()->read_data;
-      if (read_data.count() != 0) {
+      if (read_data.size() != 0) {
         printf("Reads:");
         for (auto& i : read_data) {
           printf(" ");
-          for (size_t j = 0; j < i.count(); ++j) {
+          for (size_t j = 0; j < i.size(); ++j) {
             printf("0x%02X ", i.data()[j]);
           }
         }

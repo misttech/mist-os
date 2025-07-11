@@ -499,10 +499,7 @@ pub trait ServiceInstance {
     /// Attempts to connect the given server end to the `p` member.
     fn connect_to_p(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::Protocol, Self::Transport>,
     ) -> Result<(), Self::Error>;
 }
 
@@ -515,10 +512,7 @@ where
 
     fn connect_to_p(
         &self,
-        server_end: ::fidl_next::ServerEnd<
-            ::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>,
-            Self::Transport,
-        >,
+        server_end: ::fidl_next::ServerEnd<crate::Protocol, Self::Transport>,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("p", server_end.into_untyped())
     }

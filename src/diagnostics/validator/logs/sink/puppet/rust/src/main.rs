@@ -74,7 +74,7 @@ async fn run_puppet(
                 let info = PuppetInfo {
                     tag: None,
                     pid: rt::process_self().get_koid().unwrap().raw_koid(),
-                    tid: rt::thread_self().get_koid().unwrap().raw_koid(),
+                    tid: rt::with_thread_self(|thread| thread.get_koid().unwrap()).raw_koid(),
                 };
                 responder.send(&info).unwrap();
             }

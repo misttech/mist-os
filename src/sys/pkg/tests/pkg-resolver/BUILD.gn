@@ -535,7 +535,7 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
   }
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":pkg-resolver-integration-tests" ]
 }

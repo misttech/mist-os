@@ -142,7 +142,7 @@ zx::vmo GenerateMinidump(const zx::exception& exception,
   // Set the exception reason.
   *exception_reason = DetectExceptionReason(report);
 
-  // Create a process snapshot form the process and the exception thread.
+  // Create a process snapshot from the process and the exception thread.
   crashpad::ProcessSnapshotFuchsia process_snapshot;
   if (!process_snapshot.Initialize(process) ||
       !process_snapshot.InitializeException(thread_koid, report)) {

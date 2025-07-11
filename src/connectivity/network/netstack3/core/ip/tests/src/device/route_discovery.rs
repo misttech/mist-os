@@ -19,7 +19,9 @@ use packet_formats::utils::NonZeroDuration;
 
 use netstack3_base::testutil::{FakeInstant, TestAddrs, TestIpExt as _};
 use netstack3_base::FrameDestination;
-use netstack3_core::device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice};
+use netstack3_core::device::{
+    DeviceId, EthernetCreationProperties, EthernetDeviceEvent, EthernetLinkDevice,
+};
 use netstack3_core::testutil::{
     CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
 };
@@ -561,6 +563,7 @@ fn flush_routes_on_interface_disabled_integration() {
         device_id,
         TestAddrs { local_mac: _, remote_mac, local_ip: _, remote_ip: _, subnet },
     ) = setup();
+    let ethernet_device_id = assert_matches!(device_id, DeviceId::Ethernet(ref id) => id);
     add_link_local_route(&mut ctx, &device_id);
 
     let src_ip = remote_mac.to_ipv6_link_local().addr();
@@ -636,15 +639,22 @@ fn flush_routes_on_interface_disabled_integration() {
         let ip::Entry { subnet, device, gateway, metric: _ } = on_link_route_entry;
         let event2 = IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway };
         let events = ctx.bindings_ctx.take_events();
-        let (a, b, c) = assert_matches!(&events[..], [a, b, c] => (a, b, c));
+
+        let (a, b, c, d) = assert_matches!(&events[..], [a, b, c, d] => (a, b, c, d));
         assert!([a, b].contains(&&DispatchedEvent::IpLayerIpv6(event1)));
         assert!([a, b].contains(&&DispatchedEvent::IpLayerIpv6(event2)));
         assert_eq!(
-            c,
-            &DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                device: device.downgrade(),
-                ip_enabled: false
-            })
+            [c, d],
+            [
+                &DispatchedEvent::EthernetDevice(EthernetDeviceEvent::MulticastLeave {
+                    device: ethernet_device_id.downgrade(),
+                    addr: Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into(),
+                }),
+                &DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
+                    device: device.downgrade(),
+                    ip_enabled: false
+                }),
+            ]
         );
     }
 }

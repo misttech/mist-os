@@ -111,7 +111,7 @@ TEST(KeyboardTest, BootKeyboard) {
             keyboard.CreateDescriptor(descriptor_allocator, descriptor));
   EXPECT_TRUE(descriptor.has_keyboard());
   EXPECT_TRUE(descriptor.keyboard().has_input());
-  EXPECT_EQ(105, descriptor.keyboard().input().keys3().count());
+  EXPECT_EQ(105, descriptor.keyboard().input().keys3().size());
 
   // Test a report parses correctly.
   hid_boot_kbd_report kbd_report = {};
@@ -154,7 +154,7 @@ TEST(KeyboardTest, OutputDescriptor) {
   EXPECT_EQ(hid_input_report::ParseResult::kOk,
             keyboard.CreateDescriptor(descriptor_allocator, descriptor));
 
-  ASSERT_EQ(descriptor.keyboard().output().leds().count(), 5);
+  ASSERT_EQ(descriptor.keyboard().output().leds().size(), 5);
   EXPECT_EQ(descriptor.keyboard().output().leds()[0],
             fuchsia_input_report::wire::LedType::kNumLock);
   EXPECT_EQ(descriptor.keyboard().output().leds()[1],
@@ -232,7 +232,7 @@ TEST(KeyboardTest, FullKeysKeyboard) {
   EXPECT_EQ(hid_input_report::ParseResult::kOk,
             keyboard.CreateDescriptor(descriptor_allocator, descriptor));
 
-  EXPECT_EQ(descriptor.keyboard().input().keys3().count(), 107);
+  EXPECT_EQ(descriptor.keyboard().input().keys3().size(), 107);
 
   // Test a report parses correctly.
   hid_boot_kbd_report kbd_report = {};
@@ -247,7 +247,7 @@ TEST(KeyboardTest, FullKeysKeyboard) {
             keyboard.ParseInputReport(reinterpret_cast<uint8_t*>(&kbd_report), sizeof(kbd_report),
                                       report_allocator, input_report));
 
-  ASSERT_EQ(input_report.keyboard().pressed_keys3().count(), 5U);
+  ASSERT_EQ(input_report.keyboard().pressed_keys3().size(), 5U);
   EXPECT_EQ(input_report.keyboard().pressed_keys3()[0], fuchsia_input::wire::Key::kLeftShift);
   EXPECT_EQ(input_report.keyboard().pressed_keys3()[1], fuchsia_input::wire::Key::kRightMeta);
   EXPECT_EQ(input_report.keyboard().pressed_keys3()[2], fuchsia_input::wire::Key::kA);

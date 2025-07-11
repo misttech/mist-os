@@ -64,7 +64,7 @@ class TestEffectsV2::TestProcessor : public fidl::WireServer<fuchsia_audio_effec
   void Process(ProcessRequestView request, ProcessCompleter::Sync& completer) {
     float db = 0;
     if (request->options.has_total_applied_gain_db_per_input() &&
-        request->options.total_applied_gain_db_per_input().count() == 1) {
+        request->options.total_applied_gain_db_per_input().size() == 1) {
       db = request->options.total_applied_gain_db_per_input()[0];
     }
 

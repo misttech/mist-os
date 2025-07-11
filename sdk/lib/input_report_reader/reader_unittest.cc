@@ -167,7 +167,7 @@ TEST_F(InputReportReaderTests, ReadInputReportsTest) {
   ASSERT_FALSE(result->is_error());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1, reports.size());
 
   ASSERT_TRUE(reports[0].has_event_time());
   ASSERT_TRUE(reports[0].has_mouse());
@@ -205,7 +205,7 @@ TEST_F(InputReportReaderTests, ReaderAddsRequiredFields) {
   ASSERT_FALSE(result->is_error());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1, reports.size());
 
   ASSERT_TRUE(reports[0].has_event_time());
   ASSERT_TRUE(reports[0].has_trace_id());
@@ -245,7 +245,7 @@ TEST_F(InputReportReaderTests, TwoReaders) {
     ASSERT_FALSE(result->is_error());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1, reports.size());
 
     ASSERT_TRUE(reports[0].has_event_time());
     ASSERT_TRUE(reports[0].has_mouse());
@@ -267,7 +267,7 @@ TEST_F(InputReportReaderTests, TwoReaders) {
     ASSERT_FALSE(result->is_error());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1, reports.size());
 
     ASSERT_TRUE(reports[0].has_event_time());
     ASSERT_TRUE(reports[0].has_mouse());
@@ -303,7 +303,7 @@ TEST_F(InputReportReaderTests, ReadInputReportsHangingGetTest) {
         ASSERT_OK(result.status());
         ASSERT_FALSE(result->is_error());
         auto& reports = result->value()->reports;
-        ASSERT_EQ(1, reports.count());
+        ASSERT_EQ(1, reports.size());
 
         auto& report = reports[0];
         ASSERT_TRUE(report.has_event_time());
@@ -377,7 +377,7 @@ TEST_F(InputReportReaderTests, MaxUnreadReports) {
   ASSERT_FALSE(result->is_error());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(10, reports.count());
+  ASSERT_EQ(10, reports.size());
 
   ASSERT_TRUE(reports[0].has_mouse());
   ASSERT_TRUE(reports[0].mouse().has_movement_x());
@@ -410,7 +410,7 @@ TEST_F(InputReportReaderTests, InitialReportTest) {
   ASSERT_FALSE(result->is_error());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1, reports.size());
 
   ASSERT_TRUE(reports[0].has_event_time());
   ASSERT_TRUE(reports[0].has_mouse());

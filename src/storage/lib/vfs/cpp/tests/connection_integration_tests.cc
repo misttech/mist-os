@@ -5,20 +5,35 @@
 // This file includes basic VFS file/directory connection tests. For comprehensive behavioral tests,
 // see the fuchsia.io Conformance Test Suite in //src/storage/conformance.
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <stdio.h>
+#include <lib/fidl/cpp/channel.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/status.h>
+#include <lib/fidl/cpp/wire/string_view.h>
+#include <lib/fidl/cpp/wire/wire_messaging.h>
+#include <lib/fidl/cpp/wire_natural_conversions.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
+#include <cstdint>
+#include <mutex>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <fbl/ref_ptr.h>
+#include <fbl/string.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
@@ -203,7 +218,7 @@ TEST_F(ConnectionTest, InheritPermissionsDirectoryRightExpansion) {
       fio::Flags::kPermInheritWrite | fio::Flags::kPermInheritExecute};
 
   for (const fio::Flags flags : kFlagCombinations) {
-    // Connect to drectory specifying the flag combination we want to test.
+    // Connect to directory specifying the flag combination we want to test.
     zx::result dc = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_EQ(dc.status_value(), ZX_OK);
     ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "dir",

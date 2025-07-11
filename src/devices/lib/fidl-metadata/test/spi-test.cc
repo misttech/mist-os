@@ -28,7 +28,7 @@ static void check_encodes(uint32_t bus_id,
 
   ASSERT_TRUE(metadata.has_channels());
   auto channels = metadata.channels();
-  ASSERT_EQ(channels.count(), spi_channels.size());
+  ASSERT_EQ(channels.size(), spi_channels.size());
 
   for (size_t i = 0; i < spi_channels.size(); i++) {
     ASSERT_TRUE(channels[i].has_cs());

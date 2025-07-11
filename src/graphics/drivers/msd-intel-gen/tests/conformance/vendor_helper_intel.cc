@@ -33,7 +33,7 @@ class VendorHelperServerIntel : public VendorHelperServerGeneric {
       ValidateCalibratedTimestampsCompleter::Sync& completer) override {
     struct magma_intel_gen_timestamp_query intel_timestamp_return;
 
-    FX_CHECK(request->query_buffer.count() >= sizeof(intel_timestamp_return));
+    FX_CHECK(request->query_buffer.size() >= sizeof(intel_timestamp_return));
     memcpy(&intel_timestamp_return, request->query_buffer.data(), sizeof(intel_timestamp_return));
 
     if (request->before_ns >= intel_timestamp_return.monotonic_raw_timestamp[0]) {

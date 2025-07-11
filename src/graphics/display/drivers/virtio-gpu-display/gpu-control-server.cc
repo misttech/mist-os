@@ -40,7 +40,7 @@ void GpuControlServer::SendHardwareCommand(
   };
 
   owner_->SendHardwareCommand(
-      cpp20::span<uint8_t>(request->request.data(), request->request.count()), std::move(callback));
+      cpp20::span<uint8_t>(request->request.data(), request->request.size()), std::move(callback));
 }
 
 }  // namespace virtio_display

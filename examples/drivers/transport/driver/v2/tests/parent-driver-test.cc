@@ -79,10 +79,10 @@ TEST_F(ParentTransportDriverTest, TestClient) {
   ASSERT_TRUE(transact_result->is_ok());
 
   const std::vector<uint8_t> kExpectedReadData = {0, 1, 2};
-  ASSERT_EQ(1u, transact_result.value()->read.count());
+  ASSERT_EQ(1u, transact_result.value()->read.size());
 
   auto read_data = transact_result.value()->read[0];
-  ASSERT_EQ(kExpectedReadData.size(), read_data.data.count());
+  ASSERT_EQ(kExpectedReadData.size(), read_data.data.size());
   for (size_t i = 0; i < kExpectedReadData.size(); i++) {
     EXPECT_EQ(kExpectedReadData[i], read_data.data[i]);
   }

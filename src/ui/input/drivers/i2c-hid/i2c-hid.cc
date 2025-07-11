@@ -144,7 +144,7 @@ void I2cHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
 
   // The command bytes are the 6 or 7 bytes for the command, 2 bytes for the report's size,
   // and then the full report.
-  std::vector<uint8_t> command_bytes(7 + 2 + request->data.count());
+  std::vector<uint8_t> command_bytes(7 + 2 + request->data.size());
   uint8_t command_bytes_index = 0;
 
   // Set the command bytes.
@@ -154,11 +154,11 @@ void I2cHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
   command_bytes[command_bytes_index++] = static_cast<uint8_t>(data_reg & 0xff);
   command_bytes[command_bytes_index++] = static_cast<uint8_t>(data_reg >> 8);
   // Set the bytes for the report's size.
-  command_bytes[command_bytes_index++] = static_cast<uint8_t>((request->data.count() + 2) & 0xff);
-  command_bytes[command_bytes_index++] = static_cast<uint8_t>((request->data.count() + 2) >> 8);
+  command_bytes[command_bytes_index++] = static_cast<uint8_t>((request->data.size() + 2) & 0xff);
+  command_bytes[command_bytes_index++] = static_cast<uint8_t>((request->data.size() + 2) >> 8);
   // Set the bytes for the report.
-  memcpy(command_bytes.data() + command_bytes_index, request->data.data(), request->data.count());
-  command_bytes_index += request->data.count();
+  memcpy(command_bytes.data() + command_bytes_index, request->data.data(), request->data.size());
+  command_bytes_index += request->data.size();
 
   fbl::AutoLock lock(&i2c_lock_);
 

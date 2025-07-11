@@ -1,0 +1,27 @@
+{% if !union.is_result %}
+
+{#
+{{ restriction }}
+impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
+    #[inline]
+    fn from(from: crate::{{ name }}) -> Self {
+        match from {
+            {% for member in union.members %}
+                crate::{{ name }}::{{ member.name|camel }}(value) => Self::{{ member.name|compat_camel }}(value.into()),
+            {% endfor %}
+            {% if !union.is_strict %}
+                crate::{{ name }}::UnknownOrdinal_(unknown_ordinal) => Self::__SourceBreaking { unknown_ordinal },
+            {% endif %}
+        }
+    }
+}
+
+impl ::core::convert::From<Option<Box<crate::{{ name }}>>> for Option<Box<::{{ compat_crate_name }}::{{ compat_name }}>> {
+    #[inline]
+    fn from(from: Option<Box<crate::{{ name }}>>) -> Self {
+        from.map(|inner| Box::new(::core::convert::From::from(*inner)))
+    }
+}
+#}
+
+{% endif %}

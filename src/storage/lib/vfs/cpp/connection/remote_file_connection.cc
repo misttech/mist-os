@@ -4,20 +4,22 @@
 
 #include "src/storage/lib/vfs/cpp/connection/remote_file_connection.h"
 
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/zx/handle.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
+#include <lib/zx/result.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <utility>
 
-#include <fbl/string_buffer.h>
+#include <fbl/ref_ptr.h>
 
+#include "src/storage/lib/vfs/cpp/connection/file_connection.h"
 #include "src/storage/lib/vfs/cpp/debug.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;
@@ -108,7 +110,7 @@ zx_status_t RemoteFileConnection::WriteInternal(const void* data, size_t len, si
 
 void RemoteFileConnection::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   size_t actual;
-  zx_status_t status = WriteInternal(request->data.data(), request->data.count(), &actual);
+  zx_status_t status = WriteInternal(request->data.data(), request->data.size(), &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {
@@ -132,7 +134,7 @@ zx_status_t RemoteFileConnection::WriteAtInternal(const void* data, size_t len, 
 void RemoteFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter::Sync& completer) {
   size_t actual = 0;
   zx_status_t status =
-      WriteAtInternal(request->data.data(), request->data.count(), request->offset, &actual);
+      WriteAtInternal(request->data.data(), request->data.size(), request->offset, &actual);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {

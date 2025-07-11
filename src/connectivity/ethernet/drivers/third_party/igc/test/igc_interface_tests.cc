@@ -380,7 +380,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
 
   ClearNumTxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffers).status());
-  WaitForTxTailUpdates(tx_buffers.count());
+  WaitForTxTailUpdates(tx_buffers.size());
 
   driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
@@ -421,7 +421,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
 
   ClearNumTxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffer_extra).status());
-  WaitForTxTailUpdates(tx_buffer_extra.count());
+  WaitForTxTailUpdates(tx_buffer_extra.size());
 
   driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
@@ -463,7 +463,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueRxSpace) {
 
   ClearNumRxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer).status());
-  WaitForRxTailUpdates(rx_space_buffer.count());
+  WaitForRxTailUpdates(rx_space_buffer.size());
 
   driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
@@ -501,7 +501,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueRxSpace) {
 
   ClearNumRxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer_extra).status());
-  WaitForRxTailUpdates(rx_space_buffer_extra.count());
+  WaitForRxTailUpdates(rx_space_buffer_extra.size());
 
   driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
@@ -568,11 +568,11 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplStop) {
 
   ClearNumRxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer).status());
-  WaitForRxTailUpdates(rx_space_buffer.count());
+  WaitForRxTailUpdates(rx_space_buffer.size());
 
   ClearNumTxTailUpdates();
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffer).status());
-  WaitForTxTailUpdates(tx_buffer.count());
+  WaitForTxTailUpdates(tx_buffer.size());
 
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->Stop().status());
 
@@ -628,11 +628,11 @@ TEST_F(IgcInterfaceTest, NetworkPortGetInfo) {
 
   EXPECT_EQ(info.port_class(), netdev::wire::PortClass::kEthernet);
   EXPECT_EQ(info.rx_types()[0], netdev::wire::FrameType::kEthernet);
-  EXPECT_EQ(info.rx_types().count(), 1U);
+  EXPECT_EQ(info.rx_types().size(), 1U);
   EXPECT_EQ(info.tx_types()[0].type, netdev::wire::FrameType::kEthernet);
   EXPECT_EQ(info.tx_types()[0].features, netdev::wire::kFrameFeaturesRaw);
   EXPECT_EQ(info.tx_types()[0].supported_flags, netdev::wire::TxFlags{});
-  EXPECT_EQ(info.tx_types().count(), 1U);
+  EXPECT_EQ(info.tx_types().size(), 1U);
 }
 
 TEST_F(IgcInterfaceTest, NetworkPortGetStatus) {

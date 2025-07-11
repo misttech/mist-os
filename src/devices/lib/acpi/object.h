@@ -36,7 +36,7 @@ class Object {
         break;
       }
       case Tag::kBufferVal: {
-        std::vector<uint8_t> val(object.buffer_val().count());
+        std::vector<uint8_t> val(object.buffer_val().size());
         memcpy(val.data(), object.buffer_val().data(), val.size());
         break;
       }

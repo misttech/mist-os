@@ -4,8 +4,10 @@
 
 import("//build/zircon/migrated_targets.gni")
 
+# LINT.IfChange
 zx_library("fit") {
   sdk = "source"
+  sdk_area = "Kernel"
   sdk_publishable = "partner"
   stable = true
   sdk_headers = [
@@ -28,6 +30,8 @@ zx_library("fit") {
   sources = []
   public_deps = [ "//sdk/lib/stdcompat" ]
 }
+
+# LINT.ThenChange(BUILD.bazel)
 
 group("tests") {
   testonly = true

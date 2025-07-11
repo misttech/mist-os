@@ -49,7 +49,7 @@ TEST(ConsoleTestCase, Read) {
         ASSERT_OK(result.status());
         fit::result response = result.value();
         ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-        ASSERT_EQ(response.value()->data.count(), kWriteCount);
+        ASSERT_EQ(response.value()->data.size(), kWriteCount);
         for (uint8_t byte : response.value()->data) {
           ASSERT_EQ(byte, kWrittenByte);
         }
@@ -105,7 +105,7 @@ TEST(ConsoleTestCase, ReadRaw) {
         ASSERT_OK(result.status());
         fit::result response = result.value();
         ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-        ASSERT_EQ(response.value()->data.count(), kWriteCount);
+        ASSERT_EQ(response.value()->data.size(), kWriteCount);
         for (uint8_t byte : response.value()->data) {
           ASSERT_EQ(byte, kWrittenByte);
         }

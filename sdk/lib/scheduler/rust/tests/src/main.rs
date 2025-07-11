@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use std::thread;
-use zx::Status;
+use zx::{HandleBased, Status};
 
 #[fuchsia::test]
 fn test_set_role_for_this_thread() -> Result<()> {
@@ -24,9 +24,10 @@ fn test_set_role_for_thread() -> Result<()> {
     let (handle_send, handle_recv) = ::std::sync::mpsc::channel();
     let (exit_send, exit_recv) = ::std::sync::mpsc::channel();
     let child_thread = thread::spawn(move || {
-        handle_send
-            .send(fuchsia_runtime::thread_self())
-            .expect("failed to send this thread's handle");
+        fuchsia_runtime::with_thread_self(|thread| {
+            handle_send.send(thread.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+        })
+        .expect("failed to send this thread's handle");
         exit_recv.recv().expect("failed to receive exit signal");
     });
     let thread = handle_recv.recv()?;

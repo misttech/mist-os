@@ -43,7 +43,7 @@ class FakeSpiImplServer : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiIm
   void TransmitVector(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVectorRequest* request,
                       fdf::Arena& arena, TransmitVectorCompleter::Sync& completer) override {
     size_t actual;
-    auto status = SpiImplExchange(request->chip_select, request->data.data(), request->data.count(),
+    auto status = SpiImplExchange(request->chip_select, request->data.data(), request->data.size(),
                                   nullptr, 0, &actual);
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
@@ -66,10 +66,10 @@ class FakeSpiImplServer : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiIm
   }
   void ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVectorRequest* request,
                       fdf::Arena& arena, ExchangeVectorCompleter::Sync& completer) override {
-    std::vector<uint8_t> rxdata(request->txdata.count());
+    std::vector<uint8_t> rxdata(request->txdata.size());
     size_t actual;
     auto status = SpiImplExchange(request->chip_select, request->txdata.data(),
-                                  request->txdata.count(), rxdata.data(), rxdata.size(), &actual);
+                                  request->txdata.size(), rxdata.data(), rxdata.size(), &actual);
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
@@ -642,7 +642,7 @@ TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
     auto result = cs1_client->ReceiveVector(sizeof(test_data));
     ASSERT_OK(result.status());
     EXPECT_EQ(result.value().status, ZX_ERR_INTERNAL);
-    EXPECT_EQ(result.value().data.count(), 0ul);
+    EXPECT_EQ(result.value().data.size(), 0ul);
   }
 
   set_current_test_cs(0);
@@ -652,7 +652,7 @@ TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
     auto result = cs0_client->ExchangeVector(tx_buffer);
     ASSERT_OK(result.status());
     EXPECT_EQ(result.value().status, ZX_ERR_INTERNAL);
-    EXPECT_EQ(result.value().rxdata.count(), 0ul);
+    EXPECT_EQ(result.value().rxdata.size(), 0ul);
   }
 }
 

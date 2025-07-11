@@ -478,8 +478,8 @@ TEST_F(AmlUartHarness, SerialImplReadDriverService) {
         ASSERT_TRUE(result.value().is_ok());
 
         auto res = result.value().value();
-        EXPECT_EQ(res->data.count(), kDataLen);
-        EXPECT_EQ(memcmp(data, res->data.data(), res->data.count()), 0);
+        EXPECT_EQ(res->data.size(), kDataLen);
+        EXPECT_EQ(memcmp(data, res->data.data(), res->data.size()), 0);
         quit();
       });
 

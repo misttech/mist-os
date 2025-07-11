@@ -83,7 +83,7 @@ pub fn calculate(function: &MathFunction, operands: &[MetricValue]) -> MetricVal
     }
 }
 
-fn fold<T: num_traits::Num + Copy>(operands: Vec<T>, function: &dyn (Fn(T, T) -> T)) -> T {
+fn fold<T: num_traits::Num + Copy>(operands: Vec<T>, function: &dyn Fn(T, T) -> T) -> T {
     let mut iter = operands.iter();
     let mut result = *iter.next().unwrap(); // Checked non-empty in calculate()
     loop {

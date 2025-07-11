@@ -165,7 +165,7 @@ pub fn with_zx_name<O: zx::AsHandleRef>(obj: O, name: impl AsRef<[u8]>) -> O {
 /// created to execute a user-level task, and should only be called once at the start of that
 /// thread's execution.
 pub fn set_current_task_info(name: &CString, pid: pid_t, tid: tid_t) {
-    set_zx_name(&fuchsia_runtime::thread_self(), name.as_bytes());
+    fuchsia_runtime::with_thread_self(|thread| set_zx_name(thread, name.as_bytes()));
     CURRENT_TASK_INFO.with(|task_info| {
         *task_info.borrow_mut() =
             TaskDebugInfo::User { pid, tid, command: name.to_string_lossy().to_string() };
@@ -179,7 +179,7 @@ pub fn set_current_task_info(name: &CString, pid: pid_t, tid: tid_t) {
 /// purposes of writing kernel logic beyond logging for debugging purposes, those should be accessed
 /// through the `CurrentTask` type as an argument explicitly passed to your function.
 #[doc(hidden)]
-pub fn with_current_task_info<T>(f: impl Fn(&(dyn fmt::Display)) -> T) -> T {
+pub fn with_current_task_info<T>(f: impl Fn(&dyn fmt::Display) -> T) -> T {
     match CURRENT_TASK_INFO.try_with(|task_info| f(&task_info.borrow())) {
         Ok(value) => value,
         Err(_) => f(&TaskDebugInfo::Unknown),

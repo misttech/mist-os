@@ -95,9 +95,8 @@ zx_status_t fdio_open3_fd_at(int dir_fd, const char* path, uint64_t flags, int* 
 // Always consumes `request`.
 //
 // See `fdio_ns_open` for details.
-// TODO(https://fxbug.dev/400787296): Mark this as removed at NEXT when we ship API level 27.
 zx_status_t fdio_open(const char* path, uint32_t flags, ZX_HANDLE_RELEASE zx_handle_t request)
-    ZX_REMOVED_SINCE(1, 27, HEAD, "Use fdio_open3 instead.");
+    ZX_REMOVED_SINCE(1, 27, NEXT, "Use fdio_open3 instead.");
 
 // Opens an object at `path` relative to `directory` with `flags` asynchronously.
 //
@@ -113,10 +112,9 @@ zx_status_t fdio_open(const char* path, uint32_t flags, ZX_HANDLE_RELEASE zx_han
 //
 // ZX_ERR_INVALID_ARGS: `path` is invalid.
 // ZX_ERR_BAD_HANDLE: `directory` is invalid.
-// TODO(https://fxbug.dev/400787296): Mark this as removed at NEXT when we ship API level 27.
 zx_status_t fdio_open_at(zx_handle_t directory, const char* path, uint32_t flags,
                          ZX_HANDLE_RELEASE zx_handle_t request)
-    ZX_REMOVED_SINCE(1, 27, HEAD, "Use fdio_open3_at instead.");
+    ZX_REMOVED_SINCE(1, 27, NEXT, "Use fdio_open3_at instead.");
 
 // Opens an object at `path` relative to the root of the namespace for the current process with
 // `flags` synchronously, and on success, binds that channel to a file descriptor, returned via
@@ -128,9 +126,8 @@ zx_status_t fdio_open_at(zx_handle_t directory, const char* path, uint32_t flags
 // `flags` is a `fuchsia.io/OpenFlags`.
 //
 // See `fdio_open` for details.
-// TODO(https://fxbug.dev/400787296): Mark this as removed at NEXT when we ship API level 27.
 zx_status_t fdio_open_fd(const char* path, uint32_t flags, int* out_fd)
-    ZX_REMOVED_SINCE(1, 27, HEAD, "Use fdio_open3_fd instead.");
+    ZX_REMOVED_SINCE(1, 27, NEXT, "Use fdio_open3_fd instead.");
 
 // Opens an object at `path` relative to `dir_fd` with `flags` synchronously, and on success, binds
 // that channel to a file descriptor, returned via `out_fd`.
@@ -141,9 +138,8 @@ zx_status_t fdio_open_fd(const char* path, uint32_t flags, int* out_fd)
 // `flags` is a `fuchsia.io/OpenFlags`.
 //
 // See `fdio_open_at` for details.
-// TODO(https://fxbug.dev/400787296): Mark this as removed at NEXT when we ship API level 27.
 zx_status_t fdio_open_fd_at(int dir_fd, const char* path, uint32_t flags, int* out_fd)
-    ZX_REMOVED_SINCE(1, 27, HEAD, "Use fdio_open3_fd_at instead.");
+    ZX_REMOVED_SINCE(1, 27, NEXT, "Use fdio_open3_fd_at instead.");
 
 __END_CDECLS
 

@@ -26,7 +26,7 @@ TEST(Mali, IcdList) {
   const fidl::WireResult result = fidl::WireCall(channel)->GetIcdList();
   EXPECT_TRUE(result.ok()) << result.FormatDescription();
   const fidl::WireResponse response = result.value();
-  EXPECT_EQ(response.icd_list.count(), 3u);
+  EXPECT_EQ(response.icd_list.size(), 3u);
   {
     auto& icd_item = response.icd_list[0];
     EXPECT_TRUE(icd_item.has_flags());

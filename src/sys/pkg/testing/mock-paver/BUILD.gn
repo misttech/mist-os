@@ -32,7 +32,7 @@ fuchsia_unittest_package("mock-paver-tests") {
   deps = [ ":mock-paver_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":mock-paver-tests" ]
 }

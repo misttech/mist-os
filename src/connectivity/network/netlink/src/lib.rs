@@ -12,7 +12,6 @@
 #![warn(missing_docs, unused)]
 
 mod client;
-mod errors;
 pub(crate) mod eventloop;
 pub mod interfaces;
 pub(crate) mod logging;
@@ -338,6 +337,11 @@ impl NetlinkWorkerDiscoverableProtocols {
 /// `protocols` is taken as a closure because we need to avoid creating asynchronous FIDL proxies
 /// until an executor is running, so it's helpful to defer creation until the event loop starts
 /// running.
+///
+/// # Panics
+///
+/// Panics if a non-recoverable error is encountered by the worker. For example,
+/// a FIDL error on one of the FIDL connections with the netstack.
 async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverProvider>(
     params: NetlinkWorkerParams<H, P>,
     protocols: impl FnOnce() -> NetlinkWorkerDiscoverableProtocols + Send + 'static,
@@ -385,9 +389,7 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
                 feature_flags,
             };
 
-            match event_loop.run(on_initialized).await {
-                Err(e) => panic!("error running event loop: {e:?}"),
-            }
+            event_loop.run(on_initialized).await;
         }
     });
 

@@ -241,7 +241,7 @@ func (a *allocatorBuilder) visitVector(value []ir.Value, decl *mixer.VectorDecl,
 				a.write("%s[%d] = %s;\n", vector, i, elem)
 			}
 			a.write(
-				`for (size_t offset = 0; offset < %[1]s.count(); offset += %[2]d) {
+				`for (size_t offset = 0; offset < %[1]s.size(); offset += %[2]d) {
 memcpy(%[1]s.data() + offset, %[1]s.data(), %[2]d);
 }
 `, vector, period)

@@ -407,19 +407,19 @@ TEST_F(SimpleAudioTest, Enumerate1) {
   auto ret = stream_client->GetSupportedFormats();
   auto& supported_formats = ret.value().supported_formats;
   auto& formats = supported_formats[0].pcm_supported_formats();
-  ASSERT_EQ(1, formats.channel_sets().count());
-  ASSERT_EQ(2, formats.channel_sets()[0].attributes().count());
-  ASSERT_EQ(1, formats.sample_formats().count());
+  ASSERT_EQ(1, formats.channel_sets().size());
+  ASSERT_EQ(2, formats.channel_sets()[0].attributes().size());
+  ASSERT_EQ(1, formats.sample_formats().size());
   ASSERT_EQ(audio_fidl::wire::SampleFormat::kPcmSigned, formats.sample_formats()[0]);
-  ASSERT_EQ(1, formats.frame_rates().count());
+  ASSERT_EQ(1, formats.frame_rates().size());
   ASSERT_EQ(48000, formats.frame_rates()[0]);
-  ASSERT_EQ(1, formats.bytes_per_sample().count());
+  ASSERT_EQ(1, formats.bytes_per_sample().size());
   ASSERT_EQ(2, formats.bytes_per_sample()[0]);
-  ASSERT_EQ(1, formats.valid_bits_per_sample().count());
+  ASSERT_EQ(1, formats.valid_bits_per_sample().size());
   ASSERT_EQ(16, formats.valid_bits_per_sample()[0]);
 
   auto& channels_attributes = formats.channel_sets()[0].attributes();
-  ASSERT_EQ(2, channels_attributes.count());
+  ASSERT_EQ(2, channels_attributes.size());
   ASSERT_EQ(40, channels_attributes[0].min_frequency());
   ASSERT_EQ(3'000, channels_attributes[0].max_frequency());
   ASSERT_EQ(3'000, channels_attributes[1].min_frequency());
@@ -467,40 +467,40 @@ TEST_F(SimpleAudioTest, Enumerate2) {
 
   auto ret = stream_client->GetSupportedFormats();
   auto& supported_formats = ret.value().supported_formats;
-  ASSERT_EQ(2, supported_formats.count());
+  ASSERT_EQ(2, supported_formats.size());
 
   auto& formats1 = supported_formats[0].pcm_supported_formats();
-  ASSERT_EQ(3, formats1.channel_sets().count());
-  ASSERT_EQ(2, formats1.channel_sets()[0].attributes().count());
-  ASSERT_EQ(3, formats1.channel_sets()[1].attributes().count());
-  ASSERT_EQ(4, formats1.channel_sets()[2].attributes().count());
-  ASSERT_EQ(1, formats1.sample_formats().count());
+  ASSERT_EQ(3, formats1.channel_sets().size());
+  ASSERT_EQ(2, formats1.channel_sets()[0].attributes().size());
+  ASSERT_EQ(3, formats1.channel_sets()[1].attributes().size());
+  ASSERT_EQ(4, formats1.channel_sets()[2].attributes().size());
+  ASSERT_EQ(1, formats1.sample_formats().size());
   ASSERT_EQ(audio_fidl::wire::SampleFormat::kPcmSigned, formats1.sample_formats()[0]);
-  ASSERT_EQ(5, formats1.frame_rates().count());
+  ASSERT_EQ(5, formats1.frame_rates().size());
   std::set<uint32_t> rates1;
   for (auto& i : formats1.frame_rates()) {
     rates1.insert(i);
   }
   ASSERT_EQ(rates1, std::set<uint32_t>({48'000, 96'000, 192'000, 384'000, 768'000}));
-  ASSERT_EQ(1, formats1.bytes_per_sample().count());
+  ASSERT_EQ(1, formats1.bytes_per_sample().size());
   ASSERT_EQ(4, formats1.bytes_per_sample()[0]);
-  ASSERT_EQ(1, formats1.valid_bits_per_sample().count());
+  ASSERT_EQ(1, formats1.valid_bits_per_sample().size());
   ASSERT_EQ(24, formats1.valid_bits_per_sample()[0]);
 
   auto& formats2 = supported_formats[1].pcm_supported_formats();
-  ASSERT_EQ(1, formats2.channel_sets().count());
-  ASSERT_EQ(1, formats2.channel_sets()[0].attributes().count());
-  ASSERT_EQ(1, formats2.sample_formats().count());
+  ASSERT_EQ(1, formats2.channel_sets().size());
+  ASSERT_EQ(1, formats2.channel_sets()[0].attributes().size());
+  ASSERT_EQ(1, formats2.sample_formats().size());
   ASSERT_EQ(audio_fidl::wire::SampleFormat::kPcmFloat, formats2.sample_formats()[0]);
-  ASSERT_EQ(1, formats2.frame_rates().count());
+  ASSERT_EQ(1, formats2.frame_rates().size());
   std::set<uint32_t> rates2;
   for (auto& i : formats2.frame_rates()) {
     rates2.insert(i);
   }
   ASSERT_EQ(rates2, std::set<uint32_t>({88'200}));
-  ASSERT_EQ(1, formats2.bytes_per_sample().count());
+  ASSERT_EQ(1, formats2.bytes_per_sample().size());
   ASSERT_EQ(4, formats2.bytes_per_sample()[0]);
-  ASSERT_EQ(1, formats2.valid_bits_per_sample().count());
+  ASSERT_EQ(1, formats2.valid_bits_per_sample().size());
   ASSERT_EQ(32, formats2.valid_bits_per_sample()[0]);
   loop_.Shutdown();
   server->DdkAsyncRemove();
@@ -535,14 +535,14 @@ TEST_F(SimpleAudioTest, EnumerateMultipleRateFamilies) {
 
   auto ret = stream_client->GetSupportedFormats();
   auto& supported_formats = ret.value().supported_formats;
-  ASSERT_EQ(1, supported_formats.count());
+  ASSERT_EQ(1, supported_formats.size());
 
   auto& formats = supported_formats[0].pcm_supported_formats();
-  ASSERT_EQ(1, formats.channel_sets().count());
-  ASSERT_EQ(2, formats.channel_sets()[0].attributes().count());
-  ASSERT_EQ(1, formats.sample_formats().count());
+  ASSERT_EQ(1, formats.channel_sets().size());
+  ASSERT_EQ(2, formats.channel_sets()[0].attributes().size());
+  ASSERT_EQ(1, formats.sample_formats().size());
   ASSERT_EQ(audio_fidl::wire::SampleFormat::kPcmSigned, formats.sample_formats()[0]);
-  ASSERT_EQ(4, formats.frame_rates().count());
+  ASSERT_EQ(4, formats.frame_rates().size());
   // Must enumerate them in ascending order.
   ASSERT_EQ(formats.frame_rates()[0], 44'100);
   ASSERT_EQ(formats.frame_rates()[1], 48'000);

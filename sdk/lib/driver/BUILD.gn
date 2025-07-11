@@ -20,7 +20,7 @@ group("tests") {
     "mmio/rust:tests",
     "mock-mmio/cpp:tests",
     "platform-device/cpp:tests",
-    "power/cpp:tests",
+    "power:tests",
     "runtime/rust:tests",
   ]
 }

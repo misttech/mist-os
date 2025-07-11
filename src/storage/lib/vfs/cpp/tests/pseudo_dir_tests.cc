@@ -2,11 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <lib/fdio/vfs.h>
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
+
+#include <cstddef>
+#include <cstdint>
+
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
 #include "src/storage/lib/vfs/cpp/tests/dir_test_util.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace {

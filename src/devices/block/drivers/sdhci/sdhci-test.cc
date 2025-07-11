@@ -4,6 +4,7 @@
 
 #include "sdhci.h"
 
+#include <lib/async/cpp/wait.h>
 #include <lib/async/default.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/fake-bti/cpp/fake-bti.h>
@@ -43,7 +44,9 @@ class TestSdhci : public Sdhci {
   static fdf::MmioBuffer* mmio_;
 
   TestSdhci(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : Sdhci(std::move(start_args), std::move(dispatcher)) {}
+      : Sdhci(std::move(start_args), std::move(dispatcher)),
+        irq_ack_wait_(this, ZX_HANDLE_INVALID, ZX_VIRTUAL_INTERRUPT_UNTRIGGERED,
+                      ZX_WAIT_ASYNC_EDGE) {}
 
   zx_status_t SdmmcRequest(sdmmc_req_t* req) { return ZX_ERR_NOT_SUPPORTED; }
 
@@ -58,11 +61,6 @@ class TestSdhci : public Sdhci {
     return Sdhci::SdmmcRequest(req, out_response);
   }
 
-  void PrepareStop(fdf::PrepareStopCompleter completer) override {
-    run_thread_ = false;
-    Sdhci::PrepareStop(std::move(completer));
-  }
-
   uint8_t reset_mask() {
     uint8_t ret = reset_mask_;
     reset_mask_ = 0;
@@ -74,56 +72,19 @@ class TestSdhci : public Sdhci {
   void TriggerCardInterrupt() { card_interrupt_ = true; }
   void InjectTransferError() { inject_error_ = true; }
 
+  zx_status_t BeginIrqAckWait(zx::unowned_interrupt irq) {
+    irq_ack_wait_.set_object(irq->get());
+    if (zx_status_t status = irq_ack_wait_.Begin(irq_dispatcher()); status != ZX_OK) {
+      return status;
+    }
+    // Trigger the interrupt once to kick off the loop.
+    return irq->trigger(0, zx::time{});
+  }
+
  protected:
   zx_status_t WaitForReset(const SoftwareReset mask) override {
     reset_mask_ = mask.reg_value();
     return ZX_OK;
-  }
-
-  zx_status_t WaitForInterrupt() override {
-    auto status = InterruptStatus::Get().FromValue(0).WriteTo(&*regs_mmio_buffer_);
-
-    while (run_thread_) {
-      switch (GetRequestStatus()) {
-        case RequestStatus::COMMAND:
-          status.set_command_complete(1).WriteTo(&*regs_mmio_buffer_);
-          return ZX_OK;
-        case RequestStatus::TRANSFER_DATA_DMA:
-          status.set_transfer_complete(1);
-          if (inject_error_) {
-            status.set_error(1).set_data_crc_error(1);
-          }
-          status.WriteTo(&*regs_mmio_buffer_);
-          return ZX_OK;
-        case RequestStatus::READ_DATA_PIO:
-          if (++current_block_ == blocks_remaining_) {
-            status.set_buffer_read_ready(1).set_transfer_complete(1).WriteTo(&*regs_mmio_buffer_);
-          } else {
-            status.set_buffer_read_ready(1).WriteTo(&*regs_mmio_buffer_);
-          }
-          return ZX_OK;
-        case RequestStatus::WRITE_DATA_PIO:
-          if (++current_block_ == blocks_remaining_) {
-            status.set_buffer_write_ready(1).set_transfer_complete(1).WriteTo(&*regs_mmio_buffer_);
-          } else {
-            status.set_buffer_write_ready(1).WriteTo(&*regs_mmio_buffer_);
-          }
-          return ZX_OK;
-        case RequestStatus::BUSY_RESPONSE:
-          status.set_transfer_complete(1).WriteTo(&*regs_mmio_buffer_);
-          return ZX_OK;
-        default:
-          break;
-      }
-
-      if (card_interrupt_.exchange(false) &&
-          InterruptStatusEnable::Get().ReadFrom(&*regs_mmio_buffer_).card_interrupt() == 1) {
-        status.set_card_interrupt(1).WriteTo(&*regs_mmio_buffer_);
-        return ZX_OK;
-      }
-    }
-
-    return ZX_ERR_CANCELED;
   }
 
   zx_status_t InitMmio() override {
@@ -137,29 +98,84 @@ class TestSdhci : public Sdhci {
   }
 
  private:
+  void InterruptAck(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                    const zx_packet_signal_t* signal) {
+    if (status != ZX_OK) {
+      return;
+    }
+
+    // Start the wait and trigger the interrupt again to continue the loop.
+    irq_ack_wait_.Begin(irq_dispatcher());
+    zx_interrupt_trigger(irq_ack_wait_.object(), 0, {});
+
+    auto interrupt_status = InterruptStatus::Get().FromValue(0).WriteTo(&*regs_mmio_buffer_);
+
+    switch (GetRequestStatus()) {
+      case RequestStatus::COMMAND:
+        interrupt_status.set_command_complete(1).WriteTo(&*regs_mmio_buffer_);
+        return;
+      case RequestStatus::TRANSFER_DATA_DMA:
+        interrupt_status.set_transfer_complete(1);
+        if (inject_error_) {
+          interrupt_status.set_error(1).set_data_crc_error(1);
+        }
+        interrupt_status.WriteTo(&*regs_mmio_buffer_);
+        return;
+      case RequestStatus::READ_DATA_PIO:
+        if (++current_block_ == blocks_remaining_) {
+          interrupt_status.set_buffer_read_ready(1).set_transfer_complete(1).WriteTo(
+              &*regs_mmio_buffer_);
+        } else {
+          interrupt_status.set_buffer_read_ready(1).WriteTo(&*regs_mmio_buffer_);
+        }
+        return;
+      case RequestStatus::WRITE_DATA_PIO:
+        if (++current_block_ == blocks_remaining_) {
+          interrupt_status.set_buffer_write_ready(1).set_transfer_complete(1).WriteTo(
+              &*regs_mmio_buffer_);
+        } else {
+          interrupt_status.set_buffer_write_ready(1).WriteTo(&*regs_mmio_buffer_);
+        }
+        return;
+      case RequestStatus::BUSY_RESPONSE:
+        interrupt_status.set_transfer_complete(1).WriteTo(&*regs_mmio_buffer_);
+        return;
+      default:
+        break;
+    }
+
+    if (card_interrupt_.exchange(false) &&
+        InterruptStatusEnable::Get().ReadFrom(&*regs_mmio_buffer_).card_interrupt() == 1) {
+      interrupt_status.set_card_interrupt(1).WriteTo(&*regs_mmio_buffer_);
+    }
+  }
+
   uint8_t reset_mask_ = 0;
-  std::atomic<bool> run_thread_ = true;
   std::atomic<uint16_t> blocks_remaining_ = 0;
   std::atomic<uint16_t> current_block_ = 0;
   std::atomic<bool> card_interrupt_ = false;
   std::atomic<bool> inject_error_ = false;
+  async::WaitMethod<TestSdhci, &TestSdhci::InterruptAck> irq_ack_wait_;
 };
 
 fdf::MmioBuffer* TestSdhci::mmio_;
 
 class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
  public:
+  zx::unowned_interrupt irq() const { return irq_.borrow(); }
+
   // fuchsia.hardware.sdhci/Device protocol implementation
   void GetInterrupt(fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override {
-    zx::interrupt interrupt;
     zx_status_t status =
-        zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL, &interrupt);
+        zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL, &irq_);
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
     }
 
-    completer.buffer(arena).ReplySuccess(std::move(interrupt));
+    zx::interrupt dup;
+    ASSERT_OK(irq_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
+    completer.buffer(arena).ReplySuccess(std::move(dup));
   }
 
   void GetMmio(fdf::Arena& arena, GetMmioCompleter::Sync& completer) override {
@@ -204,6 +220,15 @@ class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
     completer.buffer(arena).ReplySuccess();
   }
 
+  void VendorPerformTuning(VendorPerformTuningRequestView request, fdf::Arena& arena,
+                           VendorPerformTuningCompleter::Sync& completer) override {
+    if (!supports_perform_tuning_) {
+      completer.buffer(arena).ReplyError(ZX_ERR_STOP);
+      return;
+    }
+    completer.buffer(arena).ReplySuccess();
+  }
+
   fuchsia_hardware_sdhci::Service::InstanceHandler GetInstanceHandler() {
     return fuchsia_hardware_sdhci::Service::InstanceHandler({
         .device = binding_group_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
@@ -220,6 +245,7 @@ class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
   }
   bool hw_reset_invoked() const { return hw_reset_invoked_; }
   void set_supports_set_bus_clock() { supports_set_bus_clock_ = true; }
+  void set_supports_perform_tuning() { supports_perform_tuning_ = true; }
 
  private:
   std::vector<zx_paddr_t> dma_paddrs_;
@@ -229,6 +255,8 @@ class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
   uint64_t dma_boundary_alignment_ = 0;
   bool hw_reset_invoked_ = false;
   bool supports_set_bus_clock_ = false;
+  bool supports_perform_tuning_ = false;
+  zx::interrupt irq_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_sdhci::Device> binding_group_;
 };
@@ -271,10 +299,19 @@ class SdhciTest : public ::testing::Test {
       env.sdhci().set_dma_boundary_alignment(dma_boundary_alignment);
     });
 
-    return driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& args) {
-      sdhci_config::Config config{{.enable_suspend = true}};
-      args.config(config.ToVmo());
-    });
+    zx::result<> result =
+        driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& args) {
+          sdhci_config::Config config{{.enable_suspend = true}};
+          args.config(config.ToVmo());
+        });
+    if (result.is_error()) {
+      return result;
+    }
+
+    zx::unowned_interrupt irq = driver_test().RunInEnvironmentTypeContext(
+        fit::callback<zx::unowned_interrupt(Environment&)>(
+            [](Environment& env) { return env.sdhci().irq(); }));
+    return zx::make_result(driver_test().driver()->BeginIrqAckWait(irq->borrow()));
   }
 
   zx::result<> StartDriver(fuchsia_hardware_sdhci::Quirk quirks = {},
@@ -282,7 +319,13 @@ class SdhciTest : public ::testing::Test {
     return StartDriver({}, quirks, dma_boundary_alignment);
   }
 
-  zx::result<> StopDriver() { return driver_test().StopDriver(); }
+  zx::result<> StopDriver() {
+    if (zx::result<> result = driver_test().StopDriver(); result.is_error()) {
+      return result;
+    }
+    driver_test().ShutdownAndDestroyDriver();
+    return zx::ok();
+  }
 
   fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
 
@@ -534,6 +577,17 @@ TEST_F(SdhciTest, SetBusFreqVendorSpecific) {
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
   EXPECT_EQ(clock_control(), initial_value);
+
+  ASSERT_OK(StopDriver());
+}
+
+TEST_F(SdhciTest, PerformTuningVendorSpecific) {
+  driver_test().RunInEnvironmentTypeContext(
+      [&](Environment& env) { env.sdhci().set_supports_perform_tuning(); });
+
+  ASSERT_OK(StartDriver());
+
+  EXPECT_OK(driver_test().driver()->SdmmcPerformTuning(MMC_SEND_TUNING_BLOCK));
 
   ASSERT_OK(StopDriver());
 }

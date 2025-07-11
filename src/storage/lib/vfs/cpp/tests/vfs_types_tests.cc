@@ -2,11 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <zircon/errors.h>
-
-#include <type_traits>
-#include <utility>
 
 #include <gtest/gtest.h>
 

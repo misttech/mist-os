@@ -1068,7 +1068,7 @@ pub fn sys_prctl(
         PR_SET_NAME => {
             let addr = UserAddress::from(arg2);
             let mut name = current_task.read_memory_to_array::<16>(addr)?;
-            set_zx_name(&fuchsia_runtime::thread_self(), &name);
+            fuchsia_runtime::with_thread_self(|thread| set_zx_name(thread, &name));
 
             // The name is truncated to 16 bytes (including the nul)
             name[15] = 0;

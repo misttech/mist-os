@@ -1246,11 +1246,7 @@ impl FsNodeOps for FuseNode {
         let passthrough_fh = unsafe { open_out.__bindgen_anon_1.passthrough_fh };
         let passthrough_file = if passthrough_fh != 0 {
             let mut connection = self.connection.lock();
-            let entry = connection.registered_passthrough.entry(passthrough_fh);
-            match entry {
-                Entry::Occupied(v) => v.remove(),
-                Entry::Vacant(_) => Default::default(),
-            }
+            connection.registered_passthrough.remove(&passthrough_fh).unwrap_or_default()
         } else {
             Weak::new()
         };
