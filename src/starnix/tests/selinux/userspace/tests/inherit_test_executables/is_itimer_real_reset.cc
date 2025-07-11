@@ -8,13 +8,14 @@
 
 #include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
 
-void get_itimer(itimerval* val) { ASSERT_THAT(getitimer(ITIMER_REAL, val), SyscallSucceeds()); }
-
 int main(int argc, char** argv) {
   bool expect_itimer_real_reset = atoi(argv[1]);
 
   struct itimerval val;
-  get_itimer(&val);
+  EXPECT_THAT(getitimer(ITIMER_REAL, &val), SyscallSucceeds());
+  if (::testing::Test::HasFailure()) {
+    return 1;
+  }
 
   if (expect_itimer_real_reset) {
     EXPECT_EQ(val.it_value.tv_sec, 0);
