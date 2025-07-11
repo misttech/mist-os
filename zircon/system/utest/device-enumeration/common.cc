@@ -110,8 +110,13 @@ void DeviceEnumerationTest::RetrieveNodeInfo() {
       }
       for (const fuchsia_driver_development::wire::NodeInfo& info : response.nodes) {
         ASSERT_TRUE(info.has_moniker());
-        std::cout << info.moniker().get() << std::endl;
-        node_info_[std::string(info.moniker().get())] = fidl::ToNatural(info);
+        if (info.has_quarantined() && info.quarantined()) {
+          std::cerr << info.moniker().get() << " exists but has failed to start successfully."
+                    << std::endl;
+        } else {
+          std::cout << info.moniker().get() << std::endl;
+          node_info_[std::string(info.moniker().get())] = fidl::ToNatural(info);
+        }
       }
     }
     std::cout << "END printing all node monikers." << std::endl;
