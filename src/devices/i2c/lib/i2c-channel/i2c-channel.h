@@ -52,6 +52,16 @@ class I2cChannel {
   // puts them in `read_data`. Returns the number of bytes read.
   zx::result<size_t> ReadSync(uint8_t addr, std::span<uint8_t> read_data);
 
+  // Calls ReadSync() with a read size of 1 and returns the byte that was read.
+  zx::result<uint8_t> ReadByteSync(uint8_t addr) {
+    std::array<uint8_t, 1> read_data{0};
+    zx::result result = ReadSync(addr, read_data);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::ok(read_data[0]);
+  }
+
   // Writes `write_data` with no trailing read.
   zx::result<> WriteSync(std::span<const uint8_t> write_data);
 

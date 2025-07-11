@@ -1,25 +1,26 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include "ti-lp8556.h"
 
 #include <endian.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/driver/compat/cpp/metadata.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <math.h>
 
 #include <algorithm>
 
-#include <ddktl/fidl.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <pretty/hexdump.h>
 
-#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "ti-lp8556Metadata.h"
 
 namespace ti {
@@ -47,7 +48,7 @@ display::PanelType ToDisplayPanelType(BootloaderPanelType bootloader_panel_type)
     case BootloaderPanelType::kBoeFiti9365:
       return display::PanelType::kBoeTv070wsmFitipowerJd9365;
   }
-  zxlogf(ERROR, "Unknown panel type %" PRIu32, static_cast<uint32_t>(bootloader_panel_type));
+  fdf::error("Unknown panel type {}", static_cast<uint32_t>(bootloader_panel_type));
   return display::PanelType::kUnknown;
 }
 
@@ -58,14 +59,14 @@ display::PanelType ToDisplayPanelType(BootloaderPanelType bootloader_panel_type)
 // from these scalars by:
 // (slope * brightness + intercept) * |brightness_to_current_scalar_|.
 constexpr std::array<double,
-                     static_cast<std::size_t>(Lp8556Device::PanelType::kNumTypes)>
+                     static_cast<std::size_t>(TiLp8556::PanelType::kNumTypes)>
     kLowBrightnessSlopeTable = {
         22.4,  // PanelType::kBoe
         22.2,  // PanelType::kKd
         22.2,  // PanelType::kUnknown
 };
 constexpr std::array<double,
-                     static_cast<std::size_t>(Lp8556Device::PanelType::kNumTypes)>
+                     static_cast<std::size_t>(TiLp8556::PanelType::kNumTypes)>
     kLowBrightnessInterceptTable = {
         1236.0,  // PanelType::kBoe
         1319.0,  // PanelType::kKd
@@ -79,7 +80,7 @@ constexpr std::array<double,
 // corresponds to a jump of |kBrightnessStep| in brightness up to the maximum
 // value of |kMaxBrightnessSetting|.
 constexpr std::array<std::array<double, kTableSize>,
-                     static_cast<std::size_t>(Lp8556Device::PanelType::kNumTypes)>
+                     static_cast<std::size_t>(TiLp8556::PanelType::kNumTypes)>
     kVoltageTable = {{
         // PanelType::kBoe
         {19.80, 19.80, 19.80, 19.80, 19.90, 20.00, 20.10, 20.20, 20.30, 20.40, 20.50, 20.53, 20.53,
@@ -101,82 +102,79 @@ constexpr std::array<double, kTableSize> kEfficiencyTable = {
     0.8889, 0.8915, 0.8953, 0.8983, 0.9003, 0.9034, 0.9049, 0.9060};
 
 // The max current value in the table is determined by the value of the three
-// max current bits within the Lp8556 CFG1 register. The value of these bits can
+// max current bits within the TiLp8556 CFG1 register. The value of these bits can
 // be obtained from the max_current sysfs node exposed by the driver. The
 // current values in the table are expressed in mA.
 constexpr std::array<double, 8> kMaxCurrentTable = {5.0, 10.0, 15.0, 20.0, 23.0, 25.0, 30.0, 50.0};
 
-void Lp8556Device::DdkRelease() { delete this; }
-
-zx_status_t Lp8556Device::GetBacklightState(bool* power, double* brightness) const {
+zx::result<> TiLp8556::GetBacklightState(bool* power, double* brightness) const {
   *power = power_;
   *brightness = brightness_;
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Lp8556Device::SetBacklightState(bool power, double brightness) {
+zx::result<> TiLp8556::SetBacklightState(bool power, double brightness) {
   brightness = std::max(brightness, 0.0);
   brightness = std::min(brightness, 1.0);
   uint16_t brightness_reg_value = static_cast<uint16_t>(ceil(brightness * kBrightnessRegMaxValue));
   if (brightness != brightness_) {
     // LSB should be updated before MSB. Writing to MSB triggers the brightness change.
-    uint8_t buf[2];
-    buf[0] = kBacklightBrightnessLsbReg;
-    buf[1] = static_cast<uint8_t>(brightness_reg_value & kBrightnessLsbMask);
-    zx_status_t status = i2c_.WriteSync(buf, sizeof(buf));
-    if (status != ZX_OK) {
-      LOG_ERROR("Failed to set brightness LSB register\n");
-      return status;
+    std::array<uint8_t, 2> write_data{
+        kBacklightBrightnessLsbReg,
+        static_cast<uint8_t>(brightness_reg_value & kBrightnessLsbMask)};
+    if (zx::result result = i2c_.WriteSync(write_data); result.is_error()) {
+      fdf::error("Failed to set brightness LSB register: {}", result);
+      return result.take_error();
     }
 
-    uint8_t msb_reg_value;
-    status = i2c_.ReadSync(kBacklightBrightnessMsbReg, &msb_reg_value, 1);
-    if (status != ZX_OK) {
-      LOG_ERROR("Failed to get brightness MSB register\n");
-      return status;
+    zx::result msb_reg_value = i2c_.ReadByteSync(kBacklightBrightnessMsbReg);
+    if (msb_reg_value.is_error()) {
+      fdf::error("Failed to get brightness MSB register: {}", msb_reg_value);
+      return msb_reg_value.take_error();
     }
 
     // The low 4-bits contain the brightness MSB. Keep the remaining bits unchanged.
-    msb_reg_value &= static_cast<uint8_t>(~kBrightnessMsbByteMask);
-    msb_reg_value |=
+    msb_reg_value.value() &= static_cast<uint8_t>(~kBrightnessMsbByteMask);
+    msb_reg_value.value() |=
         (static_cast<uint8_t>((brightness_reg_value & kBrightnessMsbMask) >> kBrightnessMsbShift));
 
-    buf[0] = kBacklightBrightnessMsbReg;
-    buf[1] = msb_reg_value;
-    status = i2c_.WriteSync(buf, sizeof(buf));
-    if (status != ZX_OK) {
-      LOG_ERROR("Failed to set brightness MSB register\n");
-      return status;
+    write_data[0] = kBacklightBrightnessMsbReg;
+    write_data[1] = msb_reg_value.value();
+    if (zx::result result = i2c_.WriteSync(write_data); result.is_error()) {
+      fdf::error("Failed to set brightness MSB register: {}", result);
+      return result.take_error();
     }
 
-    auto persistent_brightness = BrightnessStickyReg::Get().ReadFrom(&mmio_);
+    auto persistent_brightness = BrightnessStickyReg::Get().ReadFrom(&mmio_.value());
     persistent_brightness.set_brightness(brightness_reg_value & kBrightnessRegMask);
     persistent_brightness.set_is_valid(1);
-    persistent_brightness.WriteTo(&mmio_);
+    persistent_brightness.WriteTo(&mmio_.value());
   }
 
   if (power != power_) {
-    uint8_t buf[2];
-    buf[0] = kDeviceControlReg;
-    buf[1] = kDeviceControlDefaultValue | (power ? kBacklightOn : 0);
-    if (zx_status_t status = i2c_.WriteSync(buf, sizeof(buf)); status != ZX_OK) {
-      LOG_ERROR("Failed to set device control register\n");
-      return status;
+    std::array<uint8_t, 2> write_data{
+        kDeviceControlReg,
+        static_cast<uint8_t>(kDeviceControlDefaultValue | (power ? kBacklightOn : 0))};
+    if (zx::result result = i2c_.WriteSync(write_data); result.is_error()) {
+      fdf::error("Failed to set device control register: {}", result);
+      return result.take_error();
     }
 
     if (power) {
       for (size_t i = 0; i < metadata_.register_count; i += 2) {
-        if (zx_status_t status = i2c_.WriteSync(&metadata_.registers[i], 2); status != ZX_OK) {
-          LOG_ERROR("Failed to set register 0x%02x: %d\n", metadata_.registers[i], status);
-          return status;
+        auto write_data = std::span{metadata_.registers}.subspan(i, 2);
+        if (zx::result result = i2c_.WriteSync(write_data); result.is_error()) {
+          fdf::error("Failed to set register {:#02x}: {}", metadata_.registers[i], result);
+          return result.take_error();
         }
       }
 
-      buf[0] = kCfg2Reg;
-      buf[1] = cfg2_;
-      if (zx_status_t status = i2c_.WriteSync(buf, sizeof(buf)); status != ZX_OK) {
-        LOG_ERROR("Failed to set cfg2 register\n");
-        return status;
+      write_data[0] = kCfg2Reg;
+      write_data[1] = cfg2_;
+      if (zx::result result = i2c_.WriteSync(write_data); result.is_error()) {
+        fdf::error("Failed to set cfg2 register: {}", result);
+        return result.take_error();
+        ;
       }
     }
   }
@@ -188,52 +186,53 @@ zx_status_t Lp8556Device::SetBacklightState(bool power, double brightness) {
   brightness_property_.Set(brightness_);
   backlight_power_ = GetBacklightPower(brightness_reg_value);
   power_watts_property_.Set(backlight_power_);
-  return ZX_OK;
+
+  return zx::ok();
 }
 
-void Lp8556Device::GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) {
+void TiLp8556::GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) {
   fuchsia_hardware_backlight::wire::State state = {};
-  auto status = GetBacklightState(&state.backlight_on, &state.brightness);
-  if (status == ZX_OK) {
+  zx::result result = GetBacklightState(&state.backlight_on, &state.brightness);
+  if (result.is_ok()) {
     completer.ReplySuccess(state);
   } else {
-    completer.ReplyError(status);
+    completer.ReplyError(result.status_value());
   }
 }
 
-void Lp8556Device::SetStateNormalized(SetStateNormalizedRequestView request,
-                                      SetStateNormalizedCompleter::Sync& completer) {
-  auto status = SetBacklightState(request->state.backlight_on, request->state.brightness);
-  if (status == ZX_OK) {
+void TiLp8556::SetStateNormalized(SetStateNormalizedRequestView request,
+                                  SetStateNormalizedCompleter::Sync& completer) {
+  zx::result result = SetBacklightState(request->state.backlight_on, request->state.brightness);
+  if (result.is_ok()) {
     completer.ReplySuccess();
   } else {
-    completer.ReplyError(status);
+    completer.ReplyError(result.status_value());
   }
 }
 
-void Lp8556Device::GetStateAbsolute(GetStateAbsoluteCompleter::Sync& completer) {
+void TiLp8556::GetStateAbsolute(GetStateAbsoluteCompleter::Sync& completer) {
   if (!max_absolute_brightness_nits_.has_value()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
   if (scale_ != calibrated_scale_) {
-    LOG_ERROR("Can't get absolute state with non-calibrated current scale\n");
+    fdf::error("Can't get absolute state with non-calibrated current scale");
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
 
   fuchsia_hardware_backlight::wire::State state = {};
-  auto status = GetBacklightState(&state.backlight_on, &state.brightness);
-  if (status == ZX_OK) {
+  zx::result result = GetBacklightState(&state.backlight_on, &state.brightness);
+  if (result.is_ok()) {
     state.brightness *= max_absolute_brightness_nits_.value();
     completer.ReplySuccess(state);
   } else {
-    completer.ReplyError(status);
+    completer.ReplyError(result.status_value());
   }
 }
 
-void Lp8556Device::SetStateAbsolute(SetStateAbsoluteRequestView request,
-                                    SetStateAbsoluteCompleter::Sync& completer) {
+void TiLp8556::SetStateAbsolute(SetStateAbsoluteRequestView request,
+                                SetStateAbsoluteCompleter::Sync& completer) {
   if (!max_absolute_brightness_nits_.has_value()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
@@ -241,22 +240,22 @@ void Lp8556Device::SetStateAbsolute(SetStateAbsoluteRequestView request,
 
   // Restore the calibrated current scale that the bootloader set. This and the maximum brightness
   // are the only values we have that can be used to set the absolute brightness in nits.
-  auto status = SetCurrentScale(calibrated_scale_);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
+  if (zx::result result = SetCurrentScale(calibrated_scale_); result.is_error()) {
+    completer.ReplyError(result.status_value());
     return;
   }
 
-  status = SetBacklightState(request->state.backlight_on,
-                             request->state.brightness / max_absolute_brightness_nits_.value());
-  if (status == ZX_OK) {
+  zx::result result =
+      SetBacklightState(request->state.backlight_on,
+                        request->state.brightness / max_absolute_brightness_nits_.value());
+  if (result.is_ok()) {
     completer.ReplySuccess();
   } else {
-    completer.ReplyError(status);
+    completer.ReplyError(result.status_value());
   }
 }
 
-void Lp8556Device::GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::Sync& completer) {
+void TiLp8556::GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::Sync& completer) {
   if (max_absolute_brightness_nits_.has_value()) {
     completer.ReplySuccess(max_absolute_brightness_nits_.value());
   } else {
@@ -264,7 +263,7 @@ void Lp8556Device::GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::S
   }
 }
 
-void Lp8556Device::GetPowerWatts(GetPowerWattsCompleter::Sync& completer) {
+void TiLp8556::GetPowerWatts(GetPowerWattsCompleter::Sync& completer) {
   // Only supported on Nelson for now.
   if (board_pid_ == PDEV_PID_NELSON) {
     completer.ReplySuccess(static_cast<float>(backlight_power_));
@@ -273,159 +272,115 @@ void Lp8556Device::GetPowerWatts(GetPowerWattsCompleter::Sync& completer) {
   }
 }
 
-void Lp8556Device::GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) {
+void TiLp8556::GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void Lp8556Device::GetSensorName(GetSensorNameCompleter::Sync& completer) {
+void TiLp8556::GetSensorName(GetSensorNameCompleter::Sync& completer) {
   completer.Reply(fidl::StringView::FromExternal(kPowerSensorName));
 }
 
-namespace {
-
-zx::result<display::PanelType> GetDisplayPanelInfoFromPanelTypeMetadata(zx_device_t* parent) {
-  size_t actual = 0;
-  display::PanelType display_panel_type;
-  zx_status_t get_panel_info_status =
-      device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_DISPLAY_PANEL_TYPE,
-                                   &display_panel_type, sizeof(display_panel_type), &actual);
-
-  if (get_panel_info_status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get display panel info from metadata: %s",
-           zx_status_get_string(get_panel_info_status));
-    return zx::error(get_panel_info_status);
-  }
-  if (actual != sizeof(display_panel_type)) {
-    zxlogf(ERROR, "Unexpected display panel info size: %zu", actual);
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-  return zx::ok(display_panel_type);
-}
-
-zx::result<display::PanelType> GetDisplayPanelInfoFromBootloaderMetadata(zx_device_t* parent) {
-  size_t actual = 0;
-  BootloaderPanelType bootloader_panel_type;
-  zx_status_t get_panel_type_status =
-      device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_BOARD_PRIVATE,
-                                   &bootloader_panel_type, sizeof(bootloader_panel_type), &actual);
-
-  if (get_panel_type_status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get panel type from bootloader metadata: %s",
-           zx_status_get_string(get_panel_type_status));
-    return zx::error(get_panel_type_status);
-  }
-  if (actual != sizeof(BootloaderPanelType)) {
-    zxlogf(ERROR, "Unexpected panel ID size: %zu", actual);
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-  return zx::ok(ToDisplayPanelType(bootloader_panel_type));
-}
-
-}  // namespace
-
-zx::result<display::PanelType> Lp8556Device::GetDisplayPanelInfo() {
-  zx::result<display::PanelType> panel_type_result =
-      GetDisplayPanelInfoFromPanelTypeMetadata(parent());
+zx::result<display::PanelType> TiLp8556::GetDisplayPanelInfo() {
+  zx::result panel_type_result = compat::GetMetadata<display::PanelType>(
+      incoming(), DEVICE_METADATA_DISPLAY_PANEL_TYPE, "pdev");
   if (panel_type_result.is_ok()) {
-    return panel_type_result;
+    return zx::ok(*panel_type_result.value());
   }
 
   // If the display panel info is not available from the panel type metadata,
   // try to get it from the bootloader metadata.
-  zxlogf(WARNING,
-         "Failed to get display panel info from panel type metadata: %s. "
-         "Trying bootloader metadata.",
-         panel_type_result.status_string());
+  fdf::warn(
+      "Trying bootloader metadata: Failed to get display panel info from panel type metadata: {}",
+      panel_type_result);
 
-  zx::result<display::PanelType> bootloader_metadata_result =
-      GetDisplayPanelInfoFromBootloaderMetadata(parent());
-
+  zx::result bootloader_metadata_result =
+      compat::GetMetadata<display::PanelType>(incoming(), DEVICE_METADATA_BOARD_PRIVATE, "pdev");
   if (bootloader_metadata_result.is_ok()) {
-    return zx::ok(bootloader_metadata_result.value());
+    return zx::ok(*bootloader_metadata_result.value());
+  }
+  if (bootloader_metadata_result.status_value() != ZX_ERR_NOT_FOUND) {
+    fdf::error("Failed to get bootloader metadata: {}", bootloader_metadata_result);
+    return bootloader_metadata_result.take_error();
   }
 
   // If the panel type is not available to the backlight driver (on Astro and
   // Sherlock), or the panel type is unknown to the board driver (on Nelson),
   // we use `display::PanelType::kUnknown` to fall back to the default backlight power
   // configurations.
-  if (bootloader_metadata_result.status_value() == ZX_ERR_NOT_FOUND) {
-    return zx::ok(display::PanelType::kUnknown);
-  }
-  return bootloader_metadata_result;
+  return zx::ok(display::PanelType::kUnknown);
 }
 
-zx_status_t Lp8556Device::Init() {
-  root_ = inspector_.GetRoot().CreateChild("ti-lp8556");
-  double brightness_nits = 0.0;
-  size_t actual;
-  if (zx_status_t status = device_get_fragment_metadata(
-          parent(), "pdev", DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS, &brightness_nits,
-          sizeof(brightness_nits), &actual);
-      status == ZX_OK && actual == sizeof(brightness_nits)) {
-    SetMaxAbsoluteBrightnessNits(brightness_nits);
+zx::result<> TiLp8556::Start() {
+  root_ = inspector().root().CreateChild("ti-lp8556");
+  zx::result brightness_nits = compat::GetMetadata<double>(
+      incoming(), DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS, "pdev");
+  if (brightness_nits.is_ok()) {
+    SetMaxAbsoluteBrightnessNits(*brightness_nits.value());
   }
+
+  // Obtain I2C protocol needed to control backlight
+  zx::result i2c = incoming()->Connect<fuchsia_hardware_i2c::Service::Device>("i2c");
+  if (i2c.is_error()) {
+    fdf::error("Failed to connect to i2c: {}", i2c);
+    return i2c.take_error();
+  }
+  i2c_ = i2c::I2cChannel{std::move(i2c.value())};
+
+  zx::result metadata =
+      compat::GetMetadata<TiLp8556Metadata>(incoming(), DEVICE_METADATA_PRIVATE, "pdev");
   // Supplying this metadata is optional.
-  if (zx_status_t status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE,
-                                                        &metadata_, sizeof(metadata_), &actual);
-      status == ZX_OK) {
+  if (metadata.is_ok()) {
+    metadata_ = *metadata.value();
     if (metadata_.register_count % (2 * sizeof(uint8_t)) != 0) {
-      LOG_ERROR("Register metadata is invalid. Register count (%u) is not a multiple of %zu\n",
-                metadata_.register_count, 2 * sizeof(uint8_t));
-      return ZX_ERR_INVALID_ARGS;
-    }
-    if (actual != sizeof(metadata_)) {
-      LOG_ERROR(
-          "Too many registers specified in metadata. Expected size %zu, got %zu. Got metadata with "
-          "value\n",
-          sizeof(metadata_), actual);
-      char output_buffer[80];
-      for (size_t count = 0; count < actual; count += 16) {
-        FILE* f = fmemopen(output_buffer, sizeof(output_buffer), "w");
-        if (!f) {
-          zxlogf(ERROR, "Couldn't open buffer. Returning.");
-          return status;
-        }
-        hexdump_very_ex(reinterpret_cast<uint8_t*>(&metadata_) + count,
-                        std::min(actual - count, 16UL), count, hexdump_stdio_printf, f);
-        fclose(f);
-        zxlogf(ERROR, "%s", output_buffer);
-      }
-      return ZX_ERR_OUT_OF_RANGE;
+      fdf::error("Register metadata is invalid. Register count ({}) is not a multiple of {}",
+                 metadata_.register_count, 2 * sizeof(uint8_t));
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
     for (size_t i = 0; i < metadata_.register_count; i += 2) {
-      if (zx_status_t status = i2c_.WriteSync(&metadata_.registers[i], 2); status != ZX_OK) {
-        LOG_ERROR("Failed to set register 0x%02x: %d\n", metadata_.registers[i], status);
-        return status;
+      auto write_data = std::span{metadata_.registers}.subspan(i, 2);
+      if (zx::result result = i2c_.WriteSync(write_data); result.is_error()) {
+        fdf::error("Failed to set register {:#02x}: {}", metadata_.registers[i], result);
+        return result.take_error();
       }
     }
   }
 
   zx::result<display::PanelType> panel_type_result = GetDisplayPanelInfo();
   if (panel_type_result.is_error()) {
-    LOG_ERROR("Failed to get display panel info: %s", panel_type_result.status_string());
-    return panel_type_result.status_value();
+    fdf::error("Failed to get display panel info: {}", panel_type_result);
+    return panel_type_result.take_error();
   }
-  panel_type_ = std::move(panel_type_result).value();
+  panel_type_ = panel_type_result.value();
 
-  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_platform_device::Service::Device>(parent(), "pdev");
-  if (pdev_client_end.is_ok()) {
-    fdf::PDev pdev{std::move(pdev_client_end.value())};
-    zx::result board_info = pdev.GetBoardInfo();
-    if (board_info.is_ok()) {
-      board_pid_ = board_info->pid;
-    }
+  zx::result pdev_client_end =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
+  if (pdev_client_end.is_error()) {
+    fdf::error("Failed to connect to platform device: {}", pdev_client_end);
+    return pdev_client_end.take_error();
+  }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  zx::result board_info = pdev.GetBoardInfo();
+  if (board_info.is_ok()) {
+    board_pid_ = board_info->pid;
   }
 
-  auto persistent_brightness = BrightnessStickyReg::Get().ReadFrom(&mmio_);
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    fdf::error("Failed to map mmio: {}", mmio);
+    return mmio.take_error();
+  }
+  mmio_.emplace(std::move(mmio.value()));
+
+  auto persistent_brightness = BrightnessStickyReg::Get().ReadFrom(&mmio_.value());
   if (persistent_brightness.is_valid()) {
     persistent_brightness_property_ =
         root_.CreateUint("persistent_brightness", persistent_brightness.brightness());
   }
 
-  if (zx_status_t status = ReadInitialState(); status != ZX_OK) {
-    return status;
+  if (zx::result result = ReadInitialState(); result.is_error()) {
+    return result.take_error();
   }
 
   brightness_property_ = root_.CreateDouble("brightness", brightness_);
@@ -438,40 +393,55 @@ zx_status_t Lp8556Device::Init() {
   panel_id_property_ = root_.CreateUint("panel_id", static_cast<uint32_t>(panel_type_));
   panel_type_property_ = root_.CreateUint("panel_type", static_cast<uint32_t>(GetPanelType()));
 
-  return ZX_OK;
+  zx::result connector = devfs_connector_.Bind(dispatcher());
+  if (connector.is_error()) {
+    fdf::error("Failed to bind devfs connector: {}", connector);
+    return connector.take_error();
+  }
+
+  fuchsia_driver_framework::DevfsAddArgs devfs_args{{.connector{std::move(connector.value())}}};
+
+  zx::result child = AddOwnedChild(kChildNodeName, devfs_args);
+  if (child.is_error()) {
+    fdf::error("Failed to create child: {}", child);
+    return child.take_error();
+  }
+  child_ = std::move(child.value());
+
+  return zx::ok();
 }
 
-zx_status_t Lp8556Device::SetCurrentScale(uint16_t scale) {
+zx::result<> TiLp8556::SetCurrentScale(uint16_t scale) {
   scale &= kBrightnessRegMask;
 
   if (scale == scale_) {
-    return ZX_OK;
+    return zx::ok();
   }
 
-  uint8_t msb_reg_value;
-  zx_status_t status = i2c_.ReadSync(kCfgReg, &msb_reg_value, sizeof(msb_reg_value));
-  if (status != ZX_OK) {
-    LOG_ERROR("Failed to get current scale register: %d", status);
-    return status;
+  zx::result msb_reg_value = i2c_.ReadByteSync(kCfgReg);
+  if (msb_reg_value.is_error()) {
+    fdf::error("Failed to get current scale register: {}", msb_reg_value);
+    return msb_reg_value.take_error();
   }
-  msb_reg_value &= ~kBrightnessMsbByteMask;
+  msb_reg_value.value() &= ~kBrightnessMsbByteMask;
 
-  const uint8_t buf[] = {
+  std::array<uint8_t, 3> write_data{
       kCurrentLsbReg,
       static_cast<uint8_t>(scale & kBrightnessLsbMask),
-      static_cast<uint8_t>(msb_reg_value | (scale >> kBrightnessMsbShift)),
+      static_cast<uint8_t>(msb_reg_value.value() | (scale >> kBrightnessMsbShift)),
   };
-  if (zx_status_t status = i2c_.WriteSync(buf, sizeof(buf)); status != ZX_OK) {
-    LOG_ERROR("Failed to set current scale register: %d", status);
-    return status;
+  if (zx::result result = i2c_.WriteSync(write_data); result.is_error()) {
+    fdf::error("Failed to set current scale register: {}", result);
+    return result.take_error();
   }
 
   scale_ = scale;
   scale_property_.Set(scale);
-  return ZX_OK;
+
+  return zx::ok();
 }
 
-double Lp8556Device::GetBacklightPower(double backlight_brightness) const {
+double TiLp8556::GetBacklightPower(double backlight_brightness) const {
   if (board_pid_ != PDEV_PID_NELSON) {
     return 0;
   }
@@ -494,7 +464,7 @@ double Lp8556Device::GetBacklightPower(double backlight_brightness) const {
   return backlight_voltage * current_amp / driver_efficiency;
 }
 
-double Lp8556Device::GetBrightnesstoCurrentScalar() const {
+double TiLp8556::GetBrightnesstoCurrentScalar() const {
   double max_current_amp = max_current_ / kMilliampPerAmp;
   // The setpoint current refers to the backlight current for a single driver
   // channel, assuming that the backlight brightness setting is at its max value
@@ -507,7 +477,7 @@ double Lp8556Device::GetBrightnesstoCurrentScalar() const {
   return kNumBacklightDriverChannels * setpoint_current_amp / kMaxBrightnessSetting;
 }
 
-double Lp8556Device::GetBacklightVoltage(double backlight_brightness, PanelType panel_type) {
+double TiLp8556::GetBacklightVoltage(double backlight_brightness, PanelType panel_type) {
   std::size_t panel_type_index = static_cast<std::size_t>(panel_type);
 
   // Backlight is at max brightness
@@ -524,7 +494,7 @@ double Lp8556Device::GetBacklightVoltage(double backlight_brightness, PanelType 
   double fractional = modf(backlight_brightness / kBrightnessStep, &integral);
   std::size_t table_index = static_cast<std::size_t>(integral) - 1;
   if (table_index + 1 >= kVoltageTable[panel_type_index].size()) {
-    LOG_ERROR("Invalid backlight brightness: %f", backlight_brightness);
+    fdf::error("Invalid backlight brightness: {}", backlight_brightness);
     return kVoltageTable[panel_type_index].back();
   }
   double lower_voltage = kVoltageTable[panel_type_index][table_index];
@@ -532,7 +502,7 @@ double Lp8556Device::GetBacklightVoltage(double backlight_brightness, PanelType 
   return (upper_voltage - lower_voltage) * fractional + lower_voltage;
 }
 
-double Lp8556Device::GetDriverEfficiency(double backlight_brightness) {
+double TiLp8556::GetDriverEfficiency(double backlight_brightness) {
   // Backlight is at max brightness
   if (backlight_brightness == kMaxBrightnessSetting) {
     return kEfficiencyTable.back();
@@ -545,7 +515,7 @@ double Lp8556Device::GetDriverEfficiency(double backlight_brightness) {
   double fractional = modf(backlight_brightness / kBrightnessStep, &integral);
   std::size_t table_index = static_cast<std::size_t>(integral) - 1;
   if (table_index + 1 >= kEfficiencyTable.size()) {
-    LOG_ERROR("Invalid backlight brightness: %f", backlight_brightness);
+    fdf::error("Invalid backlight brightness: {}", backlight_brightness);
     return kEfficiencyTable.back();
   }
   double lower_efficiency = kEfficiencyTable[table_index];
@@ -553,121 +523,73 @@ double Lp8556Device::GetDriverEfficiency(double backlight_brightness) {
   return (upper_efficiency - lower_efficiency) * fractional + lower_efficiency;
 }
 
-Lp8556Device::PanelType Lp8556Device::GetPanelType() const {
+TiLp8556::PanelType TiLp8556::GetPanelType() const {
   switch (panel_type_) {
     case display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson:
     case display::PanelType::kBoeTv070wsmFitipowerJd9365:
-      return Lp8556Device::PanelType::kBoe;
+      return TiLp8556::PanelType::kBoe;
     case display::PanelType::kKdKd070d82FitipowerJd9364:
     case display::PanelType::kKdKd070d82FitipowerJd9365:
-      return Lp8556Device::PanelType::kKd;
+      return TiLp8556::PanelType::kKd;
     case display::PanelType::kUnknown:
     default:
-      return Lp8556Device::PanelType::kUnknown;
+      return TiLp8556::PanelType::kUnknown;
   }
 }
 
-zx_status_t Lp8556Device::ReadInitialState() {
-  if ((i2c_.ReadSync(kCfg2Reg, &cfg2_, 1) != ZX_OK) || (cfg2_ == 0)) {
+zx::result<> TiLp8556::ReadInitialState() {
+  zx::result cfg2 = i2c_.ReadByteSync(kCfg2Reg);
+  if (cfg2.is_error() || cfg2.value() == 0) {
     cfg2_ = kCfg2Default;
+  } else {
+    cfg2_ = cfg2.value();
   }
 
-  uint8_t buf[2];
-  if (zx_status_t status = i2c_.ReadSync(kCurrentLsbReg, buf, sizeof(buf)); status != ZX_OK) {
-    LOG_ERROR("Could not read current scale value: %d\n", status);
-    return status;
+  std::array<uint8_t, 2> read_data;
+  if (zx::result result = i2c_.ReadSync(kCurrentLsbReg, read_data); result.is_error()) {
+    fdf::error("Failed to read current scale value: {}", result);
+    return result.take_error();
   }
-  scale_ = static_cast<uint16_t>(buf[0] | (buf[1] << kBrightnessMsbShift)) & kBrightnessRegMask;
+  scale_ = static_cast<uint16_t>(read_data[0] | (read_data[1] << kBrightnessMsbShift)) &
+           kBrightnessRegMask;
   calibrated_scale_ = scale_;
 
-  if (zx_status_t status = i2c_.ReadSync(kBacklightBrightnessLsbReg, buf, sizeof(buf));
-      status == ZX_OK) {
+  if (zx::result result = i2c_.ReadSync(kBacklightBrightnessLsbReg, read_data); result.is_ok()) {
     uint16_t brightness_reg;
-    memcpy(&brightness_reg, buf, sizeof(brightness_reg));
+    memcpy(&brightness_reg, read_data.data(), sizeof(brightness_reg));
     brightness_reg = le16toh(brightness_reg) & kBrightnessRegMask;
     brightness_ = static_cast<double>(brightness_reg) / kBrightnessRegMaxValue;
   } else {
-    LOG_ERROR("Could not read backlight brightness: %s\n", zx_status_get_string(status));
+    fdf::error("Failed to read backlight brightness: {}", result);
     brightness_ = 1.0;
     backlight_power_ = 0;
   }
 
-  uint8_t device_control;
-  if (zx_status_t status =
-          i2c_.ReadSync(kDeviceControlReg, &device_control, sizeof(device_control));
-      status == ZX_OK) {
-    power_ = device_control & kBacklightOn;
+  if (zx::result device_control = i2c_.ReadByteSync(kDeviceControlReg); device_control.is_ok()) {
+    power_ = device_control.value() & kBacklightOn;
   } else {
-    LOG_ERROR("Could not read backlight power: %s\n", zx_status_get_string(status));
+    fdf::error("Failed to read backlight power: {}", device_control);
     power_ = true;
   }
 
   // max_absolute_brightness_nits will be initialized in SetMaxAbsoluteBrightnessNits.
-  uint8_t max_current_idx;
-  i2c_.ReadSync(kCfgReg, &max_current_idx, sizeof(max_current_idx));
-  max_current_idx = (max_current_idx >> 4) & 0b111;
-  max_current_ = kMaxCurrentTable[max_current_idx];
+  zx::result max_current_idx = i2c_.ReadByteSync(kCfgReg);
+  if (max_current_idx.is_error()) {
+    fdf::error("Failed to read max current index: {}", max_current_idx);
+    return max_current_idx.take_error();
+  }
+  max_current_idx.value() = (max_current_idx.value() >> 4) & 0b111;
+  max_current_ = kMaxCurrentTable[max_current_idx.value()];
 
   backlight_power_ = GetBacklightPower(brightness_);
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t ti_lp8556_bind(void* ctx, zx_device_t* parent) {
-  // Get platform device protocol
-  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_platform_device::Service::Device>(parent, "pdev");
-  if (pdev_client_end.is_error()) {
-    LOG_ERROR("Failed to connect to platform device: %s", pdev_client_end.status_string());
-    return pdev_client_end.status_value();
-  }
-  fdf::PDev pdev{std::move(pdev_client_end.value())};
-
-  // Map MMIO
-  zx::result mmio = pdev.MapMmio(0);
-  if (mmio.is_error()) {
-    LOG_ERROR("Failed to map mmio: %s", mmio.status_string());
-    return mmio.status_value();
-  }
-
-  // Obtain I2C protocol needed to control backlight
-  ddk::I2cChannel i2c(parent, "i2c");
-  if (!i2c.is_valid()) {
-    LOG_ERROR("Could not obtain I2C protocol\n");
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  fbl::AllocChecker ac;
-  auto dev =
-      fbl::make_unique_checked<ti::Lp8556Device>(&ac, parent, std::move(i2c), *std::move(mmio));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  if (zx_status_t status = dev->Init(); status != ZX_OK) {
-    return status;
-  }
-
-  zx_status_t status =
-      dev->DdkAdd(ddk::DeviceAddArgs("ti-lp8556").set_inspect_vmo(dev->InspectVmo()));
-  if (status != ZX_OK) {
-    LOG_ERROR("Could not add device\n");
-    return status;
-  }
-
-  // devmgr is now in charge of memory for dev
-  [[maybe_unused]] auto ptr = dev.release();
-
-  return status;
+void TiLp8556::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_adhoc_lp8556::Device> server) {
+  bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
 }
-
-static constexpr zx_driver_ops_t ti_lp8556_driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = ti_lp8556_bind;
-  return ops;
-}();
 
 }  // namespace ti
 
-ZIRCON_DRIVER(ti_lp8556, ti::ti_lp8556_driver_ops, "TI-LP8556", "0.1");
+FUCHSIA_DRIVER_EXPORT(ti::TiLp8556);
