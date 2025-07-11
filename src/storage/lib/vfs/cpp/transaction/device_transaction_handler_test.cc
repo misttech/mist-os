@@ -4,12 +4,28 @@
 
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <sanitizer/lsan_interface.h>
+#include <storage/buffer/block_buffer.h>
+#include <storage/operation/operation.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
+
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer) || \
+    __has_feature(hwaddress_sanitizer)
+#include <sanitizer/lsan_interface.h>
+#endif
 
 namespace {
 
@@ -47,7 +63,7 @@ class MockBlockDevice : public block_client::FakeBlockDevice {
 
 class MockTransactionHandler : public fs::DeviceTransactionHandler {
  public:
-  MockTransactionHandler() {}
+  MockTransactionHandler() = default;
   ~MockTransactionHandler() override {}
 
   const std::vector<block_fifo_request_t>& GetRequests() const { return device_.requests(); }

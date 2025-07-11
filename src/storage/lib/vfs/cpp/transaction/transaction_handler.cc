@@ -4,13 +4,10 @@
 
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
-#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <zircon/types.h>
 
-#include <utility>
-
-#include <fbl/algorithm.h>
-#include <fbl/macros.h>
-#include <fbl/vector.h>
+#include <storage/buffer/block_buffer.h>
+#include <storage/operation/operation.h>
 
 namespace fs {
 

@@ -18,26 +18,23 @@ static_library("transaction") {
   ]
 
   public_deps = [
-    "//sdk/lib/fit-promise",
-    "//zircon/system/ulib/fbl",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_c",
+    "//src/storage/lib/block_client/cpp:interface",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/storage/operation",
   ]
 
   deps = [
-    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/storage/operation",
   ]
 
   if (is_fuchsia) {
     sources += [ "device_transaction_handler.cc" ]
 
-    public_deps += [ "//src/storage/lib/block_client/cpp" ]
-
     deps += [
-      "//sdk/lib/fdio",
+      "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_c",
       "//src/storage/lib/trace:cpp",
-      "//zircon/system/ulib/zx",
     ]
   }
 }
@@ -49,14 +46,20 @@ group("tests") {
 
 test("fs-transaction-test") {
   output_name = "fs_transaction_test"
-  deps = [
-    "//src/lib/fxl/test:gtest_main",
-    "//src/storage/lib/block_client/cpp:fake_device",
-    "//src/storage/lib/vfs/cpp/transaction",
-  ]
   sources = [
     "buffered_operations_builder_test.cc",
     "device_transaction_handler_test.cc",
+  ]
+  deps = [
+    ":transaction",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_c",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/storage/lib/block_client/cpp:fake_device",
+    "//src/storage/lib/block_client/cpp:interface",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/storage/buffer",
+    "//zircon/system/ulib/storage/operation",
+    "//zircon/system/ulib/zx",
   ]
 }
 
