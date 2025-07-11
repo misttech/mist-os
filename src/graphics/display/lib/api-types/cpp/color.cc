@@ -7,7 +7,17 @@
 #include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
+#include <type_traits>
+
 namespace display {
+
+static_assert(std::is_standard_layout_v<Color>);
+static_assert(std::is_trivially_assignable_v<Color, Color>);
+static_assert(std::is_trivially_copyable_v<Color>);
+static_assert(std::is_trivially_copy_constructible_v<Color>);
+static_assert(std::is_trivially_destructible_v<Color>);
+static_assert(std::is_trivially_move_assignable_v<Color>);
+static_assert(std::is_trivially_move_constructible_v<Color>);
 
 // static
 void Color::StaticAsserts() {

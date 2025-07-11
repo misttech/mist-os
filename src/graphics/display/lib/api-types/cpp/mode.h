@@ -20,6 +20,9 @@ namespace display {
 //
 // Instances are guaranteed to represent display modes supported by the display
 // stack.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class Mode {
  private:
   // Enables creating instances using the designated initializer syntax.

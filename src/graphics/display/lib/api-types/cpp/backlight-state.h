@@ -17,6 +17,9 @@ namespace display {
 // See `::fuchsia_hardware_backlight::wire::State` for references.
 //
 // Instances are guaranteed to represent valid backlight states.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class BacklightState {
  private:
   // Enables creating instances using the designated initializer syntax.

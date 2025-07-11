@@ -14,6 +14,9 @@
 namespace display {
 
 // Equivalent to the FIDL type [`fuchsia.hardware.display.types/ImageTilingTypeIdValue`].
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class ImageTilingType {
  public:
   explicit constexpr ImageTilingType(

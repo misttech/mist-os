@@ -26,6 +26,9 @@ namespace display {
 // The canonical representation of empty region dimensions is 0x0 (width and
 // height are both zero). Instances are guaranteed to only use the canonical
 // representation for empty region dimensions.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class Dimensions {
  private:
   // Enables creating instances using the designated initializer syntax.

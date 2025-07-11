@@ -21,6 +21,9 @@ namespace display {
 // See `::fuchsia_images2::wire::PixelFormat` for references.
 //
 // Instances are guaranteed to represent values supported by the display stack.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class PixelFormat {
  public:
   // True iff `fidl_pixel_format` is convertible to a valid PixelFormat.

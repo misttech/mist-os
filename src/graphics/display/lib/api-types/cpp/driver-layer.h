@@ -20,6 +20,9 @@ namespace display {
 // Equivalent to the FIDL type [`fuchsia.hardware.display.engine/DriverLayer`].
 //
 // Instances are guaranteed to represent valid layer definitions.
+//
+// This is a value type. Instances can be stored in containers. Copying, moving
+// and destruction are trivial.
 class DriverLayer {
  private:
   // Enables creating instances using the designated initializer syntax.
