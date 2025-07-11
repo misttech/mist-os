@@ -79,7 +79,6 @@ impl FsckTest {
         );
         Ok(())
     }
-    // TODO(https://fxbug.dev/422604584): Validate layer file contents for root store.
     async fn run(&self, test_options: TestOptions) -> Result<(), Error> {
         let options = FsckOptions {
             fail_on_warning: true,
@@ -129,7 +128,7 @@ async fn install_items_in_store<K: Key, V: Value>(
     items: impl AsRef<[Item<K, V>]>,
 ) {
     let device = filesystem.device();
-    let root_store = filesystem.root_store();
+    let parent_store = store.parent_store().unwrap();
     let mut transaction = filesystem
         .clone()
         .new_transaction(lock_keys![], Options::default())
@@ -139,7 +138,7 @@ async fn install_items_in_store<K: Key, V: Value>(
         let object_id = store.get_next_object_id(transaction.txn_guard()).await.unwrap();
         let (key, unwrapped_key) = crypt.create_key(object_id, KeyPurpose::Data).await.unwrap();
         ObjectStore::create_object_with_key(
-            &root_store,
+            parent_store,
             &mut transaction,
             object_id,
             HandleOptions::default(),
@@ -149,7 +148,7 @@ async fn install_items_in_store<K: Key, V: Value>(
         .await
         .expect("create_object failed")
     } else {
-        ObjectStore::create_object(&root_store, &mut transaction, HandleOptions::default(), None)
+        ObjectStore::create_object(parent_store, &mut transaction, HandleOptions::default(), None)
             .await
             .expect("create_object failed")
     };
@@ -174,7 +173,7 @@ async fn install_items_in_store<K: Key, V: Value>(
     // were written (i.e. excluding any entries pending in the journal) so we read it and modify
     // it's layer files.
     let store_info_handle = ObjectStore::open_object(
-        &root_store,
+        parent_store,
         store.store_info_handle_object_id().unwrap(),
         HandleOptions::default(),
         None,
@@ -822,6 +821,32 @@ async fn test_overlapping_keys_in_layer_file() {
     test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
         .await
         .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Fatal(FsckFatal::OverlappingKeysInLayerFile(..))]
+    );
+}
+
+#[fuchsia::test]
+async fn test_overlapping_keys_in_root_store_layer_file() {
+    let mut test = FsckTest::new().await;
+
+    {
+        let fs = test.filesystem();
+        install_items_in_store(
+            &fs,
+            &fs.root_store(),
+            vec![
+                Item::new(ObjectKey::extent(1, 0, 0..20), ObjectValue::deleted_extent()),
+                Item::new(ObjectKey::extent(1, 0, 10..30), ObjectValue::deleted_extent()),
+                Item::new(ObjectKey::extent(1, 0, 15..40), ObjectValue::deleted_extent()),
+            ],
+        )
+        .await;
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
     assert_matches!(
         test.errors()[..],
         [FsckIssue::Fatal(FsckFatal::OverlappingKeysInLayerFile(..))]
