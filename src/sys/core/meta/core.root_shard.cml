@@ -393,6 +393,12 @@
             to: "#toolbox",
         },
         {
+            protocol: [ "fuchsia.dash.Launcher" ],
+            from: "#core",
+            to: "#toolbox",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.process.Resolver" ],
             from: "#core",
             to: "#bootstrap",

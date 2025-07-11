@@ -8,7 +8,7 @@ use fidl_fuchsia_dash as fdash;
 use futures::stream::StreamExt as _;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use target_holders::moniker;
+use target_holders::toolbox;
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -25,8 +25,8 @@ pub enum CommandStatus {
 pub struct ExploreTool {
     #[command]
     cmd: ExploreCommand,
-    #[with(fho::deferred(moniker("/core/debug-dash-launcher")))]
-    dash_launcher_proxy: fho::Deferred<fdash::LauncherProxy>,
+    #[with(toolbox())]
+    dash_launcher_proxy: fdash::LauncherProxy,
 }
 
 fho::embedded_plugin!(ExploreTool);
@@ -36,7 +36,7 @@ impl FfxMain for ExploreTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> Result<()> {
         #[allow(clippy::large_futures)]
-        match explore_cmd(self.cmd, self.dash_launcher_proxy.await?).await {
+        match explore_cmd(self.cmd, self.dash_launcher_proxy).await {
             Ok(()) => {
                 writer.machine(&CommandStatus::Ok {})?;
                 Ok(())

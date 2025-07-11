@@ -1645,7 +1645,10 @@ assembly_input_bundle("core_realm_development_access") {
       components = [
         {
           component_name = "toolbox"
-          shards = [ "//src/developer/remote-control/meta/remote-control.toolbox_shard.cml" ]
+          shards = [
+            "//src/developer/remote-control/meta/remote-control.toolbox_shard.cml",
+            "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher_from_core.toolbox_shard.cml",
+          ]
         },
       ]
     },
