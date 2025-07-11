@@ -313,6 +313,7 @@ fidl_library://fidl/fuchsia.pkg.resolution
 fidl_library://fidl/fuchsia.power
 fidl_library://fidl/fuchsia.power.broker (unstable)
 fidl_library://fidl/fuchsia.power.clientlevel
+fidl_library://fidl/fuchsia.power.observability (unstable)
 fidl_library://fidl/fuchsia.power.profile
 fidl_library://fidl/fuchsia.power.system
 fidl_library://fidl/fuchsia.power.systemmode

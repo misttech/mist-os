@@ -170,6 +170,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.pkg.resolution:fuchsia.pkg.resolution",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker",
   "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel",
+  "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability",
   "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile",
   "//sdk/fidl/fuchsia.power.system:fuchsia.power.system",
   "//sdk/fidl/fuchsia.power.systemmode:fuchsia.power.systemmode",
