@@ -6,6 +6,7 @@ use anyhow::{Context as _, Result};
 use async_fs::File;
 use async_lock::{Mutex, MutexGuard};
 use async_trait::async_trait;
+use fidl_fuchsia_tracing_controller::{ProvisionerProxy, TraceConfig};
 use fuchsia_async::Task;
 use futures::prelude::*;
 use futures::task::{Context as FutContext, Poll};
@@ -13,23 +14,40 @@ use protocols::prelude::*;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap};
 use std::pin::Pin;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
+use std::sync::atomic::AtomicU64;
 use std::time::{Duration, Instant};
 use tasks::TaskManager;
 use thiserror::Error;
 use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing_controller as trace};
 
+static SERIAL: AtomicU64 = AtomicU64::new(100);
+
 #[derive(Debug)]
 struct TraceTask {
-    target_info: ffx::TargetInfo,
+    /// Unique identifier for this task. The value of this id monotonicallly increases.
+    task_id: u64,
+    /// Tag used to identify this task in the log.
+    debug_tag: String,
+    /// Name of the output file for the trace data on the host machine.
+    /// The [TraceTask] instance may use this name to make a temporary file on the device.
+    /// The output_file will be used to rendezvous start and stop requests.
     output_file: String,
+    /// Trace configuration.
     config: trace::TraceConfig,
+    /// Trace session proxy to the tracing support on the device.
     proxy: Option<trace::SessionProxy>,
+    /// Trace options not part of the trace config.
     options: ffx::TraceOptions,
+    /// The result of the trace task .
     terminate_result: Rc<Mutex<trace::StopResult>>,
+    /// Start time of the task.
     start_time: Instant,
+    /// Channel used to shutdown this task.
     shutdown_sender: async_channel::Sender<()>,
+    /// The task.
     task: Task<()>,
+    /// Indicator that shutdown is completed.
     trace_shutdown_complete: Rc<Mutex<bool>>,
 }
 
@@ -150,47 +168,42 @@ async fn trace_shutdown(
 }
 
 impl TraceTask {
-    async fn new(
-        map: Weak<Mutex<TraceMap>>,
-        target_info: ffx::TargetInfo,
+    async fn new<F>(
+        debug_tag: String,
         output_file: String,
         options: ffx::TraceOptions,
         config: trace::TraceConfig,
         provisioner: trace::ProvisionerProxy,
-    ) -> Result<Self, TraceTaskStartError> {
-        let duration = options.duration;
+        on_complete: F,
+    ) -> Result<Self, TraceTaskStartError>
+    where
+        F: FnOnce() -> Pin<Box<dyn Future<Output = ()>>> + 'static,
+    {
+        // Start the tracing session immediately. Maybe we should consider separating the creating
+        // of the session and the actual starting of it. This seems like a side-effect.
         let (client, server) = fidl::Socket::create_stream();
         let client = fidl::AsyncSocket::from_socket(client);
         let f = File::create(&output_file).await.context("opening file")?;
         let (client_end, server_end) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
-        let expanded_categories = match config.categories.clone() {
-            Some(categories) => {
-                let context = ffx_config::global_env_context()
-                    .context("Discovering ffx environment context")?;
-                Some(ffx_trace::expand_categories(&context, categories)?)
-            }
-            None => None,
-        };
-        let config_with_expanded_categories =
-            trace::TraceConfig { categories: expanded_categories, ..config.clone() };
-        provisioner.initialize_tracing(server_end, &config_with_expanded_categories, server)?;
+        provisioner.initialize_tracing(server_end, &config, server)?;
         client_end
             .start_tracing(&trace::StartOptions::default())
             .await?
             .map_err(TraceTaskStartError::TracingStartError)?;
+
+        let duration = options.duration;
         let output_file_clone = output_file.clone();
-        let target_info_clone = target_info.clone();
-        let pipe_fut = async move {
-            log::debug!("{:?} -> {} starting trace.", target_info_clone, output_file_clone);
+        let debug_tag_clone = debug_tag.clone();
+
+        let copy_trace_fut = async move {
+            log::debug!("{} -> {output_file_clone} starting trace.", &debug_tag_clone);
             let mut out_file = f;
             let res = futures::io::copy(client, &mut out_file)
                 .await
                 .map_err(|e| log::warn!("file error: {:#?}", e));
             log::debug!(
-                "{:?} -> {} trace complete, result: {:#?}",
-                target_info_clone,
-                output_file_clone,
-                res
+                "{} -> {output_file_clone} trace complete, result: {res:#?}",
+                &debug_tag_clone
             );
             // async_fs files don't guarantee that the file is flushed on drop, so we need to
             // explicitly flush the file after writing.
@@ -204,7 +217,8 @@ impl TraceTask {
         let terminate_result = Rc::new(Mutex::new(trace::StopResult::default()));
         let (shutdown_sender, shutdown_receiver) = async_channel::bounded::<()>(1);
         Ok(Self {
-            target_info: target_info.clone(),
+            task_id: SERIAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            debug_tag: debug_tag.clone(),
             config,
             proxy: Some(client_end),
             options,
@@ -222,29 +236,14 @@ impl TraceTask {
                     }
                 })
                 .fuse();
-                let mut pipe_fut = Box::pin(pipe_fut).fuse();
+                let mut copy_trace_fut = Box::pin(copy_trace_fut).fuse();
                 let trigger_proxy = controller.clone();
                 let mut trigger_fut =
                     TriggersWatcher::new(&trigger_proxy, triggers, shutdown_receiver).fuse();
 
-                // pipe_fut waits for the trace task to end before completing. We explicitly
-                // remove the trace task after shutdown so that pip_fut can finish
-                // writing to the output file.
-                let drop_task_fut = async move {
-                    if let Some(map) = map.upgrade() {
-                        let mut map = map.lock().await;
-                        let _ = map.output_file_to_nodename.remove(&output_file);
-                        let _ = map.nodename_to_task.remove(&target_info.nodename.unwrap_or_else(
-                            || {
-                                log::info!(
-                                    "trace writing to '{}' has no target nodename",
-                                    output_file
-                                );
-                                String::new()
-                            },
-                        ));
-                    }
-                };
+                // Wrap the callback in an Option to ensure it's only called once.
+                let mut on_complete = Some(on_complete);
+
                 let shutdown_fut = async move {
                     let mut done = trace_shutdown_complete.lock().await;
                     if !*done {
@@ -263,17 +262,26 @@ impl TraceTask {
                     drop(controller);
                 };
                 futures::select! {
-                    _ = pipe_fut => {},
+                    // If copying the trace completes, that's fine.
+                    _ = copy_trace_fut => {},
+
+                    // Timeout, clean up and wait for copying to finish.
                     _ = timeout_fut => {
                         log::debug!("timeout reached, doing cleanup");
+                        // Shutdown the trace.
                         shutdown_fut.await;
+                        // Drop triggers, they are no longer needed.
                         drop(trigger_fut);
                         drop(trigger_proxy);
-                        let _ = futures::join!(
-                            drop_task_fut,
-                            pipe_fut
-                        );
+                        // Wait for drop task and copy to complete.
+                        if let Some(on_complete_fn) = on_complete.take() {
+                            log::debug!("running on_complete callback for {}", output_file);
+                            let _ = futures::join!(on_complete_fn(), copy_trace_fut);
+                        } else {
+                            copy_trace_fut.await;
+                        }
                     }
+                    // Trigger hit, shutdown and copy the trace.
                     action = trigger_fut => {
                         if let Some(action) = action {
                             match action {
@@ -285,17 +293,25 @@ impl TraceTask {
                         shutdown_fut.await;
                         drop(trigger_fut);
                         drop(trigger_proxy);
-                        let _ = futures::join!(
-                            drop_task_fut,
-                            pipe_fut
-                        );
+                        // Wait for drop task and copy to complete.
+                        if let Some(on_complete_fn) = on_complete.take() {
+                            log::debug!("running on_complete callback for {}", output_file);
+                            let _ = futures::join!(on_complete_fn(), copy_trace_fut);
+                        } else {
+                            copy_trace_fut.await;
+                        }
                     }
                 };
             }),
         })
     }
 
+    /// Shutdown the tracing task.
     async fn shutdown(mut self) -> Result<trace::StopResult, ffx::RecordingError> {
+        let debug_tag = self.debug_tag.clone();
+        let task_id = self.task_id;
+
+        // The scope here is to limit the lifetime of the mutex for the shutdown state.
         {
             let proxy = self.proxy.take().expect("missing trace session proxy");
             let mut trace_shutdown_done = self.trace_shutdown_complete.lock().await;
@@ -306,33 +322,42 @@ impl TraceTask {
                         *terminate_result_guard = trace_result.into();
                     }
                     Err(e) => {
-                        log::warn!("error shutting down trace: {:?}", e);
+                        log::warn!(
+                            "trace task {debug_tag}:{task_id} error shutting down trace: {:?}",
+                            e
+                        );
                     }
                 };
                 *trace_shutdown_done = true;
             }
         }
-        let target_info_clone = self.target_info.clone();
         let output_file = self.output_file.clone();
         let terminate_result: Rc<Mutex<trace::StopResult>> = self.terminate_result.clone();
         let _ = self.shutdown_sender.send(()).await;
+
         self.await;
-        log::trace!("trace task {:?} -> {} shutdown completed", target_info_clone, output_file);
+        log::trace!("trace task {debug_tag}:{task_id} -> {output_file} shutdown completed.");
         let terminate_result_guard = terminate_result.lock().await;
         Ok(terminate_result_guard.clone())
     }
 }
 
-#[derive(Default)]
+/// Struct to hold on to an instance ot TraceTask started by the daemon.
+#[derive(Debug)]
+struct TraceTaskEntry {
+    pub task: TraceTask,
+    pub target_info: ffx::TargetInfo,
+}
+#[derive(Default, Debug)]
 struct TraceMap {
-    nodename_to_task: HashMap<String, TraceTask>,
+    nodename_to_task: HashMap<String, TraceTaskEntry>,
     output_file_to_nodename: HashMap<String, String>,
 }
 
 #[ffx_protocol]
 #[derive(Default)]
 pub struct TracingProtocol {
-    tasks: Rc<Mutex<TraceMap>>,
+    task_map: Rc<Mutex<TraceMap>>,
     iter_tasks: TaskManager,
 }
 
@@ -353,10 +378,10 @@ impl TracingProtocol {
     async fn remove_output_file_or_find_target_nodename(
         &self,
         cx: &Context,
-        tasks: &mut MutexGuard<'_, TraceMap>,
+        task_map: &mut MutexGuard<'_, TraceMap>,
         output_file: &String,
     ) -> Result<String, ffx::RecordingError> {
-        match tasks.output_file_to_nodename.remove(output_file) {
+        match task_map.output_file_to_nodename.remove(output_file) {
             Some(n) => Ok(n),
             None => {
                 let target = cx
@@ -383,6 +408,119 @@ impl TracingProtocol {
             }
         }
     }
+
+    // StartRecording handler for the task protocol. The return
+    // matches the API for start_recording; a target_info or a recording object,
+    async fn start_recording<'a>(
+        &self,
+        target_info: &'a ffx::TargetInfo,
+        provisioner: ProvisionerProxy,
+        output_file: String,
+        options: ffx::TraceOptions,
+        trace_config: TraceConfig,
+    ) -> Result<&'a ffx::TargetInfo, ffx::RecordingError> {
+        let mut task_map = self.task_map.lock().await;
+
+        // This should functionally never happen (a target whose nodename isn't
+        // known after having been identified for service discovery would be a
+        // critical error).
+        let nodename = if let Some(name) = &target_info.nodename {
+            name.clone()
+        } else {
+            return Err::<&ffx::TargetInfo, ffx::RecordingError>(
+                ffx::RecordingError::TargetProxyOpen,
+            );
+        };
+        match task_map.output_file_to_nodename.entry(output_file.clone()) {
+            Entry::Occupied(_) => return Err(ffx::RecordingError::DuplicateTraceFile),
+            Entry::Vacant(e) => {
+                // Expand any configuration groups defined in config.
+                let expanded_categories = match trace_config.categories.clone() {
+                    Some(categories) => {
+                        let context = match ffx_config::global_env_context()
+                            .context("Discovering ffx environment context")
+                        {
+                            Ok(c) => c,
+                            Err(e) => {
+                                log::error!("Could not get global env context: {e}");
+                                return Err(ffx::RecordingError::RecordingStart);
+                            }
+                        };
+
+                        match ffx_trace::expand_categories(&context, categories) {
+                            Ok(expanded_categories) => Some(expanded_categories),
+                            Err(e) => {
+                                log::error!("Could not expand categories: {e}");
+                                return Err(ffx::RecordingError::RecordingStart);
+                            }
+                        }
+                    }
+                    None => None,
+                };
+                let config_with_expanded_categories =
+                    trace::TraceConfig { categories: expanded_categories, ..trace_config.clone() };
+
+                // Make a callback to clean up the task map.
+                let task_map_for_cleanup = self.task_map.clone();
+                let output_file_for_cleanup = output_file.clone();
+                let on_complete_callback = move || {
+                    let task_map = task_map_for_cleanup.clone();
+                    let output_file = output_file_for_cleanup.clone();
+                    Box::pin(async move {
+                        let mut map = task_map.lock().await;
+                        // The cleanup logic is the same, just inside this async block.
+                        if let Some(nodename) = map.output_file_to_nodename.remove(&output_file) {
+                            map.nodename_to_task.remove(&nodename);
+                            log::debug!("cleaned up task for output file: {}", output_file);
+                        } else {
+                            log::warn!(
+                                "could not find output file '{}' in map for cleanup",
+                                output_file
+                            );
+                        }
+                    }) as Pin<Box<dyn Future<Output = ()> + 'static>>
+                };
+
+                let task = match TraceTask::new(
+                    // Use the target info as the task name
+                    format!("{target_info:?}"),
+                    output_file.clone(),
+                    options,
+                    config_with_expanded_categories,
+                    provisioner,
+                    on_complete_callback,
+                )
+                .await
+                {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::warn!("unable to start trace: {:?}", e);
+                        let res = match e {
+                            TraceTaskStartError::TracingStartError(t) => match t {
+                                trace::StartError::AlreadyStarted => {
+                                    Err(ffx::RecordingError::RecordingAlreadyStarted)
+                                }
+                                e => {
+                                    log::warn!("Start error: {:?}", e);
+                                    Err(ffx::RecordingError::RecordingStart)
+                                }
+                            },
+                            e => {
+                                log::warn!("Start error: {:?}", e);
+                                Err(ffx::RecordingError::RecordingStart)
+                            }
+                        };
+                        return res;
+                    }
+                };
+                e.insert(nodename.clone());
+                task_map
+                    .nodename_to_task
+                    .insert(nodename, TraceTaskEntry { task, target_info: target_info.clone() });
+            }
+        }
+        Ok(target_info)
+    }
 }
 
 #[async_trait(?Send)]
@@ -399,10 +537,8 @@ impl FidlProtocol for TracingProtocol {
                 target_config,
                 responder,
             } => {
-                let mut tasks = self.tasks.lock().await;
-                let target_query = target_query.string_matcher;
                 let (target_info, provisioner) =
-                    match get_controller_proxy(target_query.as_ref(), cx).await {
+                    match get_controller_proxy(target_query.string_matcher.as_ref(), cx).await {
                         Ok(p) => p,
                         Err(e) => {
                             log::warn!("getting target controller proxy: {:?}", e);
@@ -411,81 +547,43 @@ impl FidlProtocol for TracingProtocol {
                                 .map_err(Into::into);
                         }
                     };
-                // This should functionally never happen (a target whose nodename isn't
-                // known after having been identified for service discovery would be a
-                // critical error).
-                let nodename = match target_info.nodename {
-                    Some(ref n) => n.clone(),
-                    None => {
-                        log::warn!(
-                            "query does not match a valid target with nodename: {:?}",
-                            target_query
-                        );
-                        return responder
-                            .send(Err(ffx::RecordingError::TargetProxyOpen))
-                            .map_err(Into::into);
-                    }
-                };
-                match tasks.output_file_to_nodename.entry(output_file.clone()) {
-                    Entry::Occupied(_) => {
-                        return responder
-                            .send(Err(ffx::RecordingError::DuplicateTraceFile))
-                            .map_err(Into::into);
-                    }
-                    Entry::Vacant(e) => {
-                        let task = match TraceTask::new(
-                            Rc::downgrade(&self.tasks),
-                            target_info.clone(),
-                            output_file.clone(),
-                            options,
-                            target_config,
-                            provisioner,
-                        )
-                        .await
-                        {
-                            Ok(t) => t,
-                            Err(e) => {
-                                log::warn!("unable to start trace: {:?}", e);
-                                let res = match e {
-                                    TraceTaskStartError::TracingStartError(t) => match t {
-                                        trace::StartError::AlreadyStarted => {
-                                            Err(ffx::RecordingError::RecordingAlreadyStarted)
-                                        }
-                                        e => {
-                                            log::warn!("Start error: {:?}", e);
-                                            Err(ffx::RecordingError::RecordingStart)
-                                        }
-                                    },
-                                    e => {
-                                        log::warn!("Start error: {:?}", e);
-                                        Err(ffx::RecordingError::RecordingStart)
-                                    }
-                                };
-                                return responder.send(res).map_err(Into::into);
-                            }
-                        };
-                        e.insert(nodename.clone());
-                        tasks.nodename_to_task.insert(nodename, task);
-                    }
+                if target_info.nodename.is_none() {
+                    let target_query = target_query.string_matcher;
+                    // This should functionally never happen (a target whose nodename isn't
+                    // known after having been identified for service discovery would be a
+                    // critical error).
+                    log::warn!(
+                        "query does not match a valid target with nodename: {:?}",
+                        target_query
+                    );
+                    return responder
+                        .send(Err(ffx::RecordingError::TargetProxyOpen))
+                        .map_err(Into::into);
                 }
-                responder.send(Ok(&target_info)).map_err(Into::into)
+                let result = self
+                    .start_recording(&target_info, provisioner, output_file, options, target_config)
+                    .await;
+                responder.send(result).map_err(Into::into)
             }
             ffx::TracingRequest::StopRecording { name, responder } => {
-                let task = {
-                    let mut tasks = self.tasks.lock().await;
+                let task_entry = {
+                    let mut task_map = self.task_map.lock().await;
                     let nodename = match self
-                        .remove_output_file_or_find_target_nodename(cx, &mut tasks, &name)
+                        .remove_output_file_or_find_target_nodename(cx, &mut task_map, &name)
                         .await
                     {
                         Ok(n) => n,
-                        Err(e) => return responder.send(Err(e)).map_err(Into::into),
+                        Err(e) => {
+                            return responder.send(Err(e)).map_err(Into::into);
+                        }
                     };
-                    if let Some(task) = tasks.nodename_to_task.remove(&nodename) {
+                    if let Some(task_entry) = task_map.nodename_to_task.remove(&nodename) {
                         // If we have found the task using nodename and not output file, the
                         // output_file_to_nodename mapping might still be around. Explicitly
                         // remove it to be sure.
-                        let _ = tasks.output_file_to_nodename.remove(&task.output_file);
-                        task
+                        let _ =
+                            task_map.output_file_to_nodename.remove(&task_entry.task.output_file);
+                        task_entry
                     } else {
                         // TODO(https://fxbug.dev/42167418)
                         log::warn!("no task associated with trace file '{}'", name);
@@ -494,11 +592,11 @@ impl FidlProtocol for TracingProtocol {
                             .map_err(Into::into);
                     }
                 };
-                let output_file = task.output_file.clone();
-                let target_info = task.target_info.clone();
-                let categories = task.config.categories.clone().unwrap_or_default();
+                let output_file = task_entry.task.output_file.clone();
+                let target_info = task_entry.target_info.clone();
+                let categories = task_entry.task.config.categories.clone().unwrap_or_default();
                 responder
-                    .send(match task.shutdown().await {
+                    .send(match task_entry.task.shutdown().await {
                         Ok(ref result) => Ok((&target_info, &output_file, &categories, result)),
                         Err(e) => Err(e),
                     })
@@ -507,23 +605,23 @@ impl FidlProtocol for TracingProtocol {
             ffx::TracingRequest::Status { iterator, responder } => {
                 let mut stream = iterator.into_stream();
                 let res = self
-                    .tasks
+                    .task_map
                     .lock()
                     .await
                     .nodename_to_task
                     .values()
                     .map(|t| ffx::TraceInfo {
                         target: Some(t.target_info.clone()),
-                        output_file: Some(t.output_file.clone()),
-                        duration: t.options.duration.clone(),
-                        remaining_runtime: t.options.duration.clone().map(|d| {
+                        output_file: Some(t.task.output_file.clone()),
+                        duration: t.task.options.duration.clone(),
+                        remaining_runtime: t.task.options.duration.clone().map(|d| {
                             Duration::from_secs_f64(d)
-                                .checked_sub(t.start_time.elapsed())
+                                .checked_sub(t.task.start_time.elapsed())
                                 .unwrap_or(Duration::from_secs(0))
                                 .as_secs_f64()
                         }),
-                        config: Some(t.config.clone()),
-                        triggers: t.options.triggers.clone(),
+                        config: Some(t.task.config.clone()),
+                        triggers: t.task.options.triggers.clone(),
                         ..Default::default()
                     })
                     .collect::<Vec<_>>();
@@ -545,9 +643,9 @@ impl FidlProtocol for TracingProtocol {
 
     async fn stop(&mut self, _cx: &Context) -> Result<()> {
         let tasks = {
-            let mut tasks = self.tasks.lock().await;
-            tasks.output_file_to_nodename.clear();
-            tasks.nodename_to_task.drain().map(|(_, v)| v.shutdown()).collect::<Vec<_>>()
+            let mut task_map = self.task_map.lock().await;
+            task_map.output_file_to_nodename.clear();
+            task_map.nodename_to_task.drain().map(|(_, v)| v.task.shutdown()).collect::<Vec<_>>()
         };
         futures::future::join_all(tasks).await;
         Ok(())
@@ -618,7 +716,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trace_start_stop_write_check() {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeProvisioner>()
@@ -649,7 +747,7 @@ mod tests {
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trace_error_double_start() {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeProvisioner>()
@@ -688,7 +786,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trace_error_handling_already_started() {
         let fake_provisioner = Rc::new(RefCell::new(FakeProvisioner::default()));
         fake_provisioner.borrow_mut().start_error.replace(trace::StartError::AlreadyStarted);
@@ -717,7 +815,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trace_error_handling_generic_start_error() {
         let fake_provisioner = Rc::new(RefCell::new(FakeProvisioner::default()));
         fake_provisioner.borrow_mut().start_error.replace(trace::StartError::NotInitialized);
@@ -746,7 +844,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trace_shutdown_no_trace() {
         let daemon = FakeDaemonBuilder::new().register_fidl_protocol::<TracingProtocol>().build();
         let proxy = daemon.open_proxy::<ffx::TracingMarker>().await;
@@ -758,7 +856,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trace_duration_shutdown_via_output_file() {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeProvisioner>()
@@ -787,11 +885,11 @@ mod tests {
         let mut res = String::new();
         f.read_to_string(&mut res).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
-        let tasks = protocol.borrow().tasks.clone();
-        assert!(tasks.lock().await.nodename_to_task.is_empty());
+        let task_map = protocol.borrow().task_map.clone();
+        assert!(task_map.lock().await.nodename_to_task.is_empty());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_trace_duration_shutdown_via_nodename() {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeProvisioner>()
@@ -820,8 +918,8 @@ mod tests {
         let mut res = String::new();
         f.read_to_string(&mut res).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
-        let tasks = protocol.borrow().tasks.clone();
-        assert!(tasks.lock().await.nodename_to_task.is_empty());
+        let task_map = protocol.borrow().task_map.clone();
+        assert!(task_map.lock().await.nodename_to_task.is_empty());
     }
 
     fn spawn_fake_alert_watcher(alert: &'static str) -> trace::SessionProxy {
@@ -841,7 +939,7 @@ mod tests {
         proxy
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_triggers_valid() {
         let proxy = spawn_fake_alert_watcher("foober");
         let (_sender, receiver) = async_channel::bounded::<()>(1);
@@ -857,7 +955,7 @@ mod tests {
         assert_eq!(res, Some(ffx::Action::Terminate));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_triggers_server_dropped() {
         let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
         let (_sender, receiver) = async_channel::bounded::<()>(1);

@@ -31,7 +31,10 @@ rustc_library("ffx_daemon_protocol_tracing") {
     "//third_party/rust_crates:thiserror",
   ]
 
-  test_deps = [ "//third_party/rust_crates:tempfile" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:tempfile",
+  ]
 
   sources = [ "src/lib.rs" ]
 }

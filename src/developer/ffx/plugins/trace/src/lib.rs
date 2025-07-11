@@ -342,7 +342,7 @@ pub async fn trace(
             };
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
-                categories: Some(opts.categories),
+                categories: Some(expanded_categories.clone()),
                 buffering_mode: Some(opts.buffering_mode),
                 defer_transfer: Some(defer_transfer),
                 ..ffx_trace::map_categories_to_providers(&expanded_categories)
@@ -359,7 +359,10 @@ pub async fn trace(
             if let Err(e) = res {
                 ffx_bail!("{}", handle_recording_error(&context, e, &output).await);
             }
-            writer.line(format!("Tracing categories: [{}]...", expanded_categories.join(","),))?;
+            writer.line(format!(
+                "Tracing categories: [{}]...",
+                trace_config.categories.unwrap().join(","),
+            ))?;
             if opts.background {
                 writer.line("To manually stop the trace, use `ffx trace stop`")?;
                 writer.line("Current tracing status:")?;
