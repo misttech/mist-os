@@ -371,15 +371,23 @@ struct Config {
     pub dns_config: DnsConfig,
     pub filter_config: FilterConfig,
     pub filter_enabled_interface_types: HashSet<InterfaceType>,
+    // NB: `InterfaceMetrics` custom default behavior sets all included
+    // interface types to the same metric. It is encouraged to set at least one
+    // metric for predictable packet routing on a multinetworked system.
     #[serde(default)]
     pub interface_metrics: InterfaceMetrics,
+    // NB: `AllowedDeviceClasses` custom default behavior is permissive. To
+    // permit a subset of device classes, specify this in configuration.
     #[serde(default)]
     pub allowed_upstream_device_classes: AllowedDeviceClasses,
+    // NB: See above.
     #[serde(default)]
     pub allowed_bridge_upstream_device_classes: AllowedDeviceClasses,
     // TODO(https://fxbug.dev/42173732): default to false.
     #[serde(default = "dhcpv6_enabled_default")]
     pub enable_dhcpv6: bool,
+    // NB: `ForwardedDeviceClasses` custom default behavior is restrictive. To
+    // permit a subset of device classes, specify this in configuration.
     #[serde(default)]
     pub forwarded_device_classes: ForwardedDeviceClasses,
     #[serde(default)]
