@@ -604,12 +604,12 @@ TEEC_Result PostprocessOperation(
   // returned list of parameter structures may be less than those originally
   // be provided to the operation (e.g., in stripping trailing input
   // parameters). At least check that this number isn't somehow now greater.
-  if (parameter_set.count() > CountOperationParameters(*out_operation)) {
+  if (parameter_set.size() > CountOperationParameters(*out_operation)) {
     return TEEC_ERROR_BAD_PARAMETERS;
   }
 
   TEEC_Result rc = TEEC_SUCCESS;
-  for (size_t i = 0; i < parameter_set.count(); i++) {
+  for (size_t i = 0; i < parameter_set.size(); i++) {
     uint32_t param_type = GetParamTypeForIndex(out_operation->paramTypes, i);
 
     switch (param_type) {

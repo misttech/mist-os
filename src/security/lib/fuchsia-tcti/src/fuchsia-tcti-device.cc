@@ -75,7 +75,7 @@ int fuchsia_tpm_send(opaque_ctx_t* context, int command_code, const uint8_t* buf
     return result.value().error_value();
   }
   auto response = *result.value();
-  if (response->data.count() > 0) {
+  if (response->data.size() > 0) {
     internal_context->recv_buffer.insert(internal_context->recv_buffer.end(),
                                          response->data.begin(), response->data.end());
   }

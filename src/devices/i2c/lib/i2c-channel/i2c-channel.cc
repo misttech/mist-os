@@ -103,11 +103,11 @@ zx::result<size_t> I2cChannel::WriteReadSync(std::span<const uint8_t> write_data
   if (read_size > 0) {
     const auto& read_data_src = reply->value()->read_data;
     // Truncate the returned buffer to match the behavior of the Banjo version.
-    if (read_data_src.count() != 1) {
+    if (read_data_src.size() != 1) {
       return zx::error(ZX_ERR_IO);
     }
 
-    bytes_read = std::min(read_size, read_data_src[0].count());
+    bytes_read = std::min(read_size, read_data_src[0].size());
     memcpy(read_data.data(), read_data_src[0].data(), bytes_read);
   }
 

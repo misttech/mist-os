@@ -129,7 +129,7 @@ OtRadioBlResult OtRadioDeviceBootloader::SendSpiCmdAndGetResponse(uint8_t *cmd, 
       size_t read_length = exp_resp_size;
       auto receive_result = dev_handle_->spi_->ReceiveVector(read_length);
       if (receive_result.ok() && receive_result->status == ZX_OK) {
-        rx_actual = receive_result->data.count();
+        rx_actual = receive_result->data.size();
         memcpy(dev_handle_->spi_rx_buffer_, receive_result->data.data(), rx_actual);
       }
       zxlogf(DEBUG, "ot-radio: rx_actual %lu expected : %lu", rx_actual, read_length);

@@ -2037,7 +2037,7 @@ TEST(Sysmem, DuplicateSyncV1) {
   auto duplicate_result =
       token_1->DuplicateSync(fidl::VectorView<zx_rights_t>::FromExternal(rights_attenuation_masks));
   ASSERT_OK(duplicate_result);
-  ASSERT_EQ(duplicate_result.value().tokens.count(), 1);
+  ASSERT_EQ(duplicate_result.value().tokens.size(), 1);
   auto token_client_2 = std::move(duplicate_result.value().tokens[0]);
 
   auto [collection_client_1, collection_server_1] =
@@ -2078,7 +2078,7 @@ TEST(Sysmem, DuplicateSyncV1) {
   auto duplicate_result_2 = token_2->DuplicateSync(
       fidl::VectorView<zx_rights_t>::FromExternal(rights_attenuation_masks_2));
   ASSERT_OK(duplicate_result_2);
-  ASSERT_EQ(duplicate_result_2->tokens.count(), 2);
+  ASSERT_EQ(duplicate_result_2->tokens.size(), 2);
 
   ASSERT_NE(token_2.client_end().channel().get(), ZX_HANDLE_INVALID);
   ASSERT_OK(allocator->BindSharedCollection(token_2.TakeClientEnd(),

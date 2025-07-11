@@ -112,7 +112,7 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::GetMaxFrameSize(
 
 void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView request,
                                                           SendFrameCompleter::Sync& completer) {
-  [[maybe_unused]] auto data_count = request->data.count();
+  [[maybe_unused]] auto data_count = request->data.size();
   TRACE_DURATION(kOtRadioTraceCategory, __func__, "ot_radio_obj_.power_status_",
                  ot_radio_obj_.power_status_, "request->data.count()", data_count,
                  "ot_radio_obj_.outbound_allowance", ot_radio_obj_.outbound_allowance_,
@@ -121,7 +121,7 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView r
     // TODO(https://fxbug.dev/42176667): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
         ->OnError(lowpan_spinel_fidl::wire::Error::kClosed, false);
-  } else if (request->data.count() > kMaxFrameSize) {
+  } else if (request->data.size() > kMaxFrameSize) {
     // TODO(https://fxbug.dev/42176667): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
         ->OnError(lowpan_spinel_fidl::wire::Error::kOutboundFrameTooLarge, false);
@@ -133,7 +133,7 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView r
     completer.Close(ZX_ERR_IO_OVERRUN);
   } else {
     // All good, send out the frame.
-    zx_status_t res = ot_radio_obj_.RadioPacketTx(request->data.begin(), request->data.count());
+    zx_status_t res = ot_radio_obj_.RadioPacketTx(request->data.begin(), request->data.size());
     if (res != ZX_OK) {
       zxlogf(ERROR, "Error in handling send frame req: %s", zx_status_get_string(res));
     } else {

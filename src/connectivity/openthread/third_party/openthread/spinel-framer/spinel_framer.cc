@@ -129,7 +129,7 @@ zx_status_t SpinelFramer::DoSpiXfer(uint16_t len) {
   if (!result.ok()) {
     return result.status();
   }
-  if (result->rxdata.count() != tot_len) {
+  if (result->rxdata.size() != tot_len) {
     return ZX_ERR_BAD_STATE;
   }
 

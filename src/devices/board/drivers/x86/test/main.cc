@@ -81,7 +81,7 @@ TEST(X86Board, ListTableEntries) {
   const auto& response = *result->value();
 
   // We expect to find at least a DSDT entry.
-  EXPECT_GE(response.entries.count(), 1);
+  EXPECT_GE(response.entries.size(), 1);
   bool found_dsdt = false;
   for (const TableInfo& info : response.entries) {
     if (SignatureToString(info.name) != "DSDT") {
