@@ -1611,7 +1611,8 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   const config_stamp_t invalid_banjo_config_stamp =
       display::ToBanjoDriverConfigStamp(virtcon_initial_driver_config_stamp);
   CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
-      ToBanjoDisplayId(primary_client->state().display_id()), 0u, &invalid_banjo_config_stamp);
+      display::ToBanjoDisplayId(primary_client->state().display_id()), 0u,
+      &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   ASSERT_EQ(1u, primary_client->state().vsync_count());

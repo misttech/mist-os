@@ -158,9 +158,9 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
     if (!acknowledge_request_sent_) {
       // We have not sent a (new) cookie to client for acknowledgement; do it now.
       // First, increment cookie sequence.
-      cookie_sequence_++;
+      ++vsync_cookie_sequence_;
       // Generate new cookie by xor'ing initial cookie with sequence number.
-      vsync_ack_cookie = initial_cookie_ ^ cookie_sequence_;
+      vsync_ack_cookie = display::VsyncAckCookie(vsync_cookie_salt_ ^ vsync_cookie_sequence_);
     } else {
       // Client has already been notified; check if client has acknowledged it.
       ZX_DEBUG_ASSERT(last_cookie_sent_ != display::kInvalidVsyncAckCookie);
@@ -191,7 +191,7 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
 
   auto cleanup = fit::defer([&]() {
     if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
-      cookie_sequence_--;
+      --vsync_cookie_sequence_;
     }
     // Make sure status is not `ZX_ERR_BAD_HANDLE`, otherwise channel write may crash (depending on
     // policy setting).
@@ -296,7 +296,7 @@ zx_status_t ClientProxy::Init(
   is_owner_property_ = node_.CreateBool("is_owner", false);
 
   unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
-  initial_cookie_ = display::VsyncAckCookie(rand_r(&seed));
+  vsync_cookie_salt_ = rand_r(&seed);
 
   fidl::OnUnboundFn<Client> unbound_callback =
       [this](Client* client, fidl::UnbindInfo info,

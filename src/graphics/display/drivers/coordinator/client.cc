@@ -326,16 +326,15 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
 
   fbl::AllocChecker alloc_checker;
   display::LayerId layer_id = next_layer_id_;
-  ++next_layer_id_;
   auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, &controller_, layer_id);
   if (!alloc_checker.check()) {
-    --next_layer_id_;
     completer.ReplyError(ZX_ERR_NO_MEMORY);
     return;
   }
+  ++next_layer_id_;
 
   layers_.insert(std::move(new_layer));
-  completer.ReplySuccess(ToFidlLayerId(layer_id));
+  completer.ReplySuccess(display::ToFidlLayerId(layer_id));
 }
 
 void Client::DestroyLayer(DestroyLayerRequestView request,
@@ -1212,8 +1211,8 @@ fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time timesta
   }
 
   fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
-      ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
-      ToFidlVsyncAckCookie(vsync_ack_cookie));
+      display::ToFidlDisplayId(display_id), timestamp.get(),
+      display::ToFidlConfigStamp(config_stamp), display::ToFidlVsyncAckCookie(vsync_ack_cookie));
   return send_call_result;
 }
 
@@ -1248,14 +1247,14 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
       continue;
     }
 
-    display_config->applied_.display_id = ToBanjoDisplayId(display_config->id());
+    display_config->applied_.display_id = display::ToBanjoDisplayId(display_config->id());
     display_config->applied_.layer_list = nullptr;
     display_config->applied_.layer_count = 0;
 
     std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
-    display_config->applied_.mode = ToBanjoDisplayMode(display_timings[0]);
+    display_config->applied_.mode = display::ToBanjoDisplayMode(display_timings[0]);
 
     display_config->applied_.cc_flags = 0;
 

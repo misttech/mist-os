@@ -153,8 +153,8 @@ class ClientProxy {
   };
 
   fbl::RingBuffer<VsyncMessageData, kVsyncBufferSize> buffered_vsync_messages_;
-  display::VsyncAckCookie initial_cookie_ = display::VsyncAckCookie(0);
-  display::VsyncAckCookie cookie_sequence_ = display::VsyncAckCookie(0);
+  uint64_t vsync_cookie_salt_ = 0;
+  uint64_t vsync_cookie_sequence_ = 0;
 
   uint64_t number_of_vsyncs_sent_ = 0;
   display::VsyncAckCookie last_cookie_sent_ = display::kInvalidVsyncAckCookie;

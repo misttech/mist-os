@@ -268,7 +268,7 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
       current_layers_fidl_id.push_back(display::ToFidlLayerId(layer_id));
     }
     if (!dc->SetDisplayLayers(
-               ToFidlDisplayId(display.id()),
+               display::ToFidlDisplayId(display.id()),
                fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(
                    current_layers_fidl_id))
              .ok()) {

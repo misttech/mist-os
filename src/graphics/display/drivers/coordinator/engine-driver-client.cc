@@ -134,7 +134,7 @@ void EngineDriverClient::ReleaseImage(display::DriverImageId driver_image_id) {
   if (use_engine_) {
     fdf::Arena arena(kArenaTag);
     fidl::OneWayStatus result =
-        fidl_engine_.buffer(arena)->ReleaseImage(ToFidlDriverImageId(driver_image_id));
+        fidl_engine_.buffer(arena)->ReleaseImage(display::ToFidlDriverImageId(driver_image_id));
     if (!result.ok()) {
       fdf::error("ReleaseImage failed: {}", result.status_string());
     }
@@ -142,7 +142,7 @@ void EngineDriverClient::ReleaseImage(display::DriverImageId driver_image_id) {
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.ReleaseImage(ToBanjoDriverImageId(driver_image_id));
+  banjo_engine_.ReleaseImage(display::ToBanjoDriverImageId(driver_image_id));
 }
 
 zx::result<> EngineDriverClient::ReleaseCapture(
@@ -150,13 +150,13 @@ zx::result<> EngineDriverClient::ReleaseCapture(
   if (use_engine_) {
     fdf::Arena arena(kArenaTag);
     fdf::WireUnownedResult result = fidl_engine_.buffer(arena)->ReleaseCapture(
-        ToFidlDriverCaptureImageId(driver_capture_image_id));
+        display::ToFidlDriverCaptureImageId(driver_capture_image_id));
     return zx::make_result(result.status());
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
   zx_status_t banjo_status =
-      banjo_engine_.ReleaseCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
+      banjo_engine_.ReleaseCapture(display::ToBanjoDriverCaptureImageId(driver_capture_image_id));
   return zx::make_result(banjo_status);
 }
 
@@ -307,7 +307,7 @@ zx::result<> EngineDriverClient::StartCapture(
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
   zx_status_t banjo_status =
-      banjo_engine_.StartCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
+      banjo_engine_.StartCapture(display::ToBanjoDriverCaptureImageId(driver_capture_image_id));
   return zx::make_result(banjo_status);
 }
 
@@ -317,7 +317,8 @@ zx::result<> EngineDriverClient::SetDisplayPower(display::DisplayId display_id, 
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  zx_status_t banjo_status = banjo_engine_.SetDisplayPower(ToBanjoDisplayId(display_id), power_on);
+  zx_status_t banjo_status =
+      banjo_engine_.SetDisplayPower(display::ToBanjoDisplayId(display_id), power_on);
   return zx::make_result(banjo_status);
 }
 

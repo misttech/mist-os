@@ -1738,7 +1738,7 @@ bool Controller::CalculatePipeAllocation(
     DisplayDevice* display = FindDevice(display_id);
     if (display != nullptr && display->pipe() == nullptr) {
       for (unsigned pipe_num = 0; pipe_num < display_allocated_to_pipe.size(); pipe_num++) {
-        if (!display_allocated_to_pipe[pipe_num]) {
+        if (display_allocated_to_pipe[pipe_num] == display::kInvalidDisplayId) {
           display_allocated_to_pipe[pipe_num] = display_id;
           break;
         }

@@ -119,7 +119,7 @@ void Layer::ApplyChanges() {
   }
 
   if (applied_image_ != nullptr) {
-    applied_layer_config_.image_handle = ToBanjoDriverImageId(applied_image_->driver_id());
+    applied_layer_config_.image_handle = display::ToBanjoDriverImageId(applied_image_->driver_id());
   } else {
     applied_layer_config_.image_handle = INVALID_DISPLAY_ID;
   }
@@ -175,7 +175,7 @@ bool Layer::ActivateLatestReadyImage() {
                                                 applied_image_->latest_client_config_stamp()));
 
   applied_image_ = std::move(newest_ready_image);
-  applied_layer_config_.image_handle = ToBanjoDriverImageId(applied_image_->driver_id());
+  applied_layer_config_.image_handle = display::ToBanjoDriverImageId(applied_image_->driver_id());
 
   // TODO(costan): `applied_layer_config_` is updated without updating
   // `draft_layer_config_differs_from_applied_`. Is it guaranteed that the
