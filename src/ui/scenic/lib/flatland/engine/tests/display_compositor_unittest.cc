@@ -171,7 +171,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     display_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         dispatcher(), std::move(shared_display_coordinator), renderer_,
         utils::CreateSysmemAllocatorSyncPtr("display_compositor_unittest"),
-        /*enable_display_composition*/ true, /*max_display_layers=*/2, /*visual_debug_level=*/0);
+        flatland::DisplayCompositorConfig{.max_display_layers = 2});
   }
 
   void TearDown() override {
@@ -216,7 +216,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
   }
 
   void ForceRendererOnlyMode(bool force_renderer_only) {
-    display_compositor_->enable_display_composition_ = !force_renderer_only;
+    const_cast<bool&>(display_compositor_->config_.enable_direct_to_display) = !force_renderer_only;
   }
 
   void SendOnVsyncEvent(fuchsia_hardware_display::wire::ConfigStamp stamp) {

@@ -57,6 +57,10 @@ static constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 mi
 // per display.
 static constexpr uint32_t kMaxDisplayLayers = 4;
 
+// See "Config for Fuchsia Visual Debugging" doc.
+constexpr uint8_t VISUAL_DEBUGGING_LEVEL_INFO = 2;
+constexpr uint8_t VISUAL_DEBUGGING_LEVEL_INFO_PLUS = 3;
+
 std::optional<fuchsia_hardware_display_types::wire::DisplayId> GetDisplayId(
     const scenic_structured_config::Config& values) {
   if (values.i_can_haz_display_id() < 0) {
@@ -431,8 +435,12 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.display_composition(), kMaxDisplayLayers,
-        config_values_.visual_debugging_level());
+        flatland::DisplayCompositorConfig{
+            .enable_direct_to_display = config_values_.display_composition(),
+            .max_display_layers = kMaxDisplayLayers,
+            .tint_gpu_fallback_images =
+                (config_values_.visual_debugging_level() >= VISUAL_DEBUGGING_LEVEL_INFO),
+        });
   }
 
   // Flatland manager depends on compositor, and is required by engine.

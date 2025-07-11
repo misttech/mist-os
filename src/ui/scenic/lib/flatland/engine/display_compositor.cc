@@ -253,17 +253,14 @@ DisplayCompositor::DisplayCompositor(
     std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
         display_coordinator,
     const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
-    const bool enable_display_composition, uint32_t max_display_layers,
-    uint8_t visual_debugging_level)
+    const DisplayCompositorConfig& config)
     : display_coordinator_shared_ptr_(std::move(display_coordinator)),
       display_coordinator_(*display_coordinator_shared_ptr_),
       renderer_(renderer),
       release_fence_manager_(main_dispatcher),
       sysmem_allocator_(std::move(sysmem_allocator)),
-      enable_display_composition_(enable_display_composition),
-      max_display_layers_(max_display_layers),
       main_dispatcher_(main_dispatcher),
-      visual_debugging_level_(visual_debugging_level) {
+      config_(config) {
   FX_CHECK(main_dispatcher_);
   FX_DCHECK(renderer_);
   FX_DCHECK(sysmem_allocator_);
@@ -341,7 +338,7 @@ bool DisplayCompositor::ImportBufferCollection(
     return false;
   }
 
-  if (!enable_display_composition_) {
+  if (!config_.enable_direct_to_display) {
     // Forced fallback to using the renderer; don't attempt direct-to-display.
     // Close |display_token| without importing it to the display coordinator.
     if (const auto status = display_token->Release(); status != ZX_OK) {
@@ -445,7 +442,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   // When display composition is disabled, the only images that should be imported by the display
   // are the framebuffers, and their display support is already set in AddDisplay() (instead of
   // below). For every other image with display composition off mode we can early exit.
-  if (!enable_display_composition_ &&
+  if (!config_.enable_direct_to_display &&
       (!display_support_already_set || !buffer_collection_supports_display_[collection_id])) {
     buffer_collection_supports_display_[collection_id] = false;
     return true;
@@ -812,9 +809,9 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     event_data.wait_event.signal(ZX_EVENT_SIGNALED, 0);
 
     // Apply the debugging color to the images.
+    // Unfortunately we copy the list here due to constness.
     auto images = render_data.images;
-    const uint8_t VISUAL_DEBUGGING_LEVEL_INFO_PLATFORM = 2;
-    if (visual_debugging_level_ >= VISUAL_DEBUGGING_LEVEL_INFO_PLATFORM) {
+    if (config_.tint_gpu_fallback_images) {
       for (auto& image : images) {
         image.multiply_color[0] *= kGpuRenderingDebugColor[0];
         image.multiply_color[1] *= kGpuRenderingDebugColor[1];
@@ -889,13 +886,13 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display coordinator.
   // Note: TryDirectToDisplay() failing indicates hardware failure to do display composition.
-  const bool fallback_to_gpu_composition = !enable_display_composition_ ||
+  const bool fallback_to_gpu_composition = !config_.enable_direct_to_display ||
                                            test_args.force_gpu_composition ||
                                            !TryDirectToDisplay(render_data_list);
   if (fallback_to_gpu_composition) {
     // Discard only if we have attempted to TryDirectToDisplay() and have an unapplied config.
     // DiscardConfig call is costly and we should avoid calling when it isn't necessary.
-    if (enable_display_composition_) {
+    if (config_.enable_direct_to_display) {
       DiscardConfig();
     }
 
@@ -937,7 +934,7 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
 
 bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render_data_list) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  FX_DCHECK(enable_display_composition_);
+  FX_DCHECK(config_.enable_direct_to_display);
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::TryDirectToDisplay");
 
   for (const auto& data : render_data_list) {
@@ -1056,7 +1053,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
     // used when we directly composite render data in hardware via the display coordinator.
     // TODO(https://fxbug.dev/42157936): per-display layer lists are probably a bad idea; this
     // approach doesn't reflect the constraints of the underlying display hardware.
-    for (uint32_t i = 0; i < max_display_layers_; i++) {
+    for (uint32_t i = 0; i < config_.max_display_layers; i++) {
       display_engine_data.layers.push_back(CreateDisplayLayer());
     }
   }

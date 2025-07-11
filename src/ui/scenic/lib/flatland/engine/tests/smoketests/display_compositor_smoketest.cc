@@ -172,7 +172,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      /*enable_display_composition*/ true, /*max_display_layers=*/1, /*visual_debug_level=*/0);
+      flatland::DisplayCompositorConfig{});
 
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
