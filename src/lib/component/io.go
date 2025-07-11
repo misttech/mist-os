@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	stdio "io"
 	"log"
@@ -162,7 +163,10 @@ func (*Service) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Nod
 }
 
 func (*Service) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
+	if err := closeWithEpitaphIgnorePeerClosed(request.Channel, zx.ErrNotSupported); err != nil {
+		logError(fmt.Errorf("Service.ListExtendedAttributes: %w", err))
+	}
+	return nil
 }
 
 func (*Service) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
@@ -349,7 +353,10 @@ func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) 
 }
 
 func (*directoryState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
+	if err := closeWithEpitaphIgnorePeerClosed(request.Channel, zx.ErrNotSupported); err != nil {
+		logError(fmt.Errorf("directoryState.ListExtendedAttributes: %w", err))
+	}
+	return nil
 }
 
 func (*directoryState) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
@@ -413,12 +420,19 @@ func (dirState *directoryState) Open(ctx fidl.Context, path string, flags io.Fla
 			if dir, ok := proxy.(io.DirectoryWithCtx); ok {
 				return dir.Open(ctx, path[i+len(slash):], flags, options, channel)
 			}
-			return CloseWithEpitaph(channel, zx.ErrNotDir)
+			if err := closeWithEpitaphIgnorePeerClosed(channel, zx.ErrNotDir); err != nil {
+				logError(fmt.Errorf("directoryState.Open: %w", err))
+			}
+			return nil
 		}
 	} else if node, ok := dirState.Directory.Get(path); ok {
 		return node.addConnection(flags, channel)
 	}
-	return CloseWithEpitaph(channel, zx.ErrNotFound)
+
+	if err := closeWithEpitaphIgnorePeerClosed(channel, zx.ErrNotDir); err != nil {
+		logError(fmt.Errorf("directoryState.Open: %w", err))
+	}
+	return nil
 }
 
 func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.DirectoryUnlinkResult, error) {
@@ -755,7 +769,10 @@ func (*fileState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.N
 }
 
 func (*fileState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
+	if err := closeWithEpitaphIgnorePeerClosed(request.Channel, zx.ErrNotSupported); err != nil {
+		logError(fmt.Errorf("fileState.ListExtendedAttributes: %w", err))
+	}
+	return nil
 }
 
 func (*fileState) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
@@ -873,4 +890,17 @@ func (fState *fileState) GetBackingMemory(fidl.Context, io.VmoFlags) (io.FileGet
 		}
 	}
 	return io.FileGetBackingMemoryResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+// closeWithEpitaphIgnorePeerClosed closes req with status as its epitaph. It
+// returns observed errors except for peer closed.
+func closeWithEpitaphIgnorePeerClosed(req zx.Channel, status zx.Status) error {
+	err := CloseWithEpitaph(req, status)
+	var e *zx.Error
+	if errors.As(err, &e) {
+		if e.Status == zx.ErrPeerClosed {
+			return nil
+		}
+	}
+	return err
 }
