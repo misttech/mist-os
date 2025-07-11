@@ -176,8 +176,6 @@ closed protocol Vmo {
     ///                           or [*buffer*, *buffer* + *buffer_size*) is
     ///                           not writable.
     ///
-    /// `ZX_ERR_INVALID_ARGS`  *buffer* is an invalid pointer or NULL.
-    ///
     /// `ZX_ERR_NOT_FOUND` *buffer* address does not map to address in address space.
     ///
     /// `ZX_ERR_OUT_OF_RANGE`  *offset* + *buffer_size* is greater than the size of
@@ -265,8 +263,6 @@ closed protocol Vmo {
     /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_WRITE` right
     ///                           or [*buffer*, *buffer* + *buffer_size*) is
     ///                           not readable.
-    ///
-    /// `ZX_ERR_INVALID_ARGS`  *buffer* is an invalid pointer or NULL.
     ///
     /// `ZX_ERR_NOT_FOUND` *buffer* address does not map to address in address space.
     ///
