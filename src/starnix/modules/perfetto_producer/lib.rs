@@ -210,7 +210,7 @@ where
             Ok(conn) => return conn,
             Err(err) => {
                 log_error!(
-                    tag="perfetto-producer", err:%; "Failed to set up perfetto producer connection");
+                    tag="perfetto_producer", err:%; "Failed to set up perfetto producer connection");
                 continue;
             }
         };
@@ -225,17 +225,17 @@ pub fn start_perfetto_producer_thread(kernel: &Kernel, socket_path: FsString) ->
         let mut data_source = match FuchsiaDataSource::new(conn, locked, current_task) {
             Ok(data_source) => data_source,
             Err(err) => {
-                log_error!(tag="perfetto-producer", err:%; "Failed to set up data source");
+                log_error!(tag="perfetto_producer", err:%; "Failed to set up data source");
                 return;
             }
         };
 
         // Commands work on a "hanging-get" style protocol, we repeatedly ask for a command
         // from perfetto, block until we get one, then handle whatever we get.
-        log_info!(tag="perfetto-producer"; "Initialized and ready to trace!");
+        log_info!(tag="perfetto_producer"; "Initialized and ready to trace!");
         loop {
             if let Err(err) = data_source.handle_command(locked, current_task) {
-                log_error!(tag="perfetto-producer", err:%; "Error serving connection");
+                log_error!(tag="perfetto_producer", err:%; "Error serving connection");
                 return;
             }
         }
