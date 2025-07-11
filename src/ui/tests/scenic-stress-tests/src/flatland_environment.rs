@@ -96,6 +96,7 @@ impl FlatlandEnvironment {
                     .capability(Capability::configuration(
                         "fuchsia.scenic.MaxDisplayRefreshRateMillihertz",
                     ))
+                    .capability(Capability::configuration("fuchsia.scenic.FrameCounterOverlay"))
                     .capability(Capability::configuration("fuchsia.ui.VisualDebuggingLevel"))
                     .from(&config)
                     .to(&scenic),

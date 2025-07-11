@@ -57,7 +57,7 @@ static constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 mi
 // per display.
 static constexpr uint32_t kMaxDisplayLayers = 4;
 
-// See "Config for Fuchsia Visual Debugging" doc.
+// See "Config for Fuchsia Visual Debugging": go/config-fuchsia-visual-debugging
 constexpr uint8_t VISUAL_DEBUGGING_LEVEL_INFO = 2;
 constexpr uint8_t VISUAL_DEBUGGING_LEVEL_INFO_PLUS = 3;
 

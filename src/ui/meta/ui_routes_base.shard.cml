@@ -113,6 +113,7 @@
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.scenic.DisplayComposition",
                 "fuchsia.scenic.DisplayRotation",
+                "fuchsia.scenic.FrameCounterOverlay",
                 "fuchsia.scenic.FramePredictionMarginInUs",
                 "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
                 "fuchsia.scenic.ICanHazDisplayId",
