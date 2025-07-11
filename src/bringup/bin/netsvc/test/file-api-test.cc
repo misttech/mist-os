@@ -15,44 +15,6 @@
 
 namespace {
 
-class FakePaver : public netsvc::PaverInterface {
- public:
-  FakePaver() { exit_code_.set_value(ZX_OK); }
-
-  std::shared_future<zx_status_t> exit_code() override {
-    if (exit_code_future_.has_value()) {
-      return exit_code_future_.value();
-    }
-    return exit_code_future_.emplace(exit_code_.get_future());
-  }
-
-  tftp_status OpenWrite(std::string_view filename, size_t size, zx::duration) override {
-    exit_code_future_.reset();
-    exit_code_ = {};
-    return TFTP_NO_ERROR;
-  }
-
-  tftp_status Write(const void* data, size_t* length, off_t offset) override {
-    if (exit_code().wait_for(std::chrono::nanoseconds::zero()) == std::future_status::ready) {
-      return TFTP_ERR_INTERNAL;
-    }
-    return TFTP_NO_ERROR;
-  }
-
-  void Close() override {}
-  void Abort() override { ADD_FATAL_FAILURE("unexpected call to abort"); }
-
-  void set_exit_code(zx_status_t exit_code) {
-    exit_code_future_.reset();
-    exit_code_ = {};
-    exit_code_.set_value(exit_code);
-  }
-
- private:
-  std::promise<zx_status_t> exit_code_;
-  std::optional<std::shared_future<zx_status_t>> exit_code_future_;
-};
-
 constexpr char kReadData[] = "laksdfjsadfa";
 constexpr char kFakeData[] = "lalala";
 
@@ -121,13 +83,11 @@ class FileApiTest : public zxtest::Test {
   FileApiTest()
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         fake_sysinfo_(loop_.dispatcher()),
-        file_api_(true, std::make_unique<FakeNetCopy>(), std::move(fake_sysinfo_.svc_chan()),
-                  fake_paver_) {
+        file_api_(true, std::make_unique<FakeNetCopy>(), std::move(fake_sysinfo_.svc_chan())) {
     loop_.StartThread("file-api-test-loop");
   }
 
   async::Loop loop_;
-  FakePaver fake_paver_;
   FakeSysinfo fake_sysinfo_;
   netsvc::FileApi file_api_;
 };
@@ -135,11 +95,6 @@ class FileApiTest : public zxtest::Test {
 TEST_F(FileApiTest, OpenReadNetCopy) {
   ASSERT_EQ(file_api_.OpenRead("file", zx::duration::infinite()), sizeof(kReadData));
   file_api_.Close();
-}
-
-TEST_F(FileApiTest, OpenReadFailedPave) {
-  fake_paver_.set_exit_code(ZX_ERR_INTERNAL);
-  ASSERT_NE(file_api_.OpenRead("file", zx::duration::infinite()), sizeof(kReadData));
 }
 
 TEST_F(FileApiTest, OpenWriteNetCopy) {
@@ -151,28 +106,6 @@ TEST_F(FileApiTest, OpenWriteBoardName) {
   ASSERT_EQ(file_api_.OpenWrite(NETBOOT_BOARD_NAME_FILENAME, 10, zx::duration::infinite()),
             TFTP_NO_ERROR);
   file_api_.Close();
-}
-
-TEST_F(FileApiTest, OpenWritePaver) {
-  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
-  file_api_.Close();
-}
-
-TEST_F(FileApiTest, OpenWriteWhilePaving) {
-  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
-  ASSERT_NE(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
-  file_api_.Close();
-}
-
-TEST_F(FileApiTest, OpenReadWhilePaving) {
-  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
-  ASSERT_LT(file_api_.OpenRead("file", zx::duration::infinite()), 0);
-  file_api_.Close();
-}
-
-TEST_F(FileApiTest, OpenWriteFailedPave) {
-  fake_paver_.set_exit_code(ZX_ERR_INTERNAL);
-  ASSERT_NE(file_api_.OpenWrite("file", 10, zx::duration::infinite()), TFTP_NO_ERROR);
 }
 
 TEST_F(FileApiTest, WriteNetCopy) {
@@ -224,14 +157,6 @@ TEST_F(FileApiTest, ReadBoardInfo) {
 #else
   ASSERT_BYTES_EQ(board_info.board_name, kFakeData, sizeof(kFakeData));
 #endif
-  file_api_.Close();
-}
-
-TEST_F(FileApiTest, WritePaver) {
-  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
-  size_t len = sizeof(kFakeData);
-  ASSERT_EQ(file_api_.Write(kFakeData, &len, 0), TFTP_NO_ERROR);
-  ASSERT_EQ(len, sizeof(kFakeData));
   file_api_.Close();
 }
 

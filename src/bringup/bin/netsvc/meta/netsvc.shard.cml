@@ -68,11 +68,6 @@
             to: "#netsvc",
         },
         {
-            protocol: [ "fuchsia.paver.Paver" ],
-            from: "#paver",
-            to: "#netsvc",
-        },
-        {
             protocol: "fuchsia.logger.Log",
             from: "#archivist",
             to: "#netsvc",

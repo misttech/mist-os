@@ -21,7 +21,6 @@
 #include "src/bringup/bin/netsvc/inet6.h"
 #include "src/bringup/bin/netsvc/netcp.h"
 #include "src/bringup/bin/netsvc/netsvc.h"
-#include "src/bringup/bin/netsvc/paver.h"
 #include "src/bringup/bin/netsvc/zbi.h"
 
 bool xfer_active = false;
@@ -393,20 +392,10 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
       }
       break;
     case NETBOOT_COMMAND_BOOT:
-      // Wait for the paver to complete if it is running.
-      if (zx_status_t exit_code = netsvc::Paver::Get().exit_code().get(); exit_code != ZX_OK) {
-        printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
-        break;
-      }
       do_boot = true;
       printf("netboot: Boot Kernel...\n");
       break;
     case NETBOOT_COMMAND_REBOOT:
-      // Wait for the paver to complete if it is running.
-      if (zx_status_t exit_code = netsvc::Paver::Get().exit_code().get(); exit_code != ZX_OK) {
-        printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
-        break;
-      }
       do_reboot = true;
       printf("netboot: Reboot ...\n");
       break;
