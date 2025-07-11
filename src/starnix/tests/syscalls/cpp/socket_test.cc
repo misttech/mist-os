@@ -19,6 +19,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <format>
 #include <thread>
 
 #include <asm-generic/socket.h>
@@ -30,6 +31,7 @@
 #include <linux/filter.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
+#include <linux/if_tun.h>
 #include <linux/ipv6.h>
 #include <linux/rtnetlink.h>
 
@@ -380,6 +382,175 @@ TEST(RouteNetlinkSocket, AddDropMulticastGroup) {
   ASSERT_EQ(recv(nlsock.get(), buf, sizeof(buf), MSG_DONTWAIT), -1);
   ASSERT_EQ(errno, EAGAIN);
 }
+
+namespace {
+
+struct RouteNetlinkSocketNewAddrParam {
+  uint8_t family;
+  const char* addr;
+  uint8_t prefix;
+  bool expect_subnet_route;
+};
+
+class RouteNetlinkSocketNewAddr : public testing::TestWithParam<RouteNetlinkSocketNewAddrParam> {
+ public:
+  void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+    }
+    const char* dev_tun;
+    if (test_helper::IsStarnix()) {
+      dev_tun = "/dev/tun";
+    } else {
+      dev_tun = "/dev/net/tun";
+    }
+    tun_ = fbl::unique_fd(open(dev_tun, O_RDWR));
+    ifreq ifr{};
+    ifr.ifr_flags = IFF_NO_PI | IFF_TUN;
+
+    strncpy(ifr.ifr_name, kTestIfName, IFNAMSIZ);
+
+    auto result = ioctl(tun_.get(), TUNSETIFF, &ifr);
+    ASSERT_EQ(result, 0) << strerror(errno);
+    auto s = fbl::unique_fd(socket(AF_INET, SOCK_DGRAM, 0));
+    ifr.ifr_flags = 0;
+    ASSERT_EQ(ioctl(s.get(), SIOCGIFFLAGS, &ifr), 0) << strerror(errno);
+    ifr.ifr_flags |= IFF_UP;
+    ASSERT_EQ(ioctl(s.get(), SIOCSIFFLAGS, &ifr), 0) << strerror(errno);
+  }
+
+  void TearDown() override { tun_.reset(); }
+  static constexpr char kTestIfName[] = "netlink_test";
+
+ private:
+  fbl::unique_fd tun_;
+};
+
+TEST_P(RouteNetlinkSocketNewAddr, AddSubnetRoute) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+  }
+
+  fbl::unique_fd nlsock(socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE));
+  ASSERT_TRUE(nlsock) << strerror(errno);
+
+  const auto [family, addr, prefix, expect_subnet_route] = GetParam();
+
+  struct sockaddr_nl nladdr = {};
+  nladdr.nl_family = AF_NETLINK;
+  struct sockaddr* sa = reinterpret_cast<struct sockaddr*>(&nladdr);
+  ASSERT_EQ(bind(nlsock.get(), sa, sizeof(nladdr)), 0) << strerror(errno);
+
+  {
+    test_helper::NetlinkEncoder encoder(RTM_NEWADDR, NLM_F_REQUEST | NLM_F_ACK);
+    struct ifaddrmsg ifa = {
+        .ifa_family = family,
+        .ifa_prefixlen = prefix,
+        .ifa_flags = IFA_F_PERMANENT,
+        .ifa_scope = RT_SCOPE_UNIVERSE,
+        .ifa_index = if_nametoindex(kTestIfName),
+    };
+    uint8_t addrbuf[sizeof(in6_addr)];
+    ASSERT_EQ(inet_pton(family, addr, &addrbuf), 1);
+    auto addr = std::span(addrbuf, family == AF_INET ? sizeof(in_addr) : sizeof(in6_addr));
+    encoder.Write(ifa);
+    encoder.BeginNla(IFA_ADDRESS);
+    encoder.WriteSpan(addr);
+    encoder.EndNla();
+    encoder.BeginNla(IFA_LOCAL);
+    encoder.WriteSpan(addr);
+    encoder.EndNla();
+    iovec iov = {};
+    encoder.Finalize(iov);
+    struct msghdr header = {};
+    header.msg_iov = &iov;
+    header.msg_iovlen = 1;
+
+    ASSERT_EQ(sendmsg(nlsock.get(), &header, 0), static_cast<ssize_t>(iov.iov_len))
+        << strerror(errno);
+  }
+  char buf[4096] = {};
+  ssize_t len = recv(nlsock.get(), buf, sizeof(buf), 0);
+  ASSERT_GT(len, 0) << strerror(errno);
+
+  nlmsghdr* nlmsg = reinterpret_cast<nlmsghdr*>(buf);
+
+  ASSERT_TRUE(MY_NLMSG_OK(nlmsg, len));
+  ASSERT_EQ(nlmsg->nlmsg_type, NLMSG_ERROR);
+  auto* errmsg = reinterpret_cast<nlmsgerr*>(NLMSG_DATA(nlmsg));
+  ASSERT_EQ(errmsg->error, 0);
+
+  {
+    test_helper::NetlinkEncoder encoder(RTM_GETROUTE, NLM_F_REQUEST | NLM_F_DUMP);
+    rtmsg rtm = {
+        .rtm_family = family,
+    };
+    encoder.Write(rtm);
+    iovec iov = {};
+    encoder.Finalize(iov);
+    struct msghdr msg = {};
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    ASSERT_EQ(sendmsg(nlsock.get(), &msg, 0), static_cast<ssize_t>(iov.iov_len)) << strerror(errno);
+  }
+  while (true) {
+    ssize_t len = recv(nlsock.get(), buf, sizeof(buf), MSG_DONTWAIT);
+    if (len == 0) {
+      break;
+    }
+    if (len == -1) {
+      ASSERT_EQ(errno, EAGAIN);
+      break;
+    }
+    rtmsg* rtm;
+    for (nlmsghdr* nlh = reinterpret_cast<nlmsghdr*>(buf);
+         NLMSG_OK(nlh, static_cast<uint32_t>(len)); nlh = NLMSG_NEXT(nlh, len)) {
+      switch (nlh->nlmsg_type) {
+        case NLMSG_DONE:
+          break;
+        case RTM_NEWROUTE:
+          rtm = reinterpret_cast<rtmsg*>(NLMSG_DATA(nlh));
+          // Linux and Fuchsia does local delivery differently, we ignore those by
+          // filtering out routes that are not in the main table.
+          if (rtm->rtm_table != RT_TABLE_MAIN) {
+            continue;
+          }
+          if (rtm->rtm_dst_len == prefix) {
+            ASSERT_TRUE(expect_subnet_route);
+            return;
+          }
+          break;
+        default:
+          FAIL() << "unknown message type: " << nlh->nlmsg_type;
+      }
+    }
+    ASSERT_FALSE(expect_subnet_route);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RouteNetlinkSocket, RouteNetlinkSocketNewAddr,
+    testing::Values(
+        RouteNetlinkSocketNewAddrParam{
+            .family = AF_INET, .addr = "192.0.2.1", .prefix = 0, .expect_subnet_route = false},
+        RouteNetlinkSocketNewAddrParam{
+            .family = AF_INET, .addr = "192.0.2.1", .prefix = 1, .expect_subnet_route = true},
+        RouteNetlinkSocketNewAddrParam{
+            .family = AF_INET, .addr = "192.0.2.1", .prefix = 32, .expect_subnet_route = false},
+        RouteNetlinkSocketNewAddrParam{
+            .family = AF_INET6, .addr = "2001:db8::1", .prefix = 0, .expect_subnet_route = true},
+        RouteNetlinkSocketNewAddrParam{
+            .family = AF_INET6, .addr = "2001:db8::1", .prefix = 1, .expect_subnet_route = true},
+        RouteNetlinkSocketNewAddrParam{
+            .family = AF_INET6, .addr = "2001:db8::1", .prefix = 128, .expect_subnet_route = true}),
+    [](const testing::TestParamInfo<RouteNetlinkSocketNewAddr::ParamType>& info) {
+      return std::format("{}_prefix_{}", info.param.family == AF_INET ? "v4" : "v6",
+                         info.param.prefix);
+    });
+}  // namespace
 
 TEST(NetlinkSocket, RecvMsg) {
   // TODO(https://fxbug.dev/317285180) don't skip on baseline

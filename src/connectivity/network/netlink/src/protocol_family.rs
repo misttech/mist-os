@@ -799,7 +799,17 @@ pub mod route {
                         addr_flags,
                     }) = extracted_request {
                         let (completer, waiter) = oneshot::channel();
-                        let add_subnet_route = addr_flags & IFA_F_NOPREFIXROUTE != IFA_F_NOPREFIXROUTE;
+                        let requested_subnet_route =
+                            addr_flags & IFA_F_NOPREFIXROUTE != IFA_F_NOPREFIXROUTE;
+                        // Linux doesn't add subnet routes for /0 and /32 IPv4 addresses.
+                        let can_add_subnet_route = match address_and_interface_id.address {
+                            AddrSubnetEither::V4(addr_subnet) => {
+                                let prefix = addr_subnet.subnet().prefix();
+                                prefix != 0 && prefix != 32
+                            }
+                            AddrSubnetEither::V6(_addr_subnet) => true,
+                        };
+                        let add_subnet_route = requested_subnet_route && can_add_subnet_route;
                         unified_request_sink.send(UnifiedRequest::InterfacesRequest(
                             interfaces::Request {
                                 args: interfaces::RequestArgs::Address(
@@ -2403,6 +2413,7 @@ mod test {
     #[test_case(
         TestAddrCase {
             prefix_len: 0,
+            kind: AddressRequestKind::New { add_subnet_route: false },
             ..valid_new_addr_request(
                 true,
                 net_addr_subnet!("192.0.2.123/0"),

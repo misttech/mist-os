@@ -239,6 +239,8 @@ class NetlinkEncoder {
     Write(&value, sizeof(T));
   }
 
+  void WriteSpan(const std::span<uint8_t> &data) { Write(data.data(), data.size_bytes()); }
+
   // Writes a value to the buffer at a specified offset
   template <typename T>
   void Write(T &value, size_t offset) {
@@ -298,7 +300,7 @@ class NetlinkEncoder {
     nlmsghdr hdr;
     Read(hdr, netlink_header);
     out.iov_base = data_.data() + netlink_header;
-    hdr.nlmsg_len += offset_ - genetlink_header;
+    hdr.nlmsg_len = static_cast<uint32_t>(offset_);
     out.iov_len = hdr.nlmsg_len;
     sequence_++;
     Write(hdr, netlink_header);
