@@ -115,6 +115,10 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         else:
             asserts.assert_is_instance(self.device.firmware_version, str)
 
+    def test_last_reboot_reason(self) -> None:
+        """Test case for last_reboot_reason"""
+        asserts.assert_is_instance(self.device.last_reboot_reason, str)
+
     def test_is_starnix_device(self) -> None:
         """Test case for is_starnix_device"""
         asserts.assert_is_instance(self.device.is_starnix_device(), bool)

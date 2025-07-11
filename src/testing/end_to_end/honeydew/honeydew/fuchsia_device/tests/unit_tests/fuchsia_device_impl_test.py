@@ -721,6 +721,18 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         """Testcase for BaseFuchsiaDevice.firmware_version property"""
         self.assertEqual(self.fd_fc_obj.firmware_version, "1.2.3")
 
+    @mock.patch.object(
+        fuchsia_device_impl.FuchsiaDeviceImpl,
+        "_last_reboot_info",
+        return_value={
+            "reason": 9,
+        },
+        new_callable=mock.PropertyMock,
+    )
+    def test_last_reboot_reason(self, *unused_args: Any) -> None:
+        """Testcase for BaseFuchsiaDevice.last_reboot_reason property"""
+        self.assertEqual(self.fd_fc_obj.last_reboot_reason, "USER_REQUEST")
+
     # List all the tests related to affordances
     def test_fuchsia_device_is_reboot_capable(self) -> None:
         """Test case to make sure fuchsia device is reboot capable"""
