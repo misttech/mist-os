@@ -359,7 +359,9 @@ idk_cc_source_library(
 	idk_name = "magma_common",
 	stable = True,
 	hdrs = ["include/lib/magma_common/magma_common_defs.h"],
-	public_configs = [ ":magma_include" ],
+	public_configs = [":magma_include"],
+	deps = ["//path/to/public_deps"],
+	implementation_deps = ["//path/to/implementation_deps"],
 	visibility = [ "//visibility:public" ],
 )
 `,
@@ -373,6 +375,12 @@ idk_cc_source_library(
 	]
 	public_configs = [
 		":magma_include",
+	]
+	public_deps = [
+		"//path/to/public_deps",
+	]
+	deps = [
+		"//path/to/implementation_deps",
 	]
 	visibility = [
 		"*",
