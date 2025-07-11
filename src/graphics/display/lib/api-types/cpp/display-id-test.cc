@@ -16,35 +16,10 @@ namespace display {
 namespace {
 
 constexpr DisplayId kOne(1);
-constexpr DisplayId kAnotherOne(1);
 constexpr DisplayId kTwo(2);
 
 constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
 constexpr DisplayId kLargeId(kLargeIdValue);
-
-TEST(DisplayIdTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-  EXPECT_EQ(kInvalidDisplayId, kInvalidDisplayId);
-}
-
-TEST(DisplayIdTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(DisplayIdTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-
-  EXPECT_NE(kOne, kInvalidDisplayId);
-  EXPECT_NE(kTwo, kInvalidDisplayId);
-  EXPECT_NE(kInvalidDisplayId, kOne);
-  EXPECT_NE(kInvalidDisplayId, kTwo);
-}
 
 TEST(DisplayIdTest, ToFidlDisplayId) {
   EXPECT_EQ(1u, ToFidlDisplayId(kOne).value);

@@ -8,8 +8,16 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 
 #include <cstdint>
+#include <type_traits>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using ImageIdTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display::wire::ImageId, std::false_type>;
+
+}  // namespace display::internal
 
 namespace display {
 
@@ -17,13 +25,13 @@ namespace display {
 //
 // See `DriverImageId` for the type used at the interface between the display
 // coordinator and the display drivers.
-DEFINE_STRONG_INT(ImageId, uint64_t);
+using ImageId = display::internal::IdType<display::internal::ImageIdTraits>;
 
 constexpr ImageId ToImageId(fuchsia_hardware_display::wire::ImageId fidl_image_id) {
-  return ImageId(fidl_image_id.value);
+  return ImageId(fidl_image_id);
 }
 constexpr fuchsia_hardware_display::wire::ImageId ToFidlImageId(ImageId image_id) {
-  return {.value = image_id.value()};
+  return image_id.ToFidl();
 }
 
 constexpr ImageId kInvalidImageId(fuchsia_hardware_display_types::wire::kInvalidDispId);

@@ -16,35 +16,10 @@ namespace display {
 namespace {
 
 constexpr ModeId kOne(1);
-constexpr ModeId kAnotherOne(1);
 constexpr ModeId kTwo(2);
 
 constexpr uint16_t kLargeIdValue = uint16_t{1} << 15;
 constexpr ModeId kLargeId(kLargeIdValue);
-
-TEST(ModeIdTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-  EXPECT_EQ(kInvalidModeId, kInvalidModeId);
-}
-
-TEST(ModeIdTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(ModeIdTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-
-  EXPECT_NE(kOne, kInvalidModeId);
-  EXPECT_NE(kTwo, kInvalidModeId);
-  EXPECT_NE(kInvalidModeId, kOne);
-  EXPECT_NE(kInvalidModeId, kTwo);
-}
 
 TEST(ModeIdTest, ToFidlModeId) {
   EXPECT_EQ(1u, ToFidlModeId(kOne).value);

@@ -16,35 +16,10 @@ namespace display {
 namespace {
 
 constexpr EventId kOne(1);
-constexpr EventId kAnotherOne(1);
 constexpr EventId kTwo(2);
 
 constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
 constexpr EventId kLargeId(kLargeIdValue);
-
-TEST(EventIdTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-  EXPECT_EQ(kInvalidEventId, kInvalidEventId);
-}
-
-TEST(EventIdTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(EventIdTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-
-  EXPECT_NE(kOne, kInvalidEventId);
-  EXPECT_NE(kTwo, kInvalidEventId);
-  EXPECT_NE(kInvalidEventId, kOne);
-  EXPECT_NE(kInvalidEventId, kTwo);
-}
 
 TEST(EventIdTest, ToFidlEventId) {
   EXPECT_EQ(1u, ToFidlEventId(kOne).value);

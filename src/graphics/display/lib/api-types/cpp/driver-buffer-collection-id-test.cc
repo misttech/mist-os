@@ -16,29 +16,10 @@ namespace display {
 namespace {
 
 constexpr DriverBufferCollectionId kOne(1);
-constexpr DriverBufferCollectionId kAnotherOne(1);
 constexpr DriverBufferCollectionId kTwo(2);
 
 constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
 constexpr DriverBufferCollectionId kLargeId(kLargeIdValue);
-
-TEST(DriverBufferCollectionIdTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-}
-
-TEST(DriverBufferCollectionIdTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(DriverBufferCollectionIdTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-}
 
 TEST(DriverBufferCollectionIdTest, ToBanjoDriverBufferCollectionId) {
   EXPECT_EQ(1u, ToBanjoDriverBufferCollectionId(kOne));

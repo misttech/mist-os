@@ -8,13 +8,21 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 
 #include <cstdint>
+#include <type_traits>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using VsyncAckCookieTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display::wire::VsyncAckCookie, std::false_type>;
+
+}  // namespace display::internal
 
 namespace display {
 
 // More useful representation of `fuchsia.hardware.display/VsyncAckCookie`.
-DEFINE_STRONG_INT(VsyncAckCookie, uint64_t);
+using VsyncAckCookie = display::internal::IdType<display::internal::VsyncAckCookieTraits>;
 
 constexpr VsyncAckCookie ToVsyncAckCookie(uint64_t fidl_vsync_ack_cookie_value) {
   return VsyncAckCookie(fidl_vsync_ack_cookie_value);
@@ -22,16 +30,12 @@ constexpr VsyncAckCookie ToVsyncAckCookie(uint64_t fidl_vsync_ack_cookie_value) 
 
 constexpr VsyncAckCookie ToVsyncAckCookie(
     fuchsia_hardware_display::wire::VsyncAckCookie fidl_vsync_ack_cookie) {
-  return VsyncAckCookie(fidl_vsync_ack_cookie.value);
-}
-
-constexpr uint64_t ToFidlVsyncAckCookieValue(VsyncAckCookie vsync_ack_cookie) {
-  return vsync_ack_cookie.value();
+  return VsyncAckCookie(fidl_vsync_ack_cookie);
 }
 
 constexpr fuchsia_hardware_display::wire::VsyncAckCookie ToFidlVsyncAckCookie(
     VsyncAckCookie vsync_ack_cookie) {
-  return {.value = vsync_ack_cookie.value()};
+  return vsync_ack_cookie.ToFidl();
 }
 
 constexpr VsyncAckCookie kInvalidVsyncAckCookie(

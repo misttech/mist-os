@@ -9,8 +9,16 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 
 #include <cstdint>
+#include <type_traits>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using LayerIdTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display::wire::LayerId, std::false_type>;
+
+}  // namespace display::internal
 
 namespace display {
 
@@ -18,13 +26,13 @@ namespace display {
 //
 // See `DriverLayerId` for the type used at the interface between the display
 // coordinator and the display drivers.
-DEFINE_STRONG_INT(LayerId, uint64_t);
+using LayerId = display::internal::IdType<display::internal::LayerIdTraits>;
 
 constexpr LayerId ToLayerId(fuchsia_hardware_display::wire::LayerId fidl_layer_id) {
-  return LayerId(fidl_layer_id.value);
+  return LayerId(fidl_layer_id);
 }
 constexpr fuchsia_hardware_display::wire::LayerId ToFidlLayerId(LayerId layer_id) {
-  return {.value = layer_id.value()};
+  return layer_id.ToFidl();
 }
 constexpr LayerId kInvalidLayerId(fuchsia_hardware_display_types::wire::kInvalidDispId);
 

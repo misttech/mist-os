@@ -30,7 +30,7 @@ constexpr BufferId ToBufferId(const fuchsia_hardware_display::wire::BufferId fid
   ZX_DEBUG_ASSERT(fidl_buffer_id.buffer_index >= 0);
   ZX_DEBUG_ASSERT(fidl_buffer_id.buffer_index <= std::numeric_limits<uint32_t>::max());
   return BufferId{
-      .buffer_collection_id = ToBufferCollectionId(fidl_buffer_id.buffer_collection_id),
+      .buffer_collection_id = BufferCollectionId(fidl_buffer_id.buffer_collection_id),
       .buffer_index = fidl_buffer_id.buffer_index,
   };
 }
@@ -39,7 +39,7 @@ constexpr fuchsia_hardware_display::wire::BufferId ToFidlBufferId(BufferId buffe
   ZX_DEBUG_ASSERT(buffer_id.buffer_index >= 0);
   ZX_DEBUG_ASSERT(buffer_id.buffer_index <= std::numeric_limits<uint32_t>::max());
   return {
-      .buffer_collection_id = ToFidlBufferCollectionId(buffer_id.buffer_collection_id),
+      .buffer_collection_id = buffer_id.buffer_collection_id.ToFidl(),
       .buffer_index = buffer_id.buffer_index,
   };
 }

@@ -9,24 +9,32 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 
 #include <cstdint>
+#include <type_traits>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using ModeIdTraits =
+    DefaultIdTypeTraits<uint16_t, fuchsia_hardware_display_types::wire::ModeId, uint16_t>;
+
+}  // namespace display::internal
 
 namespace display {
 
 // More useful representation of `fuchsia.hardware.display.types/ModeId`.
-DEFINE_STRONG_INT(ModeId, uint16_t);
+using ModeId = display::internal::IdType<display::internal::ModeIdTraits>;
 
 constexpr ModeId ToModeId(uint16_t banjo_mode_id) { return ModeId(banjo_mode_id); }
 
 constexpr ModeId ToModeId(fuchsia_hardware_display_types::wire::ModeId fidl_mode_id) {
-  return ModeId(fidl_mode_id.value);
+  return ModeId(fidl_mode_id);
 }
 
-constexpr uint16_t ToBanjoModeId(ModeId mode_id) { return mode_id.value(); }
+constexpr uint16_t ToBanjoModeId(ModeId mode_id) { return mode_id.ToBanjo(); }
 
 constexpr fuchsia_hardware_display_types::wire::ModeId ToFidlModeId(ModeId mode_id) {
-  return {.value = mode_id.value()};
+  return mode_id.ToFidl();
 }
 
 constexpr ModeId kInvalidModeId(fuchsia_hardware_display_types::wire::kInvalidModeId);

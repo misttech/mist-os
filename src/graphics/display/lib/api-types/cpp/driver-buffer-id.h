@@ -31,7 +31,7 @@ constexpr DriverBufferId ToDriverBufferId(
   ZX_DEBUG_ASSERT(fidl_buffer_id.buffer_index >= 0);
   ZX_DEBUG_ASSERT(fidl_buffer_id.buffer_index <= std::numeric_limits<uint32_t>::max());
   return DriverBufferId{
-      .buffer_collection_id = ToDriverBufferCollectionId(fidl_buffer_id.buffer_collection_id),
+      .buffer_collection_id = DriverBufferCollectionId(fidl_buffer_id.buffer_collection_id),
       .buffer_index = fidl_buffer_id.buffer_index,
   };
 }
@@ -41,7 +41,7 @@ constexpr fuchsia_hardware_display_engine::wire::BufferId ToFidlDriverBufferId(
   ZX_DEBUG_ASSERT(driver_buffer_id.buffer_index >= 0);
   ZX_DEBUG_ASSERT(driver_buffer_id.buffer_index <= std::numeric_limits<uint32_t>::max());
   return {
-      .buffer_collection_id = ToFidlDriverBufferCollectionId(driver_buffer_id.buffer_collection_id),
+      .buffer_collection_id = driver_buffer_id.buffer_collection_id.ToFidl(),
       .buffer_index = driver_buffer_id.buffer_index,
   };
 }

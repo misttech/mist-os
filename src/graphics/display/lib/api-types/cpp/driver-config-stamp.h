@@ -15,8 +15,8 @@
 namespace display::internal {
 
 struct DriverConfigStampTraits
-    : public display::internal::DefaultIdTypeTraits<
-          uint64_t, fuchsia_hardware_display_engine::wire::ConfigStamp, config_stamp_t> {
+    : public DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display_engine::wire::ConfigStamp,
+                                 config_stamp_t> {
   static constexpr uint64_t FromBanjo(const config_stamp_t& banjo_config_stamp) noexcept {
     return banjo_config_stamp.value;
   }

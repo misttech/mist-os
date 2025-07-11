@@ -15,35 +15,10 @@ namespace display {
 namespace {
 
 constexpr LayerId kOne(1);
-constexpr LayerId kAnotherOne(1);
 constexpr LayerId kTwo(2);
 
 constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
 constexpr LayerId kLargeId(kLargeIdValue);
-
-TEST(LayerIdTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-  EXPECT_EQ(kInvalidLayerId, kInvalidLayerId);
-}
-
-TEST(LayerIdTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(LayerIdTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-
-  EXPECT_NE(kOne, kInvalidLayerId);
-  EXPECT_NE(kTwo, kInvalidLayerId);
-  EXPECT_NE(kInvalidLayerId, kOne);
-  EXPECT_NE(kInvalidLayerId, kTwo);
-}
 
 TEST(LayerIdTest, ToFidlLayerId) {
   EXPECT_EQ(1u, ToFidlLayerId(kOne).value);

@@ -10,7 +10,15 @@
 
 #include <cstdint>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using DriverBufferCollectionIdTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display_engine::wire::BufferCollectionId,
+                        uint64_t>;
+
+}  // namespace display::internal
 
 namespace display {
 
@@ -24,7 +32,8 @@ namespace display {
 //
 // See `BufferCollectionId` for the type used at the interface between the
 // display coordinator and clients such as Scenic.
-DEFINE_STRONG_INT(DriverBufferCollectionId, uint64_t);
+using DriverBufferCollectionId =
+    display::internal::IdType<display::internal::DriverBufferCollectionIdTraits>;
 
 constexpr DriverBufferCollectionId ToDriverBufferCollectionId(
     uint64_t banjo_driver_buffer_collection_id) {
@@ -33,18 +42,17 @@ constexpr DriverBufferCollectionId ToDriverBufferCollectionId(
 
 constexpr DriverBufferCollectionId ToDriverBufferCollectionId(
     fuchsia_hardware_display_engine::wire::BufferCollectionId fidl_driver_buffer_collection_id) {
-  return DriverBufferCollectionId(fidl_driver_buffer_collection_id.value);
+  return DriverBufferCollectionId(fidl_driver_buffer_collection_id);
 }
 
 constexpr uint64_t ToBanjoDriverBufferCollectionId(
     DriverBufferCollectionId driver_buffer_collection_id) {
-  return driver_buffer_collection_id.value();
+  return driver_buffer_collection_id.ToBanjo();
 }
 
 constexpr fuchsia_hardware_display_engine::wire::BufferCollectionId ToFidlDriverBufferCollectionId(
     DriverBufferCollectionId driver_buffer_collection_id) {
-  return fuchsia_hardware_display_engine::wire::BufferCollectionId{
-      .value = driver_buffer_collection_id.value()};
+  return driver_buffer_collection_id.ToFidl();
 }
 
 }  // namespace display

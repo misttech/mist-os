@@ -15,35 +15,10 @@ namespace display {
 namespace {
 
 constexpr DriverCaptureImageId kOne(1);
-constexpr DriverCaptureImageId kAnotherOne(1);
 constexpr DriverCaptureImageId kTwo(2);
 
 constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
 constexpr DriverCaptureImageId kLargeId(kLargeIdValue);
-
-TEST(DriverCaptureImageIdTest, EqualityIsReflexive) {
-  EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kAnotherOne, kAnotherOne);
-  EXPECT_EQ(kTwo, kTwo);
-  EXPECT_EQ(kInvalidDriverCaptureImageId, kInvalidDriverCaptureImageId);
-}
-
-TEST(DriverCaptureImageIdTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_EQ(kAnotherOne, kOne);
-}
-
-TEST(DriverCaptureImageIdTest, EqualityForDifferentValues) {
-  EXPECT_NE(kOne, kTwo);
-  EXPECT_NE(kAnotherOne, kTwo);
-  EXPECT_NE(kTwo, kOne);
-  EXPECT_NE(kTwo, kAnotherOne);
-
-  EXPECT_NE(kOne, kInvalidDriverCaptureImageId);
-  EXPECT_NE(kTwo, kInvalidDriverCaptureImageId);
-  EXPECT_NE(kInvalidDriverCaptureImageId, kOne);
-  EXPECT_NE(kInvalidDriverCaptureImageId, kTwo);
-}
 
 TEST(DriverCaptureImageIdTest, ToBanjoDriverCaptureImageId) {
   EXPECT_EQ(1u, ToBanjoDriverCaptureImageId(kOne));

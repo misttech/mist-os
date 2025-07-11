@@ -8,19 +8,27 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 
 #include <cstdint>
+#include <type_traits>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using EventIdTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display::wire::EventId, std::false_type>;
+
+}  // namespace display::internal
 
 namespace display {
 
 // More useful representation of `fuchsia.hardware.display/EventId`.
-DEFINE_STRONG_INT(EventId, uint64_t);
+using EventId = display::internal::IdType<display::internal::EventIdTraits>;
 
 constexpr EventId ToEventId(fuchsia_hardware_display::wire::EventId fidl_event_id) {
-  return EventId(fidl_event_id.value);
+  return EventId(fidl_event_id);
 }
 constexpr fuchsia_hardware_display::wire::EventId ToFidlEventId(EventId event_id) {
-  return {.value = event_id.value()};
+  return event_id.ToFidl();
 }
 
 constexpr EventId kInvalidEventId(fuchsia_hardware_display_types::wire::kInvalidDispId);
