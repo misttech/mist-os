@@ -21,6 +21,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
+#[cfg(detect_lock_cycles)]
+use tracing_mutex::util;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -786,6 +788,13 @@ impl DirEntry {
             // from the child list.
             state.new_parent().children.insert(new_basename.into(), Arc::downgrade(&renamed));
 
+            #[cfg(detect_lock_cycles)]
+            unsafe {
+                // Lock ordering is enforced from parent-to-child, and therefore we need to
+                // reset the lock ordering constraints when we reorder the tree nodes.
+                util::reset_dependencies(renamed.children.raw());
+            }
+
             if flags.contains(RenameFlags::EXCHANGE) {
                 // Reparent `replaced` when exchanging.
                 let replaced =
@@ -796,6 +805,13 @@ impl DirEntry {
                     replaced_state.local_name = old_basename.into();
                 }
                 state.old_parent().children.insert(old_basename.into(), Arc::downgrade(replaced));
+
+                #[cfg(detect_lock_cycles)]
+                unsafe {
+                    // Lock ordering is enforced from parent-to-child, and therefore we need to
+                    // reset the lock ordering constraints when we reorder the tree nodes.
+                    util::reset_dependencies(replaced.children.raw());
+                }
             } else {
                 // Remove the renamed child from the old_parent's child list.
                 state.old_parent().children.remove(old_basename);

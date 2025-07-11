@@ -18557,6 +18557,7 @@ rustc_library("tracing-mutex-v0_3_1") {
     "--cfg=feature=\"lock_api\"",
     "--cfg=feature=\"lockapi\"",
     "--cfg=feature=\"parkinglot\"",
+    "--cfg=feature=\"experimental\"",
   ]
 
   visibility = [ ":*" ]
