@@ -1089,8 +1089,10 @@ class FuchsiaDeviceImpl(
                 )
             )
             asyncio.run(
-                power_proxy.reboot(
-                    reason=fhp_statecontrol.RebootReason.USER_REQUEST
+                power_proxy.perform_reboot(
+                    options=fhp_statecontrol.RebootOptions(
+                        reasons=[fhp_statecontrol.RebootReason.USER_REQUEST],
+                    ),
                 )
             )
         except fcp.ZxStatus as status:
