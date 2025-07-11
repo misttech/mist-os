@@ -19,6 +19,7 @@ use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
     fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
 };
+use starnix_ext::map_ext::EntryExt;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -65,18 +66,16 @@ bitflags! {
     }
 }
 
-pub fn device_mapper_init(current_task: &CurrentTask) {
+pub fn device_mapper_init(current_task: &CurrentTask) -> Result<(), Errno> {
     let kernel = current_task.kernel();
 
-    kernel
-        .device_registry
-        .register_major(
-            "device-mapper".into(),
-            DeviceMode::Block,
-            DEVICE_MAPPER_MAJOR,
-            get_or_create_dm_device,
-        )
-        .expect("dm device register failed.");
+    kernel.device_registry.register_major(
+        "device-mapper".into(),
+        DeviceMode::Block,
+        DEVICE_MAPPER_MAJOR,
+        get_or_create_dm_device,
+    )?;
+    Ok(())
 }
 
 #[derive(Debug, Default)]
@@ -142,15 +141,15 @@ impl DeviceMapperRegistry {
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         minor: u32,
-    ) -> Arc<DmDevice>
+    ) -> Result<Arc<DmDevice>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices
             .lock()
             .entry(minor)
-            .or_insert_with(|| DmDevice::new(locked, current_task, minor))
-            .clone()
+            .or_insert_with_fallible(|| DmDevice::new(locked, current_task, minor))
+            .cloned()
     }
 
     /// Finds a free minor number in the DeviceMapperRegistry. Returns that minor number along with
@@ -167,7 +166,7 @@ impl DeviceMapperRegistry {
         for minor in 0..u32::MAX {
             match devices.entry(minor) {
                 Entry::Vacant(e) => {
-                    let device = DmDevice::new(locked, current_task, minor);
+                    let device = DmDevice::new(locked, current_task, minor)?;
                     e.insert(device.clone());
                     return Ok(device);
                 }
@@ -207,7 +206,11 @@ pub struct DmDevice {
 }
 
 impl DmDevice {
-    fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
+    fn new<L>(
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        minor: u32,
+    ) -> Result<Arc<Self>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -231,12 +234,12 @@ impl DmDevice {
             ),
             virtual_block_class,
             |device, dir| build_block_device_directory(device, device_weak, dir),
-        );
+        )?;
         {
             let mut state = device.state.lock();
             state.set_k_device(k_device);
         }
-        device
+        Ok(device)
     }
 
     fn create_file_ops(self: &Arc<Self>) -> Box<dyn FileOps> {
@@ -1209,6 +1212,6 @@ fn get_or_create_dm_device(
         .kernel()
         .expando
         .get::<DeviceMapperRegistry>()
-        .get_or_create_by_minor(locked, current_task, id.minor())
+        .get_or_create_by_minor(locked, current_task, id.minor())?
         .create_file_ops())
 }

@@ -446,7 +446,7 @@ impl<'a> starnix_logging::ToValue for LogOutputTag<'a> {
     }
 }
 
-pub fn mem_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask)
+pub fn mem_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask) -> Result<(), Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
@@ -461,7 +461,7 @@ where
         DeviceMetadata::new("null".into(), DeviceType::NULL, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevNull>,
-    );
+    )?;
     registry.register_device(
         locked,
         system_task,
@@ -469,7 +469,7 @@ where
         DeviceMetadata::new("zero".into(), DeviceType::ZERO, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevZero>,
-    );
+    )?;
     registry.register_device(
         locked,
         system_task,
@@ -477,7 +477,7 @@ where
         DeviceMetadata::new("full".into(), DeviceType::FULL, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevFull>,
-    );
+    )?;
     registry.register_device(
         locked,
         system_task,
@@ -485,7 +485,7 @@ where
         DeviceMetadata::new("random".into(), DeviceType::RANDOM, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevRandom>,
-    );
+    )?;
     registry.register_device(
         locked,
         system_task,
@@ -493,7 +493,7 @@ where
         DeviceMetadata::new("urandom".into(), DeviceType::URANDOM, DeviceMode::Char),
         mem_class.clone(),
         simple_device_ops::<DevRandom>,
-    );
+    )?;
     registry.register_device(
         locked,
         system_task,
@@ -501,5 +501,6 @@ where
         DeviceMetadata::new("kmsg".into(), DeviceType::KMSG, DeviceMode::Char),
         mem_class,
         open_kmsg,
-    );
+    )?;
+    Ok(())
 }

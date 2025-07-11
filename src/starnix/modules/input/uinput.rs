@@ -46,7 +46,7 @@ pub fn register_uinput_device(
     locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     input_event_relay: Arc<InputEventsRelay>,
-) {
+) -> Result<(), Errno> {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
@@ -58,7 +58,8 @@ pub fn register_uinput_device(
         DeviceMetadata::new("uinput".into(), device_type::DeviceType::UINPUT, DeviceMode::Char),
         misc_class,
         device,
-    );
+    )?;
+    Ok(())
 }
 
 fn add_and_register_input_device<L>(
@@ -66,7 +67,7 @@ fn add_and_register_input_device<L>(
     system_task: &CurrentTask,
     dev_ops: impl DeviceOps,
     device_id: u32,
-) -> Device
+) -> Result<Device, Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
@@ -339,7 +340,7 @@ impl UinputDeviceFile {
                     current_task,
                     VirtualDevice { input_id, device_type, open_files },
                     registered_device_id,
-                );
+                )?;
                 inner.k_device = Some(device);
 
                 new_device();

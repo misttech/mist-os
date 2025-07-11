@@ -2727,7 +2727,7 @@ mod tests {
     #[::fuchsia::test]
     async fn open_device_file() {
         let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        mem_device_init(locked, &current_task);
+        mem_device_init(locked, &current_task).expect("mem_device_init");
 
         // Create a device file that points to the `zero` device (which is automatically
         // registered in the kernel).

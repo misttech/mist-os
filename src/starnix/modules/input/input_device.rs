@@ -229,7 +229,8 @@ impl InputDevice {
         locked: &mut Locked<L>,
         system_task: &CurrentTask,
         device_id: DeviceId,
-    ) where
+    ) -> Result<(), Errno>
+    where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = system_task.kernel();
@@ -247,7 +248,8 @@ impl InputDevice {
             ),
             input_class,
             self,
-        );
+        )?;
+        Ok(())
     }
 
     pub fn open_internal(&self) -> Box<dyn FileOps> {

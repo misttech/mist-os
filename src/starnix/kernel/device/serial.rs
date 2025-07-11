@@ -139,7 +139,7 @@ pub fn register_serial_device(
     system_task: &CurrentTask,
     index: u32,
     serial_device: Arc<SerialDevice>,
-) {
+) -> Result<(), Errno> {
     // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
     //  64 = /dev/ttyS0    First UART serial port
     const SERIAL_MINOR_BASE: u32 = 64;
@@ -159,5 +159,6 @@ pub fn register_serial_device(
         ),
         registry.objects.tty_class(),
         serial_device,
-    );
+    )?;
+    Ok(())
 }

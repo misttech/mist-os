@@ -119,7 +119,10 @@ impl DynamicFileSource for MmStatFile {
     }
 }
 
-pub fn zram_device_init(locked: &mut Locked<Unlocked>, system_task: &CurrentTask) {
+pub fn zram_device_init(
+    locked: &mut Locked<Unlocked>,
+    system_task: &CurrentTask,
+) -> Result<(), Errno> {
     let zram_device = Arc::new(ZramDevice::default());
     let zram_device_clone = zram_device.clone();
     let registry = &system_task.kernel().device_registry;
@@ -131,5 +134,6 @@ pub fn zram_device_init(locked: &mut Locked<Unlocked>, system_task: &CurrentTask
         registry.objects.virtual_block_class(),
         |device, dir| build_zram_device_directory(device, zram_device_clone, dir),
         zram_device,
-    );
+    )?;
+    Ok(())
 }

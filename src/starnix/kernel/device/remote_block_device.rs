@@ -45,7 +45,7 @@ impl RemoteBlockDevice {
         minor: u32,
         name: &str,
         backing_memory: MemoryObject,
-    ) -> Arc<Self>
+    ) -> Result<Arc<Self>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -72,8 +72,8 @@ impl RemoteBlockDevice {
             ),
             virtual_block_class,
             |device, dir| build_block_device_directory(device, device_weak, dir),
-        );
-        device
+        )?;
+        Ok(device)
     }
 
     fn create_file_ops(self: &Arc<Self>) -> Box<dyn FileOps> {
@@ -266,7 +266,7 @@ impl RemoteBlockDeviceRegistry {
         let backing_memory = MemoryObject::from(zx::Vmo::create(initial_size)?)
             .with_zx_name(b"starnix:remote_block_device");
         let minor = self.next_minor.fetch_add(1, Ordering::Relaxed);
-        let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_memory);
+        let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_memory)?;
         if let Some(callback) = self.device_added_fn.get() {
             callback(name, minor, &device);
         }

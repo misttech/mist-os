@@ -89,7 +89,7 @@ impl Framebuffer {
             DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
             graphics_class,
             FramebufferDevice { framebuffer: framebuffer.clone() },
-        );
+        )?;
 
         Ok(framebuffer)
     }

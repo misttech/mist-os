@@ -16,6 +16,7 @@ rustc_library("device_mapper") {
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/linux_uapi",
+    "//src/starnix/lib/starnix_ext",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_uapi",

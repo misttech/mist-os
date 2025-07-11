@@ -465,17 +465,17 @@ pub fn run_container_features(
             locked,
             &kernel.kthreads.system_task(),
             DEFAULT_TOUCH_DEVICE_ID,
-        );
+        )?;
         keyboard_device.clone().register(
             locked,
             &kernel.kthreads.system_task(),
             DEFAULT_KEYBOARD_DEVICE_ID,
-        );
+        )?;
         mouse_device.clone().register(
             locked,
             &kernel.kthreads.system_task(),
             DEFAULT_MOUSE_DEVICE_ID,
-        );
+        )?;
 
         let input_events_relay = InputEventsRelay::new();
         input_events_relay.start_relays(
@@ -494,7 +494,7 @@ pub fn run_container_features(
             Some(mouse_device.inspect_status.clone()),
         );
 
-        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);
+        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay)?;
 
         // Channel we use to inform the relay of changes to `touch_standby`
         let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();
@@ -562,7 +562,7 @@ pub fn run_container_features(
         thermal_device_init(locked, kernel, devices.clone());
     }
     if features.hvdcp_opti {
-        hvdcp_opti_init(locked, system_task);
+        hvdcp_opti_init(locked, system_task)?;
     }
     if features.fastrpc {
         fastrpc_device_init(locked, system_task);

@@ -31,8 +31,12 @@ use starnix_modules_tun::DevTun;
 use starnix_modules_zram::zram_device_init;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
 
-fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
+fn misc_device_init(
+    locked: &mut Locked<Unlocked>,
+    current_task: &CurrentTask,
+) -> Result<(), Errno> {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
@@ -44,7 +48,7 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         DeviceMetadata::new("hwrng".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
         misc_class.clone(),
         simple_device_ops::<DevRandom>,
-    );
+    )?;
     registry.register_device(
         locked,
         current_task,
@@ -52,7 +56,7 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         DeviceMetadata::new("fuse".into(), DeviceType::FUSE, DeviceMode::Char),
         misc_class.clone(),
         open_fuse_device,
-    );
+    )?;
     registry.register_device(
         locked,
         current_task,
@@ -60,7 +64,7 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         DeviceMetadata::new("mapper/control".into(), DeviceType::DEVICE_MAPPER, DeviceMode::Char),
         misc_class.clone(),
         create_device_mapper,
-    );
+    )?;
     registry.register_device(
         locked,
         current_task,
@@ -68,7 +72,7 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         DeviceMetadata::new("loop-control".into(), DeviceType::LOOP_CONTROL, DeviceMode::Char),
         misc_class.clone(),
         create_loop_control_device,
-    );
+    )?;
     registry.register_device(
         locked,
         current_task,
@@ -76,7 +80,8 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         DeviceMetadata::new("tun".into(), DeviceType::TUN, DeviceMode::Char),
         misc_class,
         simple_device_ops::<DevTun>,
-    );
+    )?;
+    Ok(())
 }
 
 /// Initializes common devices in `Kernel`.
@@ -84,13 +89,17 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
 /// Adding device nodes to devtmpfs requires the current running task. The `Kernel` constructor does
 /// not create an initial task, so this function should be triggered after a `CurrentTask` has been
 /// initialized.
-pub fn init_common_devices(locked: &mut Locked<Unlocked>, system_task: &CurrentTask) {
-    misc_device_init(locked, system_task);
-    mem_device_init(locked, system_task);
-    tty_device_init(locked, system_task);
-    loop_device_init(locked, system_task);
-    device_mapper_init(system_task);
-    zram_device_init(locked, system_task);
+pub fn init_common_devices(
+    locked: &mut Locked<Unlocked>,
+    system_task: &CurrentTask,
+) -> Result<(), Errno> {
+    misc_device_init(locked, system_task)?;
+    mem_device_init(locked, system_task)?;
+    tty_device_init(locked, system_task)?;
+    loop_device_init(locked, system_task)?;
+    device_mapper_init(system_task)?;
+    zram_device_init(locked, system_task)?;
+    Ok(())
 }
 
 pub fn register_common_file_systems(_locked: &mut Locked<Unlocked>, kernel: &Kernel) {

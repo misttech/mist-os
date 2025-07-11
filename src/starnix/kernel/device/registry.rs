@@ -6,11 +6,11 @@ use crate::device::kobject::{Class, Device, DeviceMetadata, UEventAction, UEvent
 use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::fs::sysfs::build_device_directory;
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel, SimpleWaiter};
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::{FileOps, FsNode, FsStr, FsString};
-use starnix_logging::{log_error, log_warn};
-use starnix_sync::LockEqualOrBefore;
+use starnix_logging::log_error;
+use starnix_sync::{InterruptibleEvent, LockEqualOrBefore};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::device_type::{
     DeviceType, DYN_MAJOR_RANGE, MISC_DYNANIC_MINOR_RANGE, MISC_MAJOR,
@@ -273,14 +273,14 @@ struct DeviceRegistryState {
 
 impl DeviceRegistry {
     /// Notify devfs and listeners that a device has been added to the registry.
-    fn notify_device<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask, device: Device)
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
+    fn notify_device(
+        &self,
+        kernel: &Kernel,
+        device: Device,
+        event: Option<Arc<InterruptibleEvent>>,
+    ) {
         if let Some(metadata) = &device.metadata {
-            if let Err(err) = devtmpfs_create_device(locked, current_task, metadata.clone()) {
-                log_warn!("Cannot add device {:?} in devtmpfs ({:?})", metadata, err);
-            }
+            devtmpfs_create_device(kernel, metadata.clone(), event);
             self.dispatch_uevent(UEventAction::Add, device);
         }
     }
@@ -339,7 +339,7 @@ impl DeviceRegistry {
         metadata: DeviceMetadata,
         class: Class,
         dev_ops: impl DeviceOps,
-    ) -> Device
+    ) -> Result<Device, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -366,15 +366,13 @@ impl DeviceRegistry {
         class: Class,
         build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
         dev_ops: impl DeviceOps,
-    ) -> Device
+    ) -> Result<Device, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let entry = DeviceEntry::new(name.into(), dev_ops);
         self.devices(metadata.mode).register_minor(metadata.device_type, entry);
-        let device = self.objects.create_device(name, Some(metadata), class, build_directory);
-        self.notify_device(locked, current_task, device.clone());
-        device
+        self.add_device(locked, current_task, name, metadata, class, build_directory)
     }
 
     /// Register a dynamic device in the `MISC_MAJOR` major device number.
@@ -403,7 +401,7 @@ impl DeviceRegistry {
             metadata,
             self.objects.misc_class(),
             dev_ops,
-        ))
+        )?)
     }
 
     /// Register a dynamic device with major numbers 234..255.
@@ -496,7 +494,7 @@ impl DeviceRegistry {
             class,
             build_directory,
             dev_ops,
-        ))
+        )?)
     }
 
     /// Register a "silent" dynamic device with major numbers 234..255.
@@ -526,20 +524,24 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn add_device<L>(
         &self,
-        locked: &mut Locked<L>,
+        _locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
         class: Class,
         build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
-    ) -> Device
+    ) -> Result<Device, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices(metadata.mode).get(metadata.device_type).expect("device is registered");
         let device = self.objects.create_device(name, Some(metadata), class, build_directory);
-        self.notify_device(locked, current_task, device.clone());
-        device
+
+        let event = InterruptibleEvent::new();
+        let (_waiter, guard) = SimpleWaiter::new(&event);
+        self.notify_device(current_task.kernel(), device.clone(), Some(event.clone()));
+        current_task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
+        Ok(device)
     }
 
     /// Add a net device to the device registry.
@@ -893,14 +895,20 @@ mod tests {
 
         let input_class =
             registry.objects.get_or_create_class("input".into(), registry.objects.virtual_bus());
-        registry.add_device(
-            locked,
-            &current_task,
-            "mouse".into(),
-            DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
-            input_class,
-            build_device_directory,
-        );
+        registry
+            .add_device(
+                locked,
+                &current_task,
+                "mouse".into(),
+                DeviceMetadata::new(
+                    "mouse".into(),
+                    DeviceType::new(INPUT_MAJOR, 0),
+                    DeviceMode::Char,
+                ),
+                input_class,
+                build_device_directory,
+            )
+            .expect("add_device");
 
         assert!(registry.objects.root.lookup("class/input/mouse".into()).is_some());
     }
@@ -920,18 +928,20 @@ mod tests {
 
         let bus = registry.objects.get_or_create_bus("my-bus".into());
         let class = registry.objects.get_or_create_class("my-class".into(), bus);
-        registry.add_device(
-            locked,
-            &current_task,
-            "my-device".into(),
-            DeviceMetadata::new(
+        registry
+            .add_device(
+                locked,
+                &current_task,
                 "my-device".into(),
-                DeviceType::new(INPUT_MAJOR, 0),
-                DeviceMode::Char,
-            ),
-            class,
-            build_device_directory,
-        );
+                DeviceMetadata::new(
+                    "my-device".into(),
+                    DeviceType::new(INPUT_MAJOR, 0),
+                    DeviceMode::Char,
+                ),
+                class,
+                build_device_directory,
+            )
+            .expect("add_device");
         assert!(registry.objects.root.lookup("bus/my-bus".into()).is_some());
         assert!(registry.objects.root.lookup("devices/my-bus/my-class".into()).is_some());
         assert!(registry.objects.root.lookup("devices/my-bus/my-class/my-device".into()).is_some());
@@ -952,14 +962,20 @@ mod tests {
 
         let pci_bus = registry.objects.get_or_create_bus("pci".into());
         let input_class = registry.objects.get_or_create_class("input".into(), pci_bus);
-        let mouse_dev = registry.add_device(
-            locked,
-            &current_task,
-            "mouse".into(),
-            DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
-            input_class.clone(),
-            build_device_directory,
-        );
+        let mouse_dev = registry
+            .add_device(
+                locked,
+                &current_task,
+                "mouse".into(),
+                DeviceMetadata::new(
+                    "mouse".into(),
+                    DeviceType::new(INPUT_MAJOR, 0),
+                    DeviceMode::Char,
+                ),
+                input_class.clone(),
+                build_device_directory,
+            )
+            .expect("add_device");
 
         assert!(registry.objects.root.lookup("bus/pci/devices/mouse".into()).is_some());
         assert!(registry.objects.root.lookup("devices/pci/input/mouse".into()).is_some());

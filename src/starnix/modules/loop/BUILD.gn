@@ -29,6 +29,7 @@ rustc_library("loop") {
     "//sdk/rust/zx",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
+    "//src/starnix/lib/starnix_ext",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_types",
