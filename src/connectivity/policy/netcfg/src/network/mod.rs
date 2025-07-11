@@ -80,6 +80,7 @@ impl UpdateGenerations {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct NetworkPropertyResponder {
     token: fidl::EventPair,
     watched_properties: Vec<fnp_properties::Property>,
@@ -116,9 +117,12 @@ impl NetworkProperties {
     fn apply(&mut self, update: PropertyUpdate) -> UpdatesApplied {
         let mut updates = UpdatesApplied::default();
 
-        if let Some(netid) = update.default_network {
+        if let Some(new_default_network) = update.default_network {
             updates.default_network = Some(self.default_network);
-            self.default_network = Some(netid);
+            if let (None, Some(old_default_network)) = (new_default_network, self.default_network) {
+                let _: Option<_> = self.socket_marks.remove(&old_default_network);
+            }
+            self.default_network = new_default_network;
         }
 
         if let Some((netid, marks)) = update.socket_marks {
@@ -248,7 +252,7 @@ impl PropertyUpdates for Vec<fnp_properties::PropertyUpdate> {
 
 #[derive(Default)]
 pub(crate) struct PropertyUpdate {
-    default_network: Option<InterfaceId>,
+    default_network: Option<Option<InterfaceId>>,
     socket_marks: Option<(InterfaceId, fnet::Marks)>,
     dns: Option<Vec<fnet_name::DnsServer_>>,
 }
@@ -270,8 +274,13 @@ impl PropertyUpdate {
         mut self,
         network_id: N,
     ) -> Result<Self, N::Error> {
-        self.default_network = Some(network_id.try_into()?);
+        self.default_network = Some(Some(network_id.try_into()?));
         Ok(self)
+    }
+
+    pub fn default_network_lost(mut self) -> Self {
+        self.default_network = Some(None);
+        self
     }
 
     pub fn socket_marks<N: TryInto<InterfaceId>, Marks: Into<fnet::Marks>>(
@@ -332,19 +341,23 @@ impl NetpolNetworksService {
                                     interface_id,
                                 })
                                 .await;
-                            responder.send(fnp_properties::NetworkToken {
-                                value: Some(token),
-                                ..Default::default()
-                            })?;
+                            responder.send(
+                                fnp_properties::NetworksWatchDefaultResponse::Network(
+                                    fnp_properties::NetworkToken {
+                                        value: Some(token),
+                                        ..Default::default()
+                                    },
+                                ),
+                            )?;
+
+                            if let Some(responder) = self.property_responders.remove(&id) {
+                                let _ = self.generations_by_connection.remove(&id);
+                                let _ = responder
+                                    .responder
+                                    .send(Err(fnp_properties::WatchError::DefaultNetworkChanged));
+                            }
                         } else {
                             let _ = vacant_entry.insert(responder);
-                        }
-
-                        if let Some(responder) = self.property_responders.remove(&id) {
-                            let _ = self.generations_by_connection.remove(&id);
-                            let _ = responder
-                                .responder
-                                .send(Err(fnp_properties::WatchError::DefaultNetworkChanged));
                         }
                     }
                 }
@@ -430,6 +443,25 @@ impl NetpolNetworksService {
         Ok(())
     }
 
+    async fn changed_default_network(
+        error: fnp_properties::WatchError,
+        responders: &mut HashMap<ConnectionId, NetworkPropertyResponder>,
+        generations: &mut UpdateGenerations,
+    ) {
+        let mut r = HashMap::new();
+        std::mem::swap(&mut r, responders);
+        r = r
+            .into_iter()
+            .filter_map(|(id, responder)| {
+                // NB: Currently all responders are for the default network.
+                let _ = generations.remove(&id);
+                let _ = responder.responder.send(Err(error));
+                None
+            })
+            .collect::<HashMap<_, _>>();
+        std::mem::swap(&mut r, responders);
+    }
+
     pub(crate) async fn remove_network<ID: Into<InterfaceId>>(&mut self, interface_id: ID) {
         let interface_id = interface_id.into();
         info!("Removing interface {interface_id}. Reporting NETWORK_GONE to all clients.");
@@ -461,8 +493,8 @@ impl NetpolNetworksService {
     pub(crate) async fn update(&mut self, update: PropertyUpdate) {
         self.current_generation.properties += 1;
         let updates_applied = self.network_properties.apply(update);
-        let mut responders = HashMap::new();
-        std::mem::swap(&mut self.property_responders, &mut responders);
+        let mut property_responders = HashMap::new();
+        std::mem::swap(&mut self.property_responders, &mut property_responders);
 
         if updates_applied.default_network.is_some() {
             if let Some(default_network) = self.network_properties.default_network {
@@ -480,17 +512,50 @@ impl NetpolNetworksService {
                         })
                         .await;
 
-                    if let Err(e) = responder.send(fnp_properties::NetworkToken {
-                        value: Some(token),
-                        ..Default::default()
-                    }) {
+                    if let Err(e) =
+                        responder.send(fnp_properties::NetworksWatchDefaultResponse::Network(
+                            fnp_properties::NetworkToken {
+                                value: Some(token),
+                                ..Default::default()
+                            },
+                        ))
+                    {
                         warn!("Could not send to responder: {e}");
                     }
                 }
+
+                NetpolNetworksService::changed_default_network(
+                    fnp_properties::WatchError::DefaultNetworkChanged,
+                    &mut property_responders,
+                    &mut self.generations_by_connection,
+                )
+                .await;
+            } else {
+                // The default network has been lost.
+                self.current_generation.default_network += 1;
+                let mut responders = HashMap::new();
+                std::mem::swap(&mut self.default_network_responders, &mut responders);
+                for (id, responder) in responders {
+                    self.generations_by_connection.set_default_network(id, self.current_generation);
+                    if let Err(e) = responder.send(
+                        fnp_properties::NetworksWatchDefaultResponse::NoDefaultNetwork(
+                            fnp_properties::Empty,
+                        ),
+                    ) {
+                        warn!("Could not send to responder: {e}");
+                    }
+                }
+
+                NetpolNetworksService::changed_default_network(
+                    fnp_properties::WatchError::DefaultNetworkLost,
+                    &mut property_responders,
+                    &mut self.generations_by_connection,
+                )
+                .await;
             }
         }
 
-        for (id, responder) in responders {
+        for (id, responder) in property_responders {
             let mut updates = Vec::new();
             let network = match self.tokens.get(&responder.token).await {
                 Some(network) => network,
