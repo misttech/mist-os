@@ -2676,8 +2676,26 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
       weight_total_ += ep.weight();
       DEBUG_ASSERT(weight_total_ > 0);
       UpdateFairBandwidthPeriod(now);
+      // If the thread is unblocking, set the start and finish time using the new
+      // period.
+      // TODO(https://fxbug.dev/322207536): Stop resetting start and finish times
+      // when unblocking once we solve races higher in the stack.
+      if (placement == Placement::Insertion) {
+        const SchedDuration period = state.effective_period();
+        state.start_time_ = now;
+        state.finish_time_ = now + period;
+      }
       if (state.remaining_time_slice_ns() > 0 && state.finish_time() > now) {
         AdjustFairBandwidth(thread, now);
+        // If we're unblocking, update the start and finish time again now that
+        // we've adjusted the fair bandwidth.
+        // TODO(https://fxbug.dev/322207536): Stop resetting start and finish
+        // times when unblocking once we solve races higher in the stack.
+        if (placement == Placement::Insertion) {
+          const SchedDuration period = state.effective_period();
+          state.start_time_ = now;
+          state.finish_time_ = now + period;
+        }
       }
     } else {
       UpdateTotalDeadlineUtilization(ep.deadline().utilization);
