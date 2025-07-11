@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use errors::ffx_error;
 use ffx_config::EnvironmentContext;
 use ffx_writer::SimpleWriter;
-use fho::{FfxMain, FfxTool};
+use fho::{FfxMain, FfxTool, TryFromEnv};
 use fidl_fuchsia_developer_ffx::{ListenerProxy, TargetQuery};
 use fidl_fuchsia_gpu_agis::{ComponentRegistryProxy, ObserverProxy};
 use serde::Serialize;
@@ -58,8 +58,19 @@ impl Vtc {
     }
 }
 
+struct DeprecationNotice;
+#[async_trait::async_trait(?Send)]
+impl TryFromEnv for DeprecationNotice {
+    async fn try_from_env(_env: &fho::FhoEnvironment) -> fho::Result<Self> {
+        eprintln!("WARNING: The agis subtool will be removed on July 18, 2025.\nWARNING: Please contact slgrady@google.com for more information.");
+        Ok(DeprecationNotice)
+    }
+}
+
 #[derive(FfxTool)]
 pub struct AgisTool {
+    // Put the deprecation first, so it runs regardless of any other errors.
+    _deprecation: DeprecationNotice,
     #[with(moniker("/core/agis"))]
     // fuchsia.gpu.agis.ComponentRegistry
     component_registry: ComponentRegistryProxy,
