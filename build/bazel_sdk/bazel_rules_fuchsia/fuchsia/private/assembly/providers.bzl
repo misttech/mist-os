@@ -116,7 +116,7 @@ FuchsiaPartitionsConfigInfo = provider(
 )
 
 FuchsiaProductImageInfo = provider(
-    doc = "Info needed to pave a Fuchsia image",
+    doc = "Info needed to create a product bundle from the output of create-system",
     fields = {
         "images_out": "images out directory",
         "product_assembly_out": "product assembly out directory",
