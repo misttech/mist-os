@@ -7,11 +7,13 @@ import subprocess
 
 def run_product_assembly(
     ffx_bin,
+    platform,
     product,
     board_info,
     input_bundles,
     legacy_bundle,
     outdir,
+    gendir,
     suppress_overrides_warning=False,
     extra_config=[],
     capture_output=False,
@@ -56,6 +58,8 @@ def run_product_assembly(
         input_bundles,
         "--outdir",
         outdir,
+        "--gendir",
+        gendir,
     ]
     if legacy_bundle:
         args += [

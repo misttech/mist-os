@@ -64,8 +64,16 @@ impl Assembly {
     }
 
     pub async fn create_system(self, outdir: &Utf8PathBuf) -> Result<AssembledSystem> {
+        let should_configure_example =
+            ffx_config::get::<bool, _>("assembly_example_enabled").unwrap_or_default();
+
         let tools = PlatformToolProvider::new(self.platform_path.clone());
-        let mut product_assembly = ProductAssembly::new(self.platform, self.product, self.board)?;
+        let mut product_assembly = ProductAssembly::new(
+            self.platform,
+            self.product,
+            self.board,
+            should_configure_example,
+        )?;
         product_assembly.set_validation_mode(ValidationMode::Off);
         let iac = product_assembly.build(&tools, outdir)?;
         AssembledSystem::new(iac, false, outdir, &tools, None).await

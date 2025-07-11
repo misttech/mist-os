@@ -8,6 +8,7 @@ use camino::Utf8PathBuf;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use assembly_cli_args::{CreateSystemArgs, ProductArgs};
 use assembly_images_config::BlobfsLayout;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -26,33 +27,6 @@ pub enum OperationClass {
     CreateUpdate(CreateUpdateArgs),
     Product(ProductArgs),
     SizeCheck(SizeCheckArgs),
-}
-
-/// create the system images.
-#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
-#[argh(subcommand, name = "create-system")]
-pub struct CreateSystemArgs {
-    /// the configuration file that specifies the packages, binaries, and
-    /// settings specific to the product being assembled.
-    #[argh(option)]
-    pub image_assembly_config: Utf8PathBuf,
-
-    /// whether to include an account partition in the FVMs.
-    #[argh(switch)]
-    pub include_account: bool,
-
-    /// the directory to write the assembled system to.
-    #[argh(option)]
-    pub outdir: Utf8PathBuf,
-
-    /// the directory to write generated intermediate files to.
-    #[argh(option)]
-    pub gendir: Utf8PathBuf,
-
-    /// name to give the Base Package. This is useful if you must publish multiple
-    /// base packages to the same TUF repository.
-    #[argh(option)]
-    pub base_package_name: Option<String>,
 }
 
 /// construct an UpdatePackage using images and package.
@@ -236,71 +210,4 @@ impl FromStr for AuthMode {
 
 fn default_blobfs_layout() -> BlobfsLayout {
     BlobfsLayout::Compact
-}
-
-/// Arguments for performing a high-level product assembly operation.
-#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
-#[argh(subcommand, name = "product")]
-pub struct ProductArgs {
-    /// the product configuration directory.
-    #[argh(option)]
-    pub product: Utf8PathBuf,
-
-    /// the board configuration directory.
-    #[argh(option)]
-    pub board_info: Utf8PathBuf,
-
-    /// the directory to write assembled outputs to.
-    #[argh(option)]
-    pub outdir: Utf8PathBuf,
-
-    /// the directory to write generated intermediate files to.
-    #[argh(option)]
-    pub gendir: Option<Utf8PathBuf>,
-
-    /// the directory in which to find the platform assembly input bundles
-    #[argh(option)]
-    pub input_bundles_dir: Utf8PathBuf,
-
-    /// disable validation of the assembly's packages
-    #[argh(option, default = "Default::default()")]
-    pub package_validation: PackageValidationHandling,
-
-    /// path to an AIB containing a customized kernel zbi to use instead of the
-    /// one in the platform AIBs.
-    #[argh(option)]
-    pub custom_kernel_aib: Option<Utf8PathBuf>,
-
-    /// path to an AIB containing a customized qemu_kernel boot shim to use
-    /// instead of the in the platform AIBs.
-    #[argh(option)]
-    pub custom_boot_shim_aib: Option<Utf8PathBuf>,
-
-    /// whether to hide the warning that shows the overrides that are enabled.
-    /// This can be helpful to disable for test assemblies.
-    #[argh(switch)]
-    pub suppress_overrides_warning: bool,
-
-    /// path to a file specifying developer-level overrides for assembly.
-    #[argh(option)]
-    pub developer_overrides: Option<Utf8PathBuf>,
-}
-
-#[derive(Debug, Default, PartialEq)]
-pub enum PackageValidationHandling {
-    Warning,
-    #[default]
-    Error,
-}
-
-impl FromStr for PackageValidationHandling {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.as_ref() {
-            "warning" => Ok(PackageValidationHandling::Warning),
-            "error" => Ok(PackageValidationHandling::Error),
-            _ => Err(format!("Unknown handling for package validation, valid values are 'warning' and 'error' (the default): {}", s))
-        }
-    }
 }

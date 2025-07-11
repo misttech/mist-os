@@ -3,19 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use assembly_cli_args::{PackageValidationHandling, ProductArgs};
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
 use assembly_config_schema::{AssemblyConfig, BoardInformation};
 use assembly_container::AssemblyContainer;
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_platform_artifacts::PlatformArtifacts;
-use assembly_sdk::SdkToolProvider;
+use assembly_tool::PlatformToolProvider;
 use assembly_util::read_config;
 use camino::Utf8PathBuf;
-use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use fuchsia_pkg::PackageManifest;
 use image_assembly_config_builder::{ProductAssembly, ValidationMode};
 use log::info;
 
+/// Product assembly
 pub fn assemble(args: ProductArgs) -> Result<()> {
     let ProductArgs {
         product,
@@ -28,12 +29,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         custom_boot_shim_aib,
         suppress_overrides_warning,
         developer_overrides,
+        include_example_aib_for_tests,
     } = args;
 
     info!("Reading configuration files.");
     info!("  product: {}", product);
 
-    if package_validation == PackageValidationHandling::Warning {
+    if package_validation == Some(PackageValidationHandling::Warning) {
         eprintln!(
             "
 *=========================================*
@@ -71,7 +73,12 @@ Resulting product is not supported and may misbehave!
     };
 
     // Prepare product assembly.
-    let mut pa = ProductAssembly::new(platform_artifacts, product_config, board_config)?;
+    let mut pa = ProductAssembly::new(
+        platform_artifacts,
+        product_config,
+        board_config,
+        include_example_aib_for_tests.unwrap_or(false),
+    )?;
     if let Some(developer_overrides) = developer_overrides {
         pa = pa.add_developer_overrides(developer_overrides)?;
     }
@@ -81,7 +88,7 @@ Resulting product is not supported and may misbehave!
     if let Some(path) = custom_boot_shim_aib {
         pa.set_boot_shim_aib(path)?;
     }
-    if package_validation == PackageValidationHandling::Warning {
+    if package_validation == Some(PackageValidationHandling::Warning) {
         pa.set_validation_mode(ValidationMode::WarnOnly);
     }
 
@@ -99,7 +106,7 @@ Resulting product is not supported and may misbehave!
 
     // Do the actual building and validation of everything for the Image
     // Assembly config.
-    let tools = SdkToolProvider::try_new()?;
+    let tools = PlatformToolProvider::new(input_bundles_dir);
     let image_assembly_config =
         pa.build(&tools, &outdir).context("Building Image Assembly config")?;
 

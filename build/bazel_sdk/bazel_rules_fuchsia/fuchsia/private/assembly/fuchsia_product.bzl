@@ -84,6 +84,9 @@ def _fuchsia_product_assembly_impl(ctx):
         platform_artifacts.root,
         "--outdir",
         out_dir.path,
+        "--gendir",
+        # Reuse --outdir since it is not actively used in the 'product' subcommmand.
+        out_dir.path,
         "--package-validation",
         ctx.attr.package_validation,
     ]
@@ -203,6 +206,7 @@ _fuchsia_product_assembly = rule(
 
 def _fuchsia_product_create_system_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
+    platform_artifacts = ctx.attr.platform_artifacts[FuchsiaPlatformArtifactsInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     gen_dir_path = "{basedir}/{label_name}_gen".format(
         basedir = out_dir.dirname,
@@ -219,6 +223,7 @@ def _fuchsia_product_create_system_impl(ctx):
         fuchsia_toolchain,
         product_assembly_info,
         ffx_isolate_dir,
+        platform_artifacts.root,
         out_dir.path,
         gen_dir_path,
     )
@@ -264,6 +269,7 @@ def generate_create_system_call_info(
         fuchsia_toolchain,
         product_assembly_info,
         ffx_isolate_dir,
+        platform_artifacts,
         out_dir_path,
         gen_dir_path):
     """Returns a struct of the script to run, the inputs, and the outputs for create-system
@@ -279,6 +285,7 @@ def generate_create_system_call_info(
       fuchsia_toolchain: The fuchsia toolchain to use
       product_assembly_info: The FuchsiaProductAssemblyInfo for the system being created
       ffx_isolate_dir: directory to write ffx logs into
+      platform_artifacts: path to the platform artifacts directory
       out_dir_path: path to the output dir to write the final outputs in
       gen_dir_path: path to the gendir to write temporary files to, these are not available outside
                      of this action
@@ -301,6 +308,8 @@ def generate_create_system_call_info(
         "create-system",
         "--image-assembly-config",
         product_assembly_info.product_assembly_out.path + "/image_assembly.json",
+        "--platform",
+        platform_artifacts,
         "--outdir",
         out_dir_path,
         "--gendir",
@@ -321,6 +330,11 @@ _fuchsia_product_create_system = rule(
         "product_assembly": attr.label(
             doc = "A fuchsia_product_assembly target.",
             providers = [FuchsiaProductAssemblyInfo],
+            mandatory = True,
+        ),
+        "platform_artifacts": attr.label(
+            doc = "Platform artifacts to use for this product.",
+            providers = [FuchsiaPlatformArtifactsInfo],
             mandatory = True,
         ),
     } | COMPATIBILITY.HOST_ATTRS,
@@ -344,5 +358,6 @@ def fuchsia_product(
     _fuchsia_product_create_system(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
+        platform_artifacts = platform_artifacts,
         **kwargs
     )

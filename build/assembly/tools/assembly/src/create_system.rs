@@ -4,17 +4,18 @@
 
 use anyhow::{Context, Result};
 use assembled_system::AssembledSystem;
+use assembly_cli_args::CreateSystemArgs;
 use assembly_container::AssemblyContainer;
-use assembly_sdk::SdkToolProvider;
-use assembly_tool::ToolProvider;
+use assembly_tool::{PlatformToolProvider, ToolProvider};
 use assembly_util as util;
 use camino::Utf8PathBuf;
-use ffx_assembly_args::CreateSystemArgs;
 use image_assembly_config::ImageAssemblyConfig;
 use std::fs::File;
 
+/// Create an image assembly config.
 pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let CreateSystemArgs {
+        platform,
         image_assembly_config,
         include_account,
         outdir,
@@ -26,12 +27,12 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         .context("Failed to read the image assembly config")?;
 
     // Get the tool set.
-    let tools = SdkToolProvider::try_new()?;
+    let tools = PlatformToolProvider::new(platform);
 
     // Construct the assembled system.
     let assembled_system = AssembledSystem::new(
         image_assembly_config,
-        include_account,
+        include_account.unwrap_or(false),
         &gendir,
         &tools,
         base_package_name,

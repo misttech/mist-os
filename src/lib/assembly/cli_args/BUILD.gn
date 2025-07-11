@@ -14,6 +14,7 @@ rustc_library("cli_args") {
   edition = "2021"
 
   deps = [
+    "//src/developer/ffx/config:lib",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
   ]

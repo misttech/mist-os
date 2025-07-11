@@ -329,6 +329,7 @@ template("assembled_system") {
   files = {
     outdir = "${target_out_dir}/${_namespace}"
     gendir = "${outdir}_gen"
+    product_assembly_gen = "${outdir}_product_assembly_gen"
 
     product_assembly_config_dir =
         get_label_info(invoker.product_assembly_config_label,
@@ -495,6 +496,8 @@ template("assembled_system") {
     args += [
       "--input-bundles-dir",
       rebase_path(files.platform_artifacts, root_build_dir),
+      "--gendir",
+      rebase_path(files.product_assembly_gen, root_build_dir),
       "--outdir",
       rebase_path(files.gendir, root_build_dir),
     ]
@@ -609,7 +612,10 @@ template("assembled_system") {
     # action.  Further, this action will need to delete items from these
     # directories that are not added back (on an incremental build, if an item
     # is removed from one of these sets)
-    hermetic_action_ignored_prefixes = [ files.outdir ]
+    hermetic_action_ignored_prefixes = [
+      files.outdir,
+      files.platform_artifacts,
+    ]
 
     ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"
@@ -617,6 +623,8 @@ template("assembled_system") {
     args = [
       "assembly",
       "create-system",
+      "--platform",
+      rebase_path(files.platform_artifacts, root_build_dir),
       "--image-assembly-config",
       rebase_path(files.regenerated_image_assembly_config, root_build_dir),
       "--gendir",

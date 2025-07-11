@@ -26,6 +26,8 @@ pub(crate) mod prelude {
 
 use prelude::*;
 
+pub mod example;
+
 mod battery;
 mod bluetooth;
 mod build_info;
@@ -34,7 +36,6 @@ mod connectivity;
 mod development;
 mod diagnostics;
 mod driver_framework;
-mod example;
 mod factory_store_providers;
 mod fonts;
 mod forensics;
@@ -66,9 +67,6 @@ mod ui;
 mod usb;
 mod virtualization;
 
-/// ffx config flag for enabling configuring the assembly+structured config example.
-const EXAMPLE_ENABLED_FLAG: &str = "assembly_example_enabled";
-
 /// Convert the high-level description of product configuration into a series of configuration
 /// value files with concrete package/component tuples.
 ///
@@ -80,6 +78,7 @@ pub fn define_configuration(
     gendir: impl AsRef<Utf8Path>,
     resource_dir: impl AsRef<Utf8Path>,
     developer_only_options: Option<&DeveloperOnlyOptions>,
+    include_example_aib_for_tests: bool,
 ) -> anyhow::Result<CompletedConfiguration> {
     let icu_config = &platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
@@ -106,7 +105,13 @@ pub fn define_configuration(
         };
 
         // Call the configuration functions for each subsystem.
-        configure_subsystems(&context, platform, product, &mut builder)?;
+        configure_subsystems(
+            &context,
+            platform,
+            product,
+            &mut builder,
+            include_example_aib_for_tests,
+        )?;
     }
 
     Ok(builder.build())
@@ -236,6 +241,7 @@ fn configure_subsystems(
     platform: &PlatformConfig,
     product: &ProductConfig,
     builder: &mut dyn ConfigurationBuilder,
+    include_example_aib_for_tests: bool,
 ) -> anyhow::Result<()> {
     // Define the common platform bundles for this platform configuration.
     CommonBundles::define_configuration(
@@ -246,7 +252,7 @@ fn configure_subsystems(
     .context("Selecting the common platform assembly input bundles")?;
 
     // Configure the Product Assembly + Structured Config example, if enabled.
-    if should_configure_example() {
+    if include_example_aib_for_tests {
         example::ExampleSubsystemConfig::define_configuration(
             &context_base.for_subsystem("example"),
             &platform.example_config,
@@ -529,11 +535,6 @@ fn configure_subsystems(
     Ok(())
 }
 
-/// Check ffx config for whether we should execute example code.
-fn should_configure_example() -> bool {
-    ffx_config::get::<bool, _>(EXAMPLE_ENABLED_FLAG).unwrap_or_default()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -556,8 +557,15 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let AssemblyConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
-        let result =
-            define_configuration(&platform, &product, &BoardInformation::default(), "", "", None);
+        let result = define_configuration(
+            &platform,
+            &product,
+            &BoardInformation::default(),
+            "",
+            "",
+            None,
+            true,
+        );
 
         assert!(result.is_err());
     }

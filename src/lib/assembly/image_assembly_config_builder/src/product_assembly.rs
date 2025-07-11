@@ -31,6 +31,7 @@ pub struct ProductAssembly {
     validation_mode: ValidationMode,
     builder_forensics_file_path: Option<Utf8PathBuf>,
     board_forensics_file_path: Option<Utf8PathBuf>,
+    include_example_aib_for_tests: bool,
 }
 
 impl ProductAssembly {
@@ -38,6 +39,7 @@ impl ProductAssembly {
         platform_artifacts: PlatformArtifacts,
         product_config: AssemblyConfig,
         board_config: BoardInformation,
+        include_example_aib_for_tests: bool,
     ) -> Result<Self> {
         let image_mode = product_config.platform.storage.filesystems.image_mode;
         let builder = ImageAssemblyConfigBuilder::new(
@@ -72,6 +74,7 @@ impl ProductAssembly {
             validation_mode: ValidationMode::On,
             builder_forensics_file_path: None,
             board_forensics_file_path: None,
+            include_example_aib_for_tests,
         })
     }
 
@@ -156,6 +159,7 @@ impl ProductAssembly {
         let product = self.product_config.product;
         let board_config = self.board_config;
         let mut builder = self.builder;
+        let include_example_aib_for_tests = self.include_example_aib_for_tests;
 
         builder
             .add_bundle(&self.kernel_aib)
@@ -210,6 +214,7 @@ impl ProductAssembly {
             &outdir,
             &resource_dir,
             self.developer_only_options.as_ref(),
+            include_example_aib_for_tests,
         )?;
 
         // Set the info used for BoardDriver arguments.
