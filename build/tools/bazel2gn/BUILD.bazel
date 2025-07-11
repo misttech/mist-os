@@ -10,6 +10,7 @@ go_library(
     name = "bazel2gn_lib",
     srcs = [
         "bazel2gn.go",
+        "constants.go",
         "select.go",
     ],
     importpath = "go.fuchsia.dev/fuchsia/build/tools/bazel2gn",
@@ -37,6 +38,7 @@ go_test(
     name = "bazel2gn_tests",
     srcs = [
         "bazel2gn_test.go",
+        "constants_test.go",
         "select_test.go",
     ],
     embed = [
