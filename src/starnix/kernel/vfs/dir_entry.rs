@@ -149,7 +149,7 @@ pub type DirEntryHandle = Arc<DirEntry>;
 
 impl DirEntry {
     #[allow(clippy::let_and_return)]
-    pub fn new(
+    pub fn new_uncached(
         node: FsNodeHandle,
         parent: Option<DirEntryHandle>,
         local_name: FsString,
@@ -171,13 +171,23 @@ impl DirEntry {
             let _l1 = result.children.read();
             let _l2 = result.state.read();
         }
+        result
+    }
+
+    pub fn new(
+        node: FsNodeHandle,
+        parent: Option<DirEntryHandle>,
+        local_name: FsString,
+    ) -> DirEntryHandle {
+        let result = Self::new_uncached(node, parent, local_name);
         result.node.fs().did_create_dir_entry(&result);
         result
     }
 
-    /// Returns a new DirEntry for the given `node` without parent. The entry has no local name.
+    /// Returns a new DirEntry for the given `node` without parent. The entry has no local name and
+    /// is not cached.
     pub fn new_unrooted(node: FsNodeHandle) -> DirEntryHandle {
-        Self::new(node, None, FsString::default())
+        Self::new_uncached(node, None, FsString::default())
     }
 
     /// Returns a new `DirEntry` that is ready marked as having been deleted.
@@ -186,7 +196,7 @@ impl DirEntry {
         parent: Option<DirEntryHandle>,
         local_name: FsString,
     ) -> DirEntryHandle {
-        let entry = DirEntry::new(node, parent, local_name);
+        let entry = DirEntry::new_uncached(node, parent, local_name);
         entry.state.write().is_dead = true;
         entry
     }

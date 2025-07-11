@@ -178,7 +178,8 @@ impl FileSystem {
     }
 
     fn set_root(self: &FileSystemHandle, root: FsNodeHandle) {
-        let root_dir = DirEntry::new(root, None, FsString::default());
+        // No need to cache the root directory, it is owned by the filesystem.
+        let root_dir = DirEntry::new_uncached(root, None, FsString::default());
         assert!(
             self.root.set(root_dir).is_ok(),
             "FileSystem::set_root can't be called more than once"
