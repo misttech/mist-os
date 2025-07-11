@@ -69,11 +69,11 @@ TEST_F(FakeStreamTest, CanConnectToStream) {
   EXPECT_EQ(info_sent.buffer_index, info_received.buffer_index);
   EXPECT_EQ(info_sent.frame_counter, info_received.frame_counter);
   EXPECT_EQ(info_sent.timestamp, info_received.timestamp);
-  zx_info_handle_basic sent_fence_info{};
+  zx_info_handle_basic_t sent_fence_info{};
   ASSERT_EQ(info_sent.release_fence.get_info(ZX_INFO_HANDLE_BASIC, &sent_fence_info,
                                              sizeof(sent_fence_info), nullptr, nullptr),
             ZX_OK);
-  zx_info_handle_basic received_fence_info{};
+  zx_info_handle_basic_t received_fence_info{};
   ASSERT_EQ(info_sent.release_fence.get_info(ZX_INFO_HANDLE_BASIC, &received_fence_info,
                                              sizeof(received_fence_info), nullptr, nullptr),
             ZX_OK);

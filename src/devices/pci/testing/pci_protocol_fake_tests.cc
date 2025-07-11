@@ -224,7 +224,7 @@ namespace {
 // duplicated handle returned by MapInterrupt.
 template <typename T>
 bool MatchKoids(zx_handle_t first, const zx::object<T>& second) {
-  zx_info_handle_basic finfo{}, sinfo{};
+  zx_info_handle_basic_t finfo{}, sinfo{};
   ZX_ASSERT(zx_object_get_info(first, ZX_INFO_HANDLE_BASIC, &finfo, sizeof(finfo), nullptr,
                                nullptr) == ZX_OK);
   ZX_ASSERT(second.get_info(ZX_INFO_HANDLE_BASIC, &sinfo, sizeof(sinfo), nullptr, nullptr) ==

@@ -134,7 +134,7 @@ TEST(PDevTest, GetMmioBuffer) {
   constexpr size_t kMmioSize = 11;
   MMIO_PTR void* mmio_vaddr;
   zx_koid_t vmo_koid;
-  zx_info_handle_basic info;
+  zx_info_handle_basic_t info;
   std::map<uint32_t, fdf_fake::Mmio> mmios;
   {
     zx::vmo vmo;

@@ -73,7 +73,7 @@ TEST(ProcessTest, GetRuntimeNoPermission) {
   zx::vmar vmar;
   ASSERT_OK(zx::process::create(*zx::job::default_job(), "", 0, 0, &proc, &vmar));
 
-  zx_info_handle_basic basic;
+  zx_info_handle_basic_t basic;
   ASSERT_OK(proc.get_info(ZX_INFO_HANDLE_BASIC, &basic, sizeof(basic), nullptr, nullptr));
 
   zx::process proc_dup;
