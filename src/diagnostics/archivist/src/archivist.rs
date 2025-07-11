@@ -53,6 +53,9 @@ pub struct Archivist {
     /// The server handling fuchsia.logger.Log
     log_server: Arc<LogServer>,
 
+    /// The server handling fuchsia.diagnostics.system.LogFlush
+    flush_server: Arc<LogFlushServer>,
+
     /// The server handling fuchsia.diagnostics.LogStream
     log_stream_server: Arc<LogStreamServer>,
 
@@ -110,6 +113,7 @@ impl Archivist {
             general_scope.new_child_with_name("logs_repository"),
         );
         let (freeze_sender, freeze_receiver) = unbounded::<SerialLogControlRequestStream>();
+        let (flush_sender, flush_receiver) = unbounded();
         if !config.allow_serial_logs.is_empty() {
             let logs_repo_clone = Arc::clone(&logs_repo);
             general_scope.spawn(async move {
@@ -119,6 +123,7 @@ impl Archivist {
                     logs_repo_clone,
                     SerialSink,
                     freeze_receiver,
+                    flush_receiver,
                 )
                 .await;
             });
@@ -140,6 +145,11 @@ impl Archivist {
             config.maximum_concurrent_snapshots_per_reader,
             BatchRetrievalTimeout::from_seconds(config.per_component_batch_timeout_seconds),
             servers_scope.new_child_with_name("ArchiveAccessor"),
+        ));
+
+        let flush_server = Arc::new(LogFlushServer::new(
+            servers_scope.new_child_with_name("LogFlush"),
+            flush_sender,
         ));
 
         let log_server = Arc::new(LogServer::new(
@@ -198,6 +208,7 @@ impl Archivist {
         Self {
             accessor_server,
             log_server,
+            flush_server,
             log_stream_server,
             event_router,
             _inspect_sink_server: inspect_sink_server,
@@ -280,6 +291,7 @@ impl Archivist {
             freeze_sender: _freeze_sender,
             servers_scope,
             event_router,
+            flush_server: _flush_server,
         } = self;
 
         // Start ingesting events.
@@ -339,6 +351,13 @@ impl Archivist {
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.logger.Log connection");
             log_server.spawn(stream);
+        });
+
+        // Serve fuchsia.diagnostics.system.LogFlush
+        let flush_server = Arc::clone(&self.flush_server);
+        svc_dir.add_fidl_service(move |stream| {
+            debug!("fuchsia.diagnostics.system.LogFlush connection");
+            flush_server.spawn(stream);
         });
 
         let sender = self.freeze_sender.clone();

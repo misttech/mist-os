@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 mod log;
+mod log_flush;
 mod log_freeze;
 mod log_settings;
 mod log_stream;
 
 pub use log::LogServer;
+pub use log_flush::LogFlushServer;
 pub use log_freeze::LogFreezeServer;
 pub use log_settings::LogSettingsServer;
 pub use log_stream::LogStreamServer;

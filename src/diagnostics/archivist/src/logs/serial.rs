@@ -8,9 +8,9 @@ use anyhow::Error;
 use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
 use fidl_fuchsia_diagnostics_system::SerialLogControlRequestStream;
-use fuchsia_async::OnSignals;
+use fuchsia_async::{yield_now, OnSignals};
 use fuchsia_trace as ftrace;
-use futures::channel::mpsc::UnboundedReceiver;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::future::{select, Either};
 use futures::{FutureExt, StreamExt};
 use log::warn;
@@ -34,11 +34,29 @@ pub async fn launch_serial(
     logs_repo: Arc<LogsRepository>,
     writer: impl Write,
     mut freeze_receiver: UnboundedReceiver<SerialLogControlRequestStream>,
+    mut flush_receiver: UnboundedReceiver<UnboundedSender<()>>,
 ) {
     let mut write_logs_to_serial =
         pin!(SerialConfig::new(allow_serial_log_tags, deny_serial_log_tags)
             .write_logs(logs_repo, writer)
             .fuse());
+    let mut poll_flush = pin!(async {
+        loop {
+            let Some(flush_request) = flush_receiver.next().await else {
+                break;
+            };
+            // Yield to the executor to allow for logs to be polled.
+            // Because we're using select, the polling order is:
+            // write_logs_to_serial, (our future).
+            // When we yield, we should first write_logs_to_serial,
+            // then poll this future again, so we know we've flushed
+            // after we return from the yield operation.
+            yield_now().await;
+            // The caller of Flush may have dropped its channel, so it's OK
+            // to ignore the result here.
+            let _ = flush_request.unbounded_send(());
+        }
+    });
     loop {
         let log_freezer_future = pin!(async {
             // Wait for FDIO to give us the channel
@@ -49,13 +67,15 @@ pub async fn launch_serial(
             Some(server)
         }
         .fuse());
-        let maybe_frozen_token = select(&mut write_logs_to_serial, log_freezer_future).await;
+        let maybe_frozen_token =
+            select(select(&mut write_logs_to_serial, &mut poll_flush), log_freezer_future).await;
         if let Either::Right((Some(token), _)) = maybe_frozen_token {
             // Lock acquired, wait for it to be released before doing anything else.
             // Ignore any errors, as we may either get PEER_CLOSED as an error or signal.
             let _ = OnSignals::new(&token, Signals::EVENTPAIR_PEER_CLOSED).await;
         } else {
-            // Serial writer exited, no work left to do.
+            // Serial writer or flush server exited, no work left to do
+            // (Archivist is shutting down).
             break;
         }
     }
@@ -381,10 +401,11 @@ mod tests {
         let (sink, mut rcv) = TestSink::new();
         let cloned_repo = Arc::clone(&repo);
         let (mut sender, receiver) = unbounded();
+        let (_flush_sender, flush_receiver) = unbounded();
         let mut serial_task = pin!(async move {
             let allowed = vec!["bootstrap/**".into(), "/core/foo".into()];
             let denied = vec!["foo".into()];
-            launch_serial(allowed, denied, cloned_repo, sink, receiver).await;
+            launch_serial(allowed, denied, cloned_repo, sink, receiver, flush_receiver).await;
         }
         .fuse());
         bootstrap_bar_container.ingest_message(make_message(

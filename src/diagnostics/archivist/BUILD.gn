@@ -130,6 +130,7 @@ rustc_library("lib") {
     "src/logs/repository.rs",
     "src/logs/serial.rs",
     "src/logs/servers/log.rs",
+    "src/logs/servers/log_flush.rs",
     "src/logs/servers/log_freeze.rs",
     "src/logs/servers/log_settings.rs",
     "src/logs/servers/log_stream.rs",
