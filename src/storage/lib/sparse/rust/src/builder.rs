@@ -155,6 +155,14 @@ impl SparseImageBuilder {
         output.flush()?;
         Ok(())
     }
+
+    #[cfg(target_os = "fuchsia")]
+    pub fn build_vmo(self) -> Result<zx::Vmo> {
+        let vmo = zx::Vmo::create(self.built_size())?;
+        let mut stream = zx::Stream::create(zx::StreamOptions::MODE_WRITE, &vmo, 0)?;
+        self.build(&mut stream)?;
+        Ok(vmo)
+    }
 }
 
 struct ChunkWriter<'a, W> {
