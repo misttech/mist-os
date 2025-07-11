@@ -588,6 +588,7 @@ mod tests {
                         },
                         remove: {},
                     },
+                    pressed_buttons: Vec::<String>::new(),
                 },
                 "004_touchpad_event": {
                     event_time: AnyProperty,

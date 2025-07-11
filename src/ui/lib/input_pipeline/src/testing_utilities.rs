@@ -659,7 +659,11 @@ pub fn create_touch_screen_event_with_handled(
     };
     input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::TouchScreen(
-            touch_binding::TouchScreenEvent { contacts, injector_contacts },
+            touch_binding::TouchScreenEvent {
+                contacts,
+                injector_contacts,
+                pressed_buttons: vec![],
+            },
         ),
         device_descriptor: device_descriptor.clone(),
         event_time,
@@ -685,6 +689,19 @@ pub fn create_touch_screen_event(
         device_descriptor,
         input_device::Handled::No,
     )
+}
+
+pub fn create_touch_screen_event_with_buttons(
+    contacts: HashMap<fidl_ui_input::PointerEventPhase, Vec<touch_binding::TouchContact>>,
+    pressed_buttons: Vec<fidl_input_report::TouchButton>,
+    event_time: zx::MonotonicInstant,
+    device_descriptor: &input_device::InputDeviceDescriptor,
+) -> input_device::InputEvent {
+    let mut event = create_touch_screen_event(contacts, event_time, device_descriptor);
+    if let input_device::InputDeviceEvent::TouchScreen(ref mut touch_event) = event.device_event {
+        touch_event.pressed_buttons = pressed_buttons;
+    }
+    event
 }
 
 /// Creates a [`touch_binding::TouchpadEvent`] with the provided parameters.
