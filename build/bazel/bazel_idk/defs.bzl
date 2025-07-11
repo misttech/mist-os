@@ -65,8 +65,14 @@ FuchsiaIdkMoleculeInfo = provider(
     },
 )
 
-def _get_idk_label(label):
-    return label + "_idk"
+def _get_idk_label(label_str):
+    # Ensure the label is relative to the `BUILD` file, not this `.bzl` file
+    # in cases where `label_str` omits the package (e.g., ":target_name").
+    label = native.package_relative_label(label_str)
+
+    # Build the label to handle cases where `label_str` omits the target name
+    # (e.g., "//path/to/package").
+    return "//{}:{}_idk".format(label.package, label.name)
 
 def _get_idk_deps(underlying_deps):
     idk_deps = []

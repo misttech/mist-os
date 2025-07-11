@@ -33,7 +33,13 @@ idk_cc_source_library(
     idk_name = "test_source_set",
     include_base = ".",
     stable = True,
-    deps = [":test_source_set_dependency"],
+    deps = [
+        # Cover deps strings that omit the package path, omit the target name,
+        # and provide the full label.
+        ":test_source_set_dependency",
+        "//build/bazel/bazel_idk/tests",
+        "//build/bazel/bazel_idk/tests:test_source_set_dependency2",
+    ],
 )
 
 idk_cc_source_library(
@@ -46,6 +52,36 @@ idk_cc_source_library(
     idk_name = "source_set_dependency",
     include_base = ".",
     stable = True,
+)
+
+idk_cc_source_library(
+    name = "test_source_set_dependency2",
+    testonly = True,
+    hdrs = ["dependency.h"],
+    api_area = "Developer",
+    category = "partner",
+    hdrs_for_internal_use = ["another_header.h"],
+    idk_name = "source_set_dependency",
+    include_base = ".",
+    stable = True,
+)
+
+# A target whose name matches the last component of the package path. It is used
+# to test deps on labels that omit the target name. Not to be confused with a
+# collection of tests. For that, see ":build_only_tests".
+idk_cc_source_library(
+    name = "tests",
+    testonly = True,
+    hdrs = ["dependency.h"],
+    api_area = "Developer",
+    category = "partner",
+    hdrs_for_internal_use = ["another_header.h"],
+    idk_name = "source_set_dependency",
+    include_base = ".",
+    stable = True,
+
+    # Prevent mistaken use of this target as a group of tests.
+    visibility = ["//visibility:private"],
 )
 
 idk_molecule(
