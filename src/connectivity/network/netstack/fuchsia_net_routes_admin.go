@@ -150,7 +150,7 @@ func (impl *routesAdminMainRouteTable) Detach(ctx_ fidl.Context) error {
 }
 
 func (impl *routesAdminMainRouteTable) Remove(ctx_ fidl.Context) (routesAdmin.BaseRouteTableRemoveResult, error) {
-	return routesAdmin.BaseRouteTableRemoveResultWithErr(routesAdmin.BaseRouteTableRemoveErrorInvalidOpOnMainTable), nil
+	return routesAdmin.BaseRouteTableRemoveResultWithErr(routesAdmin.BaseRouteTableRemoveErrorInvalidOp), nil
 }
 
 func (impl *routesAdminMainRouteTable) GetAuthorizationForRouteTable(ctx_ fidl.Context) (routesAdmin.GrantForRouteTableAuthorization, error) {

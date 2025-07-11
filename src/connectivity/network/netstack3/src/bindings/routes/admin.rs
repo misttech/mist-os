@@ -186,7 +186,7 @@ pub(crate) async fn serve_route_table<
             let fidl_result = match removed {
                 Ok(()) | Err(TableRemoveError::Removed) => Ok(()),
                 Err(TableRemoveError::InvalidOp) => {
-                    Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable)
+                    Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOp)
                 }
             };
             responder.send(fidl_result)

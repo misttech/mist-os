@@ -1458,7 +1458,7 @@ async fn main_table_remove<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>
         fnet_routes_ext::admin::remove_route_table::<I>(&route_table)
             .await
             .expect("fidl should succeed"),
-        Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable),
+        Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOp),
     );
 }
 

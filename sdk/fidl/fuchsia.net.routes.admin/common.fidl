@@ -93,11 +93,11 @@ closed protocol BaseRouteTable {
 
     /// Removes the route table explicitly.
     ///
-    /// This method cannot be called on the main table, an error will be
-    /// returned if called. The server will close the channel after this
-    /// method successfully returns.
+    /// This method cannot be called on the main table or an interface-local
+    /// table, an error will be returned if called. The server will close the
+    /// channel after this method successfully returns.
     strict Remove() -> () error flexible enum : uint32 {
-        INVALID_OP_ON_MAIN_TABLE = 1;
+        INVALID_OP = 1;
     };
 
     /// Gets an authentication credential for this table.
