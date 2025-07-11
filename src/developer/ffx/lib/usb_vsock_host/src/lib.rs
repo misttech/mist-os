@@ -377,7 +377,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortListening<S> {
         cid: Option<u32>,
         port: u32,
         sender: mpsc::Sender<IncomingConnection<S>>,
-    ) -> Result<(), UsbVsockError> {
+    ) -> Result<(), ListenError> {
         match self {
             PortListening::AnyCid(old) if old.is_closed() => {
                 if let Some(cid) = cid {
@@ -399,7 +399,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortListening<S> {
                                 occupied_entry.insert(sender);
                                 Ok(())
                             } else {
-                                Err(UsbVsockError::PortInUse(port))
+                                Err(ListenError::PortInUse(port))
                             }
                         }
                     }
@@ -407,10 +407,10 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortListening<S> {
                     *self = PortListening::AnyCid(sender);
                     Ok(())
                 } else {
-                    Err(UsbVsockError::PortInUse(port))
+                    Err(ListenError::PortInUse(port))
                 }
             }
-            _ => Err(UsbVsockError::PortInUse(port)),
+            _ => Err(ListenError::PortInUse(port)),
         }
     }
 }
@@ -436,9 +436,9 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> PortState<S> {
         cid: Option<u32>,
         port: u32,
         sender: mpsc::Sender<IncomingConnection<S>>,
-    ) -> Result<(), UsbVsockError> {
+    ) -> Result<(), ListenError> {
         match self {
-            PortState::Reserved => Err(UsbVsockError::PortInUse(port)),
+            PortState::Reserved => Err(ListenError::PortInUse(port)),
             PortState::Listening(l) => l.add_listener(cid, port, sender),
         }
     }
@@ -475,6 +475,28 @@ pub enum UsbVsockError {
     AcceptFailed(std::io::Error),
     #[error("Port number was too large")]
     PortOutOfRange,
+}
+
+/// Errors returned from [`UsbVsockHost::connect`]
+#[derive(Debug, Error)]
+pub enum ConnectError {
+    #[error("No target found with cid {0}")]
+    NotFound(u32),
+    #[error("Port {0} already in use")]
+    PortInUse(u32),
+    #[error("Connection failed")]
+    Failed(std::io::Error),
+    #[error("Port number was too large")]
+    PortOutOfRange,
+}
+
+/// Errors returned from [`UsbVsockHost::listen`]
+#[derive(Debug, Error)]
+pub enum ListenError {
+    #[error("No target found with cid {0}")]
+    NotFound(u32),
+    #[error("Port {0} already in use")]
+    PortInUse(u32),
 }
 
 /// Lock-protected fields of `UsbVsockHost`.
@@ -595,9 +617,9 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         cid: NonZero<u32>,
         port: u32,
         socket: S,
-    ) -> Result<usb_vsock::ConnectionState, UsbVsockError> {
+    ) -> Result<usb_vsock::ConnectionState, ConnectError> {
         if port == u32::MAX {
-            return Err(UsbVsockError::PortOutOfRange);
+            return Err(ConnectError::PortOutOfRange);
         }
 
         let cid = cid.get();
@@ -607,7 +629,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         let Some(conn) =
             self.inner.lock().unwrap().conns.get_mut(&cid).map(|x| Arc::clone(&x.connection))
         else {
-            return Err(UsbVsockError::NotFound(cid));
+            return Err(ConnectError::NotFound(cid));
         };
 
         // TODO(407622199): Arrange for this port to be released when the connection dies.
@@ -623,7 +645,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
             socket,
         )
         .await
-        .map_err(UsbVsockError::ConnectFailed)
+        .map_err(ConnectError::Failed)
     }
 
     /// Listen for connections to the host (cid 2) on the given port.
@@ -631,7 +653,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         &self,
         port: u32,
         cid: Option<NonZero<u32>>,
-    ) -> Result<impl Stream<Item = IncomingConnection<S>>, UsbVsockError> {
+    ) -> Result<impl Stream<Item = IncomingConnection<S>> + 'static, ListenError> {
         let cid = cid.map(|x| x.get()).map(|x| if x == CID_LOOPBACK { CID_HOST } else { x });
         let mut inner = self.inner.lock().unwrap();
 
@@ -639,7 +661,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         // See comment in add_incoming_request_handler
         if let Some(cid) = cid {
             if cid > CID_HOST && !inner.conns.contains_key(&cid) {
-                return Err(UsbVsockError::NotFound(cid));
+                return Err(ListenError::NotFound(cid));
             }
         }
 
@@ -1077,7 +1099,7 @@ mod test {
         let host = UsbVsockHost::new_for_test(event_sender);
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
-        let Err(UsbVsockError::NotFound(got_cid)) =
+        let Err(ConnectError::NotFound(got_cid)) =
             host.connect(3.try_into().unwrap(), 1234, sock).await
         else {
             panic!()
@@ -1099,7 +1121,7 @@ mod test {
         } = TestConnection::new();
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
-        let Err(UsbVsockError::PortOutOfRange) =
+        let Err(ConnectError::PortOutOfRange) =
             host.connect(cid.try_into().unwrap(), u32::MAX, sock).await
         else {
             panic!()
@@ -1127,7 +1149,7 @@ mod test {
         let req = incoming_requests.next().await.unwrap();
         connection.reject(req).await.unwrap();
 
-        let Err(UsbVsockError::ConnectFailed(_)) = connect_task.await else {
+        let Err(ConnectError::Failed(_)) = connect_task.await else {
             panic!();
         };
     }
@@ -1236,7 +1258,7 @@ mod test {
         } = TestConnection::new();
 
         let _listener = host.listen(1234, None).unwrap();
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(1234, None) else {
+        let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
             panic!();
         };
         assert_eq!(1234, port);
@@ -1270,7 +1292,7 @@ mod test {
         let _remote_state = connection.accept(request, socket).await.unwrap();
         let _state = connect_task.await.unwrap();
 
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(host_port, None) else {
+        let Err(ListenError::PortInUse(port)) = host.listen(host_port, None) else {
             panic!();
         };
         assert_eq!(host_port, port);
@@ -1289,7 +1311,7 @@ mod test {
         } = TestConnection::new();
 
         let _listener = host.listen(1234, None).unwrap();
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(1234, Some(cid.try_into().unwrap()))
+        let Err(ListenError::PortInUse(port)) = host.listen(1234, Some(cid.try_into().unwrap()))
         else {
             panic!();
         };
@@ -1309,7 +1331,7 @@ mod test {
         } = TestConnection::new();
 
         let _listener = host.listen(1234, Some(cid.try_into().unwrap())).unwrap();
-        let Err(UsbVsockError::PortInUse(port)) = host.listen(1234, None) else {
+        let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
             panic!();
         };
         assert_eq!(1234, port);
@@ -1327,7 +1349,7 @@ mod test {
             scope: _scope,
         } = TestConnection::new();
 
-        let Err(UsbVsockError::NotFound(cid)) = host.listen(1234, Some(60.try_into().unwrap()))
+        let Err(ListenError::NotFound(cid)) = host.listen(1234, Some(60.try_into().unwrap()))
         else {
             panic!();
         };
@@ -1353,8 +1375,7 @@ mod test {
             .is_pending());
         host.remove_device(cid);
         std::mem::drop(connection);
-        let Err(UsbVsockError::NotFound(got_cid)) =
-            host.listen(5678, Some(cid.try_into().unwrap()))
+        let Err(ListenError::NotFound(got_cid)) = host.listen(5678, Some(cid.try_into().unwrap()))
         else {
             panic!();
         };
@@ -1425,7 +1446,7 @@ mod test {
 
         let (_unused, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
-        let Err(UsbVsockError::NotFound(got_cid)) =
+        let Err(ConnectError::NotFound(got_cid)) =
             host.connect(cid.try_into().unwrap(), 1234, other_end).await
         else {
             panic!();
