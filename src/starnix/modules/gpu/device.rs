@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use rutabaga_gfx::*;
+use rutabaga_gfx::{RutabagaBuilder, RutabagaComponentType, RutabagaFenceHandler};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_logging::log_error;

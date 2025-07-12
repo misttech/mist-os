@@ -12,6 +12,8 @@ rustc_library("thermal") {
 
   sources = [ "lib.rs" ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
     "//sdk/rust/zx",

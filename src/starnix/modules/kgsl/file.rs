@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fdio::service_connect;
-use kgsl_strings::*;
+use kgsl_strings::{ioctl_kgsl, kgsl_prop};
 use magma::{
     magma_device_import, magma_device_query, magma_device_release, magma_device_t, magma_handle_t,
     magma_initialize_logging, MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_OK,

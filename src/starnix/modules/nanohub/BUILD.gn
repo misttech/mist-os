@@ -41,6 +41,8 @@ rustc_library("nanohub") {
     "socket_tunnel_file.rs",
   ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/fidl/fuchsia.hardware.google.nanohub:fuchsia.hardware.google.nanohub_rust",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_rust",

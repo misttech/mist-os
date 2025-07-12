@@ -12,6 +12,8 @@ rustc_library("pstore") {
 
   sources = [ "lib.rs" ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/lib/bootreason",

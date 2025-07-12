@@ -42,6 +42,8 @@ rustc_library("procfs") {
     "zoneinfo.rs",
   ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",

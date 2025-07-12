@@ -16,6 +16,8 @@ rustc_library("kgsl") {
     "lib.rs",
   ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",

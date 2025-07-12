@@ -25,6 +25,8 @@ rustc_library("loop") {
 
   sources = [ "lib.rs" ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/rust/zx",
     "//src/starnix/kernel:starnix_core",

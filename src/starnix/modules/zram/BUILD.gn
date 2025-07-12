@@ -12,6 +12,8 @@ rustc_library("zram") {
 
   sources = [ "lib.rs" ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/rust/zx",

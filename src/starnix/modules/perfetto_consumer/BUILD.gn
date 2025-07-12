@@ -16,6 +16,8 @@ rustc_library("perfetto_consumer") {
     "lib.rs",
   ]
 
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   deps = [
     "//sdk/rust/zx",
     "//src/lib/trace/rust:trace",
