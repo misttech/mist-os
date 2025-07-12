@@ -255,7 +255,7 @@ impl<I: Ip> Table<I> {
         } else {
             TableModifyResult::NoChange
         };
-        info!("insert route {route:?} (table={core_id:?}) (set={set:?}) had result {result:?}");
+        info!("insert route {route:?} (table={core_id:?} set={set:?}) had result {result:?}");
         result
     }
 
@@ -321,12 +321,15 @@ impl<I: Ip> Table<I> {
         let result = {
             if !removed_from_table.is_empty() {
                 info!(
-                    "remove operation on routing table (table={core_id:?}) resulted in removal of \
-                     {} routes from the table:",
+                    "remove operation on routing table (table={core_id:?}) from set {set:?} \
+                    resulted in removal of {} routes from the table:",
                     removed_from_table.len()
                 );
                 for (route, generation) in &removed_from_table {
-                    info!("-- removed route {route:?} (generation={generation:?})");
+                    info!(
+                        "removed route {route:?} (table={core_id:?} set={set:?} \
+                        generation={generation:?})"
+                    );
                 }
                 TableModifyResult::TableChanged(removed_from_table)
             } else if removed_any_from_set {
@@ -338,7 +341,7 @@ impl<I: Ip> Table<I> {
             } else {
                 info!(
                     "remove operation on routing table (table={core_id:?}) from set {set:?} \
-                     resulted in no change"
+                    resulted in no change"
                 );
                 TableModifyResult::NoChange
             }
@@ -371,7 +374,9 @@ impl<I: Ip> Table<I> {
         );
 
         for (route, generation) in &removed_from_table {
-            info!("-- removed route {route:?} (generation={generation:?})");
+            info!(
+                "removed route {route:?} (table={core_id:?} set={set:?} generation={generation:?})"
+            );
         }
 
         removed_from_table
