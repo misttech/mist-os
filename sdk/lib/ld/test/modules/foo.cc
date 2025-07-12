@@ -14,3 +14,5 @@ extern "C" [[gnu::visibility("default")]] int64_t SUFFIXED_SYMBOL(call_foo)();
 extern "C" int64_t SUFFIXED_SYMBOL(foo)();
 
 extern "C" int64_t SUFFIXED_SYMBOL(call_foo)() { return SUFFIXED_SYMBOL(foo)(); }
+
+extern "C" int64_t SUFFIXED_SYMBOL(TestStart)() { return SUFFIXED_SYMBOL(call_foo)(); }

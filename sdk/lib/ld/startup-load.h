@@ -155,7 +155,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   void Relocate(Diagnostics& diag, const List& modules) {
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
-    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kTlsDescResolver);
+    auto resolver =
+        elfldltl::MakeSymbolResolver(*this, modules, diag, kTlsDescResolver, ld::kResolverPolicy);
     elfldltl::RelocateSymbolic(memory(), diag, reloc_info(), symbol_info(), load_bias(), resolver);
   }
 

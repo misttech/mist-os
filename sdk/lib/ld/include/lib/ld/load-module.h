@@ -5,6 +5,7 @@
 #ifndef LIB_LD_LOAD_MODULE_H_
 #define LIB_LD_LOAD_MODULE_H_
 
+#include <lib/elfldltl/resolve.h>
 #include <lib/elfldltl/tls-layout.h>
 
 #include <cassert>
@@ -17,6 +18,10 @@
 #include "tls.h"
 
 namespace ld {
+
+// TODO(https://fxbug.dev/338237380): This should match Musl behavior with
+// ResolverPolicy::kStrongOverWeak.
+constexpr elfldltl::ResolverPolicy kResolverPolicy = elfldltl::ResolverPolicy::kStrictLinkOrder;
 
 // Forward declaration for a helper class defined below.
 // See the name_ref() and soname_ref() methods in ld::LoadModule, below.

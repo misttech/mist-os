@@ -6,9 +6,11 @@
 #define LIB_LD_TEST_LD_LOAD_TESTS_BASE_H_
 
 #include <lib/elfldltl/diagnostics-ostream.h>
+#include <lib/elfldltl/resolve.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/test-pipe-reader.h>
+#include <lib/ld/load-module.h>
 
 #include <memory>
 #include <sstream>
@@ -33,6 +35,10 @@ class LdLoadTestsBase {
   // features so that it may skip related tests if not supported.
   static constexpr bool kCanCollectLog = true;
   static constexpr bool kRunsLdStartup = true;
+
+  // The resolver policy that determines symbol resolution order, and that tests
+  // use to verify resolved values.
+  static constexpr elfldltl::ResolverPolicy kResolverPolicy = ld::kResolverPolicy;
 
   void InitLog(fbl::unique_fd& log_fd);
 

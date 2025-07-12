@@ -25,6 +25,13 @@ using dl::testing::TestModule;
 using dl::testing::TestShlib;
 using dl::testing::TestSym;
 
+// Weak symbol resolution tests conditionalize on `ld::kResolverPolicy` to
+// verify the symbol chosen based on the resolution strategy (e.g., strict
+// link-order vs. strong-over-weak).
+// TODO(https://fxbug.dev/338237380): This should match Musl behavior with
+// ResolverPolicy::kStrongOverWeak.
+static_assert(ld::kResolverPolicy == elfldltl::ResolverPolicy::kStrictLinkOrder);
+
 // Test that the module data structure uses its own copy of the module's name,
 // so that there is no dependency on the memory backing the original string
 // pointer.
@@ -120,7 +127,7 @@ TYPED_TEST(DlTests, Symbolic) {
 //   - foo-v1 -> [[gnu::weak]] foo() returns 2
 //   - foo-v2 -> foo() returns 7
 // call call_foo from one-weak-symbol and expect it to resolve its foo symbol to
-// 7 from foo-v2 for musl and libc (which uses strong symbols over weak), or 2
+// 7 from foo-v2 for musl (which uses strong symbols over weak), or 2
 // from from foo-v1 (for glibc which uses the first symbol encountered).
 TYPED_TEST(DlTests, OneWeakSymbol) {
   const std::string kOneWeakSymbolFile = TestModule("one-weak-symbol");
@@ -140,10 +147,15 @@ TYPED_TEST(DlTests, OneWeakSymbol) {
   ASSERT_TRUE(sym.is_ok()) << sym.error_value();
   ASSERT_TRUE(sym.value());
 
-  if (TestFixture::kStrictLinkOrderResolution) {
-    EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV1ReturnValue);
-  } else {
-    EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV2ReturnValue);
+  switch (TestFixture::kResolverPolicy) {
+    case elfldltl::ResolverPolicy::kStrictLinkOrder: {
+      EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV1ReturnValue);
+      break;
+    }
+    case elfldltl::ResolverPolicy::kStrongOverWeak: {
+      EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV2ReturnValue);
+      break;
+    }
   }
 
   ASSERT_TRUE(this->DlClose(open.value()).is_ok());
