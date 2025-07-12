@@ -32,7 +32,7 @@ use starnix_core::security;
 use starnix_core::task::container_namespace::ContainerNamespace;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager};
 use starnix_core::time::utc::update_utc_clock;
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
 use starnix_logging::{
     log_debug, log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX,
@@ -615,7 +615,7 @@ async fn create_container(
     }
 
     // Collect a vector of functions to be invoked while constructing /proc/device-tree
-    let mut procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)> = Vec::new();
+    let mut procfs_device_tree_setup: Vec<fn(&SimpleDirectoryMutator)> = vec![];
     if features.nanohub {
         procfs_device_tree_setup.push(starnix_modules_nanohub::nanohub_procfs_builder);
     }

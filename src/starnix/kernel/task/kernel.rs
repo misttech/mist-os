@@ -22,7 +22,7 @@ use crate::task::{
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
-use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
@@ -297,7 +297,7 @@ pub struct Kernel {
 
     /// Vector of functions to be run when procfs is constructed. This is to allow
     /// modules to expose directories into /proc/device-tree.
-    pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)>,
+    pub procfs_device_tree_setup: Vec<fn(&SimpleDirectoryMutator)>,
 
     /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
     shutting_down: AtomicBool,
@@ -376,7 +376,7 @@ impl Kernel {
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         security_state: security::KernelState,
-        procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)>,
+        procfs_device_tree_setup: Vec<fn(&SimpleDirectoryMutator)>,
         time_adjustment_proxy: Option<AdjustSynchronousProxy>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =

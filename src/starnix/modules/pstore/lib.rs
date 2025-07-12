@@ -6,14 +6,13 @@
 
 use bootreason::get_console_ramoops;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectory;
 use starnix_core::vfs::pseudo::simple_file::BytesFile;
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{
-    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
-use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::{statfs, PSTOREFS_MAGIC};
@@ -61,28 +60,26 @@ impl PstoreFs {
     {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, PstoreFs, options)?;
-        let mut dir = StaticDirectoryBuilder::new(&fs);
 
-        if let Some(ramoops_contents) = get_console_ramoops() {
-            let ramoops_contents_0 = ramoops_contents.clone();
-            dir.node(
-                "console-ramoops-0",
-                fs.create_node_and_allocate_node_id(
+        let dir = SimpleDirectory::new();
+        dir.edit(&fs, |dir| {
+            if let Some(ramoops_contents) = get_console_ramoops() {
+                let ramoops_contents_0 = ramoops_contents.clone();
+                dir.entry(
+                    "console-ramoops-0",
                     BytesFile::new_node(ramoops_contents_0),
-                    FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
-                ),
-            );
-            dir.node(
-                "console-ramoops",
-                fs.create_node_and_allocate_node_id(
+                    mode!(IFREG, 0o440),
+                );
+                dir.entry(
+                    "console-ramoops",
                     BytesFile::new_node(ramoops_contents),
-                    FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
-                ),
-            );
-        }
+                    mode!(IFREG, 0o440),
+                );
+            }
+        });
 
-        dir.build_root();
-
+        let root_ino = fs.allocate_ino();
+        fs.create_root(root_ino, dir);
         Ok(fs)
     }
 }

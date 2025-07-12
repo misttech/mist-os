@@ -158,6 +158,11 @@ impl SimpleDirectory {
         let (parent, basename) = self.walk(path)?;
         parent.get(basename)
     }
+
+    pub fn into_node(self: Arc<Self>, fs: &FileSystemHandle, mode: u32) -> FsNodeHandle {
+        let info = FsNodeInfo::new(mode!(IFDIR, mode), FsCred::root());
+        fs.create_node_and_allocate_node_id(self, info)
+    }
 }
 
 impl FsNodeOps for Arc<SimpleDirectory> {
