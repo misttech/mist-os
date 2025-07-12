@@ -23,6 +23,11 @@ def main():
         help="Output directory",
         nargs=1,
     )
+    parser.add_argument(
+        "--depfile",
+        type=argparse.FileType("w"),
+        help="Depfile",
+    )
     args = parser.parse_args()
     [manifest_file] = args.manifest
     [output_dir_name] = args.output
@@ -39,6 +44,10 @@ def main():
     for dst, src in files.items():
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         os.link(src, dst)
+
+    inputs = " ".join(list(files.values()) + [manifest_file.name])
+    args.depfile.write(f"{output_dir_name}: {inputs}\n")
+    args.depfile.close()
 
     return 0
 
