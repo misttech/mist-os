@@ -254,10 +254,13 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Erases the configuration that has been set on the display coordinator.
   void DiscardConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Applies the config to the display coordinator and returns the ConfigStamp associated with this
-  // config. ConfigStamp is provided by the display coordinator. This should only be called after
-  // CheckConfig has verified that the config is okay, since ApplyConfig does not return any errors.
-  fuchsia_hardware_display::wire::ConfigStamp ApplyConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  // Applies the config to the display coordinator and record the corresponding ConfigStamp, so that
+  // we can observe Vsync events to know when this config was actually displayed.
+  //
+  // This should only be called after CheckConfig() has verified that the config is okay, since
+  // ApplyConfig does not return any errors.
+  void ApplyConfig(uint64_t frame_number, uint64_t trace_flow_id)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   bool ImportBufferCollectionToDisplayCoordinator(
       allocation::GlobalBufferCollectionId identifier,

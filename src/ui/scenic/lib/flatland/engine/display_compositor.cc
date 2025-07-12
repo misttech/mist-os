@@ -732,7 +732,7 @@ void DisplayCompositor::DiscardConfig() {
   FX_DCHECK(result.ok()) << "Failed to call FIDL DiscardConfig method: " << result.status_string();
 }
 
-fuchsia_hardware_display::wire::ConfigStamp DisplayCompositor::ApplyConfig() {
+void DisplayCompositor::ApplyConfig(uint64_t frame_number, uint64_t trace_flow_id) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(display_coordinator_.is_valid());
 
@@ -749,7 +749,11 @@ fuchsia_hardware_display::wire::ConfigStamp DisplayCompositor::ApplyConfig() {
           .Build());
   FX_DCHECK(result.ok()) << "Failed to call FIDL ApplyConfig method: " << result.status_string();
 
-  return config_stamp;
+  pending_apply_configs_.push_back({
+      .config_stamp = config_stamp,
+      .frame_number = frame_number,
+      .trace_flow_id = trace_flow_id,
+  });
 }
 
 bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
@@ -885,51 +889,49 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
 
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display coordinator.
-  // Note: TryDirectToDisplay() failing indicates hardware failure to do display composition.
-  const bool fallback_to_gpu_composition = !config_.enable_direct_to_display ||
-                                           test_args.force_gpu_composition ||
-                                           !TryDirectToDisplay(render_data_list);
-  if (fallback_to_gpu_composition) {
-    // Discard only if we have attempted to TryDirectToDisplay() and have an unapplied config.
-    // DiscardConfig call is costly and we should avoid calling when it isn't necessary.
-    if (config_.enable_direct_to_display) {
-      DiscardConfig();
-    }
-
-    if (PerformGpuComposition(frame_number, presentation_time, render_data_list,
-                              std::move(release_fences), std::move(callback))) {
+  // Notes:
+  //   - failing TryDirectToDisplay() means that the display driver is unable to directly display
+  //     this frame's list of client images.
+  const bool should_try_direct_to_display =
+      config_.enable_direct_to_display && !test_args.force_gpu_composition;
+  if (should_try_direct_to_display) {
+    if (TryDirectToDisplay(render_data_list)) {
       for (const auto& data : render_data_list) {
         const int32_t num_render_data = static_cast<int32_t>(data.rectangles.size());
         const uint64_t display_id = data.display_id.value;
-        TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(0));
-        TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(num_render_data));
+        TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(num_render_data));
+        TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(0));
       }
-    } else {
-      return RenderFrameResult::kFailure;
+
+      // CC was successfully applied to the config so we update the state machine.
+      cc_state_machine_.SetApplyConfigSucceeded();
+
+      // See ReleaseFenceManager comments for details.
+      release_fence_manager_.OnDirectScanoutFrame(frame_number, std::move(release_fences),
+                                                  std::move(callback));
+
+      ApplyConfig(frame_number, trace_flow_id);
+      return RenderFrameResult::kDirectToDisplay;
     }
 
-  } else {
+    // Fall through to GPU composition.
+    DiscardConfig();
+  }
+
+  if (PerformGpuComposition(frame_number, presentation_time, render_data_list,
+                            std::move(release_fences), std::move(callback))) {
     for (const auto& data : render_data_list) {
       const int32_t num_render_data = static_cast<int32_t>(data.rectangles.size());
       const uint64_t display_id = data.display_id.value;
-      TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(num_render_data));
-      TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(0));
+      TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(0));
+      TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(num_render_data));
     }
 
-    // CC was successfully applied to the config so we update the state machine.
-    cc_state_machine_.SetApplyConfigSucceeded();
-
-    // See ReleaseFenceManager comments for details.
-    release_fence_manager_.OnDirectScanoutFrame(frame_number, std::move(release_fences),
-                                                std::move(callback));
+    ApplyConfig(frame_number, trace_flow_id);
+    return RenderFrameResult::kGpuComposition;
   }
 
-  const fuchsia_hardware_display::wire::ConfigStamp config_stamp = ApplyConfig();
-  pending_apply_configs_.push_back(
-      {.config_stamp = config_stamp, .frame_number = frame_number, .trace_flow_id = trace_flow_id});
-
-  return fallback_to_gpu_composition ? RenderFrameResult::kGpuComposition
-                                     : RenderFrameResult::kDirectToDisplay;
+  return RenderFrameResult::kFailure;
 }
 
 bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render_data_list) {
