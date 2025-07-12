@@ -12,6 +12,8 @@ When updating, please add the value in alphabetical order.
 
     | Configuration Value                     | Documentation                      |
     | --------------------------------------- | ---------------------------------- |
+    | `connectivity.direct`                   | Support direct target connections. |
+    |                                         | Defaults to `false`.               |
     | `connectivity.enable_usb`               | Allow ffx to use a USB connection. |
     |                                         | Not supported on mac. Defaults to  |
     |                                         | `false`.                           |

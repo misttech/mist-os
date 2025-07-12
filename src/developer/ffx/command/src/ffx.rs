@@ -281,6 +281,10 @@ pub struct Ffx {
     ///   * Configuration is read only
     /// The features in this flag are currently under active development.
     pub strict: bool,
+
+    #[argh(switch, short = 'd', long = "direct")]
+    /// make a direct connection to the target
+    pub direct: bool,
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
@@ -402,7 +406,15 @@ impl Ffx {
         // Configuration initialization must happen before ANY calls to the config (or the cache won't
         // properly have the runtime parameters.
         let overrides = self.runtime_config_overrides();
-        let runtime_args = ffx_config::runtime::populate_runtime(&*self.config, overrides)?;
+        let mut runtime_args = ffx_config::runtime::populate_runtime(&*self.config, overrides)?;
+        if self.direct {
+            // If "-d" is passed, insert "connectivity.direct=true"
+            // Note: "--direct" will take precedence over "-c connectivity.direct=false"
+            let mut connectivity = serde_json::Map::new();
+            connectivity.insert("direct".into(), true.into());
+            let _ =
+                runtime_args.insert("connectivity".into(), serde_json::Value::Object(connectivity));
+        }
         let env_path = self.env.as_ref().map(PathBuf::from);
         let current_dir = std::env::current_dir().bug_context("Failed to get working directory")?;
 
@@ -510,6 +522,7 @@ impl Ffx {
             log_destination: None,
             no_environment: false,
             strict: false,
+            direct: false,
         };
 
         let mut argv_iter = argv.iter();
@@ -579,6 +592,9 @@ impl Ffx {
                 }
                 "--strict" => {
                     return_val.strict = true;
+                }
+                "-d" | "--direct" => {
+                    return_val.direct = true;
                 }
                 _ => {
                     return_val.subcommand.push(opt.to_string());
@@ -1004,5 +1020,22 @@ mod test {
         let cmd_line =
             FfxCommandLine::new(Some("tools/ffx"), &args).expect("Command line should parse");
         assert_eq!(cmd_line.global.machine, Some(MachineFormat::Raw));
+    }
+
+    #[test]
+    fn direct_updates_runtime_config() {
+        // Defaults to unset
+        let args = ["ffx"].map(String::from);
+        let cmd_line = FfxCommandLine::new(Some("ffx"), &args).expect("Command line should parse");
+        let context = cmd_line.global.load_context(ExecutableKind::Test).expect("load_context");
+        let direct: Option<bool> = context.get("connectivity.direct").expect("config get");
+        assert!(direct.is_none());
+
+        // Gets overridden to true
+        let args = ["ffx", "--direct"].map(String::from);
+        let cmd_line = FfxCommandLine::new(Some("ffx"), &args).expect("Command line should parse");
+        let context = cmd_line.global.load_context(ExecutableKind::Test).expect("load_context");
+        let direct: bool = context.get("connectivity.direct").expect("config get");
+        assert!(direct);
     }
 }
