@@ -6,6 +6,10 @@
         {
             name: "socket-proxy",
             url: "fuchsia-pkg://fuchsia.com/network-socket-proxy#meta/network-socket-proxy.cm",
+
+            // TODO(https://fxbug.dev/417568023): Remove this once FDIO is updated to reconnect
+            // to the socket provider protocol when it observes a FIDL channel closure.
+            on_terminate: "reboot",
         },
     ],
     offer: [
