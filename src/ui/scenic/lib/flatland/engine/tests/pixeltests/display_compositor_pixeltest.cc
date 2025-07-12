@@ -422,7 +422,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // This should only be running on devices with capture support.
     bool capture_supported = scenic_impl::IsCaptureSupported(*display_coordinator);
     if (!capture_supported) {
-      FX_LOGS(WARNING) << "Capture is not supported on this device. Test skipped.";
+      FX_LOGS(FATAL) << "Capture is not supported on this device. Test skipped.";
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
