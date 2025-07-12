@@ -8,19 +8,27 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 
 #include <cstdint>
+#include <type_traits>
 
-#include <fbl/strong_int.h>
+#include "src/graphics/display/lib/api-types/cpp/id-type.h"
+
+namespace display::internal {
+
+using ConfigStampTraits =
+    DefaultIdTypeTraits<uint64_t, fuchsia_hardware_display::wire::ConfigStamp, std::false_type>;
+
+}  // namespace display::internal
 
 namespace display {
 
 // More useful representation of `fuchsia.hardware.display/ConfigStamp`.
-DEFINE_STRONG_INT(ConfigStamp, uint64_t);
+using ConfigStamp = display::internal::IdType<display::internal::ConfigStampTraits>;
 
 constexpr ConfigStamp ToConfigStamp(fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp) {
-  return ConfigStamp(fidl_config_stamp.value);
+  return ConfigStamp(fidl_config_stamp);
 }
 constexpr fuchsia_hardware_display::wire::ConfigStamp ToFidlConfigStamp(ConfigStamp config_stamp) {
-  return fuchsia_hardware_display::wire::ConfigStamp{.value = config_stamp.value()};
+  return config_stamp.ToFidl();
 }
 
 constexpr ConfigStamp kInvalidConfigStamp(fuchsia_hardware_display::wire::kInvalidConfigStampValue);

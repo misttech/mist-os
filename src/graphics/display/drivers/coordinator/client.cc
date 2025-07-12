@@ -800,7 +800,7 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
 
 void Client::GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Display::Client::GetLatestAppliedConfigStamp");
-  completer.Reply(ToFidlConfigStamp(latest_config_stamp_));
+  completer.Reply(display::ToFidlConfigStamp(latest_config_stamp_));
 }
 
 void Client::SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,

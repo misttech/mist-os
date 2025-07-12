@@ -63,7 +63,6 @@ source_set("cpp") {
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
     "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
     "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/fbl",
   ]
 }
 
