@@ -15,9 +15,13 @@ use fidl_fuchsia_component_internal::{
 use log::warn;
 use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use version_history::{AbiRevision, AbiRevisionError, VersionHistory};
+
+#[cfg(feature = "serde")]
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Runtime configuration options.
 /// This configuration intended to be "global", in that the same configuration
@@ -177,6 +181,100 @@ impl AllowlistEntry {
         } else {
             true
         }
+    }
+}
+
+impl FromStr for AllowlistEntry {
+    type Err = AllowlistEntryParseError;
+
+    fn from_str(input: &str) -> Result<AllowlistEntry, AllowlistEntryParseError> {
+        let entry = if let Some(entry) = input.strip_prefix('/') {
+            entry
+        } else {
+            return Err(AllowlistEntryParseError::NoLeadingSlash(input.to_string()));
+        };
+
+        if entry.is_empty() {
+            return Ok(AllowlistEntry { matchers: vec![] });
+        }
+
+        if entry.contains("**") && !entry.ends_with("**") {
+            return Err(AllowlistEntryParseError::DescendantWildcardOnlyAtEnd(input.to_string()));
+        }
+
+        let mut parts = vec![];
+        for name in entry.split('/') {
+            let part = match name {
+                "**" => AllowlistMatcher::AnyDescendant,
+                "*" => AllowlistMatcher::AnyChild,
+                name => {
+                    if let Some(collection_name) = name.strip_suffix(":**") {
+                        let collection_name = Name::new(collection_name).map_err(|e| {
+                            AllowlistEntryParseError::InvalidCollectionName(
+                                collection_name.to_string(),
+                                e,
+                            )
+                        })?;
+                        AllowlistMatcher::AnyDescendantInCollection(collection_name)
+                    } else if let Some(collection_name) = name.strip_suffix(":*") {
+                        let collection_name = Name::new(collection_name).map_err(|e| {
+                            AllowlistEntryParseError::InvalidCollectionName(
+                                collection_name.to_string(),
+                                e,
+                            )
+                        })?;
+                        AllowlistMatcher::AnyChildInCollection(collection_name)
+                    } else {
+                        let child_moniker = ChildName::parse(name).map_err(|e| {
+                            AllowlistEntryParseError::InvalidChildName(name.to_string(), e)
+                        })?;
+                        AllowlistMatcher::Exact(child_moniker)
+                    }
+                }
+            };
+            parts.push(part);
+        }
+
+        Ok(AllowlistEntry { matchers: parts })
+    }
+}
+
+impl ToString for AllowlistEntry {
+    fn to_string(&self) -> String {
+        let mut parts = vec!["".to_string()];
+        for matcher in &self.matchers {
+            parts.push(match matcher {
+                AllowlistMatcher::AnyDescendant => "**".to_string(),
+                AllowlistMatcher::AnyChild => "*".to_string(),
+                AllowlistMatcher::AnyDescendantInCollection(bounded_name) => {
+                    format!("{bounded_name}:**")
+                }
+                AllowlistMatcher::AnyChildInCollection(bounded_name) => format!("{bounded_name}:*"),
+                AllowlistMatcher::Exact(child_name) => child_name.to_string(),
+            });
+        }
+        parts.join("/")
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for AllowlistEntry {
+    fn deserialize<D>(deserializer: D) -> Result<AllowlistEntry, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(de::Error::custom)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for AllowlistEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -560,61 +658,9 @@ fn parse_allowlist_entries(strs: &Option<Vec<String>>) -> Result<Vec<AllowlistEn
 
     let mut entries = vec![];
     for input in strs {
-        let entry = parse_allowlist_entry(input)?;
-        entries.push(entry);
+        entries.push(input.parse()?);
     }
     Ok(entries)
-}
-
-fn parse_allowlist_entry(input: &str) -> Result<AllowlistEntry, AllowlistEntryParseError> {
-    let entry = if let Some(entry) = input.strip_prefix('/') {
-        entry
-    } else {
-        return Err(AllowlistEntryParseError::NoLeadingSlash(input.to_string()));
-    };
-
-    if entry.is_empty() {
-        return Ok(AllowlistEntry { matchers: vec![] });
-    }
-
-    if entry.contains("**") && !entry.ends_with("**") {
-        return Err(AllowlistEntryParseError::DescendantWildcardOnlyAtEnd(input.to_string()));
-    }
-
-    let mut parts = vec![];
-    for name in entry.split('/') {
-        let part = match name {
-            "**" => AllowlistMatcher::AnyDescendant,
-            "*" => AllowlistMatcher::AnyChild,
-            name => {
-                if let Some(collection_name) = name.strip_suffix(":**") {
-                    let collection_name = Name::new(collection_name).map_err(|e| {
-                        AllowlistEntryParseError::InvalidCollectionName(
-                            collection_name.to_string(),
-                            e,
-                        )
-                    })?;
-                    AllowlistMatcher::AnyDescendantInCollection(collection_name)
-                } else if let Some(collection_name) = name.strip_suffix(":*") {
-                    let collection_name = Name::new(collection_name).map_err(|e| {
-                        AllowlistEntryParseError::InvalidCollectionName(
-                            collection_name.to_string(),
-                            e,
-                        )
-                    })?;
-                    AllowlistMatcher::AnyChildInCollection(collection_name)
-                } else {
-                    let child_moniker = ChildName::parse(name).map_err(|e| {
-                        AllowlistEntryParseError::InvalidChildName(name.to_string(), e)
-                    })?;
-                    AllowlistMatcher::Exact(child_moniker)
-                }
-            }
-        };
-        parts.push(part);
-    }
-
-    Ok(AllowlistEntry { matchers: parts })
 }
 
 fn as_usize_or_default(value: Option<u32>, default: usize) -> usize {
@@ -798,11 +844,11 @@ fn parse_debug_capability_policy(
             let mut policies: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>> =
                 HashMap::new();
             for e in allowlist.into_iter() {
-                let moniker = parse_allowlist_entry(
-                    e.moniker
-                        .as_deref()
-                        .ok_or_else(|| Error::new(PolicyConfigError::EmptySourceMoniker))?,
-                )?;
+                let moniker = e
+                    .moniker
+                    .as_deref()
+                    .ok_or_else(|| Error::new(PolicyConfigError::EmptySourceMoniker))?
+                    .parse()?;
                 let name = if let Some(name) = e.name.as_ref() {
                     Ok(name
                         .parse()
@@ -1520,22 +1566,32 @@ mod tests {
         Ok(())
     }
 
+    test_function_ok! { parse_allowlist_entries, missing_entries => (&None, vec![]) }
+
     macro_rules! test_entries_ok {
         ( $($test_name:ident => ($input:expr, $expected:expr)),+ $(,)? ) => {
-            test_function_ok! { parse_allowlist_entries, $($test_name => ($input, $expected)),+ }
+            $(
+                #[test]
+                fn $test_name() {
+                    let input = $input;
+                    let parsed = parse_allowlist_entries(&Some(input.clone())).unwrap();
+                    assert_eq!(parsed, $expected);
+                    let round_trip: Vec<_> = parsed.iter().map(AllowlistEntry::to_string).collect();
+                    assert_eq!(round_trip, input);
+                }
+            )+
         };
     }
 
     macro_rules! test_entries_err {
         ( $($test_name:ident => ($input:expr, $type:ty, $expected:expr)),+ $(,)? ) => {
-            test_function_err! { parse_allowlist_entries, $($test_name => ($input, $type, $expected)),+ }
+            test_function_err! { parse_allowlist_entries, $($test_name => (&Some($input), $type, $expected)),+ }
         };
     }
 
     test_entries_ok! {
-        missing_entries => (&None, vec![]),
-        empty_entries => (&Some(vec![]), vec![]),
-        all_entry_types => (&Some(vec![
+        empty_entries => (vec![], vec![]),
+        all_entry_types => (vec![
             "/core".into(),
             "/**".into(),
             "/foo/**".into(),
@@ -1544,7 +1600,7 @@ mod tests {
             "/core/ffx-laboratory:*/echo_client".into(),
             "/core/*/ffx-laboratory:*/**".into(),
             "/core/*/bar".into(),
-        ]), vec![
+        ], vec![
             AllowlistEntryBuilder::new().exact("core").build(),
             AllowlistEntryBuilder::new().any_descendant(),
             AllowlistEntryBuilder::new().exact("foo").any_descendant(),
@@ -1558,40 +1614,40 @@ mod tests {
 
     test_entries_err! {
         invalid_realm_entry => (
-            &Some(vec!["/foo/**".into(), "bar/**".into()]),
+            vec!["/foo/**".into(), "bar/**".into()],
             AllowlistEntryParseError,
             AllowlistEntryParseError::NoLeadingSlash("bar/**".into())),
         invalid_realm_in_collection_entry => (
-            &Some(vec!["/foo/coll:**".into(), "bar/coll:**".into()]),
+            vec!["/foo/coll:**".into(), "bar/coll:**".into()],
             AllowlistEntryParseError,
             AllowlistEntryParseError::NoLeadingSlash("bar/coll:**".into())),
         missing_realm_in_collection_entry => (
-            &Some(vec!["coll:**".into()]),
+            vec!["coll:**".into()],
             AllowlistEntryParseError,
             AllowlistEntryParseError::NoLeadingSlash("coll:**".into())),
         missing_collection_name => (
-            &Some(vec!["/foo/coll:**".into(), "/:**".into()]),
+            vec!["/foo/coll:**".into(), "/:**".into()],
             AllowlistEntryParseError,
             AllowlistEntryParseError::InvalidCollectionName(
                 "".into(),
                 ParseError::Empty
             )),
         invalid_collection_name => (
-            &Some(vec!["/foo/coll:**".into(), "/*:**".into()]),
+            vec!["/foo/coll:**".into(), "/*:**".into()],
             AllowlistEntryParseError,
             AllowlistEntryParseError::InvalidCollectionName(
                 "*".into(),
                 ParseError::InvalidValue
             )),
         invalid_exact_entry => (
-            &Some(vec!["/foo/bar*".into()]),
+            vec!["/foo/bar*".into()],
             AllowlistEntryParseError,
             AllowlistEntryParseError::InvalidChildName(
                 "bar*".into(),
                 MonikerError::InvalidMonikerPart { 0: ParseError::InvalidValue }
             )),
         descendant_wildcard_in_between => (
-            &Some(vec!["/foo/**/bar".into()]),
+            vec!["/foo/**/bar".into()],
             AllowlistEntryParseError,
             AllowlistEntryParseError::DescendantWildcardOnlyAtEnd(
                 "/foo/**/bar".into(),
