@@ -5,6 +5,7 @@
 #ifndef TOOLS_FIDLCAT_LIB_MESSAGE_GRAPH_H_
 #define TOOLS_FIDLCAT_LIB_MESSAGE_GRAPH_H_
 
+#include <cstdint>
 #include <iostream>
 #include <list>
 #include <map>
@@ -302,7 +303,7 @@ class MessageGraph {
   static std::vector<uint32_t> ReplacesHandlesWithTokens(std::string* message) {
     static std::vector<std::string> handle_texts = {"handle: ", "handle = "};
     std::vector<uint32_t> handle_ids;
-    uint cur_token = 0;
+    uint32_t cur_token = 0;
 
     for (size_t i = 0; i < handle_texts.size(); i++) {
       std::string_view handle_text = handle_texts[i];
