@@ -132,6 +132,11 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.diagnostics.LogFlusher",
+            from: "#archivist",
+            to: "#driver_manager",
+        },
+        {
             protocol: "fuchsia.component.resolution.Resolver",
             from: "parent",
             as: "fuchsia.component.resolution.Resolver-boot",

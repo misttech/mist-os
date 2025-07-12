@@ -16,6 +16,7 @@
         },
         {
             protocol: [
+                "fuchsia.diagnostics.LogFlusher",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LogStream",
                 "fuchsia.diagnostics.system.SerialLogControl",
@@ -54,6 +55,7 @@
     expose: [
         {
             protocol: [
+                "fuchsia.diagnostics.LogFlusher",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LogStream",
                 "fuchsia.diagnostics.system.SerialLogControl",

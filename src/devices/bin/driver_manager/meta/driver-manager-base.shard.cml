@@ -66,6 +66,10 @@
             protocol: "fuchsia.component.Realm",
         },
         {
+            protocol: "fuchsia.diagnostics.LogFlusher",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.component.sandbox.CapabilityStore",
             from: "framework",
         },
