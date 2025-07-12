@@ -53,19 +53,19 @@ class SessionUsingFfx(session.Session):
             SessionError: session failed to start.
         """
 
-        _LOGGER.info(f"start session on device {self._name}")
+        _LOGGER.info("start session on device %s", self._name)
 
         try:
             self._ffx.run(["session", "start"])
         except ffx_errors.FfxCommandError as err:
             raise session_errors.SessionError(err)
 
-        _LOGGER.info(f"wait for session started on device {self._name}")
+        _LOGGER.info("wait for session started on device %s", self._name)
         # wait for session started.
         while not self.is_started():
             time.sleep(1)  # second.
 
-        _LOGGER.info(f"session started on device {self._name}")
+        _LOGGER.info("session started on device %s", self._name)
 
     def is_started(self) -> bool:
         """Check if session is started.
@@ -104,7 +104,7 @@ class SessionUsingFfx(session.Session):
         """
 
         if not self.is_started():
-            _LOGGER.info(f"session not started on device {self._name}")
+            _LOGGER.info("session not started on device %s", self._name)
             self.start()
 
     def add_component(self, url: str) -> None:
@@ -136,19 +136,19 @@ class SessionUsingFfx(session.Session):
         if not self.is_started():
             raise session_errors.SessionError("session is not started.")
 
-        _LOGGER.info(f"restart session on device {self._name}")
+        _LOGGER.info("restart session on device %s", self._name)
 
         try:
             self._ffx.run(["session", "restart"])
         except ffx_errors.FfxCommandError as err:
             raise session_errors.SessionError(err)
 
-        _LOGGER.info(f"wait for session started on device {self._name}")
+        _LOGGER.info("wait for session started on device %s", self._name)
         # wait for session started.
         while not self.is_started():
             time.sleep(1)  # second.
 
-        _LOGGER.info(f"session started on device {self._name}")
+        _LOGGER.info("session started on device %s", self._name)
 
     def stop(self) -> None:
         """Stop the session.
@@ -160,19 +160,19 @@ class SessionUsingFfx(session.Session):
             SessionError: Session failed stop to the session.
         """
 
-        _LOGGER.info(f"stop session on device {self._name}")
+        _LOGGER.info("stop session on device %s", self._name)
 
         try:
             self._ffx.run(["session", "stop"])
         except ffx_errors.FfxCommandError as err:
             raise session_errors.SessionError(err)
 
-        _LOGGER.info(f"wait for session stopped on device {self._name}")
+        _LOGGER.info("wait for session stopped on device %s", self._name)
         # wait for session stopped.
         while self.is_started():
             time.sleep(1)  # second.
 
-        _LOGGER.info(f"session stopped on device {self._name}")
+        _LOGGER.info("session stopped on device %s", self._name)
 
     def _cleanup(self) -> None:
         """Cleanup the session using `ffx component list` and `ffx session remove`.
@@ -184,7 +184,8 @@ class SessionUsingFfx(session.Session):
         # when session is stopped, no cleanup.
         if not self.is_started():
             _LOGGER.info(
-                f"no cleanup needed on device {self._name}, session is stopped."
+                "no cleanup needed on device %s, session is stopped.",
+                self._name,
             )
             return
 
@@ -200,7 +201,9 @@ class SessionUsingFfx(session.Session):
                     # `ffx session remove` seems not work.
                     if not name.startswith("main"):
                         _LOGGER.info(
-                            f"remove component on device {self._name}: {name}"
+                            "remove component on device %s: %s",
+                            self._name,
+                            name,
                         )
                         self._ffx.run(["session", "remove", name])
         except ffx_errors.FfxCommandError as err:

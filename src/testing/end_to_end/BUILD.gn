@@ -158,6 +158,7 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
+    "honeydew/honeydew/affordances/starnix/tests/functional_tests:starnix_test_on_non_starnix($host_toolchain)",
     "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
     "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
     "honeydew/honeydew/fuchsia_device/tests/functional_tests:vim3_test($host_toolchain)",
@@ -170,10 +171,7 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
 
 group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   testonly = true
-  public_deps = [
-    "honeydew/honeydew/affordances/starnix/tests/functional_tests:starnix_test_on_non_starnix($host_toolchain)",
-    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
-  ]
+  public_deps = [ "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)" ]
 }
 
 group("core_vim3_staging_tests") {
@@ -195,6 +193,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
+    "honeydew/honeydew/affordances/hello_world/tests/functional_tests:hello_world_test($host_toolchain)",
     "honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
     "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
     "honeydew/honeydew/affordances/session/tests/functional_tests:session_test($host_toolchain)",
@@ -217,9 +216,6 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
     "honeydew/honeydew/affordances/starnix/tests/functional_tests:starnix_test_on_non_starnix($host_toolchain)",
     "honeydew/honeydew/affordances/ui/scenic/tests/functional_tests:scenic_test($host_toolchain)",
     "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
-
-    # Note - Intentionally not adding this hello_world_test across all the test groups
-    "honeydew/honeydew/affordances/hello_world/tests/functional_tests:hello_world_test($host_toolchain)",
 
     # Do not run this test in CQ (stable_tests) until b/412361464 is fixed
     "honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test($host_toolchain)",

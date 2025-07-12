@@ -33,7 +33,7 @@ class ScenicUsingFfxTests(unittest.TestCase):
             ("unknown", 'renderer -> String("a")', "a"),
         ]
     )
-    def test_renderer(self, name: str, ffx_ret: str, want: str) -> None:
+    def test_renderer(self, unused_name: str, ffx_ret: str, want: str) -> None:
         self.mock_ffx.run.return_value = ffx_ret
         self.assertEqual(self.scenic_obj.renderer(), want)
         self.mock_ffx.run.assert_called_once_with(
