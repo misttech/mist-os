@@ -611,13 +611,13 @@
     },
     {
         "package": "fuchsia/third_party/gcc/linux-amd64",
-        "version": "git_revision:ea99ca71c1d14ed046b14e41d6a5717d55863a91,a42172797ce96b4f01628d27003bba0ee56a17d9",
-        "instance_id": "IcRSzBzLrZMWSMlMnfpdAl6iaK9bSs9-xvybgwsxw-YC"
+        "version": "git_revision:c0900e67a08c0e1140ab47af4d1e90eb00bc17ee,b9b7bbb466efc2955c80204250eedeecfacbecd7",
+        "instance_id": "Xaxf1dK90sTVpAbFVcgp4h4JmHXkSTZP11RBZo0nS34C"
     },
     {
         "package": "fuchsia/third_party/gcc/linux-arm64",
-        "version": "git_revision:ea99ca71c1d14ed046b14e41d6a5717d55863a91,a42172797ce96b4f01628d27003bba0ee56a17d9",
-        "instance_id": "l52ME4RLwbG9p01KaU-RkrGucbVvxXrQZkaUjShdRYkC"
+        "version": "git_revision:c0900e67a08c0e1140ab47af4d1e90eb00bc17ee,b9b7bbb466efc2955c80204250eedeecfacbecd7",
+        "instance_id": "1wL6p7egJrv7xLDfPV3DAnXap01-0AogCCmMGXVE_eMC"
     },
     {
         "package": "fuchsia/third_party/grpcwebproxy/linux-amd64",
