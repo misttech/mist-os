@@ -118,6 +118,22 @@ impl From<Id> for u64 {
     }
 }
 
+pub trait AsTraceStrRef {
+    fn as_trace_str_ref(&self, context: &TraceCategoryContext) -> sys::trace_string_ref_t;
+}
+
+impl AsTraceStrRef for &'static str {
+    fn as_trace_str_ref(&self, context: &TraceCategoryContext) -> sys::trace_string_ref_t {
+        context.register_str(self)
+    }
+}
+
+impl AsTraceStrRef for String {
+    fn as_trace_str_ref(&self, _context: &TraceCategoryContext) -> sys::trace_string_ref_t {
+        trace_make_inline_string_ref(self.as_str())
+    }
+}
+
 /// `Arg` holds an argument to a tracing function, which can be one of many types.
 #[repr(transparent)]
 pub struct Arg<'a>(sys::trace_arg_t, PhantomData<&'a ()>);
@@ -129,6 +145,9 @@ pub struct Arg<'a>(sys::trace_arg_t, PhantomData<&'a ()>);
 /// `ArgValue`, such as `i32`, `f64`, or `&str`.
 pub trait ArgValue {
     fn of<'a>(key: &'a str, value: Self) -> Arg<'a>
+    where
+        Self: 'a;
+    fn of_registered<'a>(name_ref: sys::trace_string_ref_t, value: Self) -> Arg<'a>
     where
         Self: 'a;
 }
@@ -151,6 +170,21 @@ macro_rules! arg_from {
 
                     Arg(sys::trace_arg_t {
                         name_ref: trace_make_inline_string_ref(key),
+                        value: sys::trace_arg_value_t {
+                            type_: $tag,
+                            value: $value,
+                        },
+                    }, PhantomData)
+                }
+                #[inline]
+                fn of_registered<'a>(name_ref: sys::trace_string_ref_t, $valname: Self) -> Arg<'a>
+                    where Self: 'a
+                {
+                    #[allow(unused)]
+                    let $valname = $valname;
+
+                    Arg(sys::trace_arg_t {
+                        name_ref,
                         value: sys::trace_arg_value_t {
                             type_: $tag,
                             value: $value,
@@ -194,6 +228,22 @@ impl<T> ArgValue for *const T {
             PhantomData,
         )
     }
+    #[inline]
+    fn of_registered<'a>(name_ref: sys::trace_string_ref_t, val: Self) -> Arg<'a>
+    where
+        Self: 'a,
+    {
+        Arg(
+            sys::trace_arg_t {
+                name_ref,
+                value: sys::trace_arg_value_t {
+                    type_: sys::TRACE_ARG_POINTER,
+                    value: sys::trace_arg_union_t { pointer_value: val as usize },
+                },
+            },
+            PhantomData,
+        )
+    }
 }
 
 impl<T> ArgValue for *mut T {
@@ -213,6 +263,22 @@ impl<T> ArgValue for *mut T {
             PhantomData,
         )
     }
+    #[inline]
+    fn of_registered<'a>(name_ref: sys::trace_string_ref_t, val: Self) -> Arg<'a>
+    where
+        Self: 'a,
+    {
+        Arg(
+            sys::trace_arg_t {
+                name_ref,
+                value: sys::trace_arg_value_t {
+                    type_: sys::TRACE_ARG_POINTER,
+                    value: sys::trace_arg_union_t { pointer_value: val as usize },
+                },
+            },
+            PhantomData,
+        )
+    }
 }
 
 impl<'a> ArgValue for &'a str {
@@ -224,6 +290,24 @@ impl<'a> ArgValue for &'a str {
         Arg(
             sys::trace_arg_t {
                 name_ref: trace_make_inline_string_ref(key),
+                value: sys::trace_arg_value_t {
+                    type_: sys::TRACE_ARG_STRING,
+                    value: sys::trace_arg_union_t {
+                        string_value_ref: trace_make_inline_string_ref(val),
+                    },
+                },
+            },
+            PhantomData,
+        )
+    }
+    #[inline]
+    fn of_registered<'b>(name_ref: sys::trace_string_ref_t, val: Self) -> Arg<'b>
+    where
+        Self: 'b,
+    {
+        Arg(
+            sys::trace_arg_t {
+                name_ref,
                 value: sys::trace_arg_value_t {
                     type_: sys::TRACE_ARG_STRING,
                     value: sys::trace_arg_union_t {
@@ -262,8 +346,9 @@ macro_rules! instant {
     ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                $crate::instant(&context, $name, $scope, &[$($crate::ArgValue::of($key, $val)),*]);
+                $crate::instant(&context, $name, $scope, &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*]);
             }
         }
     }
@@ -458,9 +543,10 @@ macro_rules! duration {
             // event, so this second lookup is irrelevant.  Retaining the context for the lifetime
             // of the DurationScope to avoid this second lookup would prevent the trace buffers from
             // flushing until the DurationScope is dropped.
-            if let Some(_context) =
+            use $crate::AsTraceStrRef;
+            if let Some(context) =
                     $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                args = [$($crate::ArgValue::of($key, $val)),*];
+                args = [$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*];
                 Some($crate::duration($category, $name, &args))
             } else {
                 None
@@ -507,9 +593,10 @@ macro_rules! duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::duration_begin(&context, $name,
-                                       &[$($crate::ArgValue::of($key, $val)),*])
+                                       &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*])
             }
         }
     };
@@ -533,8 +620,9 @@ macro_rules! duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                $crate::duration_end(&context, $name, &[$($crate::ArgValue::of($key, $val)),*])
+                $crate::duration_end(&context, $name, &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*])
             }
         }
     };
@@ -1265,6 +1353,26 @@ impl TraceCategoryContext {
     }
 
     #[inline]
+    #[cfg(fuchsia_api_level_at_least = "27")]
+    pub fn register_str(&self, name: &'static str) -> sys::trace_string_ref_t {
+        unsafe {
+            let mut name_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
+            sys::trace_context_register_bytestring(
+                self.raw,
+                name.as_ptr().cast::<libc::c_char>(),
+                name.len(),
+                name_ref.as_mut_ptr(),
+            );
+            name_ref.assume_init()
+        }
+    }
+    #[inline]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
+    pub fn register_str(&self, name: &'static str) -> sys::trace_string_ref_t {
+        trace_make_inline_string_ref(name)
+    }
+
+    #[inline]
     fn register_current_thread(&self) -> sys::trace_thread_ref_t {
         unsafe {
             let mut thread_ref = mem::MaybeUninit::<sys::trace_thread_ref_t>::uninit();
@@ -1799,16 +1907,17 @@ mod sys {
             category_literal: *const libc::c_char,
         ) -> bool;
 
-        pub fn trace_context_register_string_copy(
-            context: *const trace_context_t,
-            string: *const libc::c_char,
-            length: libc::size_t,
-            out_ref: *mut trace_string_ref_t,
-        );
-
         pub fn trace_context_register_string_literal(
             context: *const trace_context_t,
             string_literal: *const libc::c_char,
+            out_ref: *mut trace_string_ref_t,
+        );
+
+        #[cfg(fuchsia_api_level_at_least = "27")]
+        pub fn trace_context_register_bytestring(
+            context: *const trace_context_t,
+            string_literal: *const libc::c_char,
+            length: libc::size_t,
             out_ref: *mut trace_string_ref_t,
         );
 

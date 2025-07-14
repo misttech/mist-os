@@ -60,8 +60,9 @@ TEST(TEST_SUITE, test_instant) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"name\")\n"
-      "String(index: 3, \"process\")\n"
+      "String(index: 2, \"arg\")\n"
+      "String(index: 3, \"name\")\n"
+      "String(index: 4, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process), "
@@ -77,8 +78,10 @@ TEST(TEST_SUITE, test_duration) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"name\")\n"
-      "String(index: 3, \"process\")\n"
+      "String(index: 2, \"x\")\n"
+      "String(index: 3, \"y\")\n"
+      "String(index: 4, \"name\")\n"
+      "String(index: 5, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
@@ -94,8 +97,11 @@ TEST(TEST_SUITE, test_scoped_duration) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"name\")\n"
-      "String(index: 3, \"process\")\n"
+      "String(index: 2, \"x\")\n"
+      "String(index: 3, \"y\")\n"
+      "String(index: 4, \"arg\")\n"
+      "String(index: 5, \"name\")\n"
+      "String(index: 6, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process), "
@@ -113,14 +119,17 @@ TEST(TEST_SUITE, test_duration_granular) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"name\")\n"
-      "String(index: 3, \"process\")\n"
+      "String(index: 2, \"x\")\n"
+      "String(index: 3, \"name\")\n"
+      "String(index: 4, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationBegin, {x: "
       "int32(5)})\n"
+      "String(index: 5, \"arg\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process), "
       "{arg: int32(10)})\n"
+      "String(index: 6, \"y\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationEnd, {y: "
       "string(\"foo\")})\n");
 }
@@ -173,8 +182,23 @@ TEST(TEST_SUITE, test_arglimit) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"name\")\n"
-      "String(index: 3, \"process\")\n"
+      "String(index: 2, \"1\")\n"
+      "String(index: 3, \"2\")\n"
+      "String(index: 4, \"3\")\n"
+      "String(index: 5, \"4\")\n"
+      "String(index: 6, \"5\")\n"
+      "String(index: 7, \"6\")\n"
+      "String(index: 8, \"7\")\n"
+      "String(index: 9, \"8\")\n"
+      "String(index: 10, \"9\")\n"
+      "String(index: 11, \"10\")\n"
+      "String(index: 12, \"11\")\n"
+      "String(index: 13, \"12\")\n"
+      "String(index: 14, \"13\")\n"
+      "String(index: 15, \"14\")\n"
+      "String(index: 16, \"15\")\n"
+      "String(index: 17, \"name\")\n"
+      "String(index: 18, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
@@ -198,6 +222,7 @@ TEST(TEST_SUITE, test_async_event) {
       "Thread(index: 1, <>)\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", AsyncBegin(id: 1), {x: "
       "int32(5), y: int32(10)})\n"
+      "String(index: 4, \"arg\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process)"
       ", {arg: int32(10)})\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", AsyncEnd(id: 1), {})\n");
