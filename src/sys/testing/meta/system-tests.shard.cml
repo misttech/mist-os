@@ -478,7 +478,6 @@
             dictionary: "tee_session",
             from: "parent",
             to: [ "#system-tests" ],
-            availability: "optional",
         },
     ],
 }
