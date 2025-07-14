@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pin/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
-#include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <stdio.h>
@@ -134,7 +133,6 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_pin::Pin>,
   fbl::DoublyLinkedList<fbl::RefPtr<GpioInstance>> gpio_instances_;
   fidl::ServerBindingGroup<fuchsia_hardware_pin::Pin> pin_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_pin::Debug> debug_bindings_;
-  compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_;
   driver_devfs::Connector<fuchsia_hardware_pin::Debug> devfs_connector_;
 };

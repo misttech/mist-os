@@ -35,7 +35,6 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.pin:fuchsia.hardware.pin_cpp",
     "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
-    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//zircon/system/ulib/fbl",
@@ -48,7 +47,10 @@ fuchsia_cc_driver("gpio-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  deps = [ ":common" ]
+  deps = [
+    ":common",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
 }
 
 fuchsia_driver_component("gpio") {
@@ -78,6 +80,7 @@ test("gpio-test-bin") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/lib/ddk:ddk_metadata",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
