@@ -583,7 +583,7 @@
              path="third_party/wayland"
              remote="https://fuchsia.googlesource.com/third_party/wayland"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="9192d3cebd2e7a82aa3dc7cd235fb15ae8a5884d"/>
+             revision="1851f817deb8c0ef611801c1fba2d866d88584ff"/>
     <project name="third_party/yxml"
              path="third_party/yxml"
              remote="https://fuchsia.googlesource.com/third_party/yxml"
