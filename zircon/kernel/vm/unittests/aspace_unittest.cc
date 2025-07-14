@@ -32,25 +32,25 @@ const ktl::array kernel_regions = {
     KernelRegion{
         .name = "kernel_code",
         .base = (vaddr_t)__code_start,
-        .size = ROUNDUP((uintptr_t)__code_end - (uintptr_t)__code_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)__code_end - (uintptr_t)__code_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE,
     },
     KernelRegion{
         .name = "kernel_rodata",
         .base = (vaddr_t)__rodata_start,
-        .size = ROUNDUP((uintptr_t)__rodata_end - (uintptr_t)__rodata_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)__rodata_end - (uintptr_t)__rodata_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
     },
     KernelRegion{
         .name = "kernel_relro",
         .base = (vaddr_t)__relro_start,
-        .size = ROUNDUP((uintptr_t)__relro_end - (uintptr_t)__relro_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)__relro_end - (uintptr_t)__relro_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
     },
     KernelRegion{
         .name = "kernel_data_bss",
         .base = (vaddr_t)__data_start,
-        .size = ROUNDUP((uintptr_t)_end - (uintptr_t)__data_start, PAGE_SIZE),
+        .size = ROUNDUP_PAGE_SIZE((uintptr_t)_end - (uintptr_t)__data_start),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
     },
 };

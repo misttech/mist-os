@@ -78,7 +78,7 @@ zx_status_t MapUnalignedRegion(VmAspace* aspace, paddr_t base, size_t size, cons
 
   auto vmar = aspace->RootVmar();
   fbl::RefPtr<VmObjectPhysical> vmo;
-  paddr_t aligned_base = ROUNDDOWN(base, PAGE_SIZE);
+  paddr_t aligned_base = ROUNDDOWN_PAGE_SIZE(base);
   size_t aligned_size = ROUNDUP_PAGE_SIZE(size + (base - aligned_base));
   zx_status_t status = VmObjectPhysical::Create(aligned_base, aligned_size, &vmo);
   if (status != ZX_OK) {

@@ -128,16 +128,16 @@ void apic_io_init(struct io_apic_descriptor* io_apic_descs, size_t num_io_apic_d
     struct io_apic* apic = &io_apics[i];
     const paddr_t paddr = apic->desc.paddr;
     void* vaddr = nullptr;
-    const paddr_t paddr_page_base = ROUNDDOWN(paddr, PAGE_SIZE);
+    const paddr_t paddr_page_base = ROUNDDOWN_PAGE_SIZE(paddr);
     // An IO APIC cannot cross a page boundary.
     ASSERT(paddr + IO_APIC_WINDOW_SIZE <= paddr_page_base + PAGE_SIZE);
 
     // Check if a previous IO APIC shared the same page as this one so we can re-use the mapping.
     for (size_t j = 0; j < i; j++) {
-      if (ROUNDDOWN(io_apics[j].desc.paddr, PAGE_SIZE) == paddr_page_base) {
+      if (ROUNDDOWN_PAGE_SIZE(io_apics[j].desc.paddr) == paddr_page_base) {
         // The vaddr stored in the io_apics is to the MMIO base, round it back down to the page base
         vaddr = reinterpret_cast<void*>(
-            ROUNDDOWN(reinterpret_cast<uintptr_t>(io_apics[j].vaddr), PAGE_SIZE));
+            ROUNDDOWN_PAGE_SIZE(reinterpret_cast<uintptr_t>(io_apics[j].vaddr)));
         break;
       }
     }

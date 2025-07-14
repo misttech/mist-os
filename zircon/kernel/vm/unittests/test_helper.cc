@@ -14,7 +14,7 @@ namespace vm_unittest {
 zx_status_t AllocUser(VmAspace* aspace, const char* name, size_t size, user_inout_ptr<void>* ptr) {
   ASSERT(aspace->is_user());
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }

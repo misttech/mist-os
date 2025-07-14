@@ -179,7 +179,7 @@ zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flag
     return ZX_ERR_INVALID_ARGS;
   }
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
 
   Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
@@ -289,7 +289,7 @@ zx_status_t VmMapping::Unmap(vaddr_t base, size_t size) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
 
   fbl::RefPtr<VmAspace> aspace(aspace_);
   if (!aspace) {
@@ -731,7 +731,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
   Guard<CriticalMutex> aspace_guard{lock()};
   canary_.Assert();
 
-  len = ROUNDUP(len, PAGE_SIZE);
+  len = ROUNDUP_PAGE_SIZE(len);
   if (len == 0) {
     return ZX_ERR_INVALID_ARGS;
   }

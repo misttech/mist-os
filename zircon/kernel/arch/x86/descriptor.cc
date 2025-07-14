@@ -168,7 +168,7 @@ void gdt_setup() {
 
   // Can only create a protection boundary at page boundaries, so round up the gdt to the next page
   // boundary for mapping and protection purposes.
-  const size_t gdt_real_map_size = ROUNDUP(gdt_real_size, PAGE_SIZE);
+  const size_t gdt_real_map_size = ROUNDUP_PAGE_SIZE(gdt_real_size);
 
   // Create the read/write real gdt mapping.
   zx::result<VmAddressRegion::MapResult> mapping_result = vmar->CreateVmMapping(

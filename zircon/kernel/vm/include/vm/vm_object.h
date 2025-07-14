@@ -792,7 +792,7 @@ class VmObject : public VmHierarchyBase,
   static constexpr uint64_t MAX_SIZE = VmPageList::MAX_SIZE;
   // Ensure that MAX_SIZE + PAGE_SIZE doesn't overflow so no VmObjects
   // need to worry about overflow for loop bounds.
-  static_assert(MAX_SIZE <= ROUNDDOWN(UINT64_MAX, PAGE_SIZE) - PAGE_SIZE);
+  static_assert(MAX_SIZE <= ROUNDDOWN_PAGE_SIZE(UINT64_MAX) - PAGE_SIZE);
   static_assert(MAX_SIZE % PAGE_SIZE == 0);
 
  private:

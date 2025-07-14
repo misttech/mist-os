@@ -179,9 +179,9 @@ zx_status_t VmObjectPhysical::Lookup(uint64_t offset, uint64_t len,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  uint64_t cur_offset = ROUNDDOWN(offset, PAGE_SIZE);
+  uint64_t cur_offset = ROUNDDOWN_PAGE_SIZE(offset);
   uint64_t end = offset + len;
-  uint64_t end_page_offset = ROUNDUP(end, PAGE_SIZE);
+  uint64_t end_page_offset = ROUNDUP_PAGE_SIZE(end);
 
   for (size_t idx = 0; cur_offset < end_page_offset; cur_offset += PAGE_SIZE, ++idx) {
     zx_status_t status = lookup_fn(cur_offset, base_ + cur_offset);

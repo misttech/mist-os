@@ -66,7 +66,7 @@ InstrumentationDataVmo LlvmProfdataVmo() {
   // Now map in just the pages holding the live data.  This mapping will be
   // kept alive permanently so the live data can be updated through it.
   const uint64_t map_offset =
-      ROUNDDOWN(ktl::min(profdata.counters_offset(), profdata.bitmap_offset()), PAGE_SIZE);
+      ROUNDDOWN_PAGE_SIZE(ktl::min(profdata.counters_offset(), profdata.bitmap_offset()));
   const size_t map_size =
       ROUNDUP_PAGE_SIZE(ktl::max(profdata.counters_offset() + profdata.counters_size_bytes(),
                                  profdata.bitmap_offset() + profdata.bitmap_size_bytes())) -

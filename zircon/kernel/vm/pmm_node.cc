@@ -497,7 +497,7 @@ zx_status_t PmmNode::AllocRange(paddr_t address, size_t count, list_node* list) 
     return ZX_OK;
   }
 
-  address = ROUNDDOWN(address, PAGE_SIZE);
+  address = ROUNDDOWN_PAGE_SIZE(address);
 
   bool free_list_had_fill_pattern = false;
 

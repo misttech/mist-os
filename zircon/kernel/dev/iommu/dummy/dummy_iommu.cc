@@ -90,7 +90,7 @@ zx_status_t DummyIommu::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmOb
   }
   const uint64_t offset = map_token + map_offset;
   paddr_t paddr = INVALID_PADDR;
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   zx_status_t status = vmo->LookupContiguous(offset, size, &paddr);
   // If the range is fundamentally incorrect or out of range then we immediately error. Otherwise
   // even if we have some other error case we will fall back to attempting single pages at a time.

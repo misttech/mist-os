@@ -459,7 +459,7 @@ zx_status_t IommuImpl::EnableBiosReservedMappingsLocked() {
 
       LTRACEF("Enabling region [%lx, %lx) for %02x:%02x.%02x\n", mem->base_addr,
               mem->base_addr + mem->len, bdf.bus(), bdf.dev(), bdf.func());
-      size_t size = ROUNDUP(mem->len, PAGE_SIZE);
+      size_t size = ROUNDUP_PAGE_SIZE(mem->len);
       const uint32_t perms = IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE;
       status = dev->SecondLevelMapIdentity(mem->base_addr, size, perms);
       if (status != ZX_OK) {

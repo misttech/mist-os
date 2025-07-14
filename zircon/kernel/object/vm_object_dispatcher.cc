@@ -97,7 +97,7 @@ zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo, uint64_t conte
     }
     csm = ktl::move(*result);
 
-    uint64_t aligned_content_size = ROUNDUP(content_size, PAGE_SIZE);
+    uint64_t aligned_content_size = ROUNDUP_PAGE_SIZE(content_size);
     // The content_size cannot be larger than the VMO size, so this cannot overflow.
     DEBUG_ASSERT(aligned_content_size >= content_size);
     if (aligned_content_size < vmo->size()) {
@@ -205,7 +205,7 @@ zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {
 
   csm->BeginSetContentSizeLocked(size, &op, &guard);
 
-  uint64_t size_aligned = ROUNDUP(size, PAGE_SIZE);
+  uint64_t size_aligned = ROUNDUP_PAGE_SIZE(size);
   // Check for overflow when rounding up.
   if (size_aligned < size) {
     op.CancelLocked();
@@ -364,7 +364,7 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
 
   // Zero the range from min(stream size, old stream size) to the end of the VMO.
   uint64_t zero_start = ktl::min(stream_size, old_stream_size);
-  uint64_t aligned_stream_size = ROUNDUP(stream_size, PAGE_SIZE);
+  uint64_t aligned_stream_size = ROUNDUP_PAGE_SIZE(stream_size);
   DEBUG_ASSERT(aligned_stream_size >= stream_size);
   // Dropping the lock here is fine, as an `Operation` only needs to be locked when initializing,
   // committing, or cancelling.

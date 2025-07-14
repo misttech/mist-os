@@ -99,7 +99,7 @@ zx_status_t validate_ranged_resource(fbl::RefPtr<ResourceDispatcher> resource, z
   // In the specific case of MMIO, everything is rounded to PAGE_SIZE units
   // because it's the smallest unit we can operate at with the MMU.
   if (resource->get_kind() == ZX_RSRC_KIND_MMIO) {
-    const uint64_t aligned_rbase = ROUNDDOWN(rbase, PAGE_SIZE);
+    const uint64_t aligned_rbase = ROUNDDOWN_PAGE_SIZE(rbase);
     rsize = ROUNDUP_PAGE_SIZE((rbase - aligned_rbase) + rsize);
     rbase = aligned_rbase;
   }

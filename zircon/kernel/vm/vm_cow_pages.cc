@@ -4654,8 +4654,8 @@ zx_status_t VmCowPages::PromoteRangeForReclamation(VmCowRange range) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  uint64_t start_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  uint64_t start_offset = ROUNDDOWN_PAGE_SIZE(range.offset);
+  uint64_t end_offset = ROUNDUP_PAGE_SIZE(range.end());
 
   __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
       GetLookupCursorLocked(VmCowRange(start_offset, end_offset - start_offset));
@@ -4848,8 +4848,8 @@ zx_status_t VmCowPages::DecompressInRange(VmCowRange range) {
     return ZX_OK;
   }
 
-  uint64_t cur_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  uint64_t cur_offset = ROUNDDOWN_PAGE_SIZE(range.offset);
+  uint64_t end_offset = ROUNDUP_PAGE_SIZE(range.end());
 
   zx_status_t status;
   do {
@@ -4938,8 +4938,8 @@ void VmCowPages::UnpinLocked(VmCowRange range, DeferredOps* deferred) {
   // forbid zero length unpins as zero length pins return errors.
   ASSERT(!range.is_empty());
 
-  const uint64_t start_page_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  const uint64_t end_page_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  const uint64_t start_page_offset = ROUNDDOWN_PAGE_SIZE(range.offset);
+  const uint64_t end_page_offset = ROUNDUP_PAGE_SIZE(range.end());
 
 #if (DEBUG_ASSERT_IMPLEMENTED)
   // For any pages that have their pin count transition to 0, i.e. become unpinned, we want to
@@ -5311,8 +5311,8 @@ zx_status_t VmCowPages::LookupLocked(VmCowRange range, VmObject::LookupFunction 
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  const uint64_t start_page_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  const uint64_t end_page_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  const uint64_t start_page_offset = ROUNDDOWN_PAGE_SIZE(range.offset);
+  const uint64_t end_page_offset = ROUNDUP_PAGE_SIZE(range.end());
 
   return page_list_.ForEveryPageInRange(
       [&lookup_fn](const auto* p, uint64_t off) {
@@ -5337,8 +5337,8 @@ zx_status_t VmCowPages::LookupReadableLocked(VmCowRange range, LookupReadableFun
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  uint64_t current_page_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  const uint64_t end_page_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  uint64_t current_page_offset = ROUNDDOWN_PAGE_SIZE(range.offset);
+  const uint64_t end_page_offset = ROUNDUP_PAGE_SIZE(range.end());
 
   DEBUG_ASSERT(!is_hidden());
 
@@ -6204,8 +6204,8 @@ zx_status_t VmCowPages::EnumerateDirtyRangesLocked(VmCowRange range,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  const uint64_t start_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  const uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  const uint64_t start_offset = ROUNDDOWN_PAGE_SIZE(range.offset);
+  const uint64_t end_offset = ROUNDUP_PAGE_SIZE(range.end());
 
   zx_status_t status = page_list_.ForEveryPageAndContiguousRunInRange(
       [](const VmPageOrMarker* p, uint64_t off) {

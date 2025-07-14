@@ -521,7 +521,7 @@ zx_status_t StreamDispatcher::ExpandIfNecessary(uint64_t requested_vmo_size, boo
   uint64_t current_vmo_size = vmo_->size();
   *out_actual = current_vmo_size;
 
-  uint64_t required_vmo_size = ROUNDUP(requested_vmo_size, PAGE_SIZE);
+  uint64_t required_vmo_size = ROUNDUP_PAGE_SIZE(requested_vmo_size);
   // Overflow when rounding up.
   if (required_vmo_size < requested_vmo_size) {
     return ZX_ERR_OUT_OF_RANGE;

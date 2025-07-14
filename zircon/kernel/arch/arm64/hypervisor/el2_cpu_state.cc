@@ -96,8 +96,8 @@ zx::result<> El2TranslationTable::Init() {
   }
 
   // Map the kernel's code in read/execute.
-  vaddr_t code_start = ROUNDDOWN(reinterpret_cast<vaddr_t>(__code_start), PAGE_SIZE);
-  vaddr_t code_end = ROUNDUP(reinterpret_cast<vaddr_t>(__code_end), PAGE_SIZE);
+  vaddr_t code_start = ROUNDDOWN_PAGE_SIZE(reinterpret_cast<vaddr_t>(__code_start));
+  vaddr_t code_end = ROUNDUP_PAGE_SIZE(reinterpret_cast<vaddr_t>(__code_end));
   size_t code_size = code_end - code_start;
   DEBUG_ASSERT(IsPhysicallyContiguous(code_start, code_size));
   paddr_t code_start_paddr = vaddr_to_paddr(reinterpret_cast<const void*>(code_start));

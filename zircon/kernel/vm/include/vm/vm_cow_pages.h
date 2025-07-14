@@ -74,8 +74,8 @@ struct VmCowRange {
   bool is_empty() const { return len == 0; }
   bool is_page_aligned() const { return IS_PAGE_ROUNDED(offset) && IS_PAGE_ROUNDED(len); }
   VmCowRange ExpandTillPageAligned() const {
-    const uint64_t start = ROUNDDOWN(offset, PAGE_SIZE);
-    return VmCowRange(start, ROUNDUP(end(), PAGE_SIZE) - start);
+    const uint64_t start = ROUNDDOWN_PAGE_SIZE(offset);
+    return VmCowRange(start, ROUNDUP_PAGE_SIZE(end()) - start);
   }
 
   VmCowRange OffsetBy(uint64_t delta) const { return VmCowRange(offset + delta, len); }

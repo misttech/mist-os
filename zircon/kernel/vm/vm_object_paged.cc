@@ -221,7 +221,7 @@ zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
       return ZX_ERR_OUT_OF_RANGE;
     }
     DEBUG_ASSERT(end_page >= offset);
-    offset = ROUNDDOWN(offset, PAGE_SIZE);
+    offset = ROUNDDOWN_PAGE_SIZE(offset);
     len = end_page - offset;
   }
 
@@ -909,7 +909,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       return ZX_ERR_OUT_OF_RANGE;
     }
     DEBUG_ASSERT(end_page >= offset);
-    offset = ROUNDDOWN(offset, PAGE_SIZE);
+    offset = ROUNDDOWN_PAGE_SIZE(offset);
     len = end_page - offset;
   }
 
@@ -1145,7 +1145,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
     if (!IS_PAGE_ROUNDED(offset)) {
       // We're doing partial page writes, so we should be dirty tracking.
       DEBUG_ASSERT(dirty_track);
-      const uint64_t page_base = ROUNDDOWN(offset, PAGE_SIZE);
+      const uint64_t page_base = ROUNDDOWN_PAGE_SIZE(offset);
       const uint64_t zero_start_offset = offset - page_base;
       const uint64_t zero_len = ktl::min(PAGE_SIZE - zero_start_offset, len);
       zx_status_t status =
@@ -1175,7 +1175,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
     //
     // Zeroing doesn't decommit pages of contiguous VMOs.
     if (!is_contiguous()) {
-      ktl::optional<VmCowRange> cow_range = GetCowRange(offset, ROUNDDOWN(len, PAGE_SIZE));
+      ktl::optional<VmCowRange> cow_range = GetCowRange(offset, ROUNDDOWN_PAGE_SIZE(len));
       if (!cow_range) {
         return ZX_ERR_OUT_OF_RANGE;
       }
@@ -1205,7 +1205,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
       // Offset is page aligned, and we have at least one full page to process, so find the page
       // aligned length to hand over to the cow pages zero method.
       ktl::optional<VmCowRange> cow_range =
-          GetCowRangeSizeCheckLocked(offset, ROUNDDOWN(len, PAGE_SIZE));
+          GetCowRangeSizeCheckLocked(offset, ROUNDDOWN_PAGE_SIZE(len));
       if (!cow_range) {
         return ZX_ERR_OUT_OF_RANGE;
       }
@@ -1320,8 +1320,8 @@ ktl::pair<zx_status_t, size_t> VmObjectPaged::ReadWriteInternal(uint64_t offset,
         return {ZX_OK, src_offset - offset};
       }
 
-      const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
-      const size_t last_page_offset = ROUNDDOWN(end_offset - 1, PAGE_SIZE);
+      const size_t first_page_offset = ROUNDDOWN_PAGE_SIZE(src_offset);
+      const size_t last_page_offset = ROUNDDOWN_PAGE_SIZE(end_offset - 1);
       size_t remaining_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
       size_t pages_since_last_unlock = 0;
       bool modified = false;
@@ -1934,8 +1934,8 @@ void VmObjectPaged::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) 
   canary_.Assert();
 
   // offsets for vmos needn't be aligned, but vmars use aligned offsets
-  uint64_t aligned_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  uint64_t aligned_len = ROUNDUP(range.end(), PAGE_SIZE) - aligned_offset;
+  uint64_t aligned_offset = ROUNDDOWN_PAGE_SIZE(range.offset);
+  uint64_t aligned_len = ROUNDUP_PAGE_SIZE(range.end()) - aligned_offset;
   if (GetIntersect(cow_range_.offset, cow_range_.len, aligned_offset, aligned_len, &aligned_offset,
                    &aligned_len)) {
     // Found the intersection in cow space, convert back to object space.

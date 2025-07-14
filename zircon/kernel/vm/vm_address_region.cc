@@ -632,7 +632,7 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
   if (buffer || buffer_size) {
     return ZX_ERR_INVALID_ARGS;
   }
-  len = ROUNDUP(len, PAGE_SIZE);
+  len = ROUNDUP_PAGE_SIZE(len);
   if (len == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -799,7 +799,7 @@ zx_status_t VmAddressRegion::Unmap(vaddr_t base, size_t size,
                                    VmAddressRegionOpChildren op_children) {
   canary_.Assert();
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -817,7 +817,7 @@ zx_status_t VmAddressRegion::Unmap(vaddr_t base, size_t size,
 zx_status_t VmAddressRegion::UnmapAllowPartial(vaddr_t base, size_t size) {
   canary_.Assert();
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -969,7 +969,7 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
                                      VmAddressRegionOpChildren op_children) {
   canary_.Assert();
 
-  size = ROUNDUP(size, PAGE_SIZE);
+  size = ROUNDUP_PAGE_SIZE(size);
   if (size == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
