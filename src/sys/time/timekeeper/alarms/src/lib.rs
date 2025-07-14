@@ -350,7 +350,7 @@ impl std::fmt::Display for Cmd {
     }
 }
 
-/// Extracts a KOID from the undelrying channel of the provided [stream].
+/// Extracts a KOID from the underlying channel of the provided [stream].
 ///
 /// # Returns
 /// - zx::Koid: the KOID you wanted.
@@ -367,32 +367,28 @@ pub fn get_stream_koid(
 
 /// Serves a single Wake API client.
 pub async fn serve(timer_loop: Rc<Loop>, requests: fta::WakeAlarmsRequestStream) {
-    // Compute the request ID somehow.
-    fasync::Task::local(async move {
-        let timer_loop = timer_loop.clone();
-        let timer_loop_send = || timer_loop.get_sender();
-        let (cid, mut requests) = get_stream_koid(requests);
-        let mut request_count = 0;
-        debug!("alarms::serve: opened connection: {:?}", cid);
-        while let Some(maybe_request) = requests.next().await {
-            request_count += 1;
-            debug!("alarms::serve: cid: {:?} incoming request: {}", cid, request_count);
-            match maybe_request {
-                Ok(request) => {
-                    // Should return quickly.
-                    handle_request(cid, timer_loop_send(), request).await;
-                }
-                Err(e) => {
-                    warn!("alarms::serve: error in request: {:?}", e);
-                }
+    let timer_loop = timer_loop.clone();
+    let timer_loop_send = || timer_loop.get_sender();
+    let (cid, mut requests) = get_stream_koid(requests);
+    let mut request_count = 0;
+    debug!("alarms::serve: opened connection: {:?}", cid);
+    while let Some(maybe_request) = requests.next().await {
+        request_count += 1;
+        debug!("alarms::serve: cid: {:?} incoming request: {}", cid, request_count);
+        match maybe_request {
+            Ok(request) => {
+                // Should return quickly.
+                handle_request(cid, timer_loop_send(), request).await;
             }
-            debug!("alarms::serve: cid: {:?} done request: {}", cid, request_count);
+            Err(e) => {
+                warn!("alarms::serve: error in request: {:?}", e);
+            }
         }
-        // Check if connection closure was intentional. It is way too easy to close
-        // a FIDL connection inadvertently if doing non-mainstream things with FIDL.
-        warn!("alarms::serve: CLOSED CONNECTION: cid: {:?}", cid);
-    })
-    .detach();
+        debug!("alarms::serve: cid: {:?} done request: {}", cid, request_count);
+    }
+    // Check if connection closure was intentional. It is way too easy to close
+    // a FIDL connection inadvertently if doing non-mainstream things with FIDL.
+    warn!("alarms::serve: CLOSED CONNECTION: cid: {:?}", cid);
 }
 
 async fn handle_cancel(alarm_id: String, cid: zx::Koid, cmd: &mut mpsc::Sender<Cmd>) {
@@ -469,41 +465,46 @@ async fn handle_request(
 ///
 /// One instance is created per each alarm-capable low-level device.
 pub struct Loop {
-    // The task executing the alarm event processing [Loop].
-    _task: fasync::Task<()>,
     // Given to any clients that need to send messages to `_task`
     // via [get_sender].
-    snd_cloneable: mpsc::Sender<Cmd>,
+    snd: mpsc::Sender<Cmd>,
 }
 
 impl Loop {
     /// Creates a new instance of [Loop].
     ///
     /// `device_proxy` is a connection to a low-level timer device.
-    pub fn new(device_proxy: ffhh::DeviceProxy, inspect: finspect::Node) -> Self {
+    pub fn new(
+        scope: fasync::ScopeHandle,
+        device_proxy: ffhh::DeviceProxy,
+        inspect: finspect::Node,
+    ) -> Self {
         let hw_device_timer_ops = HardwareTimerOps::new(device_proxy);
-        Loop::new_internal(hw_device_timer_ops, inspect)
+        Loop::new_internal(scope, hw_device_timer_ops, inspect)
     }
 
     // Creates a new instance of [Loop] with emulated wake alarms.
-    pub fn new_emulated(inspect: finspect::Node) -> Self {
+    pub fn new_emulated(scope: fasync::ScopeHandle, inspect: finspect::Node) -> Self {
         let timer_ops = Box::new(EmulationTimerOps::new());
-        Loop::new_internal(timer_ops, inspect)
+        Loop::new_internal(scope, timer_ops, inspect)
     }
 
-    fn new_internal(timer_ops: Box<dyn TimerOps>, inspect: finspect::Node) -> Self {
+    fn new_internal(
+        scope: fasync::ScopeHandle,
+        timer_ops: Box<dyn TimerOps>,
+        inspect: finspect::Node,
+    ) -> Self {
         let (snd, rcv) = mpsc::channel(CHANNEL_SIZE);
         let snd_clone = snd.clone();
-        let _task = fasync::Task::local(async move {
-            wake_timer_loop(snd_clone, rcv, timer_ops, inspect).await
-        });
-        Self { _task, snd_cloneable: snd }
+        let loop_scope = scope.clone();
+        scope.spawn_local(wake_timer_loop(loop_scope, snd_clone, rcv, timer_ops, inspect));
+        Self { snd }
     }
 
     /// Gets a copy of a channel through which async commands may be sent to
     /// the [Loop].
     fn get_sender(&self) -> mpsc::Sender<Cmd> {
-        self.snd_cloneable.clone()
+        self.snd.clone()
     }
 }
 
@@ -1080,6 +1081,7 @@ struct TimerState {
 /// - `timer_proxy`: the FIDL API proxy for interacting with the hardware device.
 /// - `inspect`: the inspect node to record loop info into.
 async fn wake_timer_loop(
+    scope: fasync::ScopeHandle,
     snd: mpsc::Sender<Cmd>,
     mut cmds: mpsc::Receiver<Cmd>,
     timer_proxy: Box<dyn TimerOps>,
@@ -1161,10 +1163,10 @@ async fn wake_timer_loop(
                 defer! {
                     // This is the only option that requires further action.
                     if let fta::SetMode::NotifySetupDone(setup_done) = mode {
-                            // Must signal once the setup is completed.
-                            signal(&setup_done);
-                            debug!("wake_timer_loop: START: setup_done signaled");
-                        };
+                        // Must signal once the setup is completed.
+                        signal(&setup_done);
+                        debug!("wake_timer_loop: START: setup_done signaled");
+                    };
                 }
                 deadline_histogram_prop.insert((deadline - now).into_nanos());
                 if Timers::expired(now, deadline) {
@@ -1227,6 +1229,7 @@ async fn wake_timer_loop(
                         }
                         hrtimer_status = Some(
                             schedule_hrtimer(
+                                scope.clone(),
                                 now,
                                 &timer_proxy,
                                 schedulable_deadline,
@@ -1263,6 +1266,7 @@ async fn wake_timer_loop(
                         // Reschedule the hardware timer if the removed timer is the earliest one,
                         // and another one exists.
                         let new_timer_state = schedule_hrtimer(
+                            scope.clone(),
                             now,
                             &timer_proxy,
                             deadline,
@@ -1310,6 +1314,7 @@ async fn wake_timer_loop(
                     None => None,
                     Some(deadline) => Some(
                         schedule_hrtimer(
+                            scope.clone(),
                             now,
                             &timer_proxy,
                             deadline,
@@ -1342,6 +1347,7 @@ async fn wake_timer_loop(
                     None => None, // No remaining timers, nothing to schedule.
                     Some(deadline) => Some(
                         schedule_hrtimer(
+                            scope.clone(),
                             now,
                             &timer_proxy,
                             deadline,
@@ -1381,6 +1387,7 @@ async fn wake_timer_loop(
                             None => None,
                             Some(deadline) => Some(
                                 schedule_hrtimer(
+                                    scope.clone(),
                                     now,
                                     &timer_proxy,
                                     deadline,
@@ -1441,6 +1448,7 @@ async fn wake_timer_loop(
 /// Schedules a wake alarm.
 ///
 /// Args:
+/// - `scope`: used to spawn async tasks.
 /// - `now`: the time instant used as the value of current instant.
 /// - `hrtimer`: the proxy for the hrtimer device driver.
 /// - `deadline`: the time instant in the future at which the alarm should fire.
@@ -1449,6 +1457,7 @@ async fn wake_timer_loop(
 ///   max tick value.
 /// - `needs_cancel`: if set, we must first cancel a hrtimer before scheduling a new one.
 async fn schedule_hrtimer(
+    scope: fasync::ScopeHandle,
     now: fasync::BootInstant,
     hrtimer: &Box<dyn TimerOps>,
     deadline: fasync::BootInstant,
@@ -1484,7 +1493,7 @@ async fn schedule_hrtimer(
         clone_handle(&hrtimer_scheduled),
     );
     let hrtimer_scheduled_if_error = clone_handle(&hrtimer_scheduled);
-    let hrtimer_task = fasync::Task::local(async move {
+    let hrtimer_task = scope.spawn_local(async move {
         debug!("hrtimer_task: waiting for hrtimer driver response");
         trace::instant!(c"alarms", c"hrtimer:started", trace::Scope::Process);
         let response = start_and_wait_fut.await;
@@ -1527,7 +1536,7 @@ async fn schedule_hrtimer(
         }
         debug!("hrtimer_task: exiting task.");
         trace::instant!(c"alarms", c"hrtimer:task_exit", trace::Scope::Process);
-    });
+    }).into();
     debug!("schedule_hrtimer: waiting for event to be signaled");
 
     // We must wait here to ensure that the wake alarm has been scheduled.
@@ -1643,119 +1652,12 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use futures::{select, Future};
-    use std::task::Poll;
+    use fuchsia_async::TestExecutor;
+    use futures::select;
     use test_case::test_case;
     use test_util::{assert_gt, assert_lt};
 
-    // A test fixture function that sets up the fake wake alarms machinery.
-    //
-    // The user supplies a factory function with the async code to run.
-    //
-    // Args:
-    //  - `run_for_duration`: the amount of fake time that the test should run for.
-    //  - `test_fn_factory`: a normal function, which takes a WakeProxy, and returns
-    //    an async closure that the test should run.
-    fn run_in_fake_time_and_test_context<F, U, T>(
-        run_for_duration: zx::MonotonicDuration,
-        test_fn_factory: F,
-    ) where
-        F: FnOnce(fta::WakeAlarmsProxy, finspect::Inspector) -> U, // F returns an async closure.
-        U: Future<Output = T> + 'static, // the async closure may return an arbitrary type T.
-        T: 'static,
-    {
-        let mut exec = fasync::TestExecutor::new_with_fake_time(); // We will be running this test case in fake time.
-        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
-        let (mut fake_commands_in, fake_commands_out) = mpsc::channel::<FakeCmd>(0);
-        let (hrtimer_proxy, hrtimer_task) = fake_hrtimer_connection(fake_commands_out);
-        let inspector = finspect::component::inspector();
-        let alarms = Rc::new(Loop::new(hrtimer_proxy, inspector.root().create_child("test")));
-
-        let (_handle, peer) = zx::EventPair::create();
-
-        let done_set_properties = zx::Event::create();
-        let begin_test = clone_handle(&done_set_properties);
-        let begin_serve = clone_handle(&done_set_properties);
-
-        let mut fake_commands_in_clone = fake_commands_in.clone();
-        let config_task = async move {
-            fake_commands_in
-                .start_send(FakeCmd::SetProperties {
-                    resolutions: vec![zx::Duration::from_nanos(43)],
-                    max_ticks: 100,
-                    keep_alive: peer,
-                    done: clone_handle(&done_set_properties),
-                })
-                .unwrap();
-        };
-
-        let (wake_proxy, wake_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fta::WakeAlarmsMarker>();
-
-        let serving_task = async move {
-            fasync::OnSignals::new(begin_serve, zx::Signals::EVENT_SIGNALED).await.unwrap();
-            serve(alarms, wake_stream).await;
-        };
-
-        let seq_fn_fut = test_fn_factory(wake_proxy, inspector.clone());
-
-        let test_task = async move {
-            // Wait until configuration has completed.
-            fasync::OnSignals::new(begin_test, zx::Signals::EVENT_SIGNALED).await.unwrap();
-
-            let result = seq_fn_fut.await;
-
-            // Request orderly shutdown.
-            fake_commands_in_clone.start_send(FakeCmd::Exit).unwrap();
-            result
-        };
-
-        let mut main_fut = fasync::Task::local(async {
-            let _r = futures::join!(hrtimer_task, config_task, serving_task, test_task);
-        });
-        run_in_fake_time(&mut exec, &mut main_fut, run_for_duration);
-    }
-
-    // A loop that moves fake time forward in small increments, waking timers along the way.
-    //
-    // In almost all tests, we set up the environment for the test to run in, under a
-    // test executor running in fake time. We then submit the resulting future
-    // to this function for execution.
-    //
-    // This has been taken from //src/ui/lib/input_pipeline/src/autorepeater.rs
-    // with some adaptation.
-    fn run_in_fake_time<F>(
-        executor: &mut fasync::TestExecutor,
-        main_fut: &mut F,
-        total_duration: zx::MonotonicDuration,
-    ) where
-        F: Future<Output = ()> + Unpin,
-    {
-        const INCREMENT: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(13);
-        let mut current = zx::MonotonicDuration::ZERO;
-        let mut poll_status = Poll::Pending;
-
-        // We run until either the future completes or the timeout is reached,
-        // whichever comes first.
-        // Running the future after it returns Poll::Ready is not allowed, so
-        // we must exit the loop then.
-        while current < (total_duration + INCREMENT) && poll_status == Poll::Pending {
-            let next = executor.now() + INCREMENT;
-            executor.set_fake_time(next);
-            executor.wake_expired_timers();
-            poll_status = executor.run_until_stalled(main_fut);
-            current = current + INCREMENT;
-        }
-        let now = executor.now();
-        assert_eq!(
-            poll_status,
-            Poll::Ready(()),
-            "the main future did not complete at {}, perhaps increase total_duration?",
-            format_timer(now.into())
-        );
-    }
-
-    fn create_fake_wake_lease() -> fidl_fuchsia_power_system::LeaseToken {
+    fn fake_wake_lease() -> fidl_fuchsia_power_system::LeaseToken {
         let (_lease, peer) = zx::EventPair::create();
         peer
     }
@@ -1944,7 +1846,6 @@ mod tests {
             keep_alive: zx::EventPair,
             done: zx::Event,
         },
-        Exit,
     }
 
     use std::cell::RefCell;
@@ -1956,12 +1857,13 @@ mod tests {
     // bomb out if any waiting methods are called twice in a succession, without
     // canceling the timer in between.
     fn fake_hrtimer_connection(
+        scope: fasync::ScopeHandle,
         rcv: mpsc::Receiver<FakeCmd>,
-    ) -> (ffhh::DeviceProxy, fasync::Task<()>) {
+    ) -> ffhh::DeviceProxy {
         debug!("fake_hrtimer_connection: entry.");
         let (hrtimer, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<ffhh::DeviceMarker>();
-        let task = fasync::Task::local(async move {
+        scope.clone().spawn_local(async move {
             let mut rcv = rcv.fuse();
             let timer_properties = Rc::new(RefCell::new(None));
             let wake_lease = Rc::new(RefCell::new(None));
@@ -1978,7 +1880,6 @@ mod tests {
                     cmd = rcv.next() => {
                         debug!("fake_hrtimer_connection: cmd: {:?}", cmd);
                         match cmd {
-                            Some(FakeCmd::Exit) => { break; }
                             Some(FakeCmd::SetProperties{ resolutions, max_ticks, keep_alive, done}) => {
                                 let mut timer_props = vec![];
                                 for v in 0..10 {
@@ -2037,18 +1938,17 @@ mod tests {
                                         }
                                     });
                                     let timer_running_clone = timer_running.clone();
-                                    fasync::Task::local(async move {
+                                    scope.spawn_local(async move {
+                                        // Signaling the setup event allows the client to proceed
+                                        // with post-scheduling work.
+                                        signal(&setup_event);
+
                                         // Respond after the requested sleep time. In tests this will
                                         // be sleeping in fake time.
                                         fasync::Timer::new(sleep_duration).await;
                                         *timer_running_clone.borrow_mut() = false;
                                         responder.send(Ok(clone_handle(wake_lease.borrow().as_ref().unwrap()))).unwrap();
-
-                                        // Signaling the setup event allows the client to proceed
-                                        // with post-scheduling work.
-                                        signal(&setup_event);
-
-                                    }).detach();
+                                    });
                                 }
                                 ffhh::DeviceRequest::StartAndWait2 { responder, .. } => {
                                     assert!(!*timer_running.borrow(), "invariant broken: timer may not be running here");
@@ -2078,325 +1978,327 @@ mod tests {
                     },
                 }
             }
-            debug!("fake_hrtimer_connection: exiting");
         });
-        (hrtimer, task)
+        hrtimer
     }
 
-    #[fuchsia::test]
-    fn test_basic_timed_wait() {
+    struct TestContext {
+        wake_proxy: fta::WakeAlarmsProxy,
+        _scope: fasync::Scope,
+        _cmd_tx: mpsc::Sender<FakeCmd>,
+    }
+
+    impl TestContext {
+        async fn new() -> Self {
+            TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(0)).await;
+
+            let scope = fasync::Scope::new();
+            let (mut cmd_tx, wake_proxy) = {
+                let (tx, rx) = mpsc::channel::<FakeCmd>(0);
+                let hrtimer_proxy = fake_hrtimer_connection(scope.to_handle(), rx);
+
+                let inspector = finspect::component::inspector();
+                let alarms = Rc::new(Loop::new(
+                    scope.to_handle(),
+                    hrtimer_proxy,
+                    inspector.root().create_child("test"),
+                ));
+
+                let (proxy, stream) =
+                    fidl::endpoints::create_proxy_and_stream::<fta::WakeAlarmsMarker>();
+                scope.spawn_local(async move {
+                    serve(alarms, stream).await;
+                });
+                (tx, proxy)
+            };
+
+            let (_wake_lease, peer) = zx::EventPair::create();
+            let done = zx::Event::create();
+            cmd_tx
+                .start_send(FakeCmd::SetProperties {
+                    resolutions: vec![zx::Duration::from_nanos(1)],
+                    max_ticks: 100,
+                    keep_alive: peer,
+                    done: done.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                })
+                .unwrap();
+
+            // Wait until hrtimer configuration has completed.
+            assert_matches!(fasync::OnSignals::new(done, zx::Signals::EVENT_SIGNALED).await, Ok(_));
+
+            Self { wake_proxy, _scope: scope, _cmd_tx: cmd_tx }
+        }
+    }
+
+    impl Drop for TestContext {
+        fn drop(&mut self) {
+            assert_matches!(TestExecutor::next_timer(), None, "Unexpected lingering timers");
+        }
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_basic_timed_wait() {
+        let ctx = TestContext::new().await;
+
         let deadline = zx::BootInstant::from_nanos(100);
-        let test_duration = zx::MonotonicDuration::from_nanos(110);
-        run_in_fake_time_and_test_context(test_duration, |wake_proxy, _| async move {
-            let setup_done = zx::Event::create();
-            let duplicate = clone_handle(&setup_done);
+        let setup_done = zx::Event::create();
+        let mut set_task = ctx.wake_proxy.set_and_wait(
+            deadline.into(),
+            fta::SetMode::NotifySetupDone(
+                setup_done.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+            ),
+            "Hello".into(),
+        );
 
-            wake_proxy
-                .set_and_wait(
-                    deadline.into(),
-                    fta::SetMode::NotifySetupDone(setup_done),
-                    "Hello".into(),
-                )
-                .await
-                .unwrap()
-                .unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task).await, Poll::Pending);
 
-            assert_gt!(fasync::BootInstant::now().into_nanos(), deadline.into_nanos());
+        let mut setup_done_task = fasync::OnSignals::new(setup_done, zx::Signals::EVENT_SIGNALED);
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut setup_done_task).await,
+            Poll::Ready(Ok(_)),
+            "Setup event not triggered after scheduling an alarm"
+        );
 
-            // Ideally this would test that the event was signaled as soon as the alarm was set, and
-            // before it was signaled, but at least it verifies that it was signaled.
-            let signals = duplicate
-                .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE_PAST)
-                .unwrap();
-            assert_eq!(signals, zx::Signals::EVENT_SIGNALED);
-        });
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(100)).await;
+        assert_matches!(TestExecutor::poll_until_stalled(set_task).await, Poll::Ready(Ok(Ok(_))));
     }
 
-    #[test_case(
-        zx::BootInstant::from_nanos(100),
-        zx::BootInstant::from_nanos(200),
-        zx::MonotonicDuration::from_nanos(250) ;
-        "Two timers: one at 100 and another at 200 ns"
-    )]
-    #[test_case(
-        zx::BootInstant::from_nanos(100),
-        zx::BootInstant::from_nanos(100),
-        // A tight end-of-test will detect a stuck timer.
-        zx::MonotonicDuration::from_nanos(104) ;
-        "Two timers at the same deadline."
-    )]
-    #[test_case(
-        zx::BootInstant::from_nanos(-1),
-        zx::BootInstant::from_nanos(-1),
-        zx::MonotonicDuration::from_nanos(30) ;
-        "Two timers expire immediately."
-    )]
-    #[fuchsia::test]
-    fn test_timed_wait_two_timers_params(
+    #[test_case(100, 200 ; "push out")]
+    #[test_case(200, 100 ; "pull in")]
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_two_alarms_different(
         // One timer scheduled at this instant (fake time starts from zero).
-        first_deadline: zx::BootInstant,
+        first_deadline_nanos: i64,
         // Another timer scheduled at this instant.
-        second_deadline: zx::BootInstant,
-        // Run the fake time for this long.
-        duration: zx::MonotonicDuration,
+        second_deadline_nanos: i64,
     ) {
-        run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = fta::SetMode::KeepAlive(create_fake_wake_lease());
-            let fut1 = wake_proxy.set_and_wait(first_deadline.into(), lease1, "Hello1".into());
+        let ctx = TestContext::new().await;
 
-            let lease2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
-            let fut2 = wake_proxy.set_and_wait(second_deadline.into(), lease2, "Hello2".into());
+        let mut set_task_1 = ctx.wake_proxy.set_and_wait(
+            fidl::BootInstant::from_nanos(first_deadline_nanos),
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            "Hello1".into(),
+        );
+        let mut set_task_2 = ctx.wake_proxy.set_and_wait(
+            fidl::BootInstant::from_nanos(second_deadline_nanos),
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            "Hello2".into(),
+        );
 
-            let (result1, result2) = futures::join!(fut1, fut2);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_1).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_2).await, Poll::Pending);
 
-            result1.unwrap().unwrap();
-            result2.unwrap().unwrap();
+        // Sort alarms by their deadlines.
+        let mut tasks = [(first_deadline_nanos, set_task_1), (second_deadline_nanos, set_task_2)];
+        tasks.sort_by(|a, b| a.0.cmp(&b.0));
+        let [mut first_task, mut second_task] = tasks;
 
-            assert_gt!(fasync::BootInstant::now().into_nanos(), first_deadline.into_nanos());
-            assert_gt!(fasync::BootInstant::now().into_nanos(), second_deadline.into_nanos());
-        });
-    }
+        // Alarms should fire in order of deadlines.
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(first_task.0)).await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut first_task.1).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
+        assert_matches!(TestExecutor::poll_until_stalled(&mut second_task.1).await, Poll::Pending);
 
-    #[test_case(
-        zx::BootInstant::from_nanos(100),
-        zx::BootInstant::from_nanos(200),
-        zx::MonotonicDuration::from_nanos(250) ;
-        "Reschedule with push-out"
-    )]
-    #[test_case(
-        zx::BootInstant::from_nanos(100),
-        zx::BootInstant::from_nanos(100),
-        // A tight end-of-test will detect a stuck timer.
-        zx::MonotonicDuration::from_nanos(104) ;
-        "Reschedule with same deadline"
-    )]
-    #[test_case(
-        zx::BootInstant::from_nanos(200),
-        zx::BootInstant::from_nanos(100),
-        // A tight end-of-test will detect a stuck timer.
-        zx::MonotonicDuration::from_nanos(240) ;
-        "Pull in"
-    )]
-    #[fuchsia::test]
-    fn test_timed_wait_same_timer(
-        // One timer scheduled at this instant (fake time starts from zero).
-        first_deadline: zx::BootInstant,
-        // Another timer scheduled at this instant.
-        second_deadline: zx::BootInstant,
-        // Run the fake time for this long.
-        duration: zx::MonotonicDuration,
-    ) {
-        run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = fta::SetMode::KeepAlive(create_fake_wake_lease());
-
-            wake_proxy
-                .set_and_wait(first_deadline.into(), lease1, "Hello".into())
-                .await
-                .unwrap()
-                .unwrap();
-            let lease2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
-            wake_proxy
-                .set_and_wait(second_deadline.into(), lease2, "Hello2".into())
-                .await
-                .unwrap()
-                .unwrap();
-        });
-    }
-
-    // Test what happens when we schedule a timer, then change our mind and
-    // reschedule the same timer, but with a sooner deadline.
-    #[fuchsia::test]
-    fn test_reschedule_pull_in() {
-        const LONG_DEADLINE_NANOS: i64 = 200;
-        const SHORT_DEADLINE_NANOS: i64 = 100;
-        const ALARM_ID: &str = "Hello";
-        run_in_fake_time_and_test_context(
-            zx::MonotonicDuration::from_nanos(LONG_DEADLINE_NANOS + 50),
-            |wake_proxy, _| async move {
-                let wake_proxy = Rc::new(RefCell::new(wake_proxy));
-
-                let keep_alive = fta::SetMode::KeepAlive(create_fake_wake_lease());
-
-                let (mut sync_send, mut sync_recv) = mpsc::channel(1);
-
-                // Schedule timer with a long timeout first. Let it wait, then
-                // try to reschedule the same timer
-                let wake_proxy_clone = wake_proxy.clone();
-                let long_deadline_fut = async move {
-                    let wake_fut = wake_proxy_clone.borrow().set_and_wait(
-                        zx::BootInstant::from_nanos(LONG_DEADLINE_NANOS).into(),
-                        keep_alive,
-                        ALARM_ID.into(),
-                    );
-                    // Allow the rest of the test to proceed from here.
-                    sync_send.send(()).await.unwrap();
-
-                    // Yield-wait for the first scheduled timer.
-                    wake_fut.await.unwrap().unwrap();
-                };
-
-                // Schedule the same timer as above, but with a shorter deadline.
-                // The result should be that when the short deadline expires, it's
-                // sooner than the long deadline.
-                let short_deadline_fut = async move {
-                    // Wait until we know that the long deadline timer has been scheduled.
-                    let _ = sync_recv.next().await;
-
-                    let keep_alive2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
-                    let _ = wake_proxy
-                        .borrow()
-                        .set_and_wait(
-                            zx::BootInstant::from_nanos(SHORT_DEADLINE_NANOS).into(),
-                            keep_alive2,
-                            ALARM_ID.into(),
-                        )
-                        .await
-                        .unwrap()
-                        .unwrap();
-
-                    // We get here presumably after the "short" deadline expires, verify that:
-                    assert_gt!(fasync::BootInstant::now().into_nanos(), SHORT_DEADLINE_NANOS);
-                    assert_lt!(fasync::BootInstant::now().into_nanos(), LONG_DEADLINE_NANOS);
-                };
-                futures::join!(short_deadline_fut, long_deadline_fut);
-            },
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(second_task.0)).await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut second_task.1).await,
+            Poll::Ready(Ok(Ok(_)))
         );
     }
 
-    // Test what happens when we schedule a timer, then change our mind and
-    // reschedule the same timer, but with a sooner deadline.
-    #[fuchsia::test]
-    fn test_reschedule_push_out() {
-        const LONG_DEADLINE_NANOS: i64 = 200;
-        const SHORT_DEADLINE_NANOS: i64 = 100;
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_two_alarms_same() {
+        const DEADLINE_NANOS: i64 = 100;
+
+        let ctx = TestContext::new().await;
+
+        let mut set_task_1 = ctx.wake_proxy.set_and_wait(
+            fidl::BootInstant::from_nanos(DEADLINE_NANOS),
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            "Hello1".into(),
+        );
+        let mut set_task_2 = ctx.wake_proxy.set_and_wait(
+            fidl::BootInstant::from_nanos(DEADLINE_NANOS),
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            "Hello2".into(),
+        );
+
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_1).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_2).await, Poll::Pending);
+
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(DEADLINE_NANOS)).await;
+
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_1).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_2).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_alarm_immediate() {
+        let ctx = TestContext::new().await;
+        let mut set_task = ctx.wake_proxy.set_and_wait(
+            fidl::BootInstant::INFINITE_PAST,
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            "Hello1".into(),
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
+    }
+
+    // Rescheduling a timer will cancel the earlier call and use the new
+    // deadline for the later call.
+    #[test_case(200, 100 ; "pull in")]
+    #[test_case(100, 200 ; "push out")]
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_reschedule(initial_deadline_nanos: i64, override_deadline_nanos: i64) {
         const ALARM_ID: &str = "Hello";
-        run_in_fake_time_and_test_context(
-            zx::MonotonicDuration::from_nanos(LONG_DEADLINE_NANOS + 50),
-            |wake_proxy, inspector| async move {
-                let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let keep_alive = fta::SetMode::KeepAlive(create_fake_wake_lease());
+        let ctx = TestContext::new().await;
 
-                let (mut sync_send, mut sync_recv) = mpsc::channel(1);
+        let schedule = |deadline_nanos: i64| {
+            let setup_done = zx::Event::create();
+            let task = ctx.wake_proxy.set_and_wait(
+                fidl::BootInstant::from_nanos(deadline_nanos),
+                fta::SetMode::NotifySetupDone(
+                    setup_done.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                ),
+                ALARM_ID.into(),
+            );
+            (task, setup_done)
+        };
 
-                // Schedule timer with a long timeout first. Let it wait, then
-                // try to reschedule the same timer
-                let wake_proxy_clone = wake_proxy.clone();
-                let short_deadline_fut = async move {
-                    let wake_fut = wake_proxy_clone.borrow().set_and_wait(
-                        zx::BootInstant::from_nanos(SHORT_DEADLINE_NANOS).into(),
-                        keep_alive,
-                        ALARM_ID.into(),
-                    );
-                    // Allow the rest of the test to proceed from here.
-                    sync_send.send(()).await.unwrap();
+        // Schedule timer with a long timeout first. Let it wait, then
+        // try to reschedule the same timer
+        let (mut set_task_1, setup_done_1) = schedule(initial_deadline_nanos);
+        fasync::OnSignals::new(setup_done_1, zx::Signals::EVENT_SIGNALED).await.unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_1).await, Poll::Pending);
 
-                    // Yield-wait for the first scheduled timer.
-                    let result = wake_fut.await.unwrap();
-                    assert_eq!(
-                        result,
-                        Err(fta::WakeAlarmsError::Dropped),
-                        "expected wake alarm to be dropped"
-                    );
-                    assert_gt!(fasync::BootInstant::now().into_nanos(), SHORT_DEADLINE_NANOS);
-                };
+        // Schedule the same timer as above, but with a shorter deadline. This
+        // should cancel the earlier call.
+        let (mut set_task_2, setup_done_2) = schedule(override_deadline_nanos);
+        fasync::OnSignals::new(setup_done_2, zx::Signals::EVENT_SIGNALED).await.unwrap();
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_1).await,
+            Poll::Ready(Ok(Err(fta::WakeAlarmsError::Dropped)))
+        );
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_2).await, Poll::Pending);
 
-                // Schedule the same timer as above, but with a shorter deadline.
-                // The result should be that when the short deadline expires, it's
-                // sooner than the long deadline.
-                let long_deadline_fut = async move {
-                    // Wait until we know that the other deadline timer has been scheduled.
-                    let _ = sync_recv.next().await;
+        // The later call will be fired exactly on the new shorter deadline.
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(override_deadline_nanos - 1))
+            .await;
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_2).await, Poll::Pending);
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(override_deadline_nanos))
+            .await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_2).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
 
-                    let keep_alive2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
-                    let _ = wake_proxy
-                        .borrow()
-                        .set_and_wait(
-                            zx::BootInstant::from_nanos(LONG_DEADLINE_NANOS).into(),
-                            keep_alive2,
-                            ALARM_ID.into(),
-                        )
-                        .await
-                        .unwrap()
-                        .unwrap();
-
-                    // Both the short and the long deadline expire.
-                    assert_gt!(fasync::BootInstant::now().into_nanos(), LONG_DEADLINE_NANOS);
-                };
-                futures::join!(long_deadline_fut, short_deadline_fut);
-
-                // The values in the inspector tree are fixed because the test
-                // runs fully deterministically in fake time.
-                assert_data_tree!(inspector, root: {
-                    test: {
-                        hardware: {
-                            // All alarms fired, so this should be "none".
-                            current_deadline: "(none)",
-                            remaining_until_alarm: "(none)",
-                        },
-                        now_formatted: "247ns (247)",
-                        now_ns: 247i64,
-                        pending_timers: "\n\t",
-                        pending_timers_count: 0u64,
-                        requested_deadlines_ns: AnyProperty,
-                        schedule_delay_ns: AnyProperty,
-                        slack_ns: AnyProperty,
-                    },
-                });
+        // The values in the inspector tree are fixed because the test
+        // runs fully deterministically in fake time.
+        assert_data_tree!(finspect::component::inspector(), root: {
+            test: {
+                hardware: {
+                    // All alarms fired, so this should be "none".
+                    current_deadline: "(none)",
+                    remaining_until_alarm: "(none)",
+                },
+                now_formatted: format!("{override_deadline_nanos}ns ({override_deadline_nanos})"),
+                now_ns: override_deadline_nanos,
+                pending_timers: "\n\t",
+                pending_timers_count: 0u64,
+                requested_deadlines_ns: AnyProperty,
+                schedule_delay_ns: AnyProperty,
+                slack_ns: AnyProperty,
             },
+        });
+    }
+
+    // Rescheduling a timer with the same deadline will fail with WakeAlarmsError::Dropped.
+    //
+    // TODO(http://b/430638703): Consider changing this behavior.
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_reschedule_same() {
+        const ALARM_ID: &str = "Hello";
+        const DEADLINE_NANOS: i64 = 100;
+
+        let ctx = TestContext::new().await;
+
+        let schedule = |deadline_nanos: i64| {
+            let setup_done = zx::Event::create();
+            let task = ctx.wake_proxy.set_and_wait(
+                fidl::BootInstant::from_nanos(deadline_nanos),
+                fta::SetMode::NotifySetupDone(
+                    setup_done.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                ),
+                ALARM_ID.into(),
+            );
+            (task, setup_done)
+        };
+
+        // Schedule timer with a long timeout first. Let it wait, then
+        // try to reschedule the same timer
+        let (mut set_task_1, setup_done_1) = schedule(DEADLINE_NANOS);
+        fasync::OnSignals::new(setup_done_1, zx::Signals::EVENT_SIGNALED).await.unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_1).await, Poll::Pending);
+
+        // Schedule the same timer as above, but with a shorter deadline. This
+        // should cancel the earlier call.
+        let (mut set_task_2, setup_done_2) = schedule(DEADLINE_NANOS);
+        fasync::OnSignals::new(setup_done_2, zx::Signals::EVENT_SIGNALED).await.unwrap();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_1).await, Poll::Pending);
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_2).await,
+            Poll::Ready(Ok(Err(fta::WakeAlarmsError::Dropped)))
+        );
+
+        // The later call will be fired exactly on the new shorter deadline.
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(DEADLINE_NANOS)).await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_1).await,
+            Poll::Ready(Ok(Ok(_)))
         );
     }
 
     // If we get two scheduling FIDL errors one after another, the wake alarm
     // manager must not lock up.
-    #[fuchsia::test]
-    fn test_fidl_error_on_reschedule() {
-        const LONG_DEADLINE_NANOS: i64 = 200;
-        const SHORT_DEADLINE_NANOS: i64 = 100;
-        run_in_fake_time_and_test_context(
-            zx::MonotonicDuration::from_nanos(LONG_DEADLINE_NANOS + 50),
-            |_, _| async move {
-                let (wake_proxy, _stream) =
-                    fidl::endpoints::create_proxy_and_stream::<fta::WakeAlarmsMarker>();
-                drop(_stream);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_fidl_error_on_reschedule() {
+        const DEADLINE_NANOS: i64 = 100;
 
-                let wake_proxy = Rc::new(RefCell::new(wake_proxy));
-                let keep_alive = fta::SetMode::KeepAlive(create_fake_wake_lease());
-                let (mut sync_send, mut sync_recv) = mpsc::channel(1);
+        let (wake_proxy, _stream) =
+            fidl::endpoints::create_proxy_and_stream::<fta::WakeAlarmsMarker>();
+        drop(_stream);
 
-                let wake_proxy_clone = wake_proxy.clone();
-                let short_deadline_fut = async move {
-                    let wake_fut = wake_proxy_clone.borrow().set_and_wait(
-                        zx::BootInstant::from_nanos(SHORT_DEADLINE_NANOS).into(),
-                        keep_alive,
-                        "hello1".into(),
-                    );
-                    // Yield-wait for the first scheduled timer.
-                    let result = wake_fut.await;
-                    assert_matches!(result, Err(_));
+        assert_matches!(
+            wake_proxy
+                .set_and_wait(
+                    zx::BootInstant::from_nanos(DEADLINE_NANOS).into(),
+                    fta::SetMode::KeepAlive(fake_wake_lease()),
+                    "hello1".into(),
+                )
+                .await,
+            Err(fidl::Error::ClientChannelClosed { .. })
+        );
 
-                    // Allow the rest of the test to proceed from here.
-                    sync_send.send(()).await.unwrap();
-                };
-
-                let long_deadline_fut = async move {
-                    // Wait until we know that the other deadline timer has been scheduled.
-                    let _ = sync_recv.next().await;
-
-                    // This will lock up in case of errors!
-                    let keep_alive2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
-                    let result = wake_proxy
-                        .borrow()
-                        .set_and_wait(
-                            zx::BootInstant::from_nanos(LONG_DEADLINE_NANOS).into(),
-                            keep_alive2,
-                            "hello2".into(),
-                        )
-                        .await;
-                    assert_matches!(result, Err(_));
-                };
-                futures::join!(long_deadline_fut, short_deadline_fut);
-            },
+        assert_matches!(
+            wake_proxy
+                .set_and_wait(
+                    zx::BootInstant::from_nanos(DEADLINE_NANOS).into(),
+                    fta::SetMode::KeepAlive(fake_wake_lease()),
+                    "hello2".into(),
+                )
+                .await,
+            Err(fidl::Error::ClientChannelClosed { .. })
         );
     }
 }

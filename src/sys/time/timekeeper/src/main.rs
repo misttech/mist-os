@@ -301,6 +301,8 @@ async fn main() -> Result<()> {
     let use_connectivity = config.use_connectivity();
     let ps = persistent_state.clone();
 
+    let scope = fasync::Scope::new();
+
     if config.has_always_on_counter() {
         // A read only RTC implementation using an always-on counter.
         let hrtimer_proxy = alarms::connect_to_hrtimer_async().await
@@ -310,7 +312,7 @@ async fn main() -> Result<()> {
             })
             .ok();
         let read_only_rtc = rtc::new_read_only_rtc(persistent_state.clone(), hrtimer_proxy);
-        fasync::Task::local(async move {
+        scope.spawn_local(async move {
             maintain_utc(
                 primary_track,
                 monitor_track,
@@ -322,8 +324,7 @@ async fn main() -> Result<()> {
                 ps,
             )
             .await;
-        })
-        .detach();
+        });
     } else {
         // A conventional (PC-like) RTC implementation.
         let optional_rtc: Option<RtcImpl> = match RtcImpl::only_device(config.has_rtc()).await {
@@ -340,7 +341,7 @@ async fn main() -> Result<()> {
                 None
             }
         };
-        fasync::Task::local(async move {
+        scope.spawn_local(async move {
             maintain_utc(
                 primary_track,
                 monitor_track,
@@ -352,8 +353,7 @@ async fn main() -> Result<()> {
                 ps,
             )
             .await;
-        })
-        .detach();
+        });
     }
 
     let loop_inspect = inspector_root.create_child("wake_alarms");
@@ -387,11 +387,11 @@ async fn main() -> Result<()> {
         alarms::connect_to_hrtimer_async()
             .await
             .inspect_err(|e| error!("could not connect to hrtimer: {}", &e))
-            .map(|proxy| Rc::new(alarms::Loop::new(proxy, loop_inspect)))?
+            .map(|proxy| Rc::new(alarms::Loop::new(scope.to_handle(), proxy, loop_inspect)))?
     } else {
         // Emulate wake alarms. This is used on platforms that do not have
         // power management, and will *not* actually sleep.
-        Rc::new(alarms::Loop::new_emulated(loop_inspect))
+        Rc::new(alarms::Loop::new_emulated(scope.to_handle(), loop_inspect))
     };
 
     // Look for this text to know whether connections have succeeded.
@@ -434,6 +434,7 @@ async fn main() -> Result<()> {
             let time_test_mutex = time_test_mutex.clone();
             let timer_loop = timer_loop.clone();
             let adjust_server = adjust_server.clone();
+            let scope = scope.to_handle();
             fuchsia_trace::instant!(c"timekeeper", c"request", fuchsia_trace::Scope::Process);
             async move {
                 match request {
@@ -458,7 +459,7 @@ async fn main() -> Result<()> {
                         }
                     }
                     Rpcs::Wake(stream) => {
-                        alarms::serve(timer_loop.clone(), stream).await;
+                        scope.spawn_local(alarms::serve(timer_loop.clone(), stream));
                     },
                     Rpcs::Adjust(stream) => match *adjust_server {
                         Some(ref server) => {
