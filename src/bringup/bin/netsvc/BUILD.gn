@@ -97,7 +97,6 @@ source_set("netsvc_common") {
   ]
   public_deps = [
     ":inet6",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//src/bringup/lib/netboot",
     "//zircon/system/ulib/fbl",

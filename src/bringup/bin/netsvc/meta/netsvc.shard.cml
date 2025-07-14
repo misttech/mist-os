@@ -48,11 +48,6 @@
             to: "#netsvc",
         },
         {
-            protocol: "fuchsia.fshost.Admin",
-            from: "#fshost",
-            to: "#netsvc",
-        },
-        {
             protocol: "fuchsia.device.NameProvider",
             from: "#device_name_provider",
             to: "#netsvc",
