@@ -119,6 +119,7 @@ group("bazel_action_allowlist") {
   visibility = [
     "//boards/pkvm:*",
     "//boards/vim3:*",
+    "//products:*",
     "//products/microfuchsia:*",
     "//products/minimal:*",
     "//products/terminal:*",

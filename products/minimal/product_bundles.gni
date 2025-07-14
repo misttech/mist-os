@@ -1,0 +1,86 @@
+# Copyright 2025 The Fuchsia Authors.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+if (current_cpu == "x64") {
+  MINIMAL_PRODUCT_BUNDLES = [
+    {
+      testonly = true
+      gn_target_name = "product_bundle.x64"
+      product_bundle_name = "minimal.x64"
+      allow_eng_platform_bundle_use = true
+      bazel_product_bundle_target = "//products/minimal:product_bundle.x64"
+      bazel_product_image_target = "//products/minimal:image.x64"
+      bazel_product_config_target = "//products/minimal:product_config"
+      bazel_product_config_name = "minimal"
+      bazel_recovery_image_target = "//products/zedboot:x64"
+      bazel_elf_sizes_target = "//products/minimal:elf_sizes.x64"
+      bazel_inputs_from_gn = [
+        "//boards/x64:x64.bazel_input",
+        "//build/images/flash:esp.bazel_input",
+      ]
+    },
+  ]
+} else if (current_cpu == "arm64") {
+  MINIMAL_PRODUCT_BUNDLES = [
+    {
+      testonly = true
+      gn_target_name = "product_bundle.arm64"
+      product_bundle_name = "minimal.arm64"
+      allow_eng_platform_bundle_use = true
+      bazel_product_bundle_target = "//products/minimal:product_bundle.arm64"
+      bazel_product_image_target = "//products/minimal:image.arm64"
+      bazel_product_config_target = "//products/minimal:product_config"
+      bazel_product_config_name = "minimal"
+      bazel_recovery_image_target = "//products/zedboot:arm64"
+      bazel_elf_sizes_target = "//products/minimal:elf_sizes.arm64"
+      bazel_inputs_from_gn = [
+        "//boards/arm64:arm64.bazel_input",
+        "//build/images/flash:esp.bazel_input",
+      ]
+    },
+    {
+      testonly = true
+      gn_target_name = "product_bundle.vim3"
+      product_bundle_name = "minimal.vim3"
+      allow_eng_platform_bundle_use = true
+      bazel_product_bundle_target = "//products/minimal:product_bundle.vim3"
+      bazel_product_image_target = "//products/minimal:image.vim3"
+      bazel_recovery_image_target = "//products/zedboot:vim3"
+      bazel_elf_sizes_target = "//products/minimal:elf_sizes.vim3"
+      bazel_inputs_from_gn = [ "//boards/vim3:bazel_inputs" ]
+    },
+  ]
+} else if (current_cpu == "riscv64") {
+  MINIMAL_PRODUCT_BUNDLES = [
+    {
+      testonly = true
+      gn_target_name = "product_bundle.riscv64"
+      product_bundle_name = "minimal.riscv64"
+      allow_eng_platform_bundle_use = true
+      image_use_vbmeta = false
+      bazel_product_bundle_target = "//products/minimal:product_bundle.riscv64"
+      bazel_product_image_target = "//products/minimal:image.riscv64"
+      bazel_product_config_target = "//products/minimal:product_config"
+      bazel_product_config_name = "minimal"
+      bazel_recovery_image_target = "//products/zedboot:riscv64"
+      bazel_elf_sizes_target = "//products/minimal:elf_sizes.riscv64"
+      bazel_inputs_from_gn = [ "//boards/riscv64:riscv64.bazel_input" ]
+    },
+  ]
+} else {
+  assert(false, "Unsupported CPU ${current_cpu} for minimal product bundles")
+}
+
+# TODO(jayzhuang): Figure out whether minimal.emac can be removed.
+_UNUSED_EMAC_PRODUCT_BUNDLE = {
+  testonly = true
+  gn_target_name = "product_bundle.emac"
+  product_bundle_name = "minimal.emac"
+  allow_eng_platform_bundle_use = true
+  bazel_product_bundle_target = "//products/minimal:product_bundle.emac"
+  bazel_product_image_target = "//products/minimal:image.emac"
+  bazel_elf_sizes_target = "//products/minimal:elf_sizes.emac"
+  bazel_inputs_from_gn =
+      [ "//src/devices/board/drivers/vim3-devicetree:vim3-dtb" ]
+}
