@@ -43,7 +43,6 @@ class PwmChannel : public fidl::WireServer<fuchsia_hardware_pwm::Pwm> {
   ddk::PwmImplProtocolClient pwm_impl_;
 
   async_dispatcher_t* dispatcher_;
-  compat::SyncInitializedDeviceServer compat_server_;
   fidl::ServerBindingGroup<fuchsia_hardware_pwm::Pwm> bindings_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
   driver_devfs::Connector<fuchsia_hardware_pwm::Pwm> devfs_connector_{
