@@ -575,6 +575,14 @@ impl EnvironmentContext {
             _ => None,
         }
     }
+
+    /// Returns whether we are configured to make a direct connection to the
+    /// target, rather than going through the daemon. Defaults to false if
+    /// not overridden on the command line with "-d"/"--direct", or with the
+    /// `connectivity.direct` config option.
+    pub fn get_direct_connection_mode(&self) -> bool {
+        self.get("connectivity.direct").unwrap_or(false)
+    }
 }
 
 #[cfg(test)]
@@ -734,5 +742,21 @@ mod test {
         assert_eq!(context.get_config_path().unwrap(), isolate_dir.join("config"));
         assert_eq!(context.get_data_path().unwrap(), isolate_dir.join("data"));
         assert!(context.is_isolated());
+    }
+
+    #[fuchsia::test]
+    fn direct_connection_mode() {
+        // Defaults to false
+        let ctx =
+            EnvironmentContext::no_context(ExecutableKind::Test, ConfigMap::new(), None, true);
+        assert!(!ctx.get_direct_connection_mode());
+
+        // True if connectivity.direct=true
+        let mut connectivity = ConfigMap::new();
+        connectivity.insert("direct".into(), true.into());
+        let mut runtime_args = ConfigMap::new();
+        runtime_args.insert("connectivity".into(), serde_json::Value::Object(connectivity));
+        let ctx = EnvironmentContext::no_context(ExecutableKind::Test, runtime_args, None, true);
+        assert!(ctx.get_direct_connection_mode());
     }
 }
