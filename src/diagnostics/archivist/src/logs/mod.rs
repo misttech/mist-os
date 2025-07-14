@@ -11,7 +11,6 @@ pub mod repository;
 pub mod serial;
 pub mod servers;
 pub mod shared_buffer;
-pub mod socket;
 pub mod stats;
 pub mod stored_message;
 #[cfg(test)]
@@ -41,33 +40,33 @@ mod tests {
 
     #[fuchsia::test]
     async fn unfiltered_stats() {
-        let first_packet = setup_default_packet();
         let first_message = LogMessage {
-            pid: first_packet.metadata.pid,
-            tid: first_packet.metadata.tid,
-            time: zx::BootInstant::from_nanos(first_packet.metadata.time),
-            dropped_logs: first_packet.metadata.dropped_logs,
-            severity: first_packet.metadata.severity,
+            pid: 1,
+            tid: 2,
+            time: zx::BootInstant::get(),
+            dropped_logs: 3,
+            severity: Severity::Warn as i32,
             msg: String::from("BBBBB"),
             tags: vec![String::from("AAAAA")],
         };
+        let first_packet = to_record(&first_message);
 
-        let (mut second_packet, mut second_message) = (first_packet.clone(), first_message.clone());
-        second_packet.metadata.pid = 0;
-        second_message.pid = second_packet.metadata.pid;
+        let mut second_message = first_message.clone();
+        second_message.pid = 0;
+        let second_packet = to_record(&second_message);
 
-        let (mut third_packet, mut third_message) = (second_packet.clone(), second_message.clone());
-        third_packet.metadata.severity = LogLevelFilter::Info.into_primitive().into();
-        third_message.severity = third_packet.metadata.severity;
+        let mut third_message = second_message.clone();
+        third_message.severity = Severity::Info as i32;
+        let third_packet = to_record(&third_message);
 
         let (fourth_packet, fourth_message) = (third_packet.clone(), third_message.clone());
 
-        let (mut fifth_packet, mut fifth_message) = (fourth_packet.clone(), fourth_message.clone());
-        fifth_packet.metadata.severity = LogLevelFilter::Error.into_primitive().into();
-        fifth_message.severity = fifth_packet.metadata.severity;
+        let mut fifth_message = fourth_message.clone();
+        fifth_message.severity = Severity::Error as i32;
+        let fifth_packet = to_record(&fifth_message);
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
+        let mut stream = harness.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![
             first_packet,
             second_packet,
@@ -141,21 +140,20 @@ mod tests {
             $log_reader1:ident @ $foo_moniker:literal,
             $log_reader2:ident @ $bar_moniker:literal,
         ) => {{
-            let packet = setup_default_packet();
             let message = LogMessage {
-                pid: packet.metadata.pid,
-                tid: packet.metadata.tid,
-                time: zx::BootInstant::from_nanos(packet.metadata.time),
-                dropped_logs: packet.metadata.dropped_logs,
-                severity: packet.metadata.severity,
+                pid: 1,
+                tid: 2,
+                time: zx::BootInstant::get(),
+                dropped_logs: 3,
+                severity: Severity::Warn as i32,
                 msg: String::from("BBBBB"),
                 tags: vec![String::from("AAAAA")],
             };
+            let packet = to_record(&message);
 
-            let mut packet2 = packet.clone();
-            packet2.metadata.severity = LogLevelFilter::Error.into_primitive().into();
             let mut message2 = message.clone();
-            message2.severity = packet2.metadata.severity;
+            message2.severity = Severity::Error as i32;
+            let packet2 = to_record(&message2);
 
             let mut foo_stream = $harness.create_stream_from_log_reader($log_reader1);
             foo_stream.write_packet(packet);
@@ -312,18 +310,18 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_filter_by_pid() {
-        let p = setup_default_packet();
-        let mut p2 = p.clone();
-        p2.metadata.pid = 0;
         let lm = LogMessage {
-            pid: p.metadata.pid,
-            tid: p.metadata.tid,
-            time: zx::BootInstant::from_nanos(p.metadata.time),
-            dropped_logs: p.metadata.dropped_logs,
-            severity: p.metadata.severity,
+            pid: 1,
+            tid: 2,
+            time: zx::BootInstant::get(),
+            dropped_logs: 3,
+            severity: Severity::Info as i32,
             msg: String::from("BBBBB"),
             tags: vec![String::from("AAAAA")],
         };
+        let p = to_record(&lm);
+        let lm2 = LogMessage { pid: 11, ..lm.clone() };
+        let p2 = to_record(&lm2);
         let options = LogFilterOptions {
             filter_by_pid: true,
             pid: 1,
@@ -335,7 +333,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
+        let mut stream = harness.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -343,31 +341,30 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_filter_by_tid() {
-        let mut p = setup_default_packet();
-        p.metadata.pid = 0;
-        let mut p2 = p.clone();
-        p2.metadata.tid = 0;
         let lm = LogMessage {
-            pid: p.metadata.pid,
-            tid: p.metadata.tid,
-            time: zx::BootInstant::from_nanos(p.metadata.time),
-            dropped_logs: p.metadata.dropped_logs,
-            severity: p.metadata.severity,
+            pid: 1,
+            tid: 2,
+            time: zx::BootInstant::get(),
+            dropped_logs: 3,
+            severity: Severity::Info as i32,
             msg: String::from("BBBBB"),
             tags: vec![String::from("AAAAA")],
         };
+        let p = to_record(&lm);
+        let lm2 = LogMessage { tid: 12, ..lm.clone() };
+        let p2 = to_record(&lm2);
         let options = LogFilterOptions {
             filter_by_pid: false,
             pid: 1,
             filter_by_tid: true,
-            tid: 1,
+            tid: 2,
             min_severity: LogLevelFilter::None,
             verbosity: 0,
             tags: vec![],
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
+        let mut stream = harness.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -375,26 +372,21 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_filter_by_min_severity() {
-        let p = setup_default_packet();
-        let mut p2 = p.clone();
-        p2.metadata.pid = 0;
-        p2.metadata.tid = 0;
-        p2.metadata.severity = LogLevelFilter::Error.into_primitive().into();
-        let mut p3 = p.clone();
-        p3.metadata.severity = LogLevelFilter::Info.into_primitive().into();
-        let mut p4 = p.clone();
-        p4.metadata.severity = 0x70; // custom
-        let mut p5 = p.clone();
-        p5.metadata.severity = LogLevelFilter::Fatal.into_primitive().into();
         let lm = LogMessage {
-            pid: p2.metadata.pid,
-            tid: p2.metadata.tid,
-            time: zx::BootInstant::from_nanos(p2.metadata.time),
-            dropped_logs: p2.metadata.dropped_logs,
-            severity: p2.metadata.severity,
+            pid: 0,
+            tid: 0,
+            time: zx::BootInstant::get(),
+            dropped_logs: 2,
+            severity: Severity::Error as i32,
             msg: String::from("BBBBB"),
             tags: vec![String::from("AAAAA")],
         };
+        let p = to_record(&LogMessage { severity: Severity::Warn as i32, ..lm.clone() });
+        let p2 = to_record(&lm);
+        let p3 = to_record(&LogMessage { severity: Severity::Info as i32, ..lm.clone() });
+        let p4 = to_record(&LogMessage { severity: 0x70, ..lm.clone() });
+        let p5 = to_record(&LogMessage { severity: Severity::Fatal as i32, ..lm.clone() });
+
         let options = LogFilterOptions {
             filter_by_pid: false,
             pid: 1,
@@ -406,7 +398,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
+        let mut stream = harness.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2, p3, p4, p5]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -414,22 +406,18 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_filter_by_combination() {
-        let mut p = setup_default_packet();
-        p.metadata.pid = 0;
-        p.metadata.tid = 0;
-        let mut p2 = p.clone();
-        p2.metadata.severity = LogLevelFilter::Error.into_primitive().into();
-        let mut p3 = p.clone();
-        p3.metadata.pid = 1;
         let lm = LogMessage {
-            pid: p2.metadata.pid,
-            tid: p2.metadata.tid,
-            time: zx::BootInstant::from_nanos(p2.metadata.time),
-            dropped_logs: p2.metadata.dropped_logs,
-            severity: p2.metadata.severity,
+            pid: 0,
+            tid: 0,
+            time: zx::BootInstant::get(),
+            dropped_logs: 2,
+            severity: Severity::Error as i32,
             msg: String::from("BBBBB"),
             tags: vec![String::from("AAAAA")],
         };
+        let p = to_record(&LogMessage { severity: Severity::Warn as i32, ..lm.clone() });
+        let p2 = to_record(&lm);
+        let p3 = to_record(&LogMessage { pid: 1, ..lm.clone() });
         let options = LogFilterOptions {
             filter_by_pid: true,
             pid: 0,
@@ -441,7 +429,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
+        let mut stream = harness.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2, p3]);
         drop(stream);
         harness.filter_test(vec![lm], Some(options)).await;
@@ -449,36 +437,28 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_filter_by_tags() {
-        let mut p = setup_default_packet();
-        let mut p2 = p.clone();
-        // p tags - "DDDDD"
-        p.fill_data(1..6, 68);
-
-        p2.metadata.pid = 0;
-        p2.metadata.tid = 0;
-        p2.data[6] = 5;
-        // p2 tag - "AAAAA", "BBBBB"
-        // p2 msg - "CCCCC"
-        p2.fill_data(13..18, 67);
-
         let lm1 = LogMessage {
-            pid: p.metadata.pid,
-            tid: p.metadata.tid,
-            time: zx::BootInstant::from_nanos(p.metadata.time),
-            dropped_logs: p.metadata.dropped_logs,
-            severity: p.metadata.severity,
+            pid: 1,
+            tid: 1,
+            time: zx::BootInstant::get(),
+            dropped_logs: 2,
+            severity: Severity::Warn as i32,
             msg: String::from("BBBBB"),
             tags: vec![String::from("DDDDD")],
         };
+        let p = to_record(&lm1);
+
         let lm2 = LogMessage {
-            pid: p2.metadata.pid,
-            tid: p2.metadata.tid,
-            time: zx::BootInstant::from_nanos(p2.metadata.time),
-            dropped_logs: p2.metadata.dropped_logs,
-            severity: p2.metadata.severity,
+            pid: 0,
+            tid: 0,
+            time: zx::BootInstant::get(),
+            dropped_logs: 2,
+            severity: Severity::Warn as i32,
             msg: String::from("CCCCC"),
             tags: vec![String::from("AAAAA"), String::from("BBBBB")],
         };
+        let p2 = to_record(&lm2);
+
         let options = LogFilterOptions {
             filter_by_pid: false,
             pid: 1,
@@ -490,7 +470,7 @@ mod tests {
         };
 
         let mut harness = TestHarness::default();
-        let mut stream = harness.create_stream(Arc::new(ComponentIdentity::unknown()));
+        let mut stream = harness.create_structured_stream(Arc::new(ComponentIdentity::unknown()));
         stream.write_packets(vec![p, p2]);
         drop(stream);
         harness.filter_test(vec![lm1, lm2], Some(options)).await;

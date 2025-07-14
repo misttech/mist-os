@@ -11,7 +11,6 @@ use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, WriteEventParams,
 };
 use diagnostics_log_encoding::Argument;
-use diagnostics_message::LoggerMessage;
 use fidl_fuchsia_diagnostics_types as fdiagnostics;
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use std::fmt::Debug;
@@ -38,41 +37,6 @@ impl StoredMessage {
                 None
             }
         }
-    }
-
-    pub fn from_legacy(buf: Box<[u8]>, stats: &Arc<LogStreamStats>) -> Option<Self> {
-        let Ok(LoggerMessage {
-            timestamp,
-            raw_severity,
-            message,
-            pid,
-            tid,
-            dropped_logs,
-            tags,
-            size_bytes: _,
-        }) = LoggerMessage::try_from(buf.as_ref())
-        else {
-            stats.increment_invalid(buf.len());
-            return None;
-        };
-        let mut encoder =
-            Encoder::new(Cursor::new([0u8; MAX_DATAGRAM_LEN_BYTES as _]), EncoderOpts::default());
-        let _ = encoder.write_event(WriteEventParams {
-            event: LegacyMessageRecord { severity: raw_severity, data: &message, timestamp },
-            tags: &tags,
-            metatags: std::iter::empty(),
-            pid: zx::Koid::from_raw(pid),
-            tid: zx::Koid::from_raw(tid),
-            dropped: dropped_logs,
-        });
-        let cursor = encoder.take();
-        let position = cursor.position() as usize;
-        let buf = cursor.get_ref();
-        Some(Self {
-            timestamp,
-            severity: Severity::from(raw_severity),
-            bytes: Box::from(&buf[..position]),
-        })
     }
 
     pub fn from_debuglog(record: zx::DebugLogRecord, dropped: u64) -> Self {
@@ -162,42 +126,6 @@ impl StoredMessage {
             _ => {}
         }
         Ok(data)
-    }
-}
-
-struct LegacyMessageRecord<'a> {
-    severity: RawSeverity,
-    data: &'a str,
-    timestamp: zx::BootInstant,
-}
-
-impl RecordEvent for LegacyMessageRecord<'_> {
-    fn raw_severity(&self) -> RawSeverity {
-        self.severity
-    }
-
-    fn file(&self) -> Option<&str> {
-        None
-    }
-
-    fn line(&self) -> Option<u32> {
-        None
-    }
-
-    fn target(&self) -> &str {
-        ""
-    }
-
-    fn timestamp(&self) -> zx::BootInstant {
-        self.timestamp
-    }
-
-    fn write_arguments<B: MutableBuffer>(
-        self,
-        writer: &mut Encoder<B>,
-    ) -> Result<(), EncodingError> {
-        writer.write_argument(Argument::message(self.data))?;
-        Ok(())
     }
 }
 

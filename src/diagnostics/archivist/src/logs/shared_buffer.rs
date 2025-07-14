@@ -514,6 +514,7 @@ impl ContainerInfo {
                 .prev = prev;
         }
         sockets.free(socket_id.0);
+        self.stats.close_socket();
         debug!(identity:% = self.identity; "Socket closed.");
     }
 }
@@ -608,6 +609,7 @@ impl ContainerBuffer {
         let mut guard = self.shared_buffer.inner.lock();
         let InnerAndSockets(inner, sockets) = &mut *guard;
         let Some(container) = inner.containers.get_mut(self.container_id) else { return };
+        container.stats.open_socket();
         let next = container.first_socket_id;
         let socket_id = SocketId(sockets.insert(|socket_id| {
             socket
@@ -1405,7 +1407,7 @@ mod tests {
                     url: "",
                     last_timestamp: AnyProperty,
                     sockets_closed: 0u64,
-                    sockets_opened: 0u64,
+                    sockets_opened: 1u64,
                     invalid: {
                         number: 0u64,
                         bytes: 0u64,
