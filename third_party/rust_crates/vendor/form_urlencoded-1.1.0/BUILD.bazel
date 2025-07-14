@@ -74,6 +74,6 @@ rust_library(
     }),
     version = "1.1.0",
     deps = [
-        "//third_party/rust_crates/vendor/percent-encoding-2.2.0:percent_encoding",
+        "//third_party/rust_crates/vendor/percent-encoding-2.3.1:percent_encoding",
     ],
 )

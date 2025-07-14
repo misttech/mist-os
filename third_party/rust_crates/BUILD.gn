@@ -61,7 +61,7 @@ group("ash") {
 
 if (!(current_os == "fuchsia")) {
   group("askama") {
-    public_deps = [ ":askama-v0_12_1" ]
+    public_deps = [ ":askama-v0_14_0" ]
   }
 }
 
@@ -667,7 +667,7 @@ group("pem") {
 }
 
 group("percent-encoding") {
-  public_deps = [ ":percent-encoding-v2_2_0" ]
+  public_deps = [ ":percent-encoding-v2_3_1" ]
 }
 
 group("pest") {
@@ -1944,152 +1944,137 @@ rustc_library("ash-v0_37_0+1_3_209") {
   applicable_licenses = [ ":ash-v0_37_0+1_3_209.license" ]
 }
 
-license("askama-v0_12_1.license") {
+license("askama-v0_14_0.license") {
   public_package_name = "askama"
   license_files = [
-    "//third_party/rust_crates/vendor/askama-0.12.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/askama-0.12.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/askama-0.14.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/askama-0.14.0/LICENSE-MIT",
   ]
 }
 
-rustc_library("askama-v0_12_1") {
+rustc_library("askama-v0_14_0") {
   crate_name = "askama"
-  source_root = "//third_party/rust_crates/vendor/askama-0.12.1/src/lib.rs"
-  output_name = "askama-3f38ee58767ed948"
+  source_root = "//third_party/rust_crates/vendor/askama-0.14.0/src/lib.rs"
+  output_name = "askama-4353a3ef13fd6b52"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":askama_derive-v0_12_5($host_toolchain)" ]
-  deps += [ ":askama_escape-v0_10_3" ]
+  deps += [ ":askama_derive-v0_14_0($host_toolchain)" ]
+  deps += [ ":itoa-v1_0_14" ]
+  deps += [ ":percent-encoding-v2_3_1" ]
+  deps += [ ":serde-v1_0_204" ]
+  deps += [ ":serde_json-v1_0_128" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=3f38ee58767ed948",
-    "-Cextra-filename=-3f38ee58767ed948",
+    "-Cmetadata=4353a3ef13fd6b52",
+    "-Cextra-filename=-4353a3ef13fd6b52",
+    "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"config\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"derive\"",
+    "--cfg=feature=\"std\"",
+    "--cfg=feature=\"urlencode\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":askama-v0_12_1.license" ]
+  applicable_licenses = [ ":askama-v0_14_0.license" ]
 }
 
-license("askama_derive-v0_12_5.license") {
+license("askama_derive-v0_14_0.license") {
   public_package_name = "askama_derive"
   license_files = [
-    "//third_party/rust_crates/forks/askama_derive/LICENSE-APACHE",
-    "//third_party/rust_crates/forks/askama_derive/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/askama_derive-0.14.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/askama_derive-0.14.0/LICENSE-MIT",
   ]
 }
 
-rustc_macro("askama_derive-v0_12_5") {
+rustc_macro("askama_derive-v0_14_0") {
   crate_name = "askama_derive"
-  source_root = "//third_party/rust_crates/forks/askama_derive/src/lib.rs"
-  output_name = "askama_derive-e1b0d7c36e373690"
+  source_root =
+      "//third_party/rust_crates/vendor/askama_derive-0.14.0/src/lib.rs"
+  output_name = "askama_derive-62e7d07cfeb938e0"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":askama_parser-v0_2_1" ]
+  deps += [ ":memchr-v2_7_4" ]
+  deps += [ ":askama_parser-v0_14_0" ]
   deps += [ ":basic-toml-v0_1_9" ]
-  deps += [ ":mime-v0_3_17" ]
-  deps += [ ":mime_guess-v2_0_5" ]
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
+  deps += [ ":rustc-hash-v2_1_1" ]
   deps += [ ":serde-v1_0_204" ]
+  deps += [ ":serde_derive-v1_0_204($host_toolchain)" ]
   deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=e1b0d7c36e373690",
-    "-Cextra-filename=-e1b0d7c36e373690",
-    "--cfg=feature=\"basic-toml\"",
+    "-Cmetadata=62e7d07cfeb938e0",
+    "-Cextra-filename=-62e7d07cfeb938e0",
+    "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"config\"",
-    "--cfg=feature=\"serde\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"derive\"",
+    "--cfg=feature=\"std\"",
+    "--cfg=feature=\"urlencode\"",
   ]
 
   aliased_deps = {
-    parser = ":askama_parser-v0_2_1.actual"
+    parser = ":askama_parser-v0_14_0.actual"
   }
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":askama_derive-v0_12_5.license" ]
+  applicable_licenses = [ ":askama_derive-v0_14_0.license" ]
 }
 
-license("askama_escape-v0_10_3.license") {
-  public_package_name = "askama_escape"
-  license_files = [
-    "//third_party/rust_crates/vendor/askama_escape-0.10.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/askama_escape-0.10.3/LICENSE-MIT",
-  ]
-}
-
-rustc_library("askama_escape-v0_10_3") {
-  crate_name = "askama_escape"
-  source_root =
-      "//third_party/rust_crates/vendor/askama_escape-0.10.3/src/lib.rs"
-  output_name = "askama_escape-7e697b0cf594c674"
-  edition = "2018"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=7e697b0cf594c674",
-    "-Cextra-filename=-7e697b0cf594c674",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":askama_escape-v0_10_3.license" ]
-}
-
-license("askama_parser-v0_2_1.license") {
+license("askama_parser-v0_14_0.license") {
   public_package_name = "askama_parser"
   license_files = [
-    "//third_party/rust_crates/vendor/askama_parser-0.2.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/askama_parser-0.2.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/askama_parser-0.14.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/askama_parser-0.14.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/askama_parser-0.14.0/benches/librustdoc/LICENSE.md",
   ]
 }
 
-rustc_library("askama_parser-v0_2_1") {
+rustc_library("askama_parser-v0_14_0") {
   crate_name = "askama_parser"
   source_root =
-      "//third_party/rust_crates/vendor/askama_parser-0.2.1/src/lib.rs"
-  output_name = "askama_parser-f52efcbe4b9f233c"
+      "//third_party/rust_crates/vendor/askama_parser-0.14.0/src/lib.rs"
+  output_name = "askama_parser-d82a880d54b3ef2c"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":nom-v7_1_3" ]
+  deps += [ ":memchr-v2_7_4" ]
+  deps += [ ":serde-v1_0_204" ]
+  deps += [ ":serde_derive-v1_0_204($host_toolchain)" ]
+  deps += [ ":winnow-v0_7_11" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=f52efcbe4b9f233c",
-    "-Cextra-filename=-f52efcbe4b9f233c",
+    "-Cmetadata=d82a880d54b3ef2c",
+    "-Cextra-filename=-d82a880d54b3ef2c",
+    "--cfg=feature=\"config\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":askama_parser-v0_2_1.license" ]
+  applicable_licenses = [ ":askama_parser-v0_14_0.license" ]
 }
 
 license("assert_matches-v1_5_0.license") {
@@ -6698,7 +6683,7 @@ rustc_library("form_urlencoded-v1_1_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":percent-encoding-v2_2_0" ]
+  deps += [ ":percent-encoding-v2_3_1" ]
 
   rustenv = []
 
@@ -9728,72 +9713,6 @@ rustc_library("memoffset-v0_9_1") {
   applicable_licenses = [ ":memoffset-v0_9_1.license" ]
 }
 
-license("mime-v0_3_17.license") {
-  public_package_name = "mime"
-  license_files = [
-    "//third_party/rust_crates/vendor/mime-0.3.17/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/mime-0.3.17/LICENSE-MIT",
-  ]
-}
-
-rustc_library("mime-v0_3_17") {
-  crate_name = "mime"
-  source_root = "//third_party/rust_crates/vendor/mime-0.3.17/src/lib.rs"
-  output_name = "mime-92cbe2e7490bc2ab"
-  edition = "2015"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=92cbe2e7490bc2ab",
-    "-Cextra-filename=-92cbe2e7490bc2ab",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":mime-v0_3_17.license" ]
-}
-
-license("mime_guess-v2_0_5.license") {
-  public_package_name = "mime_guess"
-  license_files =
-      [ "//third_party/rust_crates/vendor/mime_guess-2.0.5/LICENSE" ]
-}
-
-rustc_library("mime_guess-v2_0_5") {
-  crate_name = "mime_guess"
-  source_root = "//third_party/rust_crates/vendor/mime_guess-2.0.5/src/lib.rs"
-  output_name = "mime_guess-ecbb8e03a128505d"
-  edition = "2015"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":mime-v0_3_17" ]
-  deps += [ ":unicase-v2_8_1" ]
-
-  rustenv = [ "MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs" ]
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=ecbb8e03a128505d",
-    "-Cextra-filename=-ecbb8e03a128505d",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"rev-mappings\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":mime_guess-v2_0_5.license" ]
-}
-
 license("miniz_oxide-v0_8_8.license") {
   public_package_name = "miniz_oxide"
   license_files = [
@@ -10347,37 +10266,6 @@ rustc_library("nix-v0_27_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":nix-v0_27_1.license" ]
-}
-
-license("nom-v7_1_3.license") {
-  public_package_name = "nom"
-  license_files = [ "//third_party/rust_crates/forks/nom/LICENSE" ]
-}
-
-rustc_library("nom-v7_1_3") {
-  crate_name = "nom"
-  source_root = "//third_party/rust_crates/forks/nom/src/lib.rs"
-  output_name = "nom-4e1aeb65676f807d"
-  edition = "2018"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":memchr-v2_7_4" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=4e1aeb65676f807d",
-    "-Cextra-filename=-4e1aeb65676f807d",
-    "--cfg=feature=\"alloc\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":nom-v7_1_3.license" ]
 }
 
 license("nom-v8_0_0.license") {
@@ -11872,19 +11760,19 @@ rustc_library("percent-encoding-v1_0_1") {
   applicable_licenses = [ ":percent-encoding-v1_0_1.license" ]
 }
 
-license("percent-encoding-v2_2_0.license") {
+license("percent-encoding-v2_3_1.license") {
   public_package_name = "percent_encoding"
   license_files = [
-    "//third_party/rust_crates/vendor/percent-encoding-2.2.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/percent-encoding-2.2.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/percent-encoding-2.3.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/percent-encoding-2.3.1/LICENSE-MIT",
   ]
 }
 
-rustc_library("percent-encoding-v2_2_0") {
+rustc_library("percent-encoding-v2_3_1") {
   crate_name = "percent_encoding"
   source_root =
-      "//third_party/rust_crates/vendor/percent-encoding-2.2.0/src/lib.rs"
-  output_name = "percent_encoding-58f6833f792480e7"
+      "//third_party/rust_crates/vendor/percent-encoding-2.3.1/src/lib.rs"
+  output_name = "percent_encoding-b96dd0efe6657d98"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -11896,15 +11784,16 @@ rustc_library("percent-encoding-v2_2_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=58f6833f792480e7",
-    "-Cextra-filename=-58f6833f792480e7",
+    "-Cmetadata=b96dd0efe6657d98",
+    "-Cextra-filename=-b96dd0efe6657d98",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":percent-encoding-v2_2_0.license" ]
+  applicable_licenses = [ ":percent-encoding-v2_3_1.license" ]
 }
 
 license("pest-v2_7_8.license") {
@@ -14957,6 +14846,40 @@ rustc_library("rustc-hash-v1_0_1") {
   applicable_licenses = [ ":rustc-hash-v1_0_1.license" ]
 }
 
+license("rustc-hash-v2_1_1.license") {
+  public_package_name = "rustc_hash"
+  license_files = [
+    "//third_party/rust_crates/vendor/rustc-hash-2.1.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/rustc-hash-2.1.1/LICENSE-MIT",
+  ]
+}
+
+rustc_library("rustc-hash-v2_1_1") {
+  crate_name = "rustc_hash"
+  source_root = "//third_party/rust_crates/vendor/rustc-hash-2.1.1/src/lib.rs"
+  output_name = "rustc_hash-ff84e699bf166b5"
+  edition = "2021"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=ff84e699bf166b5",
+    "-Cextra-filename=-ff84e699bf166b5",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":rustc-hash-v2_1_1.license" ]
+}
+
 license("rustfix-v0_9_0.license") {
   public_package_name = "rustfix"
   license_files = [
@@ -15923,6 +15846,7 @@ rustc_library("serde_json-v1_0_128") {
     "--cap-lints=allow",
     "-Cmetadata=5608300d5cc3bac5",
     "-Cextra-filename=-5608300d5cc3bac5",
+    "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"unbounded_depth\"",
@@ -18805,7 +18729,7 @@ rustc_library("tuf-v0_3_0-beta13") {
   deps += [ ":hyper-v0_14_19" ]
   deps += [ ":itoa-v1_0_14" ]
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":percent-encoding-v2_2_0" ]
+  deps += [ ":percent-encoding-v2_3_1" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_derive-v1_0_204($host_toolchain)" ]
   deps += [ ":serde_json-v1_0_128" ]
@@ -19616,7 +19540,7 @@ rustc_library("url-v2_3_1") {
   deps = []
   deps += [ ":form_urlencoded-v1_1_0" ]
   deps += [ ":idna-v0_3_0" ]
-  deps += [ ":percent-encoding-v2_2_0" ]
+  deps += [ ":percent-encoding-v2_3_1" ]
   deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
@@ -20555,6 +20479,40 @@ rustc_library("windows-targets-v0_48_5") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+license("winnow-v0_7_11.license") {
+  public_package_name = "winnow"
+  license_files =
+      [ "//third_party/rust_crates/vendor/winnow-0.7.11/LICENSE-MIT" ]
+}
+
+rustc_library("winnow-v0_7_11") {
+  crate_name = "winnow"
+  source_root = "//third_party/rust_crates/vendor/winnow-0.7.11/src/lib.rs"
+  output_name = "winnow-6a025558765f1c2d"
+  edition = "2021"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":memchr-v2_7_4" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=6a025558765f1c2d",
+    "-Cextra-filename=-6a025558765f1c2d",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":winnow-v0_7_11.license" ]
 }
 
 license("x509-cert-v0_2_5.license") {

@@ -1,4 +1,4 @@
-{% if !union.is_result %}
+{% if !union_.is_result %}
 
 {#
 {{ restriction }}
@@ -6,10 +6,10 @@ impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ 
     #[inline]
     fn from(from: crate::{{ name }}) -> Self {
         match from {
-            {% for member in union.members %}
+            {% for member in union_.members %}
                 crate::{{ name }}::{{ member.name|camel }}(value) => Self::{{ member.name|compat_camel }}(value.into()),
             {% endfor %}
-            {% if !union.is_strict %}
+            {% if !union_.is_strict %}
                 crate::{{ name }}::UnknownOrdinal_(unknown_ordinal) => Self::__SourceBreaking { unknown_ordinal },
             {% endif %}
         }

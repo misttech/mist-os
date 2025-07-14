@@ -89,7 +89,7 @@ rust_library(
         "//third_party/rust_crates/vendor/hyper-0.14.19:hyper",
         "//third_party/rust_crates/vendor/itoa-1.0.14:itoa",
         "//third_party/rust_crates/vendor/log-0.4.22:log",
-        "//third_party/rust_crates/vendor/percent-encoding-2.2.0:percent_encoding",
+        "//third_party/rust_crates/vendor/percent-encoding-2.3.1:percent_encoding",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
         "//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json",
         "//third_party/rust_crates/vendor/tempfile-3.2.0:tempfile",

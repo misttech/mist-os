@@ -175,14 +175,14 @@ alias(
 )
 
 alias(
-    name = "askama-0.12.1",
-    actual = "//third_party/rust_crates/vendor/askama-0.12.1:askama",
+    name = "askama-0.14.0",
+    actual = "//third_party/rust_crates/vendor/askama-0.14.0:askama",
     tags = ["manual"],
 )
 
 alias(
     name = "askama",
-    actual = "//third_party/rust_crates/vendor/askama-0.12.1:askama",
+    actual = "//third_party/rust_crates/vendor/askama-0.14.0:askama",
     tags = ["manual"],
 )
 
@@ -1807,14 +1807,14 @@ alias(
 )
 
 alias(
-    name = "percent-encoding-2.2.0",
-    actual = "//third_party/rust_crates/vendor/percent-encoding-2.2.0:percent_encoding",
+    name = "percent-encoding-2.3.1",
+    actual = "//third_party/rust_crates/vendor/percent-encoding-2.3.1:percent_encoding",
     tags = ["manual"],
 )
 
 alias(
     name = "percent-encoding",
-    actual = "//third_party/rust_crates/vendor/percent-encoding-2.2.0:percent_encoding",
+    actual = "//third_party/rust_crates/vendor/percent-encoding-2.3.1:percent_encoding",
     tags = ["manual"],
 )
 

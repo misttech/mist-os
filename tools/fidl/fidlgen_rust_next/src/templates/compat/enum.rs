@@ -35,7 +35,7 @@ impl<'a> EnumCompatTemplate<'a> {
             compat,
 
             name: escape(enm.name.decl_name().camel()),
-            compat_name: filters::compat_camel(enm.name.decl_name()).unwrap(),
+            compat_name: filters::escape_compat_camel(enm.name.decl_name()),
             denylist: compat.rust_or_rust_next_denylist(&enm.name),
         }
     }

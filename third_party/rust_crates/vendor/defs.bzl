@@ -415,7 +415,7 @@ _NORMAL_DEPENDENCIES = {
             "p256": Label("//third_party/rust_crates/vendor/p256-0.11.1:p256"),
             "pathdiff": Label("//third_party/rust_crates/vendor/pathdiff-0.2.3:pathdiff"),
             "pem": Label("//third_party/rust_crates/vendor/pem-0.8.3:pem"),
-            "percent-encoding": Label("//third_party/rust_crates/vendor/percent-encoding-2.2.0:percent_encoding"),
+            "percent-encoding": Label("//third_party/rust_crates/vendor/percent-encoding-2.3.1:percent_encoding"),
             "pest": Label("//third_party/rust_crates/vendor/pest-2.7.8:pest"),
             "pin-project": Label("//third_party/rust_crates/vendor/pin-project-1.0.11:pin_project"),
             "pin-project-lite": Label("//third_party/rust_crates/vendor/pin-project-lite-0.2.13:pin_project_lite"),
@@ -497,7 +497,7 @@ _NORMAL_DEPENDENCIES = {
             "zstd": Label("//third_party/rust_crates/vendor/zstd-0.11.2+zstd.1.5.2:zstd"),
         },
         "cfg(not(target_os = \"fuchsia\"))": {
-            "askama": Label("//third_party/rust_crates/vendor/askama-0.12.1:askama"),
+            "askama": Label("//third_party/rust_crates/vendor/askama-0.14.0:askama"),
             "async-fs": Label("//third_party/rust_crates/vendor/async-fs-1.6.0:async_fs"),
             "cargo_metadata": Label("//third_party/rust_crates/vendor/cargo_metadata-0.18.1:cargo_metadata"),
             "crossterm": Label("//third_party/rust_crates/vendor/crossterm-0.19.0:crossterm"),

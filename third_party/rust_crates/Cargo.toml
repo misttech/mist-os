@@ -306,7 +306,7 @@ zeroize = "1.8.1"
 # Host-side only dependencies
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
 # keep-sorted start
-askama = { version = "0.12.1", default-features = false, features = ["config"] }
+askama = "0.14.0"
 async-fs = "1.6.0"
 cargo_metadata = "0.18.1"
 crossterm = "0.19"
@@ -408,14 +408,12 @@ windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-ta
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 # keep-sorted start
-askama_derive = { path = "forks/askama_derive" }
 bt-common = { path = "forks/bluetooth/bt-common" }
 bt-gatt = { path = "forks/bluetooth/bt-gatt" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 libm = { path = "forks/libm" }
 nix_0_29_0 = { package = "nix", path = "forks/nix-0.29.0" }
-nom-7_1_3 = { package = "nom", path = "forks/nom" }
 nom-language = { package = "nom-language", path = "forks/nom-language-0.1.0" }
 notify = { path = "forks/notify" }
 num-bigint-dig = { path = "forks/num-bigint-dig" }
@@ -694,9 +692,6 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 
 [gn.package.memoffset."0.9.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
-
-[gn.package.mime_guess."2.0.5"]
-env_vars = ["MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs"]
 
 [gn.package.mock-omaha-server."0.3.5"]
 rustflags = ["--cfg=fasync"]

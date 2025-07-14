@@ -35,7 +35,7 @@ impl<'a> BitsCompatTemplate<'a> {
             compat,
 
             name: escape(bits.name.decl_name().camel()),
-            compat_name: filters::compat_camel(bits.name.decl_name()).unwrap(),
+            compat_name: filters::escape_compat_camel(bits.name.decl_name()),
             denylist: compat.rust_or_rust_next_denylist(&bits.name),
         }
     }

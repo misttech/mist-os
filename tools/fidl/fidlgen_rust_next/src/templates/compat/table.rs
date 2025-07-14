@@ -34,7 +34,7 @@ impl<'a> TableCompatTemplate<'a> {
             compat,
 
             name: table.name.decl_name().camel(),
-            compat_name: filters::compat_camel(table.name.decl_name()).unwrap(),
+            compat_name: filters::escape_compat_camel(table.name.decl_name()),
             denylist: compat.rust_or_rust_next_denylist(&table.name),
         }
     }
