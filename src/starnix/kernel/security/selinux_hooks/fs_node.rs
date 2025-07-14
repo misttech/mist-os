@@ -928,8 +928,7 @@ pub(in crate::security) fn fs_node_permission(
 ) -> Result<(), Errno> {
     let current_sid = task_effective_sid(current_task);
     let fs_node_class = fs_node.security_state.lock().class;
-    todo_has_fs_node_permissions(
-        TODO_DENY!("https://fxbug.dev/380855359", "Enforce fs_node_permission checks."),
+    has_fs_node_permissions(
         &security_server.as_permission_check(),
         &current_task.kernel(),
         current_sid,
