@@ -428,7 +428,7 @@ class RegionList final {
       size_t size;
     };
     const auto align_range = [align_pow2](vaddr_t range_base, size_t range_size) -> AlignedRange {
-      const vaddr_t aligned_base = ALIGN(range_base, 1UL << align_pow2);
+      const vaddr_t aligned_base = ROUNDUP(range_base, 1UL << align_pow2);
       const size_t base_delta = aligned_base - range_base;
       const size_t aligned_size = ffl::SaturateSubtractAs<size_t>(range_size, base_delta);
       return {.base = aligned_base, .size = aligned_size};
@@ -596,7 +596,7 @@ class RegionList final {
 
     DEBUG_ASSERT(allocation_result.is_ok());
     *alloc_spot = allocation_result.value();
-    ASSERT_MSG(IS_ALIGNED(*alloc_spot, 1UL << align_pow2), "size=%zu align_pow2=%u alloc_spot=%zx",
+    ASSERT_MSG(IS_ROUNDED(*alloc_spot, 1UL << align_pow2), "size=%zu align_pow2=%u alloc_spot=%zx",
                size, align_pow2, *alloc_spot);
     return ZX_OK;
   }

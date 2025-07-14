@@ -280,7 +280,7 @@ class VmPageOrMarker {
     // PAGE_SIZE_SHIFT bits and store only the upper bits.
     void SetAwaitingCleanLength(uint64_t len) {
       DEBUG_ASSERT(GetDirtyState() == DirtyState::Dirty);
-      DEBUG_ASSERT(IS_ALIGNED(len, PAGE_SIZE));
+      DEBUG_ASSERT(IS_ROUNDED(len, PAGE_SIZE));
       len = (len >> PAGE_SIZE_SHIFT) << kAwaitingCleanLengthShift;
       // Clear the old value.
       value_ &= BIT_MASK32(kAwaitingCleanLengthShift);
@@ -1420,8 +1420,8 @@ class VmPageList final {
   template <typename PTR_TYPE, NodeCheck NODE_CHECK, typename S, typename F>
   static zx_status_t ForEveryPageInRangeInternal(S self, F per_page_func, auto cur,
                                                  uint64_t start_offset, uint64_t end_offset) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(start_offset));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(end_offset));
     start_offset += self->list_skew_;
     end_offset += self->list_skew_;
 

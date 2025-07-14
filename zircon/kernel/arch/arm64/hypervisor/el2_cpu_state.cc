@@ -39,8 +39,8 @@ void UnmapAll(ArchVmAspace& aspace) {
 
 // Return true if the given virtual address range is contiguous in physical memory.
 [[maybe_unused]] bool IsPhysicallyContiguous(vaddr_t base, size_t size) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(base));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(base));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
 
   // Ranges smaller than a page are always physically contiguous.
   if (size <= PAGE_SIZE) {

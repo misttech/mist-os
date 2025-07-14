@@ -52,8 +52,8 @@ extern arch::AsmLabel x86_bootstrap16_start, x86_bootstrap16_end,
     x86_secondary_cpu_long_mode_high_entry;
 
 void x86_bootstrap16_init(paddr_t bootstrap_base) {
-  DEBUG_ASSERT(!IS_PAGE_ALIGNED(bootstrap_phys_addr));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(bootstrap_base));
+  DEBUG_ASSERT(!IS_PAGE_ROUNDED(bootstrap_phys_addr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(bootstrap_base));
   DEBUG_ASSERT(bootstrap_base <= (MB)-k_x86_bootstrap16_buffer_size);
   bootstrap_phys_addr = bootstrap_base;
 }
@@ -61,7 +61,7 @@ void x86_bootstrap16_init(paddr_t bootstrap_base) {
 zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture,
                                     paddr_t* instr_ptr) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Make sure x86_bootstrap16_init has been called, and bail early if not.
-  if (!IS_PAGE_ALIGNED(bootstrap_phys_addr)) {
+  if (!IS_PAGE_ROUNDED(bootstrap_phys_addr)) {
     return ZX_ERR_BAD_STATE;
   }
 

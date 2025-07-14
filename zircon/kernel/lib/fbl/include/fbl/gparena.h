@@ -205,8 +205,8 @@ class __OWNER(void) GPArena {
     top_ = committed_ = start_ = map_result->base;
     end_ = start_ + mem_sz;
 
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(start_));
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(start_));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(end_));
 
     destroy_vmar.cancel();
 

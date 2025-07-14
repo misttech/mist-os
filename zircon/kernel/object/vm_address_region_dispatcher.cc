@@ -204,7 +204,7 @@ zx_status_t VmAddressRegionDispatcher::Protect(vaddr_t base, size_t len, uint32_
                                                VmAddressRegionOpChildren op_children) {
   canary_.Assert();
 
-  if (!IS_PAGE_ALIGNED(base)) {
+  if (!IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -259,7 +259,7 @@ zx_status_t VmAddressRegionDispatcher::Unmap(vaddr_t base, size_t len,
                                              VmAddressRegionOpChildren op_children) {
   canary_.Assert();
 
-  if (!IS_PAGE_ALIGNED(base)) {
+  if (!IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
 

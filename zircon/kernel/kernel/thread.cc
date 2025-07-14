@@ -320,7 +320,7 @@ Thread* Thread::CreateEtc(Thread* t, const char* name, thread_start_routine entr
   }
 
   // assert that t is at least as aligned as the Thread is supposed to be
-  DEBUG_ASSERT(IS_ALIGNED(t, alignof(Thread)));
+  DEBUG_ASSERT(IS_ROUNDED(t, alignof(Thread)));
 
   construct_thread(t, name);
 
@@ -1964,7 +1964,7 @@ void Thread::Current::BecomeIdle() {
 void Thread::SecondaryCpuInitEarly() {
   DEBUG_ASSERT(arch_ints_disabled());
   DEBUG_ASSERT(stack_.base() != 0);
-  DEBUG_ASSERT(IS_ALIGNED(this, alignof(Thread)));
+  DEBUG_ASSERT(IS_ROUNDED(this, alignof(Thread)));
 
   // At this point, the CPU isn't far enough along to allow threads to block. Set blocking
   // disallowed until to catch bugs where code might block before we're ready.

@@ -251,7 +251,7 @@ __NO_SAFESTACK __NO_RETURN void x86_secondary_entry(ktl::atomic<unsigned int>* a
 
 #if __has_feature(safe_stack)
   // Set up the initial unsafe stack pointer.
-  DEBUG_ASSERT(IS_ALIGNED(thread->stack().unsafe_top(), 16));
+  DEBUG_ASSERT(IS_ROUNDED(thread->stack().unsafe_top(), 16));
   x86_write_gs_offset64(ZX_TLS_UNSAFE_SP_OFFSET, thread->stack().unsafe_top());
 #endif
 

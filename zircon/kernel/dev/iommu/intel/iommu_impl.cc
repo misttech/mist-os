@@ -268,7 +268,7 @@ bool IommuImpl::IsValidBusTxnId(uint64_t bus_txn_id) const {
 
 zx::result<uint64_t> IommuImpl::Map(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo,
                                     uint64_t vmo_offset, size_t size, uint32_t perms) {
-  if (!IS_PAGE_ALIGNED(vmo_offset) || size == 0) {
+  if (!IS_PAGE_ROUNDED(vmo_offset) || size == 0) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (perms & ~(IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE | IOMMU_FLAG_PERM_EXECUTE)) {
@@ -304,7 +304,7 @@ zx_status_t IommuImpl::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmObj
                                     dev_vaddr_t* vaddr, size_t* mapped_len) {
   DEBUG_ASSERT(vaddr);
   DEBUG_ASSERT(mapped_len);
-  if (!IS_PAGE_ALIGNED(map_token) || !IS_PAGE_ALIGNED(map_offset)) {
+  if (!IS_PAGE_ROUNDED(map_token) || !IS_PAGE_ROUNDED(map_offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!IsValidBusTxnId(bus_txn_id)) {
@@ -317,7 +317,7 @@ zx_status_t IommuImpl::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmObj
 
 zx_status_t IommuImpl::Unmap(uint64_t bus_txn_id, uint64_t map_token, size_t size) {
   const dev_vaddr_t vaddr = map_token;
-  if (!IS_PAGE_ALIGNED(vaddr) || !IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(vaddr) || !IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!IsValidBusTxnId(bus_txn_id)) {
@@ -475,7 +475,7 @@ zx_status_t IommuImpl::EnableBiosReservedMappingsLocked() {
 
 // Sets the root table pointer and invalidates the context-cache and IOTLB.
 zx_status_t IommuImpl::SetRootTablePointerLocked(paddr_t pa) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(pa));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(pa));
 
   auto root_table_addr = reg::RootTableAddress::Get().FromValue(0);
   // If we support extended contexts, use it.
@@ -573,7 +573,7 @@ void IommuImpl::InvalidateIotlbDomainAllLocked(uint32_t domain_id) {
 
 void IommuImpl::InvalidateIotlbPageLocked(uint32_t domain_id, dev_vaddr_t vaddr, uint pages_pow2) {
   DEBUG_ASSERT(lock_.lock().IsHeld());
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
   DEBUG_ASSERT(pages_pow2 < 64);
   DEBUG_ASSERT(pages_pow2 <= caps_.max_addr_mask_value());
   ASSERT(!caps_.required_write_buf_flushing());

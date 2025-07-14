@@ -34,7 +34,7 @@ zx_status_t PinnedMemoryTokenDispatcher::Create(fbl::RefPtr<BusTransactionInitia
                                                 KernelHandle<PinnedMemoryTokenDispatcher>* handle,
                                                 zx_rights_t* rights) {
   LTRACE_ENTRY;
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(pinned_vmo.offset()) && IS_PAGE_ALIGNED(pinned_vmo.size()));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(pinned_vmo.offset()) && IS_PAGE_ROUNDED(pinned_vmo.size()));
 
   fbl::AllocChecker ac;
   KernelHandle new_handle(

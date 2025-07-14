@@ -87,7 +87,7 @@ zx::result<> Guest::SetTrap(uint32_t kind, zx_gpaddr_t addr, size_t len,
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  if (!IS_PAGE_ALIGNED(addr) || !IS_PAGE_ALIGNED(len)) {
+  if (!IS_PAGE_ROUNDED(addr) || !IS_PAGE_ROUNDED(len)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (auto result = gpa_.UnmapRange(addr, len); result.is_error()) {

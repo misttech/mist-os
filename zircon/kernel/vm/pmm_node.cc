@@ -635,8 +635,8 @@ zx_status_t PmmNode::InitArena(const PmmArenaSelection& selected) TA_NO_THREAD_S
 }
 
 void PmmNode::InitReservedRange(const memalloc::Range& range) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.addr));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(range.addr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(range.size));
 
   ktl::string_view what =
       range.type == memalloc::Type::kReserved ? "hole in RAM"sv : memalloc::ToString(range.type);

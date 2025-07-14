@@ -507,7 +507,7 @@ class ArmArchVmAspace::ConsistencyManager {
     }
 
     // va must be page aligned so we can safely throw away the bottom bit.
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(va));
     DEBUG_ASSERT(aspace_.IsValidVaddr(va));
 
     pending_tlbs_[num_pending_tlbs_++] = {va, terminal};
@@ -891,7 +891,7 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
     // Check if this is a large page and we need to split it.
     if (index_shift > page_size_shift_ &&
         (pte & MMU_PTE_DESCRIPTOR_MASK) == MMU_PTE_L012_DESCRIPTOR_BLOCK &&
-        (!IS_ALIGNED(cursor.vaddr_rel(), block_size) || cursor.size() < block_size)) {
+        (!IS_ROUNDED(cursor.vaddr_rel(), block_size) || cursor.size() < block_size)) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure we are permitted to do that.
       if (!allow_bbm && !(unmap_options & ArchUnmapOptions::Enlarge)) {
@@ -999,8 +999,8 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro,
 
     // if we're at an unaligned address, not trying to map a block, and not at the terminal level,
     // recurse one more level of the page table tree
-    const bool level_valigned = IS_ALIGNED(cursor.vaddr_rel(), block_size);
-    const bool level_paligned = IS_ALIGNED(cursor.paddr(), block_size);
+    const bool level_valigned = IS_ROUNDED(cursor.vaddr_rel(), block_size);
+    const bool level_paligned = IS_ROUNDED(cursor.paddr(), block_size);
     if (!level_valigned || !level_paligned || cursor.PageRemaining() < block_size ||
         (index_shift > MMU_PTE_DESCRIPTOR_BLOCK_MAX_SHIFT)) {
       // Lookup the next level page table, allocating if required.
@@ -1459,9 +1459,9 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
   }
 
   // paddr and vaddr must be aligned.
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
-  if (!IS_PAGE_ALIGNED(vaddr) || !IS_PAGE_ALIGNED(paddr)) {
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(paddr));
+  if (!IS_PAGE_ROUNDED(vaddr) || !IS_PAGE_ROUNDED(paddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1532,8 +1532,8 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     return ZX_ERR_OUT_OF_RANGE;
   }
   for (size_t i = 0; i < count; ++i) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(phys[i]));
-    if (!IS_PAGE_ALIGNED(phys[i])) {
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(phys[i]));
+    if (!IS_PAGE_ROUNDED(phys[i])) {
       return ZX_ERR_INVALID_ARGS;
     }
   }
@@ -1546,8 +1546,8 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   }
 
   // vaddr must be aligned.
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
-  if (!IS_PAGE_ALIGNED(vaddr)) {
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
+  if (!IS_PAGE_ROUNDED(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1616,8 +1616,8 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
-  if (!IS_PAGE_ALIGNED(vaddr)) {
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vaddr));
+  if (!IS_PAGE_ROUNDED(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1646,7 +1646,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!IS_PAGE_ALIGNED(vaddr)) {
+  if (!IS_PAGE_ROUNDED(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1706,7 +1706,7 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   VM_KTRACE_DURATION(2, "ArmArchVmAspace::HarvestAccessed", ("vaddr", vaddr), ("count", count));
   canary_.Assert();
 
-  if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
+  if (!IS_PAGE_ROUNDED(vaddr) || !IsValidVaddr(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1770,7 +1770,7 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   VM_KTRACE_DURATION(2, "ArmArchVmAspace::MarkAccessed", ("vaddr", vaddr), ("count", count));
   canary_.Assert();
 
-  if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
+  if (!IS_PAGE_ROUNDED(vaddr) || !IsValidVaddr(vaddr)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -2355,7 +2355,7 @@ ArmArchVmAspace::~ArmArchVmAspace() {
 vaddr_t ArmArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size_t size,
                                   uint mmu_flags) {
   canary_.Assert();
-  return PAGE_ALIGN(base);
+  return ROUNDUP_PAGE_SIZE(base);
 }
 
 void ArmVmICacheConsistencyManager::SyncAddr(vaddr_t start, size_t len) {

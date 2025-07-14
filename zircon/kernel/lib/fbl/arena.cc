@@ -167,8 +167,8 @@ void Arena::Pool::Init(const char* name, fbl::RefPtr<VmObject> vmo, fbl::RefPtr<
     mapping_size = mapping_->size_locked();
   }
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(end_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(start_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(end_));
 }
 
 // Pick values that avoid lots of commits + decommits when

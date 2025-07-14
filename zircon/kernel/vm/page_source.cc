@@ -285,8 +285,8 @@ zx_status_t PageSource::PopulateRequest(PageRequest* request, uint64_t offset, u
   canary_.Assert();
   DEBUG_ASSERT(request);
   DEBUG_ASSERT(len > 0);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
 
   if (!SupportsPageRequestType(type)) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -336,9 +336,9 @@ void PageSource::FreePages(list_node* pages) { page_provider_->FreePages(pages);
 zx_status_t PageSource::PopulateRequestLocked(PageRequest* request, uint64_t offset, uint64_t len,
                                               VmoDebugInfo vmo_debug_info, page_request_type type) {
   DEBUG_ASSERT(request);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
   DEBUG_ASSERT(len > 0);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
   DEBUG_ASSERT(type < page_request_type::COUNT);
   DEBUG_ASSERT(!request->IsInitialized());
 

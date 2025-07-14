@@ -51,8 +51,8 @@ PageSourceProperties PhysicalPageProvider::properties() const {
 
 void PhysicalPageProvider::Init(VmCowPages* cow_pages, PageSource* page_source, paddr_t phys_base) {
   DEBUG_ASSERT(cow_pages);
-  DEBUG_ASSERT(!IS_PAGE_ALIGNED(kInvalidPhysBase));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(phys_base));
+  DEBUG_ASSERT(!IS_PAGE_ROUNDED(kInvalidPhysBase));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(phys_base));
   DEBUG_ASSERT(!cow_pages_);
   DEBUG_ASSERT(phys_base_ == kInvalidPhysBase);
   Guard<Mutex> guard{&mtx_};

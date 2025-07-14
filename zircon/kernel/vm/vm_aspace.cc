@@ -352,7 +352,7 @@ zx_status_t VmAspace::MapObjectInternal(fbl::RefPtr<VmObject> vmo, const char* n
   if (!vmo) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (!IS_PAGE_ALIGNED(offset)) {
+  if (!IS_PAGE_ROUNDED(offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -366,7 +366,7 @@ zx_status_t VmAspace::MapObjectInternal(fbl::RefPtr<VmObject> vmo, const char* n
     vmar_offset = reinterpret_cast<vaddr_t>(*ptr);
 
     // check that it's page aligned
-    if (!IS_PAGE_ALIGNED(vmar_offset) || vmar_offset < base_) {
+    if (!IS_PAGE_ROUNDED(vmar_offset) || vmar_offset < base_) {
       return ZX_ERR_INVALID_ARGS;
     }
 
@@ -420,12 +420,12 @@ zx_status_t VmAspace::AllocPhysical(const char* name, size_t size, void** ptr, u
           " vmm_flags 0x%x arch_mmu_flags 0x%x\n",
           this, name, size, ptr ? *ptr : 0, paddr, vmm_flags, arch_mmu_flags);
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(paddr));
 
   if (size == 0) {
     return ZX_OK;
   }
-  if (!IS_PAGE_ALIGNED(paddr)) {
+  if (!IS_PAGE_ROUNDED(paddr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 

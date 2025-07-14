@@ -33,7 +33,7 @@ void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
   vaddr_t stack_top = t->stack().top();
 
   // make sure the top of the stack is 16 byte aligned for ABI compliance
-  DEBUG_ASSERT(IS_ALIGNED(stack_top, 16));
+  DEBUG_ASSERT(IS_ROUNDED(stack_top, 16));
 
   // make sure we start the frame 8 byte unaligned (relative to the 16 byte alignment) because
   // of the way the context switch will pop the return address off the stack. After the first
@@ -56,12 +56,12 @@ void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
   arch_thread& arch = t->arch();
   x86_extended_register_init_state(arch.extended_register_buffer);
   DEBUG_ASSERT(
-      IS_ALIGNED(&arch.extended_register_buffer, alignof(decltype(arch.extended_register_buffer))));
+      IS_ROUNDED(&arch.extended_register_buffer, alignof(decltype(arch.extended_register_buffer))));
 
   // set the stack pointer
   arch.sp = (vaddr_t)frame;
 #if __has_feature(safe_stack)
-  DEBUG_ASSERT(IS_ALIGNED(t->stack().unsafe_top(), 16));
+  DEBUG_ASSERT(IS_ROUNDED(t->stack().unsafe_top(), 16));
   arch.unsafe_sp = t->stack().unsafe_top();
 #endif
 

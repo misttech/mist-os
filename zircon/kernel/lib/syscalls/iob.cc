@@ -114,7 +114,7 @@ zx_status_t sys_iob_writev(zx_handle_t handle, zx_iob_write_options_t options,
 
 // zx_status_t zx_iob_create_shared_region
 zx_status_t sys_iob_create_shared_region(uint64_t options, uint64_t size, zx_handle_t* out) {
-  if (options != 0 || !IS_PAGE_ALIGNED(size) || size == 0) {
+  if (options != 0 || !IS_PAGE_ROUNDED(size) || size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 

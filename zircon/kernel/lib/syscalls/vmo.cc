@@ -112,7 +112,7 @@ zx_status_t sys_vmo_transfer_data(zx_handle_t dst_vmo_handle, uint32_t options, 
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(length) || !IS_PAGE_ALIGNED(src_offset)) {
+  if (!IS_PAGE_ROUNDED(offset) || !IS_PAGE_ROUNDED(length) || !IS_PAGE_ROUNDED(src_offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
 

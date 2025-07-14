@@ -853,7 +853,7 @@ class KTrace {
 
       // Write any padding bytes necessary.
       constexpr uint8_t kZero[8]{};
-      const size_t aligned_bytes = ALIGN(num_bytes, 8);
+      const size_t aligned_bytes = ROUNDUP(num_bytes, 8);
       const size_t num_zeros_to_write = aligned_bytes - num_bytes;
       if (num_zeros_to_write != 0) {
         reservation_.Write(ktl::span<const ktl::byte>(reinterpret_cast<const ktl::byte*>(kZero),

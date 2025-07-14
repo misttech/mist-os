@@ -40,7 +40,7 @@ void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
   vaddr_t stack_top = t->stack().top();
 
   // make sure the top of the stack is 16 byte aligned for ABI compliance
-  DEBUG_ASSERT(IS_ALIGNED(stack_top, 16));
+  DEBUG_ASSERT(IS_ROUNDED(stack_top, 16));
 
   struct riscv64_context_switch_frame* frame = (struct riscv64_context_switch_frame*)(stack_top);
   frame--;

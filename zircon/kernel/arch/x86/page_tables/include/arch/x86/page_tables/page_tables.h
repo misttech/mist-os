@@ -980,7 +980,7 @@ class X86PageTableImpl : public X86PageTableBase {
                                             ExistingEntryAction existing_action,
                                             MappingCursor& cursor, ConsistencyManager* cm)
       TA_REQ(lock_) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(cursor.size()));
 
     const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
     const PtFlags term_flags =
@@ -1175,7 +1175,7 @@ class X86PageTableImpl : public X86PageTableBase {
   // Base case of RemoveMapping for smallest page size.
   uint RemoveMappingL0(volatile pt_entry_t* table, ArchUnmapOptions unmap_options,
                        VirtualAddressCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(cursor.size()));
 
     uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
     uint unmapped = 0;
@@ -1268,7 +1268,7 @@ class X86PageTableImpl : public X86PageTableBase {
   // Base case of UpdateMapping for smallest page size.
   zx_status_t UpdateMappingL0(volatile pt_entry_t* table, uint mmu_flags,
                               VirtualAddressCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(cursor.size()));
 
     PtFlags term_flags = static_cast<T*>(this)->terminal_flags(PageTableLevel::PT_L, mmu_flags);
 
@@ -1425,7 +1425,7 @@ class X86PageTableImpl : public X86PageTableBase {
   // Base case of HarvestMapping for smallest page size.
   void HarvestMappingL0(volatile pt_entry_t* table, TerminalAction terminal_action,
                         VirtualAddressCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(cursor.size()));
 
     uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
@@ -1551,7 +1551,7 @@ class X86PageTableImpl : public X86PageTableBase {
                    volatile pt_entry_t* pte, paddr_t paddr, PtFlags flags, bool was_terminal,
                    bool exact_flags = false) TA_REQ(lock_) {
     DEBUG_ASSERT(pte);
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(paddr));
 
     pt_entry_t olde = *pte;
     pt_entry_t newe = paddr | flags | X86_MMU_PG_P;

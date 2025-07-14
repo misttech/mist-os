@@ -21,7 +21,7 @@
 zx_status_t PinnedVmObject::Create(fbl::RefPtr<VmObject> vmo, size_t offset, size_t size,
                                    bool write, PinnedVmObject* out_pinned_vmo) {
   DEBUG_ASSERT(vmo != nullptr);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset) && IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset) && IS_PAGE_ROUNDED(size));
   DEBUG_ASSERT(out_pinned_vmo != nullptr);
 
   PinnedVmObject pinned_vmo;

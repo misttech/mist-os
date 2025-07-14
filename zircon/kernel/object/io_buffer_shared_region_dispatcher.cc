@@ -110,7 +110,7 @@ zx::result<> IoBufferSharedRegionDispatcher::Write(const uint64_t tag, user_in_i
       const uint64_t tail = header->tail.load(ktl::memory_order_acquire);
 
       if (tail > head || ktl::numeric_limits<uint64_t>::max() - head < rounded_message_size ||
-          !IS_ALIGNED(head, 8)) {
+          !IS_ROUNDED(head, 8)) {
         return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
       }
 

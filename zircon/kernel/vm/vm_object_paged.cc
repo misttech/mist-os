@@ -277,7 +277,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   }
 
   // make sure size is page aligned
-  if (!IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (size > MAX_SIZE) {
@@ -363,7 +363,7 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
                                             fbl::RefPtr<VmObjectPaged>* obj) {
   DEBUG_ASSERT(alignment_log2 < sizeof(uint64_t) * 8);
   // make sure size is page aligned
-  if (!IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (size > MAX_SIZE) {
@@ -439,8 +439,8 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
   }
 
   if (size > 0) {
-    ASSERT(IS_PAGE_ALIGNED(size));
-    ASSERT(IS_PAGE_ALIGNED(reinterpret_cast<uintptr_t>(data)));
+    ASSERT(IS_PAGE_ROUNDED(size));
+    ASSERT(IS_PAGE_ROUNDED(reinterpret_cast<uintptr_t>(data)));
 
     // Do a direct lookup of the physical pages backing the range of
     // the kernel that these addresses belong to and jam them directly
@@ -507,7 +507,7 @@ zx_status_t VmObjectPaged::CreateExternal(fbl::RefPtr<PageSource> src, uint32_t 
   }
 
   // make sure size is page aligned
-  if (!IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (size > MAX_SIZE) {
@@ -524,7 +524,7 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
                                                   uint32_t pmm_alloc_flags, uint32_t options,
                                                   uint64_t size, fbl::RefPtr<VmObjectPaged>* obj) {
   // Caller must check that size is page aligned.
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
   DEBUG_ASSERT(!(options & kAlwaysPinned));
 
   fbl::AllocChecker ac;
@@ -578,12 +578,12 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
   canary_.Assert();
 
   // Offset must be page aligned.
-  if (!IS_PAGE_ALIGNED(offset)) {
+  if (!IS_PAGE_ROUNDED(offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   // Make sure size is page aligned.
-  if (!IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (size > MAX_SIZE) {
@@ -743,12 +743,12 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
   }
 
   // offset must be page aligned
-  if (!IS_PAGE_ALIGNED(offset)) {
+  if (!IS_PAGE_ROUNDED(offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   // size must be page aligned and not too large.
-  if (!IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (size > MAX_SIZE) {
@@ -1103,7 +1103,7 @@ zx_status_t VmObjectPaged::ZeroPartialPage(uint64_t page_base_offset, uint64_t z
                                            uint64_t zero_end_offset) {
   DEBUG_ASSERT(zero_start_offset <= zero_end_offset);
   DEBUG_ASSERT(zero_end_offset <= PAGE_SIZE);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(page_base_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(page_base_offset));
 
   {
     Guard<CriticalMutex> guard{lock()};
@@ -1142,7 +1142,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
   // left to do.
   while (len > 0) {
     // Check for any non-page aligned start and handle separately.
-    if (!IS_PAGE_ALIGNED(offset)) {
+    if (!IS_PAGE_ROUNDED(offset)) {
       // We're doing partial page writes, so we should be dirty tracking.
       DEBUG_ASSERT(dirty_track);
       const uint64_t page_base = ROUNDDOWN(offset, PAGE_SIZE);
@@ -1261,7 +1261,7 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
   }
 
   // ensure the size is valid and that we will not wrap.
-  if (!IS_PAGE_ALIGNED(s)) {
+  if (!IS_PAGE_ROUNDED(s)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (s > MAX_SIZE) {
@@ -1536,7 +1536,7 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
 
   // We should consider having the callers round up to page boundaries and then check whether the
   // length is page-aligned.
-  if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
+  if (unlikely(len == 0 || !IS_PAGE_ROUNDED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
 

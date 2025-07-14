@@ -150,7 +150,7 @@ zx_status_t VmAddressRegion::CreateSubVmarInner(size_t offset, size_t size, uint
     if (!is_specific && !is_upper_bound && offset != 0) {
       return ZX_ERR_INVALID_ARGS;
     }
-    if (!IS_PAGE_ALIGNED(offset)) {
+    if (!IS_PAGE_ROUNDED(offset)) {
       return ZX_ERR_INVALID_ARGS;
     }
 
@@ -253,7 +253,7 @@ zx_status_t VmAddressRegion::CreateSubVmar(size_t offset, size_t size, uint8_t a
                                            fbl::RefPtr<VmAddressRegion>* out) {
   DEBUG_ASSERT(out);
 
-  if (!IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -291,7 +291,7 @@ zx::result<VmAddressRegion::MapResult> VmAddressRegion::CreateVmMapping(
     return zx::error{ZX_ERR_ACCESS_DENIED};
   }
 
-  if (!IS_PAGE_ALIGNED(vmo_offset)) {
+  if (!IS_PAGE_ROUNDED(vmo_offset)) {
     return zx::error{ZX_ERR_INVALID_ARGS};
   }
 
@@ -633,7 +633,7 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
     return ZX_ERR_INVALID_ARGS;
   }
   len = ROUNDUP(len, PAGE_SIZE);
-  if (len == 0 || !IS_PAGE_ALIGNED(base)) {
+  if (len == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -800,7 +800,7 @@ zx_status_t VmAddressRegion::Unmap(vaddr_t base, size_t size,
   canary_.Assert();
 
   size = ROUNDUP(size, PAGE_SIZE);
-  if (size == 0 || !IS_PAGE_ALIGNED(base)) {
+  if (size == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -818,7 +818,7 @@ zx_status_t VmAddressRegion::UnmapAllowPartial(vaddr_t base, size_t size) {
   canary_.Assert();
 
   size = ROUNDUP(size, PAGE_SIZE);
-  if (size == 0 || !IS_PAGE_ALIGNED(base)) {
+  if (size == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -970,7 +970,7 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
   canary_.Assert();
 
   size = ROUNDUP(size, PAGE_SIZE);
-  if (size == 0 || !IS_PAGE_ALIGNED(base)) {
+  if (size == 0 || !IS_PAGE_ROUNDED(base)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1095,7 +1095,7 @@ zx_status_t VmAddressRegion::AllocSpotLocked(size_t size, uint8_t align_pow2, ui
   LTRACEF("size=%zu align_pow2=%u arch_mmu_flags=%x upper_limit=%zx\n", size, align_pow2,
           arch_mmu_flags, upper_limit);
   canary_.Assert();
-  DEBUG_ASSERT(size > 0 && IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(size > 0 && IS_PAGE_ROUNDED(size));
   DEBUG_ASSERT(spot);
 
   LTRACEF_LEVEL(2, "aspace %p size 0x%zx align %hhu upper_limit 0x%lx\n", this, size, align_pow2,

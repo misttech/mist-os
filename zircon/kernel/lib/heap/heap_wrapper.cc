@@ -291,7 +291,7 @@ void* heap_page_alloc(size_t pages) {
 }
 
 void heap_page_free(void* _ptr, size_t pages) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED((uintptr_t)_ptr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED((uintptr_t)_ptr));
   DEBUG_ASSERT(pages > 0);
 
   LTRACEF("ptr %p, pages %zu\n", _ptr, pages);

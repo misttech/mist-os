@@ -965,7 +965,7 @@ VmCowPages::VmCowPages(VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint
       size_(size),
       page_source_(ktl::move(page_source)),
       discardable_tracker_(ktl::move(discardable_tracker)) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
   // If we are tracking correct lock orders then add some asserts that nodes are created with lock
   // orders that at least vaguely make sense.
 #if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
@@ -1192,8 +1192,8 @@ zx_status_t VmCowPages::RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t 
 template <typename P, typename S, typename T>
 zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
                                                           uint64_t size, const LockedPtr& parent) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
 
   uint64_t start_in_self = offset;
   uint64_t end_in_self = CheckedAdd(offset, size);
@@ -2474,7 +2474,7 @@ zx_status_t VmCowPages::AddNewPageLocked(uint64_t offset, vm_page_t* page,
 VmPageOrMarker VmCowPages::CompleteAddNewPageLocked(AddPageTransaction& transaction,
                                                     vm_page_t* page, bool zero,
                                                     DeferredOps* deferred) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(transaction.offset()));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(transaction.offset()));
 
   InitializeVmPage(page);
   if (zero) {
@@ -2498,7 +2498,7 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
   ASSERT(overwrite != CanOverwriteContent::NonZero);
   canary_.Assert();
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(start_offset));
 
   uint64_t offset = start_offset;
   while (vm_page_t* p = list_remove_head_type(pages, vm_page_t, queue_node)) {
@@ -3492,7 +3492,7 @@ uint64_t VmCowPages::LookupCursor::SkipMissingPages() {
   }
   // The cursor was empty, so we should have ended up with at least one page.
   DEBUG_ASSERT(possibly_empty >= PAGE_SIZE);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(possibly_empty));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(possibly_empty));
   DEBUG_ASSERT(possibly_empty + offset_ <= end_offset_);
   IncrementOffsetAndInvalidateCursor(possibly_empty);
   return possibly_empty / PAGE_SIZE;
@@ -3907,8 +3907,8 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
   DEBUG_ASSERT(InRange(offset, len, size_));
 
   // Verify page alignment.
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len) || (offset + len == size_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len) || (offset + len == size_));
 
   // DecommitRange() will call this function only on a VMO with no parent.
   DEBUG_ASSERT(!parent_);
@@ -3929,7 +3929,7 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
 bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
   canary_.Assert();
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(page_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(page_offset));
   DEBUG_ASSERT(page_offset < size_);
   const VmPageOrMarker* slot = page_list_.Lookup(page_offset);
   if (node_has_parent_content_markers()) {
@@ -3969,7 +3969,7 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
                                                          MultiPageRequest* page_request,
                                                          uint64_t* processed_len_out) {
   // Validate inputs.
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(page_start_base) && IS_PAGE_ALIGNED(page_end_base));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(page_start_base) && IS_PAGE_ROUNDED(page_end_base));
   DEBUG_ASSERT(page_end_base <= size_);
   DEBUG_ASSERT(is_source_preserving_page_content());
 
@@ -5023,8 +5023,8 @@ bool VmCowPages::DebugIsRangePinnedLocked(VmCowRange range) {
 bool VmCowPages::AnyPagesPinnedLocked(uint64_t offset, size_t len) {
   canary_.Assert();
   DEBUG_ASSERT(lock_ref().lock().IsHeld());
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
 
   const uint64_t start_page_offset = offset;
   const uint64_t end_page_offset = offset + len;
@@ -5049,8 +5049,8 @@ bool VmCowPages::AnyPagesPinnedLocked(uint64_t offset, size_t len) {
 }
 
 void VmCowPages::InvalidateReadRequestsLocked(uint64_t offset, uint64_t len) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
   DEBUG_ASSERT(InRange(offset, len, size_));
 
   DEBUG_ASSERT(page_source_);
@@ -5069,8 +5069,8 @@ void VmCowPages::InvalidateReadRequestsLocked(uint64_t offset, uint64_t len) {
 }
 
 void VmCowPages::InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(len));
   DEBUG_ASSERT(InRange(offset, len, size_));
 
   DEBUG_ASSERT(is_source_preserving_page_content());
@@ -5153,8 +5153,8 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
     Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
     // make sure everything is aligned before we get started
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(s));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(size_));
+    DEBUG_ASSERT(IS_PAGE_ROUNDED(s));
 
     // see if we're shrinking or expanding the vmo
     if (s < size_) {
@@ -7637,7 +7637,7 @@ uint64_t VmCowPages::DebugGetPageCountLocked() const {
 
 bool VmCowPages::DebugIsPage(uint64_t offset) const {
   canary_.Assert();
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
   Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   return p && p->IsPage();
@@ -7645,7 +7645,7 @@ bool VmCowPages::DebugIsPage(uint64_t offset) const {
 
 bool VmCowPages::DebugIsMarker(uint64_t offset) const {
   canary_.Assert();
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
   Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   return p && p->IsMarker();
@@ -7653,7 +7653,7 @@ bool VmCowPages::DebugIsMarker(uint64_t offset) const {
 
 bool VmCowPages::DebugIsEmpty(uint64_t offset) const {
   canary_.Assert();
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
   Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   return !p || p->IsEmpty();
@@ -7667,7 +7667,7 @@ vm_page_t* VmCowPages::DebugGetPage(uint64_t offset) const {
 
 vm_page_t* VmCowPages::DebugGetPageLocked(uint64_t offset) const {
   canary_.Assert();
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   if (p && p->IsPage()) {
     return p->Page();

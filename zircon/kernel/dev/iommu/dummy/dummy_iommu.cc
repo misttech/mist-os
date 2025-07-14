@@ -43,7 +43,7 @@ bool DummyIommu::IsValidBusTxnId(uint64_t bus_txn_id) const { return true; }
 
 zx::result<uint64_t> DummyIommu::Map(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo,
                                      uint64_t vmo_offset, size_t size, uint32_t perms) {
-  if (!IS_PAGE_ALIGNED(vmo_offset) || size == 0) {
+  if (!IS_PAGE_ROUNDED(vmo_offset) || size == 0) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (perms & ~(IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE | IOMMU_FLAG_PERM_EXECUTE)) {
@@ -59,7 +59,7 @@ zx::result<uint64_t> DummyIommu::Map(uint64_t bus_txn_id, const fbl::RefPtr<VmOb
 zx::result<uint64_t> DummyIommu::MapContiguous(uint64_t bus_txn_id,
                                                const fbl::RefPtr<VmObject>& vmo,
                                                uint64_t vmo_offset, size_t size, uint32_t perms) {
-  if (!IS_PAGE_ALIGNED(vmo_offset) || size == 0) {
+  if (!IS_PAGE_ROUNDED(vmo_offset) || size == 0) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (perms & ~(IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE | IOMMU_FLAG_PERM_EXECUTE)) {
@@ -85,7 +85,7 @@ zx_status_t DummyIommu::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmOb
                                      dev_vaddr_t* vaddr, size_t* mapped_len) {
   DEBUG_ASSERT(vaddr);
   DEBUG_ASSERT(mapped_len);
-  if (!IS_PAGE_ALIGNED(map_token) || !IS_PAGE_ALIGNED(map_offset) || size == 0) {
+  if (!IS_PAGE_ROUNDED(map_token) || !IS_PAGE_ROUNDED(map_offset) || size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
   const uint64_t offset = map_token + map_offset;
@@ -115,7 +115,7 @@ zx_status_t DummyIommu::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmOb
 }
 
 zx_status_t DummyIommu::Unmap(uint64_t bus_txn_id, uint64_t map_token, size_t size) {
-  if (!IS_PAGE_ALIGNED(map_token) || !IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(map_token) || !IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
   return ZX_OK;

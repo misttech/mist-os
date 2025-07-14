@@ -209,7 +209,7 @@ uint perms_to_arch_mmu_flags(uint32_t perms) {
 zx::result<uint64_t> DeviceContext::SecondLevelMap(const fbl::RefPtr<VmObject>& vmo,
                                                    uint64_t vmo_offset, size_t size,
                                                    uint32_t perms) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(vmo_offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(vmo_offset));
 
   uint flags = perms_to_arch_mmu_flags(perms);
 
@@ -329,8 +329,8 @@ zx::result<uint64_t> DeviceContext::SecondLevelMapContiguous(const fbl::RefPtr<V
 }
 
 zx_status_t DeviceContext::SecondLevelMapIdentity(paddr_t base, size_t size, uint32_t perms) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(base));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(base));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
 
   uint flags = perms_to_arch_mmu_flags(perms);
 
@@ -360,8 +360,8 @@ zx_status_t DeviceContext::SecondLevelMapIdentity(paddr_t base, size_t size, uin
 }
 
 zx_status_t DeviceContext::SecondLevelUnmap(paddr_t virt_paddr, size_t size) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(virt_paddr));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(virt_paddr));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
 
   // Check if we're trying to partially unmap a region, and if so fail.
   for (size_t i = 0; i < allocated_regions_.size(); ++i) {

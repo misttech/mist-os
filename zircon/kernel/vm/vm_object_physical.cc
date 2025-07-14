@@ -36,7 +36,7 @@ VmObjectPhysical::VmObjectPhysical(paddr_t base, uint64_t size, bool is_slice,
       parent_user_id_(parent_user_id) {
   LTRACEF("%p, size %#" PRIx64 "\n", this, size_);
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size_));
 
   AddToGlobalList();
 }
@@ -60,7 +60,7 @@ VmObjectPhysical::~VmObjectPhysical() {
 
 zx_status_t VmObjectPhysical::Create(paddr_t base, uint64_t size,
                                      fbl::RefPtr<VmObjectPhysical>* obj) {
-  if (!IS_PAGE_ALIGNED(base) || !IS_PAGE_ALIGNED(size) || size == 0) {
+  if (!IS_PAGE_ROUNDED(base) || !IS_PAGE_ROUNDED(size) || size == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -91,12 +91,12 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
   canary_.Assert();
 
   // Offset must be page aligned.
-  if (!IS_PAGE_ALIGNED(offset)) {
+  if (!IS_PAGE_ROUNDED(offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   // Make sure size is page aligned.
-  if (!IS_PAGE_ALIGNED(size)) {
+  if (!IS_PAGE_ROUNDED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -198,7 +198,7 @@ zx_status_t VmObjectPhysical::Lookup(uint64_t offset, uint64_t len,
 zx_status_t VmObjectPhysical::CommitRangePinned(uint64_t offset, uint64_t len, bool write) {
   canary_.Assert();
 
-  if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
+  if (unlikely(len == 0 || !IS_PAGE_ROUNDED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
   Guard<CriticalMutex> guard{lock()};
@@ -229,7 +229,7 @@ zx_status_t VmObjectPhysical::LookupContiguous(uint64_t offset, uint64_t len, pa
 zx_status_t VmObjectPhysical::LookupContiguousLocked(uint64_t offset, uint64_t len,
                                                      paddr_t* out_paddr) {
   canary_.Assert();
-  if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
+  if (unlikely(len == 0 || !IS_PAGE_ROUNDED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (unlikely(!InRange(offset, len, size_))) {

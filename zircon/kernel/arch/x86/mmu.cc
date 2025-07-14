@@ -120,7 +120,7 @@ bool x86_is_vaddr_canonical(vaddr_t vaddr) {
  */
 static bool x86_mmu_check_vaddr(vaddr_t vaddr) {
   /* Check to see if the address is PAGE aligned */
-  if (!IS_ALIGNED(vaddr, PAGE_SIZE))
+  if (!IS_ROUNDED(vaddr, PAGE_SIZE))
     return false;
 
   return x86_is_vaddr_canonical(vaddr);
@@ -133,7 +133,7 @@ bool x86_mmu_check_paddr(paddr_t paddr) {
   uint64_t max_paddr;
 
   /* Check to see if the address is PAGE aligned */
-  if (!IS_ALIGNED(paddr, PAGE_SIZE))
+  if (!IS_ROUNDED(paddr, PAGE_SIZE))
     return false;
 
   max_paddr = ((uint64_t)1ull << g_max_paddr_width) - 1;
@@ -1089,7 +1089,7 @@ bool X86ArchVmAspace::AccessedSinceLastCheck(bool clear) {
 vaddr_t X86ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size_t size,
                                   uint mmu_flags) {
   canary_.Assert();
-  return PAGE_ALIGN(base);
+  return ROUNDUP_PAGE_SIZE(base);
 }
 
 void X86ArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {

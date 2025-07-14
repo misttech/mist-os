@@ -647,8 +647,8 @@ static bool vmo_contiguous_decommit_test() {
   verify_expected_pages();
   auto track_decommit = [vmo, &page_expected, &verify_expected_pages](uint64_t start_offset,
                                                                       uint64_t size) {
-    ASSERT(IS_PAGE_ALIGNED(start_offset));
-    ASSERT(IS_PAGE_ALIGNED(size));
+    ASSERT(IS_PAGE_ROUNDED(start_offset));
+    ASSERT(IS_PAGE_ROUNDED(size));
     uint64_t end_offset = start_offset + size;
     for (uint64_t offset = start_offset; offset < end_offset; offset += PAGE_SIZE) {
       page_expected[offset / PAGE_SIZE] = false;
@@ -657,8 +657,8 @@ static bool vmo_contiguous_decommit_test() {
   };
   auto track_commit = [vmo, &page_expected, &verify_expected_pages](uint64_t start_offset,
                                                                     uint64_t size) {
-    ASSERT(IS_PAGE_ALIGNED(start_offset));
-    ASSERT(IS_PAGE_ALIGNED(size));
+    ASSERT(IS_PAGE_ROUNDED(start_offset));
+    ASSERT(IS_PAGE_ROUNDED(size));
     uint64_t end_offset = start_offset + size;
     for (uint64_t offset = start_offset; offset < end_offset; offset += PAGE_SIZE) {
       page_expected[offset / PAGE_SIZE] = true;

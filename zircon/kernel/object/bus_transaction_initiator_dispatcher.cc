@@ -59,8 +59,8 @@ BusTransactionInitiatorDispatcher::~BusTransactionInitiatorDispatcher() {
 zx_status_t BusTransactionInitiatorDispatcher::Pin(
     fbl::RefPtr<VmObject> vmo, uint64_t offset, uint64_t size, uint32_t perms,
     KernelHandle<PinnedMemoryTokenDispatcher>* pmt_handle, zx_rights_t* pmt_rights) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(offset));
+  DEBUG_ASSERT(IS_PAGE_ROUNDED(size));
 
   if (size == 0) {
     return ZX_ERR_INVALID_ARGS;
