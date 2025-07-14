@@ -32,9 +32,7 @@
     device_get_fragment_protocol;
     device_get_fragment_metadata;
     device_register_service_member;
-    device_connect_fidl_protocol2;
     device_connect_fragment_fidl_protocol;
-    device_connect_runtime_protocol;
     device_connect_fragment_runtime_protocol;
     device_connect_ns_protocol;
   local:

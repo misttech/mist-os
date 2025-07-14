@@ -42,12 +42,6 @@ __EXPORT zx_status_t device_get_properties(zx_device_t* device, device_props_arg
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,
-                                                     const char* protocol_name,
-                                                     fdf_handle_t request) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,
                                                               const char* fragment_name,
                                                               const char* service_name,
@@ -118,18 +112,8 @@ __EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* hand
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
-                                                  zx_handle_t request) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-__EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 

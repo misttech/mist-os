@@ -168,11 +168,6 @@ __EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* hand
                                     service_name, instance_name, member_name);
 }
 
-__EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request) {
-  return device->ConnectFragmentFidl("default", service_name, protocol_name, zx::channel(request));
-}
-
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* fragment_name,
                                                            const char* service_name,
@@ -180,12 +175,6 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            zx_handle_t request) {
   return device->ConnectFragmentFidl(fragment_name, service_name, protocol_name,
                                      zx::channel(request));
-}
-
-__EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,
-                                                     const char* protocol_name,
-                                                     fdf_handle_t request) {
-  return dev->ConnectFragmentRuntime("default", service_name, protocol_name, fdf::Channel(request));
 }
 
 __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,

@@ -567,7 +567,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::ChannelTransport>);
 
-    return DdkConnectFidlProtocol<ServiceMember>(parent());
+    return DdkConnectFragmentFidlProtocol<ServiceMember>(parent(), "default");
   }
 
   template <typename ServiceMember,
@@ -576,19 +576,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
       zx_device_t* parent) {
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::ChannelTransport>);
-
-    auto endpoints = fidl::CreateEndpoints<typename ServiceMember::ProtocolType>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-
-    auto status =
-        device_connect_fidl_protocol2(parent, ServiceMember::ServiceName, ServiceMember::Name,
-                                      endpoints->server.TakeChannel().release());
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(endpoints->client));
+    return DdkConnectFragmentFidlProtocol<ServiceMember>(parent, "default");
   }
 
   template <typename ServiceMember,
@@ -629,7 +617,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::DriverTransport>);
 
-    return DdkConnectRuntimeProtocol<ServiceMember>(parent());
+    return DdkConnectFragmentRuntimeProtocol<ServiceMember>(parent(), "default");
   }
 
   template <typename ServiceMember,
@@ -648,19 +636,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     static_assert(fidl::IsServiceMemberV<ServiceMember>);
     static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::DriverTransport>);
-
-    auto endpoints = fdf::CreateEndpoints<typename ServiceMember::ProtocolType>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-
-    auto status =
-        device_connect_runtime_protocol(parent, ServiceMember::ServiceName, ServiceMember::Name,
-                                        endpoints->server.TakeChannel().release());
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(endpoints->client));
+    return DdkConnectFragmentRuntimeProtocol<ServiceMember>(parent, "default");
   }
 
   template <typename ServiceMember>

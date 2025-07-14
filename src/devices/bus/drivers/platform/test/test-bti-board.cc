@@ -26,25 +26,17 @@ class TestBoard : public ddk::Device<TestBoard> {
 };
 
 zx_status_t TestBoard::Create(void*, zx_device_t* parent) {
-  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
+  zx::result client =
+      DdkConnectRuntimeProtocol<fuchsia_hardware_platform_bus::Service::PlatformBus>(parent);
+  if (client.is_error()) {
+    return client.status_value();
   }
 
-  zx_status_t status = device_connect_runtime_protocol(
-      parent, fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
-      fuchsia_hardware_platform_bus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus(
-      std::move(endpoints->client));
+  fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus(std::move(client.value()));
 
   auto board = std::make_unique<TestBoard>(parent);
 
-  status = board->DdkAdd("test-board", DEVICE_ADD_NON_BINDABLE);
+  zx_status_t status = board->DdkAdd("test-board", DEVICE_ADD_NON_BINDABLE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "TestBoard::Create: DdkAdd failed: %d", status);
     return status;

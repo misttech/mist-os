@@ -35,19 +35,12 @@ namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
 zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
-  auto endpoints = fdf::CreateEndpoints<fpbus::PlatformBus>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
+  zx::result client = DdkConnectRuntimeProtocol<fpbus::Service::PlatformBus>(parent);
+  if (client.is_error()) {
+    return client.status_value();
   }
 
-  zx_status_t status = device_connect_runtime_protocol(
-      parent, fpbus::Service::PlatformBus::ServiceName, fpbus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  fdf::WireSyncClient<fpbus::PlatformBus> pbus(std::move(endpoints->client));
+  fdf::WireSyncClient<fpbus::PlatformBus> pbus(std::move(client.value()));
 
   fbl::AllocChecker ac;
   auto board = fbl::make_unique_checked<Sherlock>(&ac, parent, pbus.TakeClientEnd());
@@ -88,10 +81,11 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
   };
 
   std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_platform_bus::Service::Name};
-  status = board->DdkAdd(ddk::DeviceAddArgs("sherlock")
-                             .set_str_props(kBoardDriverProps)
-                             .set_outgoing_dir(directory_endpoints->client.TakeChannel())
-                             .set_runtime_service_offers(fidl_service_offers));
+  zx_status_t status =
+      board->DdkAdd(ddk::DeviceAddArgs("sherlock")
+                        .set_str_props(kBoardDriverProps)
+                        .set_outgoing_dir(directory_endpoints->client.TakeChannel())
+                        .set_runtime_service_offers(fidl_service_offers));
   if (status != ZX_OK) {
     return status;
   }

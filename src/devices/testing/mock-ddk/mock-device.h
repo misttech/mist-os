@@ -205,10 +205,9 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   // You can add FIDL service here to your device or your parent device.
   // if you want to add a service to a fragment, add the fragment's name as 'name'.
-  // Devices will use `device_connect_fidl_protocol2` or
-  // `device_connect_fragment_fidl_protocol` to connect to these protocols
+  // Devices will use `device_connect_fragment_fidl_protocol` to connect to these protocols
   void AddFidlService(const char* service_name, fidl::ClientEnd<fuchsia_io::Directory> ns,
-                      const char* name = "");
+                      const char* name = "default");
 
   // This struct can also be a root parent device, with reduced functionality.
   // This allows the parent to store protocols that can be accessed by a child device.
@@ -278,8 +277,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   zx_status_t ConnectToFidlProtocol(const char* service_name, const char* protocol_name,
                                     zx::channel request, const char* fragment_name = "");
-  friend zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request);
   friend zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* fragment_name,
                                                            const char* service_name,
@@ -288,9 +285,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   zx_status_t ConnectToRuntimeProtocol(const char* service_name, const char* protocol_name,
                                        fdf::Channel request, const char* fragment_name = "");
-  friend zx_status_t device_connect_runtime_protocol(zx_device_t* device, const char* service_name,
-                                                     const char* protocol_name,
-                                                     fdf_handle_t request);
   friend zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* device,
                                                               const char* fragment_name,
                                                               const char* service_name,

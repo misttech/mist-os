@@ -95,8 +95,8 @@ class Nelson : public NelsonType {
   zx_status_t CreateGpioPlatformDevice();
 
   void Serve(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> request) {
-    device_connect_runtime_protocol(
-        parent(), fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
+    device_connect_fragment_runtime_protocol(
+        parent(), "default", fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
         fuchsia_hardware_platform_bus::Service::PlatformBus::Name, request.TakeChannel().release());
   }
 

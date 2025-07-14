@@ -152,8 +152,8 @@ class I2cChannel {
 
     zx_status_t status;
     if (fragment_name == nullptr) {
-      status = device_connect_fidl_protocol2(
-          parent, fuchsia_hardware_i2c::Service::Device::ServiceName,
+      status = device_connect_fragment_fidl_protocol(
+          parent, "default", fuchsia_hardware_i2c::Service::Device::ServiceName,
           fuchsia_hardware_i2c::Service::Device::Name, endpoints->server.TakeChannel().release());
     } else {
       status = device_connect_fragment_fidl_protocol(

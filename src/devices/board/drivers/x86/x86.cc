@@ -82,17 +82,9 @@ void X86::DdkInit(ddk::InitTxn txn) {
 void X86::DdkRelease() { delete this; }
 
 zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* out) {
-  auto endpoints = fdf::CreateEndpoints<fpbus::PlatformBus>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-
-  zx_status_t status = device_connect_runtime_protocol(
-      parent, fpbus::Service::PlatformBus::ServiceName, fpbus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to platform bus: %s", zx_status_get_string(status));
-    return status;
+  zx::result pbus_client = DdkConnectRuntimeProtocol<fpbus::Service::PlatformBus>(parent);
+  if (pbus_client.is_error()) {
+    return pbus_client.status_value();
   }
 
   ZX_ASSERT(zx_handle_duplicate(get_ioport_resource(parent), ZX_RIGHT_SAME_RIGHTS,
@@ -128,14 +120,14 @@ zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* ou
     zxlogf(ERROR, "Incorrect size for acpi rsdp: %lu", item.length);
     return ZX_ERR_INTERNAL;
   }
-  status = item.vmo.read(&acpi_rsdp, 0, sizeof(acpi_rsdp));
+  zx_status_t status = item.vmo.read(&acpi_rsdp, 0, sizeof(acpi_rsdp));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to read acpi vmo: %s", zx_status_get_string(status));
     return status;
   }
 
   fbl::AllocChecker ac;
-  *out = fbl::make_unique_checked<X86>(&ac, parent, std::move(endpoints->client),
+  *out = fbl::make_unique_checked<X86>(&ac, parent, std::move(pbus_client.value()),
                                        std::make_unique<acpi::AcpiImpl>());
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
