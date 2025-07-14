@@ -347,7 +347,7 @@ void bootstrap_vmos(HandoffEnd handoff_end, ktl::span<Handle*, userboot::kHandle
   RETURN_IF_NOT(!crypto::entropy::entropy_was_lost);
   RETURN_IF_NOT_OK(get_vmo_handle(crypto::entropy::entropy_vmo, true,
                                   crypto::entropy::entropy_vmo_content_size, nullptr,
-                                  &handles[kEntropyTestData]));
+                                  &handles[userboot::kEntropyTestData]));
 
 #endif
 
