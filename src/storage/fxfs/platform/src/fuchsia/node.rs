@@ -133,6 +133,10 @@ impl WeakNode {
     pub(crate) unsafe fn new(vtable: &'static WeakNodeVTable, node: *const ()) -> Self {
         Self { vtable, node }
     }
+
+    unsafe fn is_type<T: 'static>(&self) -> bool {
+        (self.vtable.type_id)() == TypeId::of::<T>()
+    }
 }
 
 impl Drop for WeakNode {
@@ -182,7 +186,7 @@ fn upgrade_and_downcast_node<T: 'static>(weak_node: &WeakNode) -> Option<Arc<T>>
     // SAFETY: We check `T` matches before converting the pointer (which should be the result of
     // `Weak<T>::into_raw`), back to `Weak<T>`.
     unsafe {
-        if (weak_node.vtable.type_id)() == TypeId::of::<T>() {
+        if weak_node.is_type::<T>() {
             ManuallyDrop::new(Weak::from_raw(weak_node.node as *const T)).upgrade()
         } else {
             None
@@ -296,9 +300,21 @@ impl NodeCache {
         }
     }
 
-    /// Returns the given node if present in the cache.
+    /// Returns the given node if present in the cache. This call should be handled with care. If it
+    /// is being used to check if there is no live node version, then there should be precautions
+    /// taken to ensure one will not be created in a race with this call or any of the resulting
+    /// actions.
     pub fn get(&self, object_id: u64) -> Option<Arc<dyn FxNode>> {
-        self.0.lock().map.get(&object_id).and_then(|n| upgrade_node(n))
+        let l = self.0.lock();
+        let weak_node = l.map.get(&object_id)?;
+        // Don't return placeholders as valid nodes. Panicking here, as this is a result of a race.
+        // If it happens we're likely breaking an assumption, but should not be permanent for the
+        // filesystem. Better to remount.
+        assert!(
+            unsafe { !weak_node.is_type::<Placeholder>() },
+            "Returning a placeholder indicates a race with open"
+        );
+        upgrade_node(weak_node)
     }
 
     /// Returns an iterator over all files in the cache.
