@@ -13,7 +13,7 @@
 ## See https://fuchsia.dev/fuchsia-src/development/languages/rust/third_party.md
 ## for more details.
 
-set -e
+set -eo pipefail
 
 function preserve_files {
   local tmp=$1
@@ -98,7 +98,7 @@ function prepare_bazel_workspace {
   ln -s "${FUCHSIA_DIR}/prebuilt/third_party/bazel/linux-x64/bazel-real" "${workspace_dir}/bazel"
   ln -s "${FUCHSIA_DIR}/prebuilt/third_party/buildifier/linux-x64/buildifier" "${workspace_dir}/buildifier"
   ln -s "${FUCHSIA_DIR}/prebuilt/third_party/rust/linux-x64" "${workspace_dir}/rust_toolchain"
-  ln -s "${FUCHSIA_DIR}/third_party/bazel_rules_rust" "${workspace_dir}/rules_rust"
+  ln -s "${FUCHSIA_DIR}/third_party/bazel_vendor/rules_rust+" "${workspace_dir}/rules_rust"
 
   # Relative paths of rust_crates need to be the same to $FUCHSIA_DIR and
   # $workspace_dir, so the generated BUILD.bazel would have correct paths when
