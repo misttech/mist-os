@@ -2,40 +2,22 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/assembly/bazel_product_bundle_group.gni")
-import("//products/microfuchsia/product_bundles.gni")
-import("//products/minimal/product_bundles.gni")
-import("//products/terminal/product_bundles.gni")
-import("//products/workbench/product_bundles.gni")
-
 group("products") {
   testonly = true
-  if (current_cpu == "x64") {
-    deps = [
-      ":microfuchsia_eng.x64_product_config",
-      ":minimal.x64_product_config",
-      ":terminal.x64_product_config",
-      ":workbench_eng.x64_product_config",
-    ]
-  } else if (current_cpu == "arm64") {
-    deps = [
-      ":microfuchsia_eng.arm64_product_config",
-      ":minimal.arm64_product_config",
-      ":terminal.arm64_product_config",
-      ":workbench_eng.arm64_product_config",
-    ]
-  } else if (current_cpu == "riscv64") {
-    deps = [ ":minimal.riscv64_product_config" ]
-  }
+  deps = [
+    "//products/microfuchsia:products",
+    "//products/minimal:products",
+    "//products/terminal:products",
+    "//products/workbench:products",
+  ]
 }
 
-# Group all Bazel product bundles for an arch in a single Bazel invocation, which is significantly
-# faster then invoking Bazel multiple times.
-#
-# This target is meant to be built by multi-product builds. Do __NOT__ include this target in single
-# product builds.
-bazel_product_bundle_group("product_bundles") {
+group("product_bundles") {
   testonly = true
-  product_bundles = MICROFUCHSIA_PRODUCT_BUNDLES + MINIMAL_PRODUCT_BUNDLES +
-                    TERMINAL_PRODUCT_BUNDLES + WORKBENCH_PRODUCT_BUNDLES
+  deps = [
+    "//products/microfuchsia",
+    "//products/minimal",
+    "//products/terminal",
+    "//products/workbench",
+  ]
 }

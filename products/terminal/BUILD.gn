@@ -2,9 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/product_assembly_configuration.gni")
+import("//build/assembly/sshd_config.gni")
 import("//build/bazel/assembly/bazel_product_bundle.gni")
-import("//build/bazel/assembly/bazel_product_configuration.gni")
-import("//products/terminal/product_bundles.gni")
+import("//build/info/info.gni")
 
 assert(
     is_fuchsia,
@@ -51,15 +52,193 @@ group("products") {
   }
 }
 
-bazel_product_configuration("terminal_product") {
+group("terminal") {
   testonly = true
-  name = "terminal"
-  bazel_product_configuration_target = ":product_config"
-  deps = common_bazel_inputs
+  if (current_cpu == "x64") {
+    deps = [
+      ":product_bundle.x64",
+      ":product_bundle.x64_reduced_perf_variation",
+      ":product_bundle_with_netstack2.x64",
+      ":product_bundle_with_netstack2.x64_reduced_perf_variation",
+    ]
+  } else if (current_cpu == "arm64") {
+    deps = [
+      ":product_bundle.arm64",
+      ":product_bundle.qemu-arm64",
+      ":product_bundle.vim3",
+      ":product_bundle.vim3_reduced_perf_variation",
+      ":product_bundle_with_netstack2.arm64",
+      ":product_bundle_with_netstack2.qemu-arm64",
+      ":product_bundle_with_netstack2.vim3",
+      ":product_bundle_with_netstack2.vim3_reduced_perf_variation",
+    ]
+  }
 }
 
-foreach(_pb, TERMINAL_PRODUCT_BUNDLES) {
-  bazel_product_bundle(_pb.gn_target_name) {
-    forward_variables_from(_pb, "*")
+if (target_cpu == "x64") {
+  bazel_product_bundle("product_bundle.x64") {
+    testonly = true
+    product_bundle_name = "terminal.x64"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.x64"
+    bazel_product_image_target = ":image.x64"
+    bazel_product_config_target = ":product_config"
+    bazel_product_config_name = "terminal"
+    bazel_recovery_image_target = "//products/zedboot:x64"
+    bazel_elf_sizes_target = ":elf_sizes.x64"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/x64:x64.bazel_input" ]
+  }
+
+  bazel_product_bundle("product_bundle.x64_reduced_perf_variation") {
+    testonly = true
+    product_bundle_name = "terminal.x64-reduced-perf-variation"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.x64_reduced_perf_variation"
+    bazel_product_image_target = ":image.x64_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:x64_reduced_perf_variation"
+    bazel_elf_sizes_target = ":elf_sizes.x64_reduced_perf_variation"
+    bazel_inputs_from_gn = common_bazel_inputs +
+                           [ "//boards/x64:reduced_perf_variation.bazel_input" ]
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.x64") {
+    testonly = true
+    product_bundle_name = "terminal_with_netstack2.x64"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.x64"
+    bazel_product_image_target = ":image_with_netstack2.x64"
+    bazel_recovery_image_target = "//products/zedboot:x64"
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.x64"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/x64:x64.bazel_input" ]
+  }
+
+  bazel_product_bundle(
+      "product_bundle_with_netstack2.x64_reduced_perf_variation") {
+    testonly = true
+    product_bundle_name = "terminal_with_netstack2.x64-reduced-perf-variation"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target =
+        ":product_bundle_with_netstack2.x64_reduced_perf_variation"
+    bazel_product_image_target =
+        ":image_with_netstack2.x64_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:x64_reduced_perf_variation"
+    bazel_elf_sizes_target =
+        ":elf_sizes_with_netstack2.x64_reduced_perf_variation"
+    bazel_inputs_from_gn = common_bazel_inputs +
+                           [ "//boards/x64:reduced_perf_variation.bazel_input" ]
+  }
+}
+
+if (target_cpu == "arm64") {
+  bazel_product_bundle("product_bundle.arm64") {
+    testonly = true
+    product_bundle_name = "terminal.arm64"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.arm64"
+    bazel_product_image_target = ":image.arm64"
+    bazel_product_config_target = ":product_config"
+    bazel_product_config_name = "terminal"
+    bazel_recovery_image_target = "//products/zedboot:arm64"
+    bazel_elf_sizes_target = ":elf_sizes.arm64"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/arm64:arm64.bazel_input" ]
+  }
+
+  bazel_product_bundle("product_bundle.qemu-arm64") {
+    testonly = true
+    image_use_vbmeta = false
+    product_bundle_name = "terminal.qemu-arm64"
+    allow_eng_platform_bundle_use = true
+    image_use_vbmeta = false
+    bazel_product_bundle_target = ":product_bundle.qemu-arm64"
+    bazel_product_image_target = ":image.qemu-arm64"
+    bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
+    bazel_elf_sizes_target = ":elf_sizes.qemu-arm64"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/qemu-arm64:qemu-arm64.bazel_input" ]
+  }
+
+  bazel_product_bundle("product_bundle.vim3") {
+    testonly = true
+    product_bundle_name = "terminal.vim3"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.vim3"
+    bazel_product_image_target = ":image.vim3"
+    bazel_recovery_image_target = "//products/zedboot:vim3"
+    bazel_elf_sizes_target = ":elf_sizes.vim3"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
+  }
+
+  bazel_product_bundle("product_bundle.vim3_reduced_perf_variation") {
+    testonly = true
+    product_bundle_name = "terminal.vim3-reduced-perf-variation"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.vim3_reduced_perf_variation"
+    bazel_product_image_target = ":image.vim3_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:vim3_reduced_perf_variation"
+    bazel_elf_sizes_target = ":elf_sizes.vim3_reduced_perf_variation"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.arm64") {
+    testonly = true
+    product_bundle_name = "terminal_with_netstack2.arm64"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.arm64"
+    bazel_product_image_target = ":image_with_netstack2.arm64"
+    bazel_recovery_image_target = "//products/zedboot:arm64"
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.arm64"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/arm64:arm64.bazel_input" ]
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.qemu-arm64") {
+    testonly = true
+    image_use_vbmeta = false
+    product_bundle_name = "terminal_with_netstack2.qemu-arm64"
+    allow_eng_platform_bundle_use = true
+    image_use_vbmeta = false
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.qemu-arm64"
+    bazel_product_image_target = ":image_with_netstack2.qemu-arm64"
+    bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.qemu-arm64"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/qemu-arm64:qemu-arm64.bazel_input" ]
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.vim3") {
+    testonly = true
+    product_bundle_name = "terminal_with_netstack2.vim3"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.vim3"
+    bazel_product_image_target = ":image_with_netstack2.vim3"
+    bazel_recovery_image_target = "//products/zedboot:vim3"
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.vim3"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
+  }
+
+  bazel_product_bundle(
+      "product_bundle_with_netstack2.vim3_reduced_perf_variation") {
+    testonly = true
+    product_bundle_name = "terminal_with_netstack2.vim3-reduced-perf-variation"
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target =
+        ":product_bundle_with_netstack2.vim3_reduced_perf_variation"
+    bazel_product_image_target =
+        ":image_with_netstack2.vim3_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:vim3_reduced_perf_variation"
+    bazel_elf_sizes_target =
+        ":elf_sizes_with_netstack2.vim3_reduced_perf_variation"
+    bazel_inputs_from_gn =
+        common_bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 }
