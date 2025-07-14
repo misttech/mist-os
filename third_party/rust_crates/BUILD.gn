@@ -52,7 +52,7 @@ group("arrayref") {
 }
 
 group("arrayvec") {
-  public_deps = [ ":arrayvec-v0_7_4" ]
+  public_deps = [ ":arrayvec-v0_7_6" ]
 }
 
 group("ash") {
@@ -1877,18 +1877,18 @@ rustc_library("arrayref-v0_3_9") {
   applicable_licenses = [ ":arrayref-v0_3_9.license" ]
 }
 
-license("arrayvec-v0_7_4.license") {
+license("arrayvec-v0_7_6.license") {
   public_package_name = "arrayvec"
   license_files = [
-    "//third_party/rust_crates/vendor/arrayvec-0.7.4/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/arrayvec-0.7.4/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/arrayvec-0.7.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/arrayvec-0.7.6/LICENSE-MIT",
   ]
 }
 
-rustc_library("arrayvec-v0_7_4") {
+rustc_library("arrayvec-v0_7_6") {
   crate_name = "arrayvec"
-  source_root = "//third_party/rust_crates/vendor/arrayvec-0.7.4/src/lib.rs"
-  output_name = "arrayvec-1608a91a4e3a890"
+  source_root = "//third_party/rust_crates/vendor/arrayvec-0.7.6/src/lib.rs"
+  output_name = "arrayvec-1e48e5173705452a"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -1900,15 +1900,15 @@ rustc_library("arrayvec-v0_7_4") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=1608a91a4e3a890",
-    "-Cextra-filename=-1608a91a4e3a890",
+    "-Cmetadata=1e48e5173705452a",
+    "-Cextra-filename=-1e48e5173705452a",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":arrayvec-v0_7_4.license" ]
+  applicable_licenses = [ ":arrayvec-v0_7_6.license" ]
 }
 
 license("ash-v0_37_0+1_3_209.license") {
@@ -18557,7 +18557,6 @@ rustc_library("tracing-mutex-v0_3_1") {
     "--cfg=feature=\"lock_api\"",
     "--cfg=feature=\"lockapi\"",
     "--cfg=feature=\"parkinglot\"",
-    "--cfg=feature=\"experimental\"",
   ]
 
   visibility = [ ":*" ]
@@ -19995,7 +19994,7 @@ rustc_library("vte-v0_15_0") {
 
   deps = []
   deps += [ ":memchr-v2_7_4" ]
-  deps += [ ":arrayvec-v0_7_4" ]
+  deps += [ ":arrayvec-v0_7_6" ]
 
   rustenv = []
 

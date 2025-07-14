@@ -79,6 +79,6 @@ rust_library(
     version = "0.15.0",
     deps = [
         "//third_party/rust_crates/ask2patch/memchr",
-        "//third_party/rust_crates/vendor/arrayvec-0.7.4:arrayvec",
+        "//third_party/rust_crates/vendor/arrayvec-0.7.6:arrayvec",
     ],
 )
