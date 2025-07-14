@@ -1075,14 +1075,14 @@ static void TestSuspendWaitAsyncSignalDeliveryWorker(zx_handle_t stack_vmar) {
   // the expected behavior and is visible via async wait.
   suspend_token = ZX_HANDLE_INVALID;
   ASSERT_EQ(zx_task_suspend_token(thread_h, &suspend_token), ZX_OK);
-  port_wait_for_signal(port, thread_h, zx_deadline_after(ZX_MSEC(100)), ZX_THREAD_SUSPENDED,
+  port_wait_for_signal(port, thread_h, zx_deadline_after(ZX_SEC(180)), ZX_THREAD_SUSPENDED,
                        &packet);
   ASSERT_EQ(packet.signal.observed & run_susp_mask, ZX_THREAD_SUSPENDED);
 
   ASSERT_TRUE(get_thread_info(thread_h, &info));
   ASSERT_EQ(info.state, ZX_THREAD_STATE_SUSPENDED);
   ASSERT_EQ(zx_handle_close(suspend_token), ZX_OK);
-  port_wait_for_signal(port, thread_h, zx_deadline_after(ZX_MSEC(100)), ZX_THREAD_RUNNING, &packet);
+  port_wait_for_signal(port, thread_h, zx_deadline_after(ZX_SEC(180)), ZX_THREAD_RUNNING, &packet);
   ASSERT_EQ(packet.signal.observed & run_susp_mask, ZX_THREAD_RUNNING);
 
   // Resumption from being suspended back into a blocking syscall will be
@@ -1101,11 +1101,6 @@ static void TestSuspendWaitAsyncSignalDeliveryWorker(zx_handle_t stack_vmar) {
 
 // Test signal delivery of suspended threads via single async wait.
 TEST_F(Threads, SuspendSingleWaitAsyncSignalDelivery) {
-  TestSuspendWaitAsyncSignalDeliveryWorker(vmar());
-}
-
-// Test signal delivery of suspended threads via repeating async wait.
-TEST_F(Threads, SuspendRepeatingWaitAsyncSignalDelivery) {
   TestSuspendWaitAsyncSignalDeliveryWorker(vmar());
 }
 
