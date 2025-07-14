@@ -72,6 +72,7 @@ impl PartialEq for TracingError {
 pub(crate) async fn trace_shutdown(
     proxy: &trace::SessionProxy,
 ) -> Result<trace::StopResult, TracingError> {
+    log::info!("Calling stop_tracing.");
     proxy
         .stop_tracing(&trace::StopOptions { write_results: Some(true), ..Default::default() })
         .await

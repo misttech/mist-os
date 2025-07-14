@@ -174,16 +174,7 @@ impl TracingProtocol {
                     Ok(t) => t,
                     Err(e) => {
                         log::warn!("unable to start trace: {:?}", e);
-                        let res = match e {
-                            TracingError::RecordingAlreadyStarted => {
-                                Err(ffx::RecordingError::RecordingAlreadyStarted)
-                            }
-                            e => {
-                                log::warn!("Start error: {:?}", e);
-                                Err(ffx::RecordingError::RecordingStart)
-                            }
-                        };
-                        return res;
+                        return Err(to_recording_error(e));
                     }
                 };
                 e.insert(nodename.clone());
@@ -271,7 +262,7 @@ impl FidlProtocol for TracingProtocol {
                 responder
                     .send(match task_entry.task.shutdown().await {
                         Ok(ref result) => Ok((&target_info, &output_file, &categories, result)),
-                        Err(_) => Err(fidl_fuchsia_developer_ffx::RecordingError::RecordingStop),
+                        Err(e) => Err(to_recording_error(e)),
                     })
                     .map_err(Into::into)
             }
@@ -345,6 +336,19 @@ fn from_ffx_trigger(t: &ffx::Trigger) -> trace_task::Trigger {
         action: t.action.map(|_a| TriggerAction::Terminate),
     }
 }
+fn to_recording_error(e: TracingError) -> ffx::RecordingError {
+    match e {
+        TracingError::TargetProxyOpen => ffx::RecordingError::TargetProxyOpen,
+        TracingError::RecordingAlreadyStarted => ffx::RecordingError::RecordingAlreadyStarted,
+        TracingError::RecordingStop(_) => ffx::RecordingError::RecordingStop,
+        TracingError::DuplicateTraceFile(_) => ffx::RecordingError::DuplicateTraceFile,
+        TracingError::NoSuchTraceFile(_) => ffx::RecordingError::NoSuchTraceFile,
+        TracingError::RecordingStart(_)
+        | TracingError::FidlError(_)
+        | TracingError::GeneralError(_) => ffx::RecordingError::RecordingStart,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

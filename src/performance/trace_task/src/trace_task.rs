@@ -277,6 +277,10 @@ impl TraceTask {
             }
         }
     }
+
+    pub async fn stop_result(&self) -> Option<trace::StopResult> {
+        self.terminate_result.clone().lock().await.clone()
+    }
 }
 
 #[cfg(test)]

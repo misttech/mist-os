@@ -7,26 +7,55 @@ use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target::get_target_specifier;
 use ffx_trace::SymbolizationMap;
-use ffx_trace_args::{TraceCommand, TraceSubCommand};
+use ffx_trace_args::{Stop, TraceCommand, TraceSubCommand};
 use ffx_writer::{MachineWriter, ToolIO as _};
-use fho::{deferred, FfxMain, FfxTool};
+use fho::{deferred, Deferred, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
-use fidl_fuchsia_tracing_controller::{ProviderInfo, ProviderStats, ProvisionerProxy, TraceConfig};
-use futures::future::{BoxFuture, FutureExt};
+use fidl_fuchsia_tracing_controller::{
+    ProviderInfo, ProviderStats, ProvisionerProxy, StopResult, TraceConfig,
+};
+use futures::future::{BoxFuture, FutureExt as _};
+use futures::Future;
 use serde::{Deserialize, Serialize};
-use std::future::Future;
 use std::io::{stdin, Stdin};
 use std::path::{Component, PathBuf};
-use std::time::Duration;
 use target_holders::{daemon_protocol, moniker};
 use term_grid::Grid;
 #[cfg_attr(test, allow(unused))]
 use termion::terminal_size;
 use termion::{color, style};
-
+mod daemon;
+mod direct;
 mod process;
 use process::*;
+
+// LineWaiter abstracts waiting for the user to press enter.  It is needed
+// to unit test interactive mode.
+trait LineWaiter<'a> {
+    type LineWaiterFut: 'a + Future<Output = ()>;
+    fn wait(&'a mut self) -> Self::LineWaiterFut;
+}
+
+impl<'a> LineWaiter<'a> for Stdin {
+    type LineWaiterFut = BoxFuture<'a, ()>;
+
+    fn wait(&'a mut self) -> Self::LineWaiterFut {
+        if cfg!(not(test)) {
+            use std::io::BufRead;
+            blocking::unblock(|| {
+                let mut line = String::new();
+                let stdin = stdin();
+                let mut locked = stdin.lock();
+                // Ignoring error, though maybe Ack would want to bubble up errors instead?
+                let _ = locked.read_line(&mut line);
+            })
+            .boxed()
+        } else {
+            async move {}.boxed()
+        }
+    }
+}
 
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
@@ -76,6 +105,15 @@ impl From<ProviderInfo> for TraceProviderInfo {
             name: info.name.as_ref().cloned().unwrap_or_else(|| "unknown".to_string()),
         }
     }
+}
+
+// The important data elements needed to finalize
+// capturing the trace data.
+#[derive(Debug)]
+pub(crate) struct TraceData {
+    pub(crate) output_file: String,
+    pub(crate) categories: Vec<String>,
+    pub(crate) stop_result: StopResult,
 }
 
 fn handle_fidl_error<T>(res: Result<T, fidl::Error>) -> Result<T> {
@@ -175,33 +213,6 @@ fn stats_to_output(provider_stats: Vec<ProviderStats>, verbose: bool) -> Vec<Str
     return stats_output;
 }
 
-// LineWaiter abstracts waiting for the user to press enter.  It is needed
-// to unit test interactive mode.
-trait LineWaiter<'a> {
-    type LineWaiterFut: 'a + Future<Output = ()>;
-    fn wait(&'a mut self) -> Self::LineWaiterFut;
-}
-
-impl<'a> LineWaiter<'a> for Stdin {
-    type LineWaiterFut = BoxFuture<'a, ()>;
-
-    fn wait(&'a mut self) -> Self::LineWaiterFut {
-        if cfg!(not(test)) {
-            use std::io::BufRead;
-            blocking::unblock(|| {
-                let mut line = String::new();
-                let stdin = stdin();
-                let mut locked = stdin.lock();
-                // Ignoring error, though maybe Ack would want to bubble up errors instead?
-                let _ = locked.read_line(&mut line);
-            })
-            .boxed()
-        } else {
-            async move {}.boxed()
-        }
-    }
-}
-
 fn symbolize_ordinal(ordinal: u64, ordinals: &SymbolizationMap, mut writer: Writer) -> Result<()> {
     if let Some(name) = ordinals.get(ordinal) {
         // If the ordinal is present in the symbolization map print the name associated with it.
@@ -243,16 +254,14 @@ fn print_grid(writer: &mut Writer, values: Vec<String>) -> Result<()> {
 type Writer = MachineWriter<TraceOutput>;
 #[derive(FfxTool)]
 pub struct TraceTool {
-    #[with(daemon_protocol())]
-    proxy: TracingProxy,
+    #[with(deferred(daemon_protocol()))]
+    proxy: Deferred<TracingProxy>,
     #[with(deferred(moniker("/core/trace_manager")))]
-    provisioner: fho::Deferred<ProvisionerProxy>,
+    provisioner: Deferred<ProvisionerProxy>,
     #[command]
     cmd: TraceCommand,
     context: EnvironmentContext,
 }
-
-fho::embedded_plugin!(TraceTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for TraceTool {
@@ -267,8 +276,8 @@ impl FfxMain for TraceTool {
 
 pub async fn trace(
     context: EnvironmentContext,
-    proxy: TracingProxy,
-    provisioner: fho::Deferred<ProvisionerProxy>,
+    proxy: Deferred<TracingProxy>,
+    provisioner: Deferred<ProvisionerProxy>,
     mut writer: Writer,
     cmd: TraceCommand,
 ) -> Result<()> {
@@ -326,7 +335,6 @@ pub async fn trace(
             }
         }
         TraceSubCommand::Start(opts) => {
-            let default = ffx::TargetQuery { string_matcher: target_spec, ..Default::default() };
             let triggers = if opts.trigger.is_empty() { None } else { Some(opts.trigger) };
             if triggers.is_some() && !opts.background {
                 ffx_bail!(
@@ -342,68 +350,82 @@ pub async fn trace(
             };
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
-                categories: Some(expanded_categories.clone()),
+                categories: Some(opts.categories.clone()),
                 buffering_mode: Some(opts.buffering_mode),
                 defer_transfer: Some(defer_transfer),
                 ..ffx_trace::map_categories_to_providers(&expanded_categories)
             };
             let output = canonical_path(opts.output)?;
-            let res = proxy
-                .start_recording(
-                    &default,
-                    &output,
-                    &ffx::TraceOptions { duration: opts.duration, triggers, ..Default::default() },
-                    &trace_config,
+
+            let options =
+                ffx::TraceOptions { duration: opts.duration, triggers, ..Default::default() };
+            writer.line(format!("Tracing categories: [{}]...", expanded_categories.join(","),))?;
+            // For the background we need a background task, so still use the daemon.
+            // Otherwise use a direct connection.
+            if opts.background {
+                let tracing_proxy = proxy.await?;
+                daemon::trace(
+                    &context,
+                    tracing_proxy.clone(),
+                    output.clone(),
+                    options,
+                    trace_config.clone(),
                 )
                 .await?;
-            if let Err(e) = res {
-                ffx_bail!("{}", handle_recording_error(&context, e, &output).await);
-            }
-            writer.line(format!(
-                "Tracing categories: [{}]...",
-                trace_config.categories.unwrap().join(","),
-            ))?;
-            if opts.background {
                 writer.line("To manually stop the trace, use `ffx trace stop`")?;
                 writer.line("Current tracing status:")?;
-                return status(&proxy, writer).await;
+                return status(tracing_proxy, &mut writer).await;
             }
 
-            let waiter = &mut stdin();
-            if let Some(duration) = &opts.duration {
-                fuchsia_async::Timer::new(Duration::from_secs_f64(*duration)).await;
-            } else {
+            let provisioner = provisioner.await?;
+            let trace_config =
+                TraceConfig { categories: Some(expanded_categories.clone()), ..trace_config };
+            let task =
+                direct::trace(provisioner.clone(), output.clone(), options, trace_config.clone())
+                    .await?;
+
+            if opts.duration.is_none() {
+                let waiter = &mut stdin();
                 writer.line("Press <enter> to stop trace.")?;
                 waiter.wait().await;
             }
-            stop_tracing(
+
+            writer.line("Trace completed! Copying trace from device...")?;
+            let mut trace_data = direct::stop_tracing(task).await?;
+            trace_data.categories = opts.categories;
+
+            finalize_trace(
                 &context,
-                &proxy,
-                output,
-                writer,
-                opts.verbose,
-                opts.no_symbolize,
-                opts.no_verify_trace,
-            )
-            .await?;
+                trace_data,
+                &Stop {
+                    output: None,
+                    verbose: opts.verbose,
+                    no_symbolize: opts.no_symbolize,
+                    no_verify_trace: opts.no_verify_trace,
+                },
+                &mut writer,
+            )?;
         }
-        TraceSubCommand::Stop(opts) => {
-            let output = match opts.output {
+        TraceSubCommand::Stop(ref opts) => {
+            // Stop is daemon only for the moment.
+            let output = match &opts.output {
                 Some(o) => canonical_path(o)?,
                 None => target_spec.unwrap_or_else(|| "".to_owned()),
             };
-            stop_tracing(
+            let trace_data = daemon::stop_tracing(&context, proxy.await?, output).await?;
+            finalize_trace(
                 &context,
-                &proxy,
-                output,
-                writer,
-                opts.verbose,
-                opts.no_symbolize,
-                opts.no_verify_trace,
-            )
-            .await?;
+                trace_data,
+                &Stop {
+                    output: None,
+                    verbose: opts.verbose,
+                    no_symbolize: opts.no_symbolize,
+                    no_verify_trace: opts.no_verify_trace,
+                },
+                &mut writer,
+            )?;
         }
-        TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
+        TraceSubCommand::Status(_opts) => status(proxy.await?, &mut writer).await?,
         TraceSubCommand::Symbolize(opts) => {
             if let Some(trace_file) = opts.fxt {
                 let outfile = opts.outfile.unwrap_or_else(|| trace_file.clone());
@@ -432,7 +454,56 @@ pub async fn trace(
     Ok(())
 }
 
-async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
+/// Does the final steps of capturing the trace such as, dumping the provider stats, post_processing
+/// and letting the user know the file name of the trace data.
+fn finalize_trace(
+    context: &EnvironmentContext,
+    trace_data: TraceData,
+    opts: &Stop,
+    writer: &mut Writer,
+) -> Result<()> {
+    let verify_trace = !opts.no_verify_trace;
+
+    for line in
+        stats_to_output(trace_data.stop_result.provider_stats.unwrap_or(vec![]), opts.verbose)
+    {
+        writer.line(line)?;
+    }
+    if verify_trace {
+        let categories = if verify_trace { Some(trace_data.categories) } else { None };
+        post_process(&context, &trace_data.output_file, categories, opts.no_symbolize, writer)?;
+    }
+    // TODO(https://fxbug.dev/431754465): Make a clickable link that auto-uploads the trace file if possible.
+    writer.line(format!("Results written to {}", trace_data.output_file))?;
+    writer.line("Upload to https://ui.perfetto.dev/#!/ to view.")?;
+    Ok(())
+}
+
+/// Do some quick verification that the trace file
+/// contains the categories specified. The categories passed in here should be what was on the
+/// command line, not the expanded list categories after processing the groups, otherwise there
+/// is a bunch or warning messages about categories not being found.
+fn post_process(
+    context: &EnvironmentContext,
+    output_file: &str,
+    categories: Option<Vec<String>>,
+    skip_symbolization: bool,
+    writer: &mut Writer,
+) -> Result<()> {
+    let expanded_categories =
+        ffx_trace::expand_categories(context, categories.clone().unwrap_or(vec![]))?;
+    let skip_symbolization =
+        skip_symbolization || !expanded_categories.contains(&"kernel:ipc".to_string());
+    writer.line("Post Processing Trace...")?;
+    let warnings =
+        process_trace_file(&output_file, &output_file, !skip_symbolization, categories, context)?;
+    for warning in warnings {
+        writer.line(format!("{}", warning))?;
+    }
+    Ok(())
+}
+
+async fn status(proxy: TracingProxy, writer: &mut Writer) -> Result<()> {
     let (iter_proxy, server) = fidl::endpoints::create_proxy::<ffx::TracingStatusIteratorMarker>();
     proxy.status(server).await?;
     let mut res = Vec::new();
@@ -499,51 +570,7 @@ async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
     Ok(())
 }
 
-async fn stop_tracing(
-    context: &EnvironmentContext,
-    proxy: &TracingProxy,
-    output: String,
-    mut writer: Writer,
-    verbose: bool,
-    skip_symbolization: bool,
-    no_verify_trace: bool,
-) -> Result<()> {
-    writer.line("Trace completed! Copying trace from device...")?;
-    let res = proxy.stop_recording(&output).await?;
-    let (_target, output_file) = match res {
-        Ok((target, output_file, categories, stop_result)) => {
-            let output = stats_to_output(stop_result.provider_stats.unwrap_or(vec![]), verbose);
-            for line in output {
-                writer.line(line)?;
-            }
-            let expanded_categories = ffx_trace::expand_categories(context, categories.clone())?;
-            let skip_symbolization =
-                skip_symbolization || !expanded_categories.contains(&"kernel:ipc".to_string());
-            if !no_verify_trace || !skip_symbolization {
-                writer.line("Post Processing Trace...")?;
-                let warnings = process_trace_file(
-                    &output_file,
-                    &output_file,
-                    !skip_symbolization,
-                    if no_verify_trace { None } else { Some(categories) },
-                    context,
-                )?;
-                for warning in warnings {
-                    writer.line(format!("{}", warning))?;
-                }
-            }
-
-            (target, output_file)
-        }
-        Err(e) => ffx_bail!("{}", handle_recording_error(context, e, &output).await),
-    };
-    // TODO(awdavies): Make a clickable link that auto-uploads the trace file if possible.
-    writer.line(format!("Results written to {}", output_file))?;
-    writer.line("Upload to https://ui.perfetto.dev/#!/ to view.")?;
-    Ok(())
-}
-
-async fn handle_recording_error(
+pub(crate) async fn handle_recording_error(
     context: &EnvironmentContext,
     err: RecordingError,
     output: &String,
@@ -613,8 +640,8 @@ package is missing from the device's system image.",
     }
 }
 
-fn canonical_path(output_path: String) -> Result<String> {
-    let output_path = PathBuf::from(output_path);
+fn canonical_path<T: ToString>(output_path: T) -> Result<String> {
+    let output_path = PathBuf::from(output_path.to_string());
     let mut path = PathBuf::new();
     if !output_path.has_root() {
         path.push(std::env::current_dir()?);
@@ -654,6 +681,7 @@ mod tests {
     use ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop, Symbolize};
     use ffx_writer::{Format, TestBuffers};
     use fidl::endpoints::{ControlHandle, Responder};
+    use fidl_fuchsia_tracing_controller::{self as tracing_controller, SessionRequest, StopResult};
     use futures::TryStreamExt;
     use pretty_assertions::assert_eq;
     use regex::Regex;
@@ -662,10 +690,7 @@ mod tests {
     use std::matches;
     use target_holders::fake_proxy;
     use tempfile::{Builder, NamedTempFile};
-    use {
-        fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
-        fidl_fuchsia_tracing_controller as tracing_controller,
-    };
+    use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing};
 
     #[test]
     fn test_canonical_path_has_root() {
@@ -797,13 +822,40 @@ mod tests {
         })
     }
 
-    fn setup_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
-        fho::Deferred::from_output(Ok(fake_proxy(|req| match req {
+    fn setup_fake_controller_proxy() -> Deferred<ProvisionerProxy> {
+        Deferred::from_output(Ok(fake_proxy(|req| match req {
             tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.send(&fake_known_categories()).expect("should respond");
             }
             tracing_controller::ProvisionerRequest::GetProviders { responder, .. } => {
                 responder.send(&fake_provider_infos()).expect("should respond");
+            }
+            tracing_controller::ProvisionerRequest::InitializeTracing {
+                controller,
+                config: _,
+                output: _,
+                control_handle: _,
+            } => {
+                let mut stream = controller.into_stream();
+                fuchsia_async::Task::local(async move {
+                    while let Ok(Some(req)) = stream.try_next().await {
+                        match req {
+                            SessionRequest::StartTracing { responder, .. } => {
+                                let response = Ok(());
+                                responder.send(response).expect("Failed to start")
+                            }
+                            SessionRequest::StopTracing { responder, .. } => {
+                                let result = StopResult::default();
+                                responder.send(Ok(&result)).expect("Respond to Stop")
+                            }
+                            SessionRequest::WatchAlert { responder, .. } => {
+                                responder.send("").expect("Respond to WatchAlert")
+                            }
+                            r => panic!("unexpected request: {:#?}", r),
+                        }
+                    }
+                })
+                .detach();
             }
             r => panic!("unsupported req: {:?}", r),
         })))
@@ -854,8 +906,8 @@ mod tests {
         infos
     }
 
-    fn setup_closed_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
-        fho::Deferred::from_output(Ok(fake_proxy(|req| match req {
+    fn setup_closed_fake_controller_proxy() -> Deferred<ProvisionerProxy> {
+        Deferred::from_output(Ok(fake_proxy(|req| match req {
             tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.control_handle().shutdown();
             }
@@ -867,7 +919,7 @@ mod tests {
     }
 
     async fn run_trace_test(ctx: EnvironmentContext, cmd: TraceCommand, writer: Writer) {
-        let proxy = setup_fake_service();
+        let proxy = Deferred::from_output(Ok(setup_fake_service()));
         let controller = setup_fake_controller_proxy();
         trace(ctx, proxy, controller, writer, cmd).await.unwrap();
     }
@@ -962,6 +1014,7 @@ mod tests {
             writer,
         )
         .await;
+        assert_eq!(test_buffers.into_stdout_str(), "Should be unreachable");
     }
 
     #[fuchsia::test]
@@ -1016,7 +1069,7 @@ mod tests {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
-        let proxy = setup_fake_service();
+        let proxy = Deferred::from_output(Ok(setup_fake_service()));
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand { sub_cmd: TraceSubCommand::ListCategories(ListCategories {}) };
         let res = trace(env.context.clone(), proxy, controller, writer, cmd).await.unwrap_err();
@@ -1048,7 +1101,7 @@ mod tests {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
-        let proxy = setup_fake_service();
+        let proxy = Deferred::from_output(Ok(setup_fake_service()));
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand { sub_cmd: TraceSubCommand::ListProviders(ListProviders {}) };
         let res = trace(env.context.clone(), proxy, controller, writer, cmd).await.unwrap_err();
