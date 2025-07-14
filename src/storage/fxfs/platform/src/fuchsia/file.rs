@@ -438,11 +438,16 @@ impl FxNode for FxFile {
         self.pager_packet_receiver_registration.stop_watching_for_zero_children();
     }
 
-    // Mark the state as to be purged. Returns true if there are no open references.
-    fn mark_to_be_purged(&self) -> bool {
+    fn mark_to_be_purged(&self) {
         let old = State(self.state.fetch_or(TO_BE_PURGED, Ordering::Relaxed));
         assert!(!old.to_be_purged());
-        old.open_count() == 0
+        if old.open_count() == 0 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 }
 

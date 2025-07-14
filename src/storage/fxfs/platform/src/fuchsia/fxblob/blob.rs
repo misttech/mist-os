@@ -123,14 +123,21 @@ impl FxBlob {
                 .collect(),
         });
 
-        // Lock must be held until the open counts are swapped to prevent concurrent handling of
+        // Lock must be held until the open counts is incremented to prevent concurrent handling of
         // zero children signals.
         let receiver_lock =
             self.pager_packet_receiver_registration.receiver().set_receiver(&new_blob);
         if receiver_lock.is_strong() {
-            // If there was a strong moved between them, then the counts exchange as well.
+            // If there was a strong moved between them, then the counts exchange as well. It is
+            // only important that the increment happen under the lock as it may handle the next
+            // zero children signal, no new requests can now go to the old blob, but to safely
+            // ensure that all existing requests finish, we will defer to an async context.
             new_blob.open_count_add_one();
-            self.clone().open_count_sub_one();
+            let old_blob = self.clone();
+            self.handle.owner().spawn(async move {
+                old_blob.pager().page_in_barrier().await;
+                old_blob.open_count_sub_one();
+            });
         }
         new_blob
     }
@@ -178,13 +185,6 @@ impl Drop for FxBlob {
     fn drop(&mut self) {
         let volume = self.handle.owner();
         volume.cache().remove(self);
-        if self.open_count.load(Ordering::Relaxed) == PURGED {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone_object(store.store_object_id(), self.object_id());
-        }
     }
 }
 
@@ -233,6 +233,13 @@ impl FxNode for FxBlob {
     fn open_count_sub_one(self: Arc<Self>) {
         let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
         assert!(old & !PURGED > 0);
+        if old == PURGED + 1 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 
     fn object_descriptor(&self) -> ObjectDescriptor {
@@ -243,10 +250,16 @@ impl FxNode for FxBlob {
         self.pager_packet_receiver_registration.stop_watching_for_zero_children();
     }
 
-    fn mark_to_be_purged(&self) -> bool {
+    fn mark_to_be_purged(&self) {
         let old = self.open_count.fetch_or(PURGED, Ordering::Relaxed);
         assert!(old & PURGED == 0);
-        old == 0
+        if old == 0 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 }
 

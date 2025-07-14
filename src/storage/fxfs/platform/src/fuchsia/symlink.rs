@@ -257,9 +257,15 @@ impl FxNode for FxSymlink {
         ObjectDescriptor::Symlink
     }
 
-    fn mark_to_be_purged(&self) -> bool {
+    fn mark_to_be_purged(&self) {
         let old = self.open_count.fetch_or(TO_BE_PURGED, Ordering::Relaxed);
         assert!(old & TO_BE_PURGED == 0);
-        old == 0
+        if old == 0 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 }

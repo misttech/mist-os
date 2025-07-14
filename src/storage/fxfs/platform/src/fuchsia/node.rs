@@ -23,11 +23,14 @@ pub trait FxNode: IntoAny + ToWeakNode + Send + Sync + 'static {
     fn parent(&self) -> Option<Arc<FxDirectory>>;
     fn set_parent(&self, parent: Arc<FxDirectory>);
     fn open_count_add_one(&self);
+
+    /// Atomically check if this brought the count to zero while the node is
+    /// marked for purge. If so, this *must* queue the node for tombstone the node.
     fn open_count_sub_one(self: Arc<Self>);
     fn object_descriptor(&self) -> ObjectDescriptor;
 
-    /// Marks the object to be purged.  Returns true if the object can be immediately tombstoned.
-    fn mark_to_be_purged(&self) -> bool {
+    /// Marks the object to be purged. Queues the node for tombstone if open count is zero.
+    fn mark_to_be_purged(&self) {
         panic!("Unexpected call to mark_to_be_purged");
     }
 
