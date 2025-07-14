@@ -127,6 +127,9 @@ type BatteryInfo = table {
 
     /// Temperature in MilliCelsius.
     13: temperature_mc int32;
+
+    /// Current in MilliAmps.
+    14: present_current_ma int32;
 };
 
 /// Provider interface used to obtain battery status details.
