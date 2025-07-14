@@ -1101,6 +1101,9 @@ class FuchsiaDeviceImpl(
         Raises:
             FuchsiaControllerError: On FIDL communication failure.
         """
+        _LOGGER.debug(
+            f"Attempting to log to device {self.device_name}: {tag}, message: {message}, level: {level}",
+        )
         try:
             rcs_proxy = fd_remotecontrol.RemoteControlClient(
                 self.fuchsia_controller.ctx.connect_remote_control_proxy()

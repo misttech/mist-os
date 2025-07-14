@@ -113,6 +113,10 @@ impl EnvContext {
     }
 
     async fn invariant_check(&self) -> Result<()> {
+        log::debug!(
+            "Checking connectivity invariant for EnvContext: {}",
+            logging::log_id(&self.context)
+        );
         if self.target_spec.is_none() {
             return Err(unspecified_target());
         }
@@ -121,10 +125,15 @@ impl EnvContext {
             *device_connection =
                 Some(new_device_connection(&self.context, &self.target_spec).await?);
         }
+        log::debug!("Invariant check successful: {}", logging::log_id(&self.context));
         Ok(())
     }
 
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
+        log::debug!(
+            "Entering connect_remote_control_proxy for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
         self.invariant_check().await?;
         let proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
@@ -138,6 +147,10 @@ impl EnvContext {
         moniker: String,
         capability_name: String,
     ) -> Result<zx_types::zx_handle_t> {
+        log::debug!(
+            "Entering connect_device_proxy for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
         self.invariant_check().await?;
         let rcs_proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
         let proxy = rcs::connect_with_timeout_at::<ControllerMarker>(
@@ -154,6 +167,10 @@ impl EnvContext {
     }
 
     pub async fn target_wait(&self, timeout: u64, offline: bool) -> Result<()> {
+        log::debug!(
+            "Executing target_wait for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
         let cmd = ffx_wait_args::WaitOptions { timeout, down: offline };
         let tool = ffx_wait::WaitOperation {
             cmd,
