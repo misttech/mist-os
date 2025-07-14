@@ -59,10 +59,13 @@ class RootResourceFilter {
     // Any unsupported range `kind` is silently accepted.
     zx_status_t res = ZX_OK;
     switch (kind) {
-      case ZX_RSRC_KIND_MMIO:
-        res =
-            mmio_deny_.AddRegion({.base = base, .size = size}, RegionAllocator::AllowOverlap::Yes);
+      case ZX_RSRC_KIND_MMIO: {
+        uintptr_t aligned_base = ROUNDDOWN_PAGE_SIZE(base);
+        size_t aligned_size = ROUNDUP_PAGE_SIZE((base - aligned_base) + size);
+        base = res = mmio_deny_.AddRegion({.base = aligned_base, .size = aligned_size},
+                                          RegionAllocator::AllowOverlap::Yes);
         break;
+      }
 #ifdef __x86_64__
       case ZX_RSRC_KIND_IOPORT:
         res = ioport_deny_.AddRegion({.base = base, .size = size},
