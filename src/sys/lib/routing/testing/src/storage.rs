@@ -90,6 +90,49 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
     ///    \
     ///     b
     ///
+    /// a: offers cache storage to b from "void"
+    /// b: uses cache storage as /storage
+    pub async fn test_storage_from_void(&self) {
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Void)
+                            .target_static_child("b")
+                            .availability(Availability::Optional),
+                    )
+                    .child_default("b")
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
+                    .build(),
+            ),
+        ];
+        let model = T::new("a", components).build().await;
+        model
+            .check_use(
+                ["b"].try_into().unwrap(),
+                CheckUse::Storage {
+                    path: "/storage".parse().unwrap(),
+                    storage_relation: Some(Moniker::try_from(["b"]).unwrap()),
+                    from_cm_namespace: false,
+                    storage_subdir: None,
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
+                },
+            )
+            .await;
+    }
+
+    ///   a
+    ///    \
+    ///     b
+    ///
     /// a: has storage decl with name "mystorage" with a source of self at path /data
     /// a: offers cache storage to b from "mystorage"
     /// b: uses cache storage as /storage

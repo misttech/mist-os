@@ -40,6 +40,11 @@ async fn storage_dir_from_cm_namespace() {
 }
 
 #[fuchsia::test]
+async fn storage_from_void() {
+    CommonStorageTest::<RoutingTestBuilder>::new().test_storage_from_void().await
+}
+
+#[fuchsia::test]
 async fn storage_and_dir_from_parent() {
     CommonStorageTest::<RoutingTestBuilder>::new().test_storage_and_dir_from_parent().await
 }
