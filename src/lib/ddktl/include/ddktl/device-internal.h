@@ -13,7 +13,6 @@
 
 #include <ddktl/fidl.h>
 #include <ddktl/init-txn.h>
-#include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
 
@@ -275,16 +274,6 @@ constexpr void CheckConfigureAutoSuspend() {
       std::is_same<decltype(&D::DdkConfigureAutoSuspend), zx_status_t (D::*)(bool, uint8_t)>::value,
       "DdkConfigureAutoSuspend must be a public non-static member function with signature "
       "'zx_status_t DdkConfigureAutoSuspend(bool, uint8_t)'.");
-}
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_resume, DdkResume);
-
-template <typename D>
-constexpr void CheckResumable() {
-  static_assert(has_ddk_resume<D>::value, "Resumable classes must implement DdkResume");
-  static_assert(std::is_same<decltype(&D::DdkResume), void (D::*)(ResumeTxn txn)>::value,
-                "DdkResume must be a public non-static member function with signature "
-                "'void DdkResume(ResumeTxn)'.");
 }
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_rxrpc, DdkRxrpc);

@@ -8,7 +8,6 @@
     device_async_remove;
     device_unbind_reply;
     device_suspend_reply;
-    device_resume_reply;
     device_set_profile_by_role;
     device_get_protocol;
     device_get_config_vmo;

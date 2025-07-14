@@ -188,28 +188,6 @@ typedef struct zx_protocol_device {
   // be executed on the devhost's main thread.
   void (*suspend)(void* ctx, uint8_t requested_state, bool enable_wake, uint8_t suspend_reason);
 
-  //@ ## resume
-  // The resume hook is used for resuming a device from a non-working sleep
-  // state to a working state. It requires reinitializing the device completely
-  // or partially depending on the sleep state that device was in, when the
-  // resume call was made.
-  //
-  // requested_state is the performance state that the device has to be in.
-  //
-  // The driver should put the device into the requested_state and call **device_resume_reply()**
-  // on itself. device_resume_reply() will take in the following parameters:
-  // (1)Status of the resume operation (2)out_power_state (3) out_perf_state
-  // On success, the device has been resumed successfully to a working state,
-  // out_perf_state is same as requested state.
-  // If the device is not able to resume to a working state, the hook returns a
-  // failure. out_power_state has the non working state the device is in.
-  // if out_power_state is a working state, out_perf_state has the performance
-  // state the device is in.
-  // This hook assumes that the drivers are aware of their current state.
-  //
-  // This hook will only be executed on the devhost's main thread.
-  void (*resume)(void* ctx, uint32_t requested_state);
-
   //@ ## configure_autosuspend
   // The configure_autosuspend hook is used for configuring whether a driver can
   // auto suspend the device depending on the activity and idleness of the device.

@@ -34,9 +34,6 @@ __EXPORT void device_suspend_reply(zx_device_t* dev, zx_status_t status, uint8_t
   dev->CompleteSuspend();
 }
 
-__EXPORT void device_resume_reply(zx_device_t* dev, zx_status_t status, uint8_t out_power_state,
-                                  uint32_t out_perf_state) {}
-
 __EXPORT zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread,
                                                 const char* role, size_t role_size) {
   if (device == nullptr) {

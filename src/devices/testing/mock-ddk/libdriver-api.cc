@@ -109,20 +109,6 @@ __EXPORT void device_suspend_reply(zx_device_t* device, zx_status_t status, uint
   device->RecordSuspendReply(status);
 }
 
-__EXPORT void device_resume_reply(zx_device_t* device, zx_status_t status, uint8_t out_power_state,
-                                  uint32_t out_perf_state) {
-  std::lock_guard guard(libdriver_lock);
-  if (!device) {
-    zxlogf(ERROR, "Error: %s passed a null device\n", __func__);
-    return;
-  }
-  if (device->IsRootParent()) {
-    zxlogf(ERROR, "Error: Mock parent device does not support %s\n", __func__);
-    return;
-  }
-  device->RecordResumeReply(status);
-}
-
 // These functions TODO(will be) supported by devices created as root parents:
 __EXPORT
 zx_status_t device_get_protocol(const zx_device_t* device, uint32_t proto_id, void* protocol) {

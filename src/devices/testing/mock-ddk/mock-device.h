@@ -147,7 +147,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   REGISTER_CALL_TRACKER(AsyncRemove)
   REGISTER_CALL_TRACKER(UnbindReply)
   REGISTER_CALL_TRACKER(SuspendReply)
-  REGISTER_CALL_TRACKER(ResumeReply)
   REGISTER_CALL_TRACKER(Remove)
   REGISTER_CALL_TRACKER(ChildPreRelease)
 #undef REGISTER_CALL_TRACKER
@@ -160,7 +159,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   void ReleaseOp();
   void SuspendNewOp(uint8_t requested_state, bool enable_wake, uint8_t suspend_reason);
   zx_status_t ConfigureAutoSuspendOp(bool enable, uint8_t requested_state);
-  void ResumeNewOp(uint32_t requested_state);
   bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn);
   void ChildPreReleaseOp(void* child_ctx);
   bool HasUnbindOp() { return ops_->unbind != nullptr; }

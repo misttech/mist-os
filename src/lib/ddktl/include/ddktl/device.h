@@ -29,7 +29,6 @@
 #include <ddktl/fidl.h>
 #include <ddktl/init-txn.h>
 #include <ddktl/metadata.h>
-#include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
 
@@ -71,9 +70,6 @@
 // | ddk::Messageable<P>::Mixin | Methods defined by fidl::WireServer<P>             |
 // |                            |                                                    |
 // | ddk::Suspendable           | void DdkSuspend(ddk::SuspendTxn txn)               |
-// |                            |                                                    |
-// | ddk::Resumable             | zx_status_t DdkResume(uint8_t requested_state,     |
-// |                            |                          uint8_t* out_state)       |
 // |                            |                                                    |
 // | ddk::Rxrpcable             | zx_status_t DdkRxrpc(zx_handle_t channel)          |
 // |                            |                                                    |
@@ -227,22 +223,6 @@ class AutoSuspendable : public base_mixin {
  private:
   static zx_status_t Configure_Auto_Suspend(void* ctx, bool enable, uint8_t requested_sleep_state) {
     return static_cast<D*>(ctx)->DdkConfigureAutoSuspend(enable, requested_sleep_state);
-  }
-};
-
-template <typename D>
-class Resumable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckResumable<D>();
-    proto->resume = Resume_New;
-  }
-
- private:
-  static void Resume_New(void* ctx, uint32_t requested_state) {
-    auto dev = static_cast<D*>(ctx);
-    ResumeTxn txn(dev->zxdev(), requested_state);
-    static_cast<D*>(ctx)->DdkResume(std::move(txn));
   }
 };
 

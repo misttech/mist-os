@@ -265,16 +265,6 @@ void device_unbind_reply(zx_device_t* device);
 // state that the device can go into.
 void device_suspend_reply(zx_device_t* device, zx_status_t status, uint8_t out_state);
 
-// This is used to signal completion of the device's |resume| hook.
-// Need not necessarily need to be called from within the |resume| hook.
-// |status| is the status of the resume operation.
-// If |status| is success, the |out_perf_state| has the working performance state
-// that the device is in currently.
-// If |status| is failure, the |out_power_state| has the power state
-// the device is in currently.
-void device_resume_reply(zx_device_t* device, zx_status_t status, uint8_t out_power_state,
-                         uint32_t out_perf_state);
-
 // Requests that the given thread be assigned a profile with parameters appropriate for the given
 // role. The available roles and the specific parameters assigned are device-dependent and may also
 // vary across builds. Requests are not guaranteed to be honored for all roles and requestors, and

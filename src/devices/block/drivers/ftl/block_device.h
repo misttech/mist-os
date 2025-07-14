@@ -54,7 +54,7 @@ struct FtlOp {
 class BlockDevice;
 using DeviceType =
     ddk::Device<BlockDevice, ddk::Unbindable, ddk::Messageable<fuchsia_hardware_block::Ftl>::Mixin,
-                ddk::Suspendable, ddk::Resumable, ddk::GetProtocolable>;
+                ddk::Suspendable, ddk::GetProtocolable>;
 
 // Exposes the FTL library as a Fuchsia BlockDevice protocol.
 class BlockDevice : public DeviceType,
@@ -77,9 +77,6 @@ class BlockDevice : public DeviceType,
   // Device protocol implementation.
   zx_status_t Suspend();
   void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkResume(ddk::ResumeTxn txn) {
-    txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
-  }
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
 
   // Block protocol implementation.
