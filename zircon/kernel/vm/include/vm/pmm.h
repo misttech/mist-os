@@ -114,9 +114,6 @@ PageQueues* pmm_page_queues();
 // Return the Evictor.
 Evictor* pmm_evictor();
 
-// Return the singleton PhysicalPageBorrowingConfig.
-PhysicalPageBorrowingConfig* pmm_physical_page_borrowing_config();
-
 // virtual to physical for kernel addresses.
 paddr_t vaddr_to_paddr(const void* va);
 

@@ -763,7 +763,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
   // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
   // we're allowed to borrow at this code location.
   const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
-                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
+                           PhysicalPageBorrowingConfig::Get().is_borrowing_on_mru_enabled();
 
   // Calculate a worst case iterations for processing any given isolate list.
   ActiveInactiveCounts active_inactive = GetActiveInactiveCounts();
@@ -880,7 +880,7 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
   // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
   // we're allowed to borrow at this code location.
   const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
-                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
+                           PhysicalPageBorrowingConfig::Get().is_borrowing_on_mru_enabled();
 
   VM_KTRACE_DURATION(2, "ProcessLruQueue");
   while (true) {

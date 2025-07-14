@@ -186,15 +186,14 @@ static bool pmm_node_loan_borrow_cancel_reclaim_end() {
 
   ManagedPmmNode node;
 
-  bool was_loaning_enabled = pmm_physical_page_borrowing_config()->is_loaning_enabled();
+  bool was_loaning_enabled = PhysicalPageBorrowingConfig::Get().is_loaning_enabled();
   bool was_borrowing_enabled =
-      pmm_physical_page_borrowing_config()->is_borrowing_in_supplypages_enabled();
-  pmm_physical_page_borrowing_config()->set_loaning_enabled(true);
-  pmm_physical_page_borrowing_config()->set_borrowing_in_supplypages_enabled(true);
+      PhysicalPageBorrowingConfig::Get().is_borrowing_in_supplypages_enabled();
+  PhysicalPageBorrowingConfig::Get().set_loaning_enabled(true);
+  PhysicalPageBorrowingConfig::Get().set_borrowing_in_supplypages_enabled(true);
   auto cleanup = fit::defer([was_loaning_enabled, was_borrowing_enabled] {
-    pmm_physical_page_borrowing_config()->set_loaning_enabled(was_loaning_enabled);
-    pmm_physical_page_borrowing_config()->set_borrowing_in_supplypages_enabled(
-        was_borrowing_enabled);
+    PhysicalPageBorrowingConfig::Get().set_loaning_enabled(was_loaning_enabled);
+    PhysicalPageBorrowingConfig::Get().set_borrowing_in_supplypages_enabled(was_borrowing_enabled);
   });
 
   list_node list = LIST_INITIAL_VALUE(list);

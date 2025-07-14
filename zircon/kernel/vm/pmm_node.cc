@@ -328,7 +328,7 @@ zx::result<vm_page_t*> PmmNode::AllocLoanedPage(
   DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
   AutoPreemptDisabler preempt_disable;
 
-  if (!pmm_physical_page_borrowing_config()->is_any_borrowing_enabled()) {
+  if (!PhysicalPageBorrowingConfig::Get().is_any_borrowing_enabled()) {
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
 

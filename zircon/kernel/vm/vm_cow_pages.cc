@@ -5771,7 +5771,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
       }
       if (options != SupplyOptions::PhysicalPageProvider && should_borrow_locked() &&
           src_page.IsPage() &&
-          pmm_physical_page_borrowing_config()->is_borrowing_in_supplypages_enabled()) {
+          PhysicalPageBorrowingConfig::Get().is_borrowing_in_supplypages_enabled()) {
         // Assert some things we implicitly know are true (currently).  We can avoid explicitly
         // checking these in the if condition for now.
         DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());

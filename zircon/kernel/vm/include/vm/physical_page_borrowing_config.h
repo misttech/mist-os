@@ -13,9 +13,8 @@ enum class PhysicalPageBorrowingSite : uint32_t {
   kSupplyPages,
 };
 
-// The PmmNode has an instance of this class, which will allow the ppb kernel command to dynamically
-// control whether physical page borrowing is enabled or disabled (for pager-backed VMOs only for
-// now).
+// Allow the ppb kernel command to dynamically control whether physical page borrowing is enabled
+// or disabled (for pager-backed VMOs only for now).
 //
 // TODO(dustingreen):
 //  * Change the default from false to true.
@@ -26,6 +25,8 @@ class PhysicalPageBorrowingConfig {
   PhysicalPageBorrowingConfig(PhysicalPageBorrowingConfig&& to_move) = delete;
   PhysicalPageBorrowingConfig& operator=(const PhysicalPageBorrowingConfig& to_copy) = delete;
   PhysicalPageBorrowingConfig& operator=(PhysicalPageBorrowingConfig&& to_move) = delete;
+
+  static PhysicalPageBorrowingConfig& Get() { return instance_; }
 
   bool is_any_borrowing_enabled() {
     return is_any_borrowing_enabled_.load(ktl::memory_order_relaxed);
@@ -70,6 +71,9 @@ class PhysicalPageBorrowingConfig {
     bool enabled = is_borrowing_in_supplypages_enabled() || is_borrowing_on_mru_enabled();
     is_any_borrowing_enabled_.store(enabled, ktl::memory_order_relaxed);
   }
+
+  // Singleton.
+  static PhysicalPageBorrowingConfig instance_;
 
   // True iff any borrowing is enabled.
   ktl::atomic<bool> is_any_borrowing_enabled_ = false;

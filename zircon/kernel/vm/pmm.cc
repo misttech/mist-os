@@ -54,9 +54,6 @@ KCOUNTER(boot_memory_bytes, "boot.memory.post_init_free_bytes")
 // The (currently) one and only pmm node
 PmmNode Pmm::node_;
 
-// Singleton
-static PhysicalPageBorrowingConfig ppb_config;
-
 // Check that if random should wait is requested that this is a debug build with assertions as it is
 // currently assumed that enabling this in a non-debug build would be a mistake that should be
 // caught.
@@ -168,11 +165,6 @@ uint64_t pmm_count_total_bytes() { return Pmm::Node().CountTotalBytes(); }
 PageQueues* pmm_page_queues() { return Pmm::Node().GetPageQueues(); }
 
 Evictor* pmm_evictor() { return Pmm::Node().GetEvictor(); }
-
-PhysicalPageBorrowingConfig* pmm_physical_page_borrowing_config() {
-  // singleton
-  return &ppb_config;
-}
 
 bool pmm_set_free_memory_signal(uint64_t free_lower_bound, uint64_t free_upper_bound,
                                 uint64_t delay_allocations_pages, Event* event) {

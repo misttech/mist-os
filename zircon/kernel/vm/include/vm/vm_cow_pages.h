@@ -242,7 +242,7 @@ class VmCowPages final : public VmHierarchyBase,
   // both are true should the caller actually borrow at the caller's specific potential borrowing
   // site.  For example, see is_borrowing_in_supplypages_enabled() and
   // is_borrowing_on_mru_enabled().
-  // Aside from the general borrowing in the pmm_physical_page_borrow_config being turned on and
+  // Aside from the general borrowing in the PhysicalPageBorrowingConfig being turned on and
   // off, the ability to borrow is constant over the lifetime of the VmCowPages.
   bool can_borrow_locked() const TA_REQ(lock()) {
     // TODO(dustingreen): Or rashaeqbal@.  We can only borrow while the page is not dirty.
@@ -272,7 +272,7 @@ class VmCowPages final : public VmHierarchyBase,
     // !is_any_borrowing_enabled() (in case we have it disabled due to late discovery of a problem
     // with borrowing).
     bool borrowing_is_generally_acceptable =
-        pmm_physical_page_borrowing_config()->is_any_borrowing_enabled();
+        PhysicalPageBorrowingConfig::Get().is_any_borrowing_enabled();
 
     // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
     // these from being compatible AFAICT - we're just avoiding overlap of these two things until

@@ -258,7 +258,7 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
           bool needs_evict = true;
 
           // Check if we should attempt to replace the page to avoid eviction.
-          if (pmm_physical_page_borrowing_config()->is_replace_on_unloan_enabled()) {
+          if (PhysicalPageBorrowingConfig::Get().is_replace_on_unloan_enabled()) {
             __UNINITIALIZED AnonymousPageRequest page_request;
             zx_status_t replace_result = cow_container->ReplacePage(page, vmo_backlink.offset,
                                                                     false, nullptr, &page_request);
