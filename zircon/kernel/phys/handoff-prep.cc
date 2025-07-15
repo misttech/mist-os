@@ -101,6 +101,7 @@ HandoffPrep::HandoffPrep(ElfImage kernel)
 
   ktl::optional spec = kernel_.GetZirconInfo<ZirconAbiSpec>();
   ZX_ASSERT_MSG(spec, "no Zircon ELF note containing the ZirconAbiSpec!");
+  spec->AssertValid<ZX_PAGE_SIZE>();
   abi_spec_ = *spec;
 }
 
@@ -177,6 +178,7 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kKernel:
       case memalloc::Type::kKernelPageTables:
+      case memalloc::Type::kBootMachineStack:
       case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kPermanentPhysHandoff:
       case memalloc::Type::kPhysLog:

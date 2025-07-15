@@ -39,6 +39,13 @@ struct ZirconAbiSpec {
     // stack. Must be page-aligned.
     uint32_t upper_guard_size_bytes = 0;
   };
+
+  template <size_t PageSize>
+  constexpr void AssertValid() {
+    machine_stack.AssertValid<PageSize>();
+  }
+
+  Stack machine_stack;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ZIRCON_ABI_SPEC_H_

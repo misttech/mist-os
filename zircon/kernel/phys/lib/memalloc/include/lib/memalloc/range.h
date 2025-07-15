@@ -80,6 +80,9 @@ enum class Type : uint64_t {
   // The userboot memory image.
   kUserboot,
 
+  // The kernel's boot machine stack.
+  kBootMachineStack,
+
   // The intermediate kernel memory image used to trampoline into the same image
   // loaded at a fixed address (i.e., as used by TrampolineBoot).
   kTrampolineStagingKernel,

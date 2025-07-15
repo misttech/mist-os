@@ -68,17 +68,18 @@ void HandoffPrep::ArchDoHandoff(ZirconAbi abi, const ArchPatchInfo& patch_info) 
       "mv ra, zero\n"
       "mv s0, zero\n"
 
-      // TODO(https://fxbug.dev/42164859): Set the machine stack pointer
       // TODO(https://fxbug.dev/42164859): Set or clear the would-be shadow call stack pointer
       // TODO(https://fxbug.dev/42164859): Set the thread pointer.
+      "mv sp, %[sp]\n"
 
       "mv a0, %[handoff]\n"
       "jr %[entry]"
-      :                                //
-      : [entry] "r"(kernel_.entry()),  //
-        [handoff] "r"(handoff_),       //
-        "m"(*handoff_)                 // Ensures no store to the handoff can be regarded as dead
-      : "a0"                           //
+      :                                   //
+      : [entry] "r"(kernel_.entry()),     //
+        [handoff] "r"(handoff_),          //
+        [sp] "r"(abi.machine_stack_top),  //
+        "m"(*handoff_)                    // Ensures no store to the handoff can be regarded as dead
+      : "a0"                              //
   );
 
   __UNREACHABLE;

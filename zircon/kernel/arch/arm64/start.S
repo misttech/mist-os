@@ -85,10 +85,6 @@ handoff_paddr           .req x21
   dsb sy
   isb
 
-  // set up the boot stack for real
-  adr_global tmp, .Lboot_cpu_kstack_end
-  mov sp, tmp
-
   // Set the thread pointer early so compiler-generated references
   // to the stack-guard and unsafe-sp slots work.  This is not a
   // real 'struct thread' yet, just a pointer to (past, actually)
@@ -123,12 +119,6 @@ handoff_paddr           .req x21
   .quad 0
 #endif
 .Lboot_cpu_fake_thread_pointer_location:
-.end_object
-
-.object boot_cpu_kstack, bss, local
-  .skip DEFAULT_STACK_SIZE
-  .balign 16
-.Lboot_cpu_kstack_end:
 .end_object
 
 #if __has_feature(safe_stack)

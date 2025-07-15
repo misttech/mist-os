@@ -106,7 +106,7 @@ zx_status_t map(const Stack& stack, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t* o
 
   LTRACEF("%s vmar at %#" PRIxPTR "\n", stack.name, kstack_vmar->base());
 
-  // create a mapping offset kStackPaddingSize into the vmar we created
+  // create a mapping offset kStackGuardRegionSize into the vmar we created
   zx::result<VmAddressRegion::MapResult> mapping_result = kstack_vmar->CreateVmMapping(
       stack.lower_guard_size_bytes, stack.size_bytes, 0, VMAR_FLAG_SPECIFIC, vmo, *offset,
       ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, stack.name);

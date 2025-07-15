@@ -8,12 +8,15 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/code-patching/self-test.h>
 #include <lib/counters.h>
+#include <lib/elfldltl/machine.h>
+#include <lib/thread-stack/abi.h>
 #include <lib/zbitl/view.h>
 #include <platform.h>
 #include <zircon/assert.h>
 #include <zircon/rights.h>
 
 #include <fbl/ref_ptr.h>
+#include <kernel/thread.h>
 #include <ktl/byte.h>
 #include <ktl/span.h>
 #include <ktl/utility.h>
@@ -26,6 +29,7 @@
 #include <platform/boot_timestamps.h>
 #include <platform/timer.h>
 #include <vm/handoff-end.h>
+#include <vm/kstack.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>
 #include <vm/vm_object_paged.h>
@@ -38,7 +42,9 @@ namespace {
 
 // TODO(https://fxbug.dev/42164859): Populate with sizes and alignments
 // relating to C++ ABI set-up (e.g., stack sizes).
-constexpr ZirconAbiSpec kZirconAbiSpec{};
+constexpr ZirconAbiSpec kZirconAbiSpec{
+    .machine_stack = kMachineStack,
+};
 
 // The mechanism to convey the ABI specification to physboot: we encode it as
 // an ELF note, to be parsed by physboot at hand-off prep time.

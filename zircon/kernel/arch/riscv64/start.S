@@ -29,9 +29,6 @@
   lla     t0, kernel_entry_ticks
   sd      a2, (t0)
 
-  // set the default stack
-  lla     sp, .Lboot_cpu_kstack_end
-
 #if __has_feature(shadow_call_stack)
   lla     shadow_call_sp, boot_shadow_call_stack
 #endif
@@ -59,12 +56,6 @@
   wfi
   j       0b
 .end_function
-
-.object boot_cpu_kstack, bss, local
-  .skip DEFAULT_STACK_SIZE
-  .balign 16
-.Lboot_cpu_kstack_end:
-.end_object
 
 .object boot_shadow_call_stack, bss, local
   .skip PAGE_SIZE

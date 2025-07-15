@@ -5,9 +5,11 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/paging.h>
+#include <lib/elfldltl/machine.h>
 #include <lib/memalloc/range.h>
 
 #include <fbl/algorithm.h>
+#include <ktl/bit.h>
 #include <ktl/string_view.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
@@ -166,6 +168,36 @@ MappedMemoryRange HandoffPrep::PublishSingleMappingVmar(ktl::string_view name,
   return {aligned.subspan(addr - aligned_paddr, size), addr};
 }
 
+MappedMemoryRange HandoffPrep::PublishStackVmar(ZirconAbiSpec::Stack stack, memalloc::Type type) {
+  ktl::string_view name = memalloc::ToString(type);
+
+  ZX_DEBUG_ASSERT_MSG(IsPageAligned(stack.size_bytes), "%.*s size (%#x) is not page-aligned",
+                      static_cast<int>(name.size()), name.data(), stack.size_bytes);
+  ZX_DEBUG_ASSERT_MSG(IsPageAligned(stack.lower_guard_size_bytes),
+                      "%.*s lower guard size (%#x) is not page-aligned",
+                      static_cast<int>(name.size()), name.data(), stack.size_bytes);
+  ZX_DEBUG_ASSERT_MSG(IsPageAligned(stack.upper_guard_size_bytes),
+                      "%.*s upper guard size (%#x) is not page-aligned",
+                      static_cast<int>(name.size()), name.data(), stack.size_bytes);
+
+  size_t vmar_size = stack.lower_guard_size_bytes + stack.size_bytes + stack.upper_guard_size_bytes;
+  uintptr_t base = first_class_mapping_allocator_.AllocatePages(vmar_size);
+  auto prep = PrepareVmarAt(name, base, vmar_size);
+  uint64_t paddr = Allocation::GetPool().Allocate(type, stack.size_bytes, ZX_PAGE_SIZE).value();
+  PhysMapping mapping{
+      name,                                 //
+      PhysMapping::Type::kNormal,           //
+      base + stack.lower_guard_size_bytes,  //
+      stack.size_bytes,                     //
+      paddr,                                //
+      PhysMapping::Permissions::Rw(),       //
+  };
+  MappedMemoryRange mapped = prep.PublishMapping(mapping);
+  memset(mapped.data(), 0, mapped.size_bytes());
+  ktl::move(prep).Publish();
+  return mapped;
+}
+
 HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
   ZirconAbi abi{};
 
@@ -200,6 +232,14 @@ HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver
       return true;
     });
     ktl::move(prep).Publish();
+  }
+
+  // Kernel ABI
+  {
+    ktl::span machine_stack =
+        PublishStackVmar(abi_spec_.machine_stack, memalloc::Type::kBootMachineStack);
+    abi.machine_stack_top = elfldltl::AbiTraits<>::InitialStackPointer(
+        reinterpret_cast<uintptr_t>(machine_stack.data()), machine_stack.size_bytes());
   }
 
   // Periphmap

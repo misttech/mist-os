@@ -38,9 +38,6 @@
   // As early as possible collect the time stamp.
   sample_ticks %r15
 
-  // Set up the stack.
-  lea _kstack_end(%rip), %rsp
-
   // Save off the handoff pointer in a register that won't get clobbered.
   mov %rdi, %r14
 
@@ -153,11 +150,6 @@
   pause
   jmp 0b                  /* so jump back to halt to conserve power */
 .end_function
-
-.object _kstack, bss, global, align=16
-  .skip 8192
-_kstack_end:
-.end_object
 
 // This symbol is used by gdb python to know the base of the kernel module
 .label KERNEL_BASE_ADDRESS, global, value=KERNEL_BASE

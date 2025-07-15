@@ -6,6 +6,7 @@
 
 #include <lib/boot-options/boot-options.h>
 #include <lib/code-patching/self-test.h>
+#include <lib/elfldltl/machine.h>
 #include <lib/uart/all.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
@@ -16,7 +17,14 @@
 
 namespace {
 
-constexpr ZirconAbiSpec kZirconAbiSpec{};
+constexpr ZirconAbiSpec kZirconAbiSpec{
+    .machine_stack =
+        {
+            .size_bytes = 0x1000,
+            .lower_guard_size_bytes = 0x1000,
+            .upper_guard_size_bytes = 0x1000,
+        },
+};
 
 ZIRCON_INFO_NOTE ZirconInfoNote<kZirconAbiSpec> kZirconAbiSpecNote;
 
@@ -25,6 +33,10 @@ ZIRCON_INFO_NOTE ZirconInfoNote<kZirconAbiSpec> kZirconAbiSpecNote;
 PhysHandoff* gPhysHandoff = nullptr;
 
 void PhysbootHandoff(PhysHandoff* handoff) {
+  // Check that the stack is aligned.
+  uintptr_t stack_pointer = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  ZX_ASSERT((stack_pointer & (elfldltl::AbiTraits<>::kStackAlignment<uintptr_t> - 1)) == 0);
+
   // Temporary hand-off pointer dereferencing checks that this is set.
   gPhysHandoff = handoff;
 
