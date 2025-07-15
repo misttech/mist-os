@@ -321,8 +321,14 @@ mod tests {
 
         root.record_int("int", 3);
 
+        let instrumentation = Inspector::default();
+        let counter = instrumentation.root().create_uint("counter", 0);
+
         let (_server, proxy) = spawn_server_proxy(inspector, TreeServerSendPreference::default());
-        let result = read_with_timeout(&proxy, Duration::from_secs(5)).await?;
+        let result = read_with_timeout(&proxy, Duration::from_secs(5), &counter).await?;
+
+        assert_json_diff!(instrumentation, root: { counter: 1 });
+
         assert_json_diff!(result, root: {
             child: "value",
             int: 3i64,

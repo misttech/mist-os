@@ -164,6 +164,10 @@ impl GlobalConnectionStats {
         self.component_timeouts_count.add(1);
     }
 
+    pub fn timeout_counter(&self) -> &UintProperty {
+        &self.component_timeouts_count
+    }
+
     pub fn record_percent_truncated_schemas(&self, percent_truncated_schemas: u64) {
         self.snapshot_schema_truncation_percentage.insert(percent_truncated_schemas);
     }

@@ -6,12 +6,23 @@ use crate::reader::error::ReaderError;
 use crate::reader::{
     DiagnosticsHierarchy, MissingValueReason, PartialNodeHierarchy, ReadableTree, Snapshot,
 };
+use crate::{NumericProperty, UintProperty};
 use fuchsia_async::{DurationExt, TimeoutExt};
-use futures::future::BoxFuture;
+use fuchsia_sync::Mutex;
 use futures::prelude::*;
+use futures::stream::FuturesUnordered;
 use inspect_format::LinkNodeDisposition;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
+
+/// Ten minutes, an absurdly long time to try and read Inspect
+///
+/// Note: do not replace with Duration::MAX. It will overflow in the
+/// implementation of `DurationExt::after_now` used for timeouts.
+const MAX_READ_TIME: std::time::Duration = std::time::Duration::from_secs(60 * 10);
 
 /// Contains the snapshot of the hierarchy and snapshots of all the lazy nodes in the hierarchy.
 #[derive(Debug)]
@@ -23,17 +34,53 @@ pub struct SnapshotTree {
 impl SnapshotTree {
     /// Loads a snapshot tree from the given inspect tree.
     #[cfg(target_os = "fuchsia")]
-    pub async fn try_from(
+    pub async fn try_from_proxy(
         tree: &fidl_fuchsia_inspect::TreeProxy,
     ) -> Result<SnapshotTree, ReaderError> {
-        load_snapshot_tree(tree, None).await
+        load_snapshot_tree(tree, MAX_READ_TIME, &Default::default()).await
     }
 
-    pub async fn try_from_with_timeout<T: ReadableTree + Send + Sync>(
+    pub async fn try_from_with_timeout<T: ReadableTree + Send + Sync + Clone>(
         tree: &T,
         lazy_child_timeout: Duration,
+        timeout_counter: &UintProperty,
     ) -> Result<SnapshotTree, ReaderError> {
-        load_snapshot_tree(tree, Some(lazy_child_timeout)).await
+        load_snapshot_tree(tree, lazy_child_timeout, timeout_counter).await
+    }
+}
+
+impl<'a, T> TryFrom<Trees<'a, T>> for SnapshotTree
+where
+    T: ReadableTree + Send + Sync + Clone,
+{
+    type Error = ReaderError;
+
+    fn try_from(trees: Trees<'a, T>) -> Result<Self, Self::Error> {
+        let snapshot =
+            trees.resolved_node.into_inner().expect("lazy initialization must be performed")?;
+
+        let mut children_map: SnapshotTreeMap = BTreeMap::new();
+
+        // Iterate through successfully discovered children Arc<Trees<T>>.
+        for child_arc in trees.children.into_inner().into_iter() {
+            // Get the child's name to use as the key in the map.
+            if child_arc.name.is_some() {
+                let Some(mut child) = Arc::into_inner(child_arc) else {
+                    return Err(ReaderError::Internal);
+                };
+                let name = child.name.take().unwrap_or_default();
+                let child_result = SnapshotTree::try_from(child);
+
+                children_map.insert(name, child_result);
+            }
+            // If a child has no name, it cannot be represented in the map; skip it.
+        }
+
+        for (name, error) in trees.child_errors.into_inner().into_iter() {
+            children_map.insert(name, Err(error));
+        }
+
+        Ok(SnapshotTree { snapshot, children: children_map })
     }
 }
 
@@ -92,9 +139,9 @@ fn expand(
 /// This reads versions 1 and 2 of the Inspect Format.
 pub async fn read<T>(tree: &T) -> Result<DiagnosticsHierarchy, ReaderError>
 where
-    T: ReadableTree + Send + Sync,
+    T: ReadableTree + Send + Sync + Clone,
 {
-    load_snapshot_tree(tree, None).await?.try_into()
+    load_snapshot_tree(tree, MAX_READ_TIME, &Default::default()).await?.try_into()
 }
 
 /// Reads the given `ReadableTree` into a DiagnosticsHierarchy with Lazy Node timeout.
@@ -102,56 +149,134 @@ where
 pub async fn read_with_timeout<T>(
     tree: &T,
     lazy_node_timeout: Duration,
+    timeout_counter: &UintProperty,
 ) -> Result<DiagnosticsHierarchy, ReaderError>
 where
-    T: ReadableTree + Send + Sync,
+    T: ReadableTree + Send + Sync + Clone,
 {
-    load_snapshot_tree(tree, Some(lazy_node_timeout)).await?.try_into()
+    load_snapshot_tree(tree, lazy_node_timeout, timeout_counter).await?.try_into()
 }
 
-fn load_snapshot_tree<T>(
-    tree: &T,
-    lazy_child_timeout: Option<Duration>,
-) -> BoxFuture<'_, Result<SnapshotTree, ReaderError>>
+/// Intermediate type for representing the tree structure of a proxy/Inspector while
+/// inflating nodes in an online-manner.
+struct Trees<'a, T: Clone> {
+    node: Cow<'a, T>,
+    name: Option<String>,
+    resolved_node: Mutex<Option<Result<Snapshot, ReaderError>>>,
+    // TODO: b/431224266 - Explore using bumpalo rather than Arc for these allocations
+    children: Mutex<Vec<Arc<Trees<'a, T>>>>,
+    parent: Mutex<Option<Weak<Trees<'a, T>>>>,
+    child_errors: Mutex<BTreeMap<String, ReaderError>>,
+}
+
+async fn load_snapshot_tree<'a, T>(
+    tree: &'a T,
+    timeout: Duration,
+    timeout_counter: &UintProperty,
+) -> Result<SnapshotTree, ReaderError>
 where
-    T: ReadableTree + Send + Sync,
+    T: ReadableTree + Send + Sync + Clone,
 {
-    async move {
-        let results = if let Some(t) = lazy_child_timeout {
-            future::join(tree.vmo(), tree.tree_names())
-                .on_timeout(t.after_now(), || {
-                    (Err(ReaderError::TreeTimedOut), Err(ReaderError::TreeTimedOut))
+    let trees = Arc::new(Trees {
+        node: Cow::Borrowed(tree),
+        name: None,
+        children: Mutex::new(vec![]),
+        parent: Mutex::new(None),
+        resolved_node: Mutex::new(None),
+        child_errors: Mutex::new(BTreeMap::new()),
+    });
+    let vmo_resolver = FuturesUnordered::new();
+    let moveable_for_read_tree_queue = Arc::clone(&trees);
+    let mut read_tree_resolver = FuturesUnordered::<
+        Pin<Box<dyn Future<Output = Option<Arc<Trees<'a, T>>>> + Send>>,
+    >::from_iter([
+        async move { Some(moveable_for_read_tree_queue) }.boxed(),
+    ]);
+
+    while let Some(current) = read_tree_resolver.next().await {
+        let Some(current) = current else {
+            continue;
+        };
+        let moveable = Arc::clone(&current);
+        vmo_resolver.push(async move {
+            let resolution = moveable
+                .node
+                .vmo()
+                .on_timeout(timeout.after_now(), || {
+                    timeout_counter.add(1);
+                    Err(ReaderError::TreeTimedOut)
                 })
                 .await
-        } else {
-            future::join(tree.vmo(), tree.tree_names()).await
+                .and_then(|data| Snapshot::try_from(&data));
+            let _ = moveable.resolved_node.lock().insert(resolution);
+        });
+        let tree_names = match current
+            .node
+            .tree_names()
+            .on_timeout(timeout.after_now(), || {
+                // no timeout_counter increment, because a failure here
+                // will also manifest as failing to read the VMO of this node
+                Err(ReaderError::TreeTimedOut)
+            })
+            .await
+        {
+            Ok(tree_names) => tree_names,
+            Err(err) => {
+                let guard = current.parent.lock();
+                let Some(Some(parent)) = guard.as_ref().map(|weak| weak.upgrade()) else {
+                    // If we can't get the parent, then we can't register an error. Oh well.
+                    // We also can't read any children, since the tree_names call didn't work.
+                    // So, just move to the next node and give up.
+                    continue;
+                };
+                if let Some(name) = &current.name {
+                    parent.child_errors.lock().insert(String::clone(name), err);
+                }
+                continue;
+            }
         };
 
-        let vmo = results.0?;
-        let children_names = results.1?;
-        let mut children = BTreeMap::new();
-        // TODO(miguelfrde): remove recursion or limit depth.
-        for child_name in children_names {
-            let result = if let Some(t) = lazy_child_timeout {
-                tree.read_tree(&child_name)
-                    .on_timeout(t.after_now(), || Err(ReaderError::TreeTimedOut))
-                    .and_then(|child_tree| load(child_tree, lazy_child_timeout))
+        for child in tree_names.into_iter() {
+            let current = Arc::clone(&current);
+            let next_node = async move {
+                current
+                    .node
+                    .read_tree(&child)
+                    .map(|node| match node {
+                        Ok(node) => {
+                            let next = Arc::new(Trees {
+                                node: Cow::Owned(node),
+                                name: Some(String::clone(&child)),
+                                resolved_node: Mutex::new(None),
+                                children: Mutex::new(vec![]),
+                                parent: Mutex::new(Some(Arc::downgrade(&current))),
+                                child_errors: Mutex::new(BTreeMap::new()),
+                            });
+                            let mut guard = current.children.lock();
+                            guard.push(next);
+                            guard.last().map(Arc::clone)
+                        }
+                        Err(e) => {
+                            current.child_errors.lock().insert(String::clone(&child), e);
+                            None
+                        }
+                    })
+                    .on_timeout(timeout.after_now(), || {
+                        timeout_counter.add(1);
+                        current
+                            .child_errors
+                            .lock()
+                            .insert(String::clone(&child), ReaderError::TreeTimedOut);
+                        None
+                    })
                     .await
-            } else {
-                tree.read_tree(&child_name).and_then(|child_tree| load(child_tree, None)).await
             };
-            children.insert(child_name, result);
+            read_tree_resolver.push(next_node.boxed());
         }
-        Ok(SnapshotTree { snapshot: Snapshot::try_from(&vmo)?, children })
     }
-    .boxed()
-}
 
-async fn load<T>(tree: T, lazy_node_timeout: Option<Duration>) -> Result<SnapshotTree, ReaderError>
-where
-    T: ReadableTree + Send + Sync,
-{
-    load_snapshot_tree(&tree, lazy_node_timeout).await
+    let _ = vmo_resolver.collect::<Vec<()>>().await;
+    Arc::into_inner(trees).map(SnapshotTree::try_from).unwrap_or(Err(ReaderError::Internal))
 }
 
 #[cfg(test)]
@@ -179,8 +304,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_load_snapshot_tree() -> Result<(), anyhow::Error> {
+        let instrumentation = Inspector::default();
+        let counter = instrumentation.root().create_uint("counter", 0);
+
         let inspector = test_inspector();
-        let mut snapshot_tree = load_snapshot_tree(&inspector, None).await?;
+        let mut snapshot_tree = load_snapshot_tree(&inspector, MAX_READ_TIME, &counter).await?;
+
+        assert_data_tree!(instrumentation, root: { counter: 0u64 });
 
         let root_hierarchy: DiagnosticsHierarchy =
             PartialNodeHierarchy::try_from(snapshot_tree.snapshot)?.into();
@@ -210,6 +340,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn read_with_hanging_lazy_node() -> Result<(), anyhow::Error> {
+        let instrumentation = Inspector::default();
+        let counter = instrumentation.root().create_uint("counter", 0);
+
         let inspector = Inspector::default();
         let root = inspector.root();
         root.record_string("child", "value");
@@ -224,7 +357,10 @@ mod tests {
 
         root.record_int("int", 3);
 
-        let hierarchy = read_with_timeout(&inspector, Duration::from_secs(2)).await?;
+        let hierarchy = read_with_timeout(&inspector, Duration::from_secs(2), &counter).await?;
+
+        assert_data_tree!(instrumentation, root: { counter: 1u64 });
+
         assert_json_diff!(hierarchy, root: {
             child: "value",
             int: 3i64,
@@ -310,5 +446,104 @@ mod tests {
             .boxed()
         });
         inspector
+    }
+
+    #[fuchsia::test]
+    async fn try_from_trees_for_snapshot_tree() {
+        // 1. Set up the data
+        let inspector_root = Inspector::default();
+        inspector_root.root().record_int("val", 1);
+        let vmo_root = inspector_root.vmo().await.unwrap();
+        let snapshot_root = Snapshot::try_from(&vmo_root).unwrap();
+
+        let inspector_child1 = Inspector::default();
+        inspector_child1.root().record_int("val", 2);
+        let vmo_child1 = inspector_child1.vmo().await.unwrap();
+        let snapshot_child1 = Snapshot::try_from(&vmo_child1).unwrap();
+
+        let child1 = Arc::new(Trees::<Inspector> {
+            node: Cow::Owned(inspector_child1),
+            name: Some("child1".to_string()),
+            resolved_node: Mutex::new(Some(Ok(snapshot_child1))),
+            children: Mutex::new(vec![]),
+            parent: Mutex::new(None),
+            child_errors: Mutex::new(BTreeMap::new()),
+        });
+
+        let mut child_errors = BTreeMap::new();
+        child_errors.insert("child2".to_string(), ReaderError::TreeTimedOut);
+
+        let root_trees = Trees::<Inspector> {
+            node: Cow::Owned(inspector_root),
+            name: Some("root".to_string()),
+            resolved_node: Mutex::new(Some(Ok(snapshot_root))),
+            children: Mutex::new(vec![child1]),
+            parent: Mutex::new(None),
+            child_errors: Mutex::new(child_errors),
+        };
+
+        // 2. Call the function to be tested
+        let mut snapshot_tree = SnapshotTree::try_from(root_trees).unwrap();
+
+        // 3. Assert the results
+        let root_hierarchy: DiagnosticsHierarchy =
+            PartialNodeHierarchy::try_from(snapshot_tree.snapshot).unwrap().into();
+        assert_data_tree!(root_hierarchy, root: {
+            val: 1i64,
+        });
+
+        assert_eq!(snapshot_tree.children.len(), 2);
+
+        // Check the successful child
+        let child1_tree = snapshot_tree.children.remove("child1").unwrap().unwrap();
+        let child1_hierarchy: DiagnosticsHierarchy =
+            PartialNodeHierarchy::try_from(child1_tree.snapshot).unwrap().into();
+        assert_data_tree!(child1_hierarchy, root: {
+            val: 2i64,
+        });
+        assert!(child1_tree.children.is_empty());
+
+        // Check the error child
+        let child2_error = snapshot_tree.children.remove("child2").unwrap().unwrap_err();
+        assert!(matches!(child2_error, ReaderError::TreeTimedOut));
+    }
+
+    #[fuchsia::test]
+    async fn try_from_trees_for_snapshot_tree_child_with_no_name() {
+        // 1. Set up the data
+        let inspector_root = Inspector::default();
+        inspector_root.root().record_int("val", 1);
+        let vmo_root = inspector_root.vmo().await.unwrap();
+        let snapshot_root = Snapshot::try_from(&vmo_root).unwrap();
+
+        let inspector_child1 = Inspector::default();
+        inspector_child1.root().record_int("val", 2);
+        let vmo_child1 = inspector_child1.vmo().await.unwrap();
+        let snapshot_child1 = Snapshot::try_from(&vmo_child1).unwrap();
+
+        let child1 = Arc::new(Trees::<Inspector> {
+            node: Cow::Owned(inspector_child1),
+            name: None, // No name
+            resolved_node: Mutex::new(Some(Ok(snapshot_child1))),
+            children: Mutex::new(vec![]),
+            parent: Mutex::new(None),
+            child_errors: Mutex::new(BTreeMap::new()),
+        });
+
+        let root_trees = Trees::<Inspector> {
+            node: Cow::Owned(inspector_root),
+            name: Some("root".to_string()),
+            resolved_node: Mutex::new(Some(Ok(snapshot_root))),
+            children: Mutex::new(vec![child1]),
+            parent: Mutex::new(None),
+            child_errors: Mutex::new(BTreeMap::new()),
+        };
+
+        // 2. Call the function to be tested
+        let snapshot_tree = SnapshotTree::try_from(root_trees).unwrap();
+
+        // 3. Assert the results
+        // The child with no name should be skipped.
+        assert!(snapshot_tree.children.is_empty());
     }
 }

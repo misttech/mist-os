@@ -92,7 +92,7 @@ fn snapshot_tree_bench(b: &mut criterion::Bencher, size: usize, frequency: usize
     add_lazies(inspector, 4);
 
     b.iter_with_large_drop(|| loop {
-        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
+        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from_proxy(&proxy)) {
             break snapshot;
         }
     });
@@ -113,7 +113,7 @@ fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
     let task = fasync::Task::local(tree_server_fut);
 
     b.iter_with_large_drop(|| loop {
-        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
+        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from_proxy(&proxy)) {
             break snapshot;
         }
     });
@@ -142,7 +142,7 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
     }
 
     b.iter_with_large_drop(|| loop {
-        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
+        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from_proxy(&proxy)) {
             break snapshot;
         }
     });
