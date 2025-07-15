@@ -75,6 +75,11 @@ class DriverServer final : public fdf::WireServer<fuchsia_driver_framework::Driv
     // run too early, causing use-after-frees during the cleanup of the request.
     async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_),
                     [this, inner_completer = std::move(start_completer)]() mutable {
+                      zx::result<> result = driver_->RunInitMethods();
+                      if (result.is_error()) {
+                        inner_completer(result.take_error());
+                        return;
+                      }
                       driver_->Start(std::move(inner_completer));
                       complete_start_call_ = true;
                     });

@@ -23,6 +23,8 @@ sdk_source_set("cpp") {
     "element-description-builder.h",
     "power-support.cc",
     "power-support.h",
+    "suspend.cc",
+    "suspend.h",
     "types.cc",
     "types.h",
     "wake-lease.cc",

@@ -11,7 +11,8 @@ group("drivers") {
     "bind/fidl_bindlib_codegen",
     "driver_test_realm/sample_driver",
     "metadata:drivers",
-    "power/rust:pkg",
+    "power:drivers",
+    "simple/dfv1:pkg",
     "simple/dfv1:pkg",
     "simple/dfv2:bazel_package",
     "simple/rust:pkg",
@@ -26,6 +27,7 @@ group("hermetic_tests") {
   deps = [
     "driver_test_realm:hermetic_tests",
     "metadata:hermetic_tests",
+    "power:hermetic_tests",
     "simple/rust:hermetic_tests",
     "transport:hermetic_tests",
   ]

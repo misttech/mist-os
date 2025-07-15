@@ -2,6 +2,7 @@
 //examples/drivers/metadata/forwarder:driver
 //examples/drivers/metadata/retriever:driver
 //examples/drivers/metadata/sender:driver
+//examples/drivers/power/cpp:driver
 //examples/drivers/power/rust:driver
 //examples/drivers/simple/dfv1:driver
 //examples/drivers/simple/dfv2:bazel_package.bazel_build
