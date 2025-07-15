@@ -445,8 +445,11 @@ void PageQueues::EnableAging() {
     panic("Mismatched disable/enable pair");
   }
 
-  // Return the aging token, allowing the aging thread to proceed if it was waiting.
+  // Return the aging token and possibly notify the LRU thread, allowing the MRU and LRU threads to
+  // proceed if they had been waiting.
   aging_token_.Signal();
+  MaybeTriggerLruProcessing();
+
 #if DEBUG_ASSERT_IMPLEMENTED
   Guard<SpinLock, IrqSave> guard{&list_lock_};
   if (debug_compressor_) {
