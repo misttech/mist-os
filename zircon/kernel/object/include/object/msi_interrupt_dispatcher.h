@@ -28,7 +28,7 @@
 // The common interface for all MSI related interrupt handling. This encompasses MSI and MSI-X.
 class MsiInterruptDispatcher : public InterruptDispatcher {
  public:
-  using RegisterIntFn = void (*)(const msi_block_t*, uint, interrupt_handler_t, void*);
+  using RegisterIntFn = void (*)(const msi_block_t*, uint, interrupt_handler_t);
 
   static zx_status_t Create(fbl::RefPtr<MsiAllocation> alloc, uint32_t msi_id,
                             const fbl::RefPtr<VmObject>& vmo, zx_off_t cap_offset, uint32_t options,
@@ -54,7 +54,6 @@ class MsiInterruptDispatcher : public InterruptDispatcher {
                          RegisterIntFn = msi_register_handler);
   const fbl::RefPtr<VmMapping>& mapping() const { return mapping_; }
   const fbl::RefPtr<MsiAllocation>& allocation() const { return alloc_; }
-  static void IrqHandler(void* ctx);
 
  private:
   // MSI / MSI-X interrupts share a masking approach and should be masked while

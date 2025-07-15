@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_DEV_INTERRUPT_INCLUDE_DEV_INTERRUPT_H_
 #define ZIRCON_KERNEL_DEV_INTERRUPT_INCLUDE_DEV_INTERRUPT_H_
 
+#include <lib/fit/function.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -18,7 +19,7 @@ constexpr uint32_t MAX_MSI_IRQS = 32;
 constexpr uint32_t MAX_INTERRUPTS = 1024;
 
 using interrupt_vector_t = uint32_t;
-using interrupt_handler_t = void (*)(void* arg);
+using interrupt_handler_t = fit::inline_function<void()>;
 
 enum class interrupt_trigger_mode {
   EDGE,
@@ -92,15 +93,14 @@ zx_status_t set_interrupt_affinity(interrupt_vector_t vector, cpu_mask_t mask);
 // with internal spinlocks held and should not itself call register_int_handler. This handler may
 // be serialized with other handlers.
 // This can be called repeatedly to change the handler/arg for a given vector.
-zx_status_t register_int_handler(interrupt_vector_t vector, interrupt_handler_t handler, void* arg);
+zx_status_t register_int_handler(interrupt_vector_t vector, interrupt_handler_t handler);
 
 // Registers a handler+arg to be called for the given interrupt vector. Once this is used to set a
 // handler it is an error to modify the vector again through this or register_int_handler.
 // Registration via this method allows the interrupt manager to avoid needing to synchronize
 // re-registrations with invocations, which can be much more efficient and avoid unneeded
 // serialization of handlers.
-zx_status_t register_permanent_int_handler(interrupt_vector_t vector, interrupt_handler_t handler,
-                                           void* arg);
+zx_status_t register_permanent_int_handler(interrupt_vector_t vector, interrupt_handler_t handler);
 
 // These return the [base, max] range of vectors that can be used with zx_interrupt syscalls
 // This api will need to evolve if valid vector ranges later are not contiguous
@@ -171,7 +171,6 @@ void msi_free_block(msi_block_t* block);
 // Register a handler function for a given msi_id within an msi_block. Passing a
 // NULL handler will effectively unregister a handler for a given msi_id within the
 // block.
-void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
-                          void* ctx);
+void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler);
 
 #endif  // ZIRCON_KERNEL_DEV_INTERRUPT_INCLUDE_DEV_INTERRUPT_H_

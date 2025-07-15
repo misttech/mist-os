@@ -180,7 +180,7 @@ inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD(cpu_num); }
 extern uint8_t x86_num_cpus;
 inline uint arch_max_num_cpus() { return x86_num_cpus; }
 
-void x86_ipi_halt_handler(void *) __NO_RETURN;
+void x86_ipi_halt_handler() __NO_RETURN;
 
 // Called from assembly.
 extern "C" void x86_secondary_entry(ktl::atomic<unsigned int> *aps_still_booting, Thread *thread);

@@ -14,8 +14,6 @@
 #include <zircon/listnode.h>
 #include <zircon/types.h>
 
-#include <limits>
-
 #include <dev/interrupt.h>
 #include <dev/pci_config.h>
 #include <dev/pcie_bridge.h>
@@ -102,14 +100,16 @@ fbl::RefPtr<SharedLegacyIrqHandler> SharedLegacyIrqHandler::Create(uint irq_id) 
 
 SharedLegacyIrqHandler::SharedLegacyIrqHandler(uint irq_id) : irq_id_(irq_id) {
   mask_interrupt(irq_id_);  // This should not be needed, but just in case.
-  zx_status_t status = register_int_handler(irq_id_, HandlerThunk, this);
+
+  zx_status_t status = register_int_handler(irq_id_, [this]() { Handler(); });
+
   DEBUG_ASSERT(status == ZX_OK);
 }
 
 SharedLegacyIrqHandler::~SharedLegacyIrqHandler() {
   DEBUG_ASSERT(device_handler_list_.is_empty());
   mask_interrupt(irq_id_);
-  zx_status_t status = register_int_handler(irq_id_, nullptr, nullptr);
+  zx_status_t status = register_int_handler(irq_id_, nullptr);
   DEBUG_ASSERT(status == ZX_OK);
 }
 
@@ -389,7 +389,7 @@ void PcieDevice::FreeMsiBlock() {
     if (bus_drv_.platform().supports_msi_masking()) {
       bus_drv_.platform().MaskUnmaskMsi(b, i, true);
     }
-    bus_drv_.platform().RegisterMsiHandler(b, i, nullptr, nullptr);
+    bus_drv_.platform().RegisterMsiHandler(b, i, nullptr);
   }
 
   /* Give the block of IRQs back to the plaform */
@@ -488,8 +488,9 @@ zx_status_t PcieDevice::EnterMsiIrqMode(uint requested_irqs) {
   /* Register each IRQ with the dispatcher */
   DEBUG_ASSERT(irq_.handler_count <= irq_.msi->irq_block_.num_irq);
   for (uint i = 0; i < irq_.handler_count; ++i) {
-    bus_drv_.platform().RegisterMsiHandler(&irq_.msi->irq_block_, i, PcieDevice::MsiIrqHandlerThunk,
-                                           irq_.handlers + i);
+    auto handler = [hstate = irq_.handlers + i]() { hstate->dev->MsiIrqHandler(*hstate); };
+
+    bus_drv_.platform().RegisterMsiHandler(&irq_.msi->irq_block_, i, handler);
   }
 
   /* Enable MSI at the top level */
@@ -530,13 +531,6 @@ void PcieDevice::MsiIrqHandler(pcie_irq_handler_state_t& hstate) {
   if (!(irq_ret & PCIE_IRQRET_MASK)) {
     MaskUnmaskMsiIrqLocked(hstate.pci_irq_id, false);
   }
-}
-
-void PcieDevice::MsiIrqHandlerThunk(void* arg) {
-  DEBUG_ASSERT(arg);
-  auto& hstate = *(reinterpret_cast<pcie_irq_handler_state_t*>(arg));
-  DEBUG_ASSERT(hstate.dev);
-  hstate.dev->MsiIrqHandler(hstate);
 }
 
 /******************************************************************************

@@ -260,11 +260,6 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
       tx_interrupt.Notify();
     };
 
-    constexpr auto irq_handler = [](void* driver_ptr) {
-      auto* typed_driver = static_cast<ktl::decay_t<decltype(driver)>*>(driver_ptr);
-      typed_driver->Interrupt(tx_irq_handler, rx_irq_handler);
-    };
-
     if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
       // Configure the interrupt if available.
       auto irq_config = GetIrqConfigFromFlags(driver.config().flags);
@@ -276,8 +271,8 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
     }
 
     // Register IRQ Handler.
-    zx_status_t irq_register_result =
-        register_permanent_int_handler(*uart_irq, irq_handler, &driver);
+    auto irq_handler = [&driver]() { driver.Interrupt(tx_irq_handler, rx_irq_handler); };
+    zx_status_t irq_register_result = register_permanent_int_handler(*uart_irq, irq_handler);
     DEBUG_ASSERT(irq_register_result == ZX_OK);
     // Init Rx Interrupt.
     driver.InitInterrupt([uart_irq]() { unmask_interrupt(*uart_irq); });

@@ -46,8 +46,7 @@ struct pdev_interrupt_ops {
   zx_status_t (*msi_alloc_block)(uint requested_irqs, bool can_target_64bit, bool is_msix,
                                  msi_block_t* out_block);
   void (*msi_free_block)(msi_block_t* block);
-  void (*msi_register_handler)(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
-                               void* ctx);
+  void (*msi_register_handler)(const msi_block_t* block, uint msi_id, interrupt_handler_t handler);
 };
 
 void pdev_register_interrupts(const struct pdev_interrupt_ops* ops);

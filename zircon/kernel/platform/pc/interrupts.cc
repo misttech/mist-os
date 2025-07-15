@@ -210,13 +210,13 @@ void platform_irq(iframe_t* frame) {
   apic_issue_eoi();
 }
 
-zx_status_t register_int_handler(unsigned int vector, interrupt_handler_t handler, void* arg) {
-  return kInterruptManager.RegisterInterruptHandler(vector, handler, arg);
+zx_status_t register_int_handler(unsigned int vector, interrupt_handler_t handler) {
+  return kInterruptManager.RegisterInterruptHandler(vector, ktl::move(handler));
 }
 
-zx_status_t register_permanent_int_handler(unsigned int vector, interrupt_handler_t handler,
-                                           void* arg) {
-  return kInterruptManager.RegisterInterruptHandler(vector, handler, arg, true /* Permanent */);
+zx_status_t register_permanent_int_handler(unsigned int vector, interrupt_handler_t handler) {
+  return kInterruptManager.RegisterInterruptHandler(vector, ktl::move(handler),
+                                                    true /* Permanent */);
 }
 
 // On x64 these methods return the base and max Global System Interrupts as
@@ -270,9 +270,8 @@ zx_status_t msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_
   return kInterruptManager.MsiAllocBlock(requested_irqs, can_target_64bit, is_msix, out_block);
 }
 
-void msi_free_block(msi_block_t* block) { return kInterruptManager.MsiFreeBlock(block); }
+void msi_free_block(msi_block_t* block) { kInterruptManager.MsiFreeBlock(block); }
 
-void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
-                          void* ctx) {
-  return kInterruptManager.MsiRegisterHandler(block, msi_id, handler, ctx);
+void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler) {
+  kInterruptManager.MsiRegisterHandler(block, msi_id, ktl::move(handler));
 }

@@ -193,7 +193,7 @@ void mp_sync_exec(mp_ipi_target_t target, cpu_mask_t mask, mp_sync_task_t task, 
       if (!empty) {
         bool previous_blocking_disallowed = arch_blocking_disallowed();
         arch_set_blocking_disallowed(true);
-        mp_mbx_generic_irq(nullptr);
+        mp_mbx_generic_irq();
         arch_set_blocking_disallowed(previous_blocking_disallowed);
         continue;
       }
@@ -341,7 +341,7 @@ zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_instant_mono_t deadline) 
   return ZX_OK;
 }
 
-void mp_mbx_generic_irq(void*) {
+void mp_mbx_generic_irq() {
   DEBUG_ASSERT(arch_ints_disabled());
   const cpu_num_t local_cpu = arch_curr_cpu_num();
 
@@ -360,7 +360,7 @@ void mp_mbx_generic_irq(void*) {
   }
 }
 
-void mp_mbx_reschedule_irq(void*) {
+void mp_mbx_reschedule_irq() {
   const cpu_num_t cpu = arch_curr_cpu_num();
 
   LTRACEF("cpu %u\n", cpu);
@@ -372,7 +372,7 @@ void mp_mbx_reschedule_irq(void*) {
   }
 }
 
-void mp_mbx_interrupt_irq(void*) {
+void mp_mbx_interrupt_irq() {
   const cpu_num_t cpu = arch_curr_cpu_num();
 
   LTRACEF("cpu %u\n", cpu);

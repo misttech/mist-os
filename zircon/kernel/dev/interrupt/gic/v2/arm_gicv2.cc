@@ -331,7 +331,7 @@ zx_status_t gic_send_ipi(cpu_mask_t logical_target, mp_ipi_t ipi) {
   return ZX_OK;
 }
 
-void arm_ipi_halt_handler(void*) {
+void arm_ipi_halt_handler() {
   LTRACEF("cpu %u\n", arch_curr_cpu_num());
 
   arch_disable_ints();

@@ -131,12 +131,6 @@ void InterruptEventDispatcher::GetDiagnostics(WakeVector::Diagnostics& diagnosti
   diagnostics_out.PrintExtra("IRQ %" PRIu32, vector_);
 }
 
-void InterruptEventDispatcher::IrqHandler(void* ctx) {
-  InterruptEventDispatcher* self = reinterpret_cast<InterruptEventDispatcher*>(ctx);
-
-  self->InterruptHandler();
-}
-
 InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, Flags flags, uint32_t options)
     : InterruptDispatcher(flags, options), vector_(vector) {
   kcounter_add(dispatcher_interrupt_event_create_count, 1);
@@ -160,9 +154,9 @@ void InterruptEventDispatcher::DeactivateInterrupt() {
 }
 
 zx_status_t InterruptEventDispatcher::RegisterInterruptHandler() {
-  return register_int_handler(vector_, IrqHandler, this);
+  return register_int_handler(vector_, [this]() { InterruptHandler(); });
 }
 
 void InterruptEventDispatcher::UnregisterInterruptHandler() {
-  register_int_handler(vector_, nullptr, nullptr);
+  register_int_handler(vector_, nullptr);
 }

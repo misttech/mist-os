@@ -39,7 +39,6 @@ class InterruptEventDispatcher final : public InterruptDispatcher {
   void UnregisterInterruptHandler() final;
 
   zx_status_t RegisterInterruptHandler();
-  static void IrqHandler(void* ctx);
 
   const uint32_t vector_;
 };

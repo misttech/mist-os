@@ -192,22 +192,16 @@ void MsiInterruptDispatcher::GetDiagnostics(WakeVector::Diagnostics& diagnostics
   diagnostics_out.PrintExtra("MSI %" PRIu32, vector());
 }
 
-// This IrqHandler acts as a trampoline to call into the base
-// InterruptDispatcher's InterruptHandler() routine. Masking and signaling will
-// be handled there based on flags set in the constructor.
-void MsiInterruptDispatcher::IrqHandler(void* ctx) {
-  auto* self = reinterpret_cast<MsiInterruptDispatcher*>(ctx);
-  self->InterruptHandler();
-  kcounter_add(dispatcher_msi_interrupt_count, 1);
-}
-
 zx_status_t MsiInterruptDispatcher::RegisterInterruptHandler() {
-  register_int_fn_(&alloc_->block(), msi_id_, IrqHandler, this);
+  register_int_fn_(&alloc_->block(), msi_id_, [this]() {
+    this->InterruptHandler();
+    kcounter_add(dispatcher_msi_interrupt_count, 1);
+  });
   return ZX_OK;
 }
 
 void MsiInterruptDispatcher::UnregisterInterruptHandler() {
-  register_int_fn_(&alloc_->block(), msi_id_, nullptr, this);
+  register_int_fn_(&alloc_->block(), msi_id_, nullptr);
 }
 
 void MsiInterruptDispatcherImpl::MaskInterrupt() {

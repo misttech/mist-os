@@ -8,4 +8,5 @@ import("//build/zircon/migrated_targets.gni")
 
 zx_library("interrupt") {
   sources = []
+  public_deps = [ "//sdk/lib/fit" ]
 }

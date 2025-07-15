@@ -22,6 +22,8 @@
 #include <fbl/ref_ptr.h>
 #include <pdev/interrupt.h>
 
+#include <ktl/enforce.h>
+
 namespace {
 
 class ArmGicV2PciePlatformSupport : public PciePlatformInterface {
@@ -37,9 +39,9 @@ class ArmGicV2PciePlatformSupport : public PciePlatformInterface {
 
   void FreeMsiBlock(msi_block_t* block) override { arm_gicv2m_msi_free_block(block); }
 
-  void RegisterMsiHandler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
-                          void* ctx) override {
-    arm_gicv2m_msi_register_handler(block, msi_id, handler, ctx);
+  void RegisterMsiHandler(const msi_block_t* block, uint msi_id,
+                          interrupt_handler_t handler) override {
+    arm_gicv2m_msi_register_handler(block, msi_id, ktl::move(handler));
   }
 
   void MaskUnmaskMsi(const msi_block_t* block, uint msi_id, bool mask) override {

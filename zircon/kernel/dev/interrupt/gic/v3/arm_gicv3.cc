@@ -425,7 +425,7 @@ zx_status_t gic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
   return ZX_OK;
 }
 
-void arm_ipi_halt_handler(void*) {
+void arm_ipi_halt_handler() {
   LTRACEF("cpu %u\n", arch_curr_cpu_num());
 
   arch_disable_ints();
@@ -529,8 +529,7 @@ zx_status_t gic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool
 
 void gic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
 
-void gic_msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
-                              void* ctx) {
+void gic_msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler) {
   PANIC_UNIMPLEMENTED;
 }
 

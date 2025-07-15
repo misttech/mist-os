@@ -226,8 +226,7 @@ zx_status_t plic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, boo
 
 void plic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
 
-void plic_msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
-                               void* ctx) {
+void plic_msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler) {
   PANIC_UNIMPLEMENTED;
 }
 

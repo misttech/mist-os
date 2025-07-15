@@ -282,7 +282,7 @@ static constexpr uint16_t I8253_CONTROL_REG = 0x43;
 static constexpr uint16_t I8253_DATA_REG = 0x40;
 
 // The PIT timer will keep track of wall time if we aren't using the TSC
-static void pit_timer_tick(void* arg) { pit_ticks = pit_ticks + 1; }
+static void pit_timer_tick() { pit_ticks = pit_ticks + 1; }
 
 // The APIC timers will call this when they fire
 void platform_handle_apic_timer_tick(void) { timer_tick(); }
@@ -694,7 +694,7 @@ static void pc_init_timer(uint level) {
       set_pit_frequency(desired_pit_frequency);
 
       uint32_t irq = apic_io_isa_to_global(ISA_IRQ_PIT);
-      zx_status_t status = register_permanent_int_handler(irq, &pit_timer_tick, NULL);
+      zx_status_t status = register_permanent_int_handler(irq, &pit_timer_tick);
       DEBUG_ASSERT(status == ZX_OK);
       unmask_interrupt(irq);
 

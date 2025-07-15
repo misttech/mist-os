@@ -96,7 +96,7 @@ IommuImpl::~IommuImpl() {
 
   DisableFaultsLocked();
   if (irq_block_.allocated) {
-    msi_register_handler(&irq_block_, 0, nullptr, nullptr);
+    msi_register_handler(&irq_block_, 0, nullptr);
     msi_free_block(&irq_block_);
   }
 
@@ -712,7 +712,7 @@ zx_status_t IommuImpl::ConfigureFaultEventInterruptLocked() {
   auto fault_status_ctl = reg::FaultStatus::Get().ReadFrom(&mmio_);
   fault_status_ctl.WriteTo(&mmio_);
 
-  msi_register_handler(&irq_block_, 0, FaultHandler, this);
+  msi_register_handler(&irq_block_, 0, [this]() { FaultHandler(this); });
 
   // Unmask interrupts
   auto fault_event_ctl = reg::FaultEventControl::Get().ReadFrom(&mmio_);

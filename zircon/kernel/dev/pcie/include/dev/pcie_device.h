@@ -416,7 +416,6 @@ class PcieDevice {
   zx_status_t EnterMsiIrqMode(uint requested_irqs) __TA_REQUIRES(dev_lock_);
 
   void MsiIrqHandler(pcie_irq_handler_state_t& hstate);
-  static void MsiIrqHandlerThunk(void* arg);
 
   // Common Internal IRQ support.
   void ResetCommonIrqBookkeeping();

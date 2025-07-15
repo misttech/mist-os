@@ -26,6 +26,6 @@ zx_status_t arm_gicv2m_msi_alloc_block(uint requested_irqs, bool can_target_64bi
                                        msi_block_t* out_block);
 void arm_gicv2m_msi_free_block(msi_block_t* block);
 void arm_gicv2m_msi_register_handler(const msi_block_t* block, uint msi_id,
-                                     interrupt_handler_t handler, void* ctx);
+                                     interrupt_handler_t handler);
 
 #endif  // ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V2_INCLUDE_DEV_INTERRUPT_ARM_GICV2M_MSI_H_

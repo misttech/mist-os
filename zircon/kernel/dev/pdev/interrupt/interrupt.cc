@@ -13,13 +13,14 @@
 #include <lk/init.h>
 #include <pdev/interrupt.h>
 
+#include <ktl/enforce.h>
+
 namespace {
 
 DECLARE_SINGLETON_SPINLOCK(pdev_lock);
 
 struct int_handler_struct {
   interrupt_handler_t handler TA_GUARDED(pdev_lock::Get()) = nullptr;
-  void* arg TA_GUARDED(pdev_lock::Get()) = nullptr;
   ktl::atomic<bool> permanent = false;
 };
 
@@ -31,7 +32,7 @@ struct int_handler_struct* pdev_get_int_handler(interrupt_vector_t vector) {
 }
 
 zx_status_t register_int_handler_common(interrupt_vector_t vector, interrupt_handler_t handler,
-                                        void* arg, bool permanent) {
+                                        bool permanent) {
   if (!is_valid_interrupt(vector, 0)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -42,8 +43,7 @@ zx_status_t register_int_handler_common(interrupt_vector_t vector, interrupt_han
   if ((handler && h->handler) || h->permanent.load(ktl::memory_order_relaxed)) {
     return ZX_ERR_ALREADY_BOUND;
   }
-  h->handler = handler;
-  h->arg = arg;
+  h->handler = ktl::move(handler);
   h->permanent.store(permanent, ktl::memory_order_relaxed);
 
   return ZX_OK;
@@ -77,20 +77,18 @@ const struct pdev_interrupt_ops default_ops = {
     .msi_mask_unmask = [](const msi_block_t*, uint, bool) {},
     .msi_alloc_block = [](uint, bool, bool, msi_block_t*) { return ZX_ERR_NOT_SUPPORTED; },
     .msi_free_block = [](msi_block_t*) {},
-    .msi_register_handler = [](const msi_block_t*, uint, interrupt_handler_t, void*) {}};
+    .msi_register_handler = [](const msi_block_t*, uint, interrupt_handler_t) {}};
 
 const struct pdev_interrupt_ops* intr_ops = &default_ops;
 
 }  // anonymous namespace
 
-zx_status_t register_int_handler(interrupt_vector_t vector, interrupt_handler_t handler,
-                                 void* arg) {
-  return register_int_handler_common(vector, handler, arg, false);
+zx_status_t register_int_handler(interrupt_vector_t vector, interrupt_handler_t handler) {
+  return register_int_handler_common(vector, ktl::move(handler), false);
 }
 
-zx_status_t register_permanent_int_handler(interrupt_vector_t vector, interrupt_handler_t handler,
-                                           void* arg) {
-  return register_int_handler_common(vector, handler, arg, true);
+zx_status_t register_permanent_int_handler(interrupt_vector_t vector, interrupt_handler_t handler) {
+  return register_int_handler_common(vector, ktl::move(handler), true);
 }
 
 bool pdev_invoke_int_if_present(interrupt_vector_t vector) {
@@ -102,14 +100,14 @@ bool pdev_invoke_int_if_present(interrupt_vector_t vector) {
     // to read them without holding the lock.
     [&h]() TA_NO_THREAD_SAFETY_ANALYSIS {
       DEBUG_ASSERT(h->handler);
-      h->handler(h->arg);
+      h->handler();
     }();
     return true;
   }
   Guard<SpinLock, IrqSave> guard{pdev_lock::Get()};
 
   if (h->handler) {
-    h->handler(h->arg);
+    h->handler();
     return true;
   }
   return false;
@@ -208,9 +206,8 @@ zx_status_t msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_
 
 void msi_free_block(msi_block_t* block) { intr_ops->msi_free_block(block); }
 
-void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
-                          void* ctx) {
-  intr_ops->msi_register_handler(block, msi_id, handler, ctx);
+void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler) {
+  intr_ops->msi_register_handler(block, msi_id, ktl::move(handler));
 }
 
 namespace {

@@ -11,6 +11,7 @@
 #include <sys/types.h>
 
 #include <dev/interrupt.h>
+#include <ktl/utility.h>
 
 #define GIC_BASE_SGI 0
 #define GIC_BASE_PPI 16
@@ -38,7 +39,7 @@ enum {
 static inline zx_status_t gic_register_sgi_handler(unsigned int vector,
                                                    interrupt_handler_t handler) {
   DEBUG_ASSERT(vector < GIC_BASE_PPI);
-  return register_permanent_int_handler(vector, handler, nullptr);
+  return register_permanent_int_handler(vector, ktl::move(handler));
 }
 
 #endif  // ZIRCON_KERNEL_DEV_INTERRUPT_GIC_COMMON_INCLUDE_DEV_INTERRUPT_ARM_GIC_COMMON_H_

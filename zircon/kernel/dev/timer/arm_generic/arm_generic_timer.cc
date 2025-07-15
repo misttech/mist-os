@@ -250,7 +250,7 @@ static inline void write_ctl(uint32_t val) { reg_procs.write_ctl(val); }
 static inline void write_cval(uint64_t val) { reg_procs.write_cval(val); }
 [[maybe_unused]] static inline void write_tval(uint32_t val) { reg_procs.write_tval(val); }
 
-static void platform_tick(void* arg) {
+static void platform_tick() {
   write_ctl(0);
   timer_tick();
 }
@@ -531,7 +531,7 @@ static void arm_generic_timer_init(uint32_t freq_override) {
   // Set up the hardware timer irq handler for this vector. Use the permanent irq handler
   // registraion scheme since it is enabled on all cpus and does not need any locking
   // for reentrancy and deregistration purposes.
-  zx_status_t status = register_permanent_int_handler(timer_irq, &platform_tick, NULL);
+  zx_status_t status = register_permanent_int_handler(timer_irq, &platform_tick);
   DEBUG_ASSERT(status == ZX_OK);
 
   // At this point in time, we expect that the `cntkctl_el1` timer register has
