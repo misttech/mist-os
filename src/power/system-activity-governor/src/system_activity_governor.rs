@@ -73,6 +73,8 @@ pub struct SuspendStatsManager {
     /// The inspect node that contains the duration the platform spent in suspension in the last
     /// attempt.
     last_time_in_suspend_node: IInt,
+    /// The inspect node that contains the total time the platform spent in suspension since boot.
+    total_time_in_suspend_node: IInt,
     /// The inspect node that contains the duration the platform spent transitioning to a suspended
     /// state in the last attempt.
     last_time_in_suspend_operations_node: IInt,
@@ -83,6 +85,7 @@ impl SuspendStatsManager {
         let stats = fsuspend::SuspendStats {
             success_count: Some(0),
             fail_count: Some(0),
+            total_time_in_suspend: Some(0),
             ..Default::default()
         };
 
@@ -97,6 +100,10 @@ impl SuspendStatsManager {
         let last_time_in_suspend_node = inspect_node.create_int(
             fobs::SUSPEND_LAST_TIMESTAMP,
             *stats.last_time_in_suspend.as_ref().unwrap_or(&-1i64),
+        );
+        let total_time_in_suspend_node = inspect_node.create_int(
+            fobs::SUSPEND_CUMULATIVE_DURATION,
+            *stats.total_time_in_suspend.as_ref().unwrap_or(&0i64),
         );
         let last_time_in_suspend_operations_node = inspect_node.create_int(
             fobs::SUSPEND_LAST_DURATION,
@@ -125,6 +132,7 @@ impl SuspendStatsManager {
             fail_count_node,
             last_failed_error_node,
             last_time_in_suspend_node,
+            total_time_in_suspend_node,
             last_time_in_suspend_operations_node,
         }
     }
@@ -146,6 +154,8 @@ impl SuspendStatsUpdater for SuspendStatsManager {
                     .set((*stats.last_failed_error.as_ref().unwrap_or(&0i32)).into());
                 self.last_time_in_suspend_node
                     .set(*stats.last_time_in_suspend.as_ref().unwrap_or(&-1i64));
+                self.total_time_in_suspend_node
+                    .set(*stats.total_time_in_suspend.as_ref().unwrap_or(&0i64));
                 self.last_time_in_suspend_operations_node
                     .set(*stats.last_time_in_suspend_operations.as_ref().unwrap_or(&-1i64));
             });

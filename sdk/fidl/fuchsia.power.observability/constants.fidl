@@ -74,6 +74,9 @@ const SUSPEND_ATTEMPT_BLOCKED_AT string = "attempt_blocked_at_ns";
 /// The duration of time last spent in suspend.
 const SUSPEND_LAST_TIMESTAMP string = "last_time_in_suspend_ns";
 
+/// The total cumulative duration of time spent in suspend since boot.
+const SUSPEND_CUMULATIVE_DURATION string = "total_time_in_suspend_ns";
+
 /// The duration of time last spent in operations leading to suspend,
 /// excluding the time actually spent suspended.
 ///

@@ -10,6 +10,7 @@ use futures::FutureExt;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
 const SUSPEND_EVENT_BUFFER_SIZE: usize = 4096;
@@ -71,6 +72,9 @@ pub struct SagEventLogger {
     ///   history_duration_seconds: i64
     ///   at_capacity_history_duration_seconds: i64
     _event_log_stats: Rc<RefCell<ILazyNode>>,
+    /// Total time that the device has spent suspended since boot (or at least
+    /// since this logger was created), in nanoseconds.
+    cumulative_suspend_duration: Arc<AtomicI64>,
 }
 
 impl SagEventLogger {
@@ -111,6 +115,7 @@ impl SagEventLogger {
             event_log,
             event_log_times,
             _event_log_stats: Rc::new(RefCell::new(event_log_stats)),
+            cumulative_suspend_duration: Arc::new(AtomicI64::new(0)),
         }
     }
 
@@ -125,6 +130,11 @@ impl SagEventLogger {
                 SagEvent::SuspendResumed { suspend_duration } => {
                     node.record_int(fobs::SUSPEND_RESUMED_AT, time);
                     node.record_int(fobs::SUSPEND_LAST_TIMESTAMP, suspend_duration);
+                    let cumulative = self
+                        .cumulative_suspend_duration
+                        .fetch_add(suspend_duration, Ordering::SeqCst)
+                        + suspend_duration;
+                    node.record_int(fobs::SUSPEND_CUMULATIVE_DURATION, cumulative);
                 }
                 SagEvent::SuspendFailed => {
                     node.record_int(fobs::SUSPEND_FAILED_AT, time);

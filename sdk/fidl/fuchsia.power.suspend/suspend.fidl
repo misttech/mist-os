@@ -21,6 +21,8 @@ type SuspendStats = table {
     /// Suspend and resume operations are those actions taken by the platform in
     /// order to enter and exit, respectively, a suspended state.
     5: last_time_in_suspend_operations zx.Duration;
+    /// The total amount of time spent in a suspended state.
+    6: total_time_in_suspend zx.Duration;
 };
 
 /// A protocol for retrieving statistics related to suspend/resume operations.
