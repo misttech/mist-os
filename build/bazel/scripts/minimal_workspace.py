@@ -139,7 +139,7 @@ def main(argv: Sequence[str]) -> int:
     (workspace_dir / "third_party").mkdir(parents=True, exist_ok=True)
     force_symlink(
         workspace_dir / "third_party" / "bazel_skylib",
-        fuchsia_dir / "third_party" / "bazel_skylib",
+        fuchsia_dir / "third_party" / "bazel_vendor/bazel_skylib+",
     )
 
     # copy/link over build files (no template expansion needed)
