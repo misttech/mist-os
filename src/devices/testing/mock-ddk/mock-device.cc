@@ -176,16 +176,6 @@ zx_status_t MockDevice::GetMetadata(uint32_t type, void* buf, size_t buflen, siz
   return ZX_ERR_NOT_FOUND;
 }
 
-zx_status_t MockDevice::GetMetadataSize(uint32_t type, size_t* out_size) {
-  auto itr = metadata_.find(type);
-  if (itr != metadata_.end()) {
-    auto metadata = itr->second;
-    *out_size = metadata.size();
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_FOUND;
-}
-
 void MockDevice::PropagateMetadata() {
   for (auto& child : children_) {
     for (const auto& [key, value] : metadata_) {

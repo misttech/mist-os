@@ -802,10 +802,6 @@ zx_status_t Device::GetMetadata(uint32_t type, void* buf, size_t buflen, size_t*
   return device_server_.GetMetadata(type, buf, buflen, actual);
 }
 
-zx_status_t Device::GetMetadataSize(uint32_t type, size_t* out_size) {
-  return device_server_.GetMetadataSize(type, out_size);
-}
-
 zx_status_t Device::RegisterServiceMember(component::AnyHandler handler, const char* service_name,
                                           const char* instance_name, const char* member_name) {
   std::string fullpath = std::format("svc/{}/{}", service_name, instance_name);

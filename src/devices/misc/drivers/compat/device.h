@@ -86,7 +86,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   zx_status_t GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out);
   zx_status_t AddMetadata(uint32_t type, const void* data, size_t size);
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);
-  zx_status_t GetMetadataSize(uint32_t type, size_t* out_size);
   zx_status_t RegisterServiceMember(component::AnyHandler handler, const char* service_name,
                                     const char* instance_name, const char* member_name);
 

@@ -40,8 +40,8 @@ MetadataGetterDfv1::MetadataGetterDfv1(zx_device_t* device) : device_(device) {
 zx::result<std::vector<uint8_t>> MetadataGetterDfv1::GetBytes(uint32_t type,
                                                               std::string_view instance) {
   size_t metadata_size_bytes = 0;
-  zx_status_t status = device_get_metadata_size(device_, type, &metadata_size_bytes);
-  if (status != ZX_OK) {
+  zx_status_t status = device_get_metadata(device_, type, nullptr, 0, &metadata_size_bytes);
+  if (status != ZX_ERR_BUFFER_TOO_SMALL) {
     zxlogf(ERROR, "Failed to get metadata size of type %" PRIu32 ": %s", type,
            zx_status_get_string(status));
     return zx::error(status);

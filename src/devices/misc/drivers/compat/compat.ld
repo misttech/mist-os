@@ -22,7 +22,6 @@
     get_power_resource;
     load_firmware_from_driver;
     device_get_metadata;
-    device_get_metadata_size;
     device_add_metadata;
     device_add_composite_spec;
     driver_log_severity_enabled_internal;

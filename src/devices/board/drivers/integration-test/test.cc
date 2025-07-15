@@ -100,8 +100,8 @@ void TestBoard::DdkRelease() { delete this; }
 // This function is driver_integration_test::GetBootItem.
 zx_status_t TestBoard::FetchAndDeserialize() {
   size_t metadata_size;
-  zx_status_t status = DdkGetMetadataSize(DEVICE_METADATA_BOARD_PRIVATE, &metadata_size);
-  if (status != ZX_OK) {
+  zx_status_t status = DdkGetMetadata(DEVICE_METADATA_BOARD_PRIVATE, nullptr, 0, &metadata_size);
+  if (status != ZX_ERR_BUFFER_TOO_SMALL) {
     return status;
   }
   if (metadata_size < sizeof(DeviceList)) {

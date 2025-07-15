@@ -57,11 +57,6 @@ zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf, s
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT
-zx_status_t device_get_metadata_size(zx_device_t* device, uint32_t type, size_t* out_size) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* device, const char* name,
                                                   uint32_t proto_id, void* protocol) {
   return ZX_ERR_NOT_SUPPORTED;

@@ -462,16 +462,6 @@ TEST_F(DeviceTest, DeviceMetadata) {
   status = device.AddMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
   ASSERT_EQ(ZX_OK, status);
 
-  // Check the metadata size.
-  size_t size = 0;
-  status = device.GetMetadataSize(DEVICE_METADATA_PRIVATE, &size);
-  ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(sizeof(metadata), size);
-
-  // Check the metadata size for missing metadata.
-  status = device.GetMetadataSize(DEVICE_METADATA_BOARD_PRIVATE, &size);
-  ASSERT_EQ(ZX_ERR_NOT_FOUND, status);
-
   // Get the metadata.
   uint64_t found = 0;
   size_t found_size = 0;

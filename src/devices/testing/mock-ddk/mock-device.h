@@ -210,7 +210,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // This allows the parent to store protocols that can be accessed by a child device.
   // If IsRootParent returns true, only the following calls may target this device:
   //  device_get_protocol
-  //  device_get_metadata_size
   //  device_get_metadata
   // These calls will be able to target this type of device soon:
   //  device_get_fragment
@@ -296,10 +295,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);
   friend zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf,
                                          size_t buflen, size_t* actual);
-
-  // device_get_metadata_size calls GetMetadataSize:
-  zx_status_t GetMetadataSize(uint32_t type, size_t* out_size);
-  friend zx_status_t device_get_metadata_size(zx_device_t* device, uint32_t type, size_t* out_size);
 
   // device_get_config_vmo calls GetConfigVmo:
   zx::vmo& GetConfigVmo() { return config_vmo_; }

@@ -73,10 +73,6 @@ __EXPORT zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* 
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, size_t* out_size) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data,
                                          size_t length) {
   return ZX_ERR_NOT_SUPPORTED;
