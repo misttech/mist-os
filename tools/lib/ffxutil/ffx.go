@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
@@ -1002,7 +1001,7 @@ func processPBArtifactsResult(raw string, err error) ([]string, error) {
 }
 
 // GetImageFromPB returns an image from a product bundle.
-func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string, bootloader string) (*bootserver.Image, error) {
+func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string, bootloader string) (*build.Image, error) {
 	args := []string{"--machine", "json", "product", "get-image-path", pbPath, "-r"}
 	if slot != "" && imageType != "" && bootloader == "" {
 		args = append(args, "--slot", slot, "--image-type", imageType)
@@ -1019,7 +1018,7 @@ func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot st
 	return processImageFromPBResult(pbPath, strings.TrimSpace(s), err)
 }
 
-func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver.Image, error) {
+func processImageFromPBResult(pbPath string, raw string, err error) (*build.Image, error) {
 	if raw == "" {
 		if err != nil {
 			return nil, err
@@ -1062,22 +1061,7 @@ func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver
 	}
 
 	imagePath := filepath.Join(pbPath, result.Ok.Path)
-	buildImg := build.Image{Name: result.Ok.Path, Path: imagePath}
-	reader, err := os.Open(imagePath)
-	if err != nil {
-		return nil, err
-	}
-	fi, err := reader.Stat()
-	if err != nil {
-		return nil, err
-	}
-	image := bootserver.Image{
-		Image:  buildImg,
-		Reader: reader,
-		Size:   fi.Size(),
-	}
-
-	return &image, nil
+	return &build.Image{Name: result.Ok.Path, Path: imagePath}, nil
 }
 
 // Log runs "ffx log <args>", optionally sending the output to "output"

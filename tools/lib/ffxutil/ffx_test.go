@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
 )
@@ -172,23 +171,14 @@ func TestFFXPBArtifacts(t *testing.T) {
 
 func TestFFXPBImagePath(t *testing.T) {
 	tmpDir := t.TempDir()
-	imageDir := filepath.Join(tmpDir, "pb/relpath")
-	imagePath := filepath.Join(imageDir, "image")
-	err := os.MkdirAll(imageDir, 0777)
-	if err != nil {
-		t.Errorf("Test error: %q", err)
-	}
-	err = os.WriteFile(imagePath, []byte("Some bytes to have a size"), 0644)
-	if err != nil {
-		t.Errorf("Test error: %q", err)
-	}
+	imagePath := filepath.Join(tmpDir, "pb/relpath/image")
 
 	for _, testcase := range []struct {
 		name      string
 		output    string
 		errOutput string
 		exitCode  int
-		wantImage *bootserver.Image
+		wantImage *build.Image
 		wantError error
 	}{
 		{
@@ -196,9 +186,9 @@ func TestFFXPBImagePath(t *testing.T) {
 			output:    `{"ok": {"path": "relpath/image"}}`,
 			errOutput: "",
 			exitCode:  0,
-			wantImage: &bootserver.Image{
-				Image: build.Image{Name: "relpath/image", Path: imagePath},
-				Size:  25,
+			wantImage: &build.Image{
+				Name: "relpath/image",
+				Path: imagePath,
 			},
 			wantError: nil,
 		},
@@ -244,14 +234,11 @@ func TestFFXPBImagePath(t *testing.T) {
 			}
 			if image != nil {
 
-				if image.Image.Name != testcase.wantImage.Image.Name {
-					t.Errorf("Image name mismatch Got  %v want %v", image.Image, testcase.wantImage.Image)
+				if image.Name != testcase.wantImage.Name {
+					t.Errorf("Image name mismatch Got  %v want %v", image.Name, testcase.wantImage.Name)
 				}
-				if image.Image.Path != testcase.wantImage.Image.Path {
-					t.Errorf("Image name mismatch Got  %v want %v", image.Path, testcase.wantImage.Path)
-				}
-				if image.Size != testcase.wantImage.Size {
-					t.Errorf("Image size mismatch Got  %v want %v", image.Size, testcase.wantImage.Size)
+				if image.Path != testcase.wantImage.Path {
+					t.Errorf("Image path mismatch Got  %v want %v", image.Path, testcase.wantImage.Path)
 				}
 			}
 		})

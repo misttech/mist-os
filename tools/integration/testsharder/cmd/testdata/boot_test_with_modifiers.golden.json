@@ -48,7 +48,6 @@
             "host_x64/fvm",
             "host_x64/llvm-profdata",
             "host_x64/zbi",
-            "images.json",
             "product_bundles.json"
         ],
         "timeout_secs": 602,
@@ -86,8 +85,6 @@
             "run",
             "-llvm-profdata",
             "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
             "-timeout",
             "602s",
             "-ffx",
@@ -151,7 +148,6 @@
             "host_x64/fvm",
             "host_x64/llvm-profdata",
             "host_x64/zbi",
-            "images.json",
             "product_bundles.json"
         ],
         "timeout_secs": 602,
@@ -189,8 +185,6 @@
             "run",
             "-llvm-profdata",
             "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
             "-timeout",
             "602s",
             "-ffx",

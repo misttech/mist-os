@@ -394,7 +394,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if pbPath == "" {
 			return fmt.Errorf("product bundle %s is not included in the product_bundles.json manifest", s.ProductBundle)
 		}
-		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), params.Pave, pbPath, ffxPath); err != nil {
+		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, pbPath, ffxPath); err != nil {
 			return err
 		}
 	}

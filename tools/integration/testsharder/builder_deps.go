@@ -73,7 +73,7 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 		if err != nil {
 			return err
 		}
-		toolDeps := []string{"bootserver_new", "ssh"}
+		toolDeps := []string{"ssh"}
 		if s.HostCPU() == "x64" {
 			// Relevant for automatic symbolization of things running on
 			// host. Only the x64 variation is available in the checkout and

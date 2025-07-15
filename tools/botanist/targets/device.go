@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -24,7 +23,6 @@ import (
 	serialconstants "go.fuchsia.dev/fuchsia/tools/lib/serial/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/net/netboot"
-	"go.fuchsia.dev/fuchsia/tools/net/netutil"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	"go.fuchsia.dev/fuchsia/tools/net/tftp"
 
@@ -223,12 +221,8 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 	return t.sshClient(&net.IPAddr{IP: addr}, "device")
 }
 
-func (t *Device) mustLoadThroughZedboot() bool {
-	return t.config.FastbootSernum == "" && t.config.InstallMode != fastbootMode
-}
-
 // Start starts the device target.
-func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) error {
+func (t *Device) Start(ctx context.Context, args []string, pbPath string, isBootTest bool) error {
 	serialSocketPath := t.SerialSocketPath()
 
 	// Set up log listener and dump kernel output to stdout.
@@ -330,63 +324,6 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 					return errWrapped
 				}
 			}
-		}
-	}
-	if t.mustLoadThroughZedboot() {
-		// Initialize the tftp client if:
-		// 1. It is currently uninitialized.
-		// 2. The device has been placed in Zedboot.
-		if t.tftp == nil {
-			// Discover the node on the network and initialize a tftp client to
-			// talk to it.
-			addr, err := netutil.GetNodeAddress(ctx, t.Nodename())
-			if err != nil {
-				return err
-			}
-			tftpClient, err := tftp.NewClient(&net.UDPAddr{
-				IP:   addr.IP,
-				Port: tftp.ClientPort,
-				Zone: addr.Zone,
-			}, 0, 0)
-			if err != nil {
-				return err
-			}
-			t.tftp = tftpClient
-		}
-		// For boot tests, we need to add the appropriate boot args to the
-		// specified custom images instead of the default images, so we'll pass
-		// in only the custom images to bootserver.Boot() to exclude the default
-		// images which already have boot args attached to them.
-		var finalImgs []bootserver.Image
-		var zbi, fvm *bootserver.Image
-		if isBootTest {
-			// Only get images from product bundle for boot tests when
-			// loading through zedboot. Regular tests should just use
-			// the images from images.json as is.
-			zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
-			if err != nil {
-				return err
-			}
-			if zbi != nil {
-				zbi.Args = []string{"--boot"}
-				finalImgs = append(finalImgs, *zbi)
-			}
-			fvm, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
-			if err != nil {
-				return err
-			}
-			if fvm != nil {
-				fvm.Args = []string{"--fvm"}
-				finalImgs = append(finalImgs, *fvm)
-			}
-		}
-		if len(finalImgs) == 0 {
-			for _, img := range images {
-				finalImgs = append(finalImgs, img)
-			}
-		}
-		if err := bootserver.Boot(ctx, t.Tftp(), finalImgs, args, authorizedKeys); err != nil {
-			return err
 		}
 	}
 

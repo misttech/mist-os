@@ -224,9 +224,6 @@ func ConstructBaseCommand(shard *Shard, checkoutRoot, buildDir string, tools bui
 		cmd = append(cmd, "-llvm-profdata", fmt.Sprintf("%s=clang", llvmProfdata))
 	}
 	cmd = append(cmd,
-		// TODO(https://fxbug.dev/346868967): Remove when we've migrated off of paving.
-		"-images",
-		imagesManifest,
 		"-timeout",
 		fmt.Sprintf("%ds", shard.TimeoutSecs),
 	)

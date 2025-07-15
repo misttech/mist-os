@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -453,7 +452,7 @@ func (g *GCE) UseProductBundles() bool {
 	return false
 }
 
-func (g *GCE) Start(_ context.Context, _ []bootserver.Image, _ []string, _ string, _ bool) error {
+func (g *GCE) Start(_ context.Context, _ []string, _ string, _ bool) error {
 	return nil
 }
 

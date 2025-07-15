@@ -27,7 +27,6 @@ go_library("lib") {
   ]
   deps = [
     "//third_party/golibs:golang.org/x/sync",
-    "//tools/bootserver:bootserverconstants",
     "//tools/botanist:constants",
     "//tools/build",
     "//tools/lib/ffxutil:constants",
