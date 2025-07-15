@@ -1723,7 +1723,11 @@ async fn gpt_all_binds_multiple_disks() {
     }]);
     builder.fshost().set_config_value("gpt_all", true);
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    builder.with_extra_disk().with_gpt().with_extra_gpt_partition("test_part");
+    builder
+        .with_extra_disk()
+        .with_gpt()
+        .with_unformatted_volume_manager()
+        .with_extra_gpt_partition("test_part");
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
