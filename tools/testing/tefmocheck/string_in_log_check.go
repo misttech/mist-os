@@ -890,10 +890,9 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/427942765
 		&stringInLogCheck{
-			String:             "Failed to setup PSY and IIO path",
-			Type:               syslogType,
-			SkipAllPassedTests: true,
-			AttributeToTest:    true,
+			String:          "Failed to setup PSY and IIO path",
+			Type:            syslogType,
+			AttributeToTest: true,
 		},
 	}
 }
