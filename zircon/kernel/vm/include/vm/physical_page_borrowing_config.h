@@ -7,17 +7,10 @@
 #ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_PHYSICAL_PAGE_BORROWING_CONFIG_H_
 #define ZIRCON_KERNEL_VM_INCLUDE_VM_PHYSICAL_PAGE_BORROWING_CONFIG_H_
 
-#include <kernel/spinlock.h>
-
-enum class PhysicalPageBorrowingSite : uint32_t {
-  kSupplyPages,
-};
+#include <ktl/atomic.h>
 
 // Allow the ppb kernel command to dynamically control whether physical page borrowing is enabled
 // or disabled (for pager-backed VMOs only for now).
-//
-// TODO(dustingreen):
-//  * Change the default from false to true.
 class PhysicalPageBorrowingConfig {
  public:
   PhysicalPageBorrowingConfig() = default;
