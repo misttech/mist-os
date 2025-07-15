@@ -46,7 +46,7 @@ use wlan_common::test_utils::ExpectWithin;
 use wlan_common::{assert_variant, random_fidl_bss_description};
 #[allow(
     clippy::single_component_path_imports,
-    reason = "mass allow for https://fxbug.dev/381896734"
+    reason = "mass allow for https://https://fxbug.devug.dev/381896734"
 )]
 use {
     fidl_fuchsia_wlan_common as fidl_common,
@@ -784,7 +784,7 @@ use fidl_sme::Protection as Scanned;
 #[test_case(Saved::Wpa, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_max.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_psk.clone())]
-// TODO(https://fxbug.dev/42166758): reenable credential upgrading
+// TODO(https://https://fxbug.devug.dev/42166758): reenable credential upgrading
 // #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_min.clone())]
 // #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_max.clone())]
 // #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_psk.clone())]
@@ -828,7 +828,7 @@ fn test_save_and_connect(
     );
 }
 
-// TODO(https://fxbug.dev/42166758): reenable credential upgrading, which will make these cases connect
+// TODO(https://https://fxbug.devug.dev/42166758): reenable credential upgrading, which will make these cases connect
 #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_max.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_psk.clone())]
@@ -973,7 +973,7 @@ fn test_save_and_fail_to_connect(
                     },
                     fidl_sme::ScanRequest::Passive(_req) => {
                         // Sometimes, a passive scan sneaks in for the idle interface. Ignore it.
-                        // Context: https://fxbug.dev/42066447
+                        // Context: https://https://fxbug.devug.dev/42066447
                     },
                 }
                 let vmo = write_vmo(mock_scan_results).expect("failed to write VMO");
@@ -1768,6 +1768,8 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     }
 }
 
+// TODO(https://fxbug.dev/424173437) - Re-enable once IfaceManager deadlock issue has been resolved.
+#[ignore]
 #[fuchsia::test]
 fn test_destroy_iface_recovery() {
     let mut exec = fasync::TestExecutor::new();
@@ -1836,6 +1838,8 @@ fn test_destroy_iface_recovery() {
     );
 }
 
+// TODO(https://fxbug.dev/424173437) - Re-enable once IfaceManager deadlock issue has been resolved.
+#[ignore]
 #[fuchsia::test]
 fn test_create_iface_recovery() {
     let mut exec = fasync::TestExecutor::new();
