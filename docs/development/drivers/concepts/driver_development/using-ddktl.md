@@ -22,7 +22,6 @@ Mixin class            | Function             | Purpose
 `ddk::Initializable`      | **DdkInit()**        | called after **DdkAdd()**, for completing initialization of a device safely
 `ddk::Unbindable`         | **DdkUnbind()**      | called when this device is being removed
 `ddk::Suspendable`        | **DdkSuspend()**     | to suspend device
-`ddk::PerformanceTunable` | **DdkSetPerformanceState()**   | to transition the performant state
 
 When defining the class for your device, you specify which functions it will
 support by including the appropriate mixins.

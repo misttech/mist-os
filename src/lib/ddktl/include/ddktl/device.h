@@ -60,10 +60,6 @@
 // |                            |                                                    |
 // | ddk::Unbindable            | void DdkUnbind(ddk::UnbindTxn txn)                 |
 // |                            |                                                    |
-// | ddk::PerformanceTunable    | zx_status_t DdkSetPerformanceState(                |
-// |                            |                           uint32_t requested_state,|
-// |                            |                           uint32_t* out_state)     |
-// |                            |                                                    |
 // | ddk::Messageable<P>::Mixin | Methods defined by fidl::WireServer<P>             |
 // |                            |                                                    |
 // | ddk::Suspendable           | void DdkSuspend(ddk::SuspendTxn txn)               |
