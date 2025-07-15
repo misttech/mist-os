@@ -410,6 +410,31 @@ impl EventLoop {
             .unwrap_or_else(|| {
                 exit_with_anyhow_error(anyhow!("interface watcher stream unexpectedly ended"))
             });
+
+        // Only proceed with tracking interfaces in `interface_properties` if
+        // the interface should be monitored.
+        let should_monitor_interface = match event.inner() {
+            fnet_interfaces::Event::Existing(properties)
+            | fnet_interfaces::Event::Added(properties) => Self::should_monitor_interface(
+                properties
+                    .port_class
+                    .clone()
+                    .expect("non-Changed Events should have port_class present"),
+            ),
+            // Changed and Removed events are preceded by a previous Existing
+            // or Added event that add the interface to `interface_properties`.
+            // When the interface does not exist in the map, don't process the
+            // Changed or Removed event.
+            fnet_interfaces::Event::Changed(fnet_interfaces::Properties { id, .. }) => self
+                .interface_properties
+                .contains_key(&id.expect("Changed events must include the interface id")),
+            fnet_interfaces::Event::Removed(id) => self.interface_properties.contains_key(id),
+            fnet_interfaces::Event::Idle(_) => true,
+        };
+        if !should_monitor_interface {
+            return None;
+        }
+
         let discovered_id = self
             .handle_interface_watcher_event(event)
             .await
@@ -441,10 +466,6 @@ impl EventLoop {
         {
             fnet_interfaces_ext::UpdateResult::Added { properties, state: _ }
             | fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
-                if !Self::should_monitor_interface(&properties) {
-                    return Ok(None);
-                }
-
                 let id = properties.id;
                 debug!("setting timer for interface {}", id);
 
@@ -532,22 +553,28 @@ impl EventLoop {
     }
 
     /// Determine whether an interface should be monitored or not.
-    fn should_monitor_interface(
-        &fnet_interfaces_ext::Properties { port_class, .. }: &fnet_interfaces_ext::Properties<
-            fnet_interfaces_ext::DefaultInterest,
-        >,
-    ) -> bool {
-        return match port_class {
-            fnet_interfaces_ext::PortClass::Loopback
-            | fnet_interfaces_ext::PortClass::Blackhole
-            | fnet_interfaces_ext::PortClass::Lowpan => false,
-            fnet_interfaces_ext::PortClass::Virtual
-            | fnet_interfaces_ext::PortClass::Ethernet
-            | fnet_interfaces_ext::PortClass::WlanClient
-            | fnet_interfaces_ext::PortClass::WlanAp
-            | fnet_interfaces_ext::PortClass::Ppp
-            | fnet_interfaces_ext::PortClass::Bridge => true,
-        };
+    fn should_monitor_interface(port_class: fnet_interfaces::PortClass) -> bool {
+        match port_class {
+            fnet_interfaces::PortClass::Loopback(_)
+            | fnet_interfaces::PortClass::Blackhole(_)
+            | fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Lowpan) => false,
+            fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Virtual)
+            | fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Ethernet)
+            | fnet_interfaces::PortClass::Device(fhardware_network::PortClass::WlanClient)
+            | fnet_interfaces::PortClass::Device(fhardware_network::PortClass::WlanAp)
+            | fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Ppp)
+            | fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Bridge) => true,
+            fnet_interfaces::PortClass::Device(
+                fhardware_network::PortClass::__SourceBreaking { unknown_ordinal },
+            ) => {
+                log::warn!("unknown fhardware_network::PortClass ordinal {unknown_ordinal:?}");
+                false
+            }
+            fnet_interfaces::PortClass::__SourceBreaking { unknown_ordinal } => {
+                log::warn!("unknown fnet_interfaces::PortClass ordinal {unknown_ordinal:?}");
+                false
+            }
+        }
     }
 
     /// Handles events observed by the route watchers by adding/removing routes
