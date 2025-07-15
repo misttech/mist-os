@@ -9,7 +9,6 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/driver-unit-test/utils.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -312,24 +311,6 @@ zx_status_t OtRadioDevice::Init() {
       zxlogf(ERROR, "Failed to configure bootloader gpio to output: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
-    }
-  }
-
-  size_t actual;
-  uint32_t device_id;
-  zx_status_t status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE,
-                                                    &device_id, sizeof(device_id), &actual);
-  if (status != ZX_OK || sizeof(device_id) != actual) {
-    status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &device_id, sizeof(device_id),
-                                 &actual);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to get metadata: %s", zx_status_get_string(status));
-      return status;
-    }
-    if (sizeof(device_id) != actual) {
-      zxlogf(ERROR, "ot-radio: Failed to get metadata: Expected %lu but actual is %lu bytes",
-             sizeof(device_id), actual);
-      return ZX_ERR_INTERNAL;
     }
   }
 
