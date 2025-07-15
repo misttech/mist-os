@@ -420,7 +420,13 @@ class RouteNetlinkSocketNewAddr : public testing::TestWithParam<RouteNetlinkSock
     ASSERT_EQ(ioctl(s.get(), SIOCSIFFLAGS, &ifr), 0) << strerror(errno);
   }
 
-  void TearDown() override { tun_.reset(); }
+  void TearDown() override {
+    tun_.reset();
+    // Wait for the device to go away so that it does not linger into the next test.
+    while (if_nametoindex(kTestIfName) > 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+  }
   static constexpr char kTestIfName[] = "netlink_test";
 
  private:
@@ -496,8 +502,11 @@ TEST_P(RouteNetlinkSocketNewAddr, AddSubnetRoute) {
 
     ASSERT_EQ(sendmsg(nlsock.get(), &msg, 0), static_cast<ssize_t>(iov.iov_len)) << strerror(errno);
   }
+  // Use a timeout instead of MSG_DONTWAIT to avoid timing issues with delays.
+  struct timeval timeout = {.tv_sec = 0, .tv_usec = 100'000};
+  ASSERT_EQ(setsockopt(nlsock.get(), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)), 0);
   while (true) {
-    ssize_t len = recv(nlsock.get(), buf, sizeof(buf), MSG_DONTWAIT);
+    ssize_t len = recv(nlsock.get(), buf, sizeof(buf), 0);
     if (len == 0) {
       break;
     }
@@ -505,9 +514,9 @@ TEST_P(RouteNetlinkSocketNewAddr, AddSubnetRoute) {
       ASSERT_EQ(errno, EAGAIN);
       break;
     }
-    rtmsg* rtm;
-    for (nlmsghdr* nlh = reinterpret_cast<nlmsghdr*>(buf);
-         NLMSG_OK(nlh, static_cast<uint32_t>(len)); nlh = NLMSG_NEXT(nlh, len)) {
+    rtmsg* rtm = nullptr;
+    for (nlmsghdr* nlh = reinterpret_cast<nlmsghdr*>(buf); MY_NLMSG_OK(nlh, len);
+         nlh = NLMSG_NEXT(nlh, len)) {
       switch (nlh->nlmsg_type) {
         case NLMSG_DONE:
           break;
@@ -527,8 +536,8 @@ TEST_P(RouteNetlinkSocketNewAddr, AddSubnetRoute) {
           FAIL() << "unknown message type: " << nlh->nlmsg_type;
       }
     }
-    ASSERT_FALSE(expect_subnet_route);
   }
+  ASSERT_FALSE(expect_subnet_route);
 }
 
 INSTANTIATE_TEST_SUITE_P(
