@@ -3965,15 +3965,15 @@ rustc_library("cmac-v0_7_2") {
   applicable_licenses = [ ":cmac-v0_7_2.license" ]
 }
 
-license("combine-v4_6_2.license") {
+license("combine-v4_6_7.license") {
   public_package_name = "combine"
-  license_files = [ "//third_party/rust_crates/vendor/combine-4.6.2/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/combine-4.6.7/LICENSE" ]
 }
 
-rustc_library("combine-v4_6_2") {
+rustc_library("combine-v4_6_7") {
   crate_name = "combine"
-  source_root = "//third_party/rust_crates/vendor/combine-4.6.2/src/lib.rs"
-  output_name = "combine-b374e32fabd5ae13"
+  source_root = "//third_party/rust_crates/vendor/combine-4.6.7/src/lib.rs"
+  output_name = "combine-dfa2132adab9c82"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -3987,8 +3987,8 @@ rustc_library("combine-v4_6_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=b374e32fabd5ae13",
-    "-Cextra-filename=-b374e32fabd5ae13",
+    "-Cmetadata=dfa2132adab9c82",
+    "-Cextra-filename=-dfa2132adab9c82",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"bytes\"",
     "--cfg=feature=\"default\"",
@@ -3997,7 +3997,7 @@ rustc_library("combine-v4_6_2") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":combine-v4_6_2.license" ]
+  applicable_licenses = [ ":combine-v4_6_7.license" ]
 }
 
 license("concurrent-queue-v2_5_0.license") {
@@ -18255,7 +18255,7 @@ rustc_library("toml_edit-v0_2_1") {
 
   deps = []
   deps += [ ":chrono-v0_4_41" ]
-  deps += [ ":combine-v4_6_2" ]
+  deps += [ ":combine-v4_6_7" ]
   deps += [ ":linked-hash-map-v0_5_6" ]
 
   rustenv = []

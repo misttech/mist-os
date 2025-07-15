@@ -20,22 +20,19 @@ package(
 
 package_info(
     name = "package_info",
-    package_name = "toml_edit",
-    package_url = "https://github.com/ordian/toml_edit",
-    package_version = "0.2.1",
+    package_name = "combine",
+    package_url = "https://github.com/Marwes/combine",
+    package_version = "4.6.7",
 )
 
 license(
     name = "license",
-    license_kinds = [
-        "@rules_license//licenses/spdx:Apache-2.0",
-        "@rules_license//licenses/spdx:MIT",
-    ],
-    license_text = "LICENSE-APACHE",
+    license_kinds = ["@rules_license//licenses/spdx:MIT"],
+    license_text = "LICENSE",
 )
 
 rust_library(
-    name = "toml_edit",
+    name = "combine",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -52,6 +49,12 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "alloc",
+        "bytes",
+        "default",
+        "std",
+    ],
     crate_root = "src/lib.rs",
     edition = "2018",
     rustc_flags = [
@@ -59,7 +62,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=toml_edit",
+        "crate-name=combine",
         "manual",
         "noclippy",
         "norustfmt",
@@ -72,10 +75,9 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.2.1",
+    version = "4.6.7",
     deps = [
-        "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
-        "//third_party/rust_crates/vendor/combine-4.6.7:combine",
-        "//third_party/rust_crates/vendor/linked-hash-map-0.5.6:linked_hash_map",
+        "//third_party/rust_crates/ask2patch/memchr",
+        "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",
     ],
 )
