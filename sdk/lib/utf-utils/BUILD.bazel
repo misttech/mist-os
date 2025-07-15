@@ -1,0 +1,50 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# LINT.IfChange
+# TODO(https://fxbug.dev/429374432): Use bazel2gn to keep BUILD.gn in sync (see below).
+load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
+
+idk_cc_source_library(
+    name = "utf-utils",
+    srcs = [
+        "internal/arm-neon.h",
+        "internal/generic-simd.h",
+        "internal/scalar.cc",
+        "internal/scalar.h",
+        "internal/x86-avx2.h",
+        "internal/x86-ssse3.h",
+        "utf-utils.cc",
+    ],
+    hdrs = [
+        "utf-utils.h",
+    ],
+    api_area = "Unknown",
+    category = "partner",
+    idk_name = "utf-utils",
+    include_base = "//sdk",
+    stable = True,
+    # TODO: The Fuchsia build configuration for this target requires
+    # depending on //zircon/system/ulib/zx:zx as well. This requires
+    # using a select() statement as in:
+    #
+    #   deps = ["//sdk/lib/stdcompat"] + select({
+    #     "@platforms//os:fuchsia": [ "//zircon/system/ulib/zx" ],
+    #     "//conditions:default": []
+    #   }),
+    #
+    # But this is not possible for now for two reasons:
+    #
+    #  - There is no Bazel definition for //zircon/system/ulib/zx yet.
+    #
+    #  - idk_cc_source_library() is a macro that doesn't support
+    #    select() statements in `deps` yet.
+    #
+    # When these issues are solved, update the definition here then
+    # use bazel2gn to sync this file with BUILD.gn.
+    #
+    visibility = ["//visibility:public"],
+    deps = ["//sdk/lib/stdcompat"],
+)
+# LINT.ThenChange(BUILD.gn)

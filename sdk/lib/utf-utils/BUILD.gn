@@ -9,6 +9,7 @@ import("//build/fuzz.gni")
 import("//build/test.gni")
 import("//build/testing/cc_test_executable.gni")
 
+# LINT.IfChange
 sdk_source_set("utf-utils") {
   category = "partner"
 
@@ -46,6 +47,8 @@ sdk_source_set("utf-utils") {
 
   public_configs = [ "//sdk/config" ]
 }
+
+# LINT.ThenChange(BUILD.bazel)
 
 cc_test_executable("unit-tests-bin") {
   testonly = true
