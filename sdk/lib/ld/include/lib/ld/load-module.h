@@ -19,9 +19,7 @@
 
 namespace ld {
 
-// TODO(https://fxbug.dev/338237380): This should match Musl behavior with
-// ResolverPolicy::kStrongOverWeak.
-constexpr elfldltl::ResolverPolicy kResolverPolicy = elfldltl::ResolverPolicy::kStrictLinkOrder;
+constexpr elfldltl::ResolverPolicy kResolverPolicy = elfldltl::ResolverPolicy::kStrongOverWeak;
 
 // Forward declaration for a helper class defined below.
 // See the name_ref() and soname_ref() methods in ld::LoadModule, below.

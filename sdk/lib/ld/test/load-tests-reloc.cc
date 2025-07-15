@@ -9,9 +9,7 @@
 namespace ld::testing {
 namespace {
 
-// TODO(https://fxbug.dev/338237380): This should match Musl behavior with
-// ResolverPolicy::kStrongOverWeak.
-static_assert(ld::kResolverPolicy == elfldltl::ResolverPolicy::kStrictLinkOrder);
+static_assert(ld::kResolverPolicy == elfldltl::ResolverPolicy::kStrongOverWeak);
 
 TYPED_TEST(LdLoadTests, Relative) {
   constexpr int64_t kReturnValue = 17;

@@ -28,9 +28,7 @@ using dl::testing::TestSym;
 // Weak symbol resolution tests conditionalize on `ld::kResolverPolicy` to
 // verify the symbol chosen based on the resolution strategy (e.g., strict
 // link-order vs. strong-over-weak).
-// TODO(https://fxbug.dev/338237380): This should match Musl behavior with
-// ResolverPolicy::kStrongOverWeak.
-static_assert(ld::kResolverPolicy == elfldltl::ResolverPolicy::kStrictLinkOrder);
+static_assert(ld::kResolverPolicy == elfldltl::ResolverPolicy::kStrongOverWeak);
 
 // Test that the module data structure uses its own copy of the module's name,
 // so that there is no dependency on the memory backing the original string
