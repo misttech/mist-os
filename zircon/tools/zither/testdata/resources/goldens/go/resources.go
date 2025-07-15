@@ -19,7 +19,7 @@ const (
 type Handle uint32
 
 type StructWithHandleMembers struct {
-	UntypedHandle Handle
-	HandleA       Handle
-	HandleB       Handle
+	UntypedHandle Handle `json:"untyped_handle"`
+	HandleA       Handle `json:"handle_a"`
+	HandleB       Handle `json:"handle_b"`
 }

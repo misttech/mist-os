@@ -9,6 +9,6 @@
 package multifile
 
 type C struct {
-	A  A
-	B2 B2
+	A  A  `json:"a"`
+	B2 B2 `json:"b2"`
 }

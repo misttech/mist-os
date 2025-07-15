@@ -20,29 +20,29 @@ const SizeConst uint = 100
 const UintptrConst uintptr = 0x1234abcd5678ffff
 
 type StructWithPrimitives struct {
-	CharField    byte
-	SizeField    uint
-	UintptrField uintptr
+	CharField    byte    `json:"char_field"`
+	SizeField    uint    `json:"size_field"`
+	UintptrField uintptr `json:"uintptr_field"`
 }
 
 type Uint8Alias = uint8
 
 type StructWithPointers struct {
-	U64ptr   *uint64
-	Charptr  *byte
-	Usizeptr *uint
-	Byteptr  *uint8
-	Voidptr  unsafe.Pointer
-	Aliasptr *Uint8Alias
+	U64ptr   *uint64        `json:"u64ptr"`
+	Charptr  *byte          `json:"charptr"`
+	Usizeptr *uint          `json:"usizeptr"`
+	Byteptr  *uint8         `json:"byteptr"`
+	Voidptr  unsafe.Pointer `json:"voidptr"`
+	Aliasptr *Uint8Alias    `json:"aliasptr"`
 }
 
 type StructWithStringArrays struct {
-	Str  [10]byte
-	Strs [4][6]byte
+	Str  [10]byte   `json:"str"`
+	Strs [4][6]byte `json:"strs"`
 }
 
 type OverlayStructVariant struct {
-	Value uint64
+	Value uint64 `json:"value"`
 }
 
 type OverlayWithEquallySizedVariantsDiscriminant uint64
@@ -143,6 +143,6 @@ func (o *OverlayWithDifferentlySizedVariants) AsC() *bool {
 }
 
 type StructWithOverlayMembers struct {
-	Overlay1 OverlayWithEquallySizedVariants
-	Overlay2 OverlayWithDifferentlySizedVariants
+	Overlay1 OverlayWithEquallySizedVariants     `json:"overlay1"`
+	Overlay2 OverlayWithDifferentlySizedVariants `json:"overlay2"`
 }

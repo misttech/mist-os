@@ -26,13 +26,14 @@ type Generator struct {
 
 func NewGenerator(formatter fidlgen.Formatter) *Generator {
 	gen := fidlgen.NewGenerator("GoTemplates", templates, formatter, template.FuncMap{
-		"PackageBasename": PackageBasename,
-		"PackageImports":  PackageImports,
-		"Name":            zither.UpperCamelCase,
-		"ConstMemberName": ConstMemberName,
-		"ConstType":       ConstType,
-		"ConstValue":      ConstValue,
-		"DescribeType":    DescribeType,
+		"PackageBasename":          PackageBasename,
+		"PackageImports":           PackageImports,
+		"Name":                     zither.UpperCamelCase,
+		"ConstMemberName":          ConstMemberName,
+		"ConstType":                ConstType,
+		"ConstValue":               ConstValue,
+		"DescribeType":             DescribeType,
+		"LowerCaseWithUnderscores": zither.LowerCaseWithUnderscores,
 	})
 	return &Generator{*gen}
 }

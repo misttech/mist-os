@@ -15,7 +15,7 @@ type {{ Name . }} struct {
 //{{ . }}
 {{- end }}
 {{- end }}
-    {{ Name . }} {{ DescribeType .Type }}
+     {{ Name . }} {{ DescribeType .Type }} `json:{{ LowerCaseWithUnderscores . | printf "%q" }}`
 {{- end }}
 }
 
