@@ -3300,7 +3300,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   // correct queue. Discardable pages are not considered zero forks as they are always in the
   // reclaimable page queues.
   if (zero_fork_ && source == vm_get_zero_page() && !target_->is_discardable()) {
-    pmm_page_queues()->MoveToAnonymousZeroFork(out_page);
+    pmm_page_queues()->MoveAnonymousToAnonymousZeroFork(out_page);
   }
 
   // This is the only path where we can allocate a new page without being a clone (clones are

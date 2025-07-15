@@ -1150,18 +1150,28 @@ void PageQueues::SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint6
   MaybeCheckActiveRatioAging(1);
 }
 
-void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
-  // The common case is that the |page| being moved was previously placed into the anonymous queue.
-  // If the zero fork queue is reclaimable, then most likely so is the anonymous queue, and so this
-  // move would be a no-op. As this case is common it is worth doing this quick check to
-  // short-circuit.
-  if (zero_fork_is_reclaimable_ &&
+void PageQueues::MoveAnonymousToAnonymousZeroFork(vm_page_t* page) {
+  // First perform a common case short-circuit where the page is already in the anonymous queue and
+  // both the anonymous and zero fork queues are the same reclaimable queue. In this case the page
+  // is already in the correct queue, and nothing needs to be done.
+  if (zero_fork_is_reclaimable_ && anonymous_is_reclaimable_ &&
       queue_is_reclaim(static_cast<PageQueue>(
           page->object.get_page_queue_ref().load(ktl::memory_order_relaxed)))) {
     return;
   }
   {
     Guard<SpinLock, IrqSave> guard{&list_lock_};
+    // First check if the page is presently in whatever counts as the anonymous queue. If it isn't,
+    // then we don't move it.
+    PageQueue queue =
+        static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
+    if (anonymous_is_reclaimable_ && !queue_is_reclaim(queue)) {
+      return;
+    }
+    if (!anonymous_is_reclaimable_ && queue != PageQueueAnonymous) {
+      return;
+    }
+    // In the anonymous queue, move to whatever counts as the anonymous zero fork queue.
     MoveToQueueLockedList(
         page, zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork);
 #if DEBUG_ASSERT_IMPLEMENTED

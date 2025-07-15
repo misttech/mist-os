@@ -123,8 +123,13 @@ class PageQueues {
   void MoveToReclaim(vm_page_t* page);
   void MoveToReclaimDontNeed(vm_page_t* page);
   void MoveToPagerBackedDirty(vm_page_t* page);
-  void MoveToAnonymousZeroFork(vm_page_t* page);
   void MoveToHighPriority(vm_page_t* page);
+
+  // If a page is presently in the anonymous (or reclaim queue, depending if anonymous pages are
+  // reclaimable) moves it to the appropriate anonymous zero fork queue (exact queue depends on
+  // whether zero forks are reclaimable or not). If the page is not in the anonymous queue then it
+  // is not modified.
+  void MoveAnonymousToAnonymousZeroFork(vm_page_t* page);
 
   // Indicates that page has failed a compression attempted, and moves it to a separate queue to
   // prevent it from being considered part of the reclaim set, which makes it neither active nor
