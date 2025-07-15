@@ -1023,8 +1023,7 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   }
 
   size_t actual = 0;
-  auto status = DdkGetFragmentMetadata("pdev", DEVICE_METADATA_PRIVATE, &metadata_,
-                                       sizeof(metadata_), &actual);
+  auto status = DdkGetMetadata(DEVICE_METADATA_PRIVATE, &metadata_, sizeof(metadata_), &actual);
   if (status != ZX_OK || actual != sizeof(metadata_)) {
     zxlogf(ERROR, "Dwc2::Init can't get driver metadata: %s, actual size: %ld expected size: %ld",
            zx_status_get_string(status), actual, sizeof(metadata_));

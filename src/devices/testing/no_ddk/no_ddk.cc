@@ -67,12 +67,6 @@ __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* device, const cha
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT
-zx_status_t device_get_fragment_metadata(zx_device_t* device, const char* name, uint32_t type,
-                                         void* buf, size_t buflen, size_t* actual) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* handler,
                                                     const char* service_name,
                                                     const char* instance_name,

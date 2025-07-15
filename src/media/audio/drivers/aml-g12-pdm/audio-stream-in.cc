@@ -97,10 +97,10 @@ zx_status_t AudioStreamIn::Init() {
 
 zx_status_t AudioStreamIn::InitPDev() {
   size_t actual = 0;
-  auto status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE, &metadata_,
-                                             sizeof(metadata::AmlPdmConfig), &actual);
+  auto status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &metadata_,
+                                    sizeof(metadata::AmlPdmConfig), &actual);
   if (status != ZX_OK || sizeof(metadata::AmlPdmConfig) != actual) {
-    zxlogf(ERROR, "device_get_fragment_metadata failed %d", status);
+    zxlogf(ERROR, "device_get_metadata failed %d", status);
     return status;
   }
 

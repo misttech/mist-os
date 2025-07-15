@@ -65,8 +65,8 @@ zx_status_t Ina231Device::Create(void* ctx, zx_device_t* parent) {
 
   Ina231Metadata metadata = {};
   size_t actual = 0;
-  zx_status_t status = device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_PRIVATE,
-                                                    &metadata, sizeof(metadata), &actual);
+  zx_status_t status =
+      device_get_metadata(parent, DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata), &actual);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get metadata: %d", status);
     return status;

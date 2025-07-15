@@ -158,13 +158,6 @@ __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* device, const cha
   return device->GetProtocol(proto_id, protocol, name);
 }
 
-__EXPORT
-zx_status_t device_get_fragment_metadata(zx_device_t* device, const char* name, uint32_t type,
-                                         void* buf, size_t buflen, size_t* actual) {
-  // The libdriver_lock will be locked in `device_get_metadata`.
-  return device_get_metadata(device, type, buf, buflen, actual);
-}
-
 __EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* handler,
                                                     const char* service_name,
                                                     const char* instance_name,

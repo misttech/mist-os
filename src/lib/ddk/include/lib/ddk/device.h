@@ -285,11 +285,6 @@ zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* dat
 zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* name, uint32_t proto_id,
                                          void* protocol);
 
-// retrieves metadata for a specific device
-// searches parent devices to find a match
-zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* name, uint32_t type,
-                                         void* buf, size_t buflen, size_t* actual);
-
 // Adds a service member protocol to the outgoing directory of |dev|
 //
 // May be called by the device ONLY AFTER device_add is called.

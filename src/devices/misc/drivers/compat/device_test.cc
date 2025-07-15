@@ -499,8 +499,8 @@ TEST_F(DeviceTest, DeviceFragmentMetadata) {
   // Get the metadata.
   uint64_t found = 0;
   size_t found_size = 0;
-  status = device_get_fragment_metadata(device.ZxDevice(), "fragment-name", DEVICE_METADATA_PRIVATE,
-                                        &found, sizeof(found), &found_size);
+  status = device_get_metadata(device.ZxDevice(), DEVICE_METADATA_PRIVATE, &found, sizeof(found),
+                               &found_size);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(metadata, found);
   EXPECT_EQ(sizeof(metadata), found_size);
