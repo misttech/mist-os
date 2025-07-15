@@ -50,6 +50,23 @@ pub async fn init_connection_behavior(
     }
 }
 
+/// Explicitly create daemon connection behavior, for subtools such as `ffx daemon echo`
+/// which we guarantee will use the daemon, irrespective of the configured connection type.
+/// Returns an error when in strict mode.
+pub async fn init_daemon_connection_behavior(
+    context: &EnvironmentContext,
+) -> Result<FhoConnectionBehavior> {
+    if context.is_strict() {
+        return Err(ffx_command_error::Error::User(anyhow::anyhow!(
+            "Daemon connections are not supported in strict mode"
+        )));
+    }
+    let build_info = context.build_info();
+    let overnet_injector = Injection::initialize_overnet(context.clone(), None, build_info).await?;
+    log::info!("Initializing FhoConnectionBehavior::DaemonConnector");
+    Ok(FhoConnectionBehavior::DaemonConnector(Arc::new(overnet_injector)))
+}
+
 /// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
 /// specify the moniker for the component exposing the proxy you're loading.
 ///
@@ -106,5 +123,20 @@ mod tests {
             EnvironmentContext::no_context(ExecutableKind::Test, ConfigMap::new(), None, true);
         let behavior = init_connection_behavior(&ctx).await.unwrap();
         assert!(matches!(behavior, FhoConnectionBehavior::DaemonConnector(_)));
+    }
+
+    #[fuchsia::test]
+    async fn test_daemon_connection_behavior() {
+        let ctx =
+            EnvironmentContext::no_context(ExecutableKind::Test, ConfigMap::new(), None, true);
+        let behavior = init_daemon_connection_behavior(&ctx).await.unwrap();
+        assert!(matches!(behavior, FhoConnectionBehavior::DaemonConnector(_)));
+    }
+
+    #[fuchsia::test]
+    async fn test_daemon_connection_behavior_fails_in_strict() {
+        let ctx =
+            EnvironmentContext::strict(ExecutableKind::Test, ConfigMap::new()).expect("strict env");
+        assert!(matches!(init_daemon_connection_behavior(&ctx).await, Err(_)));
     }
 }
