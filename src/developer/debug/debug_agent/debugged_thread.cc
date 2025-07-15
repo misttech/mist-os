@@ -462,8 +462,10 @@ debug_ipc::ThreadRecord DebuggedThread::GetThreadRecord(
       uint32_t max_stack_depth =
           stack_amount == debug_ipc::ThreadRecord::StackAmount::kMinimal ? 2 : 256;
 
+      LOGS(Info) << "Unwinding stack";
       UnwindStack(process_->process_handle(), process_->module_list(), thread_handle(), *regs,
                   max_stack_depth, &record.frames);
+      LOGS(Info) << "Done.";
     }
   } else {
     // Didn't bother querying the stack.

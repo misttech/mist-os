@@ -373,12 +373,15 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
           .test_collection = get_test_realm_res->test_collection,
       }};
     }
+
+    LOGS(Info) << "Launching test: " << test_url_;
     auto run_res = suite_runner->Run(
         {test_url_, std::move(run_suite_options), CreateEndpointsAndBind(suite_controller_)});
     if (!run_res.is_ok()) {
       return debug::ZxStatus(run_res.error_value().status(),
                              run_res.error_value().FormatDescription());
     }
+    LOGS(Info) << "Launching test succeeded, watching for events.";
     suite_controller_->WatchEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
       self->OnSuiteEvents(std::move(res));
     });
@@ -401,6 +404,9 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
       (void)suite_controller_.UnbindMaybeGetEndpoint();  // Otherwise run_controller won't return.
       if (result.is_error())
         LOGS(Warn) << "Failed to launch test: " << result.error_value();
+      if (result->events().empty()) {
+        LOGS(Warn) << "No more events from test suite controller.";
+      }
       if (component_manager_)
         component_manager_->running_tests_info_.erase(test_url_);
       return;

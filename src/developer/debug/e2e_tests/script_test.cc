@@ -103,6 +103,7 @@ void ScriptTest::OnOutput(const OutputBuffer& output) {
 
   if (match) {
     // We got at least one match, we're done processing this command's output.
+    fprintf(stderr, "done processing.\n");
     processing_ = false;
   }
 
@@ -168,6 +169,7 @@ void ScriptTest::DispatchNextCommandWhenReady(const std::string& command) {
     // do this after resetting our internal state above.
     ProcessScriptLines();
 
+    fprintf(stderr, "processing: %s\n", command.c_str());
     console().ProcessInputLine(command);
   });
 }
