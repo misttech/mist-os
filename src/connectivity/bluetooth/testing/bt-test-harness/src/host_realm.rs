@@ -9,8 +9,10 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_bluetooth_host::{HostMarker, ReceiverMarker, ReceiverRequestStream};
 use fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::{
-    Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, Durability, StartupMode,
+    Child, ChildRef, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, DependencyType,
+    Durability, Offer, OfferDirectory, Ref as CompRef, StartupMode,
 };
+use fidl_fuchsia_io::Operations;
 use fidl_fuchsia_logger::LogSinkMarker;
 use fuchsia_bluetooth::constants::{
     BT_HOST, BT_HOST_COLLECTION, BT_HOST_URL, DEV_DIR, HCI_DEVICE_DIR,
@@ -140,7 +142,7 @@ impl HostRealm {
             name: BT_HOST_COLLECTION.parse().unwrap(),
             durability: Durability::SingleRun,
             environment: None,
-            allowed_offers: cm_types::AllowedOffers::StaticOnly,
+            allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
             allow_long_names: false,
             persistent_storage: None,
         });
@@ -216,10 +218,33 @@ impl HostRealm {
             ..Default::default()
         };
 
+        let bt_host_offer = Offer::Directory(OfferDirectory {
+            source: Some(CompRef::Child(ChildRef {
+                name: fuchsia_driver_test::COMPONENT_NAME.to_owned(),
+                collection: None,
+            })),
+            source_name: Some("dev-class".to_owned()),
+            target_name: Some("dev-bt-hci-instance".to_owned()),
+            subdir: Some(format!("bt-hci/{filename}")),
+            dependency_type: Some(DependencyType::Strong),
+            rights: Some(
+                Operations::READ_BYTES
+                    | Operations::CONNECT
+                    | Operations::GET_ATTRIBUTES
+                    | Operations::TRAVERSE
+                    | Operations::ENUMERATE,
+            ),
+            ..Default::default()
+        });
+
         let realm_proxy: RealmProxy =
             realm.instance().connect_to_protocol_at_exposed_dir().unwrap();
         let _ = realm_proxy
-            .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
+            .create_child(
+                &collection_ref,
+                &child_decl,
+                CreateChildArgs { dynamic_offers: Some(vec![bt_host_offer]), ..Default::default() },
+            )
             .await
             .map_err(|e| format_err!("{e:?}"))?
             .map_err(|e| format_err!("{e:?}"))?;
