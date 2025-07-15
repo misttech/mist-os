@@ -1035,8 +1035,8 @@ impl<V> IaChecker for HashMap<v6::IAID, V> {
 ///    such a message if the information is of use to the recipient or
 ///    (2) ignore such a message completely and just discard it.
 ///
-/// The choice made by this function is (2): an error will be returned in such
-/// cases to inform callers that they should ignore the entire message.
+/// The choice made by this function is (1): invalid options will be ignored,
+/// and processing continues as usual.
 fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChecker>(
     msg: &v6::Message<'_, B>,
     exchange_type: ExchangeType,
@@ -1086,21 +1086,43 @@ fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChe
         min_t2 = maybe_get_nonzero_min(min_t2, t2);
     };
 
-    struct AllowedOptions {
-        preference: bool,
-        information_refresh_time: bool,
-        identity_association: bool,
+    #[derive(Copy, Clone)]
+    enum OptionAction {
+        Accept,
+        Ignore,
+        Drop,
+    }
+    impl OptionAction {
+        fn accept_option<'a>(
+            self,
+            opt: &v6::ParsedDhcpOption<'a>,
+            exchange_type: ExchangeType,
+        ) -> Result<bool, OptionsError> {
+            match self {
+                Self::Drop => Err(OptionsError::InvalidOption(format!("{:?}", opt))),
+                Self::Ignore => {
+                    warn!("{:?}: ignoring invalid option {:?}", exchange_type, opt);
+                    Ok(false)
+                }
+                Self::Accept => Ok(true),
+            }
+        }
+    }
+    struct OptionActions {
+        preference: OptionAction,
+        information_refresh_time: OptionAction,
+        identity_association: OptionAction,
     }
     // See RFC 8415 appendix B for a summary of which options are allowed in
     // which message types.
-    let AllowedOptions {
-        preference: preference_allowed,
-        information_refresh_time: information_refresh_time_allowed,
-        identity_association: identity_association_allowed,
+    let OptionActions {
+        preference: preference_action,
+        information_refresh_time: information_refresh_time_action,
+        identity_association: identity_association_action,
     } = match exchange_type {
-        ExchangeType::ReplyToInformationRequest => AllowedOptions {
-            preference: false,
-            information_refresh_time: true,
+        ExchangeType::ReplyToInformationRequest => OptionActions {
+            preference: OptionAction::Ignore,
+            information_refresh_time: OptionAction::Accept,
             // Per RFC 8415, section 16.12:
             //
             //    Servers MUST discard any received Information-request message that
@@ -1111,30 +1133,22 @@ fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChe
             // Since it's invalid to include IA options in an Information-request message,
             // it is also invalid to receive IA options in a Reply in response to an
             // Information-request message.
-            identity_association: false,
+            identity_association: OptionAction::Drop,
         },
-        ExchangeType::AdvertiseToSolicit => AllowedOptions {
-            preference: true,
-            information_refresh_time: false,
-            identity_association: true,
+        ExchangeType::AdvertiseToSolicit => OptionActions {
+            preference: OptionAction::Accept,
+            information_refresh_time: OptionAction::Ignore,
+            identity_association: OptionAction::Accept,
         },
         ExchangeType::ReplyWithLeases(
             RequestLeasesMessageType::Request
             | RequestLeasesMessageType::Renew
             | RequestLeasesMessageType::Rebind,
-        ) => {
-            AllowedOptions {
-                preference: false,
-                // Per RFC 8415, section 21.23
-                //
-                //    Information Refresh Time Option
-                //
-                //    [...] It is only used in Reply messages in response
-                //    to Information-request messages.
-                information_refresh_time: false,
-                identity_association: true,
-            }
-        }
+        ) => OptionActions {
+            preference: OptionAction::Ignore,
+            information_refresh_time: OptionAction::Ignore,
+            identity_association: OptionAction::Accept,
+        },
     };
 
     for opt in msg.options() {
@@ -1187,8 +1201,8 @@ fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChe
                 }
             }
             v6::ParsedDhcpOption::Preference(preference_opt) => {
-                if !preference_allowed {
-                    return Err(OptionsError::InvalidOption(format!("{:?}", opt)));
+                if !preference_action.accept_option(&opt, exchange_type)? {
+                    continue;
                 }
                 if let Some(existing) = preference {
                     return Err(OptionsError::DuplicateOption(
@@ -1200,8 +1214,8 @@ fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChe
                 preference = Some(preference_opt);
             }
             v6::ParsedDhcpOption::Iana(ref iana_data) => {
-                if !identity_association_allowed {
-                    return Err(OptionsError::InvalidOption(format!("{:?}", opt)));
+                if !identity_association_action.accept_option(&opt, exchange_type)? {
+                    continue;
                 }
                 let iaid = v6::IAID::new(iana_data.iaid());
                 let processed_ia_na = match process_ia_na(iana_data) {
@@ -1296,8 +1310,8 @@ fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChe
                 status_code_option = Some((status_code, message.to_string()));
             }
             v6::ParsedDhcpOption::IaPd(ref iapd_data) => {
-                if !identity_association_allowed {
-                    return Err(OptionsError::InvalidOption(format!("{:?}", opt)));
+                if !identity_association_action.accept_option(&opt, exchange_type)? {
+                    continue;
                 }
                 let iaid = v6::IAID::new(iapd_data.iaid());
                 let processed_ia_pd = match process_ia_pd(iapd_data) {
@@ -1375,8 +1389,8 @@ fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChe
                 };
             }
             v6::ParsedDhcpOption::InformationRefreshTime(information_refresh_time) => {
-                if !information_refresh_time_allowed {
-                    return Err(OptionsError::InvalidOption(format!("{:?}", opt)));
+                if !information_refresh_time_action.accept_option(&opt, exchange_type)? {
+                    continue;
                 }
                 if let Some(existing) = refresh_time_option {
                     return Err(OptionsError::DuplicateOption(
@@ -6890,28 +6904,10 @@ mod tests {
     #[test_case(
         v6::MessageType::Reply,
         ExchangeType::ReplyToInformationRequest,
-        v6::DhcpOption::Preference(ADVERTISE_MAX_PREFERENCE);
-        "reply_to_information_request_preference"
-    )]
-    #[test_case(
-        v6::MessageType::Reply,
-        ExchangeType::ReplyToInformationRequest,
         v6::DhcpOption::Iana(v6::IanaSerializer::new(v6::IAID::new(0), T1.get(),T2.get(), &[]));
         "reply_to_information_request_ia_na"
     )]
-    #[test_case(
-        v6::MessageType::Advertise,
-        ExchangeType::AdvertiseToSolicit,
-        v6::DhcpOption::InformationRefreshTime(42u32);
-        "advertise_to_solicit_information_refresh_time"
-    )]
-    #[test_case(
-        v6::MessageType::Reply,
-        ExchangeType::ReplyWithLeases(RequestLeasesMessageType::Request),
-        v6::DhcpOption::Preference(ADVERTISE_MAX_PREFERENCE);
-        "reply_to_request_preference"
-    )]
-    fn process_options_invalid<'a>(
+    fn process_options_drop<'a>(
         message_type: v6::MessageType,
         exchange_type: ExchangeType,
         opt: v6::DhcpOption<'a>,
@@ -6926,6 +6922,75 @@ mod tests {
         assert_matches!(
             process_options(&msg, exchange_type, Some(&CLIENT_ID), &NoIaRequested, &NoIaRequested),
             Err(OptionsError::InvalidOption(_))
+        );
+    }
+
+    #[test_case(
+        v6::MessageType::Reply,
+        ExchangeType::ReplyToInformationRequest;
+        "reply_to_information_request"
+    )]
+    #[test_case(
+        v6::MessageType::Reply,
+        ExchangeType::ReplyWithLeases(RequestLeasesMessageType::Request);
+        "reply_to_request"
+    )]
+    fn process_options_ignore_preference<'a>(
+        message_type: v6::MessageType,
+        exchange_type: ExchangeType,
+    ) {
+        let options = [
+            v6::DhcpOption::ClientId(&CLIENT_ID),
+            v6::DhcpOption::ServerId(&SERVER_ID[0]),
+            v6::DhcpOption::Preference(ADVERTISE_MAX_PREFERENCE),
+        ];
+        let builder = v6::MessageBuilder::new(message_type, [0, 1, 2], &options);
+        let mut buf = vec![0; builder.bytes_len()];
+        builder.serialize(&mut buf);
+        let mut buf = &buf[..]; // Implements BufferView.
+        let msg = v6::Message::parse(&mut buf, ()).expect("failed to parse test buffer");
+        assert_matches!(
+            process_options(&msg, exchange_type, Some(&CLIENT_ID), &NoIaRequested, &NoIaRequested),
+            Ok(ProcessedOptions { result: Ok(Options { preference: None, .. }), .. })
+        );
+    }
+
+    #[test_case(
+        v6::MessageType::Advertise,
+        ExchangeType::AdvertiseToSolicit;
+        "advertise_to_solicit"
+    )]
+    #[test_case(
+        v6::MessageType::Reply,
+        ExchangeType::ReplyWithLeases(RequestLeasesMessageType::Request);
+        "reply_to_request"
+    )]
+    fn process_options_ignore_information_refresh_time<'a>(
+        message_type: v6::MessageType,
+        exchange_type: ExchangeType,
+    ) {
+        let options = [
+            v6::DhcpOption::ClientId(&CLIENT_ID),
+            v6::DhcpOption::ServerId(&SERVER_ID[0]),
+            v6::DhcpOption::InformationRefreshTime(42u32),
+        ];
+        let builder = v6::MessageBuilder::new(message_type, [0, 1, 2], &options);
+        let mut buf = vec![0; builder.bytes_len()];
+        builder.serialize(&mut buf);
+        let mut buf = &buf[..]; // Implements BufferView.
+        let msg = v6::Message::parse(&mut buf, ()).expect("failed to parse test buffer");
+        assert_matches!(
+            process_options(&msg, exchange_type, Some(&CLIENT_ID), &NoIaRequested, &NoIaRequested),
+            Ok(ProcessedOptions {
+                result: Ok(Options {
+                    next_contact_time: NextContactTime::RenewRebind { t1, t2 },
+                    ..
+                }),
+                ..
+            }) => {
+                assert_eq!(t1, v6::NonZeroTimeValue::Infinity);
+                assert_eq!(t2, v6::NonZeroTimeValue::Infinity);
+            }
         );
     }
 
