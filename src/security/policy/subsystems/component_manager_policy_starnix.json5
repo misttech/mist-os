@@ -45,6 +45,26 @@
                     "/core/starnix_runner/kernels:**",
                 ],
             },
+            {
+                source_moniker: "/core/network/netstack",
+                source: "component",
+                source_name: "fuchsia.net.filter.Control",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/starnix_runner",
+                    "/core/starnix_runner/kernels:**",
+                ],
+            },
+            {
+                source_moniker: "/core/network/netstack",
+                source: "component",
+                source_name: "fuchsia.net.filter.SocketControl",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/starnix_runner",
+                    "/core/starnix_runner/kernels:**",
+                ],
+            },
         ],
     },
 }

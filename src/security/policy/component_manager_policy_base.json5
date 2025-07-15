@@ -340,7 +340,8 @@
                 ],
             },
 
-            // TODO(https://fxbug.dev/42175614): not security policy; split out into separate file.
+            // NB: Consult Netstack team before routing the following protocols
+            // as there may be alternatives available.
             // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
             // components running in the network realm, remove this policy.
             {
@@ -382,6 +383,41 @@
                     "/core/network/netstack/dhcp-client",
                     "/core/network/netstack",
                     "/core/network/test-components:**",
+                ],
+            },
+            {
+                source_moniker: "/core/network/netstack",
+                source: "component",
+                source_name: "fuchsia.net.filter.Control",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/network",
+                    "/core/network/netstack",
+                    "/core/network/netcfg",
+                ],
+            },
+            {
+                source_moniker: "/core/network/netstack",
+                source: "component",
+                source_name: "fuchsia.net.filter.SocketControl",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/network",
+                    "/core/network/netstack",
+                ],
+            },
+            {
+                source_moniker: "/core/network/netcfg",
+                source: "component",
+                source_name: "fuchsia.net.name.DnsServerWatcher",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/network",
+                    "/core/network/netcfg",
+
+                    // TODO(https://fxbug.dev/42175016): This is temporary until the new DNS
+                    // configuration API is designed.
+                    "/core/lowpan-ot-driver",
                 ],
             },
         ],

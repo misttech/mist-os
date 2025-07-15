@@ -225,6 +225,7 @@
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
                 "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
+                "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
@@ -235,6 +236,7 @@
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",
+                "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
 
                 // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
@@ -243,43 +245,13 @@
             ],
             from: "#netstack",
         },
-
-        // TODO(https://fxbug.dev/42062982) Don't expose the Root API once
-        // Weavestack no longer needs it.
         {
-            protocol: [ "fuchsia.net.root.Interfaces" ],
+            protocol: [
+                "fuchsia.net.filter.Control",
+                "fuchsia.net.filter.SocketControl",
+            ],
             from: "#netstack",
-            as: "fuchsia.net.root.Interfaces_OnlyForWeavestack",
-        },
-        {
-            protocol: [ "fuchsia.net.filter.Control" ],
-            from: "#netstack",
-            as: "fuchsia.net.filter.Control_OnlyForStarnix",
             availability: "same_as_target",
-        },
-        {
-            protocol: [ "fuchsia.net.filter.SocketControl" ],
-            from: "#netstack",
-            as: "fuchsia.net.filter.SocketControl_OnlyForStarnix",
-            availability: "same_as_target",
-        },
-        {
-            protocol: [ "fuchsia.net.root.Interfaces" ],
-            from: "#netstack",
-            as: "fuchsia.net.root.Interfaces_OnlyForStarnix",
-        },
-        {
-            protocol: [ "fuchsia.posix.socket.packet.Provider" ],
-            from: "#netstack",
-            as: "fuchsia.posix.socket.packet.Provider_OnlyForStarnix",
-        },
-
-        // TODO(https://fxbug.dev/42175016): This is temporary until the new DNS
-        // configuration API is designed.
-        {
-            protocol: [ "fuchsia.net.name.DnsServerWatcher" ],
-            from: "#netcfg",
-            as: "fuchsia.net.name.DnsServerWatcher_OnlyForLowpan",
         },
         {
             protocol: [ "fuchsia.net.name.Lookup" ],
@@ -297,6 +269,7 @@
             protocol: [
                 "fuchsia.net.dhcpv6.PrefixProvider",
                 "fuchsia.net.masquerade.Factory",
+                "fuchsia.net.name.DnsServerWatcher",
             ],
             from: "#netcfg",
         },

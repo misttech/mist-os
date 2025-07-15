@@ -28,8 +28,7 @@ namespace nl::Weave::Warm::Platform {
 namespace {
 using DeviceLayer::ConnectivityMgrImpl;
 
-constexpr char kFuchsiaNetRootInterfacesProtocolName[] =
-    "fuchsia.net.root.Interfaces_OnlyForWeavestack";
+constexpr char kFuchsiaNetRootInterfacesProtocolName[] = "fuchsia.net.root.Interfaces";
 
 // Fixed name for tunnel interface.
 constexpr char kTunInterfaceName[] = "weav-tun0";
