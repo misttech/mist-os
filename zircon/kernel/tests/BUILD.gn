@@ -127,6 +127,7 @@ if (toolchain_environment == "kernel") {
       "//zircon/kernel/lib/power-management:tests",
       "//zircon/kernel/lib/root_resource_filter",
       "//zircon/kernel/lib/spsc_buffer/tests",
+      "//zircon/kernel/lib/thread-stack",
       "//zircon/kernel/lib/thread_sampler/tests",
       "//zircon/kernel/lib/unittest",
       "//zircon/kernel/lib/zxc",

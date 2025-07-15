@@ -22,8 +22,6 @@ static_assert(PAGE_SIZE == (1L << PAGE_SIZE_SHIFT), "Page size mismatch!");
 
 #define MAX_CACHE_LINE 64
 
-#define ARCH_DEFAULT_STACK_SIZE 8192
-
 #define ARCH_PHYSMAP_SIZE (0x1000000000UL)  // 64GB
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_DEFINES_H_

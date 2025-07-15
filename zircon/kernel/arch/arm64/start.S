@@ -7,6 +7,7 @@
 #include <arch/arm64/asm.h>
 #include <arch/arm64/mmu.h>
 #include <arch/arm64.h>
+#include <lib/thread-stack/abi.h>
 #include <lib/arch/asm.h>
 #include <arch/code-patches/case-id-asm.h>
 #include <arch/defines.h>
@@ -125,14 +126,14 @@ handoff_paddr           .req x21
 .end_object
 
 .object boot_cpu_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
+  .skip DEFAULT_STACK_SIZE
   .balign 16
 .Lboot_cpu_kstack_end:
 .end_object
 
 #if __has_feature(safe_stack)
 .object boot_cpu_unsafe_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
+  .skip DEFAULT_STACK_SIZE
   .balign 16
 .Lboot_cpu_unsafe_kstack_end:
 .end_object

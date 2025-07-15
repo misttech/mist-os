@@ -52,8 +52,6 @@ static_assert(PAGE_SIZE == (1L << PAGE_SIZE_SHIFT), "Page size mismatch!");
 #define ARM64_MMFR0_ASIDBITS_8 BM(4, 4, 0)
 #define ARM64_MMFR0_ASIDBITS_MASK BM(4, 4, 15)
 
-#define ARCH_DEFAULT_STACK_SIZE 8192
-
 /* map 512GB at the base of the kernel. this is the max that can be mapped with a
  * single level 1 page table using 1GB pages.
  */

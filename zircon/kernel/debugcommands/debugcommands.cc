@@ -11,6 +11,7 @@
 #include <endian.h>
 #include <lib/console.h>
 #include <lib/instrumentation/asan.h>
+#include <lib/thread-stack/abi.h>
 #include <lib/unittest/user_memory.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -373,7 +374,7 @@ __attribute__((noinline)) static void stomp_stack(size_t size) {
 }
 
 static int crash_stackstomp() {
-  for (size_t i = 0; i < DEFAULT_STACK_SIZE * 2; i++)
+  for (size_t i = 0; i < internal::kMachineStackSize * 2; i++)
     stomp_stack(i);
 
   printf("survived.\n");

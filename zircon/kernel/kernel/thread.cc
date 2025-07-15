@@ -302,8 +302,6 @@ void Thread::Trampoline() {
  *  IDLE_PRIORITY
  *  LOWEST_PRIORITY
  *
- * Stack size is set to DEFAULT_STACK_SIZE
- *
  * @return  Pointer to thread object, or nullptr on failure.
  */
 Thread* Thread::CreateEtc(Thread* t, const char* name, thread_start_routine entry, void* arg,

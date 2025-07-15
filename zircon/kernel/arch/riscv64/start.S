@@ -6,6 +6,7 @@
 
 #include <arch/defines.h>
 #include <lib/arch/asm.h>
+#include <lib/thread-stack/abi.h>
 
 // We avoid the `la` pseudoinstruction while doing something equivalent
 // so that we can avoid generating a .got relocation and thus can assert
@@ -60,7 +61,7 @@
 .end_function
 
 .object boot_cpu_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
+  .skip DEFAULT_STACK_SIZE
   .balign 16
 .Lboot_cpu_kstack_end:
 .end_object
