@@ -319,12 +319,13 @@ pub async fn download<T: AsyncRead + AsyncWrite + Unpin>(
                 .truncate(true)
                 .open(path)
                 .await?;
-            while bytes_read != size {
+            while bytes_read < size {
                 match interface.read(&mut buffer[..]).await {
                     Err(e) => bail!(DownloadError::CouldNotReadToInterface(e)),
                     Ok(len) => {
-                        log::debug!("fastboot: upload got {bytes_read}/{size} bytes");
+                        let len = if (bytes_read + len) > size { size - bytes_read } else { len };
                         bytes_read += len;
+                        log::debug!("fastboot: upload got {bytes_read}/{size} bytes. Len {len}");
                         file.write_all(&buffer[..len]).await?;
                     }
                 }
