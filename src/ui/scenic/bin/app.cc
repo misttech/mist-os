@@ -44,18 +44,18 @@ using scenic_impl::RendererType;
 
 // App installs the loader manifest FS at this path so it can use
 // fsl::DeviceWatcher on it.
-static const char* kDependencyPath = "/gpu-manifest-fs";
+const char* kDependencyPath = "/gpu-manifest-fs";
 
-static constexpr zx::duration kShutdownTimeout = zx::sec(1);
+constexpr zx::duration kShutdownTimeout = zx::sec(1);
 
 // After every Flatland frame is sent to the display, we kick off a task for Escher to clean up
 // unused Vulkan resources such as command buffers, which repeats with the specified interval until
 // all resources are cleaned up.
-static constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 millisecond
+constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 millisecond
 
 // The maximum number of "layers" that can be passed to the display hardware in a single frame,
 // per display.
-static constexpr uint32_t kMaxDisplayLayers = 4;
+constexpr uint32_t kMaxDisplayLayers = 4;
 
 // See "Config for Fuchsia Visual Debugging": go/config-fuchsia-visual-debugging
 constexpr uint8_t VISUAL_DEBUGGING_LEVEL_INFO = 2;
@@ -157,7 +157,8 @@ scenic_structured_config::Config GetConfig() {
                        .value
                 << " i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0)
                 << " display_rotation: " << GetDisplayRotation(values)
-                << " visual_debugging_level: " << static_cast<int>(values.visual_debugging_level());
+                << " visual_debugging_level: " << static_cast<int>(values.visual_debugging_level())
+                << " enable_frame_counter_overlay: " << values.enable_frame_counter_overlay();
 
   return values;
 }

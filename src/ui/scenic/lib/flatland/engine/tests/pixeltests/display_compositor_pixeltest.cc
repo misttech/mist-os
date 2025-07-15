@@ -790,7 +790,7 @@ Vulkan Renderer, try creating a DisplayCompositor with the NullRenderer
       flatland::DisplayCompositorConfig{});
 
 Lastly, if you are specifically testing the Vulkan Renderer and do not need Display Compositing, try
-creating a DisplayCompositor with enable_display_composition=false:
+creating a DisplayCompositor with enable_direct_to_display=false:
 
    auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
@@ -1798,7 +1798,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
       GenerateDisplayListForTest(
           {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {},
-      // NOTE: this is somewhat redundant, since we also pass enable_display_composition=false into
+      // NOTE: this is somewhat redundant, since we also pass enable_direct_to_display=false into
       // the DisplayCompositor constructor.  But, no harm is done.
       DisplayCompositor::RenderFrameTestArgs{.force_gpu_composition = true});
   EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kGpuComposition);
