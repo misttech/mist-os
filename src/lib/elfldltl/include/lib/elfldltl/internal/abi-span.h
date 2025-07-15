@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_ABI_SPAN_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_ABI_SPAN_H_
 
+#include <cassert>
 #include <span>
 #include <type_traits>
 
@@ -13,7 +14,7 @@
 namespace elfldltl {
 
 // Forward declaration.
-template <typename T, size_t N, class Elf, class Traits>
+template <typename T, size_t N, class Elf, AbiPtrTraitsApi<T, Elf> Traits>
 class AbiSpan;
 
 namespace internal {
@@ -21,7 +22,7 @@ namespace internal {
 // This is the common base type for all AbiSpan instantiations.
 // It's separately instantiated for each one, but then different
 // subclasses are defined for different instantiations.
-template <typename T, size_t N, class Elf, class Traits>
+template <typename T, size_t N, class Elf, AbiPtrTraitsApi<T, Elf> Traits>
 class AbiSpanImplBase {
  public:
   using Ptr = AbiPtr<T, Elf, Traits>;
@@ -31,14 +32,6 @@ class AbiSpanImplBase {
   using element_type = T;
   using value_type = std::remove_cv_t<T>;
   using difference_type = std::make_signed_t<size_type>;
-
-  constexpr AbiSpanImplBase() = default;
-
-  constexpr AbiSpanImplBase(const AbiSpanImplBase&) = default;
-
-  constexpr explicit AbiSpanImplBase(const Ptr& ptr) : ptr_(ptr) {}
-
-  constexpr AbiSpanImplBase& operator=(const AbiSpanImplBase&) = default;
 
   static constexpr size_t extent = N;
 
@@ -109,6 +102,14 @@ class AbiSpanImplBase {
   template <size_t Extent = N>
   using Span = AbiSpan<T, Extent, Elf, Traits>;
 
+  constexpr AbiSpanImplBase() = default;
+
+  constexpr AbiSpanImplBase(const AbiSpanImplBase&) = default;
+
+  constexpr explicit AbiSpanImplBase(const Ptr& ptr) : ptr_(ptr) {}
+
+  constexpr AbiSpanImplBase& operator=(const AbiSpanImplBase&) = default;
+
   constexpr auto& AsSpan() const { return *static_cast<const Span<>*>(this); }
 
  private:
@@ -116,7 +117,9 @@ class AbiSpanImplBase {
 };
 
 // If AbiPtr::get() isn't supported, no access methods are provided.
-template <typename T, size_t N, class Elf, class Traits, typename = void>
+template <typename T, size_t N, class Elf, AbiPtrTraitsApi<T, Elf> Traits,
+          bool Local = AbiPtrLocalTraitsApi<Traits, T, Elf>>
+  requires(Local == AbiPtrLocalTraitsApi<Traits, T, Elf>)
 class AbiSpanImpl : public AbiSpanImplBase<T, N, Elf, Traits> {
  public:
   using AbiSpanImplBase<T, N, Elf, Traits>::AbiSpanImplBase;
@@ -125,8 +128,7 @@ class AbiSpanImpl : public AbiSpanImplBase<T, N, Elf, Traits> {
 
 // This specialization kicks in when AbiPtr::get() is available.
 template <typename T, size_t N, class Elf, class Traits>
-class AbiSpanImpl<T, N, Elf, Traits, std::void_t<decltype(AbiPtr<T, Elf, Traits>{}.get())>>
-    : public AbiSpanImplBase<T, N, Elf, Traits> {
+class AbiSpanImpl<T, N, Elf, Traits, true> : public AbiSpanImplBase<T, N, Elf, Traits> {
  public:
   using pointer = T*;
   using const_pointer = const T*;
@@ -136,12 +138,14 @@ class AbiSpanImpl<T, N, Elf, Traits, std::void_t<decltype(AbiPtr<T, Elf, Traits>
   using reverse_iterator = typename std::span<T, N>::reverse_iterator;
 
   using AbiSpanImplBase<T, N, Elf, Traits>::AbiSpanImplBase;
+  using AbiSpanImplBase<T, N, Elf, Traits>::AsSpan;
   using AbiSpanImplBase<T, N, Elf, Traits>::operator=;
+  using AbiSpanImplBase<T, N, Elf, Traits>::ptr;
 
-  constexpr T* data() const { return this->AsSpan().ptr().get(); }
+  constexpr T* data() const { return ptr().get(); }
 
   constexpr std::span<T, N> get() const {
-    const auto count = this->AsSpan().size();
+    const auto count = AsSpan().size();
     return std::span<T, N>{data(), count};
   }
 

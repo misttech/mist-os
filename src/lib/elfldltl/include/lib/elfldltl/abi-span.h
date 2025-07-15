@@ -5,6 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_SPAN_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_SPAN_H_
 
+#include <concepts>
+
 #include "internal/abi-span.h"
 
 namespace elfldltl {
@@ -23,8 +25,9 @@ namespace elfldltl {
 // fancy constructors), can be copy-constructed from std::span<T>, and also has
 // an explicit `get()` method to return it.  The iterator methods (begin, end,
 // etc.) return the std::span<T> iterator types directly.
+
 template <typename T, size_t N = std::dynamic_extent, class Elf = elfldltl::Elf<>,
-          class Traits = LocalAbiTraits>
+          AbiPtrTraitsApi<T, Elf> Traits = LocalAbiTraits>
 class AbiSpan : public internal::AbiSpanImpl<T, N, Elf, Traits> {
  public:
   using typename internal::AbiSpanImpl<T, N, Elf, Traits>::Ptr;
@@ -34,40 +37,47 @@ class AbiSpan : public internal::AbiSpanImpl<T, N, Elf, Traits> {
 
   constexpr AbiSpan(const AbiSpan&) = default;
 
-  constexpr AbiSpan(Ptr ptr, size_type size) noexcept
+  explicit constexpr AbiSpan(Ptr ptr, size_type size) noexcept
       : internal::AbiSpanImpl<T, N, Elf, Traits>(ptr) {
     assert(size == N);
   }
 
-  // If T is const, then non-const pointers are OK too.
-  template <typename TT = T, typename = std::enable_if_t<std::is_const_v<TT>>>
-  constexpr AbiSpan(AbiPtr<std::remove_const_t<T>, Elf, Traits> ptr, size_type size) noexcept
+  template <typename U>
+    requires std::constructible_from<std::span<T, N>, U*, size_t>
+  explicit constexpr AbiSpan(AbiPtr<U, Elf, Traits> ptr, size_type size) noexcept
       : AbiSpan{Ptr{ptr}, size} {}
 
   // Allow copy-construction from the corresponding span type if it admits
   // construction from a pointer.  Note that span's "range" copy-constructor
   // already allows the other direction because AbiSpan has data() and size().
-  template <typename P = T*, typename = std::enable_if_t<std::is_constructible_v<Ptr, P>>>
-  constexpr AbiSpan(std::span<T, N> other)
+  explicit(false) constexpr AbiSpan(std::span<T, N> other)
+    requires Ptr::kLocal
       : internal::AbiSpanImpl<T, N, Elf, Traits>(Ptr{other.data()}) {}
 
-  // This is redundant with the std::span<T, N> overloads below if they're
-  // available, because a non-const std::span will implicitly convert.
-  template <typename TT,
-            typename = std::enable_if_t<std::is_const_v<TT> && std::is_constructible_v<Ptr, TT*>>>
-  constexpr AbiSpan& operator=(const AbiSpan<std::remove_const_t<T>, N, Elf, Traits>& other) {
+  constexpr AbiSpan& operator=(const AbiSpan&) = default;
+
+  template <typename U, size_t Extent>
+    requires std::constructible_from<std::span<T, N>, std::span<U, Extent>>
+  constexpr AbiSpan& operator=(const AbiSpan<U, Extent, Elf, Traits>& other) {
     *this = AbiSpan{other.ptr(), other.size()};
     return *this;
   }
 
-  template <typename TT = T, typename = std::enable_if_t<std::is_constructible_v<Ptr, TT*>>>
-  constexpr AbiSpan& operator=(std::span<T, N> other) {
+  template <typename U, size_t Extent>
+    requires std::constructible_from<std::span<T, N>, std::span<U, Extent>> && Ptr::kLocal
+  constexpr AbiSpan& operator=(std::span<U, Extent> other) {
     *this = AbiSpan{other};
     return *this;
   }
 
   constexpr size_type size() const { return static_cast<size_type>(N); }
 };
+
+// Deduction guide, equivalent to the std::span deduction guide.
+template <typename... Args>
+AbiSpan(Args&&... args)
+    -> AbiSpan<typename decltype(std::span{std::forward<Args>(args)...})::element_type,
+               decltype(std::span{std::forward<Args>(args)...})::extent>;
 
 template <typename T, class Elf, class Traits>
 class AbiSpan<T, std::dynamic_extent, Elf, Traits>
@@ -84,29 +94,29 @@ class AbiSpan<T, std::dynamic_extent, Elf, Traits>
   constexpr AbiSpan(Ptr ptr, size_type size) noexcept
       : internal::AbiSpanImpl<T, std::dynamic_extent, Elf, Traits>{ptr}, size_(size) {}
 
-  template <typename TT, typename = std::enable_if_t<std::is_const_v<TT>>>
-  constexpr AbiSpan(AbiPtr<std::remove_const_t<T>, Elf, Traits> ptr, size_type size) noexcept
+  template <typename U>
+    requires std::constructible_from<std::span<T>, U*, size_t>
+  constexpr AbiSpan(AbiPtr<U, Elf, Traits> ptr, size_type size) noexcept
       : AbiSpan{Ptr{ptr}, size} {}
 
   // See comment above.
-  template <typename TT = T, typename = std::enable_if_t<std::is_constructible_v<Ptr, TT*>>>
-  constexpr AbiSpan(std::span<T> other)
+  explicit(false) constexpr AbiSpan(std::span<T> other)
+    requires Ptr::kLocal
       : internal::AbiSpanImpl<T, std::dynamic_extent, Elf, Traits>{Ptr{other.data()}},
         size_{static_cast<size_type>(other.size())} {}
 
   constexpr AbiSpan& operator=(const AbiSpan&) = default;
 
-  // This is redundant with the std::span<T> overload below if available.
-  template <typename TT = T,
-            typename = std::enable_if_t<std::is_const_v<TT> && !std::is_constructible_v<Ptr, TT*>>>
-  constexpr AbiSpan& operator=(
-      const AbiSpan<std::remove_const_t<T>, std::dynamic_extent, Elf, Traits>& other) {
+  template <typename U, size_t Extent>
+    requires std::constructible_from<std::span<T>, std::span<U, Extent>>
+  constexpr AbiSpan& operator=(const AbiSpan<U, Extent, Elf, Traits>& other) {
     *this = AbiSpan{other.ptr(), other.size()};
     return *this;
   }
 
-  template <typename TT = T, typename = std::enable_if_t<std::is_constructible_v<Ptr, TT*>>>
-  constexpr AbiSpan& operator=(std::span<T> other) {
+  template <typename U, size_t Extent>
+    requires std::constructible_from<std::span<T>, std::span<U, Extent>> && Ptr::kLocal
+  constexpr AbiSpan& operator=(std::span<U, Extent> other) {
     *this = AbiSpan{other};
     return *this;
   }
@@ -139,9 +149,9 @@ class AbiStringView {
 
   constexpr AbiStringView(Ptr ptr, size_type length) : contents_{ptr, length} {}
 
-  template <typename S = Span,
-            typename = std::enable_if_t<std::is_constructible_v<S, std::span<const char>>>>
-  constexpr AbiStringView(std::string_view str) : contents_{std::span{str}} {}
+  explicit(false) constexpr AbiStringView(std::string_view str)
+    requires Ptr::kLocal
+      : contents_{std::span{str}} {}
 
   constexpr AbiStringView& operator=(const AbiStringView&) = default;
 
@@ -150,22 +160,25 @@ class AbiStringView {
   constexpr size_t size() const { return contents_.size(); }
   constexpr size_t length() const { return contents_.size(); }
 
-  constexpr typename Span::Ptr ptr() const { return contents_.ptr(); }
+  constexpr Ptr ptr() const { return contents_.ptr(); }
 
   constexpr Span as_span() const { return contents_; }
 
-  template <typename S = Span, typename = decltype(S{}.get())>
-  constexpr operator std::string_view() const {
+  explicit(false) constexpr operator std::string_view() const
+    requires Ptr::kLocal
+  {
     return get();
   }
 
-  template <typename S = Span, typename = decltype(S{}.data())>
-  constexpr std::string_view get() const {
+  constexpr std::string_view get() const
+    requires Ptr::kLocal
+  {
     return {data(), size()};
   }
 
-  template <typename S = Span, typename = decltype(S{}.data())>
-  constexpr const char* data() const {
+  constexpr const char* data() const
+    requires Ptr::kLocal
+  {
     return contents_.data();
   }
 

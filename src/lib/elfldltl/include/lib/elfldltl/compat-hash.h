@@ -18,7 +18,7 @@ namespace elfldltl {
 // official ELF standard format.  This interface matches GnuHash (gnu-hash.h).
 // See SymbolInfo (symbol.h) for details.
 
-inline constexpr uint32_t CompatHashString(std::string_view name) {
+constexpr uint32_t CompatHashString(std::string_view name) {
   uint_fast32_t hash = 0;
   for (char c : name) {
     hash = (hash << 4) + std::bit_cast<unsigned char>(c);
@@ -37,7 +37,7 @@ constexpr uint32_t kCompatNoHash = ~uint32_t{};
 // the number of buckets and the number of chain entries (i.e. the number of
 // symbol table entries).  Then the bucket words follow, then the chain words.
 
-template <class Elf, class AbiTraits = LocalAbiTraits>
+template <class Elf, AbiPtrTraitsApi<const typename Elf::Word, Elf> AbiTraits = LocalAbiTraits>
 class CompatHash {
  public:
   using Word = typename Elf::Word;
@@ -90,7 +90,7 @@ class CompatHash {
 
 // This is only actually used when AbiTraits supports direct memory access, so
 // it doesn't need to work with other instantiations.
-template <class Elf, class AbiTraits>
+template <class Elf, AbiPtrTraitsApi<const typename Elf::Word, Elf> AbiTraits>
 class CompatHash<Elf, AbiTraits>::BucketIterator {
  public:
   constexpr BucketIterator() = default;
@@ -145,7 +145,7 @@ class CompatHash<Elf, AbiTraits>::BucketIterator {
 
 // Iterate over the hash buckets to yield a BucketIerator for each bucket.
 // Together this allows for exhaustive iteration over the whole table.
-template <class Elf, class AbiTraits>
+template <class Elf, AbiPtrTraitsApi<const typename Elf::Word, Elf> AbiTraits>
 class CompatHash<Elf, AbiTraits>::iterator {
  public:
   constexpr bool operator==(const iterator& other) const { return it_ == other.it_; }
@@ -171,7 +171,7 @@ class CompatHash<Elf, AbiTraits>::iterator {
   typename std::span<const typename Elf::Word>::iterator it_;
 };
 
-template <class Elf, class AbiTraits>
+template <class Elf, AbiPtrTraitsApi<const typename Elf::Word, Elf> AbiTraits>
 constexpr auto CompatHash<Elf, AbiTraits>::begin() const -> iterator {
   iterator it;
   it.table_ = this;
@@ -179,7 +179,7 @@ constexpr auto CompatHash<Elf, AbiTraits>::begin() const -> iterator {
   return it;
 }
 
-template <class Elf, class AbiTraits>
+template <class Elf, AbiPtrTraitsApi<const typename Elf::Word, Elf> AbiTraits>
 constexpr auto CompatHash<Elf, AbiTraits>::end() const -> iterator {
   iterator it;
   it.table_ = this;
