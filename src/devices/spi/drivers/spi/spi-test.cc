@@ -302,14 +302,6 @@ class FakeSpiImplServer : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiIm
 class TestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Initialize(component::kDefaultInstance);
-
-    zx_status_t status =
-        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-
     if (zx::result result = spi_metadata_server_.Serve(
             to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
         result.is_error()) {
@@ -354,7 +346,6 @@ class TestEnvironment : public fdf_testing::Environment {
 
  private:
   FakeSpiImplServer fake_spi_impl_;
-  compat::DeviceServer device_server_;
   fdf_metadata::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata> spi_metadata_server_;
   fdf_metadata::MetadataServer<fuchsia_scheduler::RoleName> scheduler_role_name_metadata_server_;
 };
