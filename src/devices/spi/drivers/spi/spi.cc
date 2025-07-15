@@ -6,8 +6,6 @@
 
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/metadata/cpp/metadata.h>
@@ -99,29 +97,19 @@ zx::result<> SpiDriver::AddChildren(
     char name[20];
     snprintf(name, sizeof(name), "spi-%u-%u", bus_id_, cs);
 
-    std::unique_ptr compat_server = std::make_unique<compat::SyncInitializedDeviceServer>();
-
-    {
-      auto result = compat_server->Initialize(incoming(), outgoing(), node_name(), name);
-      if (result.is_error()) {
-        FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
-        return result.take_error();
-      }
-    }
-
     fidl::Arena arena;
 
-    std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server->CreateOffers2(arena);
-    offers.push_back(fdf::MakeOffer2<fuchsia_hardware_spi::Service>(arena, name));
+    auto offers = std::vector{
+        fdf::MakeOffer2<fuchsia_hardware_spi::Service>(arena, name),
+    };
 
     auto [controller_client, controller_server] =
         fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
     fbl::AllocChecker ac;
 
-    std::unique_ptr<SpiChild> dev(new (&ac) SpiChild(client.Clone(), cs, has_siblings,
-                                                     fidl_dispatcher(), std::move(compat_server),
-                                                     std::move(controller_client)));
+    std::unique_ptr<SpiChild> dev(new (&ac) SpiChild(
+        client.Clone(), cs, has_siblings, fidl_dispatcher(), std::move(controller_client)));
 
     if (!ac.check()) {
       FDF_LOG(ERROR, "Out of memory");
