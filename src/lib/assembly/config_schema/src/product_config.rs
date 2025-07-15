@@ -67,7 +67,7 @@ pub struct ProductConfig {
 
     /// A package that includes files to include in bootfs.
     ///
-    /// This is only usable in the empty, embeddable, bootstrap, and utility feature set levels.
+    /// This is only usable in the empty, embeddable, and bootstrap feature set levels.
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -114,8 +114,6 @@ pub struct ProductPackagesConfig {
 
     /// Paths to package manifests, or more detailed json entries for packages
     /// to add to the 'bootfs' package set, which are keyed by package name.
-    ///
-    /// This is only usable in the empty, embeddable, bootstrap, and utility feature set levels.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub bootfs: BTreeMap<String, ProductPackageDetails>,
 }
