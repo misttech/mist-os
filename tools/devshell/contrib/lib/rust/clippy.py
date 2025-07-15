@@ -163,9 +163,14 @@ def build_targets(clippy_outputs, build_dir, args):
         prebuilt / "ninja" / HOST_PLATFORM / "ninja",
         "-C",
         build_dir,
-        "-k",
-        "0",
     ]
+    if args.stop_on_first_error:
+        ninja += ["-k", "1"]
+    else:
+        ninja += ["-k", "0"]
+    if args.jobs is not None:
+        ninja += ["-j", str(args.jobs)]
+
     if args.verbose:
         ninja += ["--verbose"]
     if args.quiet:
@@ -228,6 +233,19 @@ def parse_args():
         "--no-build",
         action="store_true",
         help="don't build the clippy output, instead expect that it already exists",
+    )
+    advanced.add_argument(
+        "--stop-on-first-error",
+        action="store_true",
+        help="stop on first error",
+        default=False,
+    )
+    advanced.add_argument(
+        "--jobs",
+        "-j",
+        type=int,
+        help="number of concurrent jobs to run",
+        default=None,
     )
     return parser.parse_args()
 
