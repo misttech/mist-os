@@ -831,6 +831,9 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
         .release_fences = render_fences,
         .apply_color_conversion = cc_state_machine_.GetDataToApply().has_value(),
     };
+    if (config_.enable_frame_counter_overlay) {
+      render_args.display_frame_number = frame_number;
+    }
 
     // Only add render_finished_fence if we're rendering the final display's framebuffer.
     if (is_final_display) {
@@ -892,8 +895,11 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   // Notes:
   //   - failing TryDirectToDisplay() means that the display driver is unable to directly display
   //     this frame's list of client images.
-  const bool should_try_direct_to_display =
-      config_.enable_direct_to_display && !test_args.force_gpu_composition;
+  //   - `enable_frame_counter_overlay` currently requires GPU composition because we use
+  //     `escher::DebugFont` to blit the overlay directly into the displayed framebuffer.
+  const bool should_try_direct_to_display = config_.enable_direct_to_display &&
+                                            !test_args.force_gpu_composition &&
+                                            !config_.enable_frame_counter_overlay;
   if (should_try_direct_to_display) {
     if (TryDirectToDisplay(render_data_list)) {
       for (const auto& data : render_data_list) {

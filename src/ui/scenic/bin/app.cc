@@ -441,6 +441,9 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
             .max_display_layers = kMaxDisplayLayers,
             .tint_gpu_fallback_images =
                 (config_values_.visual_debugging_level() >= VISUAL_DEBUGGING_LEVEL_INFO),
+            .enable_frame_counter_overlay =
+                config_values_.enable_frame_counter_overlay() ||
+                (config_values_.visual_debugging_level() >= VISUAL_DEBUGGING_LEVEL_INFO_PLUS),
         });
   }
 

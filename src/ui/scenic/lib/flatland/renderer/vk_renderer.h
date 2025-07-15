@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "src/lib/fxl/synchronization/thread_annotations.h"
+#include "src/ui/lib/escher/debug/debug_font.h"
 #include "src/ui/lib/escher/flatland/rectangle_compositor.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/id.h"
@@ -142,6 +143,9 @@ class VkRenderer final : public Renderer {
   std::unordered_map<GlobalBufferCollectionId, CollectionData>& GetBufferCollectionsFor(
       BufferCollectionUsage usage) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
+  // Return a lazily-initialized |DebugFont|.
+  escher::DebugFont* GetDebugFont();
+
   // Escher is how we access Vulkan.
   escher::EscherWeakPtr escher_;
 
@@ -165,6 +169,8 @@ class VkRenderer final : public Renderer {
   std::set<GlobalImageId> pending_textures_ FXL_GUARDED_BY(lock_);
   std::set<GlobalImageId> pending_render_targets_ FXL_GUARDED_BY(lock_);
   bool disable_lazy_pipeline_creation_ = false;
+
+  std::unique_ptr<escher::DebugFont> debug_font_;
 
   uint32_t frame_number_ = 0;
 

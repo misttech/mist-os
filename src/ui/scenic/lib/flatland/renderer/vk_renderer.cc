@@ -526,12 +526,19 @@ bool VkRenderer::ImportRenderTargetImage(const allocation::ImageMetadata& metada
         readback_collections_.find(metadata.collection_id) != readback_collections_.end();
   }
 
-  const vk::ImageUsageFlags kRenderTargetAsReadbackSourceUsageFlags =
-      escher::RectangleCompositor::kRenderTargetUsageFlags | vk::ImageUsageFlagBits::eTransferSrc;
-  const auto image =
-      ExtractImage(metadata, BufferCollectionUsage::kRenderTarget, vk_collection,
-                   needs_readback ? kRenderTargetAsReadbackSourceUsageFlags
-                                  : escher::RectangleCompositor::kRenderTargetUsageFlags);
+  // Image usage flags need to be modified if the client needs to read back from the render target.
+  const vk::ImageUsageFlags kRenderTargetReadbackFlags =
+      needs_readback ? vk::ImageUsageFlagBits::eTransferSrc : vk::ImageUsageFlags();
+  // TODO(https://fxbug.dev/431797024): Scenic decides at startup whether to show the debug overlay
+  // or not; it cannot be toggled dynamically at runtime.  If we knew that here, we could decide to
+  // omit this flag.
+  const vk::ImageUsageFlags kRenderTargetDebugFontFlags = vk::ImageUsageFlagBits::eTransferDst;
+
+  const vk::ImageUsageFlags kRenderTargetFlags =
+      escher::RectangleCompositor::kRenderTargetUsageFlags | kRenderTargetReadbackFlags |
+      kRenderTargetDebugFontFlags;
+  const auto image = ExtractImage(metadata, BufferCollectionUsage::kRenderTarget, vk_collection,
+                                  kRenderTargetFlags);
   if (!image) {
     FX_LOGS(ERROR) << "Could not extract render target.";
     return false;
@@ -876,6 +883,26 @@ void VkRenderer::Render(const ImageMetadata& render_target,
   compositor_.DrawBatch(command_buffer, normalized_rects, textures, color_data, output_image,
                         depth_texture, render_args.apply_color_conversion);
 
+  if (render_args.display_frame_number.has_value()) {
+    // Prepare string and positioning for frame counter overlay.
+    const uint64_t frame_number = render_args.display_frame_number.value();
+
+    constexpr int32_t kGlyphScale = 4;
+    const auto frame_number_string = std::to_string(frame_number);
+    const int32_t x_offset = (static_cast<int32_t>(output_image->width()) -
+                              (static_cast<int32_t>(frame_number_string.length()) * kGlyphScale *
+                               static_cast<int32_t>(escher::DebugFont::kGlyphWidth))) /
+                             2;
+
+    // Transition the output image layout so that we can blit into it.
+    command_buffer->impl()->TransitionImageLayout(
+        output_image, render_image_layout, vk::ImageLayout::eTransferDstOptimal,
+        escher_->device()->vk_main_queue_family(), escher_->device()->vk_main_queue_family());
+    render_image_layout = vk::ImageLayout::eTransferDstOptimal;
+
+    GetDebugFont()->Blit(command_buffer, frame_number_string, output_image, {x_offset, 40}, 4);
+  }
+
   const auto readback_image_it = local_readback_image_map.find(render_target.identifier);
   // Copy to the readback image if there is a readback image.
   if (readback_image_it != local_readback_image_map.end()) {
@@ -1060,6 +1087,17 @@ VkRenderer::GetBufferCollectionsFor(const BufferCollectionUsage usage) {
       FX_NOTREACHED();
       return texture_collections_;
   }
+}
+
+escher::DebugFont* VkRenderer::GetDebugFont() {
+  if (!debug_font_) {
+    auto gpu_uploader = escher::BatchGpuUploader::New(escher_, /*frame_trace_number*/ 0);
+    FX_DCHECK(gpu_uploader);
+
+    debug_font_ = escher::DebugFont::New(gpu_uploader.get(), escher_->image_cache());
+    gpu_uploader->Submit();
+  }
+  return debug_font_.get();
 }
 
 }  // namespace flatland

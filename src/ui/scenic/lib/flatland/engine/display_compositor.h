@@ -46,6 +46,9 @@ struct DisplayCompositorConfig {
 
   // If true, all images will be tinted when we fall back to GPU-compositing.
   bool tint_gpu_fallback_images = false;
+
+  // If true, the current frame number will be displayed above all other images.
+  bool enable_frame_counter_overlay = false;
 };
 
 // The DisplayCompositor is responsible for compositing Flatland render data onto the display(s).
