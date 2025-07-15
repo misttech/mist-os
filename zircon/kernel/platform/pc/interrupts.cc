@@ -82,9 +82,9 @@ io_apic_isa_override ParseIsaOverride(const acpi_lite::AcpiMadtIntSourceOverride
     switch (polarity) {
       case ACPI_MADT_FLAG_POLARITY_CONFORMS:
       case ACPI_MADT_FLAG_POLARITY_HIGH:
-        return IRQ_POLARITY_ACTIVE_HIGH;
+        return interrupt_polarity::HIGH;
       case ACPI_MADT_FLAG_POLARITY_LOW:
-        return IRQ_POLARITY_ACTIVE_LOW;
+        return interrupt_polarity::LOW;
       default:
         panic("Unknown IRQ polarity in override: %u\n", polarity);
     }
@@ -95,10 +95,10 @@ io_apic_isa_override ParseIsaOverride(const acpi_lite::AcpiMadtIntSourceOverride
     switch (trigger) {
       case ACPI_MADT_FLAG_TRIGGER_CONFORMS:
       case ACPI_MADT_FLAG_TRIGGER_EDGE:
-        return IRQ_TRIGGER_MODE_EDGE;
+        return interrupt_trigger_mode::EDGE;
         break;
       case ACPI_MADT_FLAG_TRIGGER_LEVEL:
-        return IRQ_TRIGGER_MODE_LEVEL;
+        return interrupt_trigger_mode::LEVEL;
       default:
         panic("Unknown IRQ trigger in override: %u\n", trigger);
     }
@@ -210,11 +210,12 @@ void platform_irq(iframe_t* frame) {
   apic_issue_eoi();
 }
 
-zx_status_t register_int_handler(unsigned int vector, int_handler handler, void* arg) {
+zx_status_t register_int_handler(unsigned int vector, interrupt_handler_t handler, void* arg) {
   return kInterruptManager.RegisterInterruptHandler(vector, handler, arg);
 }
 
-zx_status_t register_permanent_int_handler(unsigned int vector, int_handler handler, void* arg) {
+zx_status_t register_permanent_int_handler(unsigned int vector, interrupt_handler_t handler,
+                                           void* arg) {
   return kInterruptManager.RegisterInterruptHandler(vector, handler, arg, true /* Permanent */);
 }
 
@@ -271,6 +272,7 @@ zx_status_t msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_
 
 void msi_free_block(msi_block_t* block) { return kInterruptManager.MsiFreeBlock(block); }
 
-void msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler, void* ctx) {
+void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
+                          void* ctx) {
   return kInterruptManager.MsiRegisterHandler(block, msi_id, handler, ctx);
 }

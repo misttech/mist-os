@@ -148,11 +148,12 @@ ktl::optional<IrqConfig> GetIrqConfigFromFlags(uint32_t uart_flags) {
   // In order to configure the IRQ all information, trigger and polarity must be provided.
   // Otherwise the step must be omitted and let defaults take over.
   IrqConfig config = {};
-  config.trigger = uart_flags & ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED ? IRQ_TRIGGER_MODE_LEVEL
-                                                                            : IRQ_TRIGGER_MODE_EDGE;
+  config.trigger = uart_flags & ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED
+                       ? interrupt_trigger_mode::LEVEL
+                       : interrupt_trigger_mode::EDGE;
   config.polarity = uart_flags & ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH
-                        ? IRQ_POLARITY_ACTIVE_HIGH
-                        : IRQ_POLARITY_ACTIVE_LOW;
+                        ? interrupt_polarity::HIGH
+                        : interrupt_polarity::LOW;
   return config;
 }
 

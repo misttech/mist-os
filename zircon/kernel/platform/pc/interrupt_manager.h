@@ -71,7 +71,7 @@ class InterruptManager {
     return IoApic::FetchIrqConfig(global_irq, tm, pol);
   }
 
-  void GetEntryByX86Vector(uint8_t x86_vector, int_handler* handler, void** arg) {
+  void GetEntryByX86Vector(uint8_t x86_vector, interrupt_handler_t* handler, void** arg) {
     handler_table_[x86_vector].GetHandler(handler, arg);
   }
 
@@ -94,8 +94,8 @@ class InterruptManager {
   //
   // If no more CPU interrupt vectors are available, returns
   // ZX_ERR_NO_RESOURCES.
-  zx_status_t RegisterInterruptHandler(unsigned int global_irq, int_handler handler, void* arg,
-                                       bool permanent = false) {
+  zx_status_t RegisterInterruptHandler(unsigned int global_irq, interrupt_handler_t handler,
+                                       void* arg, bool permanent = false) {
     if (!IoApic::IsValidInterrupt(global_irq, 0 /* flags */)) {
       return ZX_ERR_INVALID_ARGS;
     }
@@ -233,7 +233,8 @@ class InterruptManager {
     memset(block, 0, sizeof(*block));
   }
 
-  void MsiRegisterHandler(const msi_block_t* block, uint msi_id, int_handler handler, void* ctx) {
+  void MsiRegisterHandler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
+                          void* ctx) {
     DEBUG_ASSERT(block && block->allocated);
     DEBUG_ASSERT(msi_id < block->num_irq);
 
@@ -248,7 +249,7 @@ class InterruptManager {
   // lock to ensure a consistent view of the entry.
   class InterruptTableEntry {
    public:
-    void GetHandler(int_handler* handler, void** arg) {
+    void GetHandler(interrupt_handler_t* handler, void** arg) {
       Guard<SpinLock, IrqSave> guard{&lock_};
       *handler = handler_;
       *arg = arg_;
@@ -284,7 +285,7 @@ class InterruptManager {
     // Set the handler for this entry.  If |handler| is nullptr, |arg| is
     // ignored.  Makes no change and returns false if |handler| is not
     // nullptr and this entry already has a handler assigned.
-    bool SetHandler(int_handler handler, void* arg, bool make_permanent) {
+    bool SetHandler(interrupt_handler_t handler, void* arg, bool make_permanent) {
       Guard<SpinLock, IrqSave> guard{&lock_};
       // Cannot modify existing permanent handlers.
       if (permanent()) {
@@ -302,7 +303,7 @@ class InterruptManager {
 
     // Set the handler for this entry.  If |handler| is nullptr, |arg| is
     // ignored.
-    void OverwriteHandler(int_handler handler, void* arg) {
+    void OverwriteHandler(interrupt_handler_t handler, void* arg) {
       Guard<SpinLock, IrqSave> guard{&lock_};
       DEBUG_ASSERT(!permanent());
       handler_ = handler;
@@ -312,7 +313,7 @@ class InterruptManager {
    private:
     mutable DECLARE_SPINLOCK(InterruptTableEntry) lock_;
 
-    int_handler handler_ TA_GUARDED(lock_) = nullptr;
+    interrupt_handler_t handler_ TA_GUARDED(lock_) = nullptr;
     void* arg_ TA_GUARDED(lock_) = nullptr;
     ktl::atomic<bool> permanent_ = false;
   };

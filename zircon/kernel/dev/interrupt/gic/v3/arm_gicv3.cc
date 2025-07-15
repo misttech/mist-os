@@ -50,7 +50,9 @@ uint64_t mmio_phys = 0;
 uint32_t ipi_base = 0;
 uint32_t gic_max_int;
 
-bool gic_is_valid_interrupt(unsigned int vector, uint32_t flags) { return (vector < gic_max_int); }
+bool gic_is_valid_interrupt(interrupt_vector_t vector, uint32_t flags) {
+  return (vector < gic_max_int);
+}
 
 uint32_t gic_get_base_vector() {
   // ARM Generic Interrupt Controller v3&4 chapter 2.2
@@ -285,7 +287,7 @@ zx_status_t arm_gic_sgi(const unsigned int irq, const unsigned int flags, unsign
   return ZX_OK;
 }
 
-zx_status_t gic_mask_interrupt(unsigned int vector) {
+zx_status_t gic_mask_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= gic_max_int) {
@@ -297,7 +299,7 @@ zx_status_t gic_mask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t gic_unmask_interrupt(unsigned int vector) {
+zx_status_t gic_unmask_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= gic_max_int) {
@@ -309,7 +311,7 @@ zx_status_t gic_unmask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t gic_deactivate_interrupt(unsigned int vector) {
+zx_status_t gic_deactivate_interrupt(interrupt_vector_t vector) {
   if (vector >= gic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -320,15 +322,16 @@ zx_status_t gic_deactivate_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
+zx_status_t gic_configure_interrupt(interrupt_vector_t vector, enum interrupt_trigger_mode tm,
                                     enum interrupt_polarity pol) {
-  LTRACEF("vector %u, trigger mode %d, polarity %d\n", vector, tm, pol);
+  LTRACEF("vector %u, trigger mode %s, polarity %s\n", vector, interrupt_trigger_mode_string(tm),
+          interrupt_polarity_string(pol));
 
   if (vector <= 15 || vector >= gic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (pol != IRQ_POLARITY_ACTIVE_HIGH) {
+  if (pol != interrupt_polarity::HIGH) {
     // TODO: polarity should actually be configure through a GPIO controller
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -336,7 +339,7 @@ zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_
   uint reg = vector / 16;
   uint mask = 0x2 << ((vector % 16) * 2);
   uint32_t val = arm_gicv3_read32(GICD_ICFGR(reg));
-  if (tm == IRQ_TRIGGER_MODE_EDGE) {
+  if (tm == interrupt_trigger_mode::EDGE) {
     val |= mask;
   } else {
     val &= ~mask;
@@ -350,8 +353,8 @@ zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_
   return ZX_OK;
 }
 
-zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
-                                     enum interrupt_polarity* pol) {
+zx_status_t gic_get_interrupt_config(interrupt_vector_t vector, interrupt_trigger_mode* tm,
+                                     interrupt_polarity* pol) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= gic_max_int) {
@@ -359,21 +362,21 @@ zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_trigger
   }
 
   if (tm) {
-    *tm = IRQ_TRIGGER_MODE_EDGE;
+    *tm = interrupt_trigger_mode::EDGE;
   }
   if (pol) {
-    *pol = IRQ_POLARITY_ACTIVE_HIGH;
+    *pol = interrupt_polarity::HIGH;
   }
 
   return ZX_OK;
 }
 
-zx_status_t gic_set_affinity(unsigned int vector, cpu_mask_t mask) {
+zx_status_t gic_set_affinity(interrupt_vector_t vector, cpu_mask_t mask) {
   LTRACEF("vector %u, mask %#x\n", vector, mask);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-unsigned int gic_remap_interrupt(unsigned int vector) {
+interrupt_vector_t gic_remap_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
   return vector;
 }
@@ -526,7 +529,7 @@ zx_status_t gic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool
 
 void gic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
 
-void gic_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
+void gic_msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
                               void* ctx) {
   PANIC_UNIMPLEMENTED;
 }

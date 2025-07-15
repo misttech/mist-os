@@ -156,8 +156,8 @@ void arm_gicv2m_msi_free_block(msi_block_t* block) {
   memset(block, 0, sizeof(*block));
 }
 
-void arm_gicv2m_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
-                                     void* ctx) {
+void arm_gicv2m_msi_register_handler(const msi_block_t* block, uint msi_id,
+                                     interrupt_handler_t handler, void* ctx) {
   DEBUG_ASSERT(block && block->allocated);
   DEBUG_ASSERT(msi_id < block->num_irq);
   zx_status_t status = register_int_handler(block->base_irq_id + msi_id, handler, ctx);

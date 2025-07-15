@@ -53,9 +53,9 @@ namespace {
 
 // values read from zbi
 vaddr_t plic_base = 0;
-uint plic_max_int = 0;
+interrupt_vector_t plic_max_int = 0;
 
-bool plic_is_valid_interrupt(unsigned int vector, uint32_t flags) {
+bool plic_is_valid_interrupt(interrupt_vector_t vector, uint32_t flags) {
   return (vector < plic_max_int);
 }
 
@@ -65,21 +65,21 @@ uint32_t plic_get_max_vector() { return plic_max_int; }
 
 void plic_init_percpu_early() {}
 
-void plic_enable_vector(unsigned int vector, uint32_t hart_id) {
+void plic_enable_vector(interrupt_vector_t vector, uint32_t hart_id) {
   const uintptr_t plic_enable_reg = PLIC_ENABLE(plic_base, vector, hart_id);
   uint32_t val = readl(plic_enable_reg);
   val |= (1U << (vector % 32));
   writel(val, plic_enable_reg);
 }
 
-void plic_disable_vector(unsigned int vector, uint32_t hart_id) {
+void plic_disable_vector(interrupt_vector_t vector, uint32_t hart_id) {
   const uintptr_t plic_enable_reg = PLIC_ENABLE(plic_base, vector, hart_id);
   uint32_t val = readl(plic_enable_reg);
   val &= ~(1U << (vector % 32));
   writel(val, plic_enable_reg);
 }
 
-zx_status_t plic_mask_interrupt(unsigned int vector) {
+zx_status_t plic_mask_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= plic_max_int) {
@@ -91,7 +91,7 @@ zx_status_t plic_mask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t plic_unmask_interrupt(unsigned int vector) {
+zx_status_t plic_unmask_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= plic_max_int) {
@@ -103,7 +103,7 @@ zx_status_t plic_unmask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t plic_deactivate_interrupt(unsigned int vector) {
+zx_status_t plic_deactivate_interrupt(interrupt_vector_t vector) {
   if (vector >= plic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -114,23 +114,23 @@ zx_status_t plic_deactivate_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-zx_status_t plic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
-                                     enum interrupt_polarity pol) {
+zx_status_t plic_configure_interrupt(interrupt_vector_t vector, interrupt_trigger_mode tm,
+                                     interrupt_polarity pol) {
   LTRACEF("vector %u, trigger mode %d, polarity %d\n", vector, tm, pol);
 
   if (vector >= plic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (pol != IRQ_POLARITY_ACTIVE_HIGH) {
+  if (pol != interrupt_polarity::HIGH) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
   return ZX_OK;
 }
 
-zx_status_t plic_get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
-                                      enum interrupt_polarity* pol) {
+zx_status_t plic_get_interrupt_config(interrupt_vector_t vector, interrupt_trigger_mode* tm,
+                                      interrupt_polarity* pol) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= plic_max_int) {
@@ -138,21 +138,21 @@ zx_status_t plic_get_interrupt_config(unsigned int vector, enum interrupt_trigge
   }
 
   if (tm) {
-    *tm = IRQ_TRIGGER_MODE_EDGE;
+    *tm = interrupt_trigger_mode::EDGE;
   }
   if (pol) {
-    *pol = IRQ_POLARITY_ACTIVE_HIGH;
+    *pol = interrupt_polarity::HIGH;
   }
 
   return ZX_OK;
 }
 
-static zx_status_t plic_set_affinity(unsigned int vector, cpu_mask_t mask) {
+static zx_status_t plic_set_affinity(interrupt_vector_t vector, cpu_mask_t mask) {
   LTRACEF("vector %u, mask %#x\n", vector, mask);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-unsigned int plic_remap_interrupt(unsigned int vector) {
+interrupt_vector_t plic_remap_interrupt(interrupt_vector_t vector) {
   LTRACEF("vector %u\n", vector);
   return vector;
 }
@@ -226,7 +226,7 @@ zx_status_t plic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, boo
 
 void plic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
 
-void plic_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
+void plic_msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
                                void* ctx) {
   PANIC_UNIMPLEMENTED;
 }

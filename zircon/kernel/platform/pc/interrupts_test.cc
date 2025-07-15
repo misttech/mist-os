@@ -82,13 +82,13 @@ bool TestRegisterInterruptHandler() {
   uintptr_t handler1 = 2;
 
   // Register a handler for the interrupt
-  ASSERT_EQ(
-      im->RegisterInterruptHandler(kIrq1, reinterpret_cast<int_handler>(handler1), &handler1_arg),
-      ZX_OK);
+  ASSERT_EQ(im->RegisterInterruptHandler(kIrq1, reinterpret_cast<interrupt_handler_t>(handler1),
+                                         &handler1_arg),
+            ZX_OK);
   uint8_t irq1_x86_vector = FakeIoApic::entries[kIrq1].x86_vector;
 
   // Make sure the entry matches
-  int_handler handler;
+  interrupt_handler_t handler;
   void* arg;
   im->GetEntryByX86Vector(irq1_x86_vector, &handler, &arg);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(handler), handler1);
@@ -121,17 +121,17 @@ bool TestRegisterInterruptHandlerTwice() {
   uint8_t handler2_arg = 5;
   uintptr_t handler2 = 3;
 
-  ASSERT_EQ(
-      im->RegisterInterruptHandler(kIrq, reinterpret_cast<int_handler>(handler1), &handler1_arg),
-      ZX_OK);
+  ASSERT_EQ(im->RegisterInterruptHandler(kIrq, reinterpret_cast<interrupt_handler_t>(handler1),
+                                         &handler1_arg),
+            ZX_OK);
   uint8_t irq_x86_vector = FakeIoApic::entries[kIrq].x86_vector;
-  ASSERT_EQ(
-      im->RegisterInterruptHandler(kIrq, reinterpret_cast<int_handler>(handler2), &handler2_arg),
-      ZX_ERR_ALREADY_BOUND);
+  ASSERT_EQ(im->RegisterInterruptHandler(kIrq, reinterpret_cast<interrupt_handler_t>(handler2),
+                                         &handler2_arg),
+            ZX_ERR_ALREADY_BOUND);
   ASSERT_EQ(irq_x86_vector, FakeIoApic::entries[kIrq].x86_vector);
 
   // Make sure the entry matches the first installed
-  int_handler handler;
+  interrupt_handler_t handler;
   void* arg;
   im->GetEntryByX86Vector(irq_x86_vector, &handler, &arg);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(handler), handler1);
@@ -183,7 +183,7 @@ bool TestRegisterInterruptHandlerTooMany() {
   // can validate it.  All of these should succeed, but will exhaust the
   // allocator.
   for (unsigned i = 0; i < InterruptManager<FakeIoApic>::kNumCpuVectors; ++i) {
-    ASSERT_EQ(im->RegisterInterruptHandler(i, reinterpret_cast<int_handler>(handler + i),
+    ASSERT_EQ(im->RegisterInterruptHandler(i, reinterpret_cast<interrupt_handler_t>(handler + i),
                                            &handler_arg + i),
               ZX_OK);
   }
@@ -191,7 +191,7 @@ bool TestRegisterInterruptHandlerTooMany() {
   // Make sure all of the entries are registered
   for (unsigned i = 0; i < InterruptManager<FakeIoApic>::kNumCpuVectors; ++i) {
     uint8_t x86_vector = FakeIoApic::entries[i].x86_vector;
-    int_handler installed_handler;
+    interrupt_handler_t installed_handler;
     void* installed_arg;
     im->GetEntryByX86Vector(x86_vector, &installed_handler, &installed_arg);
     EXPECT_EQ(reinterpret_cast<uintptr_t>(installed_handler), handler + i);
@@ -199,9 +199,10 @@ bool TestRegisterInterruptHandlerTooMany() {
   }
 
   // Try to allocate one more
-  ASSERT_EQ(im->RegisterInterruptHandler(InterruptManager<FakeIoApic>::kNumCpuVectors,
-                                         reinterpret_cast<int_handler>(handler), &handler_arg),
-            ZX_ERR_NO_RESOURCES);
+  ASSERT_EQ(
+      im->RegisterInterruptHandler(InterruptManager<FakeIoApic>::kNumCpuVectors,
+                                   reinterpret_cast<interrupt_handler_t>(handler), &handler_arg),
+      ZX_ERR_NO_RESOURCES);
 
   // Clean up the registered handlers
   for (unsigned i = 0; i < InterruptManager<FakeIoApic>::kNumCpuVectors; ++i) {

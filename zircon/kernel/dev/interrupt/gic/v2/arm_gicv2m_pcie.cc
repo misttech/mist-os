@@ -37,7 +37,7 @@ class ArmGicV2PciePlatformSupport : public PciePlatformInterface {
 
   void FreeMsiBlock(msi_block_t* block) override { arm_gicv2m_msi_free_block(block); }
 
-  void RegisterMsiHandler(const msi_block_t* block, uint msi_id, int_handler handler,
+  void RegisterMsiHandler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
                           void* ctx) override {
     arm_gicv2m_msi_register_handler(block, msi_id, handler, ctx);
   }

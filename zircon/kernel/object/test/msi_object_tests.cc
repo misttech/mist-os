@@ -176,7 +176,7 @@ bool allocation_support_test() {
 // Use a static var for tracking calls rather than a lambda to avoid storage issues with lambda
 // captures and function pointers without having to increase complexity in the dispatcher.
 uint32_t register_call_count = 0;
-void register_fn(const msi_block_t*, uint, int_handler, void*) { register_call_count++; }
+void register_fn(const msi_block_t*, uint, interrupt_handler_t, void*) { register_call_count++; }
 
 bool interrupt_duplication_test() {
   BEGIN_TEST;

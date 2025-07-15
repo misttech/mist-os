@@ -14,17 +14,41 @@
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 
-#define MAX_MSI_IRQS 32u
+constexpr uint32_t MAX_MSI_IRQS = 32;
+constexpr uint32_t MAX_INTERRUPTS = 1024;
 
-enum interrupt_trigger_mode {
-  IRQ_TRIGGER_MODE_EDGE = 0,
-  IRQ_TRIGGER_MODE_LEVEL = 1,
+using interrupt_vector_t = uint32_t;
+using interrupt_handler_t = void (*)(void* arg);
+
+enum class interrupt_trigger_mode {
+  EDGE,
+  LEVEL,
 };
 
-enum interrupt_polarity {
-  IRQ_POLARITY_ACTIVE_HIGH = 0,
-  IRQ_POLARITY_ACTIVE_LOW = 1,
+constexpr const char* interrupt_trigger_mode_string(interrupt_trigger_mode mode) {
+  switch (mode) {
+    case interrupt_trigger_mode::EDGE:
+      return "edge";
+    case interrupt_trigger_mode::LEVEL:
+      return "level";
+  }
+  return "unknown";
+}
+
+enum class interrupt_polarity {
+  HIGH,
+  LOW,
 };
+
+constexpr const char* interrupt_polarity_string(interrupt_polarity pol) {
+  switch (pol) {
+    case interrupt_polarity::HIGH:
+      return "high";
+    case interrupt_polarity::LOW:
+      return "low";
+  }
+  return "unknown";
+}
 
 // (mask|unmask)_interrupt will disable (mask) or enable (unmask) the interrupt
 // specified by |vector|.  In the case of interrupts which target a specific CPU
@@ -32,9 +56,9 @@ enum interrupt_polarity {
 // interrupt controller designs), these functions will affect the
 // masked/unmasked state of the interrupt vector for the caller's CPU only.
 // They will not mask/unmask the specified vector for any of the other CPUs.
-zx_status_t mask_interrupt(unsigned int vector);
-zx_status_t unmask_interrupt(unsigned int vector);
-zx_status_t deactivate_interrupt(unsigned int vector);
+zx_status_t mask_interrupt(interrupt_vector_t vector);
+zx_status_t unmask_interrupt(interrupt_vector_t vector);
+zx_status_t deactivate_interrupt(interrupt_vector_t vector);
 
 void shutdown_interrupts();
 
@@ -55,38 +79,37 @@ zx_status_t resume_interrupts_curr_cpu();
 
 // Configure the specified interrupt vector.  If it is invoked, it muust be
 // invoked prior to interrupt registration
-zx_status_t configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
-                                enum interrupt_polarity pol);
+zx_status_t configure_interrupt(interrupt_vector_t vector, interrupt_trigger_mode tm,
+                                interrupt_polarity pol);
 
-zx_status_t get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
-                                 enum interrupt_polarity* pol);
+zx_status_t get_interrupt_config(interrupt_vector_t vector, interrupt_trigger_mode* tm,
+                                 interrupt_polarity* pol);
 
 // Set the affinity for an interrupt. Intrinsically set to cpu 0 by default.
-zx_status_t set_interrupt_affinity(unsigned int vector, cpu_mask_t mask);
-
-typedef void (*int_handler)(void* arg);
+zx_status_t set_interrupt_affinity(interrupt_vector_t vector, cpu_mask_t mask);
 
 // Registers a handler+arg to be called for the given interrupt vector. The handler may be called
 // with internal spinlocks held and should not itself call register_int_handler. This handler may
 // be serialized with other handlers.
 // This can be called repeatedly to change the handler/arg for a given vector.
-zx_status_t register_int_handler(unsigned int vector, int_handler handler, void* arg);
+zx_status_t register_int_handler(interrupt_vector_t vector, interrupt_handler_t handler, void* arg);
 
 // Registers a handler+arg to be called for the given interrupt vector. Once this is used to set a
 // handler it is an error to modify the vector again through this or register_int_handler.
 // Registration via this method allows the interrupt manager to avoid needing to synchronize
 // re-registrations with invocations, which can be much more efficient and avoid unneeded
 // serialization of handlers.
-zx_status_t register_permanent_int_handler(unsigned int vector, int_handler handler, void* arg);
+zx_status_t register_permanent_int_handler(interrupt_vector_t vector, interrupt_handler_t handler,
+                                           void* arg);
 
 // These return the [base, max] range of vectors that can be used with zx_interrupt syscalls
 // This api will need to evolve if valid vector ranges later are not contiguous
 uint32_t interrupt_get_base_vector();
 uint32_t interrupt_get_max_vector();
 
-bool is_valid_interrupt(unsigned int vector, uint32_t flags);
+bool is_valid_interrupt(interrupt_vector_t vector, uint32_t flags);
 
-unsigned int remap_interrupt(unsigned int vector);
+interrupt_vector_t remap_interrupt(interrupt_vector_t vector);
 
 // sends an inter-processor interrupt
 zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi);
@@ -98,7 +121,7 @@ void interrupt_init_percpu();
 
 // A structure which holds the state of a block of IRQs allocated by the
 // platform to be used for delivering MSI or MSI-X interrupts.
-typedef struct msi_block {
+struct msi_block_t {
   uint64_t tgt_addr;  // The target write transaction physical address
   // The data which the device should write when triggering an IRQ.  Note,
   // only the lower 16 bits are used when the block has been allocated for MSI
@@ -108,7 +131,7 @@ typedef struct msi_block {
   uint32_t num_irq;      // The number of irqs in the allocated block
   bool allocated;        // Whether or not this block has been allocated
   bool is_32bit;         // 32 bit if true, 64 bit otherwise
-} msi_block_t;
+};
 
 // Methods used to determine if a platform supports MSI or not, and if so,
 // whether or not the platform can mask individual MSI vectors at the
@@ -145,9 +168,10 @@ zx_status_t msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_
 // @param block A pointer to the block to be returned
 void msi_free_block(msi_block_t* block);
 
-// Register a handler function for a given msi_id within an msi_block_t. Passing a
+// Register a handler function for a given msi_id within an msi_block. Passing a
 // NULL handler will effectively unregister a handler for a given msi_id within the
 // block.
-void msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler, void* ctx);
+void msi_register_handler(const msi_block_t* block, uint msi_id, interrupt_handler_t handler,
+                          void* ctx);
 
 #endif  // ZIRCON_KERNEL_DEV_INTERRUPT_INCLUDE_DEV_INTERRUPT_H_
