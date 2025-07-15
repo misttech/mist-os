@@ -71,19 +71,14 @@ BEGIN_SUCCESS_CASE(Suspendable)
 void DdkSuspend(ddk::SuspendTxn txn) {}
 END_SUCCESS_CASE
 
-BEGIN_SUCCESS_CASE(Rxrpcable)
-zx_status_t DdkRxrpc(zx_handle_t channel) { return ZX_OK; }
-END_SUCCESS_CASE
-
 template <typename T>
 static void do_test() {
   auto dev = std::make_unique<T>();
 }
 
 struct TestDispatch;
-using TestDispatchType =
-    ddk::Device<TestDispatch, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable,
-                ddk::Suspendable, ddk::Rxrpcable>;
+using TestDispatchType = ddk::Device<TestDispatch, ddk::GetProtocolable, ddk::Initializable,
+                                     ddk::Unbindable, ddk::Suspendable>;
 
 struct TestDispatch : public TestDispatchType {
   TestDispatch() : TestDispatchType(nullptr) {}
@@ -104,17 +99,11 @@ struct TestDispatch : public TestDispatchType {
 
   void DdkSuspend(ddk::SuspendTxn txn) { suspend_called = true; }
 
-  zx_status_t DdkRxrpc(zx_handle_t channel) {
-    rxrpc_called = true;
-    return ZX_OK;
-  }
-
   bool get_protocol_called = false;
   bool init_called = false;
   bool unbind_called = false;
   bool release_called = false;
   bool suspend_called = false;
-  bool rxrpc_called = false;
 };
 
 TEST(DdktlDevice, Dispatch) {
@@ -129,14 +118,12 @@ TEST(DdktlDevice, Dispatch) {
   ops->unbind(ctx);
   ops->release(ctx);
   ops->suspend(ctx, 2, false, 0);
-  EXPECT_EQ(ZX_OK, ops->rxrpc(ctx, 0), "");
 
   EXPECT_TRUE(dev->get_protocol_called, "");
   EXPECT_TRUE(dev->init_called, "");
   EXPECT_TRUE(dev->unbind_called, "");
   EXPECT_TRUE(dev->release_called, "");
   EXPECT_TRUE(dev->suspend_called, "");
-  EXPECT_TRUE(dev->rxrpc_called, "");
 }
 
 #if TEST_WILL_NOT_COMPILE || 0
@@ -157,7 +144,6 @@ DEFINE_FAIL_CASE(GetProtocolable)
 DEFINE_FAIL_CASE(Initializable)
 DEFINE_FAIL_CASE(Unbindable)
 DEFINE_FAIL_CASE(Suspendable)
-DEFINE_FAIL_CASE(Rxrpcable)
 
 class TestBadOverride : public ddk::Device<TestBadOverride> {
  public:
@@ -204,7 +190,6 @@ TEST(DdktlDevice, MixinGetProtocolable) { do_test<TestGetProtocolable>(); }
 TEST(DdktlDevice, MixinInitializable) { do_test<TestInitializable>(); }
 TEST(DdktlDevice, MixinUnbindable) { do_test<TestUnbindable>(); }
 TEST(DdktlDevice, MixinSuspendable) { do_test<TestSuspendable>(); }
-TEST(DdktlDevice, MixinRxrpcable) { do_test<TestRxrpcable>(); }
 
 }  // namespace
 
@@ -213,7 +198,6 @@ TEST(DdktlDevice, FailNoGetProtocol) { do_test<TestNotGetProtocolable>(); }
 TEST(DdktlDevice, FailNoInitialize) { do_test<TestNotInitializable>(); }
 TEST(DdktlDevice, FailNoUnbind) { do_test<TestNotUnbindable>(); }
 TEST(DdktlDevice, FailNoSuspende) { do_test<TestNotSuspendable>(); }
-TEST(DdktlDevice, FailNoRxrpc) { do_test<TestNotRxrpcable>(); }
 TEST(DdktlDevice, FailBadOverride) { do_test<TestBadOverride>(); }
 TEST(DdktlDevice, FailHiddenOverride) { do_test<TestHiddenOverride>(); }
 TEST(DdktlDevice, FailStaticOverride) { do_test<TestStaticOverride>(); }

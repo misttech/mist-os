@@ -204,23 +204,6 @@ typedef struct zx_protocol_device {
 
   zx_status_t (*configure_auto_suspend)(void* ctx, bool enable, uint8_t deepest_sleep_state);
 
-  //@ ## rxrpc
-  // Only called for bus devices.
-  // When the "shadow" of a busdev sends an rpc message, the
-  // device that is shadowing is notified by the rxrpc op and
-  // should attempt to read and respond to a single message on
-  // the provided channel.
-  //
-  // Any error return from this method will result in the channel
-  // being closed and the remote "shadow" losing its connection.
-  //
-  // This method is called with ZX_HANDLE_INVALID for the channel
-  // when a new client connects -- at which point any state from
-  // the previous client should be torn down.
-  //
-  // This hook will only be executed on the devhost's main thread.
-  zx_status_t (*rxrpc)(void* ctx, zx_handle_t channel);
-
   //@ ## message
   // Process a FIDL rpc message. This is used to handle class or
   // device specific messaging.

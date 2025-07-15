@@ -276,16 +276,6 @@ constexpr void CheckConfigureAutoSuspend() {
       "'zx_status_t DdkConfigureAutoSuspend(bool, uint8_t)'.");
 }
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_rxrpc, DdkRxrpc);
-
-template <typename D>
-constexpr void CheckRxrpcable() {
-  static_assert(has_ddk_rxrpc<D>::value, "Rxrpcable classes must implement DdkRxrpc");
-  static_assert(std::is_same<decltype(&D::DdkRxrpc), zx_status_t (D::*)(uint32_t)>::value,
-                "DdkRxrpc must be a public non-static member function with signature "
-                "'zx_status_t DdkRxrpc(zx_handle_t)'.");
-}
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_child_pre_release, DdkChildPreRelease);
 
 template <typename D>

@@ -71,8 +71,6 @@
 // |                            |                                                    |
 // | ddk::Suspendable           | void DdkSuspend(ddk::SuspendTxn txn)               |
 // |                            |                                                    |
-// | ddk::Rxrpcable             | zx_status_t DdkRxrpc(zx_handle_t channel)          |
-// |                            |                                                    |
 // | ddk::MadeVisible           | zx_status_t DdkMadeVisible()                       |
 // +----------------------------+----------------------------------------------------+
 //
@@ -223,20 +221,6 @@ class AutoSuspendable : public base_mixin {
  private:
   static zx_status_t Configure_Auto_Suspend(void* ctx, bool enable, uint8_t requested_sleep_state) {
     return static_cast<D*>(ctx)->DdkConfigureAutoSuspend(enable, requested_sleep_state);
-  }
-};
-
-template <typename D>
-class Rxrpcable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckRxrpcable<D>();
-    proto->rxrpc = Rxrpc;
-  }
-
- private:
-  static zx_status_t Rxrpc(void* ctx, zx_handle_t channel) {
-    return static_cast<D*>(ctx)->DdkRxrpc(channel);
   }
 };
 

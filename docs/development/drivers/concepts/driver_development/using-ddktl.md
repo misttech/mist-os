@@ -24,7 +24,6 @@ Mixin class            | Function             | Purpose
 `ddk::Suspendable`        | **DdkSuspend()**     | to suspend device
 `ddk::PerformanceTunable` | **DdkSetPerformanceState()**   | to transition the performant state
 `ddk::AutoSuspendable`    | **DdkConfigureAutoSuspend()**   | to configure whether a driver can auto suspend the device
-`ddk::Rxrpcable`          | **DdkRxrpc()**       | remote messages for bus devices
 
 When defining the class for your device, you specify which functions it will
 support by including the appropriate mixins.
