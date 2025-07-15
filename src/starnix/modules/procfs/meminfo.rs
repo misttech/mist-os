@@ -38,6 +38,7 @@ impl DynamicFileSource for MeminfoFile {
         let mem_total = memory_stats.total_bytes.unwrap_or_default() / 1024;
         let mem_free = memory_stats.free_bytes.unwrap_or_default() / 1024;
         let mem_available = (memory_stats.free_bytes.unwrap_or_default()
+            + memory_stats.vmo_pager_oldest_bytes.unwrap_or_default()
             + memory_stats.vmo_discardable_unlocked_bytes.unwrap_or_default())
             / 1024;
 
