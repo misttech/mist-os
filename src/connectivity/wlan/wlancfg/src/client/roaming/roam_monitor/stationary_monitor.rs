@@ -8,6 +8,7 @@ use crate::client::roaming::roam_monitor::RoamMonitorApi;
 use crate::client::types;
 use crate::config_management::SavedNetworksManagerApi;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::historical_list::Timestamped;
 use crate::util::pseudo_energy::EwmaSignalData;
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -43,6 +44,7 @@ pub struct StationaryMonitor {
     scan_backoff: zx::MonotonicDuration,
     /// To be used to limit how often roams can happen to avoid thrashing between APs.
     past_roams: Arc<Mutex<PastRoamList>>,
+    next_roaming_enabled_time: fasync::MonotonicInstant,
 }
 
 impl StationaryMonitor {
@@ -70,6 +72,7 @@ impl StationaryMonitor {
             saved_networks,
             scan_backoff: MIN_BACKOFF_BETWEEN_ROAM_SCANS,
             past_roams,
+            next_roaming_enabled_time: fasync::MonotonicInstant::now(),
         }
     }
 
@@ -108,19 +111,28 @@ impl StationaryMonitor {
     }
 
     fn should_roam_scan_after_signal_report(&mut self) -> RoamTriggerDataOutcome {
-        // If there have been too many roam attempts in the past 24 hours, do not attempt roaming.
+        // Exit early if roaming has been disabled.
+        if fasync::MonotonicInstant::now() <= self.next_roaming_enabled_time {
+            return RoamTriggerDataOutcome::Noop;
+        }
+        // If we have exceeded the maximum number of roam attempts per day, do not attempt roaming
+        // and record the next time at which roaming will be enabled.
         if let Some(past_roams) = self.past_roams.try_lock() {
-            if past_roams
-                .get_recent(fasync::MonotonicInstant::now() - TIMESPAN_TO_LIMIT_SCANS)
-                .len()
-                >= NUM_MAX_ROAMS_PER_DAY
-            {
+            let recent_roams =
+                past_roams.get_recent(fasync::MonotonicInstant::now() - TIMESPAN_TO_LIMIT_SCANS);
+            if recent_roams.len() >= NUM_MAX_ROAMS_PER_DAY {
+                if let Some(oldest_roam_attempt) = recent_roams.first() {
+                    self.next_roaming_enabled_time =
+                        oldest_roam_attempt.time() + TIMESPAN_TO_LIMIT_SCANS;
+                    info!("Maximum number of roam attempts per day ({}) has been reached. Roam scanning is disabled until a reboot, or until fewer than {} roam attempts have occured in the past 24 hours.", NUM_MAX_ROAMS_PER_DAY, NUM_MAX_ROAMS_PER_DAY);
+                } else {
+                    error!("Unexpectedly failed to get the oldest roam attempt.");
+                }
                 return RoamTriggerDataOutcome::Noop;
             }
         } else {
             error!("Unexpectedly failed to get lock on recent roam attempts data");
         }
-
         let mut roam_reasons: Vec<RoamReason> = vec![];
 
         // Check RSSI threshold
@@ -246,6 +258,7 @@ mod test {
             saved_networks: saved_networks.clone(),
             scan_backoff: MIN_BACKOFF_BETWEEN_ROAM_SCANS,
             past_roams: past_roams.clone(),
+            next_roaming_enabled_time: fasync::MonotonicInstant::now(),
         };
         TestValues { monitor, telemetry_receiver, saved_networks, past_roams }
     }
@@ -261,6 +274,7 @@ mod test {
             saved_networks: saved_networks.clone(),
             scan_backoff: MIN_BACKOFF_BETWEEN_ROAM_SCANS,
             past_roams: past_roams.clone(),
+            next_roaming_enabled_time: fasync::MonotonicInstant::now(),
         };
         TestValues { monitor, telemetry_receiver, saved_networks, past_roams }
     }
@@ -736,6 +750,62 @@ mod test {
                 + zx::MonotonicDuration::from_hours(24)
                 + zx::MonotonicDuration::from_seconds(1),
         );
+        let should_roam_scan_result =
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
+        assert_variant!(should_roam_scan_result, RoamTriggerDataOutcome::RoamSearch { .. });
+    }
+
+    #[fuchsia::test]
+    fn test_roaming_disabled_timer_is_set_and_respected() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let first_roam_time = fasync::MonotonicInstant::now();
+        exec.set_fake_time(first_roam_time);
+
+        // Setup with RSSIthat would trigger a roam scan if the limit were not hit.
+        let rssi = LOCAL_ROAM_THRESHOLD_RSSI_5G - 5.0;
+        let connection_data = RoamingConnectionData {
+            signal_data: EwmaSignalData::new(rssi, TEST_OK_SNR, 10),
+            ..generate_random_roaming_connection_data()
+        };
+        let mut test_values = setup_test_with_data(connection_data);
+
+        // Record enough roam attempts to prevent roaming for a while. The first roam attempt is
+        // at time 0, the second at 1 min, etc.
+        for i in 0..NUM_MAX_ROAMS_PER_DAY {
+            let time_of_roam = first_roam_time + zx::MonotonicDuration::from_minutes(i as i64);
+            exec.set_fake_time(time_of_roam);
+            test_values.past_roams.try_lock().unwrap().add(RoamEvent::new(time_of_roam));
+        }
+
+        let trigger_data =
+            RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: rssi as i8,
+                snr_db: TEST_OK_SNR as i8,
+            });
+
+        // Advance time just enough to be after the last roam event.
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_minutes(
+            NUM_MAX_ROAMS_PER_DAY as i64,
+        )));
+
+        // The limit on roams per day has been hit, no roam scan should be recommended.
+        let should_roam_scan_result =
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
+        assert_eq!(should_roam_scan_result, RoamTriggerDataOutcome::Noop);
+
+        // Check that the `next_roaming_enabled_time` was set correctly. It should be 24 hours
+        // after the *first* roam attempt.
+        let expected_reenabled_time = first_roam_time + TIMESPAN_TO_LIMIT_SCANS;
+        assert_eq!(test_values.monitor.next_roaming_enabled_time, expected_reenabled_time);
+
+        // Advance time to just BEFORE the re-enable time. Roaming should still be disabled.
+        exec.set_fake_time(expected_reenabled_time - zx::MonotonicDuration::from_seconds(1));
+        let should_roam_scan_result =
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
+        assert_eq!(should_roam_scan_result, RoamTriggerDataOutcome::Noop);
+
+        // Advance time to just AFTER the re-enable time. Roaming should now be allowed.
+        exec.set_fake_time(expected_reenabled_time + zx::MonotonicDuration::from_seconds(1));
         let should_roam_scan_result =
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
         assert_variant!(should_roam_scan_result, RoamTriggerDataOutcome::RoamSearch { .. });
