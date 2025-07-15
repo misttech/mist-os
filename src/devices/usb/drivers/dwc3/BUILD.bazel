@@ -123,10 +123,28 @@ fuchsia_cc_test(
     ],
 )
 
+fuchsia_cc_test(
+    name = "dwc3-fifo-test-bin",
+    srcs = [
+        "dwc3-fifo.h",
+        "dwc3-fifo-test.cc",
+    ],
+    linkstatic = True,
+    deps = [
+        "//src/devices/lib/dma-buffer",
+        "@com_google_googletest//:gtest_main",
+        "@fuchsia_sdk//pkg/driver_fake_bti_cpp",
+        "@fuchsia_sdk//pkg/driver_logging_cpp",
+    ],
+)
+
 fuchsia_unittest_package(
     name = "dwc3-test-package",
     package_name = "dwc3-test",
     fuchsia_api_level = "HEAD",
-    unit_tests = [":dwc3-test-bin"],
+    unit_tests = [
+        ":dwc3-test-bin",
+        ":dwc3-fifo-test-bin",
+    ],
     visibility = ["//visibility:public"],
 )

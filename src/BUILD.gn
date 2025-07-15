@@ -180,7 +180,10 @@ bazel_test_package_group("bazel_tests") {
     {
       test_package_target = "//src/devices/usb/drivers/dwc3:dwc3-test-package"
       test_package_name = "dwc3-test"
-      test_component_names = [ "dwc3-test-bin" ]
+      test_component_names = [
+        "dwc3-test-bin",
+        "dwc3-fifo-test-bin",
+      ]
       test_specs = {
         log_settings = {
           max_severity = "ERROR"
