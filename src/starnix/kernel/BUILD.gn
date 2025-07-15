@@ -73,11 +73,20 @@ rustc_binary("starnix_kernel_bin") {
     "//src/starnix/config:starnix_clippy_lints",
   ]
 
+  # Enable performance features in release mode.
+  if (compilation_mode == "release") {
+    configs += [ "//build/config/lto:lto-rust" ]
+
+    # Enable moderate level of optimization for better performance.
+    configs += [ "//build/config:optimize_moderate" ]
+  }
+
   disable_rustdoc = false
 
-  if (target_cpu == "riscv64" || is_lto_variant) {
-    # At least for riscv64 and LTO, remote linking requires machines
-    # with more memory, particularly in the linking phase.
+  if (compilation_mode == "release" || target_cpu == "riscv64" ||
+      is_lto_variant) {
+    # LTO is enabled in release mode, and remote linking requires machines with more memory,
+    # particularly in the linking phase at least for riscv64 and LTO.
     _concurrent_jobs = concurrent_jobs.rust_highmem
     configs += _concurrent_jobs.configs
     forward_variables_from(_concurrent_jobs.vars, "*")
@@ -457,6 +466,16 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  # Enable performance features in release mode.
+  if (compilation_mode == "release") {
+    # Enable linker-plugin-based LTO to only generate LLVM bitcode for
+    # this library because it is only used in a binary that has LTO enabled.
+    configs += [ "//build/config/lto:lto-rust-linker-plugin" ]
+
+    # Enable moderate level of optimization for better performance.
+    configs += [ "//build/config:optimize_moderate" ]
+  }
 
   # Allows binaries that depend on this library to link.
   public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]

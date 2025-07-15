@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Increase recursion limit because LTO causes overflow.
+#![recursion_limit = "256"]
+
 use starnix_core::bpf::fs::BpfFs;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::mem::{mem_device_init, DevRandom};

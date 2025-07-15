@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Increase recursion limit because LTO causes overflow.
+#![recursion_limit = "256"]
+
 use perfetto_protos::perfetto::protos::{
     ipc_frame, DisableTracingRequest, EnableTracingRequest, FreeBuffersRequest,
     GetAsyncCommandRequest, GetAsyncCommandResponse, InitializeConnectionRequest,
