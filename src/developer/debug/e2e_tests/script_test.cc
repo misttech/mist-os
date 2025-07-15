@@ -90,6 +90,8 @@ void ScriptTest::OnOutput(const OutputBuffer& output) {
     output_for_debug_ += '\n';
   }
 
+  fprintf(stderr, "Got output: %s\n", output_for_debug_.c_str());
+
   // We get outputs in chunks, so the entire output of one command may appear in a single output
   // buffer we receive. Meanwhile the expected outputs given by the script are parsed line by line.
   // So, we want to exhaustively match this chunk of real output until we either reach a new command
@@ -97,8 +99,17 @@ void ScriptTest::OnOutput(const OutputBuffer& output) {
   FuzzyMatcher matcher(output.AsString());
 
   bool match = matcher.MatchesLine(expected_output_pattern_, allow_out_of_order_output_);
+  if (match) {
+    // This prints the first match
+    fprintf(stderr, "matched expected output: %s\n", expected_output_pattern_.c_str());
+  }
+
   while (match && ProcessScriptLines()) {
     match = matcher.MatchesLine(expected_output_pattern_, allow_out_of_order_output_);
+    if (match) {
+      // Now |expected_output_pattern_| is updated.
+      fprintf(stderr, "matched expected output: %s\n", expected_output_pattern_.c_str());
+    }
   }
 
   if (match) {
@@ -111,6 +122,9 @@ void ScriptTest::OnOutput(const OutputBuffer& output) {
   // done.
   if (script_file_.eof()) {
     loop().PostTask(FROM_HERE, [this]() { loop().QuitNow(); });
+  } else if (!match) {
+    fprintf(stderr, "no match, waiting to execute next command. expected_output_pattern_ = %s\n",
+            expected_output_pattern_.c_str());
   }
 }
 
