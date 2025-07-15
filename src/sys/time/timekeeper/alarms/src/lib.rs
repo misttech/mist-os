@@ -272,6 +272,37 @@ async fn stop_hrtimer(hrtimer: &Box<dyn TimerOps>, timer_config: &TimerConfig) {
 // The default size of the channels created in this module.
 const CHANNEL_SIZE: usize = 100;
 
+trait AlarmResponder: std::fmt::Debug {
+    fn send(
+        &self,
+        alarm_id: &str,
+        result: Result<fidl::EventPair, fta::WakeAlarmsError>,
+    ) -> Option<Result<(), fidl::Error>>;
+}
+
+impl AlarmResponder for RefCell<Option<fta::WakeAlarmsSetAndWaitResponder>> {
+    fn send(
+        &self,
+        _alarm_id: &str,
+        result: Result<fidl::EventPair, fta::WakeAlarmsError>,
+    ) -> Option<Result<(), fidl::Error>> {
+        self.borrow_mut().take().map(|responder| responder.send(result))
+    }
+}
+
+impl AlarmResponder for RefCell<Option<fidl::endpoints::ClientEnd<fta::NotifierMarker>>> {
+    fn send(
+        &self,
+        alarm_id: &str,
+        result: Result<fidl::EventPair, fta::WakeAlarmsError>,
+    ) -> Option<Result<(), fidl::Error>> {
+        self.borrow_mut().take().map(|notifier| match result {
+            Ok(keep_alive) => notifier.into_proxy().notify(alarm_id, keep_alive),
+            Err(e) => notifier.into_proxy().notify_error(alarm_id, e),
+        })
+    }
+}
+
 /// A type handed around between the concurrent loops run by this module.
 #[derive(Debug)]
 enum Cmd {
@@ -292,7 +323,7 @@ enum Cmd {
         /// This is packaged into a Rc... only because both the "happy path"
         /// and the error path must consume the responder.  This allows them
         /// to be consumed, without the responder needing to implement Default.
-        responder: Rc<RefCell<Option<fta::WakeAlarmsSetAndWaitResponder>>>,
+        responder: Rc<dyn AlarmResponder>,
     },
     StopById {
         done: zx::Event,
@@ -454,8 +485,26 @@ async fn handle_request(
             // less to schedule the next alarm.
             log_long_op!(handle_cancel(alarm_id, cid, &mut cmd));
         }
-        fta::WakeAlarmsRequest::Set { .. } => {
-            // TODO(https://fxbug.dev/424009669): Finish implementation
+        fta::WakeAlarmsRequest::Set { notifier, deadline, mode, alarm_id, responder } => {
+            // Alarm is not scheduled yet!
+            debug!(
+                "handle_request: scheduling alarm_id: \"{alarm_id}\"\n\tcid: {cid:?}\n\tdeadline: {}",
+                format_timer(deadline.into())
+            );
+            // Expected to return quickly.
+            if let Err(e) = log_long_op!(cmd.send(Cmd::Start {
+                cid,
+                deadline: deadline.into(),
+                mode,
+                alarm_id: alarm_id.clone(),
+                responder: Rc::new(RefCell::new(Some(notifier))),
+            })) {
+                warn!("handle_request: error while trying to schedule `{}`: {:?}", alarm_id, e);
+                responder.send(Err(fta::WakeAlarmsError::Internal)).unwrap();
+            } else {
+                // Successfully scheduled the alarm.
+                responder.send(Ok(())).unwrap();
+            }
         }
         fta::WakeAlarmsRequest::_UnknownMethod { .. } => {}
     };
@@ -520,7 +569,7 @@ struct TimerNode {
     cid: zx::Koid,
     /// The responder that is blocked until the timer expires.  Used to notify
     /// the alarms subsystem client when this alarm expires.
-    responder: Option<fta::WakeAlarmsSetAndWaitResponder>,
+    responder: Rc<dyn AlarmResponder>,
 }
 
 impl TimerNode {
@@ -528,9 +577,9 @@ impl TimerNode {
         deadline: fasync::BootInstant,
         alarm_id: String,
         cid: zx::Koid,
-        responder: fta::WakeAlarmsSetAndWaitResponder,
+        responder: Rc<dyn AlarmResponder>,
     ) -> Self {
-        Self { deadline, alarm_id, cid, responder: Some(responder) }
+        Self { deadline, alarm_id, cid, responder }
     }
 
     fn get_alarm_id(&self) -> &str {
@@ -548,24 +597,20 @@ impl TimerNode {
     fn get_deadline(&self) -> &fasync::BootInstant {
         &self.deadline
     }
-
-    fn take_responder(&mut self) -> Option<fta::WakeAlarmsSetAndWaitResponder> {
-        self.responder.take()
-    }
 }
 
 impl Drop for TimerNode {
     // If the TimerNode was evicted without having expired, notify the other
     // end that the timer has been canceled.
     fn drop(&mut self) {
-        let responder = self.take_responder();
-        responder.map(|r| {
-            // If the TimerNode is dropped, notify the client that may have
-            // been waiting. We can not drop a responder, because that kills
-            // the FIDL connection.
-            r.send(Err(fta::WakeAlarmsError::Dropped))
-                .map_err(|e| error!("could not drop responder: {:?}", e))
-        });
+        // If the TimerNode is dropped, notify the client that may have
+        // been waiting. We can not drop a responder, because that kills
+        // the FIDL connection.
+        if let Some(Err(e)) =
+            self.responder.send(&self.alarm_id, Err(fta::WakeAlarmsError::Dropped))
+        {
+            error!("could not drop responder: {:?}", e);
+        }
     }
 }
 
@@ -1150,7 +1195,6 @@ async fn wake_timer_loop(
             Cmd::Start { cid, deadline, mode, alarm_id, responder } => {
                 trace::duration!(c"alarms", c"Cmd::Start");
                 fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", as_trace_id(&alarm_id));
-                let responder = responder.borrow_mut().take().expect("responder is always present");
                 // NOTE: hold keep_alive until all work is done.
                 debug!(
                     "wake_timer_loop: START alarm_id: \"{}\", cid: {:?}\n\tdeadline: {}\n\tnow:      {}",
@@ -1183,26 +1227,21 @@ async fn wake_timer_loop(
                         line!(),
                         &keep_alive.get_koid().unwrap()
                     );
-                    responder
-                        .send(Ok(keep_alive))
-                        .map(|_| {
-                            debug!(
-                                concat!(
-                                    "wake_timer_loop: cid: {:?}, alarm: {}: EXPIRED IMMEDIATELY\n\t",
-                                    "deadline({}) <= now({})"
-                                ),
-                                cid,
-                                alarm_id,
-                                format_timer(deadline.into()),
-                                format_timer(now.into())
-                            )
-                        })
-                        .map_err(|e| {
-                            error!(
-                            "wake_timer_loop: cid: {:?}, alarm: {}: could not notify, dropping: {}",
-                                cid, alarm_id, e)
-                        })
-                        .unwrap_or(());
+
+                    if let Err(e) = responder
+                        .send(&alarm_id, Ok(keep_alive))
+                        .expect("responder is always present")
+                    {
+                        error!(
+                            "wake_timer_loop: cid: {cid:?}, alarm: {alarm_id}: could not notify, dropping: {e}",
+                        );
+                    } else {
+                        debug!(
+                            "wake_timer_loop: cid: {cid:?}, alarm: {alarm_id}: EXPIRED IMMEDIATELY\n\tdeadline({}) <= now({})",
+                            format_timer(deadline.into()),
+                            format_timer(now.into()),
+                        )
+                    }
                 } else {
                     trace::duration!(c"alarms", c"Cmd::Start:regular");
                     fuchsia_trace::flow_step!(
@@ -1252,12 +1291,15 @@ async fn wake_timer_loop(
                 debug!("wake_timer_loop: STOP timer: {}", timer_id);
                 let deadline_before = timers.peek_deadline();
 
-                if let Some(mut timer_node) = timers.remove_by_id(&timer_id) {
+                if let Some(timer_node) = timers.remove_by_id(&timer_id) {
                     let deadline_after = timers.peek_deadline();
 
-                    if let Some(responder) = timer_node.take_responder() {
+                    if let Some(res) = timer_node
+                        .responder
+                        .send(&timer_node.alarm_id, Err(fta::WakeAlarmsError::Dropped))
+                    {
                         // We must reply to the responder to keep the connection open.
-                        responder.send(Err(fta::WakeAlarmsError::Dropped)).expect("infallible");
+                        res.expect("infallible");
                     }
                     if is_deadline_changed(deadline_before, deadline_after) {
                         log_long_op!(stop_hrtimer(&timer_proxy, &timer_config));
@@ -1575,7 +1617,7 @@ fn notify_all(
     trace::duration!(c"alarms", c"notify_all");
     let now = fasync::BootInstant::now();
     let mut expired = 0;
-    while let Some(mut timer_node) = timers.maybe_expire_earliest(reference_instant) {
+    while let Some(timer_node) = timers.maybe_expire_earliest(reference_instant) {
         expired += 1;
         // How much later than requested did the notification happen.
         let deadline = *timer_node.get_deadline();
@@ -1610,11 +1652,9 @@ fn notify_all(
         );
         let lease = clone_handle(lease_prototype);
         trace::instant!(c"alarms", c"notify", trace::Scope::Process, "alarm_id" => &alarm_id[..], "cid" => cid);
-        let _ = timer_node
-            .take_responder()
-            .map(|r| r.send(Ok(lease)))
-            .map_or_else(|| Ok(()), |res| res)
-            .map_err(|e| error!("could not signal responder: {:?}", e));
+        if let Some(Err(e)) = timer_node.responder.send(&timer_node.alarm_id, Ok(lease)) {
+            error!("could not signal responder: {:?}", e);
+        }
         trace::instant!(c"alarms", c"notified", trace::Scope::Process);
     }
     trace::instant!(c"alarms", c"notify", trace::Scope::Process, "expired_count" => expired);
@@ -2063,6 +2103,135 @@ mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(set_task).await, Poll::Ready(Ok(Ok(_))));
     }
 
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_basic_timed_wait_notify() {
+        const ALARM_ID: &str = "Hello";
+        let ctx = TestContext::new().await;
+
+        let (notifier_client, mut notifier_stream) =
+            fidl::endpoints::create_request_stream::<fta::NotifierMarker>();
+        let setup_done = zx::Event::create();
+        assert_matches!(
+            ctx.wake_proxy
+                .set(
+                    notifier_client,
+                    fidl::BootInstant::from_nanos(2),
+                    fta::SetMode::NotifySetupDone(
+                        setup_done.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()
+                    ),
+                    ALARM_ID,
+                )
+                .await,
+            Ok(Ok(()))
+        );
+
+        let mut done_task = fasync::OnSignals::new(setup_done, zx::Signals::EVENT_SIGNALED);
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut done_task).await,
+            Poll::Ready(Ok(_)),
+            "Setup event not triggered after scheduling an alarm"
+        );
+
+        let mut next_task = notifier_stream.next();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task).await, Poll::Pending);
+
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(1)).await;
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task).await, Poll::Pending);
+
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(2)).await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(next_task).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == ALARM_ID
+        );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_two_alarms_same() {
+        const DEADLINE_NANOS: i64 = 100;
+
+        let ctx = TestContext::new().await;
+
+        let mut set_task_1 = ctx.wake_proxy.set_and_wait(
+            fidl::BootInstant::from_nanos(DEADLINE_NANOS),
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            "Hello1".into(),
+        );
+        let mut set_task_2 = ctx.wake_proxy.set_and_wait(
+            fidl::BootInstant::from_nanos(DEADLINE_NANOS),
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            "Hello2".into(),
+        );
+
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_1).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_2).await, Poll::Pending);
+
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(DEADLINE_NANOS)).await;
+
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_1).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task_2).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_two_alarms_same_notify() {
+        const DEADLINE_NANOS: i64 = 100;
+        const ALARM_ID_1: &str = "Hello1";
+        const ALARM_ID_2: &str = "Hello2";
+
+        let ctx = TestContext::new().await;
+
+        let schedule = async |deadline_nanos: i64, alarm_id: &str| {
+            let (notifier_client, notifier_stream) =
+                fidl::endpoints::create_request_stream::<fta::NotifierMarker>();
+            assert_matches!(
+                ctx.wake_proxy
+                    .set(
+                        notifier_client,
+                        fidl::BootInstant::from_nanos(deadline_nanos),
+                        fta::SetMode::KeepAlive(fake_wake_lease()),
+                        alarm_id,
+                    )
+                    .await,
+                Ok(Ok(()))
+            );
+            notifier_stream
+        };
+
+        let mut notifier_1 = schedule(DEADLINE_NANOS, ALARM_ID_1).await;
+        let mut notifier_2 = schedule(DEADLINE_NANOS, ALARM_ID_2).await;
+
+        let mut next_task_1 = notifier_1.next();
+        let mut next_task_2 = notifier_2.next();
+
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task_1).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task_2).await, Poll::Pending);
+
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(DEADLINE_NANOS)).await;
+
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut next_task_1).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == ALARM_ID_1
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut next_task_2).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == ALARM_ID_2
+        );
+
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_1.next()).await,
+            Poll::Ready(None)
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_2.next()).await,
+            Poll::Ready(None)
+        );
+    }
+
     #[test_case(100, 200 ; "push out")]
     #[test_case(200, 100 ; "pull in")]
     #[fuchsia::test(allow_stalls = false)]
@@ -2108,35 +2277,70 @@ mod tests {
         );
     }
 
+    #[test_case(100, 200 ; "push out")]
+    #[test_case(200, 100 ; "pull in")]
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_two_alarms_same() {
-        const DEADLINE_NANOS: i64 = 100;
+    async fn test_two_alarms_different_notify(
+        // One timer scheduled at this instant (fake time starts from zero).
+        first_deadline_nanos: i64,
+        // Another timer scheduled at this instant.
+        second_deadline_nanos: i64,
+    ) {
+        const ALARM_ID_1: &str = "Hello1";
+        const ALARM_ID_2: &str = "Hello2";
 
         let ctx = TestContext::new().await;
 
-        let mut set_task_1 = ctx.wake_proxy.set_and_wait(
-            fidl::BootInstant::from_nanos(DEADLINE_NANOS),
-            fta::SetMode::KeepAlive(fake_wake_lease()),
-            "Hello1".into(),
-        );
-        let mut set_task_2 = ctx.wake_proxy.set_and_wait(
-            fidl::BootInstant::from_nanos(DEADLINE_NANOS),
-            fta::SetMode::KeepAlive(fake_wake_lease()),
-            "Hello2".into(),
-        );
+        let schedule = async |deadline_nanos: i64, alarm_id: &str| {
+            let (notifier_client, notifier_stream) =
+                fidl::endpoints::create_request_stream::<fta::NotifierMarker>();
+            assert_matches!(
+                ctx.wake_proxy
+                    .set(
+                        notifier_client,
+                        fidl::BootInstant::from_nanos(deadline_nanos),
+                        fta::SetMode::KeepAlive(fake_wake_lease()),
+                        alarm_id,
+                    )
+                    .await,
+                Ok(Ok(()))
+            );
+            notifier_stream
+        };
 
-        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_1).await, Poll::Pending);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut set_task_2).await, Poll::Pending);
+        // Sort alarms by their deadlines.
+        let mut notifier_all = futures::stream::select_all([
+            schedule(first_deadline_nanos, ALARM_ID_1).await,
+            schedule(second_deadline_nanos, ALARM_ID_2).await,
+        ]);
+        let [(early_ns, early_alarm), (later_ns, later_alarm)] = {
+            let mut tasks =
+                [(first_deadline_nanos, ALARM_ID_1), (second_deadline_nanos, ALARM_ID_2)];
+            tasks.sort_by(|a, b| a.0.cmp(&b.0));
+            tasks
+        };
 
-        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(DEADLINE_NANOS)).await;
+        // Alarms should fire in order of deadlines.
+        let mut next_task = notifier_all.next();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task).await, Poll::Pending);
 
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(early_ns)).await;
         assert_matches!(
-            TestExecutor::poll_until_stalled(&mut set_task_1).await,
-            Poll::Ready(Ok(Ok(_)))
+            TestExecutor::poll_until_stalled(next_task).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == early_alarm
+        );
+
+        let mut next_task = notifier_all.next();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task).await, Poll::Pending);
+
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(later_ns)).await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(next_task).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == later_alarm
         );
         assert_matches!(
-            TestExecutor::poll_until_stalled(&mut set_task_2).await,
-            Poll::Ready(Ok(Ok(_)))
+            TestExecutor::poll_until_stalled(notifier_all.next()).await,
+            Poll::Ready(None)
         );
     }
 
@@ -2151,6 +2355,30 @@ mod tests {
         assert_matches!(
             TestExecutor::poll_until_stalled(&mut set_task).await,
             Poll::Ready(Ok(Ok(_)))
+        );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_alarm_immediate_notify() {
+        const ALARM_ID: &str = "Hello";
+        let ctx = TestContext::new().await;
+
+        let (notifier_client, mut notifier_stream) =
+            fidl::endpoints::create_request_stream::<fta::NotifierMarker>();
+
+        let mut set_task = ctx.wake_proxy.set(
+            notifier_client,
+            fidl::BootInstant::INFINITE_PAST,
+            fta::SetMode::KeepAlive(fake_wake_lease()),
+            ALARM_ID,
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut set_task).await,
+            Poll::Ready(Ok(Ok(_)))
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_stream.next()).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == ALARM_ID
         );
     }
 
@@ -2223,7 +2451,66 @@ mod tests {
         });
     }
 
-    // Rescheduling a timer with the same deadline will fail with WakeAlarmsError::Dropped.
+    // Rescheduling a timer will send an error on the old notifier and use the
+    // new notifier for the new deadline.
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_reschedule_notify() {
+        const ALARM_ID: &str = "Hello";
+        const INITIAL_DEADLINE_NANOS: i64 = 100;
+        const OVERRIDE_DEADLINE_NANOS: i64 = 200;
+
+        let ctx = TestContext::new().await;
+
+        let schedule = async |deadline_nanos: i64| {
+            let (notifier_client, notifier_stream) =
+                fidl::endpoints::create_request_stream::<fta::NotifierMarker>();
+            assert_matches!(
+                ctx.wake_proxy
+                    .set(
+                        notifier_client,
+                        fidl::BootInstant::from_nanos(deadline_nanos),
+                        fta::SetMode::KeepAlive(fake_wake_lease()),
+                        ALARM_ID.into(),
+                    )
+                    .await,
+                Ok(Ok(()))
+            );
+            notifier_stream
+        };
+
+        let mut notifier_1 = schedule(INITIAL_DEADLINE_NANOS).await;
+        let mut next_task_1 = notifier_1.next();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task_1).await, Poll::Pending);
+
+        let mut notifier_2 = schedule(OVERRIDE_DEADLINE_NANOS).await;
+        let mut next_task_2 = notifier_2.next();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task_2).await, Poll::Pending);
+
+        // First notifier is called with an error then closed.
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut next_task_1).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::NotifyError { alarm_id, error, .. }))) if alarm_id == ALARM_ID && error == fta::WakeAlarmsError::Dropped
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_1.next()).await,
+            Poll::Ready(None)
+        );
+
+        // Second notifier is called upon the new deadline then closed.
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(OVERRIDE_DEADLINE_NANOS))
+            .await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(next_task_2).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == ALARM_ID
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_2.next()).await,
+            Poll::Ready(None)
+        );
+    }
+
+    // Rescheduling a timer with the same deadline using SetAndWait will fail
+    // with WakeAlarmsError::Dropped.
     //
     // TODO(http://b/430638703): Consider changing this behavior.
     #[fuchsia::test(allow_stalls = false)]
@@ -2266,6 +2553,61 @@ mod tests {
         assert_matches!(
             TestExecutor::poll_until_stalled(&mut set_task_1).await,
             Poll::Ready(Ok(Ok(_)))
+        );
+    }
+
+    // Rescheduling a timer with the same deadline using Set will notify with
+    // WakeAlarmsError::Dropped.
+    //
+    // TODO(http://b/430638703): Consider changing this behavior.
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_reschedule_same_notify() {
+        const ALARM_ID: &str = "Hello";
+        const DEADLINE_NANOS: i64 = 100;
+
+        let ctx = TestContext::new().await;
+
+        let schedule = async |deadline_nanos: i64| {
+            let (notifier_client, notifier_stream) =
+                fidl::endpoints::create_request_stream::<fta::NotifierMarker>();
+            assert_matches!(
+                ctx.wake_proxy
+                    .set(
+                        notifier_client,
+                        fidl::BootInstant::from_nanos(deadline_nanos),
+                        fta::SetMode::KeepAlive(fake_wake_lease()),
+                        ALARM_ID.into(),
+                    )
+                    .await,
+                Ok(Ok(()))
+            );
+            notifier_stream
+        };
+
+        let mut notifier_1 = schedule(DEADLINE_NANOS).await;
+        let mut next_task_1 = notifier_1.next();
+        assert_matches!(TestExecutor::poll_until_stalled(&mut next_task_1).await, Poll::Pending);
+
+        // Second notifier will error immediately then close the connection.
+        let mut notifier_2 = schedule(DEADLINE_NANOS).await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_2.next()).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::NotifyError { alarm_id, error, .. }))) if alarm_id == ALARM_ID && error == fta::WakeAlarmsError::Dropped
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_2.next()).await,
+            Poll::Ready(None)
+        );
+
+        // First notifier is called upon the deadline then closed.
+        TestExecutor::advance_to(fasync::MonotonicInstant::from_nanos(DEADLINE_NANOS)).await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(next_task_1).await,
+            Poll::Ready(Some(Ok(fta::NotifierRequest::Notify { alarm_id, .. }))) if alarm_id == ALARM_ID
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(notifier_1.next()).await,
+            Poll::Ready(None)
         );
     }
 
