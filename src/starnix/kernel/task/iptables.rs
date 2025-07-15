@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::MemoryAccessorExt;
 use crate::task::CurrentTask;
 use crate::vfs::socket::iptables_utils::{self, write_string_to_ascii_buffer};
-use crate::vfs::socket::{SocketDomain, SocketHandle, SocketType};
+use crate::vfs::socket::{SockOptValue, SocketDomain, SocketHandle, SocketType};
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::sync::Controller;
 use fidl_fuchsia_net_filter_ext::{
@@ -14,7 +13,6 @@ use fidl_fuchsia_net_filter_ext::{
 use fuchsia_component::client::connect_to_protocol_sync;
 use itertools::Itertools;
 use starnix_logging::{log_warn, track_stub};
-use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::iptables_flags::NfIpHooks;
 use starnix_uapi::{
@@ -588,9 +586,9 @@ impl IpTables {
         current_task: &CurrentTask,
         socket: &SocketHandle,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
-        let mut bytes = current_task.read_buffer(&user_opt)?;
+        let mut bytes = optval.to_vec(current_task)?;
         match optname {
             // Replaces the [`IpTable`] specified by `user_opt`.
             IPT_SO_SET_REPLACE => {

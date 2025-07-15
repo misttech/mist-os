@@ -946,10 +946,10 @@ pub fn sys_setsockopt(
             current_task,
             socket,
             optname,
-            user_opt,
+            user_opt.into(),
         )
     } else {
-        socket.setsockopt(locked, current_task, level, optname, user_opt)
+        socket.setsockopt(locked, current_task, level, optname, user_opt.into())
     }
 }
 

@@ -7,9 +7,10 @@ use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
 use crate::task::syscalls::SockFProgPtr;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
+use crate::vfs::socket::socket::ReadFromSockOptValue as _;
 use crate::vfs::socket::{
-    Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps, SocketPeer,
-    SocketProtocol, SocketShutdownFlags, SocketType,
+    SockOptValue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
+    SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use byteorder::ByteOrder;
@@ -19,7 +20,6 @@ use fidl::endpoints::DiscoverableProtocolMarker as _;
 use linux_uapi::{IP_MULTICAST_ALL, IP_PASSSEC};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
@@ -583,12 +583,11 @@ impl SocketOps for ZxioBackedSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog_ptr = SockFProgPtr::new_with_ref(current_task, user_opt)?;
-                let fprog = current_task.read_multi_arch_object(fprog_ptr)?;
+                let fprog = SockFProgPtr::read_from_sockopt_value(current_task, &optval)?;
                 if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
                     return error!(EINVAL);
                 }
@@ -609,7 +608,7 @@ impl SocketOps for ZxioBackedSocket {
                 Ok(())
             }
             (SOL_SOCKET, SO_MARK) => {
-                let mark = current_task.read_object::<u32>(user_opt.try_into()?)?;
+                let mark: u32 = optval.read(current_task)?;
                 let socket_mark = ZxioSocketMark::so_mark(mark);
                 let optval: &[u8; size_of::<zxio_socket_mark>()] =
                     zerocopy::transmute_ref!(&socket_mark);
@@ -619,7 +618,7 @@ impl SocketOps for ZxioBackedSocket {
                     .map_err(|out_code| errno_from_zxio_code!(out_code))
             }
             _ => {
-                let optval = current_task.read_buffer(&user_opt)?;
+                let optval = optval.to_vec(current_task)?;
                 self.zxio
                     .setsockopt(level as i32, optname as i32, &optval)
                     .map_err(|status| from_status_like_fdio!(status))?

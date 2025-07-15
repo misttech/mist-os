@@ -8,14 +8,13 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::socket::{
-    Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps, SocketPeer,
-    SocketProtocol, SocketShutdownFlags, SocketType,
+    SockOptValue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
+    SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
 };
 use crate::vfs::{AncillaryData, FileHandle, MessageReadInfo, UnixControlData};
 use fidl::endpoints::SynchronousProxy;
 use linux_uapi::{SOL_SOCKET, SO_LINGER};
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, from_status_like_fdio, uapi, ucred};
@@ -285,7 +284,7 @@ impl SocketOps for RemoteUnixDomainSocket {
         _current_task: &CurrentTask,
         _level: u32,
         _optname: u32,
-        _user_opt: UserBuffer,
+        _optval: SockOptValue,
     ) -> Result<(), Errno> {
         error!(EOPNOTSUPP)
     }

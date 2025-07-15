@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::security;
-use crate::vfs::socket::SocketDomain;
+use crate::vfs::socket::{SockOptValue, SocketDomain};
 use futures::channel::mpsc::{
     UnboundedReceiver, UnboundedSender, {self},
 };
@@ -25,7 +25,6 @@ use zerocopy::{FromBytes, IntoBytes};
 
 use crate::device::kobject::{Device, UEventAction, UEventContext};
 use crate::device::{DeviceListener, DeviceListenerKey};
-use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, Message, MessageQueue, MessageReadInfo, OutputBuffer,
@@ -36,7 +35,6 @@ use crate::vfs::socket::{
     SocketMessageFlags, SocketOps, SocketPeer, SocketShutdownFlags, SocketType,
 };
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
-use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::auth::CAP_NET_ADMIN;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
@@ -338,42 +336,38 @@ impl NetlinkSocketInner {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     // SO_SNDBUF doubles the requested capacity to leave space for bookkeeping.
                     // See https://man7.org/linux/man-pages/man7/socket.7.html
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     // SO_RCVBUF doubles the requested capacity to leave space for bookkeeping.
                     // See https://man7.org/linux/man-pages/man7/socket.7.html
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_PASSCRED => {
-                    let passcred: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let passcred: u32 = optval.read(current_task)?;
                     self.passcred = passcred != 0;
                 }
                 SO_TIMESTAMP => {
-                    let timestamp: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let timestamp: u32 = optval.read(current_task)?;
                     self.timestamp = timestamp != 0;
                 }
                 SO_SNDBUFFORCE => {
                     security::check_task_capable(current_task, CAP_NET_ADMIN)?;
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUFFORCE => {
                     security::check_task_capable(current_task, CAP_NET_ADMIN)?;
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 _ => return error!(ENOSYS),
@@ -571,9 +565,9 @@ impl SocketOps for BaseNetlinkSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
-        self.lock().setsockopt(current_task, level, optname, user_opt)
+        self.lock().setsockopt(current_task, level, optname, optval)
     }
 }
 
@@ -768,9 +762,9 @@ impl SocketOps for UEventNetlinkSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
-        self.lock().setsockopt(current_task, level, optname, user_opt)
+        self.lock().setsockopt(current_task, level, optname, optval)
     }
 }
 
@@ -1099,12 +1093,12 @@ impl SocketOps for RouteNetlinkSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_NETLINK, NETLINK_ADD_MEMBERSHIP) => {
                 let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
-                let group: u32 = current_task.read_object(user_opt.try_into()?)?;
+                let group: u32 = optval.read(current_task)?;
                 let async_work = client
                     .add_membership(ModernGroup(group))
                     .map_err(|InvalidModernGroupError| errno!(EINVAL))?;
@@ -1117,13 +1111,13 @@ impl SocketOps for RouteNetlinkSocket {
             }
             (SOL_NETLINK, NETLINK_DROP_MEMBERSHIP) => {
                 let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
-                let group: u32 = current_task.read_object(user_opt.try_into()?)?;
+                let group: u32 = optval.read(current_task)?;
                 client
                     .del_membership(ModernGroup(group))
                     .map_err(|InvalidModernGroupError| errno!(EINVAL))?;
                 Ok(())
             }
-            _ => self.inner.lock().setsockopt(current_task, level, optname, user_opt),
+            _ => self.inner.lock().setsockopt(current_task, level, optname, optval),
         }
     }
 }
@@ -1278,9 +1272,9 @@ impl SocketOps for DiagnosticNetlinkSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
-        self.inner.lock().setsockopt(current_task, level, optname, user_opt)
+        self.inner.lock().setsockopt(current_task, level, optname, optval)
     }
 }
 
@@ -1468,17 +1462,14 @@ impl SocketOps for GenericNetlinkSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
-        match level {
-            SOL_NETLINK => match optname {
-                NETLINK_ADD_MEMBERSHIP => {
-                    let group_id: u32 = current_task.read_object(user_opt.try_into()?)?;
-                    self.client.add_membership(ModernGroup(group_id))
-                }
-                _ => self.lock().setsockopt(current_task, level, optname, user_opt),
-            },
-            _ => self.lock().setsockopt(current_task, level, optname, user_opt),
+        match (level, optname) {
+            (SOL_NETLINK, NETLINK_ADD_MEMBERSHIP) => {
+                let group_id: u32 = optval.read(current_task)?;
+                self.client.add_membership(ModernGroup(group_id))
+            }
+            _ => self.lock().setsockopt(current_task, level, optname, optval),
         }
     }
 }

@@ -10,8 +10,9 @@ use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageQueue, MessageReadInfo, OutputBuffer, UnixControlData,
 };
 use crate::vfs::socket::{
-    AcceptQueue, Socket, SocketAddress, SocketDomain, SocketFile, SocketHandle, SocketMessageFlags,
-    SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
+    AcceptQueue, SockOptValue, Socket, SocketAddress, SocketDomain, SocketFile, SocketHandle,
+    SocketMessageFlags, SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
+    DEFAULT_LISTEN_BACKLOG,
 };
 use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
@@ -27,7 +28,6 @@ use ebpf_api::{
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
 use starnix_uapi::file_mode::Access;
 use starnix_uapi::open_flags::OpenFlags;
@@ -761,55 +761,52 @@ impl SocketOps for UnixSocket {
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
-        user_opt: UserBuffer,
+        optval: SockOptValue,
     ) -> Result<(), Errno> {
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     // See StreamUnixSocketPairTest.SetSocketSendBuf for why we multiply by 2 here.
                     self.set_send_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
-                    let requested_capacity: socklen_t =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = optval.read(current_task)?;
                     self.set_receive_capacity(requested_capacity as usize);
                 }
                 SO_LINGER => {
-                    let mut linger: uapi::linger =
-                        current_task.read_object(user_opt.try_into()?)?;
+                    let mut linger: uapi::linger = optval.read(current_task)?;
                     if linger.l_onoff != 0 {
                         linger.l_onoff = 1;
                     }
                     self.set_linger(linger);
                 }
                 SO_PASSCRED => {
-                    let passcred: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let passcred: u32 = optval.read(current_task)?;
                     self.set_passcred(passcred != 0);
                 }
                 SO_BROADCAST => {
-                    let broadcast: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let broadcast: u32 = optval.read(current_task)?;
                     self.set_broadcast(broadcast != 0);
                 }
                 SO_NO_CHECK => {
-                    let no_check: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let no_check: u32 = optval.read(current_task)?;
                     self.set_no_check(no_check != 0);
                 }
                 SO_REUSEADDR => {
-                    let reuseaddr: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let reuseaddr: u32 = optval.read(current_task)?;
                     self.set_reuseaddr(reuseaddr != 0);
                 }
                 SO_REUSEPORT => {
-                    let reuseport: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let reuseport: u32 = optval.read(current_task)?;
                     self.set_reuseport(reuseport != 0);
                 }
                 SO_KEEPALIVE => {
-                    let keepalive: u32 = current_task.read_object(user_opt.try_into()?)?;
+                    let keepalive: u32 = optval.read(current_task)?;
                     self.set_keepalive(keepalive != 0);
                 }
                 SO_ATTACH_BPF => {
-                    let fd: FdNumber = current_task.read_object(user_opt.try_into()?)?;
+                    let fd: FdNumber = optval.read(current_task)?;
                     let object = get_bpf_object(current_task, fd)?;
                     let program = object.as_program()?;
 
@@ -1133,6 +1130,7 @@ mod tests {
     use super::*;
     use crate::mm::MemoryAccessor;
     use crate::testing::*;
+    use starnix_types::user_buffer::UserBuffer;
 
     #[::fuchsia::test]
     async fn test_socket_send_capacity() {
@@ -1178,7 +1176,7 @@ mod tests {
         current_task.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
         let user_buffer = UserBuffer { address: user_address, length: opt_size };
         server_socket
-            .setsockopt(locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
+            .setsockopt(locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer.into())
             .unwrap();
 
         let opt_bytes =
