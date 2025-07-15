@@ -411,6 +411,7 @@ mod tests {
             release_info: BoardReleaseInfo::new_for_testing(),
             hardware_info: Default::default(),
             provided_features: Default::default(),
+            zbi_extra_items: Default::default(),
             devicetree: Default::default(),
             devicetree_overlay: Default::default(),
             filesystems: Default::default(),

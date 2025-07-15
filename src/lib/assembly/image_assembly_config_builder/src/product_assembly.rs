@@ -329,6 +329,13 @@ impl ProductAssembly {
             .add_product_base_drivers(product.base_drivers)
             .context("Adding product-provided base-drivers")?;
 
+        // Add ZBI extra items.
+        if let Some(zbi_extra_items_path) = &board_config.zbi_extra_items {
+            builder
+                .add_zbi_extra_items(zbi_extra_items_path)
+                .context("Adding ZBI extra items image")?;
+        }
+
         // Add devicetree binary
         if let Some(devicetree_path) = &board_config.devicetree {
             builder.add_devicetree(devicetree_path).context("Adding devicetree binary")?;

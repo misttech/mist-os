@@ -71,6 +71,9 @@ pub struct ImageAssemblyConfig {
     /// item.
     pub board_driver_arguments: Option<BoardDriverArguments>,
 
+    /// ZBI non bootable image containing extra items to add to the ZBI.
+    pub zbi_extra_items: Option<Utf8PathBuf>,
+
     /// Devicetree binary to be added to zbi
     pub devicetree: Option<Utf8PathBuf>,
 
@@ -105,6 +108,7 @@ impl ImageAssemblyConfig {
             images_config: ImagesConfig::default(),
             board_name: "my_board".into(),
             board_driver_arguments: None,
+            zbi_extra_items: Some("path/to/zbi_extra_items/image".into()),
             devicetree: Some("path/to/devicetree/binary".into()),
             devicetree_overlay: Some("path/to/devicetree/binary/overlay".into()),
             image_mode: Default::default(),

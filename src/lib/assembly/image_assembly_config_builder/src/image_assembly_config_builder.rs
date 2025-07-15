@@ -106,6 +106,9 @@ pub struct ImageAssemblyConfigBuilder {
     /// Configuration capabilities to add to a configuration component/package.
     configuration_capabilities: Option<assembly_config_capabilities::CapabilityNamedMap>,
 
+    /// ZBI container with extra items to be added to zbi
+    zbi_extra_items: Option<Utf8PathBuf>,
+
     /// Devicetree binary to be added to zbi
     devicetree: Option<Utf8PathBuf>,
 
@@ -158,6 +161,7 @@ impl ImageAssemblyConfigBuilder {
             memory_buckets: MemoryBuckets::default(),
             board_driver_arguments: None,
             configuration_capabilities: None,
+            zbi_extra_items: None,
             devicetree: None,
             devicetree_overlay: None,
             developer_only_options: None,
@@ -820,6 +824,14 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    pub fn add_zbi_extra_items(&mut self, zbi_extra_items_path: &Utf8Path) -> Result<()> {
+        if self.zbi_extra_items.is_some() {
+            bail!("duplicate zbi_extra_items image");
+        }
+        self.zbi_extra_items = Some(zbi_extra_items_path.into());
+        Ok(())
+    }
+
     pub fn add_devicetree(&mut self, devicetree_path: &Utf8Path) -> Result<()> {
         if self.devicetree.is_some() {
             bail!("duplicate devicetree binary");
@@ -920,6 +932,7 @@ impl ImageAssemblyConfigBuilder {
             memory_buckets: _,
             board_driver_arguments,
             configuration_capabilities,
+            zbi_extra_items,
             devicetree,
             devicetree_overlay,
             developer_only_options: _,
@@ -1167,6 +1180,7 @@ impl ImageAssemblyConfigBuilder {
             board_name,
             partitions_config,
             board_driver_arguments,
+            zbi_extra_items,
             devicetree,
             devicetree_overlay,
             system_release_info,

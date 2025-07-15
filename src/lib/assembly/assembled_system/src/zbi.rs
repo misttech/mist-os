@@ -113,6 +113,11 @@ pub fn construct_zbi(
         zbi_builder.add_ramdisk(ramdisk);
     }
 
+    // Add the extra items ZBI.
+    if let Some(zbi_extra_items) = &product.zbi_extra_items {
+        zbi_builder.add_zbi_extra_items(zbi_extra_items);
+    }
+
     // Add the devicetree binary in the ZBI if necessary.
     if let Some(devicetree) = &product.devicetree {
         zbi_builder.add_devicetree(devicetree);
