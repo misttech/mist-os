@@ -16,7 +16,7 @@ use byteorder::ByteOrder;
 use ebpf::convert_and_verify_cbpf;
 use ebpf_api::SOCKET_FILTER_CBPF_CONFIG;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use linux_uapi::IP_MULTICAST_ALL;
+use linux_uapi::{IP_MULTICAST_ALL, IP_PASSSEC};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::user_buffer::UserBuffer;
@@ -602,6 +602,10 @@ impl SocketOps for ZxioBackedSocket {
             }
             (SOL_IP, IP_MULTICAST_ALL) => {
                 track_stub!(TODO("https://fxbug.dev/404596095"), "SOL_IP.IP_MULTICAST_ALL");
+                Ok(())
+            }
+            (SOL_IP, IP_PASSSEC) if current_task.kernel().features.selinux_test_suite => {
+                track_stub!(TODO("https://fxbug.dev/398663317"), "SOL_IP.IP_PASSSEC");
                 Ok(())
             }
             (SOL_SOCKET, SO_MARK) => {
