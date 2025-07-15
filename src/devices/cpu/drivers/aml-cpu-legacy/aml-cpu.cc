@@ -275,10 +275,6 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
   return ZX_OK;
 }
 
-zx_status_t AmlCpu::DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep_state) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 void AmlCpu::GetOperatingPointInfo(GetOperatingPointInfoRequestView request,
                                    GetOperatingPointInfoCompleter::Sync& completer) {
   // Get all operating points.

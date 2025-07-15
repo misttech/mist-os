@@ -64,9 +64,6 @@
 // |                            |                           uint32_t requested_state,|
 // |                            |                           uint32_t* out_state)     |
 // |                            |                                                    |
-// | ddk::AutoSuspendable       | zx_status_t DdkConfigureAutoSuspend(bool enable,   |
-// |                            |                      uint8_t requested_sleep_state)|
-// |                            |                                                    |
 // | ddk::Messageable<P>::Mixin | Methods defined by fidl::WireServer<P>             |
 // |                            |                                                    |
 // | ddk::Suspendable           | void DdkSuspend(ddk::SuspendTxn txn)               |
@@ -207,20 +204,6 @@ class Suspendable : public base_mixin {
     auto dev = static_cast<D*>(ctx);
     SuspendTxn txn(dev->zxdev(), requested_state, enable_wake, suspend_reason);
     static_cast<D*>(ctx)->DdkSuspend(std::move(txn));
-  }
-};
-
-template <typename D>
-class AutoSuspendable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckConfigureAutoSuspend<D>();
-    proto->configure_auto_suspend = Configure_Auto_Suspend;
-  }
-
- private:
-  static zx_status_t Configure_Auto_Suspend(void* ctx, bool enable, uint8_t requested_sleep_state) {
-    return static_cast<D*>(ctx)->DdkConfigureAutoSuspend(enable, requested_sleep_state);
   }
 };
 

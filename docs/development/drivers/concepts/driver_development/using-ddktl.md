@@ -23,7 +23,6 @@ Mixin class            | Function             | Purpose
 `ddk::Unbindable`         | **DdkUnbind()**      | called when this device is being removed
 `ddk::Suspendable`        | **DdkSuspend()**     | to suspend device
 `ddk::PerformanceTunable` | **DdkSetPerformanceState()**   | to transition the performant state
-`ddk::AutoSuspendable`    | **DdkConfigureAutoSuspend()**   | to configure whether a driver can auto suspend the device
 
 When defining the class for your device, you specify which functions it will
 support by including the appropriate mixins.

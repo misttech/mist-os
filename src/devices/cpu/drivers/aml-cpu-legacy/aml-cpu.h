@@ -24,8 +24,7 @@ namespace fuchsia_cpuctrl = fuchsia_hardware_cpu_ctrl;
 namespace fuchsia_thermal = fuchsia_hardware_thermal;
 
 class AmlCpu;
-using DeviceType =
-    ddk::Device<AmlCpu, ddk::Messageable<fuchsia_cpuctrl::Device>::Mixin, ddk::AutoSuspendable>;
+using DeviceType = ddk::Device<AmlCpu, ddk::Messageable<fuchsia_cpuctrl::Device>::Mixin>;
 
 class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL> {
  public:
@@ -48,7 +47,6 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   void DdkRelease();
 
   zx_status_t SetCurrentOperatingPointInternal(uint32_t requested_opp, uint32_t* out_opp);
-  zx_status_t DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep_state);
 
   // Fidl server interface implementation.
   void GetOperatingPointInfo(GetOperatingPointInfoRequestView request,

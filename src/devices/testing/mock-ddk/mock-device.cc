@@ -139,11 +139,6 @@ void MockDevice::SuspendNewOp(uint8_t requested_state, bool enable_wake, uint8_t
   Dispatch(ctx_, ops_->suspend, requested_state, enable_wake, suspend_reason);
 }
 
-zx_status_t MockDevice::ConfigureAutoSuspendOp(bool enable, uint8_t requested_state) {
-  return Dispatch(ctx_, ops_->configure_auto_suspend, ZX_ERR_NOT_SUPPORTED, enable,
-                  requested_state);
-}
-
 bool MockDevice::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn) {
   if (ops_->message) {
     Dispatch(ctx_, ops_->message, std::move(msg).ReleaseToEncodedCMessage(), txn);

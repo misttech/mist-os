@@ -188,22 +188,6 @@ typedef struct zx_protocol_device {
   // be executed on the devhost's main thread.
   void (*suspend)(void* ctx, uint8_t requested_state, bool enable_wake, uint8_t suspend_reason);
 
-  //@ ## configure_autosuspend
-  // The configure_autosuspend hook is used for configuring whether a driver can
-  // auto suspend the device depending on the activity and idleness of the device.
-  //
-  // If "enable" is true, auto suspend is configured. deepest_sleep_state is the deepest
-  // sleep state the device is expected to go into when the device is suspended.
-  //
-  // On success, the device is configured to be autosuspended
-  // On failure, the device not configured to be autosuspended. If the device does
-  // not implement the autosuspend hook, it means the device does not support autosuspend.
-  //
-  // This hook will only be executed on the devhost's main thread.
-  //
-
-  zx_status_t (*configure_auto_suspend)(void* ctx, bool enable, uint8_t deepest_sleep_state);
-
   //@ ## message
   // Process a FIDL rpc message. This is used to handle class or
   // device specific messaging.
