@@ -434,7 +434,7 @@ zx_status_t platform_resume_timer_curr_cpu() {
 
   // Kick the timer to get things going again.
   //
-  // TODO(https://fxbug.dev/414456459): Remove/merge this with the logic in
+  // TODO(https://fxbug.dev/417558115): Remove/merge this with the logic in
   // IdlePowerThread::UpdateMonotonicClock such that we don't kick the platform
   // timer twice.
   return platform_set_oneshot_timer(0);

@@ -141,10 +141,10 @@ void platform_halt_cpu(void) {
 
 bool platform_supports_suspend_cpu() { return cpu_suspend_supported; }
 
-// TODO(https://fxbug.dev/414456459): Expand to include a deadline parameter
+// TODO(https://fxbug.dev/417558115): Expand to include a deadline parameter
 // that's used to wake the CPU based on the boot time clock.
 //
-// TODO(https://fxbug.dev/414456459): Consider adding a parameter that indicates
+// TODO(https://fxbug.dev/417553411): Consider adding a parameter that indicates
 // how deep of a suspend state we want to enter.  Then, on platforms and CPUs
 // that support multiple PSCI power states, we can choose the state that matches
 // the request.  That way this same function can be used to implement both "deep
@@ -165,16 +165,8 @@ zx_status_t platform_suspend_cpu() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // TODO(https://fxbug.dev/414456459): Rejigger |platform_suspend_cpu| to track how many CPUs in
-  // this power domain (or cluster?) are still running and use that to decide what scope to request
-  // of psci_cpu_suspend.  The idea being that the last CPU to suspend can+should request that the
-  // domain/cluster be powered down rather than just the calling CPU.
-
-  // TODO(https://fxbug.dev/414456459): Expose a PSCI function that looks at the
-  // power_state value and determines if it's considered a "power down state" in
-  // the PSCI sense of the term.  Or perhaps make that an attribute that's
-  // supplied by the PSCI driver.
-  const bool is_power_down = true;
+  const uint32_t power_state = psci_get_cpu_suspend_power_state();
+  const bool is_power_down = psci_is_powerdown_power_state(power_state);
 
   if (is_power_down) {
     lockup_percpu_shutdown();
@@ -186,7 +178,7 @@ zx_status_t platform_suspend_cpu() {
           arch_curr_cpu_num(), current_boot_time());
 
   // The following call may not return for an arbitrartily long time.
-  const PsciCpuSuspendResult result = psci_cpu_suspend();
+  const PsciCpuSuspendResult result = psci_cpu_suspend(power_state);
   LTRACEF("psci_cpu_suspend for cpu-%u, status %d\n", arch_curr_cpu_num(), result.status_value());
 
   DEBUG_ASSERT(arch_ints_disabled());
@@ -437,7 +429,7 @@ void platform_init(void) {
       }
     }
 
-    // TODO(https://fxbug.dev/414456459): Flip this flag to enable based on presence of ZBI config.
+    // TODO(https://fxbug.dev/417558115): Flip this flag to enable based on presence of ZBI config.
     cpu_suspend_supported = false;
   }
   dprintf(INFO, "platform_suspend_cpu support %s\n",

@@ -44,6 +44,14 @@ ktl::optional<uint32_t> cpu_suspend_power_state_target_power_domain;
 
 bool psci_set_suspend_mode_supported = false;
 
+// Specifies which power_state format is used by this PSCI implementation.
+enum class PowerStateFormat {
+  Unknown,
+  Original,  // Section 5.4.2.1 of "Arm Power State Coordination Interface", DEN0022F.b.
+  Extended,  // Section 5.4.2.2 of "Arm Power State Coordination Interface", DEN0022F.b.
+};
+PowerStateFormat power_state_format;
+
 uint64_t shutdown_args[3] = {0, 0, 0};
 uint64_t reboot_args[3] = {0, 0, 0};
 uint64_t reboot_bootloader_args[3] = {0, 0, 0};
@@ -93,8 +101,10 @@ psci_call_proc do_psci_call = psci_smc_call;
 
 // Parse and print |config|, setting the relevant global power state variables.
 //
-// Intended to be called once as part of |PsciInit|.
+// Intended to be called once as part of |PsciInit| after |power_state_format| has bee set.
 void parse_cpu_suspend_power_states(ktl::span<const zbi_dcfg_arm_psci_cpu_suspend_state_t> config) {
+  DEBUG_ASSERT(power_state_format != PowerStateFormat::Unknown);
+
   if (config.empty()) {
     dprintf(INFO, "PSCI power_states: none\n");
     return;
@@ -103,6 +113,8 @@ void parse_cpu_suspend_power_states(ktl::span<const zbi_dcfg_arm_psci_cpu_suspen
   constexpr uint32_t kKnownFlags = ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_LOCAL_TIMER_STOPS |
                                    ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_TARGETS_POWER_DOMAIN;
 
+  dprintf(INFO, "PSCI power_state format: %s\n",
+          power_state_format == PowerStateFormat::Original ? "original" : "extended");
   dprintf(INFO, "PSCI power_states:\n");
 
   // Iterate over every element.  The elements are in no particular order.  The last-one-wins
@@ -112,8 +124,9 @@ void parse_cpu_suspend_power_states(ktl::span<const zbi_dcfg_arm_psci_cpu_suspen
     // requirement that must be met before invoking that power state.
     const bool skip = elem.flags & ~kKnownFlags;
 
-    dprintf(INFO, "  id=0x%x, power_state=0x%x, flags=0x%x%s\n", elem.id, elem.power_state,
-            elem.flags, skip ? " SKIPPED" : "");
+    dprintf(INFO, "  id=0x%x, power_state=0x%x, flags=0x%x, powerdown=%d%s\n", elem.id,
+            elem.power_state, elem.flags, psci_is_powerdown_power_state(elem.power_state),
+            skip ? " SKIPPED" : "");
     dprintf(INFO, "    entry_latency_us=%u, exit_latency_us=%u, min_residency_us=%u\n",
             elem.entry_latency_us, elem.exit_latency_us, elem.min_residency_us);
 
@@ -148,8 +161,8 @@ void parse_cpu_suspend_power_states(ktl::span<const zbi_dcfg_arm_psci_cpu_suspen
 // value (see section 5.4.5 of DEN0022F.b):
 //
 //   PSCI_SUCCESS - The CPU_SUSPEND call succeeded.  However, the CPU did not
-//   reach a power down state because of a pending interrupt, or simply because
-//   the requested |power_state| is not a power down state.
+//   reach a powerdown state because of a pending interrupt, or simply because
+//   the requested |power_state| is not a powerdown state.
 //
 //   PSCI_INVALID_PARAMETERS - The |power_state| is invalid, or a low-power
 //   state was requested for a higher-than-core-level topology node
@@ -190,7 +203,36 @@ zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context) {
   return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, context));
 }
 
-PsciCpuSuspendResult psci_cpu_suspend() {
+uint32_t psci_get_cpu_suspend_power_state() {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  // By convention, when suspending the entire system, higher layers (like IdlePowerThread) will
+  // make sure that the boot CPU is the last one to enter CPU_SUSPEND.  So if the calling CPU is the
+  // boot CPU, and we have a power_state that targets the power domain, use that.  Otherwise, use a
+  // power_state that targets this CPU.
+  if (cpu_suspend_power_state_target_power_domain.has_value() &&
+      arch_curr_cpu_num() == BOOT_CPU_ID) {
+    return cpu_suspend_power_state_target_power_domain.value();
+  }
+
+  return cpu_suspend_power_state_target_cpu.value();
+}
+
+bool psci_is_powerdown_power_state(uint32_t power_state) {
+  DEBUG_ASSERT(power_state_format != PowerStateFormat::Unknown);
+  switch (power_state_format) {
+    case PowerStateFormat::Original:
+      // In the original format, StateType is bit-16.  If StateType is 1, it's a powerdown state.
+      return (power_state & (1 << 16)) != 0;
+    case PowerStateFormat::Extended:
+      // In the extended format, StateType is bit-30.
+      return (power_state & (1 << 30)) != 0;
+    default:
+      panic("unknown power_state_format %u", static_cast<uint32_t>(power_state_format));
+  };
+}
+
+PsciCpuSuspendResult psci_cpu_suspend(uint32_t power_state) {
   LTRACE_ENTRY;
 
   DEBUG_ASSERT(arch_ints_disabled());
@@ -200,7 +242,6 @@ PsciCpuSuspendResult psci_cpu_suspend() {
   }
 
   const paddr_t entry_pa = KernelPhysicalAddressOf<arm64_secondary_start>();
-  const uint32_t power_state = cpu_suspend_power_state_target_cpu.value();
 
   psci_cpu_resume_context context{};
 
@@ -211,7 +252,7 @@ PsciCpuSuspendResult psci_cpu_suspend() {
 
   const int64_t result = psci_do_suspend(do_psci_call, power_state, entry_pa, &context);
   if (result > 0) {
-    // We took the "long way" and restored CPU context from a power down state.
+    // We took the "long way" and restored CPU context from a powerdown state.
     return zx::ok(CpuPoweredDown::Yes);
   }
 
@@ -313,7 +354,8 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config,
       return result;
     };
 
-    const bool has_cpu_suspend = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND").has_value();
+    const ktl::optional<uint32_t> cpu_suspend_result =
+        probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND");
     probe_feature(PSCI64_CPU_OFF, "CPU_OFF");
     probe_feature(PSCI64_CPU_ON, "CPU_ON");
     probe_feature(PSCI64_AFFINITY_INFO, "AFFINITY_INFO");
@@ -340,8 +382,17 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config,
 
     probe_feature(PSCI64_SMCCC_VERSION, "PSCI64_SMCCC_VERSION");
 
-    // Print the power_states after printing all the supported features.
-    if (has_cpu_suspend) {
+    // Print the power_state format and power_states after printing all the supported features.
+    if (cpu_suspend_result.has_value()) {
+      // Determine and set the power_state_format.
+      const uint32_t options = cpu_suspend_result.value();
+      // If bit-1 is zero, then it's original format.
+      if ((options & (1 << 1)) == 0) {
+        power_state_format = PowerStateFormat::Original;
+      } else {
+        power_state_format = PowerStateFormat::Extended;
+      }
+
       parse_cpu_suspend_power_states(psci_cpu_suspend_config);
     }
   }

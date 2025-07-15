@@ -8,7 +8,7 @@
 #include <dev/psci.h>
 #include <lib/arch/asm.h>
 
-// TODO(https://fxbug.dev/414456459): See about saving/restoring other
+// TODO(https://fxbug.dev/417553411): See about saving/restoring other
 // architectural state including, sctlr2_el1 and tcr2_el1.
 
 // int64_t psci_do_suspend(psci_call_proc psci_call_routine,
