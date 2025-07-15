@@ -44,6 +44,9 @@ namespace {
 // relating to C++ ABI set-up (e.g., stack sizes).
 constexpr ZirconAbiSpec kZirconAbiSpec{
     .machine_stack = kMachineStack,
+#if __has_feature(shadow_call_stack)
+    .shadow_call_stack = kShadowCallStack,
+#endif
 };
 
 // The mechanism to convey the ABI specification to physboot: we encode it as

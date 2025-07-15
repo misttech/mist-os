@@ -32,6 +32,8 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
 void HandoffPrep::ArchConstructKernelAddressSpace() {}
 
 void HandoffPrep::ArchDoHandoff(ZirconAbi abi, const ArchPatchInfo& patch_info) {
+  ZX_DEBUG_ASSERT_MSG(!abi.shadow_call_stack_base, "Shadow call stack not supported on x86");
+
   __asm__ volatile(
       // We want the kernel's main to be at the root of the call stack, so
       // clear the frame pointer.

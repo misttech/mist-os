@@ -24,6 +24,14 @@ constexpr ZirconAbiSpec kZirconAbiSpec{
             .lower_guard_size_bytes = 0x1000,
             .upper_guard_size_bytes = 0x1000,
         },
+#if __has_feature(shadow_call_stack)
+    .shadow_call_stack =
+        {
+            .size_bytes = 0x1000,
+            .lower_guard_size_bytes = 0x1000,
+            .upper_guard_size_bytes = 0x1000,
+        },
+#endif
 };
 
 ZIRCON_INFO_NOTE ZirconInfoNote<kZirconAbiSpec> kZirconAbiSpecNote;

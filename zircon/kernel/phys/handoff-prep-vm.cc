@@ -240,6 +240,12 @@ HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver
         PublishStackVmar(abi_spec_.machine_stack, memalloc::Type::kBootMachineStack);
     abi.machine_stack_top = elfldltl::AbiTraits<>::InitialStackPointer(
         reinterpret_cast<uintptr_t>(machine_stack.data()), machine_stack.size_bytes());
+
+    if (abi_spec_.shadow_call_stack.size_bytes > 0) {
+      ktl::span shadow_call_stack =
+          PublishStackVmar(abi_spec_.shadow_call_stack, memalloc::Type::kBootShadowCallStack);
+      abi.shadow_call_stack_base = reinterpret_cast<uintptr_t>(shadow_call_stack.data());
+    }
   }
 
   // Periphmap

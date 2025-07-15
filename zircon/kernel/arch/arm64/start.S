@@ -94,10 +94,6 @@ handoff_paddr           .req x21
   // path, which (unlike on x86, e.g.) is enough to get annoying.
   adr_global tmp, .Lboot_cpu_fake_thread_pointer_location
   msr tpidr_el1, tmp
-#if __has_feature(shadow_call_stack)
-  // The shadow call stack grows up.
-  adr_global shadow_call_sp, boot_cpu_shadow_call_kstack
-#endif
 
   // set the per cpu pointer for cpu 0
   adr_global percpu_ptr, arm64_percpu_array
@@ -126,12 +122,6 @@ handoff_paddr           .req x21
   .skip DEFAULT_STACK_SIZE
   .balign 16
 .Lboot_cpu_unsafe_kstack_end:
-.end_object
-#endif
-
-#if __has_feature(shadow_call_stack)
-.object boot_cpu_shadow_call_kstack, bss, local, align=8
-  .skip PAGE_SIZE
 .end_object
 #endif
 

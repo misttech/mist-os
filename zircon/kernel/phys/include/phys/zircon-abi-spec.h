@@ -43,9 +43,11 @@ struct ZirconAbiSpec {
   template <size_t PageSize>
   constexpr void AssertValid() {
     machine_stack.AssertValid<PageSize>();
+    shadow_call_stack.AssertValid<PageSize>();
   }
 
   Stack machine_stack;
+  Stack shadow_call_stack;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ZIRCON_ABI_SPEC_H_

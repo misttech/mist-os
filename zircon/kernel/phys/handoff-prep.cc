@@ -179,6 +179,7 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kKernel:
       case memalloc::Type::kKernelPageTables:
       case memalloc::Type::kBootMachineStack:
+      case memalloc::Type::kBootShadowCallStack:
       case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kPermanentPhysHandoff:
       case memalloc::Type::kPhysLog:
