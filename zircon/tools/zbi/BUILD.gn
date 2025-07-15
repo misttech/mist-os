@@ -2,9 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/go/go_binary.gni")
 import("//build/zbi/zbi.gni")
 import("//build/zbi/zbi_input.gni")
 import("//build/zircon/migrated_targets.gni")
+import("zbi_item.gni")
 
 zx_host_tool("zbi") {
   sources = [ "zbi.cc" ]
@@ -25,6 +27,7 @@ zx_host_tool("zbi") {
 group("tests") {
   testonly = true
   deps = [
+    ":make-single-item-zbi-input-test",
     ":zbi-deduplication-test",
     ":zbi-input-size-limit-test",
     ":zbi-storage-kernel-test.compressed",
@@ -261,4 +264,35 @@ input_test("zbi-deduplication-test") {
     },
   ]
   deps = [ ":deduplication-manifest" ]
+}
+
+# Used by `zbi_item.gni`.
+go_binary("make_single_item_zbi") {
+  sources = [ "make_single_item_zbi.go" ]
+  deps = [ "//sdk/fidl/zbi:zbi_zither.go" ]
+}
+
+zbi_item("zbi-test-single-item") {
+  type = "ZBI_TYPE_KERNEL_DRIVER"
+  extra = "ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND"
+  contents = [
+    {
+      id = 1
+    },
+  ]
+}
+
+input_test("make-single-item-zbi-input-test") {
+  deps = [ ":zbi-test-single-item" ]
+
+  fields = [
+    "type",
+    "size",
+  ]
+  expected = [
+    {
+      type = "KERNEL_DRIVER"
+      size = 24
+    },
+  ]
 }
