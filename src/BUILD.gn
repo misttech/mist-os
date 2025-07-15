@@ -183,6 +183,7 @@ bazel_test_package_group("bazel_tests") {
       test_component_names = [
         "dwc3-test-bin",
         "dwc3-fifo-test-bin",
+        "dwc3-trb-fifo-test-bin",
       ]
       test_specs = {
         log_settings = {
