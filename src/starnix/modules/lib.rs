@@ -93,7 +93,7 @@ pub fn init_common_devices(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Re
     mem_device_init(locked, kernel)?;
     tty_device_init(locked, kernel)?;
     loop_device_init(locked, kernel)?;
-    device_mapper_init(kernel)?;
+    device_mapper_init(locked, kernel)?;
     zram_device_init(locked, kernel)?;
     Ok(())
 }

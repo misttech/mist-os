@@ -58,4 +58,7 @@ lock_ordering! {
     UninterruptibleLock => MemoryXattrStorageLevel,
     // Bpf Map State objects
     UninterruptibleLock => BpfMapStateLevel,
+    // DeviceRegistty
+    UninterruptibleLock => DeviceRegistryState,
+    FileOpsCore => DeviceRegistryState,
 }

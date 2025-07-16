@@ -193,7 +193,7 @@ fn devtmpfs_create_device_node(
     Ok(())
 }
 
-pub fn devtmpfs_remove_node<L>(
+pub fn devtmpfs_remove_path<L>(
     locked: &mut Locked<L>,
     current_task: &CurrentTask,
     path: &FsStr,

@@ -66,8 +66,9 @@ bitflags! {
     }
 }
 
-pub fn device_mapper_init(kernel: &Kernel) -> Result<(), Errno> {
+pub fn device_mapper_init(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Result<(), Errno> {
     kernel.device_registry.register_major(
+        locked,
         "device-mapper".into(),
         DeviceMode::Block,
         DEVICE_MAPPER_MAJOR,

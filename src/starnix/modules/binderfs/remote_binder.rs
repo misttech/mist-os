@@ -973,7 +973,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         let device: Arc<dyn DeviceOps> = current_task
             .kernel()
             .device_registry
-            .get_device(device_type, DeviceMode::Char)
+            .get_device(locked, device_type, DeviceMode::Char)
             .or_else(|_| error!(ENOTSUP))?;
         let device_ref: &BinderDevice = device
             .as_ref()

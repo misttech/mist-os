@@ -17,7 +17,7 @@ use netlink::{NewClientError, NETLINK_LOG_TAG};
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::RouteNetlinkMessage;
 use netlink_packet_utils::{DecodeError, Emitable as _};
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -599,19 +599,23 @@ impl UEventNetlinkSocket {
         self.inner.lock()
     }
 
-    fn register_listener(
+    fn register_listener<L>(
         &self,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         state: starnix_sync::MutexGuard<'_, NetlinkSocketInner>,
-    ) {
+    ) where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if state.address.is_none() {
             return;
         }
         std::mem::drop(state);
         let mut key_state = self.device_listener_key.lock();
         if key_state.is_none() {
-            *key_state =
-                Some(current_task.kernel().device_registry.register_listener(self.inner.clone()));
+            *key_state = Some(
+                current_task.kernel().device_registry.register_listener(locked, self.inner.clone()),
+            );
         }
     }
 }
@@ -619,14 +623,14 @@ impl UEventNetlinkSocket {
 impl SocketOps for UEventNetlinkSocket {
     fn connect(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: SocketPeer,
     ) -> Result<(), Errno> {
         let mut state = self.lock();
         state.connect(current_task, peer)?;
-        self.register_listener(current_task, state);
+        self.register_listener(locked, current_task, state);
         Ok(())
     }
 
@@ -650,14 +654,14 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn bind(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         socket_address: SocketAddress,
     ) -> Result<(), Errno> {
         let mut state = self.lock();
         state.bind(current_task, socket_address)?;
-        self.register_listener(current_task, state);
+        self.register_listener(locked, current_task, state);
         Ok(())
     }
 
@@ -717,13 +721,13 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn close(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _socket: &Socket,
     ) {
         let id = self.device_listener_key.lock().take();
         if let Some(id) = id {
-            current_task.kernel().device_registry.unregister_listener(&id);
+            current_task.kernel().device_registry.unregister_listener(locked, &id);
         }
     }
 

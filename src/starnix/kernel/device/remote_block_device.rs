@@ -217,11 +217,12 @@ fn open_remote_block_device(
     Ok(current_task.kernel().remote_block_device_registry.open(id.minor())?.create_file_ops())
 }
 
-pub fn remote_block_device_init(_locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
+pub fn remote_block_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     current_task
         .kernel()
         .device_registry
         .register_major(
+            locked,
             "remote-block".into(),
             DeviceMode::Block,
             REMOTE_BLOCK_MAJOR,

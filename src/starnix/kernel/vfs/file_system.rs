@@ -135,7 +135,7 @@ pub enum CacheMode {
 impl FileSystem {
     /// Create a new filesystem.
     pub fn new<L>(
-        _locked: &mut Locked<L>,
+        locked: &mut Locked<L>,
         kernel: &Kernel,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
@@ -156,7 +156,7 @@ impl FileSystem {
             root: OnceLock::new(),
             ops: Box::new(ops),
             options,
-            dev_id: kernel.device_registry.next_anonymous_dev_id(),
+            dev_id: kernel.device_registry.next_anonymous_dev_id(locked),
             rename_mutex: Mutex::new(()),
             node_cache,
             dcache: match cache_mode {

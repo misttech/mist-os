@@ -146,14 +146,26 @@ where
     // Register /dev/pts/X device type.
     for n in 0..DEVPTS_MAJOR_COUNT {
         registry
-            .register_major("pts".into(), DeviceMode::Char, DEVPTS_FIRST_MAJOR + n, device.clone())
+            .register_major(
+                locked.cast_locked(),
+                "pts".into(),
+                DeviceMode::Char,
+                DEVPTS_FIRST_MAJOR + n,
+                device.clone(),
+            )
             .expect("can register pts{n} device");
     }
 
     // Register tty and ptmx device types.
     kernel
         .device_registry
-        .register_major("/dev/tty".into(), DeviceMode::Char, TTY_ALT_MAJOR, device)
+        .register_major(
+            locked.cast_locked(),
+            "/dev/tty".into(),
+            DeviceMode::Char,
+            TTY_ALT_MAJOR,
+            device,
+        )
         .expect("can register tty device");
 
     let tty_class = registry.objects.tty_class();
