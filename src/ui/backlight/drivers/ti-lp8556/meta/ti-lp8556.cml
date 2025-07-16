@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "driver_component/driver.shard.cml",
+        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
-        binary: "driver/ti-lp8556.so",
         bind: "meta/bind/ti-lp8556.bindbc",
+        compat: "driver/ti-lp8556.so",
         colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },

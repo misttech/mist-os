@@ -42,11 +42,9 @@ source_set("common") {
     "ti-lp8556.h",
   ]
   deps = [
-    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/platform-device/cpp",
+    "//src/devices/lib/driver",
     "//src/lib/ddk",
-    "//src/lib/ddk:ddk_metadata",
-    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/pretty",
@@ -56,19 +54,21 @@ source_set("common") {
   public_deps = [
     ":fuchsia.hardware.adhoc.lp8556_cpp",
     ":metadata",
-    "//sdk/lib/driver/component/cpp",
-    "//sdk/lib/driver/devfs/cpp",
-    "//src/devices/i2c/lib/i2c-channel",
-    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/i2c/lib/i2c-channel-legacy",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/device-protocol-display",
+    "//src/lib/ddktl",
     "//zircon/system/ulib/hwreg",
   ]
 }
 
 fuchsia_cc_driver("ti-lp8556-driver") {
+  legacy = true
   output_name = "ti-lp8556"
-  deps = [ ":common" ]
+  deps = [
+    ":common",
+    ":ti-lp8556-bind",
+  ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
@@ -76,10 +76,7 @@ fuchsia_cc_driver("ti-lp8556-driver") {
 
 fuchsia_driver_component("ti-lp8556") {
   component_name = "ti-lp8556"
-  deps = [
-    ":ti-lp8556-bind",
-    ":ti-lp8556-driver",
-  ]
+  deps = [ ":ti-lp8556-driver" ]
   info = "meta/ti-lp8556-info.json"
   manifest = "meta/ti-lp8556.cml"
 }
@@ -90,31 +87,34 @@ fuchsia_driver_package("package") {
   driver_components = [ ":ti-lp8556" ]
 }
 
-test("ti-lp8556-test-bin") {
+test("ti-lp8556-test") {
   output_name = "ti-lp8556-test"
   sources = [ "ti-lp8556-test.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/mock-mmio/cpp",
-    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/i2c/testing/mock-i2c:mock-i2c-gtest",
+    "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-reg",
-    "//src/lib/ddk:ddk_metadata",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
-    "//zircon/system/ulib/ddk-platform-defs",
+    "//third_party/googletest:gtest",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-fuchsia_unittest_package("ti-lp8556-test") {
+fuchsia_unittest_package("ti-lp8556-test-package") {
   package_name = "ti-lp8556-test"
-  deps = [ ":ti-lp8556-test-bin" ]
+  deps = [ ":ti-lp8556-test" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -126,6 +126,6 @@ group("tests") {
   testonly = true
   deps = [
     ":ti-lp8556-bind_test",
-    ":ti-lp8556-test",
+    ":ti-lp8556-test-package",
   ]
 }

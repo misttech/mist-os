@@ -1,9 +1,9 @@
 {
-    "short_description": "Texas Instruments TiLp8556 backlight driver",
+    "short_description": "Texas Instruments Lp8556 backlight driver",
     "manufacturer": "Texas Instruments",
     "families": [],
     "models": [
-        "TiLp8556"
+        "Lp8556"
     ],
     "areas": [
         "Display"

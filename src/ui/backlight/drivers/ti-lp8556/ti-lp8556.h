@@ -6,20 +6,25 @@
 #define SRC_UI_BACKLIGHT_DRIVERS_TI_LP8556_TI_LP8556_H_
 
 #include <fidl/fuchsia.hardware.adhoc.lp8556/cpp/wire.h>
-#include <fidl/fuchsia.hardware.i2c/cpp/fidl.h>
 #include <lib/device-protocol/display-panel.h>
-#include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/devfs/cpp/connector.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 
 #include <optional>
 
+#include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <hwreg/bitfields.h>
 
-#include "src/devices/i2c/lib/i2c-channel/i2c-channel.h"
+#include "src/devices/i2c/lib/i2c-channel-legacy/i2c-channel.h"
 #include "ti-lp8556Metadata.h"
 
 namespace ti {
+
+#define LOG_ERROR(fmt, ...) zxlogf(ERROR, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) zxlogf(INFO, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_SPEW(fmt, ...) zxlogf(TRACE, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_TRACE zxlogf(INFO, "[%s %d]", __func__, __LINE__)
 
 constexpr uint8_t kBacklightBrightnessLsbReg = 0x10;
 constexpr uint8_t kBacklightBrightnessMsbReg = 0x11;
@@ -52,6 +57,10 @@ constexpr int kNumBacklightDriverChannels = 6;
 
 constexpr int kMilliampPerAmp = 1000;
 
+class Lp8556Device;
+using DeviceType =
+    ddk::Device<Lp8556Device, ddk::Messageable<fuchsia_hardware_adhoc_lp8556::Device>::Mixin>;
+
 class BrightnessStickyReg : public hwreg::RegisterBase<BrightnessStickyReg, uint32_t> {
  public:
   // This bit is used to distinguish between a zero register value and an unset value.
@@ -65,20 +74,18 @@ class BrightnessStickyReg : public hwreg::RegisterBase<BrightnessStickyReg, uint
   static auto Get() { return hwreg::RegisterAddr<BrightnessStickyReg>(kAOBrightnessStickyReg); }
 };
 
-class TiLp8556 : public fdf::DriverBase,
-                 public fidl::WireServer<fuchsia_hardware_adhoc_lp8556::Device> {
+class Lp8556Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_BACKLIGHT> {
  public:
-  static constexpr std::string_view kDriverName = "ti_lp8556";
-  static constexpr std::string_view kChildNodeName = "ti-lp8556";
+  Lp8556Device(zx_device_t* parent, ddk::I2cChannel i2c, fdf::MmioBuffer mmio)
+      : DeviceType(parent), i2c_(std::move(i2c)), mmio_(std::move(mmio)) {}
 
-  TiLp8556(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
+  zx_status_t Init();
 
-  // fdf::DriverBase implementation.
-  zx::result<> Start() override;
+  // Methods required by the ddk mixins
+  void DdkRelease();
 
-  zx::result<> GetBacklightState(bool* power, double* brightness) const;
-  zx::result<> SetBacklightState(bool power, double brightness);
+  zx_status_t GetBacklightState(bool* power, double* brightness) const;
+  zx_status_t SetBacklightState(bool power, double brightness);
 
   double GetDeviceBrightness() const { return brightness_; }
   bool GetDevicePower() const { return power_; }
@@ -93,6 +100,7 @@ class TiLp8556 : public fdf::DriverBase,
     }
   }
 
+  zx::vmo InspectVmo() { return inspector_.DuplicateVmo(); }
   enum class PanelType {
     kBoe = 0,
     kKd = 1,
@@ -106,7 +114,7 @@ class TiLp8556 : public fdf::DriverBase,
   static double GetDriverEfficiency(double backlight_brightness);
   PanelType GetPanelType() const;
 
-  // fidl::WireServer<fuchsia_hardware_adhoc_lp8556::Device> implementation.
+  // FIDL calls
   void GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) override;
   void SetStateNormalized(SetStateNormalizedRequestView request,
                           SetStateNormalizedCompleter::Sync& completer) override;
@@ -132,17 +140,16 @@ class TiLp8556 : public fdf::DriverBase,
 
   zx::result<display::PanelType> GetDisplayPanelInfo();
 
-  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_adhoc_lp8556::Device> server);
+  zx_status_t SetCurrentScale(uint16_t scale);
+  zx_status_t ReadInitialState();
 
-  zx::result<> SetCurrentScale(uint16_t scale);
-  zx::result<> ReadInitialState();
-
+  inspect::Inspector inspector_;
   inspect::Node root_;
 
   // TODO(rashaeqbal): Switch from I2C to PWM in order to support a larger brightness range.
   // Needs a PWM driver.
-  i2c::I2cChannel i2c_;
-  std::optional<fdf::MmioBuffer> mmio_;
+  ddk::I2cChannel i2c_;
+  fdf::MmioBuffer mmio_;
 
   // brightness is set to maximum from bootloader if the persistent brightness sticky register is
   // not set.
@@ -169,11 +176,6 @@ class TiLp8556 : public fdf::DriverBase,
   uint32_t board_pid_ = 0;
   double backlight_power_ = 0;
   double max_current_ = 0.0;
-
-  fdf::OwnedChildNode child_;
-  driver_devfs::Connector<fuchsia_hardware_adhoc_lp8556::Device> devfs_connector_{
-      fit::bind_member<&TiLp8556::DevfsConnect>(this)};
-  fidl::ServerBindingGroup<fuchsia_hardware_adhoc_lp8556::Device> bindings_;
 };
 
 }  // namespace ti
