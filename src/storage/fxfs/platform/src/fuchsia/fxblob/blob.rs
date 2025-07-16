@@ -603,6 +603,7 @@ fn read_ahead_size_for_chunk_size(chunk_size: u64, suggested_read_ahead_size: u6
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fuchsia::epochs::Epochs;
     use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
     use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
     use crate::fuchsia::pager::PagerRange;
@@ -997,9 +998,16 @@ mod tests {
             blob.vmo.read_to_vec(164 * 1024, 4096).unwrap();
             assert_eq!(&get_chunks(&blob.chunks_supplied), &[1, 1, 1, 1, 0, 1, 0, 0]);
 
+            let epochs = Epochs::new();
+
             // We can't evict pages from the VMO so get the kernel to resupply them but we can call
             // page_in directly and wait for the counters to change.
-            blob.clone().page_in(PagerRange::new(32 * 1024..36 * 1024, blob.clone()));
+            blob.clone().page_in(PagerRange::new(
+                32 * 1024..36 * 1024,
+                blob.clone(),
+                epochs.add_ref(),
+                volume.scope().try_active_guard().unwrap(),
+            ));
             wait(
                 || blob.chunks_supplied[1].load(Ordering::Relaxed) == 2,
                 "chunk was never supplied",
@@ -1011,7 +1019,12 @@ mod tests {
 
             // Page in the last chunk and then do it again.
             blob.vmo.read_to_vec(224 * 1024, 4096).unwrap();
-            blob.clone().page_in(PagerRange::new(224 * 1024..228 * 1024, blob.clone()));
+            blob.clone().page_in(PagerRange::new(
+                224 * 1024..228 * 1024,
+                blob.clone(),
+                epochs.add_ref(),
+                volume.scope().try_active_guard().unwrap(),
+            ));
             wait(
                 || blob.chunks_supplied[7].load(Ordering::Relaxed) == 2,
                 "chunk was never supplied",

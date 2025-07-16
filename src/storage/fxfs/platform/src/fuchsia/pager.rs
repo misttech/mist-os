@@ -8,16 +8,16 @@ use crate::fuchsia::node::FxNode;
 use crate::fuchsia::profile::Recorder;
 use anyhow::Error;
 use bitflags::bitflags;
-use fuchsia_async as fasync;
+use fuchsia_async::scope::ScopeActiveGuard;
+use fuchsia_async::{self as fasync};
 use fuchsia_sync::{Mutex, MutexGuard};
-use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::range::RangeExt;
 use fxfs::round::{round_down, round_up};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
-use std::ops::Range;
+use std::ops::{Deref, Range};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use storage_device::buffer;
@@ -95,29 +95,42 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
             return;
         }
 
-        let file = match &*self.file.lock() {
-            FileHolder::Strong(file) => file.clone(),
-            FileHolder::Weak(file) => {
-                if let Some(file) = file.upgrade() {
-                    file
-                } else {
-                    error!("Received a page request for a file that is closed {:?}", contents);
-                    return;
+        let (file, ref_guard) = {
+            let file_lock = self.file.lock();
+            let file = match &*file_lock {
+                FileHolder::Strong(file) => file.clone(),
+                FileHolder::Weak(file) => {
+                    if let Some(file) = file.upgrade() {
+                        file
+                    } else {
+                        error!("Received a page request for a file that is closed {:?}", contents);
+                        return;
+                    }
                 }
-            }
+            };
+            let ref_guard = file.pager().epochs.add_ref();
+            (file, ref_guard)
         };
 
-        let Some(_guard) = file.pager().scope.try_active_guard() else {
+        let Some(scope_guard) = file.pager().scope.try_active_guard() else {
             // If an active guard can't be acquired then the filesystem must be shutting down. Fail
             // the page request to avoid leaving the client hanging.
             file.pager().report_failure(file.vmo(), contents.range(), zx::Status::BAD_STATE);
             return;
         };
         match command {
-            ZX_PAGER_VMO_READ => file.clone().page_in(PageInRange::new(contents.range(), file)),
-            ZX_PAGER_VMO_DIRTY => {
-                file.clone().mark_dirty(MarkDirtyRange::new(contents.range(), file))
-            }
+            ZX_PAGER_VMO_READ => file.clone().page_in(PageInRange::new(
+                contents.range(),
+                file,
+                ref_guard,
+                scope_guard,
+            )),
+            ZX_PAGER_VMO_DIRTY => file.clone().mark_dirty(MarkDirtyRange::new(
+                contents.range(),
+                file,
+                ref_guard,
+                scope_guard,
+            )),
             _ => unreachable!("Unhandled commands are filtered above"),
         }
     }
@@ -210,13 +223,6 @@ impl Pager {
             epochs: Epochs::new(),
             recorder: Mutex::new(None),
         })
-    }
-
-    /// Spawns a short term task for the pager that includes a guard that will prevent termination.
-    fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        if let Some(guard) = self.scope.try_active_guard() {
-            self.executor.spawn_detached(FutureWithGuard::new(guard, task));
-        }
     }
 
     /// Set the current profile recorder, or set to None to not record.
@@ -472,10 +478,6 @@ pub fn default_page_in<P: PagerBacked>(
         "len" => pager_range.len()
     );
 
-    let pager = this.pager();
-
-    let ref_guard = pager.epochs.add_ref();
-
     const ZERO_VMO_SIZE: u64 = 1_048_576;
     static ZERO_VMO: std::sync::LazyLock<zx::Vmo> =
         std::sync::LazyLock::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
@@ -518,18 +520,15 @@ pub fn default_page_in<P: PagerBacked>(
         let read_range = read_range.expand(expanded_range_for_readahead);
         for range in read_range.chunks(read_ahead_size) {
             let recorded_range = range.range.clone();
-            this.pager().spawn(page_in_chunk(this.clone(), range, ref_guard.clone()));
+            // Not taking an active guard since it is passed in here as part of `range`.
+            this.pager().executor.spawn_detached(page_in_chunk(this.clone(), range));
             this.pager().record_page_in(this.clone(), recorded_range);
         }
     }
 }
 
 #[fxfs_trace::trace("offset" => read_range.start(), "len" => read_range.len())]
-async fn page_in_chunk<P: PagerBacked>(
-    this: Arc<P>,
-    read_range: PageInRange<P>,
-    _ref_guard: RefGuard,
-) {
+async fn page_in_chunk<P: PagerBacked>(this: Arc<P>, read_range: PageInRange<P>) {
     let buffer = match this.aligned_read(read_range.range()).await {
         Ok(v) => v,
         Err(error) => {
@@ -629,37 +628,64 @@ impl PagerRequestType for MarkDirtyRequest {
 /// calling either `mark_dirty` or `report_failure`.
 pub type MarkDirtyRange<T> = PagerRange<T, MarkDirtyRequest>;
 
+#[derive(Clone, Debug)]
+struct PagerRangeInner<T: std::clone::Clone + Deref<Target: PagerBacked>> {
+    // All generic types in the template must be cloneable to derive Clone, so we template the Arc
+    // instead of the inner type.
+    file: T,
+
+    /// Holds a reference to the current Epoch, so that in-flight requests can be tracked.
+    _ref_guard: RefGuard,
+
+    /// Holds the current scope open, so that termination can't complete until this is dropped.
+    _scope_guard: ScopeActiveGuard,
+}
+
 /// The requested range from a pager packet. This object ensures that all pager requests receive a
 /// response.
 #[derive(Debug)]
 pub struct PagerRange<T: PagerBacked, U: PagerRequestType> {
     range: Range<u64>,
 
-    // A missing file indicates that a response has been sent for this range.
-    file: Option<Arc<T>>,
+    /// Contains the file and all the relevant guards. If this is None, then the request is
+    /// complete.
+    inner: Option<PagerRangeInner<Arc<T>>>,
 
     _request_type: PhantomData<U>,
 }
 
 impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
     /// Constructs a new `PagerRange<T, U>`. `range` must be page aligned.
-    pub fn new(range: Range<u64>, file: Arc<T>) -> Self {
+    pub fn new(
+        range: Range<u64>,
+        file: Arc<T>,
+        ref_guard: RefGuard,
+        scope_guard: ScopeActiveGuard,
+    ) -> Self {
         debug_assert!(
             range.start % page_size() == 0 && range.end % page_size() == 0,
             "{:?} is not page aligned",
             range
         );
-        Self { range, file: Some(file), _request_type: PhantomData }
+        Self {
+            range,
+            inner: Some(PagerRangeInner { file, _ref_guard: ref_guard, _scope_guard: scope_guard }),
+            _request_type: PhantomData,
+        }
     }
 
     /// Splits the underlying range allowing for different parts of the range to be handled and
     /// responded to independently. See `RangeExt::split` for how splitting a range works.
     /// `split_point` must be page aligned.
     pub fn split(mut self, split_point: u64) -> (Option<Self>, Option<Self>) {
-        let file = self.file.take().unwrap();
+        let inner = self.inner.take().unwrap();
         let (left, right) = self.range.clone().split(split_point);
-        let right = right.map(|range| Self::new(range, file.clone()));
-        let left = left.map(|range| Self::new(range, file));
+        let right = right.map(|range| Self {
+            range,
+            inner: Some(inner.clone()),
+            _request_type: PhantomData,
+        });
+        let left = left.map(|range| Self { range, inner: Some(inner), _request_type: PhantomData });
         (left, right)
     }
 
@@ -677,7 +703,8 @@ impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
             "{:?} is not page aligned",
             new_range
         );
-        Self { range: new_range, file: self.file.take(), _request_type: PhantomData }
+        self.range = new_range;
+        self
     }
 
     /// Returns an iterator that splits the range into ranges of `chunk_size`. If the length of the
@@ -694,7 +721,7 @@ impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
             start: self.range.start,
             end: self.range.end,
             chunk_size: chunk_size,
-            file: self.file.take(),
+            inner: self.inner.take(),
             _request_type: PhantomData,
         }
     }
@@ -722,14 +749,14 @@ impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
     /// Notifies the kernel that the page request for this range has failed. See `ZX_PAGER_OP_FAIL`
     /// for more information.
     pub fn report_failure(mut self, status: zx::Status) {
-        let file = self.file.take().unwrap();
-        file.pager().report_failure(file.vmo(), self.range.clone(), status);
+        let inner = self.inner.take().unwrap();
+        inner.file.pager().report_failure(inner.file.vmo(), self.range.clone(), status);
     }
 
     /// Test only method that will consume the PagerRange without having the send a response.
     #[cfg(test)]
     fn consume(mut self) {
-        self.file.take().unwrap();
+        self.inner.take().unwrap();
     }
 }
 
@@ -737,8 +764,13 @@ impl<T: PagerBacked> PagerRange<T, PageInRequest> {
     /// Supplies pages to the kernel for this range. See `zx_pager_supply_pages` for more
     /// information.
     pub fn supply_pages(mut self, transfer_vmo: &zx::Vmo, transfer_offset: u64) {
-        let file = self.file.take().unwrap();
-        file.pager().supply_pages(file.vmo(), self.range.clone(), transfer_vmo, transfer_offset);
+        let inner = self.inner.take().unwrap();
+        inner.file.pager().supply_pages(
+            inner.file.vmo(),
+            self.range.clone(),
+            transfer_vmo,
+            transfer_offset,
+        );
     }
 }
 
@@ -746,17 +778,17 @@ impl<T: PagerBacked> PagerRange<T, MarkDirtyRequest> {
     /// Allows the kernel to dirty this range of pages. See `ZX_PAGER_OP_DIRTY` for more
     /// information.
     pub fn dirty_pages(mut self) {
-        let file = self.file.take().unwrap();
-        file.pager().dirty_pages(file.vmo(), self.range.clone());
+        let inner = self.inner.take().unwrap();
+        inner.file.pager().dirty_pages(inner.file.vmo(), self.range.clone());
     }
 }
 
 impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRange<T, U> {
     fn drop(&mut self) {
-        if let Some(file) = &self.file {
+        if let Some(inner) = &self.inner {
             let request_type = U::request_type_name();
             let range = self.range.clone();
-            let key = file.pager_packet_receiver_registration().key();
+            let key = inner.file.pager_packet_receiver_registration().key();
             if cfg!(debug_assertions) {
                 // If this object is being dropped as part of a panic then avoid panicking again.
                 // Dropping pager packets when fxfs is crashing is acceptable. Panicking again would
@@ -772,7 +804,7 @@ impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRange<T, U> {
                     "PagerRange was dropped without sending a response, \
                     request_type={request_type}, range={range:?}, key={key}",
                 );
-                file.pager().report_failure(file.vmo(), range, zx::Status::BAD_STATE);
+                inner.file.pager().report_failure(inner.file.vmo(), range, zx::Status::BAD_STATE);
             }
         }
     }
@@ -784,8 +816,8 @@ pub struct PagerRangeChunksIter<T: PagerBacked, U: PagerRequestType> {
     start: u64,
     end: u64,
     chunk_size: u64,
-    // The file will be passed z
-    file: Option<Arc<T>>,
+    /// The file and locks/references that need to survive the request.
+    inner: Option<PagerRangeInner<Arc<T>>>,
     _request_type: PhantomData<U>,
 }
 
@@ -795,12 +827,20 @@ impl<T: PagerBacked, U: PagerRequestType> Iterator for PagerRangeChunksIter<T, U
         if self.start == self.end {
             None
         } else if self.start + self.chunk_size >= self.end {
-            let next = PagerRange::new(self.start..self.end, self.file.take().unwrap());
+            let next = Self::Item {
+                range: self.start..self.end,
+                inner: self.inner.take(),
+                _request_type: PhantomData,
+            };
             self.start = self.end;
             Some(next)
         } else {
             let next_end = self.start + self.chunk_size;
-            let next = PagerRange::new(self.start..next_end, self.file.as_ref().unwrap().clone());
+            let next = Self::Item {
+                range: self.start..next_end,
+                inner: self.inner.clone(),
+                _request_type: PhantomData,
+            };
             self.start = next_end;
             Some(next)
         }
@@ -812,8 +852,8 @@ impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRangeChunksIter<T, U> {
         if self.start != self.end {
             let request_type = U::request_type_name();
             let remaining = self.start..self.end;
-            let file = self.file.take().unwrap();
-            let key = file.pager_packet_receiver_registration().key();
+            let inner = self.inner.take().unwrap();
+            let key = inner.file.pager_packet_receiver_registration().key();
             if cfg!(debug_assertions) {
                 // If this object is being dropped as part of a panic then avoid panicking again.
                 // Dropping pager packets when fxfs is crashing is acceptable. Panicking again would
@@ -829,7 +869,11 @@ impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRangeChunksIter<T, U> {
                     "PagerRangeChunksIter was dropped without being fully consumed, \
                     request_type={request_type}, remaining={remaining:?}, key={key}",
                 );
-                file.pager().report_failure(file.vmo(), remaining, zx::Status::BAD_STATE);
+                inner.file.pager().report_failure(
+                    inner.file.vmo(),
+                    remaining,
+                    zx::Status::BAD_STATE,
+                );
             }
         }
     }
@@ -1351,9 +1395,15 @@ mod tests {
     async fn test_pager_range_chunks_iter_chunks() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope).unwrap());
-        let file = MockFile::new(pager);
+        let file = MockFile::new(pager.clone());
+        let epoch = Epochs::new();
 
-        let pager_range = PageInRange::new(0..page_size() * 5, file);
+        let pager_range = PageInRange::new(
+            0..page_size() * 5,
+            file,
+            epoch.add_ref(),
+            pager.scope.try_active_guard().unwrap(),
+        );
         let ranges: Vec<Range<u64>> = pager_range
             .chunks(page_size() * 2)
             .map(|pager_range| {
@@ -1376,9 +1426,15 @@ mod tests {
     async fn test_pager_range_split() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope).unwrap());
-        let file = MockFile::new(pager);
+        let file = MockFile::new(pager.clone());
+        let epoch = Epochs::new();
 
-        let pager_range = PageInRange::new(0..page_size() * 10, file);
+        let pager_range = PageInRange::new(
+            0..page_size() * 10,
+            file,
+            epoch.add_ref(),
+            pager.scope.try_active_guard().unwrap(),
+        );
         let (left, right) = pager_range.split(page_size() * 5);
         let (left, right) = (left.unwrap(), right.unwrap());
         assert_eq!(left.range(), 0..page_size() * 5);
@@ -1393,9 +1449,15 @@ mod tests {
     async fn test_pager_range_bad_expand_panics() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope).unwrap());
-        let file = MockFile::new(pager);
+        let file = MockFile::new(pager.clone());
+        let epoch = Epochs::new();
 
-        let pager_range = PageInRange::new(0..page_size() * 2, file);
+        let pager_range = PageInRange::new(
+            0..page_size() * 2,
+            file,
+            epoch.add_ref(),
+            pager.scope.try_active_guard().unwrap(),
+        );
         pager_range.expand(0..page_size()).consume();
     }
 
