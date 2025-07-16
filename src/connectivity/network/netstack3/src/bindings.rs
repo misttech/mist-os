@@ -1435,19 +1435,25 @@ impl NetstackSeed {
                         routes::state::serve_state_v6(rs, dispatchers_v6.clone())
                     }),
                 Service::RoutesAdminV4(rs) => {
-                    services_handle.spawn_request_stream_handler(rs, |rs| {
+                    let ctx = netstack.ctx.clone();
+                    services_handle.spawn_request_stream_handler(rs, |rs| async move {
                         routes::admin::serve_route_table::<Ipv4, routes::admin::MainRouteTable>(
                             rs,
-                            routes::admin::MainRouteTable::new(netstack.ctx.clone()),
+                            routes::admin::MainRouteTable::new::<Ipv4>(&ctx),
+                            &ctx,
                         )
+                        .await
                     })
                 }
                 Service::RoutesAdminV6(rs) => {
-                    services_handle.spawn_request_stream_handler(rs, |rs| {
+                    let ctx = netstack.ctx.clone();
+                    services_handle.spawn_request_stream_handler(rs, |rs| async move {
                         routes::admin::serve_route_table::<Ipv6, routes::admin::MainRouteTable>(
                             rs,
-                            routes::admin::MainRouteTable::new(netstack.ctx.clone()),
+                            routes::admin::MainRouteTable::new::<Ipv6>(&ctx),
+                            &ctx,
                         )
+                        .await
                     })
                 }
                 Service::RouteTableProviderV4(stream) => services_handle
