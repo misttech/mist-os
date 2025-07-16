@@ -471,6 +471,13 @@ impl From<UserBuffer> for SockOptValue {
 }
 
 impl SockOptValue {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Value(buffer) => buffer.len(),
+            Self::User(user_buffer) => user_buffer.length,
+        }
+    }
+
     pub fn read<T: FromBytes>(&self, current_task: &CurrentTask) -> Result<T, Errno> {
         match self {
             Self::Value(buffer) => {
@@ -478,6 +485,24 @@ impl SockOptValue {
             }
             Self::User(user_buffer) => {
                 current_task.read_object::<T>(user_buffer.clone().try_into()?)
+            }
+        }
+    }
+
+    pub fn read_bytes(
+        &self,
+        current_task: &CurrentTask,
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, Errno> {
+        match self {
+            Self::Value(buffer) => {
+                let bytes = std::cmp::min(max_bytes, buffer.len());
+                Ok(buffer[..bytes].to_owned())
+            }
+            Self::User(user_buffer) => {
+                let bytes = std::cmp::min(max_bytes, user_buffer.length);
+                current_task
+                    .read_buffer(&UserBuffer { address: user_buffer.address, length: bytes })
             }
         }
     }
@@ -490,6 +515,7 @@ impl SockOptValue {
     }
 }
 
+// Trait used to provide `read_from_sockopt_value` for `MappingMultiArchUserRef`.
 pub trait ReadFromSockOptValue {
     type Result;
     fn read_from_sockopt_value(

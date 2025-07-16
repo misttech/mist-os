@@ -4,9 +4,7 @@
 
 #include "bpf_helpers.h"
 
-// Global variable that will be stored in a .data section (which is a BPF map).
-static volatile __u64 global_counter1 = 0;
-static volatile __u64 global_counter2 = 0;
+const int SO_SNDBUF = 7;
 
 SECTION("maps")
 struct bpf_map_def ringbuf = {
@@ -35,14 +33,23 @@ struct bpf_map_def count = {
     .map_flags = 0,
 };
 
-// Struct stored in the `test_result` map in order to pass results to the test.
-// It must match `TestResult` struct in
-// `src/starnix/tests/syscalls/rust/src/ebpf.rs` .
+// The following definitions should match the values use by the tests.
+
 // LINT.IfChange
+// Struct stored in the `test_result` map in order to pass results to the test.
 struct test_result {
   __u64 uid_gid;
   __u64 pid_tgid;
+
+  __u64 optlen;
+  __u64 optval_size;
 };
+
+// Global variable that will be stored in a .data section (which is a BPF map).
+static volatile __u64 global_counter1 = 0;
+static volatile __u64 global_counter2 = 0;
+
+const int TEST_SOCK_OPT = 12345;
 // LINT.ThenChange(//src/starnix/tests/syscalls/rust/src/ebpf.rs)
 
 SECTION("maps")
@@ -119,6 +126,120 @@ int sock_release_prog(struct bpf_sock* sock) {
       .pid_tgid = bpf_get_current_pid_tgid(),
   };
   bpf_map_update_elem(&test_result, &zero, &result, 0);
+
+  return 1;
+}
+
+int setsockopt_prog(struct bpf_sockopt* sockopt) {
+  if (sockopt->optname == TEST_SOCK_OPT) {
+    __u64 buffer_size = sockopt->optval_end - sockopt->optval;
+    struct test_result result = {
+        .optlen = sockopt->optlen,
+        .optval_size = buffer_size,
+    };
+    int zero = 0;
+    bpf_map_update_elem(&test_result, &zero, &result, 0);
+
+    char v = 0;
+    if (sockopt->optval_end > sockopt->optval + sizeof(char)) {
+      v = *(char*)sockopt->optval;
+    }
+
+    switch (v) {
+      case 0:
+        // set `optlen=-1` to bypass the kernels implementation of the syscall.
+        sockopt->optlen = -1;
+        break;
+
+      case 1:
+        // Increase optlen beyond the buffer size. This is expected to result in EFAULT.
+        sockopt->optlen = buffer_size + 1;
+        break;
+
+      case 2:
+        // Returning 0 should result in EPERM.
+        return 0;
+    }
+
+    return 1;
+  }
+
+  if (sockopt->optname == SO_SNDBUF) {
+    if (sockopt->optval_end < sockopt->optval + sizeof(int)) {
+      return 1;
+    }
+    int* v = (int*)sockopt->optval;
+
+    // Override the value.
+    if (*v == 55555) {
+      *v = 66666;
+      sockopt->optlen = 4;
+    } else {
+      sockopt->optlen = 0;
+    }
+    return 1;
+  }
+
+  sockopt->optlen = 0;
+  return 1;
+}
+
+int getsockopt_prog(struct bpf_sockopt* sockopt) {
+  __u64 buffer_size = sockopt->optval_end - sockopt->optval;
+
+  if (sockopt->optname == TEST_SOCK_OPT) {
+    switch (buffer_size) {
+      case 2:
+        // Fail with the original error.
+        break;
+      case 3:
+        // If the program returns 0 then the original error code should
+        // still be returned to the user (instead of EPERM).
+        return 0;
+      case 4:
+        // Override an error set by the syscall implementation.
+        sockopt->retval = 0;
+        if (sockopt->optval + 4 <= sockopt->optval_end) {
+          *(int*)sockopt->optval = 42;
+        }
+        sockopt->optlen = 4;
+        break;
+      case 5:
+        // `getsockopt` is not allowed to set `optlen = -1`. The original
+        // ENOPROTOOPT should be returned.
+        sockopt->optlen = -1;
+        break;
+    }
+
+    return 1;
+  }
+
+  if (sockopt->optname == SO_SNDBUF) {
+    switch (buffer_size) {
+      case 55:
+        if (sockopt->optval + 8 < sockopt->optval_end) {
+          // Try overriding result with a larger value.
+          *(__u64*)sockopt->optval = 0x1234567890abcdef;
+        }
+        sockopt->optlen = 8;
+        break;
+
+      case 56:
+        // Reject the call should result in EPERM.
+        return 0;
+
+      case 57:
+        // `getsockopt` is not allowed to set `optlen = -1`. Should result in
+        // EFAULT.
+        sockopt->optlen = -1;
+        break;
+
+      case 58:
+        // Try changing retval to an error.
+        sockopt->retval = -5;
+        break;
+    }
+  }
 
   return 1;
 }
