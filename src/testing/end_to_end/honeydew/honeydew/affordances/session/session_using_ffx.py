@@ -189,7 +189,7 @@ class SessionUsingFfx(session.Session):
             )
             return
 
-        _LOGGER.info(f"cleanup session on device {self._name}")
+        _LOGGER.info("cleanup session on device %s", self._name)
 
         try:
             res = self._ffx.run(["component", "list"])

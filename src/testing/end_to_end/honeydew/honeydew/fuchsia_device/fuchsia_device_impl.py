@@ -984,7 +984,7 @@ class FuchsiaDeviceImpl(
         """
 
         try:
-            self.starnix
+            _LOGGER.info("%s is a starnix device", self.starnix)
             return True
         except errors.NotSupportedError:
             return False
