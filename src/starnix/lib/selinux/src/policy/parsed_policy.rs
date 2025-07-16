@@ -401,9 +401,6 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.generic_fs_contexts.data
     }
 
-    #[allow(dead_code)]
-    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
-    // SID calculation.
     pub(super) fn role_allowlist(&self) -> &[RoleAllow] {
         PS::deref_slice(&self.role_allowlist.data)
     }
@@ -853,6 +850,7 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         // Collate the sets of user, role, type, sensitivity and category Ids.
         let user_ids: HashSet<UserId> = self.users.data.iter().map(|x| x.id()).collect();
         let role_ids: HashSet<RoleId> = self.roles.data.iter().map(|x| x.id()).collect();
+        let class_ids: HashSet<ClassId> = self.classes.data.iter().map(|x| x.id()).collect();
         let type_ids: HashSet<TypeId> = self.types.data.iter().map(|x| x.id()).collect();
         let sensitivity_ids: HashSet<SensitivityId> =
             self.sensitivities.data.iter().map(|x| x.id()).collect();
@@ -905,9 +903,13 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
 
         // Validate that roles output by role- transitions & allows are defined.
         for transition in PS::deref_slice(&self.role_transitions.data) {
+            validate_id(&role_ids, transition.current_role(), "current_role")?;
+            validate_id(&type_ids, transition.type_(), "type")?;
+            validate_id(&class_ids, transition.class(), "class")?;
             validate_id(&role_ids, transition.new_role(), "new_role")?;
         }
         for allow in PS::deref_slice(&self.role_allowlist.data) {
+            validate_id(&role_ids, allow.source_role(), "source_role")?;
             validate_id(&role_ids, allow.new_role(), "new_role")?;
         }
 

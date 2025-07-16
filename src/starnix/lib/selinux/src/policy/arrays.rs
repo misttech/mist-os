@@ -272,7 +272,6 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     /// Returns whether this access vector rule comes from an
     /// `allowxperm [source] [target]:[class] [permission] {
     /// [extended_permissions] };` policy statement.
-    #[allow(dead_code)]
     pub fn is_allowxperm(&self) -> bool {
         (PS::deref(&self.metadata).access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_ALLOWXPERM)
             != 0
@@ -281,7 +280,6 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     /// Returns whether this access vector rule comes from an
     /// `auditallowxperm [source] [target]:[class] [permission] {
     /// [extended_permissions] };` policy statement.
-    #[allow(dead_code)]
     pub fn is_auditallowxperm(&self) -> bool {
         (PS::deref(&self.metadata).access_vector_rule_type
             & ACCESS_VECTOR_RULE_TYPE_AUDITALLOWXPERM)
@@ -291,7 +289,6 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     /// Returns whether this access vector rule comes from a
     /// `dontauditxperm [source] [target]:[class] [permission] {
     /// [extended_permissions] };` policy statement.
-    #[allow(dead_code)]
     pub fn is_dontauditxperm(&self) -> bool {
         (PS::deref(&self.metadata).access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_DONTAUDITXPERM)
             != 0
@@ -352,7 +349,6 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     /// statement, or similarly for an `auditallowxperm` or `dontauditxperm`
     /// policy statement. Return value is `None` if this access vector rule
     /// corresponds to a different kind of policy statement.
-    #[allow(dead_code)]
     pub fn extended_permissions(&self) -> Option<&ExtendedPermissions> {
         match &self.permission_data {
             PermissionData::ExtendedPermissions(xperms) => Some(xperms),
@@ -596,9 +592,14 @@ impl Validate for [RoleTransition] {
 
     fn validate(&self) -> Result<(), Self::Error> {
         for role_transition in self {
-            if role_transition.tclass.get() == 0 {
-                return Err(ValidateError::NonOptionalIdIsZero.into());
-            }
+            NonZeroU32::new(role_transition.role.get())
+                .ok_or(ValidateError::NonOptionalIdIsZero)?;
+            NonZeroU32::new(role_transition.role_type.get())
+                .ok_or(ValidateError::NonOptionalIdIsZero)?;
+            NonZeroU32::new(role_transition.tclass.get())
+                .ok_or(ValidateError::NonOptionalIdIsZero)?;
+            NonZeroU32::new(role_transition.new_role.get())
+                .ok_or(ValidateError::NonOptionalIdIsZero)?;
         }
         Ok(())
     }
@@ -628,16 +629,10 @@ pub(super) struct RoleAllow {
 }
 
 impl RoleAllow {
-    #[allow(dead_code)]
-    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
-    // SID calculation.
     pub(super) fn source_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.role.get()).unwrap())
     }
 
-    #[allow(dead_code)]
-    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
-    // SID calculation.
     pub(super) fn new_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.new_role.get()).unwrap())
     }
@@ -646,8 +641,11 @@ impl RoleAllow {
 impl Validate for [RoleAllow] {
     type Error = anyhow::Error;
 
-    /// TODO: Validate sequence of [`RoleAllow`].
     fn validate(&self) -> Result<(), Self::Error> {
+        for rule in self {
+            NonZeroU32::new(rule.role.get()).ok_or(ValidateError::NonOptionalIdIsZero)?;
+            NonZeroU32::new(rule.new_role.get()).ok_or(ValidateError::NonOptionalIdIsZero)?;
+        }
         Ok(())
     }
 }

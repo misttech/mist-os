@@ -143,9 +143,6 @@ pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 0x400;
 pub(super) const CONSTRAINT_EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK: u32 = 0x8;
 
 /// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux type.
-///
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
 pub(super) const TYPE_PROPERTIES_TYPE: u32 = 1;
 
 /// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux alias.
@@ -1225,26 +1222,6 @@ impl Validate for RoleStaticMetadata {
     fn validate(&self) -> Result<(), Self::Error> {
         Ok(())
     }
-}
-
-/// Returns whether `ty` is associated with `attr` via the mappings `attribute_maps`. Such
-/// associations arise from policy statements of the form `typeattribute [ty] [attributes];` where
-/// `attr` appears in the comma-separated list, `[attributes]`.
-///
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
-pub(super) fn type_has_attribute<'a, PS: ParseStrategy>(
-    ty: &'a Type<PS>,
-    attr: &'a Type<PS>,
-    attribute_maps: &Vec<ExtensibleBitmap<PS>>,
-) -> bool {
-    let type_id = PS::deref(&ty.metadata).id.get();
-    let type_index = type_id - 1;
-
-    let attribute_id = PS::deref(&attr.metadata).id.get();
-    let attribute_index = attribute_id - 1;
-
-    attribute_maps[type_index as usize].is_set(attribute_index)
 }
 
 impl<PS: ParseStrategy> Validate for [Type<PS>] {

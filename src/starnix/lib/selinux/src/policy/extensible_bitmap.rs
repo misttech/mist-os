@@ -21,17 +21,10 @@ array_type!(ExtensibleBitmap, PS, PS::Output<Metadata>, PS::Slice<MapItem>);
 
 array_type_validate_deref_both!(ExtensibleBitmap);
 
-// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
 impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
     /// Returns the number of bits described by this [`ExtensibleBitmap`].
     pub fn num_elements(&self) -> u32 {
         self.high_bit()
-    }
-
-    /// Returns the number of 1-bits in this [`ExtensibleBitmap`].
-    pub fn num_one_bits(&self) -> usize {
-        PS::deref_slice(&self.data).iter().map(|item| item.map.get().count_ones() as usize).sum()
     }
 
     /// Returns whether the `index`'th bit in this bitmap is a 1-bit.
@@ -60,13 +53,6 @@ impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
     /// [`ExtensibleBitmap`] may be indexed by the range `[0, Self::high_bit())`.
     fn high_bit(&self) -> u32 {
         PS::deref(&self.metadata).high_bit.get()
-    }
-
-    /// Returns the number of [`MapItem`] objects that would be needed to directly encode all bits
-    /// in this [`ExtensibleBitmap`]. Note that, in practice, every [`MapItem`] that would contain
-    /// all 0-bits in such an encoding is not stored internally.
-    fn count(&self) -> u32 {
-        PS::deref(&self.metadata).count.get()
     }
 
     fn item_ordering(&self, map_item: &MapItem, index: u32) -> Ordering {

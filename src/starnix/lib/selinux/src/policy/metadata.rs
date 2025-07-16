@@ -111,11 +111,11 @@ impl Validate for PolicyVersion {
     }
 }
 
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub(super) struct Config<PS: ParseStrategy> {
     handle_unknown: HandleUnknown,
+
+    #[allow(dead_code)]
     config: PS::Output<le::U32>,
 }
 
