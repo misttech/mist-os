@@ -19,6 +19,7 @@ use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use update_package::manifest::OtaManifestV1;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver,
     fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
@@ -104,6 +105,9 @@ enum PrepareError {
 
     #[error("while fetching update url")]
     FetchUrl(#[source] fetch::FetchError),
+
+    #[error("while parsing OTA manifest")]
+    ParseManifest(#[source] update_package::manifest::OtaManifestError),
 }
 
 impl PrepareError {
@@ -811,7 +815,14 @@ impl Attempt<'_> {
             update_package::UpdateMode::ForceRecovery => vec![],
         };
 
-        let () = validate_epoch(SOURCE_EPOCH_RAW, &update_pkg).await?;
+        let epoch =
+            update_pkg.epoch().await.map_err(PrepareError::ParseTargetEpochError)?.unwrap_or_else(
+                || {
+                    info!("no epoch in update package, assuming it's 0");
+                    0
+                },
+            );
+        let () = validate_epoch(SOURCE_EPOCH_RAW, epoch)?;
 
         let images_metadata =
             update_pkg.images_metadata().await.map_err(PrepareError::ParseImages)?;
@@ -1121,7 +1132,8 @@ impl AttemptV2<'_> {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
-        let _current_configuration = match self.prepare(target_version).await {
+        // FIXME(http://fxbug.dev/432093924): uses these to stage images
+        let (_current_configuration, _manifest) = match self.prepare(target_version).await {
             Ok(current_configuration) => current_configuration,
             Err(e) => {
                 state.fail(co, e.reason()).await;
@@ -1138,8 +1150,8 @@ impl AttemptV2<'_> {
     /// target OS and partition images that need written.
     async fn prepare(
         &mut self,
-        _target_version: &mut history::Version,
-    ) -> Result<paver::CurrentConfiguration, PrepareError> {
+        target_version: &mut history::Version,
+    ) -> Result<(paver::CurrentConfiguration, OtaManifestV1), PrepareError> {
         // Ensure that the partition boot metadata is ready for the update to begin. Specifically:
         // - the current configuration must be Healthy and Active, and
         // - the non-current configuration must be Unbootable.
@@ -1163,12 +1175,22 @@ impl AttemptV2<'_> {
             .await
             .map_err(PrepareError::PreparePartitionMetdata)?;
 
-        let _manifest_bytes = fetch::fetch_url(self.config.update_url.to_string())
+        let manifest_bytes = fetch::fetch_url(self.config.update_url.as_ref())
             .await
             .map_err(PrepareError::FetchUrl)?;
 
-        // TODO(https://fxbug.dev/429271527): parse manifest
-        Ok(current_config)
+        let manifest = update_package::manifest::parse_ota_manifest(&manifest_bytes)
+            .map_err(PrepareError::ParseManifest)?;
+
+        *target_version = history::Version::for_manifest(&manifest);
+
+        let () = verify_board_in_manifest(&self.env.build_info, &manifest)
+            .await
+            .map_err(PrepareError::VerifyBoard)?;
+
+        let () = validate_epoch(SOURCE_EPOCH_RAW, manifest.epoch)?;
+
+        Ok((current_config, manifest))
     }
 }
 
@@ -1454,6 +1476,19 @@ where
     Ok(())
 }
 
+async fn verify_board_in_manifest<B>(build_info: &B, manifest: &OtaManifestV1) -> Result<(), Error>
+where
+    B: BuildInfo,
+{
+    let current_board = build_info.board().await.context("while determining current board")?;
+    if let Some(current_board) = current_board {
+        if manifest.board != current_board {
+            return Err(anyhow!("expected board name {current_board} found {}", manifest.board));
+        }
+    }
+    Ok(())
+}
+
 async fn update_mode(
     pkg: &update_package::UpdatePackage,
 ) -> Result<update_package::UpdateMode, update_package::ParseUpdateModeError> {
@@ -1468,20 +1503,13 @@ async fn update_mode(
 
 /// Verify that epoch is non-decreasing. For more context, see
 /// [RFC-0071](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0071_ota_backstop).
-async fn validate_epoch(
-    source_epoch_raw: &str,
-    pkg: &update_package::UpdatePackage,
-) -> Result<(), PrepareError> {
+#[allow(clippy::result_large_err)]
+fn validate_epoch(source_epoch_raw: &str, target: u64) -> Result<(), PrepareError> {
     let src = match serde_json::from_str(source_epoch_raw)
         .map_err(|e| PrepareError::ParseSourceEpochError(source_epoch_raw.to_string(), e))?
     {
         epoch::EpochFile::Version1 { epoch } => epoch,
     };
-    let target =
-        pkg.epoch().await.map_err(PrepareError::ParseTargetEpochError)?.unwrap_or_else(|| {
-            info!("no epoch in update package, assuming it's 0");
-            0
-        });
     if target < src {
         return Err(PrepareError::UnsupportedDowngrade { src, target });
     }
@@ -1517,7 +1545,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
-    use fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage};
+    use fuchsia_pkg_testing::make_epoch_json;
 
     // Simulate the cobalt test hanging indefinitely, and ensure we time out correctly.
     // This test deliberately logs an error.
@@ -1527,58 +1555,33 @@ mod tests {
         flush_cobalt(hung_task, Duration::from_secs(2)).await;
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_success() {
+    #[test]
+    fn validate_epoch_success() {
         let source = make_epoch_json(1);
-        let target = make_epoch_json(2);
-        let p = FakeUpdatePackage::new().add_file("epoch.json", target).await;
+        let target = 2;
 
-        let res = validate_epoch(&source, &p).await;
+        let res = validate_epoch(&source, target);
 
         assert_matches!(res, Ok(()));
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_fail_unsupported_downgrade() {
+    #[test]
+    fn validate_epoch_fail_unsupported_downgrade() {
         let source = make_epoch_json(2);
-        let target = make_epoch_json(1);
-        let p = FakeUpdatePackage::new().add_file("epoch.json", target).await;
+        let target = 1;
 
-        let res = validate_epoch(&source, &p).await;
+        let res = validate_epoch(&source, target);
 
         assert_matches!(res, Err(PrepareError::UnsupportedDowngrade { src: 2, target: 1 }));
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_fail_parse_source() {
-        let p = FakeUpdatePackage::new().add_file("epoch.json", make_epoch_json(1)).await;
-
-        let res = validate_epoch("invalid source epoch.json", &p).await;
+    #[test]
+    fn validate_epoch_fail_parse_source() {
+        let res = validate_epoch("invalid source epoch.json", 1);
 
         assert_matches!(
             res,
             Err(PrepareError::ParseSourceEpochError(s, _)) if s == "invalid source epoch.json"
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_fail_parse_target() {
-        let p = FakeUpdatePackage::new()
-            .add_file("epoch.json", "invalid target epoch.json".to_string())
-            .await;
-
-        let res = validate_epoch(&make_epoch_json(1), &p).await;
-
-        assert_matches!(res, Err(PrepareError::ParseTargetEpochError(_)));
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn validate_epoch_target_defaults_to_zero() {
-        let p = FakeUpdatePackage::new();
-
-        assert_matches!(
-            validate_epoch(&make_epoch_json(1), &p).await,
-            Err(PrepareError::UnsupportedDowngrade { src: 1, target: 0 })
         );
     }
 }
