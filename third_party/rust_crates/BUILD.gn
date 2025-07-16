@@ -7027,7 +7027,7 @@ rustc_library("futures-lite-v1_11_3") {
   deps += [ ":futures-io-v0_3_30" ]
   deps += [ ":parking-v2_2_1" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
-  deps += [ ":waker-fn-v1_1_0" ]
+  deps += [ ":waker-fn-v1_2_0" ]
 
   rustenv = []
 
@@ -19943,18 +19943,18 @@ rustc_library("wait-timeout-v0_2_1") {
   applicable_licenses = [ ":wait-timeout-v0_2_1.license" ]
 }
 
-license("waker-fn-v1_1_0.license") {
+license("waker-fn-v1_2_0.license") {
   public_package_name = "waker_fn"
   license_files = [
-    "//third_party/rust_crates/vendor/waker-fn-1.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/waker-fn-1.1.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/waker-fn-1.2.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/waker-fn-1.2.0/LICENSE-MIT",
   ]
 }
 
-rustc_library("waker-fn-v1_1_0") {
+rustc_library("waker-fn-v1_2_0") {
   crate_name = "waker_fn"
-  source_root = "//third_party/rust_crates/vendor/waker-fn-1.1.0/src/lib.rs"
-  output_name = "waker_fn-5c6a90a186ee2ada"
+  source_root = "//third_party/rust_crates/vendor/waker-fn-1.2.0/src/lib.rs"
+  output_name = "waker_fn-32aad7b4450eea6b"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -19966,13 +19966,13 @@ rustc_library("waker-fn-v1_1_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=5c6a90a186ee2ada",
-    "-Cextra-filename=-5c6a90a186ee2ada",
+    "-Cmetadata=32aad7b4450eea6b",
+    "-Cextra-filename=-32aad7b4450eea6b",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":waker-fn-v1_1_0.license" ]
+  applicable_licenses = [ ":waker-fn-v1_2_0.license" ]
 }
 
 license("walkdir-v2_5_0.license") {
