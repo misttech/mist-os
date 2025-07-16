@@ -180,8 +180,8 @@ but it has no banjo protocol. Each of the inividual fragments can provide
 protocols and metadata, but for ease of compatibility, the fragments should not
 be accessed directly.
 
-Instead, the protocols can be accessed directly for each fragment by calling
-**device_get_fragment_protocol()**.
+Instead, the protocols and metadata can be accessed directly for each fragment by
+calling **device_get_fragment_protocol()** and **device_get_fragment_metadata()**
 
 ```c
 bool device_get_fragment_protocol (
@@ -207,6 +207,44 @@ if (status != ZX_OK) {
     return status;
 }
 ```
+
+Similarly with metadata:
+
+```c
+bool device_get_fragment_metadata (
+     zx_device_t* parent,
+     const char* fragment_name,
+     uint32_t type, void* buf,
+     size_t buflen, size_t* actual);
+```
+
+The arguments are as follows:
+
+Argument          | Meaning
+------------------|---------------------------------------------------
+`parent`          | Pointer to `zx_device_t` representing parent
+`fragment_name`   | The name of the fragment you wish to fetch
+`type`            | The ID of the protocol to be retrieved
+`buf`             | Pointer to a data set to be filled
+`buflen`          | Maximum number of bytes that can be written to buf
+`actual`          | Pointer to a size_t which is filled with the actual size
+
+```
+std::vector<uint8_t> data(50);
+size_t actual = 0;
+auto status = device_get_fragment_metadata(&composite, "fragment-name",
+                                           DEVICE_METADATA_FOO, data.data(),
+                                           data.size(), &actual);
+if (status != ZX_OK) {
+    zxlogf(ERROR, "could not get metadata");
+    return status;
+}
+```
+
+> The name of fragment supplied to **device_get_fragment_protocol()** and
+> **device_get_fragment_metadata()** is the same as the one in
+> **device_fragment_t** entries supplied to the **device_add_composite_deprecated()**
+> call by the board driver.
 
 ## Advanced Topics
 

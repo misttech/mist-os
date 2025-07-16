@@ -47,8 +47,8 @@ inline const char* GetPanelName(display::PanelType panel_type) {
 zx::result<display::PanelType> Gt6853Device::GetDisplayPanelType() {
   size_t actual = 0;
   display::PanelType panel_type;
-  zx_status_t status = DdkGetMetadata(DEVICE_METADATA_DISPLAY_PANEL_TYPE, &panel_type,
-                                      sizeof(display::PanelType), &actual);
+  zx_status_t status = DdkGetFragmentMetadata("pdev", DEVICE_METADATA_DISPLAY_PANEL_TYPE,
+                                              &panel_type, sizeof(display::PanelType), &actual);
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to get panel type from panel config metadata: %s",
            zx_status_get_string(status));

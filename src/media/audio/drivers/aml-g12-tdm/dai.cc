@@ -100,10 +100,10 @@ void AmlG12TdmDai::Reset(ResetCallback callback) {
 
 zx_status_t AmlG12TdmDai::InitPDev() {
   size_t actual = 0;
-  auto status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &metadata_,
-                                    sizeof(metadata::AmlConfig), &actual);
+  auto status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE, &metadata_,
+                                             sizeof(metadata::AmlConfig), &actual);
   if (status != ZX_OK || sizeof(metadata::AmlConfig) != actual) {
-    zxlogf(ERROR, "device_get_metadata failed %d", status);
+    zxlogf(ERROR, "device_get_fragment_metadata failed %d", status);
     return status;
   }
   status = AmlTdmConfigDevice::Normalize(metadata_);
@@ -440,10 +440,10 @@ void AmlG12TdmDai::WatchDelayInfo(WatchDelayInfoCallback callback) {
 static zx_status_t dai_bind(void* ctx, zx_device_t* device) {
   size_t actual = 0;
   metadata::AmlConfig metadata = {};
-  auto status = device_get_metadata(device, DEVICE_METADATA_PRIVATE, &metadata,
-                                    sizeof(metadata::AmlConfig), &actual);
+  auto status = device_get_fragment_metadata(device, "pdev", DEVICE_METADATA_PRIVATE, &metadata,
+                                             sizeof(metadata::AmlConfig), &actual);
   if (status != ZX_OK || sizeof(metadata::AmlConfig) != actual) {
-    zxlogf(ERROR, "device_get_metadata failed %d", status);
+    zxlogf(ERROR, "device_get_fragment_metadata failed %d", status);
     return status;
   }
 

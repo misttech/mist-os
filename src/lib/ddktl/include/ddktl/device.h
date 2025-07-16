@@ -467,6 +467,13 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     return device_add_metadata(zxdev(), type, data, length);
   }
 
+  zx_status_t DdkGetFragmentMetadata(const char* name, uint32_t type, void* buf, size_t buf_len,
+                                     size_t* actual) {
+    // Uses parent() instead of zxdev() as metadata is usually checked
+    // before DdkAdd(). There are few use cases to actually call it on self.
+    return device_get_fragment_metadata(parent(), name, type, buf, buf_len, actual);
+  }
+
   zx_status_t DdkGetFragmentProtocol(const char* name, uint32_t proto_id, void* out) {
     return device_get_fragment_protocol(zxdev(), name, proto_id, out);
   }
