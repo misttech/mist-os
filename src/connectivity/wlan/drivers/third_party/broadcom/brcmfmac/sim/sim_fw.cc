@@ -569,8 +569,8 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
       break;
     }
     case BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON: {
-      if ((status = SIM_FW_CHK_CMD_LEN(dcmd->len, sizeof(brcmf_scb_val_le))) == ZX_OK) {
-        status = ZX_ERR_IO;
+      status = SIM_FW_CHK_CMD_LEN(dcmd->len, sizeof(brcmf_scb_val_le));
+      if (status == ZX_OK) {
         if (softap_ifidx_ != std::nullopt && softap_ifidx_ == ifidx) {
           auto scb_val = reinterpret_cast<brcmf_scb_val_le*>(data);
           auto req_mac = reinterpret_cast<common::MacAddr*>(scb_val->ea);
@@ -2124,9 +2124,14 @@ void SimFirmware::SetStateToDeauthenticated(wlan_ieee80211_wire::ReasonCode reas
                                             bool locally_initiated, const common::MacAddr& bssid) {
   // Disable beacon watchdog that triggers disconnect
   DisableBeaconWatchdog();
+  // Note: real firmware has been observed to send E_DISASSOC in response to
+  // C_SCB_DEAUTHENTICATE_FOR_REASON for locally initiated deauth. For now, sim firmware just sends
+  // E_DEAUTH for that case to simplify the sim firmware implementation, and because the driver
+  // should be able to handle an incoming E_DEAUTH in this case anyway.
   SendEventToDriver(0, nullptr, locally_initiated ? BRCMF_E_DEAUTH : BRCMF_E_DEAUTH_IND,
-                    BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0, fidl::ToUnderlying(reason), bssid);
-  if (assoc_state_.state == AssocState::ASSOCIATED) {
+                    BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0, fidl::ToUnderlying(reason), bssid,
+                    kDisassocEventDelay);
+  if (assoc_state_.state != AssocState::NOT_ASSOCIATED) {
     AssocClearContext();
   }
   SendEventToDriver(0, nullptr, BRCMF_E_LINK, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,

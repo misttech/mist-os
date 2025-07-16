@@ -5645,9 +5645,9 @@ static void brcmf_log_conn_status(brcmf_if* ifp, brcmf_connect_status_t connect_
   }
 }
 
-// This function issues BRCMF_C_DISASSOC command to firmware for cleaning firmware and AP connection
-// states, firmware will send out deauth or disassoc frame to the AP based on current connection
-// state.
+// Issues commands to clear firmware and AP connection states.
+// Driver expects that firmware will send a deauthenticate frame to the current AP, but
+// this is best effort.
 static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
   struct brcmf_cfg80211_profile* prof = &ifp->vif->profile;
   zx_status_t status = ZX_OK;
@@ -5656,13 +5656,15 @@ static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
   struct brcmf_scb_val_le scbval;
   memcpy(&scbval.ea, prof->bssid, ETH_ALEN);
   scbval.val = static_cast<uint16_t>(fuchsia_wlan_ieee80211::ReasonCode::kStaLeaving);
-  brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
-  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
+  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
+                                  sizeof(scbval), &fw_err);
   if (status != ZX_OK) {
-    BRCMF_ERR("Failed to issue BRCMF_C_DISASSOC to firmware: %s, fw err %s",
+    BRCMF_ERR("Failed to issue BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON to firmware: %s, fw err %s",
               zx_status_get_string(status), brcmf_fil_get_errstr(fw_err));
   }
-  brcmf_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
+
+  // Once a deauth has been sent, client is not connected.
+  brcmf_clear_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
   status = brcmf_bss_reset(ifp);
   return status;
 }
@@ -5934,6 +5936,7 @@ void brcmf_if_roam_req(net_device* ndev,
   // Note that below this point, `req` and `ifp->roam_req` refer to the same roam request and
   // are equivalent.
   ifp->roam_req = fidl::ToNatural(*req);
+  cfg->target_bssid = ifp->roam_req->selected_bss()->bssid();
 
   brcmf_set_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
 
@@ -6504,7 +6507,7 @@ static void brcmf_connect_timeout_worker(WorkItem* work) {
       containerof(work, struct brcmf_cfg80211_info, connect_timeout_work);
   struct brcmf_if* ifp = cfg_to_if(cfg);
   BRCMF_WARN(
-      "Connection timeout, sending BRCMF_C_DISASSOC to firmware for state clean-up, and sending "
+      "Connection timeout, clearing firmware connection state, and sending "
       "assoc result to SME.");
   zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
   if (err != ZX_OK) {
@@ -6965,12 +6968,19 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
     // Disconnect happened during a roam attempt, so report that the roam failed.
     brcmf_bss_roam_done(ifp, brcmf_connect_status_t::ROAM_INTERRUPTED,
                         fuchsia_wlan_ieee80211_wire::StatusCode::kCanceled);
+  } else if (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state)) {
+    // Default assoc_result for disconnections.
+    auto assoc_result = fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified;
+    // Some connect_status values get a specific assoc_result.
+    if (connect_status == brcmf_connect_status_t::AUTHENTICATION_FAILED) {
+      assoc_result =
+          fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedUnauthenticatedAccessNotSupported;
+    } else if (connect_status == brcmf_connect_status_t::NO_NETWORK) {
+      assoc_result = fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedExternalReason;
+    }
+    brcmf_bss_connect_done(ifp, connect_status, assoc_result);
   } else {
-    brcmf_bss_connect_done(
-        ifp, connect_status,
-        (connect_status == brcmf_connect_status_t::CONNECTED)
-            ? fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess
-            : fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified);
+    brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
   }
 
   fuchsia_wlan_ieee80211::ReasonCode reason_code =
@@ -7205,13 +7215,19 @@ static zx_status_t brcmf_process_disassoc_event(struct brcmf_if* ifp,
                                                 const struct brcmf_event_msg* e, void* data) {
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
     brcmf_notify_disassoc(ifp->ndev, ZX_OK);
     return ZX_OK;
   }
   // For now, any disassoc event incurs a full disconnect. This may change in the future.
-  return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
+  auto connect_status = brcmf_connect_status_t::DISASSOCIATING;
+  if (brcmf_test_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,
+                     &cfg->disconnect_request_state)) {
+    connect_status = brcmf_connect_status_t::DEAUTHENTICATING;
+  }
+  return brcmf_indicate_client_disconnect(ifp, e, data, connect_status);
 }
 
 static zx_status_t brcmf_process_set_ssid_event(struct brcmf_if* ifp,

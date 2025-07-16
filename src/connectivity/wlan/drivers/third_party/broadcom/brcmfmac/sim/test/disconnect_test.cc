@@ -403,11 +403,10 @@ TEST_F(SimTest, SmeDisassocThenConnectThenFwDeauth) {
   // Make sure final disconnect was successful.
   EXPECT_EQ(ap.GetNumAssociatedClient(), 0U);
 
-  // Disassociated by SME during first connection. Make SME was notified.
-  EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 1U);
+  // Disassociated by SME during first connection. Make sure SME was notified.
+  ASSERT_EQ(client_ifc.stats_.disassoc_results.size(), 1U);
 
-  // Deauth event during second connection. We can tell it was from the
-  // second disconnect because of the reason code.
+  // Deauth event during second connection manifests as a DeauthInd sent to SME.
   ASSERT_EQ(client_ifc.stats_.deauth_indications.size(), 1U);
   const auto& deauth_ind = client_ifc.stats_.deauth_indications.front();
   EXPECT_TRUE(deauth_ind.locally_initiated());
