@@ -118,16 +118,11 @@ impl NetworkProperties {
         let mut updates = UpdatesApplied::default();
 
         if let Some(new_default_network) = update.default_network {
-            updates.default_network = Some(self.default_network);
-            if let (None, Some(old_default_network)) = (new_default_network, self.default_network) {
-                let _: Option<_> = self.socket_marks.remove(&old_default_network);
-            }
-            self.default_network = new_default_network;
+            updates.default_network = self.handle_default_network_update(new_default_network);
         }
 
         if let Some((netid, marks)) = update.socket_marks {
-            updates.socket_marks_network = Some(netid);
-            let _: Option<_> = self.socket_marks.insert(netid, marks);
+            updates.socket_marks_network = self.handle_socket_marks_update(netid, marks);
         }
 
         if let Some(dns) = update.dns {
@@ -136,6 +131,54 @@ impl NetworkProperties {
         }
 
         updates
+    }
+
+    // Handle the `default_network` argument in a `PropertyUpdate`, determining
+    // whether the network changed as a result of the update.
+    //
+    // Returns the update to set for the `default_network` argument
+    // of UpdatesApplied.
+    fn handle_default_network_update(
+        &mut self,
+        new_default_network: Option<InterfaceId>,
+    ) -> Option<Option<InterfaceId>> {
+        // We do not need to send an update applied if the network stayed the same.
+        if new_default_network == self.default_network {
+            return None;
+        }
+
+        let old_default_network = self.default_network;
+        if let (None, Some(old_default_network_id)) = (new_default_network, old_default_network) {
+            let _: Option<_> = self.socket_marks.remove(&old_default_network_id);
+        }
+        self.default_network = new_default_network;
+        return Some(old_default_network);
+    }
+
+    // Handle the `socket_marks` argument in a `PropertyUpdate`, determining
+    // whether the socket marks changed as a result of the update.
+    //
+    // Returns the update to set for the `socket_marks_network` argument
+    // of UpdatesApplied.
+    fn handle_socket_marks_update(
+        &mut self,
+        netid: InterfaceId,
+        marks: fnet::Marks,
+    ) -> Option<InterfaceId> {
+        // We do not need to send an update applied if the marks for the
+        // provided netid stay the same.
+        if self.socket_marks.contains_key(&netid)
+            && self
+                .socket_marks
+                .get(&netid)
+                .and_then(|old_marks| Some(*old_marks == marks))
+                .unwrap_or_default()
+        {
+            return None;
+        }
+
+        let _: Option<_> = self.socket_marks.insert(netid, marks);
+        return Some(netid);
     }
 
     fn maybe_respond(
