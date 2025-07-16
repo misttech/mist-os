@@ -224,8 +224,7 @@ cobalt::LastRebootReason ToCobaltLastRebootReason(RebootReason reason) {
     case RebootReason::kNetstackMigration:
       return cobalt::LastRebootReason::kNetstackMigration;
     case RebootReason::kAndroidUnexpectedReason:
-      // TODO(guochengwei): Add cobalt LastRebootReason
-      return cobalt::LastRebootReason::kUnknown;
+      return cobalt::LastRebootReason::kAndroidUnexpectedReason;
   }
 }
 
