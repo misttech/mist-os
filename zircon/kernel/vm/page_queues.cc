@@ -768,11 +768,6 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
   const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
                            PhysicalPageBorrowingConfig::Get().is_borrowing_on_mru_enabled();
 
-  // Calculate a worst case iterations for processing any given isolate list.
-  ActiveInactiveCounts active_inactive = GetActiveInactiveCounts();
-  const uint64_t max_isolate_iterations =
-      active_inactive.active + active_inactive.inactive + kNumReclaim;
-
   // In order to safely resume iteration where we left off between lock drops we need to make use of
   // the isolate_cursor_, which requires holding the isolate_cursor_lock_.
   Guard<Mutex> isolate_cursor_guard{&isolate_cursor_lock_};
@@ -787,14 +782,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optio
     // Count work done separately to all iterations so we can periodically drop the lock and process
     // the deferred_list.
     uint64_t work_done = 0;
-    // Separately count iterations for debug purposes.
-    uint64_t loop_iterations = 0;
     while (current) {
-      if (loop_iterations++ == max_isolate_iterations) {
-        KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max isolate loop iterations %" PRIu64 "\n",
-                    __FUNCTION__, max_isolate_iterations);
-      }
-
       vm_page_t* page = current;
       current = list_next_type(list, &current->queue_node, vm_page_t, queue_node);
       PageQueue page_queue =
