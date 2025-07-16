@@ -335,7 +335,6 @@
       "third_party/libffi/**": true,
       "third_party/libpcap/**": true,
       "third_party/libpng/**": true,
-      "third_party/libxml2/**": true,
       "third_party/linux-syscall-support/**": true,
       "third_party/llvm-libc/**": true,
       "third_party/luci-go/**": true,

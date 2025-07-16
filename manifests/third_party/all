@@ -288,11 +288,6 @@
              remote="https://fuchsia.googlesource.com/third_party/libpng"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="fceba46d3aeb8172b13f32ab3893cf5a9f91cb01"/>
-    <project name="third_party/libxml2"
-             path="third_party/libxml2"
-             remote="https://fuchsia.googlesource.com/third_party/libxml2"
-             gerrithost="https://fuchsia-review.googlesource.com"
-             revision="e5377a26d88da83baa8f638afed98b468630fbb6"/>
     <project name="linux-syscall-support"
              path="third_party/linux-syscall-support/src"
              remote="https://chromium.googlesource.com/linux-syscall-support"
