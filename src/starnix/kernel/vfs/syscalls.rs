@@ -25,7 +25,7 @@ use crate::vfs::{
     RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
     TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
 };
-use starnix_logging::{log_trace, track_stub};
+use starnix_logging::{log_trace, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::ownership::TempRef;
@@ -3151,6 +3151,7 @@ pub fn sys_io_cancel(
         .ok_or_else(|| errno!(EINVAL))?;
 
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
+    log_warn!("io_cancel not implemented!");
     return error!(ENOSYS);
 }
 
