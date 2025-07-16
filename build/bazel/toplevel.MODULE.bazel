@@ -103,7 +103,7 @@ fuchsia_idk = use_extension(
     "//build/bazel:module_extensions/fuchsia_idk_extensions.bzl",
     "fuchsia_idk",
 )
-fuchsia_idk.in_tree_repository(path = "regenerator_outputs/fuchsia_in_tree_idk")
+fuchsia_idk.in_tree_repository(path = "fuchsia_build_generated/fuchsia_in_tree_idk")
 use_repo(fuchsia_idk, "fuchsia_in_tree_idk")
 
 fuchsia_idk_repository = use_repo_rule(

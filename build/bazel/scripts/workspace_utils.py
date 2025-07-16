@@ -763,6 +763,15 @@ def record_fuchsia_workspace(
         # LINT.ThenChange(//build/regenerator.py)
     )
 
+    generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/fuchsia_in_tree_idk",
+        # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "regenerator_outputs/fuchsia_in_tree_idk",
+        # LINT.ThenChange(//build/regenerator.py)
+    )
+
 
 def generate_fuchsia_workspace(
     fuchsia_dir: Path,

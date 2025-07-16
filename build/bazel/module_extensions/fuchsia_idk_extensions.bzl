@@ -3,14 +3,13 @@
 # found in the LICENSE file.
 
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
-load("@fuchsia_build_config//:defs.bzl", "build_config")
 
 """Fuchsia IDK repository extensions."""
 
 _in_tree_repository_tags = tag_class(
     attrs = {
         "path": attr.string(
-            doc = "Path to the local IDK directory, relative to Fuchsia Ninja output directory",
+            doc = "Path to the local IDK directory, relative to workspace root",
             mandatory = True,
         ),
     },
@@ -28,7 +27,7 @@ def _fuchsia_idk_impl(mctx):
     local_repository(
         # LINT.IfChange
         name = "fuchsia_in_tree_idk",
-        path = "{}/{}".format(build_config.ninja_output_dir, path),
+        path = path,
         # LINT.ThenChange(//build/regenerator.py)
     )
 
