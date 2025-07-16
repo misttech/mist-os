@@ -617,7 +617,7 @@ fn into_termio(value: uapi::termios) -> uapi::termio {
 /// The ioctl behaviour common to main and replica terminal file descriptors.
 fn shared_ioctl<L>(
     locked: &mut Locked<L>,
-    terminal: &Arc<Terminal>,
+    terminal: &Terminal,
     is_main: bool,
     file: &FileObject,
     current_task: &CurrentTask,

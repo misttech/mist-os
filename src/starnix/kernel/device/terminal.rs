@@ -67,7 +67,7 @@ impl TtyState {
         current_task: &CurrentTask,
     ) -> Result<Arc<Terminal>, Errno> {
         let id = self.pts_ids_set.lock().acquire()?;
-        let terminal = Arc::new(Terminal::new(self.clone(), current_task.as_fscred(), id));
+        let terminal = Terminal::new(self.clone(), current_task.as_fscred(), id);
         assert!(self.terminals.write().insert(id, Arc::downgrade(&terminal)).is_none());
         Ok(terminal)
     }
@@ -158,6 +158,9 @@ pub struct TerminalMutableState {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Terminal {
+    /// Weak self to allow cloning.
+    weak_self: Weak<Self>,
+
     /// The global devpts state.
     #[derivative(Debug = "ignore")]
     state: Arc<TtyState>,
@@ -173,8 +176,18 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new(state: Arc<TtyState>, fscred: FsCred, id: u32) -> Self {
-        Self { state, fscred, id, mutable_state: RwLock::new(Default::default()) }
+    pub fn new(state: Arc<TtyState>, fscred: FsCred, id: u32) -> Arc<Self> {
+        Arc::new_cyclic(|weak_self| Self {
+            weak_self: weak_self.clone(),
+            state,
+            fscred,
+            id,
+            mutable_state: RwLock::new(Default::default()),
+        })
+    }
+
+    pub fn to_owned(&self) -> Arc<Terminal> {
+        self.weak_self.upgrade().expect("This should never be called while releasing the terminal")
     }
 
     /// Sets the terminal configuration.

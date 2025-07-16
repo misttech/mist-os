@@ -1140,7 +1140,7 @@ impl ThreadGroup {
         error!(ENOTTY)
     }
 
-    pub fn get_foreground_process_group(&self, terminal: &Arc<Terminal>) -> Result<pid_t, Errno> {
+    pub fn get_foreground_process_group(&self, terminal: &Terminal) -> Result<pid_t, Errno> {
         let state = self.read();
         let process_group = &state.process_group;
         let terminal_state = terminal.read();
@@ -1156,7 +1156,7 @@ impl ThreadGroup {
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
-        terminal: &Arc<Terminal>,
+        terminal: &Terminal,
         pgid: pid_t,
     ) -> Result<(), Errno>
     where
@@ -1206,7 +1206,7 @@ impl ThreadGroup {
     pub fn set_controlling_terminal(
         &self,
         current_task: &CurrentTask,
-        terminal: &Arc<Terminal>,
+        terminal: &Terminal,
         is_main: bool,
         steal: bool,
         is_readable: bool,
@@ -1251,8 +1251,7 @@ impl ThreadGroup {
             security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         }
 
-        session_writer.controlling_terminal =
-            Some(ControllingTerminal::new(terminal.clone(), is_main));
+        session_writer.controlling_terminal = Some(ControllingTerminal::new(terminal, is_main));
         terminal_state.controller = TerminalController::new(&process_group.session);
         Ok(())
     }
@@ -1261,7 +1260,7 @@ impl ThreadGroup {
         &self,
         locked: &mut Locked<L>,
         _current_task: &CurrentTask,
-        terminal: &Arc<Terminal>,
+        terminal: &Terminal,
         is_main: bool,
     ) -> Result<(), Errno>
     where

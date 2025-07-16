@@ -106,11 +106,11 @@ pub struct ControllingTerminal {
 }
 
 impl ControllingTerminal {
-    pub fn new(terminal: Arc<Terminal>, is_main: bool) -> Self {
-        Self { terminal, is_main }
+    pub fn new(terminal: &Terminal, is_main: bool) -> Self {
+        Self { terminal: terminal.to_owned(), is_main }
     }
 
-    pub fn matches(&self, terminal: &Arc<Terminal>, is_main: bool) -> bool {
-        Arc::ptr_eq(terminal, &self.terminal) && is_main == self.is_main
+    pub fn matches(&self, terminal: &Terminal, is_main: bool) -> bool {
+        std::ptr::eq(terminal, Arc::as_ptr(&self.terminal)) && is_main == self.is_main
     }
 }
