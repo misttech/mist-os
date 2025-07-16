@@ -202,7 +202,7 @@ impl HostRealm {
         filename: &str,
     ) -> Result<ClientEnd<HostMarker>, Error> {
         let component_name = format!("{BT_HOST}_{filename}"); // Name must only contain [a-z0-9-_]
-        let device_path = format!("{DEV_DIR}/{HCI_DEVICE_DIR}/{filename}");
+        let device_path = format!("{DEV_DIR}/{HCI_DEVICE_DIR}/default");
         let collection_ref = CollectionRef { name: BT_HOST_COLLECTION.to_owned() };
         let child_decl = Child {
             name: Some(component_name.to_owned()),
@@ -210,9 +210,7 @@ impl HostRealm {
             startup: Some(StartupMode::Lazy),
             config_overrides: Some(vec![ConfigOverride {
                 key: Some("device_path".to_string()),
-                value: Some(ConfigValue::Single(ConfigSingleValue::String(
-                    device_path.to_string(),
-                ))),
+                value: Some(ConfigValue::Single(ConfigSingleValue::String(device_path))),
                 ..ConfigOverride::default()
             }]),
             ..Default::default()
