@@ -16,11 +16,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.device.NameProvider" ],
-            from: "parent",
-            to: [ "#test-components" ],
-        },
-        {
             dictionary: "diagnostics",
             from: "parent",
             to: [ "#test-components" ],

@@ -33,7 +33,6 @@
     offer: [
         {
             protocol: [
-                "fuchsia.device.NameProvider",
                 "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
