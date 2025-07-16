@@ -27,22 +27,6 @@
 
 namespace usb_virtual_bus {
 
-namespace {
-
-inline usb_setup_t ToBanjo(fuchsia_hardware_usb_descriptor::UsbSetup setup) {
-  return usb_setup_t{
-      .bm_request_type = setup.bm_request_type(),
-      .b_request = setup.b_request(),
-      .w_value = setup.w_value(),
-      .w_index = setup.w_index(),
-      .w_length = setup.w_length(),
-  };
-}
-
-}  // namespace
-
-static constexpr uint8_t IN_EP_START = 17;
-
 #define DEVICE_SLOT_ID 0
 #define DEVICE_HUB_ID 0
 #define DEVICE_SPEED USB_SPEED_HIGH
@@ -95,12 +79,12 @@ zx_status_t UsbVirtualBus::CreateDevice() {
   }
 
   const zx_device_str_prop_t props[] = {
-    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
-                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
-                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_USB),
-    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
-                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_DEVICE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_USB),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_DEVICE),
   };
 
   std::array offers = {
@@ -148,12 +132,12 @@ zx_status_t UsbVirtualBus::CreateHost() {
   }
 
   const zx_device_str_prop_t props[] = {
-    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
-                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
-                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_USB),
-    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
-                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_BUS),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_USB),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_BUS),
   };
 
   std::array offers = {
@@ -182,174 +166,6 @@ void UsbVirtualBus::DdkInit(ddk::InitTxn txn) {
   }
   device_dispatcher_ = std::move(*result);
   return txn.Reply(ZX_OK);
-}
-
-void UsbVirtualBus::ProcessRequests() {
-  struct complete_request_t {
-    complete_request_t(UsbVirtualEp& ep, RequestVariant request, zx_status_t status, size_t actual)
-        : ep(ep), request(std::move(request)), status(status), actual(actual) {}
-
-    UsbVirtualEp& ep;
-    RequestVariant request;
-    zx_status_t status;
-    size_t actual;
-  };
-  std::queue<complete_request_t> complete_reqs_pending;
-
-  auto add_complete_reqs = [&complete_reqs_pending](UsbVirtualEp& ep, RequestVariant request,
-                                                    zx_status_t status, size_t actual) {
-    complete_reqs_pending.emplace(ep, std::move(request), status, actual);
-  };
-  auto process_complete_reqs = [&complete_reqs_pending]() {
-    while (!complete_reqs_pending.empty()) {
-      auto& complete = complete_reqs_pending.front();
-      complete.ep.RequestComplete(complete.status, complete.actual, std::move(complete.request));
-      complete_reqs_pending.pop();
-    }
-  };
-
-  {
-    fbl::AutoLock al(&device_lock_);
-    bool has_work = true;
-    while (has_work) {
-      has_work = false;
-      if (unbinding_) {
-        for (auto& ep : eps_) {
-          for (auto req = ep.device_reqs.pop(); req; req = ep.device_reqs.pop()) {
-            add_complete_reqs(ep, std::move(req.value()), ZX_ERR_IO_NOT_PRESENT, 0);
-          }
-        }
-        // We need to wait for all control requests to complete before completing the unbind.
-        if (num_pending_control_reqs_ > 0) {
-          complete_unbind_signal_.Wait(&device_lock_);
-        }
-
-        al.release();
-        process_complete_reqs();
-
-        // At this point, all pending control requests have been completed,
-        // and any queued requests wil be immediately completed with an error.
-        ZX_DEBUG_ASSERT(unbind_txn_.has_value());
-        unbind_txn_->Reply();
-        return;
-      }
-      // Data transfer between device/host (everything except ep 0)
-      for (uint8_t i = 0; i < USB_MAX_EPS; i++) {
-        auto& ep = eps_[i];
-        while (!ep.host_reqs.empty() && !ep.device_reqs.is_empty()) {
-          has_work = true;
-          auto device_req = std::move(ep.device_reqs.pop().value());
-          auto req = std::move(ep.host_reqs.front());
-          ep.host_reqs.pop();
-          size_t length = std::min(std::holds_alternative<usb::FidlRequest>(req)
-                                       ? std::get<usb::FidlRequest>(req).length()
-                                       : std::get<Request>(req).request()->header.length,
-                                   device_req.request()->header.length);
-          void* device_buffer;
-          auto status = device_req.Mmap(&device_buffer);
-          if (status != ZX_OK) {
-            zxlogf(ERROR, "%s: usb_request_mmap failed: %d", __func__, status);
-            add_complete_reqs(ep, std::move(req), status, 0);
-            add_complete_reqs(ep, std::move(device_req), status, 0);
-            continue;
-          }
-
-          if (i < IN_EP_START) {
-            if (std::holds_alternative<usb::FidlRequest>(req)) {
-              std::vector<size_t> result = std::get<usb::FidlRequest>(req).CopyFrom(
-                  0, device_buffer, length,
-                  fit::bind_member(host_->ep(i), &UsbVirtualHost::UsbEpServer::GetMapped));
-              ZX_ASSERT(result.size() == 1);
-              ZX_ASSERT(result[0] == length);
-            } else {
-              size_t result = std::get<Request>(req).CopyFrom(device_buffer, length, 0);
-              ZX_ASSERT(result == length);
-            }
-          } else {
-            if (std::holds_alternative<usb::FidlRequest>(req)) {
-              std::vector<size_t> result = std::get<usb::FidlRequest>(req).CopyTo(
-                  0, device_buffer, length,
-                  fit::bind_member(host_->ep(i), &UsbVirtualHost::UsbEpServer::GetMapped));
-              ZX_ASSERT(result.size() == 1);
-              ZX_ASSERT(result[0] == length);
-            } else {
-              size_t result = std::get<Request>(req).CopyTo(device_buffer, length, 0);
-              ZX_ASSERT(result == length);
-            }
-          }
-          add_complete_reqs(ep, std::move(req), ZX_OK, length);
-          add_complete_reqs(ep, std::move(device_req), ZX_OK, length);
-        }
-      }
-    }
-  }
-  process_complete_reqs();
-}
-
-void UsbVirtualBus::HandleControl(RequestVariant req) {
-  const usb_setup_t& setup =
-      std::holds_alternative<usb::FidlRequest>(req)
-          ? ToBanjo(*std::get<usb::FidlRequest>(req)->information()->control()->setup())
-          : std::get<Request>(req).request()->setup;
-  zx_status_t status;
-  size_t length = le16toh(setup.w_length);
-  size_t actual = 0;
-
-  zxlogf(DEBUG, "%s type: 0x%02X req: %d value: %d index: %d length: %zu", __func__,
-         setup.bm_request_type, setup.b_request, le16toh(setup.w_value), le16toh(setup.w_index),
-         length);
-
-  if (dci_intf_.is_valid()) {
-    void* buffer = nullptr;
-
-    if (length > 0) {
-      if (std::holds_alternative<usb::FidlRequest>(req)) {
-        auto& request_buffer = (*std::get<usb::FidlRequest>(req)->data())[0].buffer();
-        const auto& buffer_type = request_buffer->Which();
-        switch (buffer_type) {
-          case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId:
-            buffer = reinterpret_cast<void*>(
-                host_->ep(0)->registered_vmo(request_buffer->vmo_id().value()).addr);
-            break;
-          case fuchsia_hardware_usb_request::Buffer::Tag::kData:
-            buffer = request_buffer->data()->data();
-            break;
-          default:
-            zxlogf(ERROR, "%s: Unknown buffer type %u", __func__,
-                   static_cast<uint32_t>(buffer_type));
-            return;
-        }
-      } else {
-        auto status = std::get<Request>(req).Mmap(&buffer);
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "%s: usb_request_mmap failed: %d", __func__, status);
-          eps_[0].RequestComplete(status, 0, std::move(req));
-          return;
-        }
-      }
-    }
-
-    if ((setup.bm_request_type & USB_ENDPOINT_DIR_MASK) == USB_ENDPOINT_IN) {
-      status = dci_intf_.Control(&setup, nullptr, 0, reinterpret_cast<uint8_t*>(buffer), length,
-                                 &actual);
-    } else {
-      status = dci_intf_.Control(&setup, reinterpret_cast<uint8_t*>(buffer), length, nullptr, 0,
-                                 nullptr);
-    }
-  } else {
-    status = ZX_ERR_UNAVAILABLE;
-  }
-
-  {
-    fbl::AutoLock device_lock(&device_lock_);
-    num_pending_control_reqs_--;
-    if (unbinding_ && num_pending_control_reqs_ == 0) {
-      // The worker thread is waiting for the control request to complete.
-      complete_unbind_signal_.Signal();
-    }
-  }
-
-  eps_[0].RequestComplete(status, actual, std::move(req));
 }
 
 void UsbVirtualBus::SetConnected(bool connected) {
@@ -388,32 +204,6 @@ void UsbVirtualBus::SetConnected(bool connected) {
       dci_intf_.SetConnected(false);
     }
   }
-}
-
-zx_status_t UsbVirtualBus::SetStall(uint8_t ep_address, bool stall) {
-  uint8_t index = EpAddressToIndex(ep_address);
-  if (index >= USB_MAX_EPS) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  UsbVirtualEp& ep = eps_[index];
-  std::optional<RequestVariant> req = std::nullopt;
-  {
-    fbl::AutoLock lock(&lock_);
-
-    ep.stalled = stall;
-
-    if (stall) {
-      req.emplace(std::move(ep.host_reqs.front()));
-      ep.host_reqs.pop();
-    }
-  }
-
-  if (req) {
-    ep.RequestComplete(ZX_ERR_IO_REFUSED, 0, std::move(*req));
-  }
-
-  return ZX_OK;
 }
 
 void UsbVirtualBus::DdkUnbind(ddk::UnbindTxn txn) {
@@ -525,18 +315,12 @@ zx_status_t UsbVirtualBus::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_de
   return ZX_OK;
 }
 
-zx_status_t UsbVirtualBus::UsbDciDisableEp(uint8_t ep_address) { return ZX_OK; }
-
 zx_status_t UsbVirtualBus::UsbDciEpSetStall(uint8_t ep_address) {
   return SetStall(ep_address, true);
 }
 
 zx_status_t UsbVirtualBus::UsbDciEpClearStall(uint8_t ep_address) {
   return SetStall(ep_address, false);
-}
-
-size_t UsbVirtualBus::UsbDciGetRequestSize() {
-  return Request::RequestSize(Request::RequestSize(sizeof(usb_request_t)));
 }
 
 void UsbVirtualBus::UsbHciRequestQueue(usb_request_t* req,
@@ -551,43 +335,6 @@ void UsbVirtualBus::UsbHciRequestQueue(usb_request_t* req,
   }
 
   eps_[index].QueueRequest(std::move(request));
-}
-
-void UsbVirtualEp::QueueRequest(RequestVariant request) {
-  bool connected;
-  {
-    fbl::AutoLock _(&bus_->connection_lock_);
-    connected = bus_->connected_;
-  }
-  if (!connected) {
-    RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
-    return;
-  }
-
-  fbl::AutoLock device_lock(&bus_->device_lock_);
-  if (bus_->unbinding_) {
-    device_lock.release();
-    RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
-    return;
-  }
-
-  if (stalled) {
-    device_lock.release();
-    RequestComplete(ZX_ERR_IO_REFUSED, 0, std::move(request));
-    return;
-  }
-  if (!is_control()) {
-    host_reqs.push(std::move(request));
-    bus_->process_requests_.Post(bus_->device_dispatcher_.async_dispatcher());
-  } else {
-    bus_->num_pending_control_reqs_++;
-    // Control messages are a VERY special case.
-    // They are synchronous; so we shouldn't dispatch them
-    // to an I/O thread.
-    // We can't hold a lock when responding to a control request
-    device_lock.release();
-    bus_->HandleControl(std::move(request));
-  }
 }
 
 void UsbVirtualBus::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bus_intf) {
@@ -608,85 +355,9 @@ void UsbVirtualBus::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bu
   }
 }
 
-size_t UsbVirtualBus::UsbHciGetMaxDeviceCount() { return 1; }
-
-zx_status_t UsbVirtualBus::UsbHciEnableEndpoint(uint32_t device_id,
-                                                const usb_endpoint_descriptor_t* ep_desc,
-                                                const usb_ss_ep_comp_descriptor_t* ss_com_desc,
-                                                bool enable) {
-  return ZX_OK;
-}
-
-uint64_t UsbVirtualBus::UsbHciGetCurrentFrame() { return 0; }
-
-zx_status_t UsbVirtualBus::UsbHciConfigureHub(uint32_t device_id, usb_speed_t speed,
-                                              const usb_hub_descriptor_t* desc, bool multi_tt) {
-  return ZX_OK;
-}
-
-zx_status_t UsbVirtualBus::UsbHciHubDeviceAdded(uint32_t device_id, uint32_t port,
-                                                usb_speed_t speed) {
-  return ZX_OK;
-}
-
-zx_status_t UsbVirtualBus::UsbHciHubDeviceRemoved(uint32_t device_id, uint32_t port) {
-  return ZX_OK;
-}
-
-zx_status_t UsbVirtualBus::UsbHciHubDeviceReset(uint32_t device_id, uint32_t port) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbVirtualBus::UsbHciResetEndpoint(uint32_t device_id, uint8_t ep_address) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbVirtualBus::UsbHciResetDevice(uint32_t hub_address, uint32_t device_id) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-size_t UsbVirtualBus::UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_address) {
-  return 65536;
-}
-
 zx_status_t UsbVirtualBus::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
   uint8_t index = EpAddressToIndex(ep_address);
   return eps_[index].CancelAll().status_value();
-}
-
-zx::result<> UsbVirtualEp::CancelAll() {
-  std::queue<RequestVariant> q;
-  {
-    fbl::AutoLock lock(&bus_->device_lock_);
-    q = std::move(host_reqs);
-  }
-  while (!q.empty()) {
-    RequestComplete(ZX_ERR_IO, 0, std::move(q.front()));
-    q.pop();
-  }
-  return zx::ok();
-}
-
-size_t UsbVirtualBus::UsbHciGetRequestSize() { return Request::RequestSize(sizeof(usb_request_t)); }
-
-void UsbVirtualEp::RequestComplete(zx_status_t status, size_t actual, RequestVariant request) {
-  if (std::holds_alternative<usb::BorrowedRequest<void>>(request)) {
-    std::get<usb::BorrowedRequest<void>>(request).Complete(status, actual);
-    return;
-  }
-
-  if (bus_->device_dispatcher() != fdf::Dispatcher::GetCurrent()->async_dispatcher()) {
-    libsync::Completion wait;
-    async::PostTask(bus_->device_dispatcher(), [this, status, actual, &request, &wait]() {
-      bus_->host_->ep(index_)->RequestComplete(status, actual,
-                                               std::move(std::get<usb::FidlRequest>(request)));
-      wait.Signal();
-    });
-    wait.Wait();
-  } else {
-    bus_->host_->ep(index_)->RequestComplete(status, actual,
-                                             std::move(std::get<usb::FidlRequest>(request)));
-  }
 }
 
 void UsbVirtualBus::Enable(EnableCompleter::Sync& completer) {

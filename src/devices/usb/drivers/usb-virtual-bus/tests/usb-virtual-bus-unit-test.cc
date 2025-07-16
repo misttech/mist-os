@@ -105,7 +105,7 @@ TEST(VirtualBusUnitTest, UnbindDuringControlRequest) {
             },
         .ctx = &usb_req_sync,
     };
-    size_t parent_req_size = bus->UsbHciGetRequestSize();
+    size_t parent_req_size = Request::RequestSize(sizeof(usb_request_t));
     usb_request_t* fake_req;
     ASSERT_OK(usb_request_alloc(&fake_req, zx_system_get_page_size(), 0 /* ep_address */,
                                 parent_req_size));

@@ -18,6 +18,8 @@ source_set("common") {
     "usb-virtual-bus.h",
     "usb-virtual-device.cc",
     "usb-virtual-device.h",
+    "usb-virtual-endpoint.cc",
+    "usb-virtual-endpoint.h",
     "usb-virtual-host.cc",
     "usb-virtual-host.h",
   ]

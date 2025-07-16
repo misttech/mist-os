@@ -36,9 +36,7 @@ zx_status_t UsbVirtualDevice::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep
   return bus_->UsbDciConfigEp(ep_desc, ss_comp_desc);
 }
 
-zx_status_t UsbVirtualDevice::UsbDciDisableEp(uint8_t ep_address) {
-  return bus_->UsbDciDisableEp(ep_address);
-}
+zx_status_t UsbVirtualDevice::UsbDciDisableEp(uint8_t ep_address) { return ZX_OK; }
 
 zx_status_t UsbVirtualDevice::UsbDciCancelAll(uint8_t ep) { return bus_->UsbDciCancelAll(ep); }
 
@@ -50,11 +48,50 @@ zx_status_t UsbVirtualDevice::UsbDciEpClearStall(uint8_t ep_address) {
   return bus_->UsbDciEpClearStall(ep_address);
 }
 
-size_t UsbVirtualDevice::UsbDciGetRequestSize() { return bus_->UsbDciGetRequestSize(); }
+size_t UsbVirtualDevice::UsbDciGetRequestSize() {
+  return Request::RequestSize(Request::RequestSize(sizeof(usb_request_t)));
+}
 
 void UsbVirtualDevice::ConnectToEndpoint(ConnectToEndpointRequest& request,
                                          ConnectToEndpointCompleter::Sync& completer) {
   completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::SetInterface(SetInterfaceRequest& request,
+                                    SetInterfaceCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::StartController(StartControllerCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::StopController(StopControllerCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::ConfigureEndpoint(ConfigureEndpointRequest& request,
+                                         ConfigureEndpointCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::DisableEndpoint(DisableEndpointRequest& request,
+                                       DisableEndpointCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::EndpointSetStall(EndpointSetStallRequest& request,
+                                        EndpointSetStallCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::EndpointClearStall(EndpointClearStallRequest& request,
+                                          EndpointClearStallCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void UsbVirtualDevice::CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
 }  // namespace usb_virtual_bus

@@ -41,53 +41,29 @@ class UsbVirtualDevice : public UsbVirtualDeviceType,
   zx_status_t UsbDciCancelAll(uint8_t endpoint);
   size_t UsbDciGetRequestSize();
 
+ private:
+  DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualDevice);
+
   // fuchsia_hardware_usb.UsbDci protocol implementation.
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
                          ConnectToEndpointCompleter::Sync& completer) override;
-
-  void SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void StartController(StartControllerCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void StopController(StopControllerCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
+  void SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) override;
+  void StartController(StartControllerCompleter::Sync& completer) override;
+  void StopController(StopControllerCompleter::Sync& completer) override;
   void ConfigureEndpoint(ConfigureEndpointRequest& request,
-                         ConfigureEndpointCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
+                         ConfigureEndpointCompleter::Sync& completer) override;
   void DisableEndpoint(DisableEndpointRequest& request,
-                       DisableEndpointCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
+                       DisableEndpointCompleter::Sync& completer) override;
   void EndpointSetStall(EndpointSetStallRequest& request,
-                        EndpointSetStallCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
+                        EndpointSetStallCompleter::Sync& completer) override;
   void EndpointClearStall(EndpointClearStallRequest& request,
-                          EndpointClearStallCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
+                          EndpointClearStallCompleter::Sync& completer) override;
+  void CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) override;
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_dci::UsbDci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
-
- private:
-  DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualDevice);
 
   UsbVirtualBus* bus_;
 };

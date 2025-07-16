@@ -23,48 +23,10 @@
 #include <usb/request-cpp.h>
 
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-device.h"
+#include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-endpoint.h"
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-host.h"
 
 namespace usb_virtual_bus {
-
-// For mapping b_endpoint_address value to/from index in range 0 - 31.
-// OUT endpoints are in range 1 - 15, IN endpoints are in range 17 - 31.
-static inline uint8_t EpAddressToIndex(uint8_t addr) {
-  return static_cast<uint8_t>(((addr) & 0xF) | (((addr) & 0x80) >> 3));
-}
-
-using Request = usb::BorrowedRequest<void>;
-using RequestQueue = usb::BorrowedRequestQueue<void>;
-using RequestVariant = std::variant<Request, usb::FidlRequest>;
-
-// This struct represents an endpoint on the virtual device.
-class UsbVirtualEp {
- public:
-  ~UsbVirtualEp() {
-    ZX_ASSERT(host_reqs.empty());
-    ZX_ASSERT(device_reqs.is_empty());
-  }
-
-  void Init(UsbVirtualBus* bus, uint8_t index) {
-    bus_ = bus;
-    index_ = index;
-  }
-
-  void QueueRequest(RequestVariant request);
-  zx::result<> CancelAll();
-  void RequestComplete(zx_status_t status, size_t actual, RequestVariant request);
-
-  bool is_control() const { return index_ == 0; }
-
-  std::queue<RequestVariant> host_reqs;
-  RequestQueue device_reqs;
-  uint16_t max_packet_size = 0;
-  bool stalled = false;
-
- private:
-  UsbVirtualBus* bus_;
-  uint8_t index_;
-};
 
 class UsbVirtualBus;
 class UsbVirtualDevice;
@@ -101,26 +63,12 @@ class UsbVirtualBus : public UsbVirtualBusType {
   zx_status_t UsbDciEpSetStall(uint8_t ep_address);
   zx_status_t UsbDciEpClearStall(uint8_t ep_address);
   zx_status_t UsbDciCancelAll(uint8_t endpoint);
-  size_t UsbDciGetRequestSize();
 
   // USB host controller protocol implementation.
   void UsbHciRequestQueue(usb_request_t* usb_request,
                           const usb_request_complete_callback_t* complete_cb);
   void UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bus_intf);
-  size_t UsbHciGetMaxDeviceCount();
-  zx_status_t UsbHciEnableEndpoint(uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
-                                   const usb_ss_ep_comp_descriptor_t* ss_com_desc, bool enable);
-  uint64_t UsbHciGetCurrentFrame();
-  zx_status_t UsbHciConfigureHub(uint32_t device_id, usb_speed_t speed,
-                                 const usb_hub_descriptor_t* desc, bool multi_tt);
-  zx_status_t UsbHciHubDeviceAdded(uint32_t device_id, uint32_t port, usb_speed_t speed);
-  zx_status_t UsbHciHubDeviceRemoved(uint32_t device_id, uint32_t port);
-  zx_status_t UsbHciHubDeviceReset(uint32_t device_id, uint32_t port);
-  zx_status_t UsbHciResetEndpoint(uint32_t device_id, uint8_t ep_address);
-  zx_status_t UsbHciResetDevice(uint32_t hub_address, uint32_t device_id);
-  size_t UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_address);
   zx_status_t UsbHciCancelAll(uint32_t device_id, uint8_t ep_address);
-  size_t UsbHciGetRequestSize();
 
   // FIDL messages
   void Enable(EnableCompleter::Sync& completer) override;

@@ -14,6 +14,8 @@
 #include <usb/descriptors.h>
 #include <usb/request-fidl.h>
 
+#include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-endpoint.h"
+
 namespace usb_virtual_bus {
 
 class UsbVirtualBus;
@@ -28,53 +30,6 @@ class UsbVirtualHost : public UsbVirtualHostType,
                        public fidl::Server<fuchsia_hardware_usb_hci::UsbHci> {
  public:
   ~UsbVirtualHost();
-  class UsbEpServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint> {
-   public:
-    UsbEpServer(UsbVirtualEp* ep, async_dispatcher_t* dispatcher,
-                fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server)
-        : ep_(ep),
-          binding_(dispatcher, std::move(server), this,
-                   fit::bind_member(this, &UsbEpServer::OnFidlClosed)) {}
-    void OnFidlClosed(fidl::UnbindInfo);
-
-    // fuchsia_hardware_usb_new.Endpoint protocol implementation.
-    void GetInfo(GetInfoCompleter::Sync& completer) override {
-      completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
-    }
-    void RegisterVmos(RegisterVmosRequest& request,
-                      RegisterVmosCompleter::Sync& completer) override;
-    void UnregisterVmos(UnregisterVmosRequest& request,
-                        UnregisterVmosCompleter::Sync& completer) override;
-    void QueueRequests(QueueRequestsRequest& request,
-                       QueueRequestsCompleter::Sync& completer) override;
-    void CancelAll(CancelAllCompleter::Sync& completer) override;
-
-    void RequestComplete(zx_status_t status, size_t actual, usb::FidlRequest request);
-    zx::result<std::optional<usb::MappedVmo>> GetMapped(
-        const fuchsia_hardware_usb_request::Buffer& buffer) {
-      if (buffer.Which() == fuchsia_hardware_usb_request::Buffer::Tag::kData) {
-        return zx::ok(std::nullopt);
-      }
-      return zx::ok(registered_vmos_.at(buffer.vmo_id().value()));
-    }
-    usb::MappedVmo& registered_vmo(uint64_t i) { return registered_vmos_[i]; }
-
-   private:
-    UsbVirtualEp* ep_;
-    // binding_ must be created, used, and destroyed on bus_->device_dispatcher_. There is no check
-    // for this, but `RequestComplete` in this class will only be called when it supports FIDL and
-    // that will happen on device_dispatcher_. When we've moved away from Banjo, it maybe worth
-    // putting this in async_patterns::DispatcherBound.
-    fidl::ServerBinding<fuchsia_hardware_usb_endpoint::Endpoint> binding_;
-
-    // completions_: Holds on to request completions that are completed, but have not been replied
-    // to due to  defer_completion == true.
-    std::vector<fuchsia_hardware_usb_endpoint::Completion> completions_;
-
-    // registered_vmos_: All pre-registered VMOs registered through RegisterVmos(). Mapping from
-    // vmo_id to usb::MappedVmo.
-    std::map<uint64_t, usb::MappedVmo> registered_vmos_;
-  };
 
   explicit UsbVirtualHost(zx_device_t* parent, UsbVirtualBus* bus)
       : UsbVirtualHostType(parent), bus_(bus) {}
