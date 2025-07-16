@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::host_device::HostDevice;
 use crate::services::access;
 use crate::{host_device, host_dispatcher};
 use fidl_fuchsia_bluetooth_sys::AccessMarker;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::HostId;
 use fuchsia_sync::RwLock;
-use futures::future::join;
 use futures::stream::FuturesUnordered;
+use futures::Future;
 use proptest::prelude::*;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -51,31 +52,42 @@ fn execution_sequences(max_num_clients: u64) -> impl Strategy<Value = Vec<Event>
     (0..max_num_clients + 1).prop_map(generate_events).prop_shuffle()
 }
 
-fn run_access_and_host<F, T>(
+fn run_access_and_host<F, T, U>(
     executor: &mut fuchsia_async::TestExecutor,
     access_sessions: &mut FuturesUnordered<T>,
     host_task: &mut Pin<Box<F>>,
+    update_test_host_info_fut: &mut Pin<Box<U>>,
     host: host_device::HostDevice,
 ) -> bool
 where
     T: futures::Future,
     F: futures::Future,
+    U: futures::Future,
 {
-    for _ in 0..2 {
+    for _ in 0..4 {
         // Run Access server sessions
         for mut access_fut in Pin::new(&mut *access_sessions).iter_pin_mut() {
             let _ = executor.run_until_stalled(&mut access_fut);
         }
 
-        // Run mock host server
+        // Run mock host server.
         let _ = executor.run_until_stalled(host_task);
+        let _ = executor.run_until_stalled(update_test_host_info_fut);
     }
 
-    // Send and process WatchHost request
-    let _ = executor
-        .run_until_stalled(&mut Box::pin(join(host.clone().refresh_test_host_info(), host_task)));
-
+    let _ = executor.run_until_stalled(update_test_host_info_fut);
     host.info().discovering
+}
+
+fn run_watch_host_info(host_device: &HostDevice) -> impl Future<Output = ()> {
+    let host = host_device.clone();
+    async move {
+        loop {
+            if let Err(_e) = host.clone().refresh_test_host_info().await {
+                return;
+            }
+        }
+    }
 }
 
 proptest! {
@@ -107,6 +119,7 @@ proptest! {
 
         let mut host_server_task_1 =
             Box::pin(host_device::test::run_discovery_host_server(host_stream_1, host_info_1));
+        let mut host_update_info_fut_1 = Box::pin(run_watch_host_info(&host_device_1));
 
         // Add mock host 2 to dispatcher but do NOT make active.
         let add_mock_host_fut_2 = host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(2), &hd);
@@ -116,9 +129,9 @@ proptest! {
 
         let mut host_server_task_2 =
             Box::pin(host_device::test::run_discovery_host_server(host_stream_2, host_info_2));
+        let mut host_update_info_fut_2 = Box::pin(run_watch_host_info(&host_device_2));
 
-
-        for event in execution {
+        for (num, event) in execution.into_iter().enumerate() {
             match event {
                 Event::ToggleDiscovery(client_num) => {
                     match discovery_sessions.remove(&client_num) {
@@ -155,12 +168,14 @@ proptest! {
                             &mut executor,
                             &mut access_sessions,
                             &mut host_server_task_1,
+                            &mut host_update_info_fut_1,
                             host_device_1.clone(),
                     );
                     let is_discovering_2 = run_access_and_host(
                             &mut executor,
                             &mut access_sessions,
                             &mut host_server_task_2,
+                            &mut host_update_info_fut_2,
                             host_device_2.clone(),
                     );
 
@@ -173,11 +188,11 @@ proptest! {
                     // and host futures, to ensure there are no pending requests, the
                     // processing of which may affect the system's state.
                     if active_host == 1 {
-                        prop_assert_eq!(is_discovering_1, !discovery_sessions.is_empty());
-                        prop_assert_eq!(is_discovering_2, false);
+                        prop_assert_eq!(is_discovering_1, !discovery_sessions.is_empty(), "step {} host 1 sessions {}", num, discovery_sessions.len());
+                        prop_assert_eq!(is_discovering_2, false, "step {} host 2 is active when not", num);
                     } else {
-                        prop_assert_eq!(is_discovering_1, false);
-                        prop_assert_eq!(is_discovering_2, !discovery_sessions.is_empty());
+                        prop_assert_eq!(is_discovering_1, false, "step {} host 1 is active after remove", num);
+                        prop_assert_eq!(is_discovering_2, !discovery_sessions.is_empty(), "step {} host 2 sessions {}", num, discovery_sessions.len());
                     }
                 }
             }
@@ -189,6 +204,7 @@ proptest! {
             &mut executor,
             &mut access_sessions,
             &mut host_server_task_1,
+            &mut host_update_info_fut_1,
             host_device_1.clone(),
         );
         prop_assert!(!is_discovering);
@@ -196,6 +212,7 @@ proptest! {
             &mut executor,
             &mut access_sessions,
             &mut host_server_task_2,
+            &mut host_update_info_fut_2,
             host_device_2.clone(),
         );
         prop_assert!(!is_discovering);

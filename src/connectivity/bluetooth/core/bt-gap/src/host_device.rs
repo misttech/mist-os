@@ -439,7 +439,7 @@ pub trait HostListener {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use fidl_fuchsia_bluetooth_host::BondingDelegateRequestStream;
+    use fidl_fuchsia_bluetooth_host::{BondingDelegateRequestStream, HostWatchStateResponder};
 
     use super::*;
 
@@ -457,6 +457,8 @@ pub(crate) mod test {
         discovery_stream: MaybeStream<DiscoverySessionRequestStream>,
         peer_watcher_stream: MaybeStream<PeerWatcherRequestStream>,
         bonding_delegate_stream: MaybeStream<BondingDelegateRequestStream>,
+        watch_state_responder: Option<HostWatchStateResponder>,
+        last_host_info: Option<HostInfo>,
         pub num_restore_bonds_calls: i32,
     }
 
@@ -471,7 +473,24 @@ pub(crate) mod test {
                 discovery_stream: MaybeStream::default(),
                 peer_watcher_stream: MaybeStream::default(),
                 bonding_delegate_stream: MaybeStream::default(),
+                watch_state_responder: None,
+                last_host_info: None,
                 num_restore_bonds_calls: 0,
+            }
+        }
+
+        async fn maybe_send_watch_state_response(&mut self) {
+            if self.watch_state_responder.is_none() {
+                return;
+            }
+            let host_info = self.host_info.read().clone();
+            if self.last_host_info.as_ref() != Some(&host_info) {
+                let responder = self.watch_state_responder.take().unwrap();
+                assert_matches::assert_matches!(
+                    responder.send(&FidlHostInfo::from(host_info.clone())),
+                    Ok(())
+                );
+                self.last_host_info = Some(host_info);
             }
         }
 
@@ -513,12 +532,7 @@ pub(crate) mod test {
                                  self.discovery_stream.set(payload.token.unwrap().into_stream());
                              }
                              Some(Ok(HostRequest::WatchState { responder })) => {
-                                 assert_matches::assert_matches!(
-                                     responder.send(
-                                         &FidlHostInfo::from(self.host_info.read().clone())
-                                     ),
-                                     Ok(())
-                                 );
+                                self.watch_state_responder = Some(responder);
                              }
                              Some(Ok(HostRequest::SetPeerWatcher {peer_watcher, ..})) => {
                                 assert!(!self.peer_watcher_stream.is_some());
@@ -529,12 +543,15 @@ pub(crate) mod test {
                                 self.bonding_delegate_stream.set(delegate.into_stream());
                              }
                              None => {
+                                 self.host_info.write().discovering = false;
+                                 self.maybe_send_watch_state_response().await;
                                  return Ok(());
                              }
                              x => panic!("Unexpected request in fake host server: {:?}", x),
                          }
                     }
                 }
+                self.maybe_send_watch_state_response().await;
             }
         }
     }
