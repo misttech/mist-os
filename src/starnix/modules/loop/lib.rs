@@ -10,7 +10,7 @@ use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CurrentTask, Kernel, KernelOrTask};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
@@ -140,15 +140,15 @@ struct LoopDevice {
 }
 
 impl LoopDevice {
-    fn new<L>(
+    fn new<'a, L>(
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         minor: u32,
     ) -> Result<Arc<Self>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let kernel = current_task.kernel();
+        let kernel = kernel_or_task.kernel();
         let registry = &kernel.device_registry;
         let loop_device_name = FsString::from(format!("loop{minor}"));
         let virtual_block_class = registry.objects.virtual_block_class();
@@ -156,7 +156,7 @@ impl LoopDevice {
         let device_weak = Arc::<LoopDevice>::downgrade(&device);
         let k_device = registry.add_device(
             locked,
-            current_task,
+            kernel_or_task,
             loop_device_name.as_ref(),
             DeviceMetadata::new(
                 loop_device_name.clone(),
@@ -590,12 +590,7 @@ impl FileOps for LoopDeviceFile {
     }
 }
 
-pub fn loop_device_init(
-    locked: &mut Locked<Unlocked>,
-    current_task: &CurrentTask,
-) -> Result<(), Errno> {
-    let kernel = current_task.kernel();
-
+pub fn loop_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Result<(), Errno> {
     // Device registry.
     kernel
         .device_registry
@@ -603,7 +598,7 @@ pub fn loop_device_init(
         .expect("loop device register failed.");
 
     // Ensure initial loop devices.
-    kernel.expando.get::<LoopDeviceRegistry>().ensure_initial_devices(locked, current_task)
+    kernel.expando.get::<LoopDeviceRegistry>().ensure_initial_devices(locked, kernel)
 }
 
 #[derive(Debug, Default)]
@@ -616,13 +611,13 @@ impl LoopDeviceRegistry {
     fn ensure_initial_devices<L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel: &Kernel,
     ) -> Result<(), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         for minor in 0..8 {
-            self.get_or_create(locked, current_task, minor)?;
+            self.get_or_create(locked, kernel, minor)?;
         }
         Ok(())
     }
@@ -631,10 +626,10 @@ impl LoopDeviceRegistry {
         self.devices.lock().get(&minor).ok_or_else(|| errno!(ENODEV)).cloned()
     }
 
-    fn get_or_create<L>(
+    fn get_or_create<'a, L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         minor: u32,
     ) -> Result<Arc<LoopDevice>, Errno>
     where
@@ -643,7 +638,7 @@ impl LoopDeviceRegistry {
         self.devices
             .lock()
             .entry(minor)
-            .or_insert_with_fallible(|| LoopDevice::new(locked, current_task, minor))
+            .or_insert_with_fallible(|| LoopDevice::new(locked, kernel_or_task, minor))
             .cloned()
     }
 

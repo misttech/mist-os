@@ -704,7 +704,7 @@ async fn create_container(
     }
 
     // Register common devices and add them in sysfs and devtmpfs.
-    init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &system_task)?;
+    init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &kernel)?;
     register_common_file_systems(kernel.kthreads.unlocked_for_async().deref_mut(), &kernel);
 
     mount_filesystems(

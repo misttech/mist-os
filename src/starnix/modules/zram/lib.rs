@@ -7,7 +7,7 @@
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
-use starnix_core::task::{CurrentTask, KernelStats};
+use starnix_core::task::{CurrentTask, Kernel, KernelStats};
 use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
 use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
@@ -119,16 +119,13 @@ impl DynamicFileSource for MmStatFile {
     }
 }
 
-pub fn zram_device_init(
-    locked: &mut Locked<Unlocked>,
-    system_task: &CurrentTask,
-) -> Result<(), Errno> {
+pub fn zram_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> Result<(), Errno> {
     let zram_device = Arc::new(ZramDevice::default());
     let zram_device_clone = zram_device.clone();
-    let registry = &system_task.kernel().device_registry;
+    let registry = &kernel.device_registry;
     registry.register_device_with_dir(
         locked,
-        system_task,
+        kernel,
         "zram0".into(),
         DeviceMetadata::new("zram0".into(), DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
         registry.objects.virtual_block_class(),

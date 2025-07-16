@@ -7,7 +7,7 @@ use crate::device::terminal::{Terminal, TtyState};
 use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::sysfs::build_device_directory;
 use crate::mm::MemoryAccessorExt;
-use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
+use crate::task::{CurrentTask, EventHandler, Kernel, KernelOrTask, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
@@ -130,11 +130,14 @@ where
     Ok(fs)
 }
 
-pub fn tty_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask) -> Result<(), Errno>
+pub fn tty_device_init<'a, L>(
+    locked: &mut Locked<L>,
+    kernel_or_task: impl KernelOrTask<'a>,
+) -> Result<(), Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    let kernel = current_task.kernel();
+    let kernel = kernel_or_task.kernel();
     let state = kernel.expando.get::<TtyState>();
     let device = DevPtsDevice::new(state);
 
@@ -156,7 +159,7 @@ where
     let tty_class = registry.objects.tty_class();
     registry.add_device(
         locked,
-        current_task,
+        kernel_or_task,
         "tty".into(),
         DeviceMetadata::new("tty".into(), DeviceType::TTY, DeviceMode::Char),
         tty_class.clone(),
@@ -164,7 +167,7 @@ where
     )?;
     registry.add_device(
         locked,
-        current_task,
+        kernel_or_task,
         "ptmx".into(),
         DeviceMetadata::new("ptmx".into(), DeviceType::PTMX, DeviceMode::Char),
         tty_class,

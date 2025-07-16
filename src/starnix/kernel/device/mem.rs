@@ -10,7 +10,8 @@ use crate::mm::{
 };
 use crate::task::syslog::{self, KmsgLevel};
 use crate::task::{
-    CurrentTask, EventHandler, LogSubscription, Syslog, SyslogAccess, WaitCanceler, Waiter,
+    CurrentTask, EventHandler, KernelOrTask, LogSubscription, Syslog, SyslogAccess, WaitCanceler,
+    Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
@@ -446,17 +447,20 @@ impl<'a> starnix_logging::ToValue for LogOutputTag<'a> {
     }
 }
 
-pub fn mem_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask) -> Result<(), Errno>
+pub fn mem_device_init<'a, L>(
+    locked: &mut Locked<L>,
+    kernel_or_task: impl KernelOrTask<'a>,
+) -> Result<(), Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    let kernel = system_task.kernel();
+    let kernel = kernel_or_task.kernel();
     let registry = &kernel.device_registry;
 
     let mem_class = registry.objects.mem_class();
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "null".into(),
         DeviceMetadata::new("null".into(), DeviceType::NULL, DeviceMode::Char),
         mem_class.clone(),
@@ -464,7 +468,7 @@ where
     )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "zero".into(),
         DeviceMetadata::new("zero".into(), DeviceType::ZERO, DeviceMode::Char),
         mem_class.clone(),
@@ -472,7 +476,7 @@ where
     )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "full".into(),
         DeviceMetadata::new("full".into(), DeviceType::FULL, DeviceMode::Char),
         mem_class.clone(),
@@ -480,7 +484,7 @@ where
     )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "random".into(),
         DeviceMetadata::new("random".into(), DeviceType::RANDOM, DeviceMode::Char),
         mem_class.clone(),
@@ -488,7 +492,7 @@ where
     )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "urandom".into(),
         DeviceMetadata::new("urandom".into(), DeviceType::URANDOM, DeviceMode::Char),
         mem_class.clone(),
@@ -496,7 +500,7 @@ where
     )?;
     registry.register_device(
         locked,
-        system_task,
+        kernel_or_task,
         "kmsg".into(),
         DeviceMetadata::new("kmsg".into(), DeviceType::KMSG, DeviceMode::Char),
         mem_class,

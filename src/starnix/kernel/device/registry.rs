@@ -6,7 +6,7 @@ use crate::device::kobject::{Class, Device, DeviceMetadata, UEventAction, UEvent
 use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::fs::sysfs::build_device_directory;
-use crate::task::{CurrentTask, Kernel, SimpleWaiter};
+use crate::task::{CurrentTask, Kernel, KernelOrTask, SimpleWaiter};
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::{FileOps, FsNode, FsStr, FsString};
 use starnix_logging::log_error;
@@ -331,10 +331,10 @@ impl DeviceRegistry {
     ///
     /// Finally, the `dev_ops` parameter is where you provide the callback for instantiating
     /// your device.
-    pub fn register_device<L>(
+    pub fn register_device<'a, L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         name: &FsStr,
         metadata: DeviceMetadata,
         class: Class,
@@ -345,7 +345,7 @@ impl DeviceRegistry {
     {
         self.register_device_with_dir(
             locked,
-            current_task,
+            kernel_or_task,
             name,
             metadata,
             class,
@@ -357,10 +357,10 @@ impl DeviceRegistry {
     /// Register a device with a custom directory.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn register_device_with_dir<L>(
+    pub fn register_device_with_dir<'a, L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         name: &FsStr,
         metadata: DeviceMetadata,
         class: Class,
@@ -372,7 +372,7 @@ impl DeviceRegistry {
     {
         let entry = DeviceEntry::new(name.into(), dev_ops);
         self.devices(metadata.mode).register_minor(metadata.device_type, entry);
-        self.add_device(locked, current_task, name, metadata, class, build_directory)
+        self.add_device(locked, kernel_or_task, name, metadata, class, build_directory)
     }
 
     /// Register a dynamic device in the `MISC_MAJOR` major device number.
@@ -382,10 +382,10 @@ impl DeviceRegistry {
     /// function instead to register the device.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn register_misc_device<L>(
+    pub fn register_misc_device<'a, L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         name: &FsStr,
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
@@ -396,7 +396,7 @@ impl DeviceRegistry {
         let metadata = DeviceMetadata::new(name.into(), device_type, DeviceMode::Char);
         Ok(self.register_device(
             locked,
-            current_task,
+            kernel_or_task,
             name,
             metadata,
             self.objects.misc_class(),
@@ -414,10 +414,10 @@ impl DeviceRegistry {
     /// to be dynamic, we should expand to using the full dynamic range.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn register_dyn_device<L>(
+    pub fn register_dyn_device<'a, L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         name: &FsStr,
         class: Class,
         dev_ops: impl DeviceOps,
@@ -427,7 +427,7 @@ impl DeviceRegistry {
     {
         self.register_dyn_device_with_dir(
             locked,
-            current_task,
+            kernel_or_task,
             name,
             class,
             build_device_directory,
@@ -438,10 +438,10 @@ impl DeviceRegistry {
     /// Register a dynamic device with a custom directory.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn register_dyn_device_with_dir<L>(
+    pub fn register_dyn_device_with_dir<'a, L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         name: &FsStr,
         class: Class,
         build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
@@ -452,7 +452,7 @@ impl DeviceRegistry {
     {
         self.register_dyn_device_with_devname(
             locked,
-            current_task,
+            kernel_or_task,
             name,
             name,
             class,
@@ -471,10 +471,10 @@ impl DeviceRegistry {
     /// to be dynamic, we should expand to using the full dynamic range.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn register_dyn_device_with_devname<L>(
+    pub fn register_dyn_device_with_devname<'a, L>(
         &self,
         locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         name: &FsStr,
         devname: &FsStr,
         class: Class,
@@ -488,7 +488,7 @@ impl DeviceRegistry {
         let metadata = DeviceMetadata::new(devname.into(), device_type, DeviceMode::Char);
         Ok(self.register_device_with_dir(
             locked,
-            current_task,
+            kernel_or_task,
             name,
             metadata,
             class,
@@ -522,10 +522,10 @@ impl DeviceRegistry {
     /// instead.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn add_device<L>(
+    pub fn add_device<'a, L>(
         &self,
         _locked: &mut Locked<L>,
-        current_task: &CurrentTask,
+        kernel_or_task: impl KernelOrTask<'a>,
         name: &FsStr,
         metadata: DeviceMetadata,
         class: Class,
@@ -537,10 +537,9 @@ impl DeviceRegistry {
         self.devices(metadata.mode).get(metadata.device_type).expect("device is registered");
         let device = self.objects.create_device(name, Some(metadata), class, build_directory);
 
-        let event = InterruptibleEvent::new();
-        let (_waiter, guard) = SimpleWaiter::new(&event);
-        self.notify_device(current_task.kernel(), device.clone(), Some(event.clone()));
-        current_task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
+        block_task_until(kernel_or_task, |kernel, event| {
+            Ok(self.notify_device(kernel, device.clone(), event))
+        })?;
         Ok(device)
     }
 
@@ -765,6 +764,25 @@ impl DeviceTypeAllocator {
             }
         }
         Ok(allocated)
+    }
+}
+
+/// Run the given closure and blocks the thread until the passed event is signaled, if this is
+/// built from a `CurrentTask`, otherwise does not block.
+fn block_task_until<'a, T, F>(kernel_or_task: impl KernelOrTask<'a>, f: F) -> Result<T, Errno>
+where
+    F: FnOnce(&Kernel, Option<Arc<InterruptibleEvent>>) -> Result<T, Errno>,
+{
+    let kernel = kernel_or_task.kernel();
+    match kernel_or_task.maybe_task() {
+        None => f(kernel, None),
+        Some(task) => {
+            let event = InterruptibleEvent::new();
+            let (_waiter, guard) = SimpleWaiter::new(&event);
+            let result = f(kernel, Some(event.clone()))?;
+            task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
+            Ok(result)
+        }
     }
 }
 

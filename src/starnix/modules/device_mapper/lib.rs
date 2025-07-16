@@ -13,7 +13,7 @@ use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, VecOutputBuffer};
 use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
@@ -66,9 +66,7 @@ bitflags! {
     }
 }
 
-pub fn device_mapper_init(current_task: &CurrentTask) -> Result<(), Errno> {
-    let kernel = current_task.kernel();
-
+pub fn device_mapper_init(kernel: &Kernel) -> Result<(), Errno> {
     kernel.device_registry.register_major(
         "device-mapper".into(),
         DeviceMode::Block,
