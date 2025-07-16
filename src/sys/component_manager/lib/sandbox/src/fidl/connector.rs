@@ -56,10 +56,11 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::ClientEnd;
-    use fidl::handle::Status;
     use fidl_fuchsia_io as fio;
     use futures::StreamExt;
+    use vfs::directory::entry::OpenRequest;
     use vfs::execution_scope::ExecutionScope;
+    use vfs::ToObjectRequest;
 
     // TODO(340891837): This test only runs on host because of the reliance on Open
     #[fuchsia::test]
@@ -67,24 +68,23 @@ mod tests {
         let receiver = {
             let (receiver, sender) = Connector::new();
             let open: crate::DirEntry = sender.into();
-            let (client_end, server_end) = Channel::create();
-            let scope = ExecutionScope::new();
-            open.open(
-                scope,
-                fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
-                ".",
-                server_end,
-            );
+            let (client, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
+            const FLAGS: fio::Flags =
+                fio::Flags::PROTOCOL_NODE.union(fio::Flags::FLAG_SEND_REPRESENTATION);
+            FLAGS.to_object_request(server.into_channel()).handle(|request| {
+                open.open_entry(OpenRequest::new(
+                    ExecutionScope::new(),
+                    FLAGS,
+                    vfs::Path::dot(),
+                    request,
+                ))
+            });
 
             // The NODE_REFERENCE connection should be terminated on the sender side.
-            let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-            let node: fio::NodeProxy = client_end.into_proxy();
-            let result = node.take_event_stream().next().await.unwrap();
+            let result = client.take_event_stream().next().await.unwrap();
             assert_matches!(
                 result,
-                Ok(fio::NodeEvent::OnOpen_ { s, info })
-                    if s == Status::OK.into_raw()
-                    && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
+                Ok(fio::NodeEvent::OnRepresentation { payload: fio::Representation::Node(_) })
             );
 
             receiver
@@ -96,43 +96,26 @@ mod tests {
 
     // TODO(340891837): This test only runs on host because of the reliance on Open
     #[fuchsia::test]
-    async fn unwrap_server_end_or_serve_node_describe() {
-        let (receiver, sender) = Connector::new();
-        let open: crate::DirEntry = sender.into();
-
-        let (client_end, server_end) = Channel::create();
-        // The VFS should send the DESCRIBE event, then hand us the channel.
-        open.open(ExecutionScope::new(), fio::OpenFlags::DESCRIBE, ".", server_end);
-
-        // Check we got the channel.
-        assert_matches!(receiver.receive().await, Some(_));
-
-        // Check the client got describe.
-        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy();
-        let result = node.take_event_stream().next().await.unwrap();
-        assert_matches!(
-            result,
-            Ok(fio::NodeEvent::OnOpen_ { s, info })
-            if s == Status::OK.into_raw()
-            && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
-        );
-    }
-
-    // TODO(340891837): This test only runs on host because of the reliance on Open
-    #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_empty() {
         let (receiver, sender) = Connector::new();
         let open: crate::DirEntry = sender.into();
 
         let (client_end, server_end) = Channel::create();
         // The VFS should not send any event, but directly hand us the channel.
-        open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
-
+        const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+        FLAGS.to_object_request(server_end).handle(|request| {
+            open.open_entry(OpenRequest::new(
+                ExecutionScope::new(),
+                FLAGS,
+                vfs::Path::dot(),
+                request,
+            ))
+        });
         // Check that we got the channel.
         assert_matches!(receiver.receive().await, Some(_));
 
-        // Check that there's no event.
+        // Check that there's no event, as we should be connected to the other end of the capability
+        // directly (i.e. this shouldn't actually be a fuchsia.io/Node connection).
         let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
         let node: fio::NodeProxy = client_end.into_proxy();
         assert_matches!(node.take_event_stream().next().await, None);
