@@ -267,6 +267,112 @@ class DefaultDiffActionTests(unittest.TestCase):
         )
 
 
+def _detail_diff_pass(a: Path, b: Path) -> int:
+    return 0
+
+
+def _detail_diff_fail(a: Path, b: Path) -> int:
+    return 1
+
+
+class VerifyFilesMatchTests(unittest.TestCase):
+    def test_no_files_to_compare_passes(self):
+        self.assertEqual(
+            output_cacher.verify_files_match(
+                fileset={},
+                diff_action=_detail_diff_pass,
+                label="blah",
+                renamed=True,
+                keep_backups=True,
+            ),
+            0,
+        )
+
+    def test_one_file_matches(self):
+        with mock.patch.object(
+            output_cacher, "files_match", return_value=True
+        ) as mock_files_match:
+            self.assertEqual(
+                output_cacher.verify_files_match(
+                    fileset={Path("a.txt"): Path("a.txt.bkp")},
+                    diff_action=_detail_diff_pass,  # doesn't matter
+                    label="blah",
+                    renamed=True,
+                    keep_backups=True,
+                ),
+                0,
+            )
+
+    def test_one_file_mismatches(self):
+        with mock.patch.object(
+            output_cacher, "files_match", return_value=False
+        ) as mock_files_match:
+            self.assertEqual(
+                output_cacher.verify_files_match(
+                    fileset={Path("a.txt"): Path("a.txt.bkp")},
+                    diff_action=_detail_diff_fail,
+                    label="blah",
+                    renamed=True,
+                    keep_backups=True,
+                ),
+                1,
+            )
+
+    def test_all_files_match(self):
+        with mock.patch.object(
+            output_cacher, "files_match", return_value=True
+        ) as mock_files_match:
+            self.assertEqual(
+                output_cacher.verify_files_match(
+                    fileset={
+                        Path("a.txt"): Path("a.txt.bkp"),
+                        Path("b.txt"): Path("b.txt.bkp"),
+                    },
+                    diff_action=_detail_diff_pass,  # doesn't matter
+                    label="blah",
+                    renamed=True,
+                    keep_backups=True,
+                ),
+                0,
+            )
+
+    def test_some_files_mismatch(self):
+        with mock.patch.object(
+            output_cacher, "files_match", side_effect=[True, False]
+        ) as mock_files_match:
+            self.assertEqual(
+                output_cacher.verify_files_match(
+                    fileset={
+                        Path("a.txt"): Path("a.txt.bkp"),
+                        Path("b.txt"): Path("b.txt.bkp"),
+                    },
+                    diff_action=_detail_diff_fail,
+                    label="blah",
+                    renamed=True,
+                    keep_backups=True,
+                ),
+                1,
+            )
+
+    def test_some_files_mismatch_but_forgiven_by_detail_diff(self):
+        with mock.patch.object(
+            output_cacher, "files_match", side_effect=[True, False]
+        ) as mock_files_match:
+            self.assertEqual(
+                output_cacher.verify_files_match(
+                    fileset={
+                        Path("a.txt"): Path("a.txt.bkp"),
+                        Path("b.txt"): Path("b.txt.bkp"),
+                    },
+                    diff_action=_detail_diff_pass,
+                    label="blah",
+                    renamed=True,
+                    keep_backups=True,
+                ),
+                0,
+            )
+
+
 class MoveIfDifferentTests(unittest.TestCase):
     def test_nonexistent_source(self):
         with mock.patch.object(

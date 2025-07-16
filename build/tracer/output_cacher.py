@@ -68,7 +68,7 @@ def _partition(
     return trues, falses
 
 
-def files_match(file1: Path, file2: Path):
+def files_match(file1: Path, file2: Path) -> bool:
     """Compares two files, returns True if they both exist and match."""
     # filecmp.cmp does not invoke any subprocesses.
     return filecmp.cmp(file1, file2, shallow=False)
@@ -105,10 +105,14 @@ def ensure_file_exists(path: Path):
     )
 
 
-def detail_diff(left: Path, right: Path):
-    """Richer difference analysis."""
+def detail_diff(left: Path, right: Path) -> int:
+    """Richer difference analysis.
+
+    Returns:
+     exist status: 0 for success, anything else for failure (same as diff).
+    """
     print(f"  {left} vs. {right}")
-    subprocess.call(
+    return subprocess.call(
         [
             _PROJECT_ROOT_REL / _DETAIL_DIFF_SCRIPT,
             # denote first/second for checking repeatability
@@ -392,7 +396,7 @@ class Action(object):
     def run_repeatedly_and_compare_outputs(
         self,
         tempfile_transform: TempFileTransform,
-        diff_action: Callable[[Path, Path], Any],
+        diff_action: Callable[[Path, Path], int],
         max_attempts: int = 1,
         verbose: bool = False,
     ) -> int:
@@ -549,6 +553,9 @@ def verify_files_match(
         that match are removed to save space, while the .keys() files are kept.
       diff_action: action to run on files with differences, e.g. more
         detailed diff analysis, copy files.
+        This action is allowed to effectively diff filtered text
+        for forgive-able differences.  When this action exits 0 (success),
+        accept this result over the comparison of the raw inputs.
       label: An identifier for the action that was run, for diagnostics.
       renamed: True if files to compare were renamed.
       keep_backups: If False, delete matching copies after comparison.
@@ -581,8 +588,11 @@ def verify_files_match(
             f"Repeating command{label_text}{renamed_text} produces different results:"
         )
 
-        for orig, temp in different_files:
-            diff_action(orig, temp)
+        # Print detailed differences, and also allow these diff statuses
+        # to take precedence over earlier comparisons of raw inputs.
+        # If all of these succeed, consider it an overall success.
+        if all(diff_action(orig, temp) == 0 for orig, temp in different_files):
+            return 0
 
         # Note: Even though the original command succeeded, forcing this to
         # fail may influence tools that examine the freshness of outputs
@@ -691,14 +701,16 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 def default_diff_action(
     left: Path, right: Path, miscomparison_export_dir: Path = None
-):
+) -> int:
     # Run detailed analysis, using various binary dumps.
-    detail_diff(left, right)
+    exit_code = detail_diff(left, right)
 
     # Keep around different outputs for analysis.
     if miscomparison_export_dir:
         copy_preserve_subpath(left, miscomparison_export_dir)
         copy_preserve_subpath(right, miscomparison_export_dir)
+
+    return exit_code
 
 
 def main():
@@ -754,8 +766,10 @@ def main():
 
     if args.check_repeatability:
 
-        def _diff_action(left: Path, right: Path):
-            default_diff_action(left, right, args.miscomparison_export_dir)
+        def _diff_action(left: Path, right: Path) -> int:
+            return default_diff_action(
+                left, right, args.miscomparison_export_dir
+            )
 
         if args.rename_outputs:
             # This check variant will find path-sensitive outputs
