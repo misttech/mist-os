@@ -457,8 +457,7 @@ TEST_F(IntegrationTest, SysmemImport) {
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   auto [token_client, token_server] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
@@ -534,8 +533,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   auto [token_client, token_server] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 

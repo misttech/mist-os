@@ -1883,7 +1883,7 @@ int32_t DpDisplay::LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) {
 
 raw_display_info_t DpDisplay::CreateRawDisplayInfo() {
   return raw_display_info_t{
-      .display_id = display::ToBanjoDisplayId(id()),
+      .display_id = id().ToBanjo(),
       .preferred_modes_list = nullptr,
       .preferred_modes_count = 0,
       .edid_bytes_list = edid_bytes_.data(),

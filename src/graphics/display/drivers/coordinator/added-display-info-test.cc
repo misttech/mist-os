@@ -37,7 +37,7 @@ TEST_F(AddedDisplayInfoTest, CreateTranscribesDisplayId) {
   static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kBanjoPixelFormats = {
       kPixelFormats[0].ToBanjo()};
   static constexpr raw_display_info_t kBanjoDisplayInfo = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .preferred_modes_list = nullptr,
       .preferred_modes_count = 0,
       .edid_bytes_list = nullptr,
@@ -66,7 +66,7 @@ TEST_F(AddedDisplayInfoTest, CreateTranscribesPixelFormats) {
   static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 2> kBanjoPixelFormats = {
       kPixelFormats[0].ToBanjo(), kPixelFormats[1].ToBanjo()};
   static constexpr raw_display_info_t kBanjoDisplayInfo = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .preferred_modes_list = nullptr,
       .preferred_modes_count = 0,
       .edid_bytes_list = nullptr,

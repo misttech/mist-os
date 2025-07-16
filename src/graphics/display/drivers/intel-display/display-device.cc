@@ -191,7 +191,7 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
           return controller->SetupGttImage(image_metadata, image_handle, rotation);
         },
         [controller = controller_](uint64_t image_handle) -> PixelFormatAndModifier {
-          const display::DriverImageId image_id = display::ToDriverImageId(image_handle);
+          const display::DriverImageId image_id = display::DriverImageId(image_handle);
           return controller->GetImportedImagePixelFormat(image_id);
         });
   }

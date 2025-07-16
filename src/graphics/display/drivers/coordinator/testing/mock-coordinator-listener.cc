@@ -29,7 +29,7 @@ void MockCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequestView req
   std::vector added_display_infos(request->added.begin(), request->added.end());
   std::vector<display::DisplayId> removed_display_ids;
   for (fuchsia_hardware_display_types::wire::DisplayId fidl_id : request->removed) {
-    removed_display_ids.push_back(display::ToDisplayId(fidl_id));
+    removed_display_ids.push_back(display::DisplayId(fidl_id));
   }
 
   on_displays_changed_callback_(std::move(added_display_infos), std::move(removed_display_ids));
@@ -37,9 +37,9 @@ void MockCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequestView req
 
 void MockCoordinatorListener::OnVsync(OnVsyncRequestView request,
                                       OnVsyncCompleter::Sync& completer) {
-  on_vsync_callback_(display::ToDisplayId(request->display_id), zx::time(request->timestamp),
-                     display::ToConfigStamp(request->applied_config_stamp),
-                     display::ToVsyncAckCookie(request->cookie));
+  on_vsync_callback_(display::DisplayId(request->display_id), zx::time(request->timestamp),
+                     display::ConfigStamp(request->applied_config_stamp),
+                     display::VsyncAckCookie(request->cookie));
 }
 
 void MockCoordinatorListener::OnClientOwnershipChange(

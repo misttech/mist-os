@@ -63,7 +63,7 @@ class FakeDisplay final : public DisplayDevice {
   bool InitWithDdiPllConfig(const DdiPllConfig& pll_config) final { return true; }
   raw_display_info_t CreateRawDisplayInfo() final {
     return raw_display_info_t{
-        .display_id = display::ToBanjoDisplayId(id()),
+        .display_id = id().ToBanjo(),
         .preferred_modes_list = nullptr,
         .preferred_modes_count = 0,
         .edid_bytes_list = nullptr,

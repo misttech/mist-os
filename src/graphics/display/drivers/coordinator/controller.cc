@@ -88,7 +88,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
       },
   };
   display_config_t test_config = {
-      .display_id = display::ToBanjoDisplayId(display_info.id()),
+      .display_id = display_info.id().ToBanjo(),
       .layer_list = test_layers,
       .layer_count = 1,
   };
@@ -241,7 +241,7 @@ void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* b
 }
 
 void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
-  display::DisplayId removed_display_id = display::ToDisplayId(banjo_display_id);
+  display::DisplayId removed_display_id = display::DisplayId(banjo_display_id);
 
   zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
       *client_dispatcher()->async_dispatcher(),
@@ -303,7 +303,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 
   const zx::time vsync_timestamp(banjo_timestamp);
   const display::DriverConfigStamp vsync_config_stamp =
-      display::ToDriverConfigStamp(*banjo_config_stamp_ptr);
+      display::DriverConfigStamp(*banjo_config_stamp_ptr);
   vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
 
   fbl::AutoLock lock(mtx());
@@ -538,7 +538,7 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
     fdf::warn("Attempted to ApplyConfiguration() with {} displays", display_count);
   }
 
-  const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(driver_config_stamp);
+  const config_stamp_t banjo_config_stamp = driver_config_stamp.ToBanjo();
   engine_driver_client_->ApplyConfiguration(banjo_display_configs, &banjo_config_stamp);
 }
 

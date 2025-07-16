@@ -62,13 +62,13 @@ class MockCoordinatorListener
     latest_added_display_infos_ = std::vector(request->added.begin(), request->added.end());
     latest_removed_display_ids_ = {};
     for (fuchsia_hardware_display_types::wire::DisplayId fidl_id : request->removed) {
-      latest_removed_display_ids_.push_back(display::ToDisplayId(fidl_id));
+      latest_removed_display_ids_.push_back(display::DisplayId(fidl_id));
     }
   }
 
   void OnVsync(OnVsyncRequestView request, OnVsyncCompleter::Sync& completer) override {
     latest_vsync_timestamp_ = zx::time(request->timestamp);
-    latest_applied_config_stamp_ = display::ToConfigStamp(request->applied_config_stamp);
+    latest_applied_config_stamp_ = display::ConfigStamp(request->applied_config_stamp);
   }
 
   void OnClientOwnershipChange(OnClientOwnershipChangeRequestView request,

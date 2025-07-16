@@ -111,7 +111,7 @@ custom_layer_t* VirtualLayer::CreateLayer(const fidl::WireSyncClient<fhd::Coordi
     printf("Creating layer failed\n");
     return nullptr;
   }
-  layers_[layers_.size() - 1].id = display::ToLayerId(result.value()->layer_id);
+  layers_[layers_.size() - 1].id = display::LayerId(result.value()->layer_id);
 
   return &layers_[layers_.size() - 1];
 }
@@ -181,7 +181,7 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     }
 
     fhdt::wire::ImageMetadata image_metadata = images_[0]->GetMetadata();
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
+    const fhd::wire::LayerId fidl_layer_id = layer->id.ToFidl();
     auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_metadata);
     if (!set_config_result.ok()) {
       printf("Setting layer config failed\n");
@@ -345,7 +345,7 @@ void PrimaryLayer::Render(int32_t frame_num) {
 
 void PrimaryLayer::SetLayerPositions(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   for (auto& layer : layers_) {
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
+    const fhd::wire::LayerId fidl_layer_id = layer.id.ToFidl();
     ZX_ASSERT(dc->SetLayerPrimaryPosition(fidl_layer_id, rotation_, layer.src, layer.dest).ok());
   }
 }
@@ -354,10 +354,9 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
                                   bool alt_image) {
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
-    const fhd::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
-    const fhd::wire::EventId fidl_wait_event_id =
-        display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
+    const fhd::wire::LayerId fidl_layer_id = layer.id.ToFidl();
+    const fhd::wire::ImageId fidl_image_id = image.id.ToFidl();
+    const fhd::wire::EventId fidl_wait_event_id = image.event_ids[WAIT_EVENT].ToFidl();
     auto result = dc->SetLayerImage2(fidl_layer_id, fidl_image_id, fidl_wait_event_id);
 
     ZX_ASSERT(result.ok());
@@ -383,7 +382,7 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 
     fidl::Array<uint8_t, 8> bytes;
     std::memcpy(bytes.data(), &color, sizeof(color));
-    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
+    const fhd::wire::LayerId fidl_layer_id = layer->id.ToFidl();
     auto result =
         dc->SetLayerColorConfig(fidl_layer_id, fuchsia_hardware_display_types::wire::Color{
                                                    .format = kColorLayerFormat,

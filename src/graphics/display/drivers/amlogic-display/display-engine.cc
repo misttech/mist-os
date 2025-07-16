@@ -232,7 +232,7 @@ void DisplayEngine::DisplayEngineUnsetListener() {
 zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
     fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
@@ -268,7 +268,7 @@ zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
 zx_status_t DisplayEngine::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     fdf::error("Failed to release buffer collection {}: buffer collection doesn't exist",
                driver_buffer_collection_id.value());
@@ -282,7 +282,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
                                                     uint64_t banjo_driver_buffer_collection_id,
                                                     uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     fdf::error("Failed to import Image on collection {}: buffer collection doesn't exist",
                driver_buffer_collection_id.value());
@@ -442,7 +442,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   fbl::AutoLock lock(&display_mutex_);
 
   // no-op, just wait for the client to try a new config
-  if (!display_attached_ || display::ToDisplayId(display_config.display_id) != display_id_) {
+  if (!display_attached_ || display::DisplayId(display_config.display_id) != display_id_) {
     return CONFIG_CHECK_RESULT_OK;
   }
 
@@ -547,7 +547,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
   const display_config_t& display_config = *display_config_ptr;
 
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-  const display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
+  const display::DriverConfigStamp config_stamp = display::DriverConfigStamp(*banjo_config_stamp);
 
   fbl::AutoLock lock(&display_mutex_);
 
@@ -572,7 +572,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
     // The only way a checked configuration could now be invalid is if display was
     // unplugged. If that's the case, then the upper layers will give a new configuration
     // once they finish handling the unplug event. So just return.
-    if (!display_attached_ || display::ToDisplayId(display_config.display_id) != display_id_) {
+    if (!display_attached_ || display::DisplayId(display_config.display_id) != display_id_) {
       return;
     }
 
@@ -612,7 +612,7 @@ void DisplayEngine::Deinitialize() {
 zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     fdf::error(
         "Failed to set buffer collection constraints for %lu: buffer collection doesn't exist",
@@ -740,7 +740,7 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
 
 zx_status_t DisplayEngine::DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
   fbl::AutoLock lock(&display_mutex_);
-  if (display::ToDisplayId(display_id) != display_id_ || !display_attached_) {
+  if (display::DisplayId(display_id) != display_id_ || !display_attached_) {
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -786,7 +786,7 @@ zx_status_t DisplayEngine::DisplayEngineSetDisplayPower(uint64_t display_id, boo
 zx_status_t DisplayEngine::DisplayEngineImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     fdf::error("Failed to import capture image on collection {}: buffer collection doesn't exist",
                driver_buffer_collection_id.value());
@@ -991,10 +991,8 @@ void DisplayEngine::OnVsync(zx::time timestamp) {
   }
   fbl::AutoLock lock(&display_mutex_);
   if (engine_listener_.is_valid() && display_attached_) {
-    const config_stamp_t banjo_config_stamp =
-        display::ToBanjoDriverConfigStamp(current_config_stamp);
-    engine_listener_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
-                                    &banjo_config_stamp);
+    const config_stamp_t banjo_config_stamp = current_config_stamp.ToBanjo();
+    engine_listener_.OnDisplayVsync(display_id_.ToBanjo(), timestamp.get(), &banjo_config_stamp);
   }
 }
 
@@ -1054,7 +1052,7 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
     display_attached_ = false;
 
     if (engine_listener_.is_valid()) {
-      engine_listener_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
+      engine_listener_.OnDisplayRemoved(removed_display_id.ToBanjo());
     }
     return;
   }

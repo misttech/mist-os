@@ -267,8 +267,7 @@ TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidCollectionId(1);
-  constexpr uint64_t kBanjoValidCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kValidCollectionId);
+  constexpr uint64_t kBanjoValidCollectionId = kValidCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(
       kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
 
@@ -279,8 +278,7 @@ TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(2);
-  constexpr uint64_t kBanjoInvalidCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
+  constexpr uint64_t kBanjoInvalidCollectionId = kInvalidCollectionId.ToBanjo();
   EXPECT_EQ(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoInvalidCollectionId),
             ZX_ERR_NOT_FOUND);
   EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoValidCollectionId));

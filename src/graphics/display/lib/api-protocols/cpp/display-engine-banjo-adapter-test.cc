@@ -99,8 +99,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ImportBufferCollectionSuccess) {
         return zx::ok();
       });
   EXPECT_OK(engine_banjo_.ImportBufferCollection(
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId),
-      std::move(buffer_collection_token_client).TakeChannel()));
+      kBufferCollectionId.ToBanjo(), std::move(buffer_collection_token_client).TakeChannel()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ImportBufferCollectionError) {
@@ -114,7 +113,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ImportBufferCollectionError) {
         return zx::error(ZX_ERR_INTERNAL);
       });
   EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.ImportBufferCollection(
-                                 display::ToBanjoDriverBufferCollectionId(kBufferCollectionId),
+                                 kBufferCollectionId.ToBanjo(),
                                  std::move(buffer_collection_token_client).TakeChannel()));
 }
 
@@ -125,8 +124,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ReleaseBufferCollectionSuccess) {
     EXPECT_EQ(kBufferCollectionId, buffer_collection_id);
     return zx::ok();
   });
-  EXPECT_OK(engine_banjo_.ReleaseBufferCollection(
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId)));
+  EXPECT_OK(engine_banjo_.ReleaseBufferCollection(kBufferCollectionId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ReleaseBufferCollectionError) {
@@ -135,8 +133,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ReleaseBufferCollectionError) {
   mock_.ExpectReleaseBufferCollection([&](display::DriverBufferCollectionId buffer_collection_id) {
     return zx::error(ZX_ERR_INTERNAL);
   });
-  EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.ReleaseBufferCollection(
-                                 display::ToBanjoDriverBufferCollectionId(kBufferCollectionId)));
+  EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.ReleaseBufferCollection(kBufferCollectionId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ImportImageSuccess) {
@@ -157,10 +154,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, ImportImageSuccess) {
 
   static constexpr image_metadata_t kBanjoImageMetadata = kImageMetadata.ToBanjo();
   uint64_t banjo_image_handle = 0;
-  EXPECT_OK(engine_banjo_.ImportImage(&kBanjoImageMetadata,
-                                      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId),
+  EXPECT_OK(engine_banjo_.ImportImage(&kBanjoImageMetadata, kBufferCollectionId.ToBanjo(),
                                       kBufferIndex, &banjo_image_handle));
-  EXPECT_EQ(kImageId, display::ToDriverImageId(banjo_image_handle));
+  EXPECT_EQ(kImageId, display::DriverImageId(banjo_image_handle));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ImportImageError) {
@@ -176,8 +172,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ImportImageError) {
   static constexpr image_metadata_t kBanjoImageMetadata = kImageMetadata.ToBanjo();
   uint64_t banjo_image_handle = 0;
   EXPECT_EQ(ZX_ERR_INTERNAL,
-            engine_banjo_.ImportImage(&kBanjoImageMetadata,
-                                      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId),
+            engine_banjo_.ImportImage(&kBanjoImageMetadata, kBufferCollectionId.ToBanjo(),
                                       kBufferIndex, &banjo_image_handle));
 }
 
@@ -194,10 +189,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, ImportImageForCaptureSuccess) {
       });
 
   uint64_t banjo_capture_image_handle = 0;
-  EXPECT_OK(engine_banjo_.ImportImageForCapture(
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId), kBufferIndex,
-      &banjo_capture_image_handle));
-  EXPECT_EQ(kCaptureImageId, display::ToDriverCaptureImageId(banjo_capture_image_handle));
+  EXPECT_OK(engine_banjo_.ImportImageForCapture(kBufferCollectionId.ToBanjo(), kBufferIndex,
+                                                &banjo_capture_image_handle));
+  EXPECT_EQ(kCaptureImageId, display::DriverCaptureImageId(banjo_capture_image_handle));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ImportImageForCaptureError) {
@@ -210,9 +204,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, ImportImageForCaptureError) {
       });
 
   uint64_t banjo_capture_image_handle = 0;
-  EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.ImportImageForCapture(
-                                 display::ToBanjoDriverBufferCollectionId(kBufferCollectionId),
-                                 kBufferIndex, &banjo_capture_image_handle));
+  EXPECT_EQ(ZX_ERR_INTERNAL,
+            engine_banjo_.ImportImageForCapture(kBufferCollectionId.ToBanjo(), kBufferIndex,
+                                                &banjo_capture_image_handle));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ReleaseImageSuccess) {
@@ -221,7 +215,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ReleaseImageSuccess) {
   mock_.ExpectReleaseImage([&](display::DriverImageId buffer_collection_id) {
     EXPECT_EQ(kImageId, buffer_collection_id);
   });
-  engine_banjo_.ReleaseImage(display::ToBanjoDriverImageId(kImageId));
+  engine_banjo_.ReleaseImage(kImageId.ToBanjo());
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
@@ -229,7 +223,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
 
   static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
@@ -253,7 +247,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerSuccess) {
   static constexpr layer_t banjo_layers[kNumLayers] = {kAcceptableLayer.ToBanjo(),
                                                        kAcceptableLayer.ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .layer_list = banjo_layers,
       .layer_count = kNumLayers,
   };
@@ -281,7 +275,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerError) {
       kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(),
       kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .layer_list = banjo_layers,
       .layer_count = kNumLayers,
   };
@@ -298,7 +292,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
 
   static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
@@ -317,7 +311,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
 
   static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
@@ -337,12 +331,11 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
 
   static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
-  static constexpr config_stamp_t kBanjoConfigStamp =
-      display::ToBanjoDriverConfigStamp(kConfigStamp);
+  static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 
   mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
                                      cpp20::span<const display::DriverLayer> layers,
@@ -365,12 +358,11 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationMultiLayer) {
       kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(), kAcceptableLayer.ToBanjo(),
       kAcceptableLayer.ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .display_id = kDisplayId.ToBanjo(),
       .layer_list = banjo_layers,
       .layer_count = kNumLayers,
   };
-  static constexpr config_stamp_t kBanjoConfigStamp =
-      display::ToBanjoDriverConfigStamp(kConfigStamp);
+  static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 
   mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
                                      cpp20::span<const display::DriverLayer> layers,
@@ -400,8 +392,8 @@ TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsSuccess) {
         EXPECT_EQ(kBufferCollectionId, buffer_collection_id);
         return zx::ok();
       });
-  EXPECT_OK(engine_banjo_.SetBufferCollectionConstraints(
-      &kBanjoImageBufferUsage, display::ToBanjoDriverBufferCollectionId(kBufferCollectionId)));
+  EXPECT_OK(engine_banjo_.SetBufferCollectionConstraints(&kBanjoImageBufferUsage,
+                                                         kBufferCollectionId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsError) {
@@ -418,8 +410,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsError) {
         return zx::error(ZX_ERR_INTERNAL);
       });
   EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.SetBufferCollectionConstraints(
-                                 &kBanjoImageBufferUsage,
-                                 display::ToBanjoDriverBufferCollectionId(kBufferCollectionId)));
+                                 &kBanjoImageBufferUsage, kBufferCollectionId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetDisplayPowerSuccess) {
@@ -430,7 +421,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, SetDisplayPowerSuccess) {
     EXPECT_EQ(true, power_on);
     return zx::ok();
   });
-  EXPECT_OK(engine_banjo_.SetDisplayPower(display::ToBanjoDisplayId(kDisplayId), true));
+  EXPECT_OK(engine_banjo_.SetDisplayPower(kDisplayId.ToBanjo(), true));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetDisplayPowerError) {
@@ -438,8 +429,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, SetDisplayPowerError) {
 
   mock_.ExpectSetDisplayPower(
       [&](display::DisplayId display_id, bool power_on) { return zx::error(ZX_ERR_INTERNAL); });
-  EXPECT_EQ(ZX_ERR_INTERNAL,
-            engine_banjo_.SetDisplayPower(display::ToBanjoDisplayId(kDisplayId), true));
+  EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.SetDisplayPower(kDisplayId.ToBanjo(), true));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, StartCaptureSuccess) {
@@ -449,7 +439,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, StartCaptureSuccess) {
     EXPECT_EQ(kCaptureImageId, capture_image_id);
     return zx::ok();
   });
-  EXPECT_OK(engine_banjo_.StartCapture(display::ToBanjoDriverCaptureImageId(kCaptureImageId)));
+  EXPECT_OK(engine_banjo_.StartCapture(kCaptureImageId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, StartCaptureError) {
@@ -457,8 +447,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, StartCaptureError) {
 
   mock_.ExpectStartCapture(
       [&](display::DriverCaptureImageId capture_image_id) { return zx::error(ZX_ERR_INTERNAL); });
-  EXPECT_EQ(ZX_ERR_INTERNAL,
-            engine_banjo_.StartCapture(display::ToBanjoDriverCaptureImageId(kCaptureImageId)));
+  EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.StartCapture(kCaptureImageId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ReleaseCaptureSuccess) {
@@ -468,7 +457,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ReleaseCaptureSuccess) {
     EXPECT_EQ(kCaptureImageId, capture_image_id);
     return zx::ok();
   });
-  EXPECT_OK(engine_banjo_.ReleaseCapture(display::ToBanjoDriverCaptureImageId(kCaptureImageId)));
+  EXPECT_OK(engine_banjo_.ReleaseCapture(kCaptureImageId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ReleaseCaptureError) {
@@ -476,8 +465,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ReleaseCaptureError) {
 
   mock_.ExpectReleaseCapture(
       [&](display::DriverCaptureImageId capture_image_id) { return zx::error(ZX_ERR_INTERNAL); });
-  EXPECT_EQ(ZX_ERR_INTERNAL,
-            engine_banjo_.ReleaseCapture(display::ToBanjoDriverCaptureImageId(kCaptureImageId)));
+  EXPECT_EQ(ZX_ERR_INTERNAL, engine_banjo_.ReleaseCapture(kCaptureImageId.ToBanjo()));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetMinimumRgbSuccess) {

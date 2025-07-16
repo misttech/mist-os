@@ -458,8 +458,7 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
-  constexpr uint64_t kBanjoValidBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
+  constexpr uint64_t kBanjoValidBufferCollectionId = kValidBufferCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(
       kBanjoValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
 
@@ -496,8 +495,7 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
-  constexpr uint64_t kBanjoInvalidBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
+  constexpr uint64_t kBanjoInvalidBufferCollectionId = kInvalidBufferCollectionId.ToBanjo();
   EXPECT_EQ(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
   EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoValidBufferCollectionId));
@@ -534,8 +532,7 @@ TEST_F(FakeSysmemTest, ImportImage) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                                  token_client.TakeChannel()));
 
@@ -546,8 +543,7 @@ TEST_F(FakeSysmemTest, ImportImage) {
                                                                          kBanjoBufferCollectionId));
 
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
-  constexpr uint64_t kBanjoInvalidBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
+  constexpr uint64_t kBanjoInvalidBufferCollectionId = kInvalidBufferCollectionId.ToBanjo();
   EXPECT_EQ(display_engine_->DisplayEngineSetBufferCollectionConstraints(
                 &kDisplayUsage, kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
@@ -601,8 +597,7 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                                  token_client.TakeChannel()));
 
@@ -653,8 +648,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                                  token_client.TakeChannel()));
 
@@ -689,8 +683,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                                  token_client.TakeChannel()));
 
@@ -743,8 +736,7 @@ TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
       fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  constexpr uint64_t kBanjoBufferCollectionId = kBufferCollectionId.ToBanjo();
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                                  token_client.TakeChannel()));
 

@@ -114,7 +114,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
   }
 
   fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
-      display::ToFidlBufferCollectionId(buffer_collection_id);
+      buffer_collection_id.ToFidl();
   auto import_result =
       dc->ImportBufferCollection(fidl_buffer_collection_id, std::move(display_token_handle));
   if (!import_result.ok() || import_result.value().is_error()) {
@@ -466,7 +466,7 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
     const display::EventId event_id = next_event_id++;
     info_out->events[i] = std::move(e1);
     info_out->event_ids[i] = event_id;
-    const fidl::Status result = dc->ImportEvent(std::move(e2), display::ToFidlEventId(event_id));
+    const fidl::Status result = dc->ImportEvent(std::move(e2), event_id.ToFidl());
     if (!result.ok()) {
       printf("Failed to import event: %s\n", result.FormatDescription().c_str());
       return false;
@@ -478,13 +478,13 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
   }
 
   fhdt::wire::ImageMetadata image_metadata = GetMetadata();
-  const fidl::WireResult import_result = dc->ImportImage(
-      image_metadata,
-      fhd::wire::BufferId{
-          .buffer_collection_id = display::ToFidlBufferCollectionId(buffer_collection_id_),
-          .buffer_index = 0,
-      },
-      display::ToFidlImageId(image_id));
+  const fidl::WireResult import_result =
+      dc->ImportImage(image_metadata,
+                      fhd::wire::BufferId{
+                          .buffer_collection_id = buffer_collection_id_.ToFidl(),
+                          .buffer_index = 0,
+                      },
+                      image_id.ToFidl());
   if (!import_result.ok()) {
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;
@@ -498,7 +498,7 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
 
   // image has been imported. we can close the connection
   [[maybe_unused]] fidl::Status result =
-      dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(buffer_collection_id_));
+      dc->ReleaseBufferCollection(buffer_collection_id_.ToFidl());
   return true;
 }
 

@@ -72,7 +72,7 @@ struct TestDisplayInfo {
 // static
 TestDisplayInfo TestDisplayInfo::From(
     const fuchsia_hardware_display::wire::Info& fidl_display_info) {
-  const display::DisplayId display_id = display::ToDisplayId(fidl_display_info.id);
+  const display::DisplayId display_id = display::DisplayId(fidl_display_info.id);
   ZX_ASSERT(display_id != display::kInvalidDisplayId);
 
   ZX_ASSERT(!fidl_display_info.modes.empty());
@@ -442,7 +442,7 @@ zx::result<> TestFidlClient::SetVirtconMode(
 zx::result<> TestFidlClient::ImportEvent(zx::event event, display::EventId event_id) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::EventId fidl_event_id = display::ToFidlEventId(event_id);
+  const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
   fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->ImportEvent(std::move(event), fidl_event_id);
@@ -470,7 +470,7 @@ zx::result<display::LayerId> TestFidlClient::CreateLayer() {
     return zx::error(fidl_value.error_value());
   }
 
-  return zx::ok(display::ToLayerId(fidl_value.value()->layer_id));
+  return zx::ok(display::LayerId(fidl_value.value()->layer_id));
 }
 
 zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_metadata,
@@ -480,7 +480,7 @@ zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_met
 
   const fuchsia_hardware_display::wire::BufferId fidl_image_buffer_id =
       display::ToFidlBufferId(image_buffer_id);
-  const fuchsia_hardware_display::wire::ImageId fidl_image_id = display::ToFidlImageId(image_id);
+  const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
 
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> fidl_status =
       coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_image_buffer_id,
@@ -508,13 +508,12 @@ zx::result<> TestFidlClient::SetDisplayLayers(display::DisplayId display_id,
   fidl_layer_ids.reserve(layer_configs.size());
   for (const LayerConfig& layer_config : layer_configs) {
     ZX_ASSERT(layer_config.layer_id != display::kInvalidLayerId);
-    const fuchsia_hardware_display::wire::LayerId fidl_layer_id =
-        display::ToFidlLayerId(layer_config.layer_id);
+    const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_config.layer_id.ToFidl();
     fidl_layer_ids.push_back(fidl_layer_id);
   }
 
   const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetDisplayLayers(
-      display::ToFidlDisplayId(display_id),
+      display_id.ToFidl(),
       fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(fidl_layer_ids));
   if (!fidl_status.ok()) {
     fdf::error("SetDisplayLayers() failed: {}", fidl_status.status_string());
@@ -527,7 +526,7 @@ zx::result<> TestFidlClient::SetLayerPrimaryConfig(display::LayerId layer_id,
                                                    const display::ImageMetadata& image_metadata) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_id.ToFidl();
   const fuchsia_hardware_display_types::wire::ImageMetadata fidl_image_metadata =
       image_metadata.ToFidl();
 
@@ -544,9 +543,9 @@ zx::result<> TestFidlClient::SetLayerImage(display::LayerId layer_id, display::I
                                            display::EventId event_id) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
-  const fuchsia_hardware_display::wire::ImageId fidl_image_id = display::ToFidlImageId(image_id);
-  const fuchsia_hardware_display::wire::EventId fidl_event_id = display::ToFidlEventId(event_id);
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_id.ToFidl();
+  const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
+  const fuchsia_hardware_display::wire::EventId fidl_event_id = event_id.ToFidl();
 
   const fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->SetLayerImage2(fidl_layer_id, fidl_image_id, fidl_event_id);
@@ -561,7 +560,7 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
                                            const display::Color& fallback_color) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_id.ToFidl();
   const fuchsia_hardware_display_types::wire::Color fidl_fallback_color = fallback_color.ToFidl();
 
   const fidl::OneWayStatus fidl_status =
@@ -597,8 +596,7 @@ zx::result<display::ConfigCheckResult> TestFidlClient::CheckConfig() {
 zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp =
-      display::ToFidlConfigStamp(config_stamp);
+  const fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp = config_stamp.ToFidl();
   fidl::Arena arena;
   fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request request =
       fidl::WireRequest<fuchsia_hardware_display::Coordinator::ApplyConfig3>::Builder(arena)
@@ -617,7 +615,7 @@ zx::result<> TestFidlClient::AcknowledgeVsync(display::VsyncAckCookie vsync_ack_
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
   const fuchsia_hardware_display::wire::VsyncAckCookie fidl_vsync_ack_cookie =
-      display::ToFidlVsyncAckCookie(vsync_ack_cookie);
+      vsync_ack_cookie.ToFidl();
   const fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->AcknowledgeVsync(fidl_vsync_ack_cookie.value);
   if (!fidl_status.ok()) {
@@ -791,7 +789,7 @@ zx::result<display::ConfigStamp> TestFidlClient::GetLastAppliedConfigStamp() {
   }
   const fidl::WireResponse<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp>&
       fidl_value = fidl_status.value();
-  return zx::ok(display::ToConfigStamp(fidl_value.stamp));
+  return zx::ok(display::ConfigStamp(fidl_value.stamp));
 }
 
 std::vector<TestFidlClient::LayerConfig> TestFidlClient::CreateFullscreenLayerConfig() {
@@ -811,7 +809,7 @@ zx::result<> TestFidlClient::ImportBufferCollection(
     display::BufferCollectionId buffer_collection_id,
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_token) {
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
-      display::ToFidlBufferCollectionId(buffer_collection_id);
+      buffer_collection_id.ToFidl();
 
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportBufferCollection> fidl_status =
       coordinator_fidl_client_->ImportBufferCollection(fidl_buffer_collection_id,
@@ -834,7 +832,7 @@ zx::result<> TestFidlClient::SetBufferCollectionConstraints(
     display::BufferCollectionId buffer_collection_id,
     display::ImageBufferUsage image_buffer_usage) {
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
-      display::ToFidlBufferCollectionId(buffer_collection_id);
+      buffer_collection_id.ToFidl();
   const fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage =
       display::ToFidlImageBufferUsage(image_buffer_usage);
 
@@ -1608,11 +1606,9 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   // TODO(https://fxbug.dev/388885807): The comment above describes the behavior
   // of a misbehaving display engine driver. Consider whether it's suitable to
   // disconnect the driver, rather than working around the error.
-  const config_stamp_t invalid_banjo_config_stamp =
-      display::ToBanjoDriverConfigStamp(virtcon_initial_driver_config_stamp);
+  const config_stamp_t invalid_banjo_config_stamp = virtcon_initial_driver_config_stamp.ToBanjo();
   CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
-      display::ToBanjoDisplayId(primary_client->state().display_id()), 0u,
-      &invalid_banjo_config_stamp);
+      primary_client->state().display_id().ToBanjo(), 0u, &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   ASSERT_EQ(1u, primary_client->state().vsync_count());

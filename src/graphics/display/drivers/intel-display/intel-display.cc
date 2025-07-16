@@ -94,11 +94,10 @@ constexpr fuchsia_images2::wire::PixelFormat kYuvPixelFormatTypes[2] = {
 
 const display_config_t* FindBanjoConfig(display::DisplayId display_id,
                                         cpp20::span<const display_config_t> banjo_display_configs) {
-  auto it =
-      std::find_if(banjo_display_configs.begin(), banjo_display_configs.end(),
-                   [display_id](const display_config_t& banjo_display_config) {
-                     return display::ToDisplayId(banjo_display_config.display_id) == display_id;
-                   });
+  auto it = std::find_if(banjo_display_configs.begin(), banjo_display_configs.end(),
+                         [display_id](const display_config_t& banjo_display_config) {
+                           return display::DisplayId(banjo_display_config.display_id) == display_id;
+                         });
   if (it == banjo_display_configs.end()) {
     return nullptr;
   }
@@ -169,7 +168,7 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
     RemoveDisplay(std::move(device));
 
     if (engine_listener_.is_valid()) {
-      engine_listener_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
+      engine_listener_.OnDisplayRemoved(removed_display_id.ToBanjo());
     }
     return;
   }
@@ -231,8 +230,8 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
   }
 
   if (pipe_attached_display_id != display::kInvalidDisplayId) {
-    const uint64_t banjo_display_id = display::ToBanjoDisplayId(pipe_attached_display_id);
-    const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(vsync_config_stamp);
+    const uint64_t banjo_display_id = pipe_attached_display_id.ToBanjo();
+    const config_stamp_t banjo_config_stamp = vsync_config_stamp.ToBanjo();
     engine_listener_.OnDisplayVsync(banjo_display_id, timestamp, &banjo_config_stamp);
   }
 }
@@ -848,7 +847,7 @@ static bool ConvertPixelFormatToTilingType(
 zx_status_t Controller::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
     fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
@@ -879,7 +878,7 @@ zx_status_t Controller::DisplayEngineImportBufferCollection(
 zx_status_t Controller::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
                driver_buffer_collection_id.value());
@@ -893,7 +892,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
                                                  uint64_t banjo_driver_buffer_collection_id,
                                                  uint32_t index, uint64_t* out_image_handle) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
@@ -1051,7 +1050,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
   imported_image_pixel_formats_.emplace(image_id,
                                         PixelFormatAndModifierFromImageFormat(format.value()));
 
-  *out_image_handle = display::ToBanjoDriverImageId(image_id);
+  *out_image_handle = image_id.ToBanjo();
   return ZX_OK;
 }
 
@@ -1099,7 +1098,7 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
   display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
 
   for (const display_config_t& banjo_display_config : banjo_display_configs) {
-    display::DisplayId display_id = display::ToDisplayId(banjo_display_config.display_id);
+    display::DisplayId display_id = display::DisplayId(banjo_display_config.display_id);
     if (display_id != pipe_attached_display_id) {
       continue;
     }
@@ -1470,7 +1469,7 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t> banjo_di
       return false;
     }
 
-    display::DisplayId display_id = display::ToDisplayId(banjo_display_config.display_id);
+    display::DisplayId display_id = display::DisplayId(banjo_display_config.display_id);
     DisplayDevice* display = FindDevice(display_id);
     if (display == nullptr) {
       continue;
@@ -1565,7 +1564,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
-  const display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+  const display::DisplayId display_id = display::DisplayId(banjo_display_config->display_id);
   DisplayDevice* display = nullptr;
   for (auto& d : display_devices_) {
     if (d->id() == display_id) {
@@ -1702,7 +1701,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
       ZX_ASSERT(pipe->in_use());  // If the allocation failed, it should be in use
       display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
 
-      display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+      display::DisplayId display_id = display::DisplayId(banjo_display_config->display_id);
       if (display_id != pipe_attached_display_id) {
         continue;
       }
@@ -1726,7 +1725,7 @@ bool Controller::CalculatePipeAllocation(
             display::kInvalidDisplayId);
   // Keep any allocated pipes on the same display
   for (const display_config_t& banjo_display_config : banjo_display_configs) {
-    display::DisplayId display_id = display::ToDisplayId(banjo_display_config.display_id);
+    display::DisplayId display_id = display::DisplayId(banjo_display_config.display_id);
     DisplayDevice* display = FindDevice(display_id);
     if (display != nullptr && display->pipe() != nullptr) {
       display_allocated_to_pipe[display->pipe()->pipe_id()] = display_id;
@@ -1734,7 +1733,7 @@ bool Controller::CalculatePipeAllocation(
   }
   // Give unallocated pipes to displays that need them
   for (const display_config_t& banjo_display_config : banjo_display_configs) {
-    display::DisplayId display_id = display::ToDisplayId(banjo_display_config.display_id);
+    display::DisplayId display_id = display::DisplayId(banjo_display_config.display_id);
     DisplayDevice* display = FindDevice(display_id);
     if (display != nullptr && display->pipe() == nullptr) {
       for (unsigned pipe_num = 0; pipe_num < display_allocated_to_pipe.size(); pipe_num++) {
@@ -1786,7 +1785,7 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
 
     if (banjo_display_config != nullptr) {
       const display::DriverConfigStamp config_stamp =
-          display::ToDriverConfigStamp(*banjo_config_stamp);
+          display::DriverConfigStamp(*banjo_config_stamp);
       display->ApplyConfiguration(banjo_display_config, config_stamp);
     } else {
       if (display->pipe()) {
@@ -1823,7 +1822,7 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
   if (engine_listener_.is_valid()) {
     zx_time_t now = (fake_vsync_size > 0) ? zx_clock_get_monotonic() : 0;
     for (size_t i = 0; i < fake_vsync_size; i++) {
-      const uint64_t banjo_display_id = display::ToBanjoDisplayId(fake_vsync_display_ids[i]);
+      const uint64_t banjo_display_id = fake_vsync_display_ids[i].ToBanjo();
       engine_listener_.OnDisplayVsync(banjo_display_id, now, banjo_config_stamp);
     }
   }
@@ -1832,7 +1831,7 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
 zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     fdf::error("SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",

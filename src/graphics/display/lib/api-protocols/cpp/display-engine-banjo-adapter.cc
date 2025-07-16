@@ -124,7 +124,7 @@ void DisplayEngineBanjoAdapter::DisplayEngineUnsetListener() {
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel banjo_buffer_collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token(
       std::move(banjo_buffer_collection_token));
 
@@ -136,7 +136,7 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineImportBufferCollection(
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   zx::result<> result = engine_.ReleaseBufferCollection(driver_buffer_collection_id);
   return result.status_value();
 }
@@ -146,31 +146,31 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineImportImage(
     uint32_t index, uint64_t* out_image_handle) {
   const display::ImageMetadata image_metadata(*banjo_image_metadata);
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   zx::result<display::DriverImageId> result =
       engine_.ImportImage(image_metadata, driver_buffer_collection_id, index);
   if (result.is_error()) {
     return result.error_value();
   }
-  *out_image_handle = display::ToBanjoDriverImageId(result.value());
+  *out_image_handle = result.value().ToBanjo();
   return ZX_OK;
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   zx::result<display::DriverCaptureImageId> result =
       engine_.ImportImageForCapture(driver_buffer_collection_id, index);
   if (result.is_error()) {
     return result.error_value();
   }
-  *out_capture_handle = display::ToBanjoDriverCaptureImageId(result.value());
+  *out_capture_handle = result.value().ToBanjo();
   return ZX_OK;
 }
 
 void DisplayEngineBanjoAdapter::DisplayEngineReleaseImage(uint64_t banjo_image_handle) {
-  const display::DriverImageId driver_image_id = display::ToDriverImageId(banjo_image_handle);
+  const display::DriverImageId driver_image_id = display::DriverImageId(banjo_image_handle);
   engine_.ReleaseImage(driver_image_id);
 }
 
@@ -205,9 +205,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   BoundedArray<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount> layers(
       banjo_layers);
 
-  display::ConfigCheckResult config_check_result =
-      engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config->display_id),
-                                 display::ModeId(1), layers.elements());
+  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
+      display::DisplayId(banjo_display_config->display_id), display::ModeId(1), layers.elements());
 
   return config_check_result.ToBanjo();
 }
@@ -240,9 +239,9 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
   BoundedArray<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount> layers(
       banjo_layers);
 
-  engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config->display_id),
+  engine_.ApplyConfiguration(display::DisplayId(banjo_display_config->display_id),
                              display::ModeId(1), layers.elements(),
-                             display::ToDriverConfigStamp(*banjo_config_stamp));
+                             display::DriverConfigStamp(*banjo_config_stamp));
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetBufferCollectionConstraints(
@@ -251,7 +250,7 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetBufferCollectionConstrain
   display::ImageBufferUsage image_buffer_usage =
       display::ToImageBufferUsage(*banjo_image_buffer_usage);
   const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+      display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   zx::result<> result =
       engine_.SetBufferCollectionConstraints(image_buffer_usage, driver_buffer_collection_id);
   return result.status_value();
@@ -259,21 +258,21 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetBufferCollectionConstrain
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetDisplayPower(uint64_t banjo_display_id,
                                                                     bool power_on) {
-  const display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
+  const display::DisplayId display_id = display::DisplayId(banjo_display_id);
   zx::result<> result = engine_.SetDisplayPower(display_id, power_on);
   return result.status_value();
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineStartCapture(uint64_t banjo_capture_handle) {
   const display::DriverCaptureImageId capture_image_id =
-      display::ToDriverCaptureImageId(banjo_capture_handle);
+      display::DriverCaptureImageId(banjo_capture_handle);
   zx::result<> result = engine_.StartCapture(capture_image_id);
   return result.status_value();
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineReleaseCapture(uint64_t banjo_capture_handle) {
   const display::DriverCaptureImageId capture_image_id =
-      display::ToDriverCaptureImageId(banjo_capture_handle);
+      display::DriverCaptureImageId(banjo_capture_handle);
   zx::result<> result = engine_.ReleaseCapture(capture_image_id);
   return result.status_value();
 }

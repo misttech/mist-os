@@ -70,7 +70,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredModes) {
   };
   static constexpr cpp20::span<const display::PixelFormat> kEmptyPixelFormats;
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
 
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
@@ -109,7 +109,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithEdidBytes) {
     edid_bytes[i] = static_cast<uint8_t>(i);
   }
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
 
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
@@ -135,7 +135,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPixelFormats) {
       display::PixelFormat::kB8G8R8A8, display::PixelFormat::kR8G8B8A8,
       display::PixelFormat::kR8G8B8, display::PixelFormat::kB8G8R8};
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
   static constexpr fuchsia_images2_pixel_format_enum_value_t kExpectedBanjoPixelFormats[] = {
       kPixelFormats[0].ToBanjo(), kPixelFormats[1].ToBanjo(), kPixelFormats[2].ToBanjo(),
       kPixelFormats[3].ToBanjo()};
@@ -194,7 +194,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredModeAndEdidBytes
       display::PixelFormat::kB8G8R8A8, display::PixelFormat::kR8G8B8A8,
       display::PixelFormat::kR8G8B8, display::PixelFormat::kB8G8R8};
 
-  static constexpr uint64_t kBanjoDisplayId = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr uint64_t kBanjoDisplayId = kDisplayId.ToBanjo();
   static constexpr fuchsia_images2_pixel_format_enum_value_t kExpectedBanjoPixelFormats[] = {
       kPixelFormats[0].ToBanjo(), kPixelFormats[1].ToBanjo(), kPixelFormats[2].ToBanjo(),
       kPixelFormats[3].ToBanjo()};

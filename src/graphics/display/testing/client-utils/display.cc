@@ -20,7 +20,7 @@ namespace fhdt = fuchsia_hardware_display_types;
 namespace display_test {
 
 Display::Display(const fhd::wire::Info& info) {
-  id_ = display::ToDisplayId(info.id);
+  id_ = display::DisplayId(info.id);
 
   for (fuchsia_images2::wire::PixelFormat pixel_format : info.pixel_format) {
     ZX_ASSERT(!pixel_format.IsUnknown());
@@ -69,7 +69,7 @@ void Display::Dump() {
 
 void Display::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc,
                    ColorCorrectionArgs color_correction_args) {
-  fhdt::wire::DisplayId fidl_display_id = display::ToFidlDisplayId(id_);
+  fhdt::wire::DisplayId fidl_display_id = id_.ToFidl();
   if (mode_idx_ != 0) {
     ZX_ASSERT(dc->SetDisplayMode(fidl_display_id, modes_[mode_idx_]).ok());
   }
