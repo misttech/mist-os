@@ -30,7 +30,7 @@ zx::result<> CoordinatorDriver::Start() {
     return create_engine_driver_client_result.take_error();
   }
 
-  const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
+  const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.coordinator";
   zx::result<fdf::SynchronizedDispatcher> create_client_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(
           fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-client-loop",

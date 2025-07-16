@@ -12,7 +12,7 @@
         bind: "meta/bind/display-coordinator.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        allowed_scheduler_roles: [ "fuchsia.graphics.display.drivers.display.controller" ],
+        allowed_scheduler_roles: [ "fuchsia.graphics.display.drivers.display.coordinator" ],
         fallback: "false",
     },
     use: [
