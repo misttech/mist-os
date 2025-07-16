@@ -5,8 +5,8 @@
 use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
-    fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    fs_node_impl_dir_readonly, CloseFreeSafe, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -159,6 +159,8 @@ impl FsNodeOps for Arc<StaticDirectory> {
     }
 }
 
+/// `StaticDirectory` doesn't implement the `close` method.
+impl CloseFreeSafe for StaticDirectory {}
 impl FileOps for StaticDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();

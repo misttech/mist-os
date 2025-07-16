@@ -118,7 +118,7 @@ impl FileOps for RemoteBinderFileOps {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,

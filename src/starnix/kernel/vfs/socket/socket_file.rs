@@ -156,7 +156,7 @@ impl FileOps for SocketFile {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         current_task: &CurrentTask,

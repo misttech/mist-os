@@ -526,7 +526,7 @@ impl FileOps for EpollFileObject {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         current_task: &CurrentTask,

@@ -913,7 +913,7 @@ impl FileOps for SeccompNotifierFileObject {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,

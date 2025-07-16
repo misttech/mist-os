@@ -6,7 +6,7 @@ use starnix_core::device::DeviceOps;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, FsNode,
 };
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex};
@@ -92,6 +92,8 @@ impl TouchPowerPolicyFile {
     }
 }
 
+/// `TouchPowerPolicyFile` doesn't implement the `close` method.
+impl CloseFreeSafe for TouchPowerPolicyFile {}
 impl FileOps for TouchPowerPolicyFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();

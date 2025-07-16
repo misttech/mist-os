@@ -571,7 +571,7 @@ impl FileOps for FunctionFsControlEndpoint {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         file: &FileObjectState,
         _current_task: &CurrentTask,

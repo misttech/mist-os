@@ -16,9 +16,10 @@ use crate::vfs::pipe::{Pipe, PipeHandle};
 use crate::vfs::rw_queue::{RwQueue, RwQueueReadGuard};
 use crate::vfs::socket::SocketHandle;
 use crate::vfs::{
-    checked_add_offset_and_length, inotify, DefaultDirEntryOps, DirEntryOps, FileObject, FileOps,
-    FileSystem, FileSystemHandle, FileWriteGuardState, FsStr, FsString, MountInfo, NamespaceNode,
-    OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
+    checked_add_offset_and_length, inotify, DefaultDirEntryOps, DirEntryOps, FileObject,
+    FileObjectState, FileOps, FileSystem, FileSystemHandle, FileWriteGuardState, FsStr, FsString,
+    MountInfo, NamespaceNode, OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks,
+    WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
 use fuchsia_runtime::UtcInstant;
@@ -1284,7 +1285,7 @@ impl FsNode {
         self.ops().as_any().downcast_ref::<T>()
     }
 
-    pub fn on_file_closed(&self, file: &FileObject) {
+    pub fn on_file_closed(&self, file: &FileObjectState) {
         if let Some(rare_data) = self.rare_data.get() {
             let mut flock_info = rare_data.flock_info.lock();
             // This function will drop the flock from `file` because the `WeakFileHandle` for

@@ -739,7 +739,7 @@ impl FileOps for FastRPCFile {
     fileops_impl_dataless!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,

@@ -22,9 +22,9 @@ use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_noop_sync, fileops_impl_seekable, fileops_impl_unbounded_seek,
-    fs_node_impl_dir_readonly, CallbackSymlinkNode, DirectoryEntryType, DirentSink, FdNumber,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
+    fs_node_impl_dir_readonly, CallbackSymlinkNode, CloseFreeSafe, DirectoryEntryType, DirentSink,
+    FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
+    FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
@@ -264,6 +264,8 @@ impl FsNodeOps for TaskDirectoryNode {
     }
 }
 
+/// `TaskDirectory` doesn't implement the `close` method.
+impl CloseFreeSafe for TaskDirectory {}
 impl FileOps for TaskDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();

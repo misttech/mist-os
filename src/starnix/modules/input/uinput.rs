@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::uinput::vfs::CloseFreeSafe;
 use crate::{
     InputEventsRelay, InputFile, LinuxKeyboardEventParser, LinuxTouchEventParser, OpenedFiles,
 };
@@ -407,6 +408,8 @@ pub fn uinput_running() -> bool {
     COUNT_OF_UINPUT_DEVICE.load(Ordering::SeqCst) > 0
 }
 
+/// `UinputDeviceFile` doesn't implement the `close` method.
+impl CloseFreeSafe for UinputDeviceFile {}
 impl FileOps for UinputDeviceFile {
     fileops_impl_seekless!();
     fileops_impl_noop_sync!();

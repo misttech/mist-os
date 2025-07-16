@@ -258,7 +258,7 @@ impl FileOps for UserFaultFile {
 
     // On closing, clear all the registrations pointing to this userfault object.
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,

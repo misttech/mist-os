@@ -394,7 +394,7 @@ impl FileOps for DevPtmxFile {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         current_task: &CurrentTask,
@@ -510,7 +510,7 @@ impl FileOps for TtyFile {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,

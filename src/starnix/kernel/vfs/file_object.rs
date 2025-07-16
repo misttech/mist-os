@@ -159,9 +159,9 @@ pub fn derive_wrapping_key(
 
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 pub trait FileOps: Send + Sync + AsAny + 'static {
-    /// Called when the FileObject is closed.
+    /// Called when the FileObject is destroyed.
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,
@@ -447,14 +447,17 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     }
 }
 
-impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
+/// Marker trait for implementation of FileOps that do not need to implement `close` and can
+/// then pass a wrapper object as the `FileOps` implementation.
+pub trait CloseFreeSafe {}
+impl<T: FileOps + CloseFreeSafe, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
     fn close(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        file: &FileObjectState,
-        current_task: &CurrentTask,
+        self: Box<Self>,
+        _locked: &mut Locked<FileOpsCore>,
+        _file: &FileObjectState,
+        _current_task: &CurrentTask,
     ) {
-        self.deref().close(locked, file, current_task)
+        // This method cannot be delegated. T being `CloseFreeSafe` this is fine.
     }
 
     fn flush(
@@ -1220,33 +1223,10 @@ impl FileOps for OPathOps {
 
 pub struct ProxyFileOps(pub FileHandle);
 
-macro_rules! delegate {
-    {
-        $delegate_to:expr;
-        $(
-            fn $name:ident(&$self:ident, $file:ident: &FileObject $(, $arg_name:ident: $arg_type:ty)*$(,)?) $(-> $ret:ty)?;
-        )*
-    } => {
-        $(
-            fn $name(&$self, _file: &FileObject $(, $arg_name: $arg_type)*) $(-> $ret)? {
-                $delegate_to.ops().$name(&$delegate_to $(, $arg_name)*)
-            }
-        )*
-    }
-}
-
 impl FileOps for ProxyFileOps {
-    delegate! {
-        self.0;
-        fn fcntl(
-            &self,
-            file: &FileObject,
-            current_task: &CurrentTask,
-            cmd: u32,
-            arg: u64,
-        ) -> Result<SyscallResult, Errno>;
-        fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno>;
-    }
+    // `close` is not delegated because the last reference to a `ProxyFileOps` is not
+    // necessarily the last reference of the proxied file. If this is the case, the
+    // releaser will handle it.
     // These don't take &FileObject making it too hard to handle them properly in the macro
     fn has_persistent_offsets(&self) -> bool {
         self.0.ops().has_persistent_offsets()
@@ -1258,21 +1238,13 @@ impl FileOps for ProxyFileOps {
         self.0.ops().is_seekable()
     }
     // These take &mut Locked<L> as a second argument
-    fn close(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        _file: &FileObjectState,
-        current_task: &CurrentTask,
-    ) {
-        self.0.ops().close(locked, &self.0, current_task);
-    }
     fn flush(
         &self,
         locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
-        self.0.ops().close(locked, &self.0, current_task);
+        self.0.ops().flush(locked, &self.0, current_task);
     }
     fn wait_async(
         &self,
@@ -1323,6 +1295,15 @@ impl FileOps for ProxyFileOps {
     ) -> Result<SyscallResult, Errno> {
         self.0.ops().ioctl(locked, &self.0, current_task, request, arg)
     }
+    fn fcntl(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        cmd: u32,
+        arg: u64,
+    ) -> Result<SyscallResult, Errno> {
+        self.0.ops().fcntl(&self.0, current_task, cmd, arg)
+    }
     fn readdir(
         &self,
         locked: &mut Locked<FileOpsCore>,
@@ -1331,6 +1312,12 @@ impl FileOps for ProxyFileOps {
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         self.0.ops().readdir(locked, &self.0, current_task, sink)
+    }
+    fn sync(&self, _file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.0.ops().sync(&self.0, current_task)
+    }
+    fn data_sync(&self, _file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.0.ops().sync(&self.0, current_task)
     }
     fn get_memory(
         &self,
@@ -1488,6 +1475,28 @@ impl FileObjectState {
     pub fn flags(&self) -> OpenFlags {
         *self.flags.lock()
     }
+
+    pub fn can_read(&self) -> bool {
+        // TODO: Consider caching the access mode outside of this lock
+        // because it cannot change.
+        self.flags.lock().can_read()
+    }
+
+    pub fn can_write(&self) -> bool {
+        // TODO: Consider caching the access mode outside of this lock
+        // because it cannot change.
+        self.flags.lock().can_write()
+    }
+
+    /// Returns false if the file was opened from a "noexec" mount.
+    pub fn can_exec(&self) -> bool {
+        !self.name.to_passive().mount.flags().contains(MountFlags::NOEXEC)
+    }
+
+    // Notifies watchers on the current node and its parent about an event.
+    pub fn notify(&self, event_mask: InotifyMask) {
+        self.name.notify(event_mask)
+    }
 }
 
 impl FileObject {
@@ -1553,23 +1562,6 @@ impl FileObject {
         });
         file.notify(InotifyMask::OPEN);
         Ok(file)
-    }
-
-    pub fn can_read(&self) -> bool {
-        // TODO: Consider caching the access mode outside of this lock
-        // because it cannot change.
-        self.flags.lock().can_read()
-    }
-
-    pub fn can_write(&self) -> bool {
-        // TODO: Consider caching the access mode outside of this lock
-        // because it cannot change.
-        self.flags.lock().can_write()
-    }
-
-    /// Returns false if the file was opened from a "noexec" mount.
-    pub fn can_exec(&self) -> bool {
-        !self.name.to_passive().mount.flags().contains(MountFlags::NOEXEC)
     }
 
     pub fn max_access_for_memory_mapping(&self) -> Access {
@@ -2142,11 +2134,6 @@ impl FileObject {
         self.ops().flush(locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
-    // Notifies watchers on the current node and its parent about an event.
-    pub fn notify(&self, event_mask: InotifyMask) {
-        self.name.notify(event_mask)
-    }
-
     fn update_atime(&self) {
         if !self.flags().contains(OpenFlags::NOATIME) {
             self.name.update_atime();
@@ -2197,11 +2184,13 @@ impl Releasable for FileObject {
             }
         }
         let locked = locked.cast_locked::<FileOpsCore>();
-        self.ops().close(locked, &self, current_task);
-        self.name.entry.node.on_file_closed(&self);
+        let ops = self.ops;
+        let state = self.state;
+        ops.close(locked, &state, current_task);
+        state.name.entry.node.on_file_closed(&state);
         let event =
-            if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
-        self.notify(event);
+            if state.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
+        state.notify(event);
     }
 }
 

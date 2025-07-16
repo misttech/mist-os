@@ -92,7 +92,7 @@ impl FileOps for NanohubSocketFile {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
         file: &FileObjectState,
         current_task: &CurrentTask,

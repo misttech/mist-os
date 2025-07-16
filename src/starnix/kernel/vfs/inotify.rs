@@ -295,7 +295,7 @@ impl FileOps for InotifyFileObject {
     }
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         file: &FileObjectState,
         _current_task: &CurrentTask,

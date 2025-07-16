@@ -121,7 +121,7 @@ impl FileOps for DevFuse {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,
@@ -762,7 +762,7 @@ impl FuseFileObject {
 
 impl FileOps for FuseFileObject {
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
         file: &FileObjectState,
         current_task: &CurrentTask,

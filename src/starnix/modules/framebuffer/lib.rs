@@ -13,7 +13,9 @@ use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::{CurrentTask, Kernel};
-use starnix_core::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
+use starnix_core::vfs::{
+    fileops_impl_memory, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, FsNode,
+};
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -243,7 +245,8 @@ impl DeviceOps for FramebufferDevice {
         Ok(Box::new(Arc::clone(&self.framebuffer)))
     }
 }
-
+/// `Framebuffer` doesn't implement the `close` method.
+impl CloseFreeSafe for Framebuffer {}
 impl FileOps for Framebuffer {
     fileops_impl_memory!(self, &self.get_memory()?);
     fileops_impl_noop_sync!();

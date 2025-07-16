@@ -141,7 +141,7 @@ impl FileOps for MemoryPressureFile {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         _current_task: &CurrentTask,

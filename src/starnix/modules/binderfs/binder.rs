@@ -205,12 +205,12 @@ impl FileOps for BinderConnection {
     fileops_impl_noop_sync!();
 
     fn close(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<FileOpsCore>,
         _file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
-        self.close(current_task.kernel());
+        (*self).close(current_task.kernel());
     }
 
     fn query_events(
