@@ -74,13 +74,13 @@ impl VmoImage {
             let src_row = reader.next_row()?.unwrap();
             // Transfer row and convert to BGRA.
             match color_type {
-                png::ColorType::RGB | png::ColorType::Indexed => {
-                    for (src, dst) in src_row.chunks(3).zip(dst_row.chunks_mut(4)) {
+                png::ColorType::Rgb | png::ColorType::Indexed => {
+                    for (src, dst) in src_row.data().chunks(3).zip(dst_row.chunks_mut(4)) {
                         dst.copy_from_slice(&[src[2], src[1], src[0], 0xff]);
                     }
                 }
-                png::ColorType::RGBA => {
-                    for (src, dst) in src_row.chunks(4).zip(dst_row.chunks_mut(4)) {
+                png::ColorType::Rgba => {
+                    for (src, dst) in src_row.data().chunks(4).zip(dst_row.chunks_mut(4)) {
                         dst.copy_from_slice(&[src[2], src[1], src[0], src[3]]);
                     }
                 }

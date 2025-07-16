@@ -1915,14 +1915,14 @@ alias(
 )
 
 alias(
-    name = "png-0.14.0",
-    actual = "//third_party/rust_crates/vendor/png-0.14.0:png",
+    name = "png-0.17.16",
+    actual = "//third_party/rust_crates/vendor/png-0.17.16:png",
     tags = ["manual"],
 )
 
 alias(
     name = "png",
-    actual = "//third_party/rust_crates/vendor/png-0.14.0:png",
+    actual = "//third_party/rust_crates/vendor/png-0.17.16:png",
     tags = ["manual"],
 )
 
