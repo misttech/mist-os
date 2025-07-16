@@ -158,9 +158,12 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                                     match new_network
                                             .expect("failed to fetch default network")
                                             .take_network() {
-                                        Some(net) => network = net,
+                                        Some(net) => {
+                                            info!("Observed new network");
+                                            network = net;
+                                        },
                                         None => {
-                                            info!("Default network was lost");
+                                            info!("Default network was lost via WatchDefault");
                                             {
                                                 let mut updates = last_updates.lock().await;
                                                 if updates.last() != Some(&None) {
@@ -178,6 +181,9 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                                             for part in &update.clone() {
                                                 if let PropertyUpdate::SocketMarks(marks) = part {
                                                     if *marks != last_marks {
+                                                        info!(
+                                                            "Updating last_updates: {:?}", update
+                                                        );
                                                         last_marks = marks.clone();
                                                         last_updates
                                                             .lock()
@@ -192,6 +198,7 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                                             }
                                         }
                                         Ok(Err(fnp_properties::WatchError::DefaultNetworkLost)) => {
+                                            info!("Default network was lost via WatchUpdate");
                                             {
                                                 let mut updates = last_updates.lock().await;
                                                 if updates.last() != Some(&None) {
