@@ -584,6 +584,13 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
             iface_tbl_[softap_ifidx_.value()].ap_config.clients.remove(client);
             status = ZX_OK;
           }
+        } else if (iface_tbl_[kClientIfidx].allocated && kClientIfidx == ifidx) {
+          // Initiate Deauth from AP
+          auto scb_val = reinterpret_cast<brcmf_scb_val_le*>(data);
+          DeauthLocalClient(static_cast<wlan_ieee80211_wire::ReasonCode>(scb_val->val));
+        } else {
+          BRCMF_ERR("No suitable interface for deauth command");
+          status = ZX_ERR_IO;
         }
       }
       break;
@@ -1262,7 +1269,6 @@ void SimFirmware::AssocScanDone(brcmf_fweh_event_status_t event_status) {
 
 void SimFirmware::AssocClearContext() {
   hw_.CancelCallback(assoc_state_.assoc_timer_id);
-  AuthClearContext();
   SetAssocState(AssocState::NOT_ASSOCIATED);
   assoc_state_.opts = nullptr;
   assoc_state_.reassoc_opts = nullptr;
@@ -2056,7 +2062,6 @@ void SimFirmware::DisassocLocalClient(wlan_ieee80211_wire::ReasonCode reason) {
     hw_.Tx(deauth_frame);
   }
 
-  AuthClearContext();
   AssocClearContext();
 }
 

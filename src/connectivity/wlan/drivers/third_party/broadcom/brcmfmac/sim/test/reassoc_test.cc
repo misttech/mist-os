@@ -161,8 +161,6 @@ TEST_F(ReassocTest, RoamTimeoutWhenNoReassocResponseReceived) {
   // Check that there were not multiple connects.
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
-  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
 }
 
 TEST_F(ReassocTest, DisconnectOnFirmwareReassocCommandFailure) {
@@ -229,8 +227,6 @@ TEST_F(ReassocTest, DisconnectOnRoamSuccessWhenDriverCannotSyncChannel) {
   // Check that there were not multiple connects.
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
-  // Current implementation only sends disconnect for original BSS in this scenario.
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
 }
 
 // Verify that on successful roam, the connection ID returned by GetIfaceStats is updated.
