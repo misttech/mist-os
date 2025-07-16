@@ -12,8 +12,8 @@ use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, Dynam
 use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::{
-    fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless, FileOps, FsNode,
-    FsNodeOps,
+    fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless, FileOps, FsNodeOps,
+    NamespaceNode,
 };
 use starnix_logging::{bug_ref, log_error};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
@@ -41,7 +41,7 @@ impl DeviceOps for ZramDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(self.clone()))

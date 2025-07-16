@@ -1334,7 +1334,7 @@ impl FsNode {
         &self,
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
-        mount: &MountInfo,
+        namespace_node: &NamespaceNode,
         flags: OpenFlags,
         access_check: AccessCheck,
     ) -> Result<Box<dyn FileOps>, Errno> {
@@ -1353,7 +1353,7 @@ impl FsNode {
             self.check_access(
                 locked,
                 current_task,
-                mount,
+                &namespace_node.mount,
                 access,
                 CheckAccessReason::InternalPermissionChecks,
             )?;
@@ -1378,26 +1378,26 @@ impl FsNode {
 
         match mode & FileMode::IFMT {
             FileMode::IFCHR => {
-                if mount.flags().contains(MountFlags::NODEV) {
+                if namespace_node.mount.flags().contains(MountFlags::NODEV) {
                     return error!(EACCES);
                 }
                 current_task.kernel().open_device(
                     locked,
                     current_task,
-                    self,
+                    namespace_node,
                     flags,
                     rdev,
                     DeviceMode::Char,
                 )
             }
             FileMode::IFBLK => {
-                if mount.flags().contains(MountFlags::NODEV) {
+                if namespace_node.mount.flags().contains(MountFlags::NODEV) {
                     return error!(EACCES);
                 }
                 current_task.kernel().open_device(
                     locked,
                     current_task,
-                    self,
+                    namespace_node,
                     flags,
                     rdev,
                     DeviceMode::Block,

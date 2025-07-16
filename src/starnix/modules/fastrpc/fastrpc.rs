@@ -12,7 +12,7 @@ use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::{CurrentTask, ThreadGroupKey};
 use starnix_core::vfs::{
-    default_ioctl, Anon, FdFlags, FdNumber, FileObject, FileObjectState, FileOps, FsNode,
+    default_ioctl, Anon, FdFlags, FdNumber, FileObject, FileObjectState, FileOps, NamespaceNode,
 };
 use starnix_core::{
     fileops_impl_dataless, fileops_impl_memory, fileops_impl_noop_sync, fileops_impl_seekless,
@@ -926,7 +926,7 @@ impl DeviceOps for FastRPCDevice {
         _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(FastRPCFile::new(

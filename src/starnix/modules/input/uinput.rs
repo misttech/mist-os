@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::uinput::vfs::CloseFreeSafe;
+use crate::uinput::vfs::{CloseFreeSafe, NamespaceNode};
 use crate::{
     InputEventsRelay, InputFile, LinuxKeyboardEventParser, LinuxTouchEventParser, OpenedFiles,
 };
@@ -19,7 +19,7 @@ use starnix_core::fileops_impl_seekless;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
-    self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+    self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsString,
 };
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -108,7 +108,7 @@ impl DeviceOps for UinputDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(UinputDeviceFile::new(self.input_event_relay.clone())))
@@ -530,7 +530,7 @@ impl DeviceOps for VirtualDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let input_file = match &self.device_type {

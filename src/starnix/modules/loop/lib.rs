@@ -14,8 +14,8 @@ use starnix_core::task::{CurrentTask, Kernel, KernelOrTask};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
-    fileops_impl_seekless, Buffer, FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString,
-    InputBufferCallback, PeekBufferSegmentsCallback,
+    fileops_impl_seekless, Buffer, FdNumber, FileHandle, FileObject, FileOps, FsString,
+    InputBufferCallback, NamespaceNode, PeekBufferSegmentsCallback,
 };
 use starnix_ext::map_ext::EntryExt;
 use starnix_logging::track_stub;
@@ -723,7 +723,7 @@ pub fn create_loop_control_device(
     _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(LoopControlDevice::new(current_task.kernel().expando.get::<LoopDeviceRegistry>())))
@@ -782,7 +782,7 @@ fn get_or_create_loop_device(
     locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task

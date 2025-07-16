@@ -9,7 +9,9 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessorExt, ProtectionFlags};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
+use crate::vfs::{
+    default_ioctl, default_seek, FileObject, FileOps, FsString, NamespaceNode, SeekTarget,
+};
 use anyhow::Error;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -211,7 +213,7 @@ fn open_remote_block_device(
     _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task.kernel().remote_block_device_registry.open(id.minor())?.create_file_ops())

@@ -155,7 +155,7 @@ impl DeviceOps for BinderDevice {
         _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let identifier = self.create_local_process(current_task.thread_group_key.clone());
@@ -5365,7 +5365,7 @@ impl DeviceOps for BinderControlDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(self.clone()))
@@ -5500,7 +5500,7 @@ pub mod tests {
     use starnix_core::testing::*;
     use starnix_core::vfs::{anon_fs, Anon};
     use starnix_uapi::errors::{EBADF, EINVAL};
-    use starnix_uapi::file_mode::FileMode;
+
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         BINDER_TYPE_WEAK_HANDLE,
@@ -8002,10 +8002,7 @@ pub mod tests {
     ) -> FileHandle {
         // `open()` requires an `FsNode` so create one in `AnonFs`.
         let fs = anon_fs(locked, current_task.kernel());
-        let node = fs.create_node_and_allocate_node_id(
-            Anon::new_for_binder_device(),
-            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
-        );
+        let node = create_namespace_node_for_testing(&fs, Anon::new_for_binder_device());
 
         let locked = locked.cast_locked::<FileOpsCore>();
         FileObject::new_anonymous(
@@ -8013,7 +8010,7 @@ pub mod tests {
             binder_driver
                 .open(locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),
-            node,
+            node.entry.node.clone(),
             OpenFlags::RDWR,
         )
     }

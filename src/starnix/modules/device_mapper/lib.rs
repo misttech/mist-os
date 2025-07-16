@@ -17,8 +17,8 @@ use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, VecOutputBuffer};
 use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
-    fileops_impl_seekless, FileHandle, FileObject, FileObjectState, FileOps, FsNode, FsString,
-    OutputBuffer,
+    fileops_impl_seekless, FileHandle, FileObject, FileObjectState, FileOps, FsString,
+    NamespaceNode, OutputBuffer,
 };
 use starnix_ext::map_ext::EntryExt;
 use starnix_logging::{log_trace, track_stub};
@@ -1195,7 +1195,7 @@ pub fn create_device_mapper(
     _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(DeviceMapper::new(current_task.kernel().expando.get::<DeviceMapperRegistry>())))
@@ -1205,7 +1205,7 @@ fn get_or_create_dm_device(
     locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task

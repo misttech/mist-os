@@ -7,7 +7,7 @@ use crate::device::terminal::{Terminal, TtyState};
 use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::devpts::TtyFile;
 use crate::task::{CurrentTask, EventHandler, Kernel, Waiter};
-use crate::vfs::{FileOps, FsNode, FsString, VecInputBuffer, VecOutputBuffer};
+use crate::vfs::{FileOps, FsString, NamespaceNode, VecInputBuffer, VecOutputBuffer};
 use anyhow::Error;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_serial as fserial;
@@ -123,7 +123,7 @@ impl DeviceOps for Arc<SerialDevice> {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(TtyFile::new(self.terminal.clone())))

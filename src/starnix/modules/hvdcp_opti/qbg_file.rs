@@ -9,8 +9,8 @@ use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, InputBuffer,
-    OutputBuffer, VecInputBuffer,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, InputBuffer,
+    NamespaceNode, OutputBuffer, VecInputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
@@ -33,7 +33,7 @@ pub fn create_qbg_device(
     _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(QbgDeviceFile::new(current_task)))

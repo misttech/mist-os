@@ -1052,7 +1052,7 @@ impl NamespaceNode {
     ) -> Result<FileHandle, Errno> {
         FileObject::new(
             current_task,
-            self.entry.node.open(locked, current_task, &self.mount, flags, access_check)?,
+            self.entry.node.open(locked, current_task, self, flags, access_check)?,
             self.clone(),
             flags,
         )

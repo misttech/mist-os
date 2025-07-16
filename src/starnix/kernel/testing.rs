@@ -17,8 +17,9 @@ use crate::task::{CurrentTask, Kernel, KernelOrTask, SchedulerManager, Task, Tas
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
-    FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsContext, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, Namespace,
+    DirEntry, FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsContext, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
+    FsStr, Namespace, NamespaceNode,
 };
 use fidl_fuchsia_io as fio;
 use selinux::SecurityServer;
@@ -685,4 +686,12 @@ pub fn create_fs_node_for_testing(fs: &FileSystemHandle, ops: impl FsNodeOps) ->
     let ino = fs.allocate_ino();
     let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
     FsNode::new_uncached(ino, ops, fs, info)
+}
+
+pub fn create_namespace_node_for_testing(
+    fs: &FileSystemHandle,
+    ops: impl FsNodeOps,
+) -> NamespaceNode {
+    let node = create_fs_node_for_testing(fs, ops);
+    NamespaceNode::new_anonymous(DirEntry::new_unrooted(node))
 }

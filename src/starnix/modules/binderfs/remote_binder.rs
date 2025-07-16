@@ -18,7 +18,7 @@ use starnix_core::power::{mark_proxy_message_handled, LockSource};
 use starnix_core::task::{CurrentTask, Kernel, LockedAndTask, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileObjectState, FileOps, FsNode,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileObjectState, FileOps,
     FsString, NamespaceNode,
 };
 use starnix_lifecycle::DropWaiter;
@@ -89,7 +89,7 @@ impl DeviceOps for RemoteBinderDevice {
         _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(RemoteBinderFileOps::new(current_task))

@@ -27,7 +27,7 @@ use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
 };
-use crate::vfs::{FileHandle, FileOps, FsNode, FsString, Mounts};
+use crate::vfs::{FileHandle, FileOps, FsString, Mounts, NamespaceNode};
 use bstr::BString;
 use expando::Expando;
 use fidl::endpoints::{
@@ -636,7 +636,7 @@ impl Kernel {
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
-        node: &FsNode,
+        node: &NamespaceNode,
         flags: OpenFlags,
         dev: DeviceType,
         mode: DeviceMode,

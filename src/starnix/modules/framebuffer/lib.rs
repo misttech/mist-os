@@ -14,7 +14,7 @@ use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{
-    fileops_impl_memory, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, FsNode,
+    fileops_impl_memory, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, NamespaceNode,
 };
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked};
@@ -231,13 +231,13 @@ impl DeviceOps for FramebufferDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         dev: DeviceType,
-        node: &FsNode,
+        node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         if dev.minor() != 0 {
             return error!(ENODEV);
         }
-        node.update_info(|info| {
+        node.entry.node.update_info(|info| {
             info.size = self.framebuffer.memory_len();
             info.blocks = self.framebuffer.memory_size() / info.blksize;
             Ok(())

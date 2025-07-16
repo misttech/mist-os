@@ -6,7 +6,8 @@ use starnix_core::device::DeviceOps;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, FsNode,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps,
+    NamespaceNode,
 };
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
@@ -71,7 +72,7 @@ impl DeviceOps for TouchPowerPolicyDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let touch_policy_file = self.touch_power_file.clone();

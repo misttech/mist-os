@@ -18,7 +18,7 @@ use starnix_core::mm::{
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     default_ioctl, default_seek, fileops_impl_noop_sync, FileObject, FileOps, FileWriteGuardRef,
-    FsNode, FsString, InputBuffer, NamespaceNode, OutputBuffer, SeekTarget,
+    FsString, InputBuffer, NamespaceNode, OutputBuffer, SeekTarget,
 };
 use starnix_lifecycle::AtomicU32Counter;
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
@@ -70,7 +70,7 @@ impl DeviceOps for AshmemDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let ashmem = Ashmem::new(self.next_id.next());

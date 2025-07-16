@@ -4,7 +4,7 @@
 
 use rutabaga_gfx::{RutabagaBuilder, RutabagaComponentType, RutabagaFenceHandler};
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileOps, FsNode};
+use starnix_core::vfs::{FileOps, NamespaceNode};
 use starnix_logging::log_error;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
@@ -16,7 +16,7 @@ fn create_gpu_device(
     _locked: &mut Locked<FileOpsCore>,
     _current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     log_error!("virtio-gpu unsupported");

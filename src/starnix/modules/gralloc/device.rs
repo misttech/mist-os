@@ -5,7 +5,7 @@
 use super::file::GrallocFile;
 use starnix_core::device::DeviceOps;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileOps, FsNode};
+use starnix_core::vfs::{FileOps, NamespaceNode};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -20,7 +20,7 @@ impl DeviceOps for GrallocDevice {
         _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         GrallocFile::new_file(current_task)

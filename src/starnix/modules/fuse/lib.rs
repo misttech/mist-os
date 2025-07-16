@@ -21,7 +21,8 @@ use starnix_core::vfs::{
     CacheMode, CheckAccessReason, DirEntry, DirEntryOps, DirectoryEntryType, DirentSink,
     FallocMode, FdNumber, FileObject, FileObjectState, FileOps, FileSystem, FileSystemHandle,
     FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize, WeakFileHandle, XattrOp,
+    NamespaceNode, PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize,
+    WeakFileHandle, XattrOp,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
@@ -99,7 +100,7 @@ pub fn open_fuse_device(
     _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     let connection = fuse_connections(current_task.kernel()).new_connection(current_task);

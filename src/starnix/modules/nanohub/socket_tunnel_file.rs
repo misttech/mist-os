@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_core::vfs::NamespaceNode;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -92,7 +93,7 @@ impl DeviceOps for SocketTunnelFile {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         connect(self.socket_label.clone())

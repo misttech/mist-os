@@ -5,7 +5,7 @@
 use crate::KgslFile;
 use starnix_core::device::DeviceOps;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileOps, FsNode};
+use starnix_core::vfs::{FileOps, NamespaceNode};
 use starnix_logging::log_info;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
@@ -21,11 +21,11 @@ impl DeviceOps for KgslDeviceBuilder {
         _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         id: DeviceType,
-        node: &FsNode,
+        node: &NamespaceNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         log_info!("kgsl: open");
-        KgslFile::new_file(current_task, id, node, flags)
+        KgslFile::new_file(current_task, id, &node.entry.node, flags)
     }
 }
 

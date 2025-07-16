@@ -8,7 +8,7 @@ use fuchsia_inspect::{NumericProperty, Property};
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileOps, FsNode, FsString};
+use starnix_core::vfs::{FileOps, FsString, NamespaceNode};
 #[cfg(test)]
 use starnix_sync::Unlocked;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
@@ -320,7 +320,7 @@ impl DeviceOps for InputDevice {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let input_file = self.open_internal();

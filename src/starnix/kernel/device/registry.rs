@@ -10,7 +10,7 @@ use crate::task::{
     register_delayed_release, CurrentTask, CurrentTaskAndLocked, Kernel, KernelOrTask, SimpleWaiter,
 };
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
-use crate::vfs::{FileOps, FsNode, FsStr, FsString};
+use crate::vfs::{FileOps, FsStr, FsString, NamespaceNode};
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_logging::log_error;
 use starnix_sync::{InterruptibleEvent, LockEqualOrBefore, OrderedMutex};
@@ -68,7 +68,7 @@ pub trait DeviceOps: DynClone + Send + Sync + AsAny + 'static {
         _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
-        _node: &FsNode,
+        _node: &NamespaceNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno>;
 
@@ -90,7 +90,7 @@ where
             &mut Locked<FileOpsCore>,
             &CurrentTask,
             DeviceType,
-            &FsNode,
+            &NamespaceNode,
             OpenFlags,
         ) -> Result<Box<dyn FileOps>, Errno>
         + 'static,
@@ -100,7 +100,7 @@ where
         locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         id: DeviceType,
-        node: &FsNode,
+        node: &NamespaceNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         self(locked, current_task, id, node, flags)
@@ -112,7 +112,7 @@ pub fn simple_device_ops<T: Default + FileOps + 'static>(
     _locked: &mut Locked<FileOpsCore>,
     _current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(T::default()))
@@ -757,7 +757,7 @@ impl DeviceRegistry {
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
-        node: &FsNode,
+        node: &NamespaceNode,
         flags: OpenFlags,
         device_type: DeviceType,
         mode: DeviceMode,
@@ -915,7 +915,7 @@ mod tests {
             .expect("registers unique");
 
         let fs = create_testfs(locked, &kernel);
-        let node = create_fs_node_for_testing(&fs, PanickingFsNode);
+        let node = create_namespace_node_for_testing(&fs, PanickingFsNode);
 
         // Fail to open non-existent device.
         assert!(registry
@@ -962,7 +962,7 @@ mod tests {
             _locked: &mut Locked<FileOpsCore>,
             _current_task: &CurrentTask,
             _id: DeviceType,
-            _node: &FsNode,
+            _node: &NamespaceNode,
             _flags: OpenFlags,
         ) -> Result<Box<dyn FileOps>, Errno> {
             Ok(Box::new(PanickingFile))
@@ -982,7 +982,7 @@ mod tests {
         assert!(DYN_MAJOR_RANGE.contains(&device_type.major()));
 
         let fs = create_testfs(locked, &kernel);
-        let node = create_fs_node_for_testing(&fs, PanickingFsNode);
+        let node = create_namespace_node_for_testing(&fs, PanickingFsNode);
         let _ = registry
             .open_device(
                 locked,

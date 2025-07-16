@@ -16,7 +16,7 @@ use crate::task::{
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps,
-    FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
+    FileWriteGuardRef, FsNodeInfo, NamespaceNode, SeekTarget,
 };
 use starnix_logging::{log_info, track_stub, Level};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -266,7 +266,7 @@ pub fn open_kmsg(
     _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
-    _node: &FsNode,
+    _node: &NamespaceNode,
     flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     if flags.can_read() {
