@@ -117,19 +117,62 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
   std::optional<fidl::ServerBindingRef<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
 };
 
+class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
+ public:
+  void AddSideEffect(
+      fit::function<void(fuchsia_power_broker::PowerLevel current_level)> side_effect) {
+    side_effect_ = std::move(side_effect);
+  }
+
+  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& req,
+              UpdateCompleter::Sync& completer) override {
+    if (side_effect_) {
+      side_effect_(req.current_level());
+    }
+    completer.Reply(fit::success());
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fit::function<void(fuchsia_power_broker::PowerLevel)> side_effect_;
+};
+
+class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
+ public:
+  void Watch(WatchCompleter::Sync& completer) override {
+    if (!have_replied_) {
+      completer.Reply(fit::success(required_level_));
+      have_replied_ = true;
+    } else {
+      old_completers_.push_back(completer.ToAsync());
+    }
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fuchsia_power_broker::PowerLevel required_level_ = 1;
+  std::vector<WatchCompleter::Async> old_completers_;
+  bool have_replied_ = false;
+};
+
 class PowerElement {
  public:
   explicit PowerElement(
       fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control,
       fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
-      std::optional<fidl::Client<fuchsia_power_broker::ElementRunner>> element_runner)
+      fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
+      fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
       : element_control_(std::move(element_control)),
         lessor_(std::move(lessor)),
-        element_runner_(std::move(element_runner)) {}
+        current_level_(std::move(current_level)),
+        required_level_(std::move(required_level)) {}
 
   fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_;
   fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_;
-  std::optional<fidl::Client<fuchsia_power_broker::ElementRunner>> element_runner_;
+  fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_;
+  fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_;
 };
 
 class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
@@ -142,6 +185,11 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   void AddElement(fuchsia_power_broker::ElementSchema& req,
                   AddElementCompleter::Sync& completer) override {
     // Get channels from request.
+    ASSERT_TRUE(req.level_control_channels().has_value());
+    fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>& current_level_server_end =
+        req.level_control_channels().value().current();
+    fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>& required_level_server_end =
+        req.level_control_channels().value().required();
     fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
 
     // Instantiate (fake) element control implementation.
@@ -168,23 +216,33 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
             [](FakeLessor* impl, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
 
-    // Make (fake) call to ElementRunner::SetLevel
-    std::optional<fidl::Client<fuchsia_power_broker::ElementRunner>> element_runner_client_;
+    // Instantiate (fake) current and required level implementations.
+    auto current_level_impl = std::make_unique<FakeCurrentLevel>();
+    auto required_level_impl = std::make_unique<FakeRequiredLevel>();
     if (req.element_name() == FuchsiaPowerManager::kHardwarePowerElementName) {
-      ASSERT_TRUE(req.element_runner().has_value());
-      fidl::Client<fuchsia_power_broker::ElementRunner> element_runner_client(
-          std::move(*req.element_runner()), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-      element_runner_client->SetLevel({1}).ThenExactlyOnce(
-          [&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) mutable {
-            if (!result.is_ok()) {
-              ADD_FAILURE() << "SetLevel failed: " << result.error_value();
-            }
-          });
-      element_runner_client_ = std::move(element_runner_client);
+      hardware_power_current_level_ = current_level_impl.get();
+      hardware_power_required_level_ = required_level_impl.get();
+    } else if (req.element_name() == FuchsiaPowerManager::kOnReadyForWorkPowerElementName) {
+      // Ignore.
+    } else {
+      ADD_FAILURE() << "Unexpected power element " << req.element_name().value_or("{none}");
     }
+    fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_binding =
+        fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(current_level_server_end),
+            std::move(current_level_impl),
+            [](FakeCurrentLevel* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> server_end) mutable {});
+    fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_binding =
+        fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(required_level_server_end),
+            std::move(required_level_impl),
+            [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
 
-    power_element_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
-                                std::move(element_runner_client_));
+    servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
+                          std::move(current_level_binding), std::move(required_level_binding));
+
     completer.Reply(fit::success());
   }
 
@@ -192,11 +250,13 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   FakeLessor* hardware_power_lessor_ = nullptr;
+  FakeCurrentLevel* hardware_power_current_level_ = nullptr;
+  FakeRequiredLevel* hardware_power_required_level_ = nullptr;
 
  private:
   fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
 
-  std::vector<PowerElement> power_element_;
+  std::vector<PowerElement> servers_;
 };
 
 class FakePowerOwner : public FuchsiaPowerManager::Owner {
