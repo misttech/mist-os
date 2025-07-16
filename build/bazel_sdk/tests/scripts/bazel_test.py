@@ -59,6 +59,7 @@ _CANONICAL_IN_TREE_IDK_REPO_NAME = "+fuchsia_idk+fuchsia_in_tree_idk"
 # Maps from apparent repo names to canonical repo names.
 _APPARENT_REPO_NAME_TO_CANONICAL = {
     "fuchsia_sdk": _CANONICAL_FUCHSIA_SDK_REPO_NAME,
+    "fuchsia_in_tree_idk": _CANONICAL_IN_TREE_IDK_REPO_NAME,
 }
 
 # Type alias for string or Path type.
@@ -617,7 +618,7 @@ def main() -> int:
         fuchsia_build_dir = _find_fuchsia_build_dir(fuchsia_source_dir)
 
     def check_fuchsia_build_dir(
-        print_error: T.Optional[T.Callable[[str], T.Any]] = None
+        print_error: T.Optional[T.Callable[[str], T.Any]] = None,
     ) -> bool:
         """Check that fuchsia_build_dir is set and exists. Return True on success."""
         if not fuchsia_build_dir:
@@ -884,10 +885,8 @@ def main() -> int:
         # *silently* with a Java exception, leaving no traces on the client
         # terminal :-(
         f"--experimental_downloader_config={downloader_config_file}",
-        # TODO: b/318334703 - Enable bzlmod when the Fuchsia build is ready.
         "--enable_bzlmod=true",
         "--incompatible_use_plus_in_repo_names",
-        "--enable_workspace=true",
         f"--vendor_dir={bazel_vendor_dir}",
         f"--registry=file://{bazel_registry}",
     ]

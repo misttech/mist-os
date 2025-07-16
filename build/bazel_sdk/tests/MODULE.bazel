@@ -35,8 +35,15 @@ local_path_override(
 bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
 local_path_override(
     module_name = "googletest",
-    path = "../../../third_party/googletest/src",
+    path = "{}/third_party/googletest/src".format(_FUCHSIA_SOURCE_ROOT),
 )
+
+fuchsia_idk = use_extension(
+    "//:module_extensions/fuchsia_idk_extensions.bzl",
+    "fuchsia_idk",
+)
+fuchsia_idk.in_tree_repository(path = "stub_fuchsia_in_tree_idk")
+use_repo(fuchsia_idk, "fuchsia_in_tree_idk")
 
 bazel_dep(name = "fuchsia_sdk_common", version = "")
 local_path_override(
