@@ -22,6 +22,22 @@ using DlSystemLoadTestsBase = DlLoadTestsBase;
 #endif
 
 class DlSystemTests : public DlSystemLoadTestsBase {
+ private:
+#ifdef __GLIBC__
+  // This is used by system tests that observe different behavior for older
+  // glibc versions. If glibc is installed, returns whether the glibc version is
+  // at least the provided major and minor.
+  static bool GlibcVersionAtLeast(int major, int minor) {
+    char version[16];
+    char installed_version[16];
+    size_t res = confstr(_CS_GNU_LIBC_VERSION, version, sizeof(version));
+    EXPECT_GT(res, 0lu) << strerror(errno);
+    EXPECT_LE(res, sizeof(version));
+    snprintf(installed_version, sizeof(installed_version), "glibc %d.%d", major, minor);
+    return strverscmp(version, installed_version) >= 0;
+  }
+#endif
+
  public:
   // This test fixture does not need to match on exact error text, since the
   // error message can vary between different system implementations.
@@ -46,9 +62,20 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // Musl attempts to fetch the same shlib from the filesystem twice, when its
   // DT_SONAME is matched with another module in a linking session.
   static constexpr bool kSonameLookupInPendingDeps = false;
+  // Musl doesn't support glibc RTLD_DI_* flags.
+  static constexpr bool kSupportsDlInfoExtensionFlags = false;
+  // Musl will emit the unsupported flag value in the error message from dlinfo.
+  static constexpr bool kEmitsDlInfoUnsupportedValue = true;
   // Musl will look for and prefer a strong symbol over a weak symbol.
   static constexpr elfldltl::ResolverPolicy kResolverPolicy =
       elfldltl::ResolverPolicy::kStrongOverWeak;
+#else
+  // TODO(https://fxbug.dev/385377689): The running glibc version must be at
+  // least 2.4 to support RTLD_DI_* extension flags.
+  static const inline bool kSupportsDlInfoExtensionFlags = GlibcVersionAtLeast(2, 40);
+  // TODO(https://fxbug.dev/385377689): In glibc versions < 2.38, destructor
+  // order can be re-sorted in dlclose.
+  static const inline bool kDestructorsRunOutOfOrder = !GlibcVersionAtLeast(2, 38);
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
@@ -58,6 +85,8 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
 
   static int DlIteratePhdr(DlIteratePhdrCallback* callback, void* data);
+
+  static fit::result<Error, int> DlInfo(void* module, int request, void* info);
 
   // ExpectRootModule or Needed are called by tests when a file is expected to
   // be loaded from the file system for the first time. The following functions

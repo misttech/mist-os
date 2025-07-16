@@ -60,6 +60,15 @@ int DlSystemTests::DlIteratePhdr(DlIteratePhdrCallback* callback, void* data) {
   return dl_iterate_phdr(callback, data);
 }
 
+fit::result<Error, int> DlSystemTests::DlInfo(void* module, int request, void* info) {
+  int result = dlinfo(module, request, info);
+  if (result < 0) {
+    EXPECT_EQ(result, -1);
+    return TakeError();
+  }
+  return fit::ok(result);
+}
+
 #ifdef __Fuchsia__
 
 // Call dlopen with the mock fuchsia_ldsvc::Loader installed and check that all

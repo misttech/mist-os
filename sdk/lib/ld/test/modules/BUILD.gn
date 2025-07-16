@@ -94,6 +94,11 @@ per_test_suffices = [
   "RtldNoDeleteDepPromotion",
   "DlIteratePhdrBasic",
   "ModuleNameOwnership",
+  "DlInfoBadFlag",
+  "DlInfoRtldDiLinkMap",
+  "DlInfoRtldDiTlsModidNoTls",
+  "DlInfoRtldDiTlsDataNoTls",
+  "DlInfoRtldDiPhdrs",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/c/dlfcn/dl/test:dl-unittests.

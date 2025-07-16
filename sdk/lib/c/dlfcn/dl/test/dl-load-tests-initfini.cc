@@ -271,14 +271,9 @@ TYPED_TEST(DlTests, InitFiniArrayWithLoadedDeps) {
 
   auto close_root_test = [&] { ASSERT_TRUE(this->DlClose(open_root).is_ok()); };
   if (TestFixture::kDlCloseCanRunFinalizers) {
-    // TODO(https://fxbug.dev/385377689): In older versions of glibc, destructor
-    // order can be re-sorted in dlclose. Remove this detection when our x86-64
-    // builders upgrade its glibc version.
-    char version[16];
-    size_t res = confstr(_CS_GNU_LIBC_VERSION, version, sizeof(version));
-    ASSERT_GT(res, 0lu);
-    ASSERT_LE(res, sizeof(version));
-    if (!strcmp(version, "glibc 2.31")) {
+    // Older glibc versions run destructors out of order. More information on
+    // this flag setting is in dl-system-tests.h.
+    if (TestFixture::kDestructorsRunOutOfOrder) {
       RunWithExpectedTestCallbacks(close_root_test, {6, 9, 7, 8, 10, 11});
     } else {
       RunWithExpectedTestCallbacks(close_root_test, {6, 7, 8, 9, 10, 11});

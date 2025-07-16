@@ -69,6 +69,9 @@ class DlImplTests : public Base {
   // modules waiting to be loaded in a LinkingSession. See
   // DlTests.SonameFilenameLoadedDep for current vs expected behavior.
   static constexpr bool kSonameLookupInPendingDeps = false;
+  // TODO(https://fxbug.dev/42085429): Implement dlinfo() in libdl.
+  static constexpr bool kImplementsDlInfo = false;
+  static constexpr bool kSupportsDlInfoExtensionFlags = false;
   // The resolver policy that determines symbol resolution order, and that tests
   // use to verify resolved values.
   static constexpr elfldltl::ResolverPolicy kResolverPolicy = ld::kResolverPolicy;
@@ -169,6 +172,12 @@ class DlImplTests : public Base {
   const link_map* ModuleLinkMap(const void* handle) {
     return reinterpret_cast<const link_map*>(
         &static_cast<const RuntimeModule*>(handle)->module().link_map);
+  }
+
+  // TODO(https://fxbug.dev/42085429): For now this is a stub function that will
+  // be replaced by a call to libdl's dlinfo implementation.
+  fit::result<Error, int> DlInfo(void* module, int request, void* info) {
+    return fit::error(Error{"TODO(https://fxbug.dev/42085429): Implement dlinfo."});
   }
 
  private:

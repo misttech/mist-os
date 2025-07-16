@@ -65,6 +65,22 @@ class DlTestsBase : public ::testing::Test {
   static constexpr elfldltl::ResolverPolicy kResolverPolicy =
       elfldltl::ResolverPolicy::kStrictLinkOrder;
 
+  // TODO(https://fxbug.dev/42085429): This is used in tests until libdl
+  // implements dlinfo().
+  static constexpr bool kImplementsDlInfo = true;
+
+  // Whether the test fixture implementation emits the unsupported flag value
+  // in its error message.
+  static constexpr bool kEmitsDlInfoUnsupportedValue = false;
+
+  // Whether the test fixture supports RTLD_DI_* extension flags. Older glibc
+  // versions don't support these options.
+  static constexpr bool kSupportsDlInfoExtensionFlags = true;
+
+  // Whether the test fixture's dlclose will run destructors out of order. Older
+  // glibc versions resort the order that destructors are run.
+  static constexpr bool kDestructorsRunOutOfOrder = false;
+
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 
