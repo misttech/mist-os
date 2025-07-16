@@ -18,6 +18,9 @@ import (
 // The final output is formatted by `gn format`.
 const indentPrefix = "\t"
 
+// clearAnnotation is a comment annotation that indicates the assignment is an explicit clear.
+const clearAnnotation = "# bazel2gn: clear"
+
 // bazelRuleToGNTemplate maps from Bazel rule names to GN template names. They can
 // be the same if Bazel and GN shared the same template name.
 //

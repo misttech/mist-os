@@ -270,6 +270,31 @@ func convertAttrName(attrName, bazelRule string) string {
 	return attrName
 }
 
+// hasClearAnnotation returns true if the input expr has a clear annotation comment.
+//
+// This function only picks up suffix comments, for example:
+//
+// ```
+//
+//	# This comment is NOT considered
+//	copts = [] # This comment is considered
+//
+//	copts = [ # This comment is NOT considered
+//	] # This comment is considered
+//
+// ```
+func hasClearAnnotation(expr syntax.Expr) bool {
+	comments := expr.Comments()
+	if comments != nil {
+		for _, c := range comments.Suffix {
+			if c.Text == clearAnnotation {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // attrAssignmentToGN converts a Bazel assignment [0] to GN. These assignments
 // are used to assign values to fields during target definitions in Bazel.
 //
@@ -289,6 +314,11 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr, bazelRule string) ([]string, er
 
 	op, ok := attrGNAssignmentOps[attrName]
 	if !ok {
+		op = "="
+	}
+
+	// TODO(https://fxbug.dev/430953918): Figure out a better way to handle configs and public_configs conversion.
+	if attrName == "configs" && hasClearAnnotation(expr) {
 		op = "="
 	}
 

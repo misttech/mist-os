@@ -485,6 +485,55 @@ func TestCCConversion(t *testing.T) {
 	}
 }`,
 		},
+		{
+			name: "configs append by default",
+			bazel: `cc_library(
+	name = "configs_append",
+	copts = [],
+)
+`,
+			wantGN: `source_set("configs_append") {
+	configs += [
+	]
+}`,
+		},
+		{
+			name: "explicit config clearing with annotation",
+			bazel: `cc_library(
+	name = "empty_configs",
+	copts = [], # bazel2gn: clear
+)
+`,
+			wantGN: `source_set("empty_configs") {
+	configs = [
+	]
+}`,
+		},
+		{
+			name: "irrelevant comments are ignored",
+			bazel: `cc_library(
+	name = "empty_configs",
+	copts = [], # this comment does NOT affect bazel2gn
+)
+`,
+			wantGN: `source_set("empty_configs") {
+	configs += [
+	]
+}`,
+		},
+		{
+			name: "comments above are ignored",
+			bazel: `cc_library(
+	name = "comment_above",
+	# bazel2gn: clear
+	copts = [],
+)
+`,
+			wantGN: `source_set("comment_above") {
+	configs += [
+	]
+}`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := toSyntaxFile(t, tc.bazel)
