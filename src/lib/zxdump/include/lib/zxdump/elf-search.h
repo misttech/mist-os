@@ -9,10 +9,8 @@
 #include <lib/fit/result.h>
 #include <zircon/syscalls/object.h>
 
-#include <optional>
+#include <ostream>
 #include <span>
-#include <string>
-#include <utility>
 
 #include "buffer.h"
 #include "dump.h"
@@ -34,11 +32,38 @@ bool IsLikelyElfMapping(const zx_info_maps_t& maps);
 // used in `prune_segment` callbacks for zxdump::ProcessDump::CollectProcess.
 // But they can also be used separately.
 
+// An error result from zxdump::DetectElf or zxdump::DetectElfIdentity stems
+// from a failing zx::process::read_memory call.  The .error_value() type
+// extends zxdump::Error with the vaddr of that failing read_memory attempt.
+// This can be due to a low-level probably reading the segment (including just
+// a race with mappings having changed in the process since the data was
+// collected); or due to ELF metadata that otherwise looked plausibly valid
+// pointing to relative addresses in the putative ELF load image.
+struct ElfSearchError : public Error {
+  constexpr ElfSearchError(Error error, zx_vaddr_t error_vaddr)
+      : Error{error}, vaddr{error_vaddr} {}
+
+  constexpr ElfSearchError(const ElfSearchError&) = default;
+
+  constexpr ElfSearchError& operator=(const ElfSearchError&) = default;
+
+  constexpr auto operator<=>(const ElfSearchError&) const = default;
+
+  zx_vaddr_t vaddr;
+};
+
+// This prints "op at vaddr: status" with the status string.
+std::ostream& operator<<(std::ostream& os, const ElfSearchError& error);
+
 // Try to detect an ELF image in this segment.  If one is found and its phdrs
 // are accessible, return a view into them from process.read_memory (which see
 // about the lifetime of the buffer).  Its ELF header can be fetched with
-// process.read_memory<Elf::Ehdr>(segment.base).
-fit::result<Error, Buffer<Elf::Phdr>> DetectElf(  //
+// process.read_memory<Elf::Ehdr>(segment.base).  If none is found, this
+// returns success with an empty Buffer.  It only returns error when
+// process.read_memory gets an error, either because the segment memory can't
+// be read or because the ELF header pointed to a Phdr range (not necessarily
+// all in that segment) that can't be read.
+fit::result<ElfSearchError, Buffer<Elf::Phdr>> DetectElf(  //
     Process& process, const zx_info_maps_t& segment);
 
 // This is the return value of zxdump::DetectElfIdentity, below.  It contains
@@ -64,18 +89,17 @@ struct ElfIdentity {
 // the build ID note and DT_SONAME string if possible.  The argument span
 // doesn't have to be one returned by DetectElf (i.e. by process.read_memory)
 // but it can be.
-fit::result<Error, ElfIdentity> DetectElfIdentity(  //
+fit::result<ElfSearchError, ElfIdentity> DetectElfIdentity(  //
     Process& process, const zx_info_maps_t& segment, std::span<const Elf::Phdr> phdrs);
 
+// This represents the data from ZX_INFO_PROCESS_MAPS or ZX_INFO_VMAR_MAPS.
+using MapsInfoSpan = std::span<const zx_info_maps_t>;
+
 // This uses zxdump::DetectElf to search a range of the address space for an
-// ELF image.  It returns a {first, last} pair giving the [first, last)
-// subrange of the argument range that holds an ELF image.  It returns the pair
-// {last, last} if none is found.  If it encounters errors, it returns {it, it}
-// pointing to the segment where zxdump::DetectElf or zxdump::DetectElfIdentity
-// returned an error.
-using MapsInfoSpanIterator = std::span<const zx_info_maps_t>::iterator;
-using ElfSearchResult = std::pair<MapsInfoSpanIterator, MapsInfoSpanIterator>;
-ElfSearchResult ElfSearch(Process& process, MapsInfoSpanIterator first, MapsInfoSpanIterator last);
+// ELF image.  It returns subspan of the argument span that holds an ELF image.
+// It returns success with an empty span if none is found.  It only returns
+// error if zxdump::DetectElf or zxdump::DetectElfIdentity got an error.
+fit::result<ElfSearchError, MapsInfoSpan> ElfSearch(Process& process, MapsInfoSpan maps_info);
 
 }  // namespace zxdump
 
