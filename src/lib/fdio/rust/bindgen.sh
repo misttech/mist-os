@@ -34,13 +34,20 @@ readonly RAW_LINES="// Copyright 2022 The Fuchsia Authors. All rights reserved.
 readonly OUTPUT="src/fdio_sys.rs"
 
 tmp="$(mktemp --suffix=.h)"
+
+readonly SED_EXPR='s/(#define \w+) \(\(\w+_t\)(\w+)\)/\1 \(\2\)/g'
+
+# processargs.h is included by other header files, so add it first so that it is included.
+cat "${FUCHSIA_DIR}"/sdk/lib/fdio/include/lib/fdio/processargs.h | sed -E "${SED_EXPR}"  >> "${tmp}"
+
 for f in "${FUCHSIA_DIR}"/sdk/lib/fdio/include/lib/fdio/*.h; do
-  if [ "${f}" = "${FUCHSIA_DIR}"/sdk/lib/fdio/include/lib/fdio/spawn-actions.h ]; then
+  if [ "${f}" = "${FUCHSIA_DIR}"/sdk/lib/fdio/include/lib/fdio/spawn-actions.h ] \
+      || [ "${f}" = "${FUCHSIA_DIR}"/sdk/lib/fdio/include/lib/fdio/processargs.h ]; then
     continue
   fi
   # TODO(https://github.com/rust-lang/rust-bindgen/issues/316): Remove this sed
   # invocation when bindgen supports macros containing type casts.
-  cat "${f}" | sed -E 's/(#define \w+) \(\(\w+_t\)(\w+)\)/\1 \(\2\)/g' >> "${tmp}"
+  cat "${f}" | sed -E "${SED_EXPR}"  >> "${tmp}"
 done
 
 "${BINDGEN}" \
@@ -60,3 +67,27 @@ done
     -I "${FUCHSIA_DIR}"/zircon/system/public
 
 fx format-code --files=${OUTPUT}
+
+tmp="$(mktemp --suffix=.h)"
+cat "${FUCHSIA_DIR}"/sdk/lib/zxio/include/lib/zxio/ops.h > "${tmp}"
+cat "${FUCHSIA_DIR}"/sdk/lib/zxio/include/lib/zxio/null.h >> "${tmp}"
+
+readonly ZXIO_OUTPUT="src/zxio_sys.rs"
+
+readonly EXTRA_ALLOWS="#![allow(non_upper_case_globals)]
+"
+
+"${BINDGEN}" \
+    "${tmp}" \
+    --disable-header-comment \
+    --raw-line "${RAW_LINES}${EXTRA_ALLOWS}" \
+    --with-derive-default \
+    --impl-debug \
+    --output "${ZXIO_OUTPUT}" \
+    --allowlist-function 'zxio_.+' \
+    --allowlist-type 'zxio_.+' \
+    -- \
+    -I "${FUCHSIA_DIR}"/sdk/lib/zxio/include \
+    -I "${FUCHSIA_DIR}"/zircon/system/public
+
+fx format-code --files=${ZXIO_OUTPUT}
