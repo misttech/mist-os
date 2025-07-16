@@ -38,6 +38,7 @@ rustc_library("routing") {
     "//src/lib/error/clonable_error",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/from-enum",
+    "//src/lib/fuchsia-sync",
     "//src/lib/versioning/version-history/rust",
     "//src/sys/component_manager/lib/router_error",
     "//src/sys/component_manager/lib/sandbox",

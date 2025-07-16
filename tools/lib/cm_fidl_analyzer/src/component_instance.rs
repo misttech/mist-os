@@ -4,7 +4,7 @@
 
 use crate::component_model::{BuildAnalyzerModelError, Child, DynamicDictionaryConfig};
 use crate::component_sandbox::{
-    build_capability_sourced_capabilities_dictionary, build_framework_dictionary,
+    build_capability_sourced_capabilities_dictionary, build_framework_router,
     build_root_component_input, new_aggregate_router,
     static_children_component_output_dictionary_routers, ProgramOutputGenerator,
 };
@@ -189,7 +189,7 @@ impl ComponentInstanceForAnalyzer {
             &decl,
             input,
             program_output_dict,
-            build_framework_dictionary(&self_),
+            build_framework_router(&self_),
             build_capability_sourced_capabilities_dictionary(&self_, &decl),
             declared_dictionaries,
             NullErrorReporter {},

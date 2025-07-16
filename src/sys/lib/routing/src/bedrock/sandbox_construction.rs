@@ -19,8 +19,10 @@ use async_trait::async_trait;
 use cm_rust::{
     CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
 };
-use cm_types::{Availability, IterablePath, Name, SeparatedPath};
+use cm_types::{Availability, BorrowedSeparatedPath, IterablePath, Name, SeparatedPath};
 use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_sync::Mutex;
+use futures::FutureExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::warn;
@@ -32,7 +34,7 @@ use sandbox::{
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 lazy_static! {
@@ -109,7 +111,7 @@ impl ProgramInput {
 
 /// A component's sandbox holds all the routing dictionaries that a component has once its been
 /// resolved.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug)]
 pub struct ComponentSandbox {
     /// The dictionary containing all capabilities that a component's parent provided to it.
     pub component_input: ComponentInput,
@@ -123,8 +125,16 @@ pub struct ComponentSandbox {
     /// The dictionary containing all capabilities that a component's program can provide.
     pub program_output_dict: Dict,
 
-    /// The dictionary containing all framework capabilities that are available to a component.
-    pub framework_dict: Dict,
+    /// Router that returns the dictionary of framework capabilities scoped to a component. This a
+    /// Router rather than the Dict itself to save memory.
+    ///
+    /// REQUIRES: This Router must never poll. This constraint exists `build_component_sandbox` is
+    /// not async.
+    // NOTE: This is wrapped in Mutex for interior mutability so that it is modifiable like the
+    // other parts of the sandbox. If this were a Dict this wouldn't be necessary because Dict
+    // already supports interior mutability, but since this is a singleton we don't need a Dict
+    // here. The Arc around the Mutex is needed for Sync.
+    framework_router: Mutex<Router<Dict>>,
 
     /// The dictionary containing all capabilities that a component declares based on another
     /// capability. Currently this is only the storage admin protocol.
@@ -143,6 +153,62 @@ pub struct ComponentSandbox {
     pub collection_inputs: StructuredDictMap<ComponentInput>,
 }
 
+impl Default for ComponentSandbox {
+    fn default() -> Self {
+        static NULL_ROUTER: LazyLock<Router<Dict>> = LazyLock::new(|| Router::new(NullRouter {}));
+        struct NullRouter;
+        #[async_trait]
+        impl Routable<Dict> for NullRouter {
+            async fn route(
+                &self,
+                _request: Option<Request>,
+                _debug: bool,
+            ) -> Result<RouterResponse<Dict>, RouterError> {
+                Err(RouterError::Internal)
+            }
+        }
+        let framework_router = Mutex::new(NULL_ROUTER.clone());
+        Self {
+            framework_router,
+            component_input: Default::default(),
+            component_output: Default::default(),
+            program_input: Default::default(),
+            program_output_dict: Default::default(),
+            capability_sourced_capabilities_dict: Default::default(),
+            declared_dictionaries: Default::default(),
+            child_inputs: Default::default(),
+            collection_inputs: Default::default(),
+        }
+    }
+}
+
+impl Clone for ComponentSandbox {
+    fn clone(&self) -> Self {
+        let Self {
+            component_input,
+            component_output,
+            program_input,
+            program_output_dict,
+            framework_router,
+            capability_sourced_capabilities_dict,
+            declared_dictionaries,
+            child_inputs,
+            collection_inputs,
+        } = self;
+        Self {
+            component_input: component_input.clone(),
+            component_output: component_output.clone(),
+            program_input: program_input.clone(),
+            program_output_dict: program_output_dict.clone(),
+            framework_router: Mutex::new(framework_router.lock().clone()),
+            capability_sourced_capabilities_dict: capability_sourced_capabilities_dict.clone(),
+            declared_dictionaries: declared_dictionaries.clone(),
+            child_inputs: child_inputs.clone(),
+            collection_inputs: collection_inputs.clone(),
+        }
+    }
+}
+
 impl ComponentSandbox {
     /// Copies all of the entries from the given sandbox into this one. Panics if the given sandbox
     /// is holding any entries that cannot be copied. Panics if there are any duplicate entries.
@@ -154,7 +220,7 @@ impl ComponentSandbox {
             component_output,
             program_input,
             program_output_dict,
-            framework_dict,
+            framework_router,
             capability_sourced_capabilities_dict,
             declared_dictionaries,
             child_inputs,
@@ -176,17 +242,21 @@ impl ComponentSandbox {
             (&program_input.namespace(), &self.program_input.namespace()),
             (&program_input.config(), &self.program_input.config()),
             (&program_output_dict, &self.program_output_dict),
-            (&framework_dict, &self.framework_dict),
             (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
             (&declared_dictionaries, &self.declared_dictionaries),
         ] {
             copy_to.append(copy_from).expect("sandbox capability is not cloneable");
         }
+        *self.framework_router.lock() = framework_router.lock().clone();
         if let Some(runner_router) = program_input.runner() {
             self.program_input.set_runner(runner_router.into());
         }
         self.child_inputs.append(child_inputs).unwrap();
         self.collection_inputs.append(collection_inputs).unwrap();
+    }
+
+    pub fn framework_router(&self) -> Router<Dict> {
+        self.framework_router.lock().clone()
     }
 }
 
@@ -198,7 +268,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     decl: &cm_rust::ComponentDecl,
     component_input: ComponentInput,
     program_output_dict: Dict,
-    framework_dict: Dict,
+    framework_router: Router<Dict>,
     capability_sourced_capabilities_dict: Dict,
     declared_dictionaries: Dict,
     error_reporter: impl ErrorReporter,
@@ -296,7 +366,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &component_input,
                 &program_input,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 use_,
                 error_reporter.clone(),
@@ -308,7 +378,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     &component_input,
                     &program_input,
                     &program_output_dict,
-                    &framework_dict,
+                    &framework_router,
                     &capability_sourced_capabilities_dict,
                     use_,
                     error_reporter.clone(),
@@ -338,7 +408,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &component_input,
                 &program_input,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 &cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
                     source: cm_rust::UseSource::Environment,
@@ -346,7 +416,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     source_dictionary: Default::default(),
                 }),
                 error_reporter.clone(),
-            );
+            )
         }
     }
 
@@ -404,12 +474,12 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     &child_component_output_dictionary_routers,
                     &component_input,
                     &program_output_dict,
-                    &framework_dict,
+                    &framework_router,
                     &capability_sourced_capabilities_dict,
                     first_offer,
                     &(get_target_dict)(),
                     error_reporter.clone(),
-                );
+                )
             }
             cm_rust::OfferDecl::Service(_) => {
                 let aggregate_router = new_aggregate_router_from_service_offers(
@@ -418,21 +488,21 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     &child_component_output_dictionary_routers,
                     &component_input,
                     &program_output_dict,
-                    &framework_dict,
+                    &framework_router,
                     &capability_sourced_capabilities_dict,
                     error_reporter.clone(),
                     aggregate_router_fn,
                 );
                 (get_target_dict)()
                     .insert(first_offer.target_name().clone(), aggregate_router.into())
-                    .expect("failed to insert capability into target dict")
+                    .expect("failed to insert capability into target dict");
             }
             cm_rust::OfferDecl::Config(_) => extend_dict_with_offer::<Data, _>(
                 component,
                 &child_component_output_dictionary_routers,
                 &component_input,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 first_offer,
                 &(get_target_dict)(),
@@ -443,7 +513,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &child_component_output_dictionary_routers,
                 &component_input,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 first_offer,
                 &(get_target_dict)(),
@@ -456,7 +526,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &child_component_output_dictionary_routers,
                 &component_input,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 first_offer,
                 &(get_target_dict)(),
@@ -477,12 +547,12 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     component,
                     &child_component_output_dictionary_routers,
                     &program_output_dict,
-                    &framework_dict,
+                    &framework_router,
                     &capability_sourced_capabilities_dict,
                     first_expose,
                     &component_output,
                     error_reporter.clone(),
-                );
+                )
             }
             cm_rust::ExposeDecl::Service(_) => {
                 let mut aggregate_sources = vec![];
@@ -492,7 +562,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                         component,
                         &child_component_output_dictionary_routers,
                         &program_output_dict,
-                        &framework_dict,
+                        &framework_router,
                         &capability_sourced_capabilities_dict,
                         expose,
                         &temp_component_output,
@@ -555,7 +625,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 component,
                 &child_component_output_dictionary_routers,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 first_expose,
                 &component_output,
@@ -565,7 +635,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 component,
                 &child_component_output_dictionary_routers,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 first_expose,
                 &component_output,
@@ -577,7 +647,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 component,
                 &child_component_output_dictionary_routers,
                 &program_output_dict,
-                &framework_dict,
+                &framework_router,
                 &capability_sourced_capabilities_dict,
                 first_expose,
                 &component_output,
@@ -592,7 +662,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         component_output,
         program_input,
         program_output_dict,
-        framework_dict,
+        framework_router: Mutex::new(framework_router),
         capability_sourced_capabilities_dict,
         declared_dictionaries,
         child_inputs,
@@ -606,7 +676,7 @@ fn new_aggregate_router_from_service_offers<C: ComponentInstanceInterface + 'sta
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
     program_output_dict: &Dict,
-    framework_dict: &Dict,
+    framework_router: &Router<Dict>,
     capability_sourced_capabilities_dict: &Dict,
     error_reporter: impl ErrorReporter,
     aggregate_router_fn: &AggregateRouterFn<C>,
@@ -640,7 +710,7 @@ fn new_aggregate_router_from_service_offers<C: ComponentInstanceInterface + 'sta
             &child_component_output_dictionary_routers,
             &component_input,
             &program_output_dict,
-            &framework_dict,
+            framework_router,
             &capability_sourced_capabilities_dict,
             offer,
             &dict_for_source_router,
@@ -855,7 +925,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     program_output_dict: &Dict,
-    framework_dict: &Dict,
+    framework_router: &Router<Dict>,
     capability_sourced_capabilities_dict: &Dict,
     target_input: &ComponentInput,
     error_reporter: impl ErrorReporter,
@@ -886,12 +956,12 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                         &child_component_output_dictionary_routers,
                         &component_input,
                         &program_output_dict,
-                        &framework_dict,
+                        framework_router,
                         &capability_sourced_capabilities_dict,
                         first_offer,
                         &target_input.capabilities(),
                         error_reporter.clone(),
-                    );
+                    )
                 } else {
                     let aggregate_router = new_aggregate_router_from_service_offers(
                         &combined_offer_bundle,
@@ -899,7 +969,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                         &child_component_output_dictionary_routers,
                         &component_input,
                         &program_output_dict,
-                        &framework_dict,
+                        framework_router,
                         &capability_sourced_capabilities_dict,
                         error_reporter.clone(),
                         aggregate_router_fn,
@@ -915,7 +985,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                 &child_component_output_dictionary_routers,
                 component_input,
                 program_output_dict,
-                framework_dict,
+                framework_router,
                 capability_sourced_capabilities_dict,
                 first_offer,
                 &target_input.capabilities(),
@@ -926,7 +996,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                 &child_component_output_dictionary_routers,
                 component_input,
                 program_output_dict,
-                framework_dict,
+                framework_router,
                 capability_sourced_capabilities_dict,
                 first_offer,
                 &target_input.capabilities(),
@@ -939,7 +1009,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                 &child_component_output_dictionary_routers,
                 component_input,
                 program_output_dict,
-                framework_dict,
+                framework_router,
                 capability_sourced_capabilities_dict,
                 first_offer,
                 &target_input.capabilities(),
@@ -1030,7 +1100,7 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
     component_input: &ComponentInput,
     program_input: &ProgramInput,
     program_output_dict: &Dict,
-    framework_dict: &Dict,
+    framework_router: &Router<Dict>,
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
     error_reporter: impl ErrorReporter,
@@ -1086,13 +1156,9 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
                 source_path.iter_segments().join("/"),
             ))
         }
-        cm_rust::UseSource::Framework => framework_dict.get_router_or_not_found::<T>(
-            &source_path,
-            RoutingError::capability_from_framework_not_found(
-                moniker,
-                source_path.iter_segments().join("/"),
-            ),
-        ),
+        cm_rust::UseSource::Framework => {
+            query_framework_router_or_not_found(framework_router, &source_path, component)
+        }
         cm_rust::UseSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
                 moniker,
@@ -1197,7 +1263,7 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
     program_output_dict: &Dict,
-    framework_dict: &Dict,
+    framework_router: &Router<Dict>,
     capability_sourced_capabilities_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &Dict,
@@ -1265,13 +1331,7 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
                 );
                 return;
             }
-            framework_dict.get_router_or_not_found::<T>(
-                &source_path,
-                RoutingError::capability_from_framework_not_found(
-                    &component.moniker(),
-                    source_path.iter_segments().join("/"),
-                ),
-            )
+            query_framework_router_or_not_found(framework_router, &source_path, component)
         }
         cm_rust::OfferSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
@@ -1320,6 +1380,37 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
     }
 }
 
+fn query_framework_router_or_not_found<T, C>(
+    router: &Router<Dict>,
+    path: &BorrowedSeparatedPath<'_>,
+    component: &Arc<C>,
+) -> Router<T>
+where
+    T: CapabilityBound,
+    Router<T>: TryFrom<Capability>,
+    C: ComponentInstanceInterface + 'static,
+{
+    let request = Request { target: component.as_weak().into(), metadata: Dict::new() };
+    let dict: Result<RouterResponse<Dict>, RouterError> = router
+        .route(Some(request), false)
+        .now_or_never()
+        .unwrap_or_else(|| Err(RouterError::Internal));
+    let dict = match dict {
+        Ok(RouterResponse::Capability(dict)) => dict,
+        // shouldn't happen, fallback
+        _ => Dict::new(),
+    };
+    // `lazy_get` is not needed here as the framework dictionary does not contain
+    // dictionary routers that have to be queried in turn.
+    dict.get_router_or_not_found::<T>(
+        path,
+        RoutingError::capability_from_framework_not_found(
+            &component.moniker(),
+            path.iter_segments().join("/"),
+        ),
+    )
+}
+
 pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
     matches!(
         expose,
@@ -1336,7 +1427,7 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     program_output_dict: &Dict,
-    framework_dict: &Dict,
+    framework_router: &Router<Dict>,
     capability_sourced_capabilities_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_component_output: &ComponentOutput,
@@ -1347,7 +1438,6 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
 {
     assert!(is_supported_expose(expose), "{expose:?}");
 
-    // Exposing to the framework is vestigial
     let target_dict = match expose.target() {
         cm_rust::ExposeTarget::Parent => target_component_output.capabilities(),
         cm_rust::ExposeTarget::Framework => target_component_output.framework(),
@@ -1392,13 +1482,7 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
                 );
                 return;
             }
-            framework_dict.get_router_or_not_found::<T>(
-                &source_path,
-                RoutingError::capability_from_framework_not_found(
-                    &component.moniker(),
-                    source_path.iter_segments().join("/"),
-                ),
-            )
+            query_framework_router_or_not_found(framework_router, &source_path, component)
         }
         cm_rust::ExposeSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(

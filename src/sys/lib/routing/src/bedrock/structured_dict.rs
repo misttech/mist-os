@@ -108,7 +108,7 @@ lazy_static! {
     /// Dictionary of resolver capabilities in a component's environment.
     static ref RESOLVERS: Name = "resolvers".parse().unwrap();
 
-    /// Dictionary of capabilities available to the framework.
+    /// Dictionary of capabilities the component exposes to the framework.
     static ref FRAMEWORK: Name = "framework".parse().unwrap();
 }
 
@@ -305,7 +305,8 @@ impl ComponentOutput {
         dict
     }
 
-    /// Returns the sub-dictionary containing capabilities routed to the component's framework.
+    /// Returns the sub-dictionary containing capabilities exposed by the component to the
+    /// framework.
     pub fn framework(&self) -> Dict {
         let cap = self.0.get(&*FRAMEWORK).expect("capabilities must be cloneable").unwrap();
         let Capability::Dictionary(dict) = cap else {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bedrock::program::{Program, StopConclusion, StopDisposition};
-use crate::framework::{build_framework_dictionary, controller};
+use crate::framework::{controller, get_framework_router};
 use crate::model::actions::{shutdown, StopAction};
 use crate::model::component::{
     Component, ComponentInstance, ExtendedInstance, IncarnationId, Package, StartReason,
@@ -473,7 +473,7 @@ impl ResolvedInstanceState {
             &decl,
             component_input,
             program_output_dict,
-            build_framework_dictionary(component),
+            get_framework_router(&component),
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
             RoutingFailureErrorReporter::new(),
@@ -928,7 +928,7 @@ impl ResolvedInstanceState {
                 &self.sandbox.component_input,
                 &dynamic_offers,
                 &self.sandbox.program_output_dict,
-                &self.sandbox.framework_dict,
+                &self.sandbox.framework_router(),
                 &self.sandbox.capability_sourced_capabilities_dict,
                 &child_input,
                 RoutingFailureErrorReporter::new(),

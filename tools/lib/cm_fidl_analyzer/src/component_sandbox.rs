@@ -13,7 +13,9 @@ use ::routing::capability_source::{
     BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
     ComponentSource, FrameworkSource, InternalCapability, NamespaceSource,
 };
-use ::routing::component_instance::WeakComponentInstanceInterface;
+use ::routing::component_instance::{
+    WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
+};
 use ::routing::environment::RunnerRegistry;
 use ::routing::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
@@ -24,7 +26,7 @@ use cm_rust::{CapabilityTypeName, ComponentDecl, DeliveryType, DictionaryDecl, P
 use cm_types::{Availability, Path};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
-use moniker::ChildName;
+use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
     CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router, RouterResponse,
@@ -151,32 +153,65 @@ impl ErrorReporter for NullErrorReporter {
     }
 }
 
-pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>) -> Dict {
-    let framework_dict = Dict::new();
-    for protocol_name in &[
-        fcomponent::BinderMarker::PROTOCOL_NAME,
-        fsandbox::CapabilityStoreMarker::PROTOCOL_NAME,
-        fcomponent::IntrospectorMarker::PROTOCOL_NAME,
-        fcomponent::NamespaceMarker::PROTOCOL_NAME,
-        fcomponent::RealmMarker::PROTOCOL_NAME,
-        fsys::ConfigOverrideMarker::PROTOCOL_NAME,
-        fsys::LifecycleControllerMarker::PROTOCOL_NAME,
-        fsys::RealmQueryMarker::PROTOCOL_NAME,
-        fsys::RouteValidatorMarker::PROTOCOL_NAME,
-        "fuchsia.sys2.RealmExplorer",
-    ] {
-        let name = cm_types::Name::new(*protocol_name).unwrap();
-        let router = new_debug_only_specific_router::<Connector>(CapabilitySource::Framework(
-            FrameworkSource {
-                capability: InternalCapability::Protocol(name.clone()),
-                moniker: component.moniker().clone(),
-            },
-        ));
-        framework_dict
-            .insert_capability(&name, router.into())
-            .expect("failed to insert framework capability into dictionary");
+pub(crate) fn build_framework_router(scope: &Arc<ComponentInstanceForAnalyzer>) -> Router<Dict> {
+    Router::new(FrameworkRouter { scope: scope.moniker().clone() })
+}
+
+struct FrameworkRouter {
+    scope: Moniker,
+}
+
+#[async_trait]
+impl Routable<Dict> for FrameworkRouter {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        _debug: bool,
+    ) -> Result<RouterResponse<Dict>, RouterError> {
+        let request = request.ok_or(RouterError::InvalidArgs)?;
+        let target = request
+            .target
+            .inner
+            .as_any()
+            .downcast_ref::<WeakExtendedInstanceInterface<ComponentInstanceForAnalyzer>>()
+            .ok_or(RouterError::Unknown)?;
+        let component = match target {
+            WeakExtendedInstanceInterface::<ComponentInstanceForAnalyzer>::Component(c) => c,
+            WeakExtendedInstanceInterface::<ComponentInstanceForAnalyzer>::AboveRoot(_) => {
+                return Err(RouterError::InvalidArgs);
+            }
+        };
+        let component = component.upgrade().map_err(RoutingError::from)?;
+        if *component.moniker() != self.scope {
+            return Err(RouterError::InvalidArgs);
+        }
+
+        let framework_dict = Dict::new();
+        for protocol_name in &[
+            fcomponent::BinderMarker::PROTOCOL_NAME,
+            fsandbox::CapabilityStoreMarker::PROTOCOL_NAME,
+            fcomponent::IntrospectorMarker::PROTOCOL_NAME,
+            fcomponent::NamespaceMarker::PROTOCOL_NAME,
+            fcomponent::RealmMarker::PROTOCOL_NAME,
+            fsys::ConfigOverrideMarker::PROTOCOL_NAME,
+            fsys::LifecycleControllerMarker::PROTOCOL_NAME,
+            fsys::RealmQueryMarker::PROTOCOL_NAME,
+            fsys::RouteValidatorMarker::PROTOCOL_NAME,
+            "fuchsia.sys2.RealmExplorer",
+        ] {
+            let name = cm_types::Name::new(*protocol_name).unwrap();
+            let router = new_debug_only_specific_router::<Connector>(CapabilitySource::Framework(
+                FrameworkSource {
+                    capability: InternalCapability::Protocol(name.clone()),
+                    moniker: component.moniker().clone(),
+                },
+            ));
+            framework_dict
+                .insert_capability(&name, router.into())
+                .expect("failed to insert framework capability into dictionary");
+        }
+        Ok(RouterResponse::Capability(framework_dict))
     }
-    framework_dict
 }
 
 pub fn build_capability_sourced_capabilities_dictionary(
