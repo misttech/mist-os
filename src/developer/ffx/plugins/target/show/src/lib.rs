@@ -18,7 +18,7 @@ use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
 };
 use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use target_holders::fdomain::{moniker, RemoteControlProxyHolder};
 use target_holders::TargetProxyHolder;
@@ -98,14 +98,12 @@ impl ShowTool {
 }
 
 async fn gather_target_info_direct(
-    connection: Arc<Mutex<Option<ffx_target::Connection>>>,
+    connection: Arc<ffx_target::Connection>,
 ) -> Result<(AddressData, Option<fidl_fuchsia_developer_ffx::CompatibilityInfo>)> {
-    let conn = connection.lock().expect("gather_target_info_direct: connection lock poisoned");
-    let conn = conn.as_ref().ok_or_else(|| anyhow!("No connection available"))?;
     // If we've gotten a connection, we must have an address we connected to
-    let addr = conn.device_address().expect("No address in connection?");
+    let addr = connection.device_address().expect("No address in connection?");
     let ad = AddressData { host: format!("{}", addr.ip()), port: addr.port() };
-    Ok((ad, conn.compatibility_info().map(|ci| ci.into())))
+    Ok((ad, connection.compatibility_info().map(|ci| ci.into())))
 }
 
 async fn gather_target_info_from_daemon(
@@ -620,7 +618,7 @@ mod tests {
             let device_address = std::net::SocketAddr::new("127.0.0.1".parse().unwrap(), 22);
             let fidl_pipe = FidlPipe::fake(Some(device_address));
             let conn = ffx_target::Connection::fake(fidl_pipe);
-            Box::pin(async { Ok(Arc::new(Mutex::new(Some(conn)))) })
+            Box::pin(async { Ok(Arc::new(conn)) })
         });
         Arc::new(dc)
     }

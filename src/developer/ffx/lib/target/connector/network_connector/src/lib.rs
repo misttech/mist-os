@@ -2,46 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use arc_swap::ArcSwapOption;
 use ffx_command_error::{bug, user_error, Error, Result};
 use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use ffx_target::fho::connector::DirectConnector;
 use ffx_target::{get_target_specifier, Connection, ConnectionError, TargetConnector};
 use futures::future::LocalBoxFuture;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 async fn connect_helper<T: TryFromEnvContext + TargetConnector + 'static>(
     env: &EnvironmentContext,
-    conn: &mut MutexGuard<'_, Option<Connection>>,
-) -> Result<()> {
-    match **conn {
-        Some(_) => Ok(()),
-        None => {
-            let overnet_connector = T::try_from_env_context(env).await?;
-            let c = match Connection::new(overnet_connector).await {
-                Ok(c) => Ok(c),
-                Err(ConnectionError::ConnectionStartError(cmd_info, error)) => {
-                    log::info!("connector encountered start error: {cmd_info}, '{error}'");
-                    Err(user_error!(
-                        "Unable to connect to device via {}: {error}",
-                        <T as TargetConnector>::CONNECTION_TYPE
-                    ))
-                }
-                Err(e) => Err(bug!("{e}")),
-            }?;
-            **conn = Some(c);
-            Ok(())
+) -> Result<Connection> {
+    let target_connector = T::try_from_env_context(env).await?;
+    match Connection::new(target_connector).await {
+        Ok(c) => Ok(c),
+        Err(ConnectionError::ConnectionStartError(cmd_info, error)) => {
+            log::info!("connector encountered start error: {cmd_info}, '{error}'");
+            Err(user_error!(
+                "Unable to connect to device via {}: {error}",
+                <T as TargetConnector>::CONNECTION_TYPE
+            ))
         }
+        Err(e) => Err(bug!("{e}")),
     }
 }
 
 /// Encapsulates a connection to a single fuchsia device, using fdomain or
 /// overnet as the FIDL communication backend.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NetworkConnector<T: TryFromEnvContext + TargetConnector> {
     env: EnvironmentContext,
-    connection: Arc<Mutex<Option<Connection>>>,
+    connection: ArcSwapOption<Connection>,
     target_spec: Option<String>,
+    connect_gate: Semaphore,
     _t: std::marker::PhantomData<T>,
 }
 
@@ -52,6 +47,7 @@ impl<T: TryFromEnvContext + TargetConnector> NetworkConnector<T> {
             env: env.clone(),
             connection: Default::default(),
             target_spec,
+            connect_gate: Semaphore::new(1),
             _t: Default::default(),
         })
     }
@@ -59,10 +55,24 @@ impl<T: TryFromEnvContext + TargetConnector> NetworkConnector<T> {
 
 impl<T: TryFromEnvContext + TargetConnector + 'static> NetworkConnector<T> {
     /// Attempts to connect. If already connected, this is a no-op.
-    fn maybe_connect(&self) -> LocalBoxFuture<'_, Result<()>> {
+    fn maybe_connect(&self) -> LocalBoxFuture<'_, Result<Arc<Connection>>> {
         Box::pin(async {
-            let mut conn = self.connection.lock().expect("maybe_connect: connection lock poisoned");
-            connect_helper::<T>(&self.env, &mut conn).await
+            if let Some(conn) = self.connection.load_full() {
+                return Ok(conn);
+            }
+            // If there are multiple tasks trying to connect, ensure only one tries at a time.
+            let _permit = self
+                .connect_gate
+                .acquire()
+                .await
+                .map_err(|_| bug!("connection semaphore was closed??"));
+            // Check again, in case someone else grabbed it while we were getting the permit
+            if let Some(conn) = self.connection.load_full() {
+                return Ok(conn);
+            }
+            let conn = Arc::new(connect_helper::<T>(&self.env).await?);
+            self.connection.store(Some(conn.clone()));
+            Ok(conn)
         })
     }
 }
@@ -70,18 +80,17 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> NetworkConnector<T> {
 impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for NetworkConnector<T> {
     fn connect(&self) -> LocalBoxFuture<'_, Result<()>> {
         Box::pin(async {
-            let mut conn = self.connection.lock().expect("connect: connection lock poisoned");
-            if conn.is_some() {
+            if self.connection.load().is_some() {
                 log::info!("Dropping current connection and reconnecting.");
+                self.connection.store(None);
             }
-            drop(conn.take());
-            connect_helper::<T>(&self.env, &mut conn).await
+            let _ = self.maybe_connect().await?;
+            Ok(())
         })
     }
-
     fn wrap_connection_errors(&self, e: crate::Error) -> crate::Error {
-        let oc = self.connection.lock().expect("warp_connection_errors: connection lock poisoned");
-        if let Some(ref c) = *oc {
+        let guard = self.connection.load();
+        if let Some(c) = guard.as_ref() {
             return Error::User(c.wrap_connection_errors(e.into()));
         }
         e
@@ -89,15 +98,15 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
 
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>> {
         Box::pin(async {
-            let conn = self.connection.lock().expect("device_address: connection lock poisoned");
-            conn.as_ref().and_then(|c| c.device_address())
+            let guard = self.connection.load();
+            guard.as_ref().and_then(|c| c.device_address())
         })
     }
 
     fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>> {
         Box::pin(async {
-            let conn = self.connection.lock().expect("host_ssh_address: connection lock poisoned");
-            conn.as_ref().and_then(|c| c.host_ssh_address()).map(|a| a.to_string())
+            let guard = self.connection.load();
+            guard.as_ref().and_then(|c| c.host_ssh_address()).map(|a| a.to_string())
         })
     }
 
@@ -105,11 +114,8 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
         self.target_spec.clone()
     }
 
-    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<Mutex<Option<Connection>>>>> {
-        Box::pin(async {
-            self.maybe_connect().await?;
-            Ok(self.connection.clone())
-        })
+    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<Connection>>> {
+        Box::pin(async { Ok(self.maybe_connect().await?) })
     }
 }
 
@@ -124,6 +130,6 @@ mod tests {
         let test_env = ffx_config::test_init().await.unwrap();
         let env = &test_env.context;
         let connector = NetworkConnector::<RegularFakeOvernet>::new(env).await.unwrap();
-        connector.connect().await.unwrap();
+        connector.connection().await.unwrap();
     }
 }

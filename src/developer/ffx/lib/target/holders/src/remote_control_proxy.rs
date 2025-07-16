@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::init_connection_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
-use ffx_command_error::{bug, FfxContext as _, Result};
+use ffx_command_error::{FfxContext as _, Result};
 use ffx_target::fho::{target_interface, FhoConnectionBehavior};
 use fho::{FhoEnvironment, TryFromEnv};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
@@ -61,15 +61,7 @@ impl TryFromEnv for RemoteControlProxyHolder {
             },
             FhoConnectionBehavior::DirectConnector(direct) => {
                 let conn = direct.connection().await?;
-                let cc =
-                    conn.lock().expect("fdomain::remote_control_proxy: connection lock poisoned");
-                cc.as_ref()
-                    .ok_or(bug!("Connection not yet initialized"))?
-                    .rcs_proxy()
-                    .await
-                    .bug()
-                    .map(Into::into)
-                    .map_err(Into::into)
+                conn.rcs_proxy().await.bug().map(Into::into).map_err(Into::into)
             }
         }
     }

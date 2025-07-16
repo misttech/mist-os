@@ -194,7 +194,6 @@ mod tests {
     use ffx_target::fho::connector::MockDirectConnector;
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
     use futures::future::LocalBoxFuture;
-    use std::sync::Mutex;
     use target_holders::RemoteControlProxyHolder;
 
     #[fuchsia::test]
@@ -253,10 +252,14 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(|| Box::pin(async { Ok(()) }));
-        mock_connector
-            .expect_connection()
-            .times(1)
-            .returning(|| Box::pin(async { Ok(Arc::new(Mutex::new(None))) }));
+        mock_connector.expect_connection().times(1).returning(|| {
+            Box::pin({
+                let device_address = std::net::SocketAddr::new("127.0.0.1".parse().unwrap(), 22);
+                let fidl_pipe = ffx_target::FidlPipe::fake(Some(device_address));
+                let conn = Arc::new(ffx_target::Connection::fake(fidl_pipe));
+                async { Ok(conn) }
+            })
+        });
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
