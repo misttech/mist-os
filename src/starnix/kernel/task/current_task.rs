@@ -67,7 +67,7 @@ pub struct TaskBuilder {
     /// The underlying task object.
     pub task: OwnedRef<Task>,
 
-    pub thread_state: ThreadState,
+    pub thread_state: Box<ThreadState>,
 }
 
 impl TaskBuilder {
@@ -133,7 +133,7 @@ pub struct CurrentTask {
     /// The underlying task object.
     pub task: OwnedRef<Task>,
 
-    pub thread_state: ThreadState,
+    pub thread_state: Box<ThreadState>,
 
     /// Makes CurrentTask neither Sync not Send.
     _local_marker: PhantomData<*mut u8>,
@@ -166,14 +166,14 @@ pub struct ThreadState {
 
 impl ThreadState {
     /// Returns a new `ThreadState` with the same `registers` as this one.
-    fn snapshot(&self) -> Self {
-        Self {
+    fn snapshot(&self) -> Box<Self> {
+        Box::new(Self {
             registers: self.registers,
             extended_pstate: Default::default(),
             restart_code: self.restart_code,
             syscall_restart_func: None,
             arch_width: self.arch_width,
-        }
+        })
     }
 
     pub fn extended_snapshot(&self) -> Self {
@@ -249,7 +249,7 @@ impl fmt::Debug for CurrentTask {
 }
 
 impl CurrentTask {
-    pub fn new(task: OwnedRef<Task>, thread_state: ThreadState) -> Self {
+    pub fn new(task: OwnedRef<Task>, thread_state: Box<ThreadState>) -> Self {
         Self { task, thread_state, _local_marker: Default::default() }
     }
 
