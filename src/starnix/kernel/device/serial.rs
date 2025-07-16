@@ -5,7 +5,7 @@
 use crate::device::kobject::DeviceMetadata;
 use crate::device::terminal::{Terminal, TtyState};
 use crate::device::{DeviceMode, DeviceOps};
-use crate::fs::devpts::TtyFile;
+use crate::fs::devpts::{new_pts_fs_with_state, TtyFile};
 use crate::task::{CurrentTask, EventHandler, Kernel, Waiter};
 use crate::vfs::{FileOps, FsString, NamespaceNode, VecInputBuffer, VecOutputBuffer};
 use anyhow::Error;
@@ -100,13 +100,15 @@ impl SerialDevice {
     ///
     /// To register the device, call `register_serial_device`.
     pub fn new(
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         serial_device: ClientEnd<fserial::DeviceMarker>,
     ) -> Result<Arc<Self>, Errno> {
         let kernel = current_task.kernel();
 
-        let state = kernel.expando.get::<TtyState>();
-        let terminal = state.get_next_terminal(current_task)?;
+        let state = Arc::new(TtyState::default());
+        let fs = new_pts_fs_with_state(locked, kernel, Default::default(), state.clone())?;
+        let terminal = state.get_next_terminal(fs.root().clone(), current_task.as_fscred())?;
 
         let serial_proxy = Arc::new(serial_device.into_sync_proxy());
         let forward_task = ForwardTask::new(terminal.clone(), serial_proxy);

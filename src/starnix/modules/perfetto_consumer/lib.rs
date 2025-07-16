@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 use anyhow::bail;
 use fuchsia_trace::{
     category_enabled, trace_string_ref_t, BufferingMode, ProlongedContext, TraceState,

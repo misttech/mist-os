@@ -519,6 +519,9 @@ testing::AssertionResult TestThatAccessSegfaults(void *test_address, AccessType 
   return helper.WaitForChildren();
 }
 
+ScopedMount::ScopedMount(std::string target_path)
+    : target_path_(std::move(target_path)), is_mounted_(true) {}
+
 fit::result<int, ScopedMount> ScopedMount::Mount(const std::string &source,
                                                  const std::string &target,
                                                  const std::string &filesystemtype,

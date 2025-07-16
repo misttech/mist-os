@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
 use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
-use starnix_sync::Unlocked;
-
 use once_cell::sync::OnceCell;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::ProtectionFlags;
@@ -19,7 +19,7 @@ use starnix_core::vfs::{
     MemoryRegularFile, SeekTarget, SymlinkTarget, XattrOp, XattrStorage, DEFAULT_BYTES_PER_BLOCK,
 };
 use starnix_logging::{impossible_error, track_stub};
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;

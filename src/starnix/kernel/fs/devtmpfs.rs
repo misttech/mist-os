@@ -73,14 +73,6 @@ impl DevTmpFs {
                         node_type: TmpFsNodeType::Link("/proc/self/fd".into()),
                     },
                 ),
-                (
-                    "ptmx".into(),
-                    TmpFsData {
-                        owner: FsCred::root(),
-                        perm: 0o777,
-                        node_type: TmpFsNodeType::Link("pts/ptmx".into()),
-                    },
-                ),
             ])),
         };
         TmpFs::set_initial_content(&fs, initial_content);
