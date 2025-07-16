@@ -20,7 +20,8 @@ use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
 use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
 use starnix_sync::{
-    FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease,
+    FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockWriteGuard,
+    TaskRelease, TerminalLock,
 };
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
@@ -1350,13 +1351,17 @@ impl Task {
     /// uses this mechanism to implement pthread_join. The thread that calls
     /// pthread_join sleeps using FUTEX_WAIT on the child tid address. We wake
     /// them up here to let them know the thread is done.
-    pub fn clear_child_tid_if_needed(&self) -> Result<(), Errno> {
+    pub fn clear_child_tid_if_needed<L>(&self, locked: &mut Locked<L>) -> Result<(), Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let mut state = self.write();
         let user_tid = state.clear_child_tid;
         if !user_tid.is_null() {
             let zero: tid_t = 0;
             self.write_object(user_tid, &zero)?;
             self.kernel().shared_futexes.wake(
+                locked,
                 self,
                 user_tid.addr(),
                 usize::MAX,

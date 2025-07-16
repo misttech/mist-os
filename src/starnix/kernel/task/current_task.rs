@@ -218,7 +218,7 @@ impl Releasable for CurrentTask {
 
     fn release<'a>(self, locked: Self::Context<'a>) {
         self.notify_robust_list();
-        let _ignored = self.clear_child_tid_if_needed();
+        let _ignored = self.clear_child_tid_if_needed(locked);
 
         let kernel = Arc::clone(self.kernel());
         let mut pids = kernel.pids.write();

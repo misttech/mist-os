@@ -61,4 +61,9 @@ lock_ordering! {
     // DeviceRegistty
     UninterruptibleLock => DeviceRegistryState,
     FileOpsCore => DeviceRegistryState,
+
+    // Terminal Level. No lock level should ever be defined after this. Can be used for any locks
+    // that is never acquired before any other lock.
+    UninterruptibleLock => TerminalLock,
+    FileOpsCore => TerminalLock,
 }

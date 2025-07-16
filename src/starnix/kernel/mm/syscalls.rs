@@ -567,7 +567,9 @@ fn do_futex<Key: FutexKey>(
             )?;
             Ok(0)
         }
-        FUTEX_WAKE => futexes.wake(current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY),
+        FUTEX_WAKE => {
+            futexes.wake(locked, current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY)
+        }
         FUTEX_WAKE_OP => {
             track_stub!(TODO("https://fxbug.dev/361181940"), "FUTEX_WAKE_OP");
             error!(ENOSYS)
@@ -584,7 +586,7 @@ fn do_futex<Key: FutexKey>(
             if value3 == 0 {
                 return error!(EINVAL);
             }
-            futexes.wake(current_task, addr, value as usize, value3)
+            futexes.wake(locked, current_task, addr, value as usize, value3)
         }
         FUTEX_REQUEUE | FUTEX_CMP_REQUEUE => {
             let wake_count = value as usize;
@@ -593,7 +595,15 @@ fn do_futex<Key: FutexKey>(
                 return error!(EINVAL);
             }
             let expected_value = if cmd == FUTEX_CMP_REQUEUE { Some(value3) } else { None };
-            futexes.requeue(current_task, addr, wake_count, requeue_count, addr2, expected_value)
+            futexes.requeue(
+                locked,
+                current_task,
+                addr,
+                wake_count,
+                requeue_count,
+                addr2,
+                expected_value,
+            )
         }
         FUTEX_WAIT_REQUEUE_PI => {
             track_stub!(TODO("https://fxbug.dev/361181558"), "FUTEX_WAIT_REQUEUE_PI");
@@ -604,7 +614,7 @@ fn do_futex<Key: FutexKey>(
             error!(ENOSYS)
         }
         FUTEX_LOCK_PI | FUTEX_LOCK_PI2 => {
-            futexes.lock_pi(current_task, addr, read_timeout(current_task)?)?;
+            futexes.lock_pi(locked, current_task, addr, read_timeout(current_task)?)?;
             Ok(0)
         }
         FUTEX_TRYLOCK_PI => {
@@ -612,7 +622,7 @@ fn do_futex<Key: FutexKey>(
             error!(ENOSYS)
         }
         FUTEX_UNLOCK_PI => {
-            futexes.unlock_pi(current_task, addr)?;
+            futexes.unlock_pi(locked, current_task, addr)?;
             Ok(0)
         }
         _ => {
@@ -633,7 +643,7 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
     let futexes = Key::get_table_from_task(current_task)?;
     let result = match deadline {
         TargetTime::Monotonic(mono_deadline) => {
-            futexes.wait(current_task, addr, value, mask, mono_deadline)
+            futexes.wait(locked, current_task, addr, value, mask, mono_deadline)
         }
         TargetTime::BootInstant(boot_deadline) => {
             let timer_slack = current_task.read().get_timerslack();

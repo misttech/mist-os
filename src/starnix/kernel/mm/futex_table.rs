@@ -6,7 +6,7 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::{CompareExchangeResult, ProtectionFlags};
 use crate::task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, Waiter};
 use futures::channel::oneshot;
-use starnix_sync::{InterruptibleEvent, Locked, Mutex, Unlocked};
+use starnix_sync::{InterruptibleEvent, LockBefore, Locked, OrderedMutex, TerminalLock, Unlocked};
 use starnix_types::futex_address::FutexAddress;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::UserAddress;
@@ -25,12 +25,12 @@ pub struct FutexTable<Key: FutexKey> {
     /// The futexes associated with each address in each VMO.
     ///
     /// This HashMap is populated on-demand when futexes are used.
-    state: Mutex<FutexTableState<Key>>,
+    state: OrderedMutex<FutexTableState<Key>, TerminalLock>,
 }
 
 impl<Key: FutexKey> Default for FutexTable<Key> {
     fn default() -> Self {
-        Self { state: Mutex::new(FutexTableState::default()) }
+        Self { state: OrderedMutex::new(FutexTableState::default()) }
     }
 }
 
@@ -49,7 +49,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         timer_slack: zx::BootDuration,
     ) -> Result<(), Errno> {
         let addr = FutexAddress::try_from(addr)?;
-        let mut state = self.state.lock();
+        let mut state = self.state.lock(locked);
         // As the state is locked, no wake can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
         // Acquire ordering to synchronize with userspace modifications to the value on other
@@ -85,16 +85,20 @@ impl<Key: FutexKey> FutexTable<Key> {
     /// Wait on the futex at the given address.
     ///
     /// See FUTEX_WAIT.
-    pub fn wait(
+    pub fn wait<L>(
         &self,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         addr: UserAddress,
         value: u32,
         mask: u32,
         deadline: zx::MonotonicInstant,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let addr = FutexAddress::try_from(addr)?;
-        let mut state = self.state.lock();
+        let mut state = self.state.lock(locked);
         // As the state is locked, no wake can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
         // Acquire ordering to synchronize with userspace modifications to the value on other
@@ -121,35 +125,43 @@ impl<Key: FutexKey> FutexTable<Key> {
     /// waiters actually woken.
     ///
     /// See FUTEX_WAKE.
-    pub fn wake(
+    pub fn wake<L>(
         &self,
+        locked: &mut Locked<L>,
         task: &Task,
         addr: UserAddress,
         count: usize,
         mask: u32,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let addr = FutexAddress::try_from(addr)?;
         let key = Key::get(task, addr)?;
-        Ok(self.state.lock().wake(key, count, mask))
+        Ok(self.state.lock(locked).wake(key, count, mask))
     }
 
     /// Requeue the waiters to another address.
     ///
     /// See FUTEX_CMP_REQUEUE
-    pub fn requeue(
+    pub fn requeue<L>(
         &self,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         addr: UserAddress,
         wake_count: usize,
         requeue_count: usize,
         new_addr: UserAddress,
         expected_value: Option<u32>,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let addr = FutexAddress::try_from(addr)?;
         let new_addr = FutexAddress::try_from(new_addr)?;
         let key = Key::get(current_task, addr)?;
         let new_key = Key::get(current_task, new_addr)?;
-        let mut state = self.state.lock();
+        let mut state = self.state.lock(locked);
         if let Some(expected) = expected_value {
             // Use acquire ordering here to synchronize with mutex impls that store w/ release
             // ordering.
@@ -188,14 +200,18 @@ impl<Key: FutexKey> FutexTable<Key> {
     /// Lock the futex at the given address.
     ///
     /// See FUTEX_LOCK_PI.
-    pub fn lock_pi(
+    pub fn lock_pi<L>(
         &self,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         addr: UserAddress,
         deadline: zx::MonotonicInstant,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let addr = FutexAddress::try_from(addr)?;
-        let mut state = self.state.lock();
+        let mut state = self.state.lock(locked);
         // As the state is locked, no unlock can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex unlock.
         let key = Key::get(current_task, addr)?;
@@ -267,9 +283,17 @@ impl<Key: FutexKey> FutexTable<Key> {
     /// Unlock the futex at the given address.
     ///
     /// See FUTEX_UNLOCK_PI.
-    pub fn unlock_pi(&self, current_task: &CurrentTask, addr: UserAddress) -> Result<(), Errno> {
+    pub fn unlock_pi<L>(
+        &self,
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let addr = FutexAddress::try_from(addr)?;
-        let mut state = self.state.lock();
+        let mut state = self.state.lock(locked);
         let tid = current_task.get_tid() as u32;
         let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
 
@@ -331,15 +355,19 @@ impl FutexTable<SharedFutexKey> {
     /// Wait on the futex at the given offset in the memory.
     ///
     /// See FUTEX_WAIT.
-    pub fn external_wait(
+    pub fn external_wait<L>(
         &self,
+        locked: &mut Locked<L>,
         memory: MemoryObject,
         offset: u64,
         value: u32,
         mask: u32,
-    ) -> Result<oneshot::Receiver<()>, Errno> {
+    ) -> Result<oneshot::Receiver<()>, Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
         let key = SharedFutexKey::new(&memory, offset);
-        let mut state = self.state.lock();
+        let mut state = self.state.lock(locked);
         // As the state is locked, no wake can happen before the waiter is registered.
         Self::external_check_futex_value(&memory, offset, value)?;
 
@@ -354,14 +382,18 @@ impl FutexTable<SharedFutexKey> {
     /// number of waiters actually woken.
     ///
     /// See FUTEX_WAKE.
-    pub fn external_wake(
+    pub fn external_wake<L>(
         &self,
+        locked: &mut Locked<L>,
         memory: MemoryObject,
         offset: u64,
         count: usize,
         mask: u32,
-    ) -> Result<usize, Errno> {
-        Ok(self.state.lock().wake(SharedFutexKey::new(&memory, offset), count, mask))
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<TerminalLock>,
+    {
+        Ok(self.state.lock(locked).wake(SharedFutexKey::new(&memory, offset), count, mask))
     }
 
     fn external_check_futex_value(

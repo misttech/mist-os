@@ -674,13 +674,14 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
     /// Serve the LutexController protocol.
     async fn serve_lutex_controller(
-        kernel: Arc<Kernel>,
+        locked_and_task: LockedAndTask<'_>,
         server_end: ServerEnd<fbinder::LutexControllerMarker>,
     ) -> Result<(), Error> {
         async fn handle_request(
-            kernel: &Kernel,
+            locked_and_task: &LockedAndTask<'_>,
             event: fbinder::LutexControllerRequest,
         ) -> Result<(), Error> {
+            let kernel = locked_and_task.current_task().kernel();
             match event {
                 fbinder::LutexControllerRequest::WaitBitset { payload, responder } => {
                     let deadline_and_receiver = (|| {
@@ -691,7 +692,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let deadline = payload.deadline.map(zx::MonotonicInstant::from_nanos);
                         kernel
                             .shared_futexes
-                            .external_wait(vmo.into(), offset, value, mask)
+                            .external_wait(
+                                &mut locked_and_task.unlocked(),
+                                vmo.into(),
+                                offset,
+                                value,
+                                mask,
+                            )
                             .map(|receiver| (deadline, receiver))
                     })();
                     let result = match deadline_and_receiver {
@@ -721,6 +728,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let count = payload.count.ok_or_else(|| errno!(EINVAL))?;
                         let mask = payload.mask.unwrap_or(u32::MAX);
                         kernel.shared_futexes.external_wake(
+                            &mut locked_and_task.unlocked(),
                             vmo.into(),
                             offset,
                             count as usize,
@@ -751,7 +759,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         );
         stream
             .map(|result| result.context("failed fbinder::LutexController request"))
-            .try_for_each_concurrent(None, |event| handle_request(&kernel, event))
+            .try_for_each_concurrent(None, |event| handle_request(&locked_and_task, event))
             .await
     }
 
@@ -1020,7 +1028,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         let handle = self.clone();
         current_task.kernel().kthreads.spawn_async_with_role(
             EXECUTOR_THREAD_ROLE,
-            async move |_: LockedAndTask<'_>| {
+            async move |locked_and_task: LockedAndTask<'_>| {
                 // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
                 // to keep a strong reference to the thread_group itself.
                 let kernel_and_drop_waiter = handle
@@ -1036,7 +1044,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 // Start the 3 servers.
                 let binder_fut = handle.clone().serve_dev_binder(dev_binder_server_end.into());
                 let lutex_fut = Self::serve_lutex_controller(
-                    kernel.clone(),
+                    locked_and_task,
                     lutex_controller_server_end.into(),
                 );
                 let power_fut = Self::serve_container_power_controller(
