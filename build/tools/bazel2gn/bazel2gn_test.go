@@ -351,33 +351,33 @@ func TestIDKConversion(t *testing.T) {
 			bazel: `load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
 
 idk_cc_source_library(
-	name = "magma_common",
+	name = "foo",
 	api_area = "Media",
 	category = "partner",
-	idk_name = "magma_common",
+	idk_name = "foobar",
 	stable = True,
-	hdrs = ["include/lib/magma_common/magma_common_defs.h"],
+	hdrs = ["include/lib/foobar/foobar_defs.h"],
 	hdrs_for_internal_use = ["path/to/internal.h"],
-	public_configs = [":magma_include"],
+	public_configs = [":foo_include"],
 	deps = ["//path/to/public_deps"],
 	implementation_deps = ["//path/to/implementation_deps"],
 	visibility = [ "//visibility:public" ],
 )
 `,
-			wantGN: `sdk_source_set("magma_common") {
+			wantGN: `sdk_source_set("foo") {
 	sdk_area = "Media"
 	category = "partner"
-	sdk_name = "magma_common"
+	sdk_name = "foobar"
 	stable = true
 	public = [
-		"include/lib/magma_common/magma_common_defs.h",
+		"include/lib/foobar/foobar_defs.h",
 	]
 	sdk_headers_for_internal_use = [
 		"path/to/internal.h",
 	]
 	public += sdk_headers_for_internal_use
 	public_configs = [
-		":magma_include",
+		":foo_include",
 	]
 	public_deps = [
 		"//path/to/public_deps",
