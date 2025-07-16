@@ -217,6 +217,67 @@ TEST(MmapTest, FileCreatedWithLessPermsShared) {
   SAFE_SYSCALL(unlink(path.c_str()));
 }
 
+TEST(MmapTest, CannotMmapNoexecAsExecutable) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities. skipping.";
+  }
+
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  test_helper::ScopedTempDir temp_dir;
+  SAFE_SYSCALL(mount(nullptr, temp_dir.path().c_str(), "tmpfs", MS_NOEXEC, nullptr));
+
+  std::string file_path = temp_dir.path() + "/executable_file";
+  close(SAFE_SYSCALL(creat(file_path.c_str(), 755)));
+  fbl::unique_fd fd(open(file_path.c_str(), O_RDONLY));
+
+  void* res = mmap(nullptr, page_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd.get(), 0);
+  EXPECT_EQ(res, MAP_FAILED);
+  EXPECT_EQ(errno, EPERM);
+  if (res != MAP_FAILED) {
+    munmap(res, page_size);
+  }
+}
+
+TEST(MmapTest, CanMprotectNonExecMmapToExecutable) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities. skipping.";
+  }
+
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  test_helper::ScopedTempDir temp_dir;
+  SAFE_SYSCALL(mount(nullptr, temp_dir.path().c_str(), "tmpfs", 0, nullptr));
+
+  std::string file_path = temp_dir.path() + "/executable_file";
+  close(SAFE_SYSCALL(creat(file_path.c_str(), 0755)));
+  fbl::unique_fd fd(open(file_path.c_str(), O_RDONLY));
+
+  void* res = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
+  ASSERT_NE(res, MAP_FAILED);
+
+  EXPECT_THAT(mprotect(res, page_size, PROT_READ | PROT_EXEC), SyscallSucceeds());
+  munmap(res, page_size);
+}
+
+TEST(MmapTest, CannotMprotectNoexecAsExecutable) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities. skipping.";
+  }
+
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  test_helper::ScopedTempDir temp_dir;
+  SAFE_SYSCALL(mount(nullptr, temp_dir.path().c_str(), "tmpfs", MS_NOEXEC, nullptr));
+
+  std::string file_path = temp_dir.path() + "/executable_file";
+  close(SAFE_SYSCALL(creat(file_path.c_str(), 0755)));
+  fbl::unique_fd fd(open(file_path.c_str(), O_RDONLY));
+
+  void* res = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
+  ASSERT_NE(res, MAP_FAILED);
+
+  EXPECT_THAT(mprotect(res, page_size, PROT_READ | PROT_EXEC), SyscallFailsWithErrno(EACCES));
+  munmap(res, page_size);
+}
+
 class MMapProcTest : public ProcTestBase {};
 
 TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
