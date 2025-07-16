@@ -357,6 +357,7 @@ idk_cc_source_library(
 	idk_name = "magma_common",
 	stable = True,
 	hdrs = ["include/lib/magma_common/magma_common_defs.h"],
+	hdrs_for_internal_use = ["path/to/internal.h"],
 	public_configs = [":magma_include"],
 	deps = ["//path/to/public_deps"],
 	implementation_deps = ["//path/to/implementation_deps"],
@@ -371,6 +372,10 @@ idk_cc_source_library(
 	public = [
 		"include/lib/magma_common/magma_common_defs.h",
 	]
+	sdk_headers_for_internal_use = [
+		"path/to/internal.h",
+	]
+	public += sdk_headers_for_internal_use
 	public_configs = [
 		":magma_include",
 	]

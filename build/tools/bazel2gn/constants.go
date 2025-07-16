@@ -89,6 +89,12 @@ var idkAttrMap = map[string]string{
 	"deps":                "public_deps",
 	"idk_name":            "sdk_name",
 	"implementation_deps": "deps",
+
+	// These are not identical because files in `hdrs_for_internal_use` need
+	// to be added to GN's `public` as well. This takes care of populating
+	// `sdk_headers_for_internal_use`, and `attrAssignmentToGN()` adds the files
+	// to `public`.
+	"hdrs_for_internal_use": "sdk_headers_for_internal_use",
 }
 
 // A mapping from Bazel rule names to attribute mappings.
