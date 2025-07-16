@@ -88,6 +88,9 @@ toc:
   - title: "Starnix"
     section:
     - include: /docs/development/starnix/_toc.yaml
+  - title: "Storage"
+    section:
+    - include: /docs/development/storage/_toc.yaml
   - title: "UI-Input"
     section:
     - include: /docs/development/ui-input/_toc.yaml
