@@ -407,6 +407,7 @@ void DebugAgentServer::OnUnboundFn(DebugAgentServer* impl, fidl::UnbindInfo info
   if (!debug_agent_)
     return;
 
+  LOGS(Info) << "DebugAgentServer is shutting down!";
   debug_agent_->RemoveObserver(this);
 }
 

@@ -404,9 +404,6 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
       (void)suite_controller_.UnbindMaybeGetEndpoint();  // Otherwise run_controller won't return.
       if (result.is_error())
         LOGS(Warn) << "Failed to launch test: " << result.error_value();
-      if (result->events().empty()) {
-        LOGS(Warn) << "No more events from test suite controller.";
-      }
       if (component_manager_)
         component_manager_->running_tests_info_.erase(test_url_);
       return;
