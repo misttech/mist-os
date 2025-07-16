@@ -25,6 +25,28 @@ class FuchsiaPowerManager final : public TimeoutSource {
     zx::event on_ready_for_work_token;
   };
 
+  class HardwareElementRunner : public fidl::Server<fuchsia_power_broker::ElementRunner> {
+   public:
+    explicit HardwareElementRunner(FuchsiaPowerManager& p) : parent_(p) {}
+    void SetLevel(fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+                  SetLevelCompleter::Sync& completer) override;
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+        fidl::UnknownMethodCompleter::Sync& completer) override;
+
+   private:
+    FuchsiaPowerManager& parent_;
+  };
+
+  class OnReadyForWorkElementRunner : public fidl::Server<fuchsia_power_broker::ElementRunner> {
+   public:
+    void SetLevel(fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+                  SetLevelCompleter::Sync& completer) override;
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+        fidl::UnknownMethodCompleter::Sync& completer) override;
+  };
+
   explicit FuchsiaPowerManager(Owner* owner);
 
   bool Initialize(ParentDevice* parent_device, inspect::Node& node);
@@ -56,13 +78,17 @@ class FuchsiaPowerManager final : public TimeoutSource {
 
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_end_;
-  fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
+  HardwareElementRunner hardware_power_element_runner_server_;
+  std::optional<fidl::ServerBindingRef<fuchsia_power_broker::ElementRunner>>
+      hardware_power_element_runner_server_bindref_;
   std::vector<zx::event> assertive_power_dep_tokens_;
   std::vector<zx::event> opportunistic_power_dep_tokens_;
 
   zx::event on_ready_for_work_token_;
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> on_ready_for_work_control_client_end_;
-  std::optional<fdf_power::ElementRunner> on_ready_for_work_runner_;
+  OnReadyForWorkElementRunner on_ready_for_work_element_runner_server_;
+  std::optional<fidl::ServerBindingRef<fuchsia_power_broker::ElementRunner>>
+      on_ready_for_work_element_runner_server_bindref_;
 
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end_;
 

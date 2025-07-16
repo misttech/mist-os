@@ -10,7 +10,8 @@
 #include <lib/driver/power/cpp/types.h>
 #include <lib/fit/defer.h>
 
-FuchsiaPowerManager::FuchsiaPowerManager(Owner* owner) : owner_(owner) {}
+FuchsiaPowerManager::FuchsiaPowerManager(Owner* owner)
+    : owner_(owner), hardware_power_element_runner_server_(*this) {}
 
 bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node& node) {
   if (!parent_device->incoming()) {
@@ -46,8 +47,12 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
       return false;
     }
 
+    fidl::Endpoints<fuchsia_power_broker::ElementRunner> element_runner =
+        fidl::Endpoints<fuchsia_power_broker::ElementRunner>::Create();
     fdf_power::ElementDesc description =
-        fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+        fdf_power::ElementDescBuilder(config, std::move(tokens.value()))
+            .SetElementRunner(std::move(element_runner.client))
+            .Build();
     auto result = fdf_power::AddElement(power_broker.value(), description);
     if (result.is_error()) {
       MAGMA_LOG(ERROR, "Failed to add power element: %u",
@@ -60,15 +65,11 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
           std::move(description.element_control_client.value());
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client.value()));
-      hardware_power_current_level_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client.value()));
-      hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-          std::move(description.required_level_client.value()),
-          fdf::Dispatcher::GetCurrent()->async_dispatcher());
       description.assertive_token.duplicate(ZX_RIGHT_SAME_RIGHTS,
                                             &hardware_element_assertive_token);
-
+      hardware_power_element_runner_server_bindref_ = fidl::BindServer(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(element_runner.server),
+          &hardware_power_element_runner_server_);
     } else {
       MAGMA_LOG(INFO, "Got unexpected power element %s", config.element.name.c_str());
     }
@@ -106,6 +107,11 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     fdf_power::ElementDesc description =
         fdf_power::ElementDescBuilder(config, std::move(tokens)).Build();
     auto result = fdf_power::AddElement(power_broker.value(), description);
+    fidl::Endpoints<fuchsia_power_broker::ElementRunner> element_runner =
+        fidl::Endpoints<fuchsia_power_broker::ElementRunner>::Create();
+    on_ready_for_work_element_runner_server_bindref_ = fidl::BindServer(
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(element_runner.server),
+        &on_ready_for_work_element_runner_server_);
     if (result.is_error()) {
       MAGMA_LOG(ERROR, "Failed to add power element: %u",
                 static_cast<uint8_t>(result.error_value()));
@@ -113,16 +119,8 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     }
     on_ready_for_work_token_ = std::move(description.assertive_token);
     on_ready_for_work_control_client_end_ = std::move(description.element_control_client.value());
-    on_ready_for_work_runner_.emplace(
-        kOnReadyForWorkPowerElementName, std::move(description.required_level_client.value()),
-        std::move(description.current_level_client.value()),
-        [](uint8_t new_level) { return fit::ok(new_level); },
-        [](fdf_power::ElementRunnerError error) {},
-        fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    on_ready_for_work_runner_->RunPowerElement();
   }
 
-  CheckRequiredLevel();
   MAGMA_LOG(INFO, "Using power framework to manage GPU power");
 
   return true;
@@ -162,39 +160,37 @@ zx_status_t FuchsiaPowerManager::AcquireLease(
   return ZX_OK;
 }
 
-void FuchsiaPowerManager::CheckRequiredLevel() {
-  fidl::Arena<> arena;
-  hardware_power_required_level_client_.buffer(arena)->Watch().Then(
-      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
-        auto defer = fit::defer([&]() { CheckRequiredLevel(); });
-        if (!result.ok()) {
-          // TODO(https://fxbug.dev/340219979): Handle failures without spinning.
-          MAGMA_LOG(ERROR, "Call to Watch failed %s", result.status_string());
-          defer.cancel();
-          return;
-        }
-        if (result->is_error()) {
-          // TODO(https://fxbug.dev/340219979): Handle failures without spinning.
-          MAGMA_LOG(ERROR, "Watch returned error %d", static_cast<uint32_t>(result->error_value()));
-          defer.cancel();
-          return;
-        }
-        uint8_t required_level = result->value()->required_level;
-        required_power_level_.Set(required_level);
+void FuchsiaPowerManager::HardwareElementRunner::SetLevel(
+    fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+    SetLevelCompleter::Sync& set_level_completer) {
+  uint8_t required_level = request.level();
+  parent_.required_power_level_.Set(required_level);
 
-        bool enabled = required_level == kPoweredUpPowerLevel;
-        owner_->PostPowerStateChange(enabled, [this](bool powered_on) {
-          uint8_t new_level = powered_on ? kPoweredUpPowerLevel : kPoweredDownPowerLevel;
-          current_power_level_.Set(new_level);
-          auto result = hardware_power_current_level_client_->Update(new_level);
-          if (!result.ok()) {
-            MAGMA_LOG(ERROR, "Call to Update failed: %s", result.status_string());
-          } else if (result->is_error()) {
-            MAGMA_LOG(ERROR, "Update returned failure %d",
-                      static_cast<uint32_t>(result->error_value()));
-          }
-        });
+  bool enabled = required_level == kPoweredUpPowerLevel;
+  parent_.owner_->PostPowerStateChange(
+      enabled, [this, completer = set_level_completer.ToAsync()](bool powered_on) mutable {
+        uint8_t new_level = powered_on ? kPoweredUpPowerLevel : kPoweredDownPowerLevel;
+        parent_.current_power_level_.Set(new_level);
+        completer.Reply();
       });
+}
+
+void FuchsiaPowerManager::HardwareElementRunner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  MAGMA_LOG(ERROR, "ElementRunner received unknown method %lu", metadata.method_ordinal);
+}
+
+void FuchsiaPowerManager::OnReadyForWorkElementRunner::SetLevel(
+    fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+    SetLevelCompleter::Sync& set_level_completer) {
+  set_level_completer.Reply();
+}
+
+void FuchsiaPowerManager::OnReadyForWorkElementRunner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  MAGMA_LOG(ERROR, "ElementRunner received unknown method %lu", metadata.method_ordinal);
 }
 
 TimeoutSource::Clock::time_point FuchsiaPowerManager::GetCurrentTimeoutPoint() {
