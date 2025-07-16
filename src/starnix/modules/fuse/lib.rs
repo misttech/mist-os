@@ -26,8 +26,8 @@ use starnix_core::vfs::{
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    AtomicMonotonicInstant, DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard,
-    RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
+    AtomicMonotonicInstant, FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_types::time::{duration_from_timespec, time_from_timespec, NANOS_PER_SECOND};
@@ -96,7 +96,7 @@ struct DevFuse {
 }
 
 pub fn open_fuse_device(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,

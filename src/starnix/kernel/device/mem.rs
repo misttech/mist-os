@@ -19,7 +19,7 @@ use crate::vfs::{
     FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
 };
 use starnix_logging::{log_info, track_stub, Level};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -263,7 +263,7 @@ impl FileOps for DevRandom {
 }
 
 pub fn open_kmsg(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,

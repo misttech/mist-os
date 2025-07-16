@@ -16,7 +16,7 @@ use starnix_core::vfs::{
     FsNodeOps,
 };
 use starnix_logging::{bug_ref, log_error};
-use starnix_sync::{DeviceOpen, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::{DeviceType, ZRAM_MAJOR};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -38,7 +38,7 @@ impl ZramDevice {
 impl DeviceOps for ZramDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,

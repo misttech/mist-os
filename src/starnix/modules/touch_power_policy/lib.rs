@@ -9,7 +9,7 @@ use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, FsNode,
 };
 use starnix_logging::{log_error, log_info};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -68,7 +68,7 @@ impl TouchPowerPolicyDevice {
 impl DeviceOps for TouchPowerPolicyDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
         _node: &FsNode,

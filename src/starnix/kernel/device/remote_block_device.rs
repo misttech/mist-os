@@ -11,7 +11,7 @@ use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
 use anyhow::Error;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, REMOTE_BLOCK_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -208,7 +208,7 @@ impl FileOps for RemoteBlockDeviceFile {
 }
 
 fn open_remote_block_device(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,

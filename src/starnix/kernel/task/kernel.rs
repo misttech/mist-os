@@ -44,7 +44,7 @@ use once_cell::sync::OnceCell;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
 use starnix_logging::{log_debug, log_error, log_info, log_warn};
 use starnix_sync::{
-    DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, Mutex, OrderedMutex,
+    FileOpsCore, KernelIpTables, KernelSwapFiles, LockEqualOrBefore, Locked, Mutex, OrderedMutex,
     OrderedRwLock, RwLock,
 };
 use starnix_types::ownership::{TempRef, WeakRef};
@@ -642,7 +642,7 @@ impl Kernel {
         mode: DeviceMode,
     ) -> Result<Box<dyn FileOps>, Errno>
     where
-        L: LockBefore<DeviceOpen>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.device_registry.open_device(locked, current_task, node, flags, dev, mode)
     }

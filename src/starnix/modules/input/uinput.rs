@@ -22,7 +22,7 @@ use starnix_core::vfs::{
     self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
 };
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::INPUT_MAJOR;
 use starnix_uapi::errors::Errno;
@@ -105,7 +105,7 @@ impl UinputDevice {
 impl DeviceOps for UinputDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,
@@ -527,7 +527,7 @@ pub struct VirtualDevice {
 impl DeviceOps for VirtualDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,

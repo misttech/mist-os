@@ -19,7 +19,7 @@ use starnix_core::vfs::{
 };
 use starnix_ext::map_ext::EntryExt;
 use starnix_logging::track_stub;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::device_type::{DeviceType, LOOP_MAJOR};
@@ -720,7 +720,7 @@ impl LoopDeviceRegistry {
 }
 
 pub fn create_loop_control_device(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -779,7 +779,7 @@ impl FileOps for LoopControlDevice {
 }
 
 fn get_or_create_loop_device(
-    locked: &mut Locked<DeviceOpen>,
+    locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,

@@ -15,7 +15,7 @@ use starnix_core::fs_node_impl_not_dir;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -89,7 +89,7 @@ fn connect(socket_label: Arc<FsString>) -> Result<Box<dyn FileOps>, Errno> {
 impl DeviceOps for SocketTunnelFile {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,

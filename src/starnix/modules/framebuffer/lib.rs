@@ -17,7 +17,7 @@ use starnix_core::vfs::{
     fileops_impl_memory, fileops_impl_noop_sync, CloseFreeSafe, FileObject, FileOps, FsNode,
 };
 use starnix_logging::{log_info, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -228,7 +228,7 @@ struct FramebufferDevice {
 impl DeviceOps for FramebufferDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         dev: DeviceType,
         node: &FsNode,

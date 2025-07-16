@@ -36,8 +36,8 @@ use starnix_logging::{
     track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
-    ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockEqualOrBefore, Locked,
-    Mutex, MutexGuard, ResourceAccessorLevel, RwLock, Unlocked,
+    ordered_lock_vec, FileOpsCore, InterruptibleEvent, LockEqualOrBefore, Locked, Mutex,
+    MutexGuard, ResourceAccessorLevel, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::convert::IntoFidl as _;
@@ -152,7 +152,7 @@ impl Deref for BinderDevice {
 impl DeviceOps for BinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -5362,7 +5362,7 @@ struct BinderControlDevice {
 impl DeviceOps for BinderControlDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
         _node: &FsNode,
@@ -8007,7 +8007,7 @@ pub mod tests {
             FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
 
-        let locked = locked.cast_locked::<DeviceOpen>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         FileObject::new_anonymous(
             current_task,
             binder_driver

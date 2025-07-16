@@ -18,7 +18,7 @@ use crate::vfs::{
 };
 use starnix_logging::track_stub;
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, ProcessGroupState, Unlocked,
+    FileOpsCore, LockBefore, LockEqualOrBefore, Locked, ProcessGroupState, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::vfs::default_statfs;
@@ -301,7 +301,7 @@ impl DevPtsDevice {
 impl DeviceOps for Arc<DevPtsDevice> {
     fn open(
         &self,
-        locked: &mut Locked<DeviceOpen>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         id: DeviceType,
         _node: &FsNode,

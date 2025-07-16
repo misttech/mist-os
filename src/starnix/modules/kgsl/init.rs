@@ -7,7 +7,7 @@ use starnix_core::device::DeviceOps;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_logging::log_info;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -18,7 +18,7 @@ struct KgslDeviceBuilder {}
 impl DeviceOps for KgslDeviceBuilder {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,

@@ -6,14 +6,14 @@ use rutabaga_gfx::{RutabagaBuilder, RutabagaComponentType, RutabagaFenceHandler}
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_logging::log_error;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 
 fn create_gpu_device(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     _current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,

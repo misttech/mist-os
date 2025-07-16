@@ -11,7 +11,7 @@ use crate::vfs::{FileOps, FsNode, FsString, VecInputBuffer, VecOutputBuffer};
 use anyhow::Error;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_serial as fserial;
-use starnix_sync::{DeviceOpen, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::{DeviceType, TTY_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
@@ -120,7 +120,7 @@ impl SerialDevice {
 impl DeviceOps for Arc<SerialDevice> {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,

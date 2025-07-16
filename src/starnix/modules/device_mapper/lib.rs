@@ -22,7 +22,7 @@ use starnix_core::vfs::{
 };
 use starnix_ext::map_ext::EntryExt;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, DEVICE_MAPPER_MAJOR, LOOP_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -1192,7 +1192,7 @@ impl FileOps for DeviceMapper {
 }
 
 pub fn create_device_mapper(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -1202,7 +1202,7 @@ pub fn create_device_mapper(
 }
 
 fn get_or_create_dm_device(
-    locked: &mut Locked<DeviceOpen>,
+    locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,

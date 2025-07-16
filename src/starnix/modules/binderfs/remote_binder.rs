@@ -26,7 +26,7 @@ use starnix_logging::{
     log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,
     CATEGORY_STARNIX,
 };
-use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::device_type::DeviceType;
@@ -86,7 +86,7 @@ pub struct RemoteBinderDevice {}
 impl DeviceOps for RemoteBinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,

@@ -11,7 +11,7 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 #[cfg(test)]
 use starnix_sync::Unlocked;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::device_type::{DeviceType, INPUT_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -317,7 +317,7 @@ impl InputDevice {
 impl DeviceOps for InputDevice {
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,

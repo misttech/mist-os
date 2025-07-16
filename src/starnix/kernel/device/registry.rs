@@ -23,7 +23,7 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, MappedMutexGuard, MutexGuard};
+use starnix_sync::{FileOpsCore, Locked, MappedMutexGuard, MutexGuard};
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::ops::{Deref, Range};
 use std::sync::Arc;
@@ -65,7 +65,7 @@ pub trait DeviceOps: DynClone + Send + Sync + AsAny + 'static {
     /// assigned to this device.
     fn open(
         &self,
-        _locked: &mut Locked<DeviceOpen>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
         _node: &FsNode,
@@ -87,7 +87,7 @@ where
         + Sync
         + Clone
         + Fn(
-            &mut Locked<DeviceOpen>,
+            &mut Locked<FileOpsCore>,
             &CurrentTask,
             DeviceType,
             &FsNode,
@@ -97,7 +97,7 @@ where
 {
     fn open(
         &self,
-        locked: &mut Locked<DeviceOpen>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,
@@ -109,7 +109,7 @@ where
 
 /// A simple `DeviceOps` function for any device that implements `FileOps + Default`.
 pub fn simple_device_ops<T: Default + FileOps + 'static>(
-    _locked: &mut Locked<DeviceOpen>,
+    _locked: &mut Locked<FileOpsCore>,
     _current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -763,9 +763,9 @@ impl DeviceRegistry {
         mode: DeviceMode,
     ) -> Result<Box<dyn FileOps>, Errno>
     where
-        L: LockBefore<DeviceOpen>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
-        let locked = locked.cast_locked::<DeviceOpen>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         let dev_ops = self.devices(locked, mode).get(device_type)?;
         dev_ops.open(locked, current_task, device_type, node, flags)
     }
@@ -959,7 +959,7 @@ mod tests {
         let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         fn create_test_device(
-            _locked: &mut Locked<DeviceOpen>,
+            _locked: &mut Locked<FileOpsCore>,
             _current_task: &CurrentTask,
             _id: DeviceType,
             _node: &FsNode,
