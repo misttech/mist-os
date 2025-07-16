@@ -967,7 +967,7 @@ void ReplyAndWait(const Message& request, uint32_t message_count, fdf::Channel s
                   async::Loop* process_loop, std::atomic<const char*>* error,
                   zx::event* wait_for_event) {
   // Make a separate dispatcher for the server.
-  int fake_driver;  // For creating a fake pointer to the driver.
+  int fake_driver = 0;  // For creating a fake pointer to the driver.
   libsync::Completion shutdown_completion;
   auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
   auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(

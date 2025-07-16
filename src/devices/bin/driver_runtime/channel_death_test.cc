@@ -13,7 +13,7 @@
 
 TEST(ChannelDeathTest, CloseCrashesIfPendingWaitNotCancelled) {
   test_utils::RunWithLsanDisabled([&] {
-    uint32_t fake_driver;
+    uint32_t fake_driver = 0;
     thread_context::PushDriver(&fake_driver);
     auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
