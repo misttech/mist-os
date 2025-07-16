@@ -24,13 +24,6 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display/EventId`.
 using EventId = display::internal::IdType<display::internal::EventIdTraits>;
 
-constexpr EventId ToEventId(fuchsia_hardware_display::wire::EventId fidl_event_id) {
-  return EventId(fidl_event_id);
-}
-constexpr fuchsia_hardware_display::wire::EventId ToFidlEventId(EventId event_id) {
-  return event_id.ToFidl();
-}
-
 constexpr EventId kInvalidEventId(fuchsia_hardware_display_types::wire::kInvalidDispId);
 
 }  // namespace display

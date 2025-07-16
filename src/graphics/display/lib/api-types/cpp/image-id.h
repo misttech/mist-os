@@ -27,13 +27,6 @@ namespace display {
 // coordinator and the display drivers.
 using ImageId = display::internal::IdType<display::internal::ImageIdTraits>;
 
-constexpr ImageId ToImageId(fuchsia_hardware_display::wire::ImageId fidl_image_id) {
-  return ImageId(fidl_image_id);
-}
-constexpr fuchsia_hardware_display::wire::ImageId ToFidlImageId(ImageId image_id) {
-  return image_id.ToFidl();
-}
-
 constexpr ImageId kInvalidImageId(fuchsia_hardware_display_types::wire::kInvalidDispId);
 
 }  // namespace display

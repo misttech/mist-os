@@ -32,21 +32,6 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display.engine/ConfigStamp`.
 using DriverConfigStamp = display::internal::IdType<display::internal::DriverConfigStampTraits>;
 
-constexpr DriverConfigStamp ToDriverConfigStamp(const config_stamp_t& banjo_driver_config_stamp) {
-  return DriverConfigStamp(banjo_driver_config_stamp);
-}
-constexpr DriverConfigStamp ToDriverConfigStamp(
-    fuchsia_hardware_display_engine::wire::ConfigStamp fidl_driver_config_stamp) {
-  return DriverConfigStamp(fidl_driver_config_stamp);
-}
-constexpr config_stamp_t ToBanjoDriverConfigStamp(DriverConfigStamp driver_config_stamp) {
-  return driver_config_stamp.ToBanjo();
-}
-constexpr fuchsia_hardware_display_engine::wire::ConfigStamp ToFidlDriverConfigStamp(
-    DriverConfigStamp driver_config_stamp) {
-  return driver_config_stamp.ToFidl();
-}
-
 constexpr DriverConfigStamp kInvalidDriverConfigStamp(
     fuchsia_hardware_display_engine::wire::kInvalidConfigStampValue);
 

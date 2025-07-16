@@ -26,16 +26,6 @@ namespace display {
 // display coordinator and the display drivers.
 using BufferCollectionId = display::internal::IdType<display::internal::BufferCollectionIdTraits>;
 
-constexpr BufferCollectionId ToBufferCollectionId(
-    fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id) {
-  return BufferCollectionId(fidl_buffer_collection_id);
-}
-
-constexpr fuchsia_hardware_display::wire::BufferCollectionId ToFidlBufferCollectionId(
-    BufferCollectionId buffer_collection_id) {
-  return buffer_collection_id.ToFidl();
-}
-
 }  // namespace display
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_BUFFER_COLLECTION_ID_H_

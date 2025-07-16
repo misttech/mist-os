@@ -35,26 +35,6 @@ namespace display {
 using DriverBufferCollectionId =
     display::internal::IdType<display::internal::DriverBufferCollectionIdTraits>;
 
-constexpr DriverBufferCollectionId ToDriverBufferCollectionId(
-    uint64_t banjo_driver_buffer_collection_id) {
-  return DriverBufferCollectionId(banjo_driver_buffer_collection_id);
-}
-
-constexpr DriverBufferCollectionId ToDriverBufferCollectionId(
-    fuchsia_hardware_display_engine::wire::BufferCollectionId fidl_driver_buffer_collection_id) {
-  return DriverBufferCollectionId(fidl_driver_buffer_collection_id);
-}
-
-constexpr uint64_t ToBanjoDriverBufferCollectionId(
-    DriverBufferCollectionId driver_buffer_collection_id) {
-  return driver_buffer_collection_id.ToBanjo();
-}
-
-constexpr fuchsia_hardware_display_engine::wire::BufferCollectionId ToFidlDriverBufferCollectionId(
-    DriverBufferCollectionId driver_buffer_collection_id) {
-  return driver_buffer_collection_id.ToFidl();
-}
-
 }  // namespace display
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DRIVER_BUFFER_COLLECTION_ID_H_

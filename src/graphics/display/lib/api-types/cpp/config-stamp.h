@@ -24,13 +24,6 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display/ConfigStamp`.
 using ConfigStamp = display::internal::IdType<display::internal::ConfigStampTraits>;
 
-constexpr ConfigStamp ToConfigStamp(fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp) {
-  return ConfigStamp(fidl_config_stamp);
-}
-constexpr fuchsia_hardware_display::wire::ConfigStamp ToFidlConfigStamp(ConfigStamp config_stamp) {
-  return config_stamp.ToFidl();
-}
-
 constexpr ConfigStamp kInvalidConfigStamp(fuchsia_hardware_display::wire::kInvalidConfigStampValue);
 
 }  // namespace display

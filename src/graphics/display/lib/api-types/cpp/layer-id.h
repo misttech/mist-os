@@ -28,12 +28,6 @@ namespace display {
 // coordinator and the display drivers.
 using LayerId = display::internal::IdType<display::internal::LayerIdTraits>;
 
-constexpr LayerId ToLayerId(fuchsia_hardware_display::wire::LayerId fidl_layer_id) {
-  return LayerId(fidl_layer_id);
-}
-constexpr fuchsia_hardware_display::wire::LayerId ToFidlLayerId(LayerId layer_id) {
-  return layer_id.ToFidl();
-}
 constexpr LayerId kInvalidLayerId(fuchsia_hardware_display_types::wire::kInvalidDispId);
 
 }  // namespace display

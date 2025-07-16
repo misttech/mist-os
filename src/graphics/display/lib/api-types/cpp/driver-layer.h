@@ -121,7 +121,7 @@ constexpr bool DriverLayer::IsValid(
   const Rectangle image_source = Rectangle::From(fidl_layer.image_source);
 
   // Constraints on `image_id`.
-  const DriverImageId image_id = ToDriverImageId(fidl_layer.image_id);
+  const DriverImageId image_id = DriverImageId(fidl_layer.image_id);
   if (image_source.dimensions().IsEmpty() && (image_id != kInvalidDriverImageId)) {
     return false;
   }
@@ -176,7 +176,7 @@ constexpr bool DriverLayer::IsValid(const layer_t& banjo_layer) {
   const Rectangle image_source = Rectangle::From(banjo_layer.image_source);
 
   // Constraints on `image_id`.
-  const DriverImageId image_id = ToDriverImageId(banjo_layer.image_handle);
+  const DriverImageId image_id = DriverImageId(banjo_layer.image_handle);
   if (image_source.dimensions().IsEmpty() && (image_id != kInvalidDriverImageId)) {
     return false;
   }
@@ -229,7 +229,7 @@ constexpr DriverLayer::DriverLayer(const DriverLayer::ConstructorArgs& args)
 constexpr DriverLayer::DriverLayer(const fuchsia_hardware_display_engine::wire::Layer& fidl_layer)
     : display_destination_(Rectangle::From(fidl_layer.display_destination)),
       image_source_(Rectangle::From(fidl_layer.image_source)),
-      image_id_(ToDriverImageId(fidl_layer.image_id)),
+      image_id_(DriverImageId(fidl_layer.image_id)),
       image_metadata_(fidl_layer.image_metadata),
       fallback_color_(Color::From(fidl_layer.fallback_color)),
       alpha_mode_(fidl_layer.alpha_mode),
@@ -241,7 +241,7 @@ constexpr DriverLayer::DriverLayer(const fuchsia_hardware_display_engine::wire::
 constexpr DriverLayer::DriverLayer(const layer_t& banjo_layer)
     : display_destination_(Rectangle::From(banjo_layer.display_destination)),
       image_source_(Rectangle::From(banjo_layer.image_source)),
-      image_id_(ToDriverImageId(banjo_layer.image_handle)),
+      image_id_(DriverImageId(banjo_layer.image_handle)),
       image_metadata_(banjo_layer.image_metadata),
       fallback_color_(Color::From(banjo_layer.fallback_color)),
       alpha_mode_(banjo_layer.alpha_mode),
@@ -264,7 +264,7 @@ constexpr fuchsia_hardware_display_engine::wire::Layer DriverLayer::ToFidl() con
   return fuchsia_hardware_display_engine::wire::Layer{
       .display_destination = display_destination_.ToFidl(),
       .image_source = image_source_.ToFidl(),
-      .image_id = ToFidlDriverImageId(image_id_),
+      .image_id = image_id_.ToFidl(),
       .image_metadata = image_metadata_.ToFidl(),
       .fallback_color = fallback_color_.ToFidl(),
       .alpha_mode = alpha_mode_.ToFidl(),
@@ -277,7 +277,7 @@ constexpr layer_t DriverLayer::ToBanjo() const {
   return layer_t{
       .display_destination = display_destination_.ToBanjo(),
       .image_source = image_source_.ToBanjo(),
-      .image_handle = ToBanjoDriverImageId(image_id_),
+      .image_handle = image_id_.ToBanjo(),
       .image_metadata = image_metadata_.ToBanjo(),
       .fallback_color = fallback_color_.ToBanjo(),
       .alpha_mode = alpha_mode_.ToBanjo(),
@@ -319,7 +319,7 @@ constexpr void DriverLayer::DebugAssertIsValid(
   const Rectangle image_source = Rectangle::From(fidl_layer.image_source);
 
   // Constraints on `image_id`.
-  const DriverImageId image_id = ToDriverImageId(fidl_layer.image_id);
+  const DriverImageId image_id = DriverImageId(fidl_layer.image_id);
   ZX_DEBUG_ASSERT(!image_source.dimensions().IsEmpty() || image_id == kInvalidDriverImageId);
 
   // Constraints on `image_metadata`.
@@ -352,7 +352,7 @@ constexpr void DriverLayer::DebugAssertIsValid(const layer_t& banjo_layer) {
   const Rectangle image_source = Rectangle::From(banjo_layer.image_source);
 
   // Constraints on `image_id`.
-  const DriverImageId image_id = ToDriverImageId(banjo_layer.image_handle);
+  const DriverImageId image_id = DriverImageId(banjo_layer.image_handle);
   ZX_DEBUG_ASSERT(!image_source.dimensions().IsEmpty() || image_id == kInvalidDriverImageId);
 
   // Constraints on `image_metadata`.

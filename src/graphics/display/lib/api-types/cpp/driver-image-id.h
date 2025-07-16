@@ -34,24 +34,6 @@ namespace display {
 // when unifying image ID namespaces.
 using DriverImageId = display::internal::IdType<display::internal::DriverImageIdTraits>;
 
-constexpr DriverImageId ToDriverImageId(uint64_t banjo_driver_image_id) {
-  return DriverImageId(banjo_driver_image_id);
-}
-
-constexpr DriverImageId ToDriverImageId(
-    fuchsia_hardware_display_engine::wire::ImageId fidl_driver_image_id) {
-  return DriverImageId(fidl_driver_image_id);
-}
-
-constexpr uint64_t ToBanjoDriverImageId(DriverImageId driver_image_id) {
-  return driver_image_id.ToBanjo();
-}
-
-constexpr fuchsia_hardware_display_engine::wire::ImageId ToFidlDriverImageId(
-    DriverImageId driver_image_id) {
-  return driver_image_id.ToFidl();
-}
-
 constexpr DriverImageId kInvalidDriverImageId(INVALID_ID);
 
 }  // namespace display

@@ -31,17 +31,6 @@ namespace display {
 using DriverCaptureImageId =
     display::internal::IdType<display::internal::DriverCaptureImageIdTraits>;
 
-constexpr DriverCaptureImageId ToDriverCaptureImageId(uint64_t banjo_driver_capture_image_id) {
-  return DriverCaptureImageId(banjo_driver_capture_image_id);
-}
-constexpr uint64_t ToBanjoDriverCaptureImageId(DriverCaptureImageId driver_capture_image_id) {
-  return driver_capture_image_id.ToBanjo();
-}
-constexpr inline fuchsia_hardware_display_engine::wire::ImageId ToFidlDriverCaptureImageId(
-    DriverCaptureImageId driver_capture_image_id) {
-  return driver_capture_image_id.ToFidl();
-}
-
 constexpr DriverCaptureImageId kInvalidDriverCaptureImageId(INVALID_ID);
 
 }  // namespace display

@@ -24,20 +24,6 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display/VsyncAckCookie`.
 using VsyncAckCookie = display::internal::IdType<display::internal::VsyncAckCookieTraits>;
 
-constexpr VsyncAckCookie ToVsyncAckCookie(uint64_t fidl_vsync_ack_cookie_value) {
-  return VsyncAckCookie(fidl_vsync_ack_cookie_value);
-}
-
-constexpr VsyncAckCookie ToVsyncAckCookie(
-    fuchsia_hardware_display::wire::VsyncAckCookie fidl_vsync_ack_cookie) {
-  return VsyncAckCookie(fidl_vsync_ack_cookie);
-}
-
-constexpr fuchsia_hardware_display::wire::VsyncAckCookie ToFidlVsyncAckCookie(
-    VsyncAckCookie vsync_ack_cookie) {
-  return vsync_ack_cookie.ToFidl();
-}
-
 constexpr VsyncAckCookie kInvalidVsyncAckCookie(
     fuchsia_hardware_display_types::wire::kInvalidDispId);
 

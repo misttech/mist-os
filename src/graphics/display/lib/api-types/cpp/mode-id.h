@@ -25,18 +25,6 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display.types/ModeId`.
 using ModeId = display::internal::IdType<display::internal::ModeIdTraits>;
 
-constexpr ModeId ToModeId(uint16_t banjo_mode_id) { return ModeId(banjo_mode_id); }
-
-constexpr ModeId ToModeId(fuchsia_hardware_display_types::wire::ModeId fidl_mode_id) {
-  return ModeId(fidl_mode_id);
-}
-
-constexpr uint16_t ToBanjoModeId(ModeId mode_id) { return mode_id.ToBanjo(); }
-
-constexpr fuchsia_hardware_display_types::wire::ModeId ToFidlModeId(ModeId mode_id) {
-  return mode_id.ToFidl();
-}
-
 constexpr ModeId kInvalidModeId(fuchsia_hardware_display_types::wire::kInvalidModeId);
 
 }  // namespace display
