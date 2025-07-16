@@ -88,7 +88,9 @@ async fn create_bt_host(realm: &RealmProxy, filename: String) -> Result<(), Erro
         startup: Some(StartupMode::Lazy),
         config_overrides: Some(vec![ConfigOverride {
             key: Some("device_path".to_string()),
-            value: Some(ConfigValue::Single(ConfigSingleValue::String(device_path))),
+            value: Some(ConfigValue::Single(ConfigSingleValue::String(
+                "/dev/class/bt-hci/default".to_owned(),
+            ))),
             ..ConfigOverride::default()
         }]),
         ..Default::default()
