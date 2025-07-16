@@ -1307,7 +1307,7 @@ pub mod options {
                 TcpOption::Sack(block) => buffer.write_obj_front(*block),
                 TcpOption::Timestamp { ts_val, ts_echo_reply } => buffer
                     .write_obj_front(&U32::new(*ts_val))
-                    .and(buffer.write_obj_front(&U32::new(*ts_echo_reply))),
+                    .and_then(|()| buffer.write_obj_front(&U32::new(*ts_echo_reply))),
             }
             .expect("buffer too short for TCP header option")
         }
