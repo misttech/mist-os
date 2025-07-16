@@ -4,7 +4,6 @@
 
 use event_listener::Event;
 use fuchsia_sync::RwLock;
-use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -104,12 +103,6 @@ impl Clone for RefGuard {
             count.fetch_add(1, Ordering::Relaxed);
             Self(self.0.clone(), self.1)
         }
-    }
-}
-
-impl fmt::Debug for RefGuard {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RefGuard").field("epoch", &self.1).finish()
     }
 }
 
