@@ -72,7 +72,7 @@ TEST(Select, Pipe) {
         .tv_usec = std::chrono::microseconds(minimum_duration).count(),
     };
 
-    char c;
+    char c = 'a';
     ASSERT_EQ(write(fds[1].get(), &c, sizeof(c)), ssize_t(sizeof(c)), "%s", strerror(errno));
 
     fd_set readfds;
