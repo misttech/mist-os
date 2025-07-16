@@ -12,6 +12,17 @@ import (
 	"go.starlark.net/syntax"
 )
 
+// Parse takes a path to a starlark file and returns a parsed AST.
+//
+// This delegates to the starlark parser library we are using.
+// Create a function wrapper here to capture the settings and modes we use during parsing.
+func Parse(path string) (*syntax.File, error) {
+	opts := syntax.FileOptions{
+		// Empty means default file-level settings for parsing.
+	}
+	return opts.Parse(path, nil, syntax.RetainComments)
+}
+
 // indent indents input lines by input levels.
 func indent(lines []string, level int) []string {
 	var indented []string

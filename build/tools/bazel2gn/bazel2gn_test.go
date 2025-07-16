@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/build/tools/bazel2gn"
-	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
 
@@ -27,8 +26,7 @@ func toSyntaxFile(t *testing.T, s string) *syntax.File {
 		t.Fatalf("Failed to write test Bazel file: %v", err)
 	}
 
-	opts := new(syntax.FileOptions)
-	f, _, err := starlark.SourceProgramOptions(opts, p, nil, func(string) bool { return true })
+	f, err := bazel2gn.Parse(p)
 	if err != nil {
 		t.Fatalf("Failed to parse test Bazel build file: %v, file content:\n%s", err, s)
 	}
@@ -419,7 +417,7 @@ func TestCCConversion(t *testing.T) {
 		"yet/another/path/to/foo.cc",
 	],
 	hdrs = [
-	"path/to/baz.h",
+		"path/to/baz.h",
 		"path/to/foo.h",
 	],
 	deps = [

@@ -17,8 +17,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/build/tools/bazel2gn"
-	"go.starlark.net/starlark"
-	"go.starlark.net/syntax"
 )
 
 var (
@@ -28,14 +26,6 @@ var (
 	checkOnly      = flag.Bool("check_only", false, "When true, compare generated GN content with the input GN file without writing to it")
 	diffOutputPath = flag.String("diff_output_path", "", "Path to write the diff to, only useful when checkOnly is true")
 )
-
-// bazelBuiltins contains all known Bazel builtin functions. The starlark parser
-// fail when it encounters any names not found in this dictionary, or not loaded
-// in through a explicit load call.
-var bazelBuiltins = starlark.StringDict{
-	"select":  nil,
-	"package": nil,
-}
 
 // commonFileHeader is the header to add to the top of every BUILD.gn file
 // converted from a BUILD.bazel file.
@@ -93,8 +83,7 @@ func main() {
 		log.Fatalf("--diff_output_path is set to %s, but --check_only is not set", *diffOutputPath)
 	}
 
-	opts := new(syntax.FileOptions)
-	bazelIn, _, err := starlark.SourceProgramOptions(opts, *bazelInputPath, nil, bazelBuiltins.Has)
+	bazelIn, err := bazel2gn.Parse(*bazelInputPath)
 	if err != nil {
 		log.Fatalf("Parsing input Bazel file %s: %v", *bazelInputPath, err)
 	}
