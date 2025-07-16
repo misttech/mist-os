@@ -233,11 +233,6 @@
 	url = https://fuchsia.googlesource.com/third_party/libpng
 	name = third_party/libpng
 	ignore = all
-[submodule "third_party/libxml2"]
-	path = third_party/libxml2
-	url = https://fuchsia.googlesource.com/third_party/libxml2
-	name = third_party/libxml2
-	ignore = all
 [submodule "third_party/llvm-libc/src"]
 	path = third_party/llvm-libc/src
 	url = https://llvm.googlesource.com/llvm-project/libc
