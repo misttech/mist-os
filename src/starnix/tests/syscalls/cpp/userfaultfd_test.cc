@@ -171,6 +171,7 @@ TEST_F(UffdProcTest, RegisterPart) {
   auto page1 = FindMemoryMappingInSmaps(start);
   ASSERT_FALSE(page1->ContainsFlag("um"));
   auto page2 = FindMemoryMappingInSmaps(start + page_size);
+  ASSERT_TRUE(page2.has_value());
   ASSERT_TRUE(page2->ContainsFlag("um"));
   ASSERT_EQ(page2->start, start + page_size);
   ASSERT_EQ(page2->end, start + (2 * page_size));

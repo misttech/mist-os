@@ -12,7 +12,9 @@ use crate::security;
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
 use crate::vfs::aio::AioContext;
-use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, SequenceFileSource};
+use crate::vfs::pseudo::dynamic_file::{
+    DynamicFile, DynamicFileBuf, DynamicFileSource, SequenceFileSource,
+};
 use crate::vfs::{FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode};
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
@@ -4533,44 +4535,88 @@ impl ProcSmapsFile {
     }
 }
 
-impl SequenceFileSource for ProcSmapsFile {
-    type Cursor = UserAddress;
-
-    fn next(
-        &self,
-        cursor: UserAddress,
-        sink: &mut DynamicFileBuf,
-    ) -> Result<Option<UserAddress>, Errno> {
+impl DynamicFileSource for ProcSmapsFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let page_size_kb = *PAGE_SIZE / 1024;
         let task = Task::from_weak(&self.0)?;
         // /proc/<pid>/smaps is empty for kthreads
         let Some(mm) = task.mm() else {
-            return Ok(None);
+            return Ok(());
         };
         let state = mm.state.read();
-        if let Some((range, map)) = state.mappings.find_at_or_after(cursor) {
-            write_map(&task, sink, range, map)?;
 
-            let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
+        let zx_mappings = state
+            .user_vmar
+            .info_maps_vec()
+            // None of https://fuchsia.dev/reference/syscalls/object_get_info?hl=en#errors should be
+            // possible for this VMAR we created and the zx crate guarantees a well-formed query.
+            .expect("must be able to query mappings for private user VMAR");
+
+        let mut zx_memory_info = RangeMap::<UserAddress, usize>::default();
+        for idx in 0..zx_mappings.len() {
+            let zx_mapping = zx_mappings[idx];
+            zx_memory_info.insert(
+                UserAddress::from_ptr(zx_mapping.base)
+                    ..UserAddress::from_ptr(zx_mapping.base + zx_mapping.size),
+                idx,
+            );
+        }
+
+        for (mm_range, mm_mapping) in state.mappings.iter() {
+            let mut committed_bytes = 0;
+
+            for (zx_range, zx_mapping_idx) in zx_memory_info.range(mm_range.clone()) {
+                let intersect_range = zx_range.intersect(mm_range);
+                let zx_mapping = zx_mappings[*zx_mapping_idx];
+                let zx_details = zx_mapping.details();
+                let Some(zx_details) = zx_details.as_mapping() else { continue };
+                let zx_committed_bytes = zx_details.committed_bytes;
+
+                // TODO(https://fxbug.dev/419882465): It can happen that the same Zircon mapping is
+                // covered by more than one Starnix mapping. In this case we don't have enough
+                // granularity to answer the question of how many committed bytes belong to one
+                // mapping or another. Make a best-effort approximation by dividing the committed
+                // bytes of a Zircon mapping proportionally.
+                committed_bytes += if intersect_range != *zx_range {
+                    let intersection_size = intersect_range.end.ptr() - intersect_range.start.ptr();
+                    let part = intersection_size as f32 / zx_mapping.size as f32;
+                    let prorated_committed_bytes: f32 = part * zx_committed_bytes as f32;
+                    prorated_committed_bytes as u64
+                } else {
+                    zx_committed_bytes as u64
+                };
+                assert_eq!(
+                    match mm_mapping.backing() {
+                        MappingBacking::Memory(m) => m.memory().get_koid(),
+                        #[cfg(feature = "alternate_anon_allocs")]
+                        MappingBacking::PrivateAnonymous =>
+                            state.private_anonymous.backing.get_koid(),
+                    },
+                    zx_details.vmo_koid,
+                    "MemoryManager and Zircon must agree on which VMO is mapped in this range",
+                );
+            }
+
+            write_map(&task, sink, mm_range, mm_mapping)?;
+
+            let size_kb = (mm_range.end.ptr() - mm_range.start.ptr()) / 1024;
             writeln!(sink, "Size:           {size_kb:>8} kB",)?;
-
-            let (committed_bytes, share_count) = match map.backing() {
+            let share_count = match mm_mapping.backing() {
                 MappingBacking::Memory(backing) => {
                     let memory_info = backing.memory().info()?;
-                    (memory_info.committed_bytes, memory_info.share_count as u64)
+                    memory_info.share_count as u64
                 }
                 #[cfg(feature = "alternate_anon_allocs")]
                 MappingBacking::PrivateAnonymous => {
-                    // TODO(b/310255065): Compute committed bytes and share count
-                    (0, 1)
+                    1 // Private mapping
                 }
             };
 
             let rss_kb = committed_bytes / 1024;
             writeln!(sink, "Rss:            {rss_kb:>8} kB")?;
 
-            let pss_kb = if map.flags().contains(MappingFlags::SHARED) {
-                rss_kb / share_count as u64
+            let pss_kb = if mm_mapping.flags().contains(MappingFlags::SHARED) {
+                rss_kb / share_count
             } else {
                 rss_kb
             };
@@ -4588,19 +4634,19 @@ impl SequenceFileSource for ProcSmapsFile {
             writeln!(sink, "Private_Clean:  {private_clean_kb:>8} kB")?;
             writeln!(sink, "Private_Dirty:  {private_dirty_kb:>8} kB")?;
 
-            let anonymous_kb = if map.private_anonymous() { rss_kb } else { 0 };
+            let anonymous_kb = if mm_mapping.private_anonymous() { rss_kb } else { 0 };
             writeln!(sink, "Anonymous:      {anonymous_kb:>8} kB")?;
             writeln!(sink, "KernelPageSize: {page_size_kb:>8} kB")?;
             writeln!(sink, "MMUPageSize:    {page_size_kb:>8} kB")?;
 
-            let locked_kb = if map.flags().contains(MappingFlags::LOCKED) { rss_kb } else { 0 };
+            let locked_kb =
+                if mm_mapping.flags().contains(MappingFlags::LOCKED) { rss_kb } else { 0 };
             writeln!(sink, "Locked:         {locked_kb:>8} kB")?;
-            writeln!(sink, "VmFlags: {}", map.vm_flags())?;
+            writeln!(sink, "VmFlags: {}", mm_mapping.vm_flags())?;
 
             track_stub!(TODO("https://fxbug.dev/297444691"), "optional smaps fields");
-            return Ok(Some(range.end));
         }
-        Ok(None)
+        Ok(())
     }
 }
 

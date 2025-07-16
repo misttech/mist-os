@@ -22,6 +22,10 @@
                 // TODO(https://fxbug.dev/342416456): Rework the test to take
                 // into account logs from the system.
                 "SyslogTest.ProcKmsgPoll",
+
+                // TODO(https://fxbug.dev/430852485): Flaky due to not decommitting the pages
+                // consistently on mremap. Fix and re-enable.
+                "MMapProcTest.MremapDontUnmapKeepsFlags",
             ],
         },
         {
@@ -97,8 +101,9 @@
                 // TODO(https://fxbug.dev/333132302)
                 "Madvise.MadvRemoveZeroesMemory",
 
-                // TODO(https://fxbug.dev/419882465)
-                "MMapProcTest.MremapDontUnmapKeepsFlags",
+                // TODO(https://fxbug.dev/419882465): Need a more granular API to report Rss values
+                // correctly in smaps
+                "MMapProcTest.SmapsRssSplitMappingsStrict",
             ],
         },
         {

@@ -17,7 +17,9 @@
 #include <atomic>
 #include <charconv>
 #include <cstdint>
+#include <cstdio>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -368,6 +370,149 @@ TEST_F(MMapProcTest, MremapDontUnmapKeepsFlags) {
   EXPECT_EQ(source_mapping->vm_flags, remapped_mapping->vm_flags);
 
   SAFE_SYSCALL(munmap(reserved, 5 * page_size));
+}
+
+TEST_F(MMapProcTest, PrivateMemoryOnFork) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  const size_t kSize = 3 * page_size;
+
+  int flags = MAP_ANON | MAP_PRIVATE;
+  // Map three pages and mark extra ones as having PROT_NONE to avoid coalescing
+  void* mapped = mmap(nullptr, kSize, PROT_READ | PROT_WRITE, flags, -1, 0);
+  ASSERT_NE(mapped, nullptr) << "errno=" << errno << ", " << strerror(errno);
+  SAFE_SYSCALL(mprotect(mapped, page_size, PROT_NONE));
+  SAFE_SYSCALL(
+      mprotect(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapped) + 2 * page_size),
+               page_size, PROT_NONE));
+
+  // Commit the allocated page by writing some data.
+  volatile char* data = reinterpret_cast<char*>(mapped) + page_size;
+  data[0] = 42;
+
+  std::string maps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/smaps", &maps));
+  auto base_mapping =
+      test_helper::find_memory_mapping_ext(reinterpret_cast<uintptr_t>(mapped) + page_size, maps);
+  ASSERT_NE(base_mapping, std::nullopt);
+  EXPECT_EQ(base_mapping->pathname, "");
+  EXPECT_EQ(base_mapping->perms, "rw-p");
+  EXPECT_EQ(base_mapping->rss, page_size / 1024);
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    std::string maps;
+    ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/smaps", &maps));
+    auto forked_mapping =
+        test_helper::find_memory_mapping_ext(reinterpret_cast<uintptr_t>(mapped) + page_size, maps);
+    ASSERT_NE(forked_mapping, std::nullopt);
+    EXPECT_EQ(forked_mapping->pathname, "");
+    EXPECT_EQ(forked_mapping->perms, "rw-p");
+    // Rss reflects a full page, not shared with the parent
+    EXPECT_EQ(forked_mapping->rss, page_size / 1024);
+  });
+
+  SAFE_SYSCALL(munmap(mapped, kSize));
+}
+
+TEST_F(MMapProcTest, SmapsRssSplitMappings) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  const size_t kSize = 5 * page_size;
+
+  int flags = MAP_ANON | MAP_PRIVATE;
+  // Map 5 pages.
+  void* mapped = mmap(nullptr, kSize, PROT_READ | PROT_WRITE, flags, -1, 0);
+  ASSERT_NE(mapped, nullptr) << "errno=" << errno << ", " << strerror(errno);
+
+  // Mark pages 0 and 4 as non-readable/non-writable. They act as guard pages to avoid coalescing.
+  SAFE_SYSCALL(mprotect(mapped, page_size, PROT_NONE));
+  SAFE_SYSCALL(
+      mprotect(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapped) + (4 * page_size)),
+               page_size, PROT_NONE));
+
+  // Add some attribute that is invisible to Zircon. That will make Starnix see 3 separate mappings
+  // where Zircon will only see one.
+  SAFE_SYSCALL(
+      madvise(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapped) + (2 * page_size)),
+              page_size, MADV_WIPEONFORK));
+
+  // Commit pages 1-3 by writing some data.
+  for (int i = 1; i < 4; i++) {
+    volatile char* data = reinterpret_cast<char*>(mapped) + i * page_size;
+    data[0] = 42;
+  }
+
+  std::string smaps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/smaps", &smaps));
+
+  // Check that all the mappings (pages 1-3) are present in smaps, with a non-zero Rss.
+  auto first_mapping =
+      test_helper::find_memory_mapping_ext(reinterpret_cast<uintptr_t>(mapped) + page_size, smaps);
+  ASSERT_NE(first_mapping, std::nullopt);
+  EXPECT_EQ(first_mapping->end - first_mapping->start, page_size);
+  EXPECT_GT(first_mapping->rss, 0u);
+  auto middle_mapping = test_helper::find_memory_mapping_ext(
+      reinterpret_cast<uintptr_t>(mapped) + (2 * page_size), smaps);
+  ASSERT_NE(middle_mapping, std::nullopt);
+  EXPECT_EQ(middle_mapping->end - middle_mapping->start, page_size);
+  EXPECT_GT(middle_mapping->rss, 0u);
+  auto last_mapping = test_helper::find_memory_mapping_ext(
+      reinterpret_cast<uintptr_t>(mapped) + (3 * page_size), smaps);
+  ASSERT_NE(last_mapping, std::nullopt);
+  EXPECT_EQ(last_mapping->end - last_mapping->start, page_size);
+  EXPECT_GT(last_mapping->rss, 0u);
+
+  SAFE_SYSCALL(munmap(mapped, kSize));
+}
+
+TEST_F(MMapProcTest, SmapsRssSplitMappingsStrict) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  const size_t kSize = 5 * page_size;
+
+  int flags = MAP_ANON | MAP_PRIVATE;
+  // Map 5 pages.
+  void* mapped = mmap(nullptr, kSize, PROT_READ | PROT_WRITE, flags, -1, 0);
+  ASSERT_NE(mapped, nullptr) << "errno=" << errno << ", " << strerror(errno);
+
+  // Mark pages 0 and 4 as non-readable/non-writable. They act as guard pages to avoid coalescing.
+  SAFE_SYSCALL(mprotect(mapped, page_size, PROT_NONE));
+  SAFE_SYSCALL(
+      mprotect(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapped) + (4 * page_size)),
+               page_size, PROT_NONE));
+
+  // Add some attribute that is invisible to Zircon. That will make Starnix see 3 separate mappings
+  // where Zircon will only see one.
+  SAFE_SYSCALL(
+      madvise(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapped) + (2 * page_size)),
+              page_size, MADV_WIPEONFORK));
+
+  // Commit the middle page by writing some data.
+  volatile char* data = reinterpret_cast<char*>(mapped) + (2 * page_size);
+  data[0] = 42;
+
+  std::string smaps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/smaps", &smaps));
+
+  // Check that all the mappings (pages 1-3) are present in smaps, with a non-zero Rss.
+  auto first_mapping =
+      test_helper::find_memory_mapping_ext(reinterpret_cast<uintptr_t>(mapped) + page_size, smaps);
+  ASSERT_NE(first_mapping, std::nullopt);
+  EXPECT_EQ(first_mapping->end - first_mapping->start, page_size);
+  // First mapping is uncommitted
+  EXPECT_EQ(first_mapping->rss, 0u);
+  auto middle_mapping = test_helper::find_memory_mapping_ext(
+      reinterpret_cast<uintptr_t>(mapped) + (2 * page_size), smaps);
+  ASSERT_NE(middle_mapping, std::nullopt);
+  EXPECT_EQ(middle_mapping->end - middle_mapping->start, page_size);
+  // Second mapping is committed.
+  EXPECT_GT(middle_mapping->rss, 0u);
+  auto last_mapping = test_helper::find_memory_mapping_ext(
+      reinterpret_cast<uintptr_t>(mapped) + (3 * page_size), smaps);
+  ASSERT_NE(last_mapping, std::nullopt);
+  EXPECT_EQ(last_mapping->end - last_mapping->start, page_size);
+  // Third mapping is uncommitted.
+  EXPECT_EQ(last_mapping->rss, 0u);
+
+  SAFE_SYSCALL(munmap(mapped, kSize));
 }
 
 class MMapProcStatmTest : public ProcTestBase, public testing::WithParamInterface<int> {
