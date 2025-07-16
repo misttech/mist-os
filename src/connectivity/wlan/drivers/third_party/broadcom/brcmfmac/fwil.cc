@@ -31,6 +31,7 @@
 #include "fwil_types.h"
 #include "linuxisms.h"
 #include "proto.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 #define MAX_HEX_DUMP_LEN 64
 

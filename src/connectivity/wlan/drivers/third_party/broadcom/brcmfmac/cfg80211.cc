@@ -36,7 +36,6 @@
 #include <optional>
 #include <vector>
 
-#include <wifi/wifi-config.h>
 #include <wlan/common/element.h>
 #include <wlan/common/ieee80211.h>
 #include <wlan/common/ieee80211_codes.h>
@@ -69,6 +68,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/proto.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/stats.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/workqueue.h"
+#include "src/devices/lib/broadcom/commands.h"
 #include "third_party/bcmdhd/crossdriver/bcmwifi_channels.h"
 #include "third_party/bcmdhd/crossdriver/dhd.h"
 #include "third_party/bcmdhd/crossdriver/include/devctrl_if/wlioctl_defs.h"

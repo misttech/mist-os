@@ -8,7 +8,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
-#include "src/devices/lib/broadcom/include/wifi/wifi-config.h"
+#include "src/devices/lib/broadcom/commands.h"
 #include "zircon/errors.h"
 
 namespace wlan::brcmfmac {

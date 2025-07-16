@@ -61,6 +61,7 @@ source_set("sdio") {
     "//sdk/lib/driver/runtime:driver_runtime",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:linuxisms",
+    "//src/devices/lib/broadcom/fuchsia.wlan.broadcom:fuchsia.wlan.broadcom_cpp",
   ]
   public_configs = [ ":config_sdio" ]
   friend = [ "test/*" ]

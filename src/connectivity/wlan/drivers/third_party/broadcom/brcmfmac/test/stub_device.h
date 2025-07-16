@@ -28,7 +28,7 @@ class StubDevice : public Device {
   async_dispatcher_t* GetTimerDispatcher() override { return nullptr; }
   DeviceInspect* GetInspect() override { return nullptr; }
   zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) override;
-  zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
+  zx::result<fuchsia_wlan_broadcom::WifiConfig> GetWifiConfig() override;
   fidl::WireClient<fdf::Node>& GetParentNode() override { return parent_node_; }
   std::shared_ptr<fdf::OutgoingDirectory>& Outgoing() override { return outgoing_dir_.value(); }
   const std::shared_ptr<fdf::Namespace>& Incoming() const override { return incoming_dir_.value(); }

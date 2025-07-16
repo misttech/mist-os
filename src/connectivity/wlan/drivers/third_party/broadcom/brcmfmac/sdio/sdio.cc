@@ -30,7 +30,6 @@
 #include <atomic>
 #include <limits>
 
-#include <wifi/wifi-config.h>
 #include <wlan/drivers/components/frame.h>
 
 #ifndef _ALL_SOURCE
@@ -3148,11 +3147,9 @@ static void brcmf_sdio_dataworker(WorkItem* work) {
   brcmf_sdio_event_handler(bus);
 }
 
-static zx_status_t brcmf_get_wifi_metadata(brcmf_bus* bus_if, void* data, size_t exp_size,
-                                           size_t* actual) {
+static zx::result<fuchsia_wlan_broadcom::WifiConfig> brcmf_get_wifi_metadata(brcmf_bus* bus_if) {
   struct brcmf_sdio_dev* sdiodev = bus_if->bus_priv.sdio;
-  return sdiodev->drvr->device->DeviceGetMetadata(DEVICE_METADATA_WIFI_CONFIG, data, exp_size,
-                                                  actual);
+  return sdiodev->drvr->device->GetWifiConfig();
 }
 
 zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -3203,21 +3200,15 @@ zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAF
   }
 
   // Get metadata to see if CLM is expected to be present.
-  wifi_config_t config;
-  size_t actual;
   bool clm_present = false;
   bool clm_needed = false;
 
-  zx_status_t ret = brcmf_get_wifi_metadata(bus_if, &config, sizeof(config), &actual);
-  if (ret != ZX_OK) {
-    BRCMF_ERR("Failed to get wifi metadata: %s", zx_status_get_string(ret));
+  zx::result config = brcmf_get_wifi_metadata(bus_if);
+  if (config.is_error()) {
+    BRCMF_ERR("Failed to get wifi metadata: %s", config.status_string());
     clm_needed = false;
-  } else if (actual == sizeof(config)) {
-    clm_needed = config.clm_needed;
   } else {
-    BRCMF_ERR("Incorrect wifi metadata size: Expected %lu bytes but actual is %lu", sizeof(config),
-              actual);
-    clm_needed = false;
+    clm_needed = config.value().clm_needed();
   }
 
   std::string clm_binary;

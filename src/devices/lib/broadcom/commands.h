@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_LIB_BROADCOM_INCLUDE_WIFI_WIFI_CONFIG_H_
-#define SRC_DEVICES_LIB_BROADCOM_INCLUDE_WIFI_WIFI_CONFIG_H_
+#ifndef SRC_DEVICES_LIB_BROADCOM_COMMANDS_H_
+#define SRC_DEVICES_LIB_BROADCOM_COMMANDS_H_
 
 #include <stdint.h>
 
@@ -81,38 +81,6 @@
 #define BRCMF_C_SET_WSEC_PMK 268
 #define BRCMF_C_SCB_AUTHENTICATE 325
 
-// Defines for IOVAR entries
-#define MAX_IOVAR_ENTRIES 32
-#define MAX_CC_TABLE_ENTRIES 64
-#define MAX_IOVAR_LEN 32
-enum {
-  // This ensures that a zero'd out table is always treated as empty.
-  IOVAR_LIST_END_TYPE = 0,
-  IOVAR_STR_TYPE,
-  IOVAR_CMD_TYPE,
-};
-
-typedef struct iovar_entry {
-  uint8_t iovar_type;
-  union {
-    char iovar_str[MAX_IOVAR_LEN];
-    uint32_t iovar_cmd;
-  };
-  uint32_t val;
-} iovar_entry_t;
-
-typedef struct cc_entry {
-  char cc_abbr[3];
-  uint32_t cc_rev;
-} cc_entry_t;
-
-typedef struct wifi_config {
-  uint32_t oob_irq_mode;  //{edge or level etc}
-  bool clm_needed = true;
-  iovar_entry_t iovar_table[MAX_IOVAR_ENTRIES];
-  cc_entry_t cc_table[MAX_CC_TABLE_ENTRIES];
-} wifi_config_t;
-
 // Fragment indices for the composite device.
 enum {
   BRCMF_FRAGMENT_SDIO_FN1,
@@ -122,4 +90,4 @@ enum {
   BRCMF_FRAGMENT_COUNT,
 };
 
-#endif  // SRC_DEVICES_LIB_BROADCOM_INCLUDE_WIFI_WIFI_CONFIG_H_
+#endif  // SRC_DEVICES_LIB_BROADCOM_COMMANDS_H_

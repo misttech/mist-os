@@ -57,7 +57,8 @@ class SdioDevice final : public Device, public fdf::DriverBase {
     BRCMF_WARN("Fidl Error: %s", error.FormatDescription().c_str());
   }
 
-  zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
+  zx::result<fuchsia_wlan_broadcom::WifiConfig> GetWifiConfig() override;
+
   zx::result<std::vector<uint8_t>> DeviceGetPersistedMetadata(
       std::string_view metadata_serializable_name) override;
 

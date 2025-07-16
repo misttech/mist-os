@@ -31,8 +31,6 @@
 #include <atomic>
 #include <limits>
 
-#include <wifi/wifi-config.h>
-
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcm_hw_ids.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_utils.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_wifi.h"
@@ -75,7 +73,7 @@ static void brcmf_sdiod_ib_irqhandler(struct brcmf_sdio_dev* sdiodev) {
 static void brcmf_sdiod_dummy_irqhandler(struct brcmf_sdio_dev* sdiodev) {}
 
 zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
-                                                wifi_config_t* config) {
+                                                const fuchsia_wlan_broadcom::WifiConfig& config) {
   fidl::WireResult cfg_result = sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->SetBufferMode(
       fuchsia_hardware_gpio::BufferMode::kInput);
   if (!cfg_result.ok()) {
@@ -89,7 +87,7 @@ zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
   }
 
   const fuchsia_hardware_gpio::InterruptMode interrupt_mode =
-      config->oob_irq_mode == ZX_INTERRUPT_MODE_LEVEL_LOW
+      config.oob_irq_mode() == ZX_INTERRUPT_MODE_LEVEL_LOW
           ? fuchsia_hardware_gpio::InterruptMode::kLevelLow
           : fuchsia_hardware_gpio::InterruptMode::kLevelHigh;
 
@@ -100,9 +98,11 @@ zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
   fidl::WireResult configure_result =
       sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->ConfigureInterrupt(interrupt_config);
   if (!configure_result.ok()) {
-    BRCMF_ERR("Configuring IRQ GPIO failed: %s", configure_result.FormatDescription().c_str());
+    BRCMF_ERR("Failed to send ConfigureInterrupt request: %s",
+              configure_result.FormatDescription().c_str());
     return configure_result.status();
-  } else if (configure_result->is_error()) {
+  }
+  if (configure_result->is_error()) {
     BRCMF_ERR("Failed to configure IRQ GPIO: %s",
               zx_status_get_string(configure_result->error_value()));
     return configure_result->error_value();
@@ -160,33 +160,21 @@ zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloa
 
   pdata = sdiodev->settings->bus.sdio;
   pdata->oob_irq_supported = false;
-  wifi_config_t config;
-  size_t actual;
 
   // Get Broadcom WiFi Metadata by calling the bus specific function
-  if (sdiodev && sdiodev->bus_if && sdiodev->bus_if->ops) {
-    ret = brcmf_bus_get_wifi_metadata(sdiodev->bus_if, &config, sizeof(wifi_config_t), &actual);
-    if (ret != ZX_OK && ret != ZX_ERR_NOT_FOUND) {
-      BRCMF_ERR("Failed to get wifi metadata: %s", zx_status_get_string(ret));
-      return ret;
-    }
-    if (ret == ZX_OK && actual != sizeof(wifi_config_t)) {
-      BRCMF_ERR("Incorrect wifi metadata size: Expected %lu bytes but actual is %lu bytes",
-                sizeof(wifi_config_t), actual);
-      return ZX_ERR_INTERNAL;
-    }
-  } else {
+  if (!sdiodev || !sdiodev->bus_if || !sdiodev->bus_if->ops) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  zx::result config = brcmf_bus_get_wifi_metadata(sdiodev->bus_if);
 
   // If there is metadata, OOB is supported.
-  if (ret == ZX_OK) {
+  if (config.is_ok()) {
     // The interrupt thread only needs to be created on startup, not on fw reload
     if (!reloading) {
       BRCMF_DBG(SDIO, "Enter, register OOB IRQ");
 
       // Configures gpios for interupt, which only needs to happen on startup
-      ret = brcmf_sdiod_configure_oob_interrupt(sdiodev, &config);
+      ret = brcmf_sdiod_configure_oob_interrupt(sdiodev, config.value());
       if (ret != ZX_OK) {
         return ret;
       }
@@ -236,14 +224,14 @@ zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloa
 
     /* redirect, configure and enable io for interrupt signal */
     data = SDIO_CCCR_BRCM_SEPINT_MASK | SDIO_CCCR_BRCM_SEPINT_OE;
-    if (config.oob_irq_mode == ZX_INTERRUPT_MODE_LEVEL_HIGH) {
+    if (config.value().oob_irq_mode() == ZX_INTERRUPT_MODE_LEVEL_HIGH) {
       data |= SDIO_CCCR_BRCM_SEPINT_ACT_HI;
     }
     brcmf_sdiod_vendor_control_wb(sdiodev, SDIO_CCCR_BRCM_SEPINT, data, &ret);
     // TODO(cphoenix): This pause is probably unnecessary.
     zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
     sdio_release_host(sdiodev->func1);
-  } else {
+  } else if (config.status_value() == ZX_ERR_NOT_FOUND) {
     BRCMF_DBG(SDIO, "Entering");
     sdio_claim_host(sdiodev->func1);
     sdio_enable_fn_intr(&sdiodev->sdio_proto_fn1);
@@ -252,6 +240,9 @@ zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloa
     (void)brcmf_sdiod_dummy_irqhandler;
     sdio_release_host(sdiodev->func1);
     sdiodev->sd_irq_requested = true;
+  } else {
+    BRCMF_ERR("Failed to get wifi metadata: %s", config.status_string());
+    return config.status_value();
   }
 
   return ZX_OK;

@@ -167,6 +167,7 @@ source_set("core") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/recovery",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/broadcom",
+    "//src/devices/lib/broadcom/fuchsia.wlan.broadcom:fuchsia.wlan.broadcom_cpp",
     "//third_party/bcmdhd/crossdriver:bcmdhd_crossdriver",
     "//zircon/system/public",
     "//zircon/system/ulib/sync",

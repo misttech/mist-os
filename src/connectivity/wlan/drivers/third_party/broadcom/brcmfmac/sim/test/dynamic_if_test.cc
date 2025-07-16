@@ -13,6 +13,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace wlan::brcmfmac {
 
@@ -179,17 +180,19 @@ uint16_t DynamicIfTest::GetChanspec(bool is_ap_iface, zx_status_t expect_result)
 // This function is used to override the default. The iovar list is made up
 // of global iovars (not meant for a specific IF) and is arbitrary and is meant
 // for test purposes only.
-static zx_status_t modified_get_metadata(brcmf_bus* bus, void* data, size_t exp_size,
-                                         size_t* actual) {
-  wifi_config_t wifi_config = {
+static zx::result<fuchsia_wlan_broadcom::WifiConfig> modified_get_metadata(brcmf_bus* bus) {
+  return zx::ok(fuchsia_wlan_broadcom::WifiConfig{{
       .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+      .clm_needed = true,
       .iovar_table =
           {
-              {IOVAR_STR_TYPE, {"ampdu_ba_wsize"}, 32},
-              {IOVAR_CMD_TYPE, {.iovar_cmd = kIovarCmds[0].set_cmd}, 0},
-              {IOVAR_CMD_TYPE, {.iovar_cmd = kIovarCmds[1].set_cmd}, 1},
-              {IOVAR_STR_TYPE, {"mpc"}, 0},
-              {IOVAR_LIST_END_TYPE, {{0}}, 0},
+              fuchsia_wlan_broadcom::IovarEntry::WithString(
+                  {{.name = "ampdu_ba_wsize", .val = 32}}),
+              fuchsia_wlan_broadcom::IovarEntry::WithCommand(
+                  {{.cmd = kIovarCmds[0].set_cmd, .val = 0}}),
+              fuchsia_wlan_broadcom::IovarEntry::WithCommand(
+                  {{.cmd = kIovarCmds[1].set_cmd, .val = 1}}),
+              fuchsia_wlan_broadcom::IovarEntry::WithString({{.name = "mpc", .val = 0}}),
           },
       .cc_table =
           {
@@ -197,10 +200,7 @@ static zx_status_t modified_get_metadata(brcmf_bus* bus, void* data, size_t exp_
               {"WW", 999},
               {"", 0},
           },
-  };
-  memcpy(data, &wifi_config, sizeof(wifi_config));
-  *actual = sizeof(wifi_config);
-  return ZX_OK;
+  }});
 }
 
 // Modified Sim bus txctl to check if C_DOWN & C_UP were set from the driver during
@@ -325,32 +325,30 @@ TEST_F(DynamicIfTest, EventHandlingOnSoftAPDel) {
 // Verify if all iovars in metadata were set.
 static void verify_metadata_iovars(brcmf_simdev* sim, brcmf_if* ifp) {
   // Get the meta data to check if all iovars were set
-  wifi_config_t config;
-  size_t actual;
-
-  ASSERT_EQ(brcmf_bus_get_wifi_metadata(sim->drvr->bus_if, &config, sizeof(wifi_config_t), &actual),
-            ZX_OK);
+  zx::result config = brcmf_bus_get_wifi_metadata(sim->drvr->bus_if);
+  ASSERT_EQ(config.status_value(), ZX_OK);
   // Check to see if all IOVARs in metadata are being set during init.
   // Go through the iovar table and check if all iovars were set correctly.
-  for (int i = 0; i < MAX_IOVAR_ENTRIES; ++i) {
+  for (const auto& entry : config.value().iovar_table()) {
     zx_status_t err;
     uint32_t cur_val;
-    switch (config.iovar_table[i].iovar_type) {
-      case IOVAR_STR_TYPE: {
+    switch (entry.Which()) {
+      case fuchsia_wlan_broadcom::IovarEntry::Tag::kString: {
         // Get the current value
-        err = brcmf_fil_iovar_int_get(ifp, config.iovar_table[i].iovar_str, &cur_val, nullptr);
+        const char* iovar_str = entry.string()->name().c_str();
+        auto val = entry.string()->val();
+        err = brcmf_fil_iovar_int_get(ifp, iovar_str, &cur_val, nullptr);
         ASSERT_EQ(err, ZX_OK);
-        BRCMF_DBG(SIM, "iovar %s get: %d new: %d", config.iovar_table[i].iovar_str, cur_val,
-                  config.iovar_table[i].val);
-        ASSERT_EQ(config.iovar_table[i].val, cur_val);
+        BRCMF_DBG(SIM, "iovar %s get: %d new: %d", iovar_str, cur_val, val);
+        ASSERT_EQ(val, cur_val);
         break;
       }
-      case IOVAR_CMD_TYPE: {
+      case fuchsia_wlan_broadcom::IovarEntry::Tag::kCommand: {
         // Get the corresponding IOVAR Get command for the Set command in the table.
         uint32_t get_cmd = 0;
         bool cmd_found = false;
         for (size_t j = 0; j < sizeof(kIovarCmds) / sizeof(iovar_get_set_cmd_t); ++j) {
-          if (kIovarCmds[j].set_cmd == config.iovar_table[i].iovar_cmd) {
+          if (kIovarCmds[j].set_cmd == entry.command()->cmd()) {
             get_cmd = kIovarCmds[j].get_cmd;
             cmd_found = true;
             break;
@@ -360,12 +358,8 @@ static void verify_metadata_iovars(brcmf_simdev* sim, brcmf_if* ifp) {
         // Get the current value
         err = brcmf_fil_cmd_data_get(ifp, get_cmd, &cur_val, sizeof(cur_val), nullptr);
         ASSERT_EQ(err, ZX_OK);
-        ASSERT_EQ(config.iovar_table[i].val, cur_val);
+        ASSERT_EQ(entry.command()->val(), cur_val);
         break;
-      }
-      case IOVAR_LIST_END_TYPE: {
-        // End of list, done checking iovars
-        return;
       }
       default: {
         // Should never get here.

@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <wifi/wifi-config.h>
-
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace wlan::brcmfmac {
 

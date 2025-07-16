@@ -21,8 +21,6 @@
 
 #include <memory>
 
-#include <wifi/wifi-config.h>
-
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/chip.h"
@@ -37,25 +35,18 @@ static const struct brcmf_bus_ops brcmf_sim_bus_ops = {
         [](brcmf_bus* bus, uint8_t* mac_addr) {
           return BUS_OP(bus)->BusGetBootloaderMacAddr(mac_addr);
         },
-    .get_wifi_metadata =
-        [](brcmf_bus* bus, void* data, size_t exp_size, size_t* actual) {
-          wifi_config_t wifi_config = {
-              .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
-              .iovar_table =
-                  {
-                      {IOVAR_LIST_END_TYPE, {{0}}, 0},
-                  },
-              .cc_table =
-                  {
-                      {"US", 842},
-                      {"WW", 999},
-                      {"", 0},
-                  },
-          };
-          memcpy(data, &wifi_config, sizeof(wifi_config));
-          *actual = sizeof(wifi_config);
-          return ZX_OK;
-        },
+    .get_wifi_metadata = [](brcmf_bus* bus) -> zx::result<fuchsia_wlan_broadcom::WifiConfig> {
+      return zx::ok(fuchsia_wlan_broadcom::WifiConfig{{
+          .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+          .clm_needed = true,
+          .cc_table =
+              {
+                  {"US", 842},
+                  {"WW", 999},
+                  {"", 0},
+              },
+      }});
+    },
     .preinit = [](brcmf_bus* bus) { return BUS_OP(bus)->BusPreinit(); },
     .stop = [](brcmf_bus* bus) { return BUS_OP(bus)->BusStop(); },
     .txframes =

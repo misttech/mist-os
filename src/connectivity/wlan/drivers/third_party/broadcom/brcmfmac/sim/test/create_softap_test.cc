@@ -7,7 +7,6 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/errors.h>
 
-#include <wifi/wifi-config.h>
 #include <zxtest/zxtest.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
@@ -16,6 +15,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/device_inspect_test_utils.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace wlan::brcmfmac {
 

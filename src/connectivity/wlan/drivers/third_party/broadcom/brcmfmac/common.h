@@ -20,8 +20,6 @@
 
 #include <string>
 
-#include <wifi/wifi-config.h>
-
 #include "bus.h"
 #include "core.h"
 #include "fwil_types.h"
@@ -78,6 +76,6 @@ zx_status_t brcmf_set_power_save_mode(brcmf_pub* drvr,
 zx_status_t brcmf_get_power_save_mode(brcmf_pub* drvr,
                                       fuchsia_wlan_common_wire::PowerSaveType* out_ps_mode);
 // Get WiFi metadata
-zx_status_t brcmf_get_meta_data(brcmf_if* ifp, wifi_config_t* config);
+zx::result<fuchsia_wlan_broadcom::WifiConfig> brcmf_get_meta_data(brcmf_if* ifp);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_COMMON_H_

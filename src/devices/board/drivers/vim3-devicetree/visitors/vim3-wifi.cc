@@ -5,6 +5,7 @@
 #include "vim3-wifi.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
+#include <fidl/fuchsia.wlan.broadcom/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
@@ -15,19 +16,19 @@
 #include <bind/fuchsia/hardware/sdio/cpp/bind.h>
 #include <bind/fuchsia/sdio/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
-#include <wifi/wifi-config.h>
+
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace vim3_dt {
 
 zx::result<> Vim3WifiVisitor::DriverVisit(fdf_devicetree::Node& node,
                                           const devicetree::PropertyDecoder& decoder) {
-  const wifi_config_t wifi_config = {
+  static const fuchsia_wlan_broadcom::WifiConfig kWifiConfig{{
       .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
       .clm_needed = false,
       .iovar_table =
           {
-              {IOVAR_CMD_TYPE, {.iovar_cmd = BRCMF_C_SET_PM}, 0},
-              {IOVAR_LIST_END_TYPE, {{0}}, 0},
+              fuchsia_wlan_broadcom::IovarEntry::WithCommand({{.cmd = BRCMF_C_SET_PM, .val = 0}}),
           },
       .cc_table =
           {
@@ -38,16 +39,21 @@ zx::result<> Vim3WifiVisitor::DriverVisit(fdf_devicetree::Node& node,
               {"SI", 0}, {"SK", 0}, {"FI", 0}, {"SE", 0}, {"EL", 0}, {"IS", 0}, {"LI", 0},
               {"TR", 0}, {"CH", 0}, {"NO", 0}, {"JP", 0}, {"", 0},
           },
-  };
+  }};
+
+  fit::result persisted_wifi_config = fidl::Persist(kWifiConfig);
+  if (!persisted_wifi_config.is_ok()) {
+    fdf::error("Failed to persist wifi config: %s",
+               persisted_wifi_config.error_value().FormatDescription().c_str());
+    return zx::error(persisted_wifi_config.error_value().status());
+  }
 
   fuchsia_hardware_platform_bus::Metadata wifi_config_metadata = {{
       .id = std::to_string(DEVICE_METADATA_WIFI_CONFIG),
-      .data = std::vector<uint8_t>(
-          reinterpret_cast<const uint8_t*>(&wifi_config),
-          reinterpret_cast<const uint8_t*>(&wifi_config) + sizeof(wifi_config)),
+      .data = std::move(persisted_wifi_config.value()),
   }};
 
-  node.AddMetadata(wifi_config_metadata);
+  node.AddMetadata(std::move(wifi_config_metadata));
 
   constexpr uint32_t kSdioFunctionCount = 2;
   for (uint32_t i = 1; i <= kSdioFunctionCount; i++) {

@@ -114,6 +114,7 @@ fuchsia_cc_driver("astro-driver") {
     "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",
+    "//src/devices/lib/broadcom/fuchsia.wlan.broadcom:fuchsia.wlan.broadcom_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/fidl-metadata",

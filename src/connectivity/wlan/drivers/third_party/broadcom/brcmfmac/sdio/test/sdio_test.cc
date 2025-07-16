@@ -31,10 +31,9 @@
 #include <memory>
 #include <tuple>
 
-#include <wifi/wifi-config.h>
+#include <sdk/lib/driver/testing/cpp/driver_runtime.h>
 #include <zxtest/zxtest.h>
 
-#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
@@ -48,9 +47,8 @@
 // This is required to use ddk::MockSdio.
 bool operator==(const sdio_rw_txn_t& lhs, const sdio_rw_txn_t& rhs) { return false; }
 
-zx_status_t get_wifi_metadata(struct brcmf_bus* bus, void* data, size_t exp_size, size_t* actual) {
-  return bus->bus_priv.sdio->drvr->device->DeviceGetMetadata(DEVICE_METADATA_WIFI_CONFIG, data,
-                                                             exp_size, actual);
+zx::result<fuchsia_wlan_broadcom::WifiConfig> get_wifi_metadata(struct brcmf_bus* bus) {
+  return bus->bus_priv.sdio->drvr->device->GetWifiConfig();
 }
 
 namespace {
@@ -63,18 +61,12 @@ class FakeSdioDevice : public wlan::brcmfmac::StubDevice {
     shutdown_complete.Wait();
   }
 
-  zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override {
-    if (type == DEVICE_METADATA_WIFI_CONFIG) {
-      // Provide a fake implementation for this metadata.
-      static constexpr wifi_config_t config = {.oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_LOW};
-      if (buflen < sizeof(config)) {
-        return ZX_ERR_BUFFER_TOO_SMALL;
-      }
-      std::memcpy(buf, &config, sizeof(config));
-      *actual = sizeof(config);
-      return ZX_OK;
-    }
-    return StubDevice::DeviceGetMetadata(type, buf, buflen, actual);
+  zx::result<fuchsia_wlan_broadcom::WifiConfig> GetWifiConfig() override {
+    // Provide a fake implementation for this metadata.
+    return zx::ok(fuchsia_wlan_broadcom::WifiConfig{{
+        .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_LOW,
+        .clm_needed = true,
+    }});
   }
 };
 
@@ -301,7 +293,9 @@ TEST_F(SdioTest, IntrRegisterUnregisterNoMetadata) {
   // If the get metadata call fails with ZX_ERR_NOT_FOUND the register and unregister calls will
   // behave differently.
   const struct brcmf_bus_ops sdio_bus_ops = {
-      .get_wifi_metadata = [](brcmf_bus*, void*, size_t, size_t*) { return ZX_ERR_NOT_FOUND; },
+      .get_wifi_metadata = [](brcmf_bus*) -> zx::result<fuchsia_wlan_broadcom::WifiConfig> {
+        return zx::error(ZX_ERR_NOT_FOUND);
+      },
   };
 
   MockSdio sdio1;

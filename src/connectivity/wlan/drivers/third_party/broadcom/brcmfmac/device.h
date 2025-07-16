@@ -115,8 +115,8 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   void NetDevReleaseVmo(uint8_t vmo_id) override;
 
   virtual zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) = 0;
-  virtual zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen,
-                                        size_t* actual) = 0;
+  virtual zx::result<fuchsia_wlan_broadcom::WifiConfig> GetWifiConfig() = 0;
+
   virtual zx::result<std::vector<uint8_t>> DeviceGetPersistedMetadata(
       std::string_view metadata_serializable_name) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);

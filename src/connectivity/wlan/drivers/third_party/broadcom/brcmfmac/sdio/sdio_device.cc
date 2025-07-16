@@ -35,7 +35,6 @@
 #include <string>
 
 #include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
-#include <wifi/wifi-config.h>
 #include <wlan/drivers/log_instance.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
@@ -230,21 +229,14 @@ zx::result<std::vector<uint8_t>> SdioDevice::DeviceGetPersistedMetadata(
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t SdioDevice::DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) {
-  if (type == DEVICE_METADATA_WIFI_CONFIG) {
-    zx::result decoded =
-        compat::GetMetadata<wifi_config_t>(incoming(), DEVICE_METADATA_WIFI_CONFIG, "pdev");
-    if (decoded.is_error()) {
-      BRCMF_ERR("Unable to get wifi metadata: %s", decoded.status_string());
-    } else {
-      auto wifi_cfg = decoded.value().get();
-      memcpy(buf, wifi_cfg, sizeof(*wifi_cfg));
-      *actual = sizeof(*wifi_cfg);
-      return ZX_OK;
-    }
+zx::result<fuchsia_wlan_broadcom::WifiConfig> SdioDevice::GetWifiConfig() {
+  zx::result metadata = compat::GetMetadata<fuchsia_wlan_broadcom::WifiConfig>(
+      incoming(), DEVICE_METADATA_WIFI_CONFIG, "pdev");
+  if (metadata.is_error()) {
+    BRCMF_ERR("Failed to get metadata: %s", metadata.status_string());
+    return metadata.take_error();
   }
-
-  return ZX_ERR_NOT_SUPPORTED;
+  return zx::ok(std::move(metadata.value()));
 }
 
 }  // namespace brcmfmac

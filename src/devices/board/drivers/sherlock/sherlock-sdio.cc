@@ -4,7 +4,8 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/fidl.h>
+#include <fidl/fuchsia.wlan.broadcom/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -32,9 +33,9 @@
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-t931/t931-gpio.h>
 #include <soc/aml-t931/t931-hw.h>
-#include <wifi/wifi-config.h>
 
 #include "sherlock.h"
+#include "src/devices/lib/broadcom/commands.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -90,38 +91,6 @@ static const std::vector<fpbus::Bti> sd_emmc_btis{
     }},
 };
 
-constexpr wifi_config_t wifi_config = {
-    .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
-    .iovar_table =
-        {
-            {IOVAR_STR_TYPE, {"ampdu_ba_wsize"}, 32},
-            {IOVAR_STR_TYPE, {"stbc_tx"}, 0},  // since tx_streams is 1
-            {IOVAR_STR_TYPE, {"stbc_rx"}, 1},
-            {IOVAR_CMD_TYPE, {.iovar_cmd = BRCMF_C_SET_PM}, 0},
-            {IOVAR_CMD_TYPE, {.iovar_cmd = BRCMF_C_SET_FAKEFRAG}, 1},
-            {IOVAR_LIST_END_TYPE, {{0}}, 0},
-        },
-    .cc_table =
-        {
-            {"WW", 1},   {"AU", 923}, {"CA", 901}, {"US", 843}, {"GB", 889}, {"BE", 889},
-            {"BG", 889}, {"CZ", 889}, {"DK", 889}, {"DE", 889}, {"EE", 889}, {"IE", 889},
-            {"GR", 889}, {"ES", 889}, {"FR", 889}, {"HR", 889}, {"IT", 889}, {"CY", 889},
-            {"LV", 889}, {"LT", 889}, {"LU", 889}, {"HU", 889}, {"MT", 889}, {"NL", 889},
-            {"AT", 889}, {"PL", 889}, {"PT", 889}, {"RO", 889}, {"SI", 889}, {"SK", 889},
-            {"FI", 889}, {"SE", 889}, {"EL", 889}, {"IS", 889}, {"LI", 889}, {"TR", 889},
-            {"CH", 889}, {"NO", 889}, {"JP", 2},   {"", 0},
-        },
-};
-
-static const std::vector<fpbus::Metadata> wifi_metadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_WIFI_CONFIG),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&wifi_config),
-            reinterpret_cast<const uint8_t*>(&wifi_config) + sizeof(wifi_config)),
-    }},
-};
-
 const std::vector<fdf::BindRule2> kPwmRules = std::vector{
     fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
 };
@@ -150,26 +119,66 @@ const std::vector<fdf::NodeProperty2> kGpioInitProperties = std::vector{
     fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
-zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
-                             fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
-  const std::vector<fdf::BindRule2> kGpioWifiHostRules = std::vector{
+zx::result<> AddWifiNode(fdf::WireSyncClient<fpbus::PlatformBus>& pbus) {
+  static const fuchsia_wlan_broadcom::WifiConfig kWifiConfig{{
+      .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+      .clm_needed = true,
+      .iovar_table =
+          {
+              fuchsia_wlan_broadcom::IovarEntry::WithString(
+                  {{.name = "ampdu_ba_wsize", .val = 32}}),
+              fuchsia_wlan_broadcom::IovarEntry::WithString(
+                  {{.name = "stbc_tx", .val = 0}}),  // since tx_streams is 1
+              fuchsia_wlan_broadcom::IovarEntry::WithString({{.name = "stbc_rx", .val = 1}}),
+              fuchsia_wlan_broadcom::IovarEntry::WithCommand({{.cmd = BRCMF_C_SET_PM, .val = 0}}),
+              fuchsia_wlan_broadcom::IovarEntry::WithCommand(
+                  {{.cmd = BRCMF_C_SET_FAKEFRAG, .val = 1}}),
+          },
+      .cc_table =
+          {
+              {"WW", 1},   {"AU", 923}, {"CA", 901}, {"US", 843}, {"GB", 889}, {"BE", 889},
+              {"BG", 889}, {"CZ", 889}, {"DK", 889}, {"DE", 889}, {"EE", 889}, {"IE", 889},
+              {"GR", 889}, {"ES", 889}, {"FR", 889}, {"HR", 889}, {"IT", 889}, {"CY", 889},
+              {"LV", 889}, {"LT", 889}, {"LU", 889}, {"HU", 889}, {"MT", 889}, {"NL", 889},
+              {"AT", 889}, {"PL", 889}, {"PT", 889}, {"RO", 889}, {"SI", 889}, {"SK", 889},
+              {"FI", 889}, {"SE", 889}, {"EL", 889}, {"IS", 889}, {"LI", 889}, {"TR", 889},
+              {"CH", 889}, {"NO", 889}, {"JP", 2},   {"", 0},
+          },
+  }};
+
+  static const std::vector<fdf::BindRule2> kGpioWifiHostRules = std::vector{
       fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
                                bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(T931_WIFI_HOST_WAKE)),
   };
 
-  const std::vector<fdf::NodeProperty2> kGpioWifiHostProperties = std::vector{
+  static const std::vector<fdf::NodeProperty2> kGpioWifiHostProperties = std::vector{
       fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
                          bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
   };
 
-  fpbus::Node wifi_dev;
-  wifi_dev.name() = "wifi";
-  wifi_dev.vid() = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM;
-  wifi_dev.pid() = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458;
-  wifi_dev.did() = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_DID_WIFI;
-  wifi_dev.metadata() = wifi_metadata;
-  wifi_dev.boot_metadata() = wifi_boot_metadata;
+  fit::result persisted_wifi_config = fidl::Persist(kWifiConfig);
+  if (!persisted_wifi_config.is_ok()) {
+    zxlogf(ERROR, "Failed to persist wifi config: %s",
+           persisted_wifi_config.error_value().FormatDescription().c_str());
+    return zx::error(persisted_wifi_config.error_value().status());
+  }
+
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_WIFI_CONFIG),
+          .data = std::move(persisted_wifi_config.value()),
+      }},
+  };
+
+  fpbus::Node node{{
+      .name = "wifi",
+      .vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
+      .pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
+      .did = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_DID_WIFI,
+      .metadata = std::move(metadata),
+      .boot_metadata = wifi_boot_metadata,
+  }};
 
   constexpr uint32_t kSdioFunctionCount = 2;
   std::vector<fdf::ParentSpec2> wifi_parents = {
@@ -198,57 +207,89 @@ zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
     });
   }
 
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('WIFI');
   fdf::WireUnownedResult result = pbus.buffer(arena)->AddCompositeNodeSpec(
-      fidl::ToWire(fidl_arena, wifi_dev),
+      fidl::ToWire(fidl_arena, node),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
                                    {.name = "wifi", .parents2 = wifi_parents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request to platform bus: %s",
-           result.status_string());
-    return result.status();
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s",
+           result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Failed to add wifi composite to platform device: %s",
+    zxlogf(ERROR, "Failed to add composite node spec: %s",
            zx_status_get_string(result->error_value()));
-    return result->error_value();
+    return zx::error(result->error_value());
   }
-  return ZX_OK;
+
+  return zx::ok();
+}
+
+zx::result<> AddSdEmmcNode(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  static const fuchsia_hardware_sdmmc::SdmmcMetadata kMetadata{{
+      .max_frequency = 208'000'000,
+      // TODO(https://fxbug.dev/42084501): Use the FIDL SDMMC protocol.
+      .use_fidl = false,
+  }};
+
+  fit::result persisted_metadata = fidl::Persist(kMetadata);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist SDMMC metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return zx::error(persisted_metadata.error_value().status());
+  }
+
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
+      }},
+  };
+
+  fpbus::Node node{{
+      .name = "sherlock-sd-emmc",
+      .vid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC,
+      .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC,
+      .did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_A,
+      .mmio = sd_emmc_mmios,
+      .irq = sd_emmc_irqs,
+      .bti = sd_emmc_btis,
+      .metadata = std::move(metadata),
+  }};
+
+  std::vector<fdf::ParentSpec2> kSdioParents = {
+      fdf::ParentSpec2{{kPwmRules, kPwmProperties}},
+      fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}},
+      fdf::ParentSpec2{{kGpioResetRules, kGpioResetProperties}}};
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena sdio_arena('SDIO');
+  auto result = pbus.buffer(sdio_arena)
+                    ->AddCompositeNodeSpec(
+                        fidl::ToWire(fidl_arena, node),
+                        fidl::ToWire(fidl_arena,
+                                     fuchsia_driver_framework::CompositeNodeSpec{
+                                         {.name = "sherlock_sd_emmc", .parents2 = kSdioParents}}));
+
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s",
+           result.FormatDescription().data());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add composite node spec: %s",
+           zx_status_get_string(result->error_value()));
+    return zx::error(result->error_value());
+  }
+
+  return zx::ok();
 }
 
 }  // namespace
 
 zx_status_t Sherlock::SdioInit() {
-  fidl::Arena<> fidl_arena;
-
-  fit::result sdmmc_metadata =
-      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
-                        .max_frequency(208'000'000)
-                        // TODO(https://fxbug.dev/42084501): Use the FIDL SDMMC protocol.
-                        .use_fidl(false)
-                        .Build());
-  if (!sdmmc_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
-           sdmmc_metadata.error_value().FormatDescription().c_str());
-    return sdmmc_metadata.error_value().status();
-  }
-
-  const std::vector<fpbus::Metadata> sd_emmc_metadata{
-      {{
-          .id = fuchsia_hardware_sdmmc::wire::SdmmcMetadata::kSerializableName,
-          .data = std::move(sdmmc_metadata.value()),
-      }},
-  };
-
-  fpbus::Node sdio_dev;
-  sdio_dev.name() = "sherlock-sd-emmc";
-  sdio_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  sdio_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
-  sdio_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_A;
-  sdio_dev.mmio() = sd_emmc_mmios;
-  sdio_dev.bti() = sd_emmc_btis;
-  sdio_dev.irq() = sd_emmc_irqs;
-  sdio_dev.metadata() = sd_emmc_metadata;
-
   // Configure eMMC-SD soc pads.
   gpio_init_steps_.push_back(GpioFunction(T931_SDIO_D0, T931_SDIO_D0_FN));
   gpio_init_steps_.push_back(GpioFunction(T931_SDIO_D1, T931_SDIO_D1_FN));
@@ -286,36 +327,16 @@ zx_status_t Sherlock::SdioInit() {
   gpio_init_steps_.push_back(GpioFunction(T931_WIFI_REG_ON, T931_WIFI_REG_ON_FN));
   gpio_init_steps_.push_back(GpioFunction(T931_WIFI_HOST_WAKE, T931_WIFI_HOST_WAKE_FN));
 
-  std::vector<fdf::ParentSpec2> kSdioParents = {
-      fdf::ParentSpec2{{kPwmRules, kPwmProperties}},
-      fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}},
-      fdf::ParentSpec2{{kGpioResetRules, kGpioResetProperties}}};
-
-  fdf::Arena sdio_arena('SDIO');
-  auto result = pbus_.buffer(sdio_arena)
-                    ->AddCompositeNodeSpec(
-                        fidl::ToWire(fidl_arena, sdio_dev),
-                        fidl::ToWire(fidl_arena,
-                                     fuchsia_driver_framework::CompositeNodeSpec{
-                                         {.name = "sherlock_sd_emmc", .parents2 = kSdioParents}}));
-
-  if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeNodeSpec Sdio(sdio_dev) request failed: %s",
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeNodeSpec Sdio(sdio_dev) failed: %s",
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-
   gpio_init_steps_.push_back(GpioPull(T931_WIFI_HOST_WAKE, fuchsia_hardware_pin::Pull::kNone));
 
-  fdf::Arena wifi_arena('WIFI');
-  status = AddWifiComposite(pbus_, fidl_arena, wifi_arena);
-  if (status != ZX_OK) {
-    return status;
+  if (zx::result result = AddSdEmmcNode(pbus_); result.is_error()) {
+    zxlogf(ERROR, "Failed to add sd-emmc node: %s", result.status_string());
+    return result.status_value();
+  }
+
+  if (zx::result result = AddWifiNode(pbus_); result.is_error()) {
+    zxlogf(ERROR, "Failed to add wifi node: %s", result.status_string());
+    return result.status_value();
   }
 
   return ZX_OK;

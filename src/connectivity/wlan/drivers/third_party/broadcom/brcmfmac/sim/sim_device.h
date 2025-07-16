@@ -65,7 +65,7 @@ class SimDevice final : public fdf::DriverBase, public Device {
 
   // Trampolines for DDK functions, for platforms that support them.
   zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) override;
-  zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
+  zx::result<fuchsia_wlan_broadcom::WifiConfig> GetWifiConfig() override;
 
   void OnRecoveryComplete() override { recovery_complete_.Signal(); }
   void WaitForRecoveryComplete() {
