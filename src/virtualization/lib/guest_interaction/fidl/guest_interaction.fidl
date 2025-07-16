@@ -4,11 +4,13 @@
 @available(added=HEAD)
 library fuchsia.virtualization.guest.interaction;
 
+using fuchsia.virtualization;
 using fuchsia.io;
 using zx;
 
 const GUEST_INTERACTION_MAX_LENGTH uint32 = 1024;
 const DEFAULT_REALM string = "gis_default";
+const DEBIAN_GUEST_NAME_MAX_LENGTH uint32 = 1024;
 
 /// Enables discovery of guest VM's for control in tests.
 @discoverable
@@ -72,4 +74,20 @@ closed protocol Interaction {
         stderr zx.Handle:<SOCKET, optional>;
         command_listener server_end:CommandListener;
     });
+};
+
+/// Encapsulates the starting and interaction of a Debian guest. This is primarily a convenience,
+/// but also provides an abstraction layer over the interaction client_impl.h and
+/// client_operation_state.h files. This abstraction allows reuse of the interaction implementations
+/// across Fuchsia processes via FIDL, regardless of the caller language (e.g. Rust).
+@discoverable
+closed protocol InteractiveDebianGuest {
+    compose Interaction;
+
+    strict Start(resource struct {
+        name string:DEBIAN_GUEST_NAME_MAX_LENGTH;
+        guest_config fuchsia.virtualization.GuestConfig;
+    }) -> ();
+
+    strict Shutdown() -> ();
 };

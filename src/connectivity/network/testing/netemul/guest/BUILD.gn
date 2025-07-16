@@ -52,7 +52,7 @@ source_set("guest") {
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_cpp",
     "//src/connectivity/network/testing/netemul/guest:fuchsia.netemul.guest_cpp",
     "//src/virtualization/lib/guest_interaction:common",
-    "//src/virtualization/lib/guest_interaction:fuchsia.virtualization.guest.interaction_hlcpp",
+    "//src/virtualization/lib/guest_interaction:fuchsia.virtualization.guest.interaction_cpp",
   ]
 
   # Enables thrd_create_with_name in <threads.h>.

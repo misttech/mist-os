@@ -57,7 +57,7 @@ source_set("client_lib") {
   ]
   public_deps = [
     ":common",
-    ":fuchsia.virtualization.guest.interaction_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -105,7 +105,7 @@ source_set("integration_test_lib") {
     "//src/virtualization/tests/lib:fake_netstack",
   ]
   deps = [
-    ":fuchsia.virtualization.guest.interaction_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_hlcpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
@@ -120,7 +120,7 @@ cc_test_executable("client_operation_test") {
   sources = [ "test/client_operation_test.cc" ]
   deps = [
     ":client_lib",
-    ":fuchsia.virtualization.guest.interaction_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_cpp",
     ":operation_test_lib",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/sys/cpp",
@@ -210,8 +210,9 @@ source_set("guest_interaction_client") {
     "client/client_operation_state.h",
   ]
 
-  deps = [
+  public_deps = [
     ":common",
+    ":fuchsia.virtualization.guest.interaction_cpp",
     ":platform_interface_posix",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
@@ -223,7 +224,7 @@ source_set("guest_interaction_client") {
   ]
 
   # Enables thrd_create_with_name in <threads.h>.
-  configs += [ "//build/config:all_source" ]
+  public_configs = [ "//build/config:all_source" ]
 }
 
 cc_test_executable("server_daemon_test") {
@@ -233,7 +234,7 @@ cc_test_executable("server_daemon_test") {
 
   deps = [
     ":common",
-    ":fuchsia.virtualization.guest.interaction_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_cpp",
     ":guest_interaction_client",
     ":integration_test_lib",
     "//src/lib/fxl",
@@ -248,8 +249,10 @@ cc_test_executable("server_daemon_test") {
 
 fidl("fuchsia.virtualization.guest.interaction") {
   sources = [ "fidl/guest_interaction.fidl" ]
-  public_deps = [ "//sdk/fidl/fuchsia.io" ]
-  enable_hlcpp = true
+  public_deps = [
+    "//sdk/fidl/fuchsia.io",
+    "//sdk/fidl/fuchsia.virtualization",
+  ]
 }
 
 extras_image = "$target_out_dir/linux/extras.img"

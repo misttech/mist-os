@@ -5,6 +5,7 @@
 #ifndef SRC_VIRTUALIZATION_LIB_GUEST_INTERACTION_CLIENT_CLIENT_IMPL_H_
 #define SRC_VIRTUALIZATION_LIB_GUEST_INTERACTION_CLIENT_CLIENT_IMPL_H_
 
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fit/function.h>
@@ -30,6 +31,8 @@ class ClientImpl {
     run();
   }
 
+  bool IsRunning() { return running_; }
+
   [[nodiscard]] int Start(thrd_t& thread) {
     running_ = true;
 
@@ -45,10 +48,10 @@ class ClientImpl {
 
   void Stop() { running_ = false; }
 
-  void Get(const std::string& source, fidl::InterfaceHandle<fuchsia::io::File> local_file,
+  void Get(const std::string& source, fidl::ClientEnd<fuchsia_io::File> local_file,
            TransferCallback callback) {
     int32_t fd;
-    zx_status_t status = fdio_fd_create(local_file.TakeChannel().release(), &fd);
+    zx_status_t status = fdio_fd_create(local_file.TakeHandle().release(), &fd);
     if (status != ZX_OK) {
       callback(OperationStatus::CLIENT_CREATE_FILE_FAILURE);
       return;
@@ -62,10 +65,10 @@ class ClientImpl {
     call_data->reader_->StartCall(call_data);
   }
 
-  void Put(fidl::InterfaceHandle<fuchsia::io::File> local_file, const std::string& destination,
+  void Put(fidl::ClientEnd<fuchsia_io::File> local_file, const std::string& destination,
            TransferCallback callback) {
     int32_t fd;
-    zx_status_t status = fdio_fd_create(local_file.TakeChannel().release(), &fd);
+    zx_status_t status = fdio_fd_create(local_file.TakeHandle().release(), &fd);
     if (status != ZX_OK) {
       callback(OperationStatus::CLIENT_FILE_READ_FAILURE);
       return;
@@ -76,11 +79,10 @@ class ClientImpl {
     call_data->writer_->StartCall(call_data);
   }
 
-  void Exec(
-      const std::string& command, const std::map<std::string, std::string>& env_vars,
-      zx::socket std_in, zx::socket std_out, zx::socket std_err,
-      fidl::InterfaceRequest<fuchsia::virtualization::guest::interaction::CommandListener> req,
-      async_dispatcher_t* dispatcher) {
+  void Exec(const std::string& command, const std::map<std::string, std::string>& env_vars,
+            zx::socket std_in, zx::socket std_out, zx::socket std_err,
+            fidl::ServerEnd<fuchsia_virtualization_guest_interaction::CommandListener> req,
+            async_dispatcher_t* dispatcher) {
     // Convert the provided zx::sockets into FDs.
     auto convert = [](zx::socket socket) {
       fbl::unique_fd fd;
@@ -103,7 +105,7 @@ class ClientImpl {
     fbl::unique_fd stderr_fd = convert(std::move(std_err));
 
     std::unique_ptr<ListenerInterface> listener =
-        std::make_unique<ListenerInterface>(std::move(req), dispatcher);
+        std::make_unique<ListenerInterface>(dispatcher, std::move(req));
 
     ExecCallData<T>* call_data =
         new ExecCallData<T>(command, env_vars, stdin_fd.release(), stdout_fd.release(),
