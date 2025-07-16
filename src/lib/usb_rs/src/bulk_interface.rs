@@ -6,8 +6,9 @@ use futures::io::{AsyncRead, AsyncWrite};
 use std::future::Future;
 use std::io::Write;
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::task::Poll;
+use tokio::sync::RwLock;
 
 const MAX_USBFS_BULK_WRITE_SIZE: usize = 256 * 1024;
 
