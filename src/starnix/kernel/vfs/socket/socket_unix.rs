@@ -36,7 +36,8 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     __sk_buff, errno, error, gid_t, socklen_t, uapi, ucred, uid_t, FIONREAD, SOL_SOCKET,
     SO_ACCEPTCONN, SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK,
-    SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
+    SO_PASSCRED, SO_PASSSEC, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT,
+    SO_SNDBUF,
 };
 use std::sync::Arc;
 use zerocopy::IntoBytes;
@@ -112,6 +113,9 @@ struct UnixSocketInner {
     /// See SO_PASSCRED.
     pub passcred: bool,
 
+    /// See SO_PASSSEC.
+    pub passsec: bool,
+
     /// See SO_BROADCAST.
     pub broadcast: bool,
 
@@ -149,6 +153,7 @@ impl UnixSocket {
                 peer_closed_with_unread_data: false,
                 linger: uapi::linger::default(),
                 passcred: false,
+                passsec: false,
                 broadcast: false,
                 no_check: false,
                 reuseaddr: false,
@@ -270,6 +275,7 @@ impl UnixSocket {
             server.messages.set_capacity(listener.messages.capacity())?;
             server.credentials = listener.credentials.clone();
             server.passcred = listener.passcred;
+            server.passsec = listener.passsec;
         }
 
         // We already checked that the socket is in Listening state...but the borrow checker cannot
@@ -373,6 +379,16 @@ impl UnixSocket {
     fn set_passcred(&self, passcred: bool) {
         let mut inner = self.lock();
         inner.passcred = passcred;
+    }
+
+    fn get_passsec(&self) -> bool {
+        let inner = self.lock();
+        inner.passsec
+    }
+
+    fn set_passsec(&self, passsec: bool) {
+        let mut inner = self.lock();
+        inner.passsec = passsec;
     }
 
     fn get_broadcast(&self) -> bool {
@@ -598,6 +614,12 @@ impl SocketOps for UnixSocket {
             let creds = creds.unwrap_or_else(|| current_task.as_ucred());
             ancillary_data.push(AncillaryData::Unix(UnixControlData::Credentials(creds)));
         }
+        if peer.passsec {
+            // TODO: https://fxbug.dev/364568855 - Store the opaque LSM property value, and expand
+            // it to a string upon readmsg.
+            let context = security::socket_getpeersec_dgram(current_task, socket);
+            ancillary_data.push(AncillaryData::Unix(UnixControlData::Security(context.into())));
+        }
         peer.write(locked, current_task, data, local_address, ancillary_data, socket.socket_type)
     }
 
@@ -785,6 +807,10 @@ impl SocketOps for UnixSocket {
                     let passcred: u32 = optval.read(current_task)?;
                     self.set_passcred(passcred != 0);
                 }
+                SO_PASSSEC => {
+                    let passsec: u32 = optval.read(current_task)?;
+                    self.set_passsec(passsec != 0);
+                }
                 SO_BROADCAST => {
                     let broadcast: u32 = optval.read(current_task)?;
                     self.set_broadcast(broadcast != 0);
@@ -854,6 +880,7 @@ impl SocketOps for UnixSocket {
                 SO_RCVBUF => Ok((self.get_receive_capacity() as socklen_t).to_ne_bytes().to_vec()),
                 SO_LINGER => Ok(self.get_linger().as_bytes().to_vec()),
                 SO_PASSCRED => Ok((self.get_passcred() as u32).as_bytes().to_vec()),
+                SO_PASSSEC => Ok((self.get_passsec() as u32).as_bytes().to_vec()),
                 SO_BROADCAST => Ok((self.get_broadcast() as u32).as_bytes().to_vec()),
                 SO_NO_CHECK => Ok((self.get_no_check() as u32).as_bytes().to_vec()),
                 SO_REUSEADDR => Ok((self.get_reuseaddr() as u32).as_bytes().to_vec()),

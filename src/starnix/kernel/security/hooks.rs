@@ -1177,6 +1177,20 @@ pub fn socket_getpeersec_stream(
     })
 }
 
+/// Returns the Security Context with which the [`crate::vfs::Socket`]'s is labeled, to return to
+/// the recipient via `SCM_SECURITY` auxiliary data, if `SO_PASSSEC` is set.
+/// Corresponds to the `socket_getpeersec_dgram()` LSM hook.
+pub fn socket_getpeersec_dgram(current_task: &CurrentTask, socket: &Socket) -> Vec<u8> {
+    track_hook_duration!(c"security.hooks.socket_getpeersec_dgram");
+    if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::socket::socket_getpeersec_dgram(&security_server, current_task, socket)
+        },
+        Vec::default,
+    )
+}
+
 /// Checks if the Unix domain `sending_socket` is allowed to send a message to the
 /// `receiving_socket`.
 /// Corresponds to the `unix_may_send()` LSM hook.

@@ -441,7 +441,7 @@ impl UnixControlData {
 }
 
 /// Stores an arbitrary sequence of bytes.
-pub trait MessageData: Sized {
+pub trait MessageData: Sized + Debug {
     /// Copies data from user memory into a new MessageData object.
     fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<Self, Errno>;
 
