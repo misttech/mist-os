@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_PERIPHERAL_H_
-#define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_PERIPHERAL_H_
+#ifndef SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_TESTS_PERIPHERAL_H_
+#define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_TESTS_PERIPHERAL_H_
 
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/ddk/debug.h>
@@ -61,4 +61,4 @@ class TestFunction : public DeviceType, public ddk::UsbFunctionInterfaceProtocol
 };
 }  // namespace virtualbus
 
-#endif  // SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_PERIPHERAL_H_
+#endif  // SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_TESTS_PERIPHERAL_H_

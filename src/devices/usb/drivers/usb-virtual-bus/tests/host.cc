@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/drivers/usb-virtual-bus/host.h"
+#include "src/devices/usb/drivers/usb-virtual-bus/tests/host.h"
 
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>

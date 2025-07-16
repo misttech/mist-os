@@ -294,9 +294,9 @@
 //src/devices/usb/drivers/usb-hub:usb-hub-driver
 //src/devices/usb/drivers/usb-peripheral-test:usb-peripheral-test-driver
 //src/devices/usb/drivers/usb-peripheral:usb-peripheral-driver
+//src/devices/usb/drivers/usb-virtual-bus/tests:virtual-bus-tester-driver
+//src/devices/usb/drivers/usb-virtual-bus/tests:virtual-bus-tester-function-driver
 //src/devices/usb/drivers/usb-virtual-bus:usb-virtual-bus-driver
-//src/devices/usb/drivers/usb-virtual-bus:virtual-bus-tester-driver
-//src/devices/usb/drivers/usb-virtual-bus:virtual-bus-tester-function-driver
 //src/devices/usb/drivers/xhci:xhci-driver
 //src/devices/usb/tests/usb-hci-test:fuchsia_driver
 //src/diagnostics/validator/logs/ddk/log-test-driver:log-test-driver-driver

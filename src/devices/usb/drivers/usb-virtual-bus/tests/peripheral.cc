@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/drivers/usb-virtual-bus/peripheral.h"
+#include "src/devices/usb/drivers/usb-virtual-bus/tests/peripheral.h"
 
 #include <assert.h>
 #include <lib/ddk/binding_driver.h>

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_HOST_H_
-#define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_HOST_H_
+#ifndef SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_TESTS_HOST_H_
+#define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_TESTS_HOST_H_
 
 #include <fidl/fuchsia.hardware.usb.virtualbustest/cpp/wire.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
@@ -55,4 +55,4 @@ class Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_VIRTUALB
 
 }  // namespace virtualbus
 
-#endif  // SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_HOST_H_
+#endif  // SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_TESTS_HOST_H_

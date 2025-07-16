@@ -211,6 +211,7 @@ shared_library("driver") {
     "//src/devices/usb/drivers/usb-peripheral:*",
     "//src/devices/usb/drivers/usb-peripheral-test:*",
     "//src/devices/usb/drivers/usb-virtual-bus:*",
+    "//src/devices/usb/drivers/usb-virtual-bus/tests:*",
     "//src/devices/usb/drivers/xhci:*",
     "//src/devices/usb/lib/usb-endpoint:*",
     "//src/devices/usb/lib/usb/tests:*",
