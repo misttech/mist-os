@@ -219,7 +219,7 @@ TEST(MmapTest, FileCreatedWithLessPermsShared) {
 
 TEST(MmapTest, CannotMmapNoexecAsExecutable) {
   if (!test_helper::HasSysAdmin()) {
-    GTEST_SKIP() << "Not running with sysadmin capabilities. skipping.";
+    GTEST_SKIP() << "Test uses mount() but running without sysadmin. Skipping.";
   }
 
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
@@ -240,7 +240,7 @@ TEST(MmapTest, CannotMmapNoexecAsExecutable) {
 
 TEST(MmapTest, CanMprotectNonExecMmapToExecutable) {
   if (!test_helper::HasSysAdmin()) {
-    GTEST_SKIP() << "Not running with sysadmin capabilities. skipping.";
+    GTEST_SKIP() << "Test uses mount() but running without sysadmin. Skipping.";
   }
 
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
@@ -260,7 +260,7 @@ TEST(MmapTest, CanMprotectNonExecMmapToExecutable) {
 
 TEST(MmapTest, CannotMprotectNoexecAsExecutable) {
   if (!test_helper::HasSysAdmin()) {
-    GTEST_SKIP() << "Not running with sysadmin capabilities. skipping.";
+    GTEST_SKIP() << "Test uses mount() but running without sysadmin. Skipping.";
   }
 
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
