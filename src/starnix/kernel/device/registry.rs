@@ -6,11 +6,15 @@ use crate::device::kobject::{Class, Device, DeviceMetadata, UEventAction, UEvent
 use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_path};
 use crate::fs::sysfs::build_device_directory;
-use crate::task::{CurrentTask, Kernel, KernelOrTask, SimpleWaiter};
+use crate::task::{
+    register_delayed_release, CurrentTask, CurrentTaskAndLocked, Kernel, KernelOrTask, SimpleWaiter,
+};
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::{FileOps, FsNode, FsStr, FsString};
+use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_logging::log_error;
 use starnix_sync::{InterruptibleEvent, LockEqualOrBefore, OrderedMutex};
+use starnix_types::ownership::{Releasable, ReleaseGuard};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::device_type::{
     DeviceType, DYN_MAJOR_RANGE, MISC_DYNANIC_MINOR_RANGE, MISC_MAJOR,
@@ -67,18 +71,8 @@ pub trait DeviceOps: DynClone + Send + Sync + AsAny + 'static {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno>;
-}
 
-impl<T: DeviceOps> DeviceOps for Arc<T> {
-    fn open(
-        &self,
-        locked: &mut Locked<DeviceOpen>,
-        current_task: &CurrentTask,
-        device_type: DeviceType,
-        node: &FsNode,
-        flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        self.deref().open(locked, current_task, device_type, node, flags)
+    fn unregister(self: Box<Self>, _locked: &mut Locked<FileOpsCore>, _current_task: &CurrentTask) {
     }
 }
 
@@ -133,6 +127,29 @@ pub trait DeviceListener: Send + Sync {
     fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext);
 }
 
+pub struct DeviceOpsWrapper(Box<dyn DeviceOps>);
+impl ReleaserAction<DeviceOpsWrapper> for DeviceOpsWrapper {
+    fn release(device_ops: ReleaseGuard<DeviceOpsWrapper>) {
+        register_delayed_release(device_ops);
+    }
+}
+impl Deref for DeviceOpsWrapper {
+    type Target = dyn DeviceOps;
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+pub type DeviceReleaser = ObjectReleaser<DeviceOpsWrapper, DeviceOpsWrapper>;
+pub type DeviceHandle = Arc<DeviceReleaser>;
+impl Releasable for DeviceOpsWrapper {
+    type Context<'a> = CurrentTaskAndLocked<'a>;
+
+    fn release<'a>(self, context: CurrentTaskAndLocked<'a>) {
+        let (locked, current_task) = context;
+        self.0.unregister(locked, current_task);
+    }
+}
+
 /// An entry in the `DeviceRegistry`.
 struct DeviceEntry {
     /// The name of the device.
@@ -141,12 +158,12 @@ struct DeviceEntry {
     name: FsString,
 
     /// The ops used to open the device.
-    ops: Arc<dyn DeviceOps>,
+    ops: DeviceHandle,
 }
 
 impl DeviceEntry {
     fn new(name: FsString, ops: impl DeviceOps) -> Self {
-        Self { name, ops: Arc::new(ops) }
+        Self { name, ops: Arc::new(DeviceOpsWrapper(Box::new(ops)).into()) }
     }
 }
 
@@ -197,7 +214,7 @@ impl RegisteredDevices {
     /// `DeviceType`, the ops for that major device will be returned. Otherwise,
     /// if there is a minor device registered, the ops for that minor device will be
     /// returned. Otherwise, returns `ENODEV`.
-    fn get(&self, device_type: DeviceType) -> Result<Arc<dyn DeviceOps>, Errno> {
+    fn get(&self, device_type: DeviceType) -> Result<DeviceHandle, Errno> {
         if let Some(major_device) = self.majors.get(&device_type.major()) {
             Ok(Arc::clone(&major_device.ops))
         } else if let Some(minor_device) = self.minors.get(&device_type) {
@@ -758,7 +775,7 @@ impl DeviceRegistry {
         locked: &mut Locked<L>,
         device_type: DeviceType,
         mode: DeviceMode,
-    ) -> Result<Arc<dyn DeviceOps>, Errno>
+    ) -> Result<DeviceHandle, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {

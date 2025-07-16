@@ -978,7 +978,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<Arc<RemoteBinderConnection>, Errno> {
         let node = current_task.lookup_path_from_root(locked, path.as_ref())?;
         let device_type = node.entry.node.info().rdev;
-        let device: Arc<dyn DeviceOps> = current_task
+        let device = current_task
             .kernel()
             .device_registry
             .get_device(locked, device_type, DeviceMode::Char)

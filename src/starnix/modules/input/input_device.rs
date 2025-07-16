@@ -197,35 +197,35 @@ impl InputDevice {
         display_width: i32,
         display_height: i32,
         inspect_node: &fuchsia_inspect::Node,
-    ) -> Arc<Self> {
+    ) -> Self {
         let node = inspect_node.create_child("touch_device");
-        Arc::new(InputDevice {
+        InputDevice {
             device_type: InputDeviceType::Touch(display_width, display_height),
             open_files: Default::default(),
             inspect_status: Arc::new(InputDeviceStatus::new(node)),
-        })
+        }
     }
 
-    pub fn new_keyboard(inspect_node: &fuchsia_inspect::Node) -> Arc<Self> {
+    pub fn new_keyboard(inspect_node: &fuchsia_inspect::Node) -> Self {
         let node = inspect_node.create_child("keyboard_device");
-        Arc::new(InputDevice {
+        InputDevice {
             device_type: InputDeviceType::Keyboard,
             open_files: Default::default(),
             inspect_status: Arc::new(InputDeviceStatus::new(node)),
-        })
+        }
     }
 
-    pub fn new_mouse(inspect_node: &fuchsia_inspect::Node) -> Arc<Self> {
+    pub fn new_mouse(inspect_node: &fuchsia_inspect::Node) -> Self {
         let node = inspect_node.create_child("mouse_device");
-        Arc::new(InputDevice {
+        InputDevice {
             device_type: InputDeviceType::Mouse,
             open_files: Default::default(),
             inspect_status: Arc::new(InputDeviceStatus::new(node)),
-        })
+        }
     }
 
     pub fn register<L>(
-        self: Arc<Self>,
+        self,
         locked: &mut Locked<L>,
         system_task: &CurrentTask,
         device_id: DeviceId,
@@ -365,7 +365,7 @@ mod test {
     fn start_touch_input(
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
-    ) -> (Arc<InputDevice>, FileHandle, fuipointer::TouchSourceRequestStream) {
+    ) -> (InputDevice, FileHandle, fuipointer::TouchSourceRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
         start_touch_input_inspect_and_dimensions(locked, current_task, 700, 1200, &inspector)
     }
@@ -374,7 +374,7 @@ mod test {
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         inspector: &fuchsia_inspect::Inspector,
-    ) -> (Arc<InputDevice>, FileHandle, fuipointer::TouchSourceRequestStream) {
+    ) -> (InputDevice, FileHandle, fuipointer::TouchSourceRequestStream) {
         start_touch_input_inspect_and_dimensions(locked, current_task, 700, 1200, &inspector)
     }
 
@@ -384,7 +384,7 @@ mod test {
         x_max: i32,
         y_max: i32,
         inspector: &fuchsia_inspect::Inspector,
-    ) -> (Arc<InputDevice>, FileHandle, fuipointer::TouchSourceRequestStream) {
+    ) -> (InputDevice, FileHandle, fuipointer::TouchSourceRequestStream) {
         let input_device = InputDevice::new_touch(x_max, y_max, inspector.root());
         let input_file =
             input_device.open_test(locked, current_task).expect("Failed to create input file");
@@ -427,7 +427,7 @@ mod test {
     fn start_keyboard_input(
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
-    ) -> (Arc<InputDevice>, FileHandle, fuiinput::KeyboardRequestStream) {
+    ) -> (InputDevice, FileHandle, fuiinput::KeyboardRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
         let input_device = InputDevice::new_keyboard(inspector.root());
         let input_file =
@@ -470,7 +470,7 @@ mod test {
     fn start_button_input(
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
-    ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
+    ) -> (InputDevice, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
         start_button_input_inspect(locked, current_task, &inspector)
     }
@@ -479,7 +479,7 @@ mod test {
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         inspector: &fuchsia_inspect::Inspector,
-    ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
+    ) -> (InputDevice, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
         let input_device = InputDevice::new_keyboard(inspector.root());
         let input_file =
             input_device.open_test(locked, current_task).expect("Failed to create input file");
@@ -518,7 +518,7 @@ mod test {
     fn start_mouse_input(
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
-    ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
+    ) -> (InputDevice, FileHandle, fuipointer::MouseSourceRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
         start_mouse_input_inspect(locked, current_task, &inspector)
     }
@@ -527,7 +527,7 @@ mod test {
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         inspector: &fuchsia_inspect::Inspector,
-    ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
+    ) -> (InputDevice, FileHandle, fuipointer::MouseSourceRequestStream) {
         let input_device = InputDevice::new_mouse(inspector.root());
         let input_file =
             input_device.open_test(locked, current_task).expect("Failed to create input file");

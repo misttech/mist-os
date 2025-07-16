@@ -863,9 +863,9 @@ mod test {
         current_task: &CurrentTask,
     ) -> (
         Arc<InputEventsRelay>,
-        Arc<InputDevice>,
-        Arc<InputDevice>,
-        Arc<InputDevice>,
+        InputDevice,
+        InputDevice,
+        InputDevice,
         FileHandle,
         FileHandle,
         FileHandle,

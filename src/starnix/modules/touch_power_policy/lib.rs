@@ -24,13 +24,11 @@ pub struct TouchPowerPolicyDevice {
 }
 
 impl TouchPowerPolicyDevice {
-    pub fn new(touch_standby_sender: Sender<bool>) -> Arc<Self> {
-        Arc::new(TouchPowerPolicyDevice {
-            touch_power_file: TouchPowerPolicyFile::new(touch_standby_sender),
-        })
+    pub fn new(touch_standby_sender: Sender<bool>) -> Self {
+        TouchPowerPolicyDevice { touch_power_file: TouchPowerPolicyFile::new(touch_standby_sender) }
     }
 
-    pub fn register<L>(self: Arc<Self>, locked: &mut Locked<L>, system_task: &CurrentTask)
+    pub fn register<L>(self, locked: &mut Locked<L>, system_task: &CurrentTask)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -47,7 +45,7 @@ impl TouchPowerPolicyDevice {
             .expect("can register touch_standby device");
     }
 
-    pub fn start_relay(self: &Arc<Self>, kernel: &Kernel, touch_standby_receiver: Receiver<bool>) {
+    pub fn start_relay(&self, kernel: &Kernel, touch_standby_receiver: Receiver<bool>) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
             let mut prev_enabled = true;
@@ -61,7 +59,7 @@ impl TouchPowerPolicyDevice {
         });
     }
 
-    fn notify_standby_state_changed(self: &Arc<Self>, touch_enabled: bool) {
+    fn notify_standby_state_changed(&self, touch_enabled: bool) {
         // TODO(b/341142285): notify input pipeline that touch_standby state has changed
         log_info!("touch enabled: {:?}", touch_enabled);
     }
