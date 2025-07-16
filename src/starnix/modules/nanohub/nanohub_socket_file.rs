@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_core::vfs::FileObjectState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -93,7 +94,7 @@ impl FileOps for NanohubSocketFile {
     fn close(
         &self,
         locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
         self.socket_file.close(locked, file, current_task);

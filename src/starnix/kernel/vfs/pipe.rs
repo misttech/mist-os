@@ -15,7 +15,7 @@ use crate::vfs::buffers::{
 use crate::vfs::fs_registry::FsRegistry;
 use crate::vfs::{
     default_fcntl, default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, CacheMode,
-    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileHandle, FileObject, FileObjectState, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNodeInfo, FsStr, SpecialNode,
 };
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked};
@@ -470,7 +470,7 @@ impl FileOps for PipeFileObject {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         self.on_close(file.flags());

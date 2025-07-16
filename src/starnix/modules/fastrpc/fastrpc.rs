@@ -11,7 +11,9 @@ use starnix_core::device::DeviceOps;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::{CurrentTask, ThreadGroupKey};
-use starnix_core::vfs::{default_ioctl, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode};
+use starnix_core::vfs::{
+    default_ioctl, Anon, FdFlags, FdNumber, FileObject, FileObjectState, FileOps, FsNode,
+};
 use starnix_core::{
     fileops_impl_dataless, fileops_impl_memory, fileops_impl_noop_sync, fileops_impl_seekless,
 };
@@ -739,7 +741,7 @@ impl FileOps for FastRPCFile {
     fn close(
         &self,
         locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         let inner = self.inner_state.lock(locked);

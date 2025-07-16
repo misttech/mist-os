@@ -59,9 +59,14 @@ impl<T> WeakKey<T> {
         Self(Arc::downgrade(arc), Arc::as_ptr(arc).into())
     }
 }
+impl<T> PartialEq<Weak<T>> for WeakKey<T> {
+    fn eq(&self, other: &Weak<T>) -> bool {
+        Weak::ptr_eq(&self.0, other)
+    }
+}
 impl<T> PartialEq for WeakKey<T> {
     fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.0, &other.0)
+        *self == other.0
     }
 }
 impl<T> Eq for WeakKey<T> {}

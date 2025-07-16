@@ -12,7 +12,7 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, DowncastedFile, FileHandle, FileObject,
-    FileOps, FsNodeInfo,
+    FileObjectState, FileOps, FsNodeInfo,
 };
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
@@ -158,7 +158,7 @@ impl FileOps for SocketFile {
     fn close(
         &self,
         locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
         self.socket.close(locked, current_task);

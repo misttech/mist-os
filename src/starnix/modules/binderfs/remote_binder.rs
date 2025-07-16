@@ -18,8 +18,8 @@ use starnix_core::power::{mark_proxy_message_handled, LockSource};
 use starnix_core::task::{CurrentTask, Kernel, LockedAndTask, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
-    NamespaceNode,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileObjectState, FileOps, FsNode,
+    FsString, NamespaceNode,
 };
 use starnix_lifecycle::DropWaiter;
 use starnix_logging::{
@@ -120,7 +120,7 @@ impl FileOps for RemoteBinderFileOps {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         self.0.close();

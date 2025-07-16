@@ -9,9 +9,9 @@ use starnix_core::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQu
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
-    fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer,
+    fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileObjectState, FileOps,
+    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps,
+    FsStr, InputBuffer, OutputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
@@ -416,12 +416,15 @@ impl FunctionFsRootDir {
         Ok(())
     }
 
-    fn from_file(file: &FileObject) -> &Self {
-        file.fs
-            .root()
+    fn from_fs(fs: &FileSystem) -> &Self {
+        fs.root()
             .node
             .downcast_ops::<FunctionFsRootDir>()
             .expect("failed to downcast functionfs root dir")
+    }
+
+    fn from_file(file: &FileObject) -> &Self {
+        Self::from_fs(&file.fs)
     }
 
     fn on_control_opened(&self) {
@@ -570,10 +573,10 @@ impl FileOps for FunctionFsControlEndpoint {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
-        let rootdir = FunctionFsRootDir::from_file(file);
+        let rootdir = FunctionFsRootDir::from_fs(&file.fs);
         rootdir.on_control_closed();
     }
 

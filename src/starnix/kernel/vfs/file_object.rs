@@ -163,7 +163,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
     }
@@ -451,7 +451,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
     fn close(
         &self,
         locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
         self.deref().close(locked, file, current_task)
@@ -1261,7 +1261,7 @@ impl FileOps for ProxyFileOps {
     fn close(
         &self,
         locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
         self.0.ops().close(locked, &self.0, current_task);
@@ -1423,14 +1423,24 @@ impl FileObjectId {
 /// that is specific to this sessions whereas the underlying FsNode contains
 /// the state that is shared between all the sessions.
 pub struct FileObject {
+    ops: Box<dyn FileOps>,
+    state: FileObjectState,
+}
+
+impl std::ops::Deref for FileObject {
+    type Target = FileObjectState;
+    fn deref(&self) -> &Self::Target {
+        &self.state
+    }
+}
+
+pub struct FileObjectState {
     /// Weak reference to the `FileHandle` of this `FileObject`. This allows to retrieve the
     /// `FileHandle` from a `FileObject`.
     pub weak_handle: WeakFileHandle,
 
     /// A unique identifier for this file object.
     pub id: FileObjectId,
-
-    ops: Box<dyn FileOps>,
 
     /// The NamespaceNode associated with this FileObject.
     ///
@@ -1468,6 +1478,17 @@ pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
 pub type FileHandle = Arc<FileReleaser>;
 pub type WeakFileHandle = Weak<FileReleaser>;
 pub type FileHandleKey = WeakKey<FileReleaser>;
+
+impl FileObjectState {
+    /// The FsNode from which this FileObject was created.
+    pub fn node(&self) -> &FsNodeHandle {
+        &self.name.entry.node
+    }
+
+    pub fn flags(&self) -> OpenFlags {
+        *self.flags.lock()
+    }
+}
 
 impl FileObject {
     /// Create a FileObject that is not mounted in a namespace.
@@ -1513,28 +1534,25 @@ impl FileObject {
         let security_state = security::file_alloc_security(current_task);
         let file = FileHandle::new_cyclic(|weak_handle| {
             Self {
-                weak_handle: weak_handle.clone(),
-                id,
-                name: name.into_active(),
-                fs,
                 ops,
-                offset: Mutex::new(0),
-                flags: Mutex::new(flags - OpenFlags::CREAT),
-                async_owner: Default::default(),
-                epoll_files: Default::default(),
-                lease: Default::default(),
-                _file_write_guard: file_write_guard,
-                security_state,
+                state: FileObjectState {
+                    weak_handle: weak_handle.clone(),
+                    id,
+                    name: name.into_active(),
+                    fs,
+                    offset: Mutex::new(0),
+                    flags: Mutex::new(flags - OpenFlags::CREAT),
+                    async_owner: Default::default(),
+                    epoll_files: Default::default(),
+                    lease: Default::default(),
+                    _file_write_guard: file_write_guard,
+                    security_state,
+                },
             }
             .into()
         });
         file.notify(InotifyMask::OPEN);
         Ok(file)
-    }
-
-    /// The FsNode from which this FileObject was created.
-    pub fn node(&self) -> &FsNodeHandle {
-        &self.name.entry.node
     }
 
     pub fn can_read(&self) -> bool {
@@ -2032,10 +2050,6 @@ impl FileObject {
         let mut flags = self.flags.lock();
         let bits = (flags.bits() & !mask_bits) | (value.bits() & mask_bits);
         *flags = OpenFlags::from_bits_truncate(bits);
-    }
-
-    pub fn flags(&self) -> OpenFlags {
-        *self.flags.lock()
     }
 
     /// Get the async owner of this file.

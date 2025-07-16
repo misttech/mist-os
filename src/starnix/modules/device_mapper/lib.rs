@@ -17,7 +17,8 @@ use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, VecOutputBuffer};
 use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
-    fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
+    fileops_impl_seekless, FileHandle, FileObject, FileObjectState, FileOps, FsNode, FsString,
+    OutputBuffer,
 };
 use starnix_ext::map_ext::EntryExt;
 use starnix_logging::{log_trace, track_stub};
@@ -414,7 +415,7 @@ impl FileOps for DmDeviceFile {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         let mut state = self.device.state.lock();

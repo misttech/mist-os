@@ -10,7 +10,8 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject,
+    FileObjectState, FileOps,
 };
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
@@ -197,7 +198,7 @@ impl FileOps for TimerFile {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
         if let Err(e) = self.timer.stop(current_task) {

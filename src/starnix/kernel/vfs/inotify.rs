@@ -9,8 +9,8 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::{
     default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, inotify, Anon,
-    DirEntryHandle, FileHandle, FileHandleKey, FileObject, FileOps, FsNodeOps, FsStr, FsString,
-    WdNumber,
+    DirEntryHandle, FileHandle, FileHandleKey, FileObject, FileObjectState, FileOps, FsNodeOps,
+    FsStr, FsString, WdNumber, WeakFileHandle,
 };
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -297,7 +297,7 @@ impl FileOps for InotifyFileObject {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         let dir_entries = {
@@ -306,7 +306,7 @@ impl FileOps for InotifyFileObject {
         };
 
         for dir_entry in dir_entries {
-            dir_entry.node.ensure_watchers().remove_by_ref(file);
+            dir_entry.node.ensure_watchers().remove_by_ref(&file.weak_handle);
         }
     }
 }
@@ -440,15 +440,9 @@ impl InotifyWatchers {
         watchers.remove(inotify);
     }
 
-    fn remove_by_ref(&self, inotify: &FileObject) {
+    fn remove_by_ref(&self, inotify: &WeakFileHandle) {
         let mut watchers = self.watchers.lock();
-        watchers.retain(|weak_key, _| {
-            if let Some(handle) = weak_key.0.upgrade() {
-                !std::ptr::eq(handle.as_ref().as_ref(), inotify)
-            } else {
-                false
-            }
-        })
+        watchers.retain(|weak_key, _| weak_key.0.strong_count() > 0 && weak_key != inotify)
     }
 
     /// Notifies all watchers that listen for the specified event mask with

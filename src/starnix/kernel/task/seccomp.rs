@@ -9,7 +9,8 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject,
+    FileObjectState, FileOps,
 };
 use bstr::ByteSlice;
 use ebpf::{
@@ -914,7 +915,7 @@ impl FileOps for SeccompNotifierFileObject {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         let mut state = self.notifier.lock();

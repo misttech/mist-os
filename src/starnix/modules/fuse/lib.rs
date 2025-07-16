@@ -19,8 +19,8 @@ use starnix_core::vfs::{
     default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
     fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly, AppendLockGuard, CacheConfig,
     CacheMode, CheckAccessReason, DirEntry, DirEntryOps, DirectoryEntryType, DirentSink,
-    FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    FallocMode, FdNumber, FileObject, FileObjectState, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
     PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize, WeakFileHandle, XattrOp,
 };
 use starnix_lifecycle::AtomicU64Counter;
@@ -123,7 +123,7 @@ impl FileOps for DevFuse {
     fn close(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         self.connection.lock().disconnect();
@@ -764,10 +764,10 @@ impl FileOps for FuseFileObject {
     fn close(
         &self,
         locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
+        file: &FileObjectState,
         current_task: &CurrentTask,
     ) {
-        let node = Self::get_fuse_node(file);
+        let node = FuseNode::from_node(file.node());
         let is_dir = file.node().is_dir();
         {
             let mut connection = self.connection.lock();

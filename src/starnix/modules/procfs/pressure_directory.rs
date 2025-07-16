@@ -17,8 +17,8 @@ use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, Dynam
 use starnix_core::vfs::pseudo::simple_directory::SimpleDirectory;
 use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
 use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps,
-    FileSystemHandle, FsNodeHandle, FsNodeOps,
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileObjectState,
+    FileOps, FileSystemHandle, FsNodeHandle, FsNodeOps,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
@@ -143,7 +143,7 @@ impl FileOps for MemoryPressureFile {
     fn close(
         &self,
         locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
+        _file: &FileObjectState,
         _current_task: &CurrentTask,
     ) {
         if let Some(monitor) = self.monitor.lock(locked).take() {
