@@ -22,6 +22,7 @@ use crate::vfs::{
 };
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_types::ownership::ReleaseGuard;
+use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::user_address::ArchSpecific;
 
 use fidl::HandleBased;
@@ -1548,8 +1549,16 @@ impl FileObject {
         self.flags.lock().can_write()
     }
 
+    /// Returns false if the file was opened from a "noexec" mount.
+    pub fn can_exec(&self) -> bool {
+        !self.name.to_passive().mount.flags().contains(MountFlags::NOEXEC)
+    }
+
     pub fn max_access_for_memory_mapping(&self) -> Access {
-        let mut access = Access::EXEC;
+        let mut access = Access::EXIST;
+        if self.can_exec() {
+            access |= Access::EXEC;
+        }
         let flags = self.flags.lock();
         if flags.can_read() {
             access |= Access::READ;
@@ -1858,7 +1867,9 @@ impl FileObject {
         if prot.contains(ProtectionFlags::WRITE) && !self.can_write() {
             return error!(EACCES);
         }
-        // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
+        if prot.contains(ProtectionFlags::EXEC) && !self.can_exec() {
+            return error!(EPERM);
+        }
         self.ops().get_memory(locked.cast_locked::<FileOpsCore>(), self, current_task, length, prot)
     }
 
@@ -1886,7 +1897,9 @@ impl FileObject {
         {
             return error!(EACCES);
         }
-        // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
+        if prot_flags.contains(ProtectionFlags::EXEC) && !self.can_exec() {
+            return error!(EPERM);
+        }
         self.ops().mmap(
             locked,
             self,
