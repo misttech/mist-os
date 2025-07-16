@@ -781,11 +781,6 @@
                 // socket_unix_seqpacket_local_test
                 "SeqpacketUnixSockets/SeqpacketUnixSocketPairTest.Sendto/*",
 
-                // socket_unix_unbound_abstract_test
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.AutoBindAddrInUse/*",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.AutoBindSuccess/*",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.GetSockNamePartialLength/*",
-
                 // socket_unix_unbound_stream_test
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassPartialRead/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CredPassPartialRead/*",
