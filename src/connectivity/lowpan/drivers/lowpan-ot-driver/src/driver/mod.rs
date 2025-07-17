@@ -5,6 +5,7 @@
 #[allow(unused_imports)]
 use super::prelude::*;
 
+use futures::channel::mpsc;
 use openthread::ot;
 use zx::MonotonicDuration;
 
@@ -92,8 +93,15 @@ pub struct OtDriver<OT, NI, BI> {
     /// Multicast routing manager:
     multicast_routing_manager: MulticastRoutingManager,
 
-    /// Allows for controlling the publishing of border agent services.
+    /// Information about the platform on which the driver is running.  This information is cached
+    /// to prevent repeated service reconnections and redundant queries.
+    product_metadata: ProductMetadata,
+
+    /// Allows for controlling the publishing of border agent service and ePSKc service.
     publisher: fidl_fuchsia_net_mdns::ServiceInstancePublisherProxy,
+
+    /// Commands ePSKc publishing logic to start or stop.
+    epskc_publisher: fuchsia_sync::Mutex<mpsc::Sender<border_agent::PublishServiceRequest>>,
 }
 
 impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
@@ -101,7 +109,9 @@ impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
         ot_instance: OT,
         net_if: NI,
         backbone_if: BI,
+        product_metadata: ProductMetadata,
         publisher: fidl_fuchsia_net_mdns::ServiceInstancePublisherProxy,
+        epskc_publisher: mpsc::Sender<border_agent::PublishServiceRequest>,
     ) -> Self {
         OtDriver {
             driver_state: fuchsia_sync::Mutex::new(DriverState::new(ot_instance)),
@@ -114,7 +124,9 @@ impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
             )),
             border_agent_vendor_txt_entries: futures::lock::Mutex::new(vec![]),
             multicast_routing_manager: MulticastRoutingManager::new(),
+            product_metadata,
             publisher,
+            epskc_publisher: fuchsia_sync::Mutex::new(epskc_publisher),
         }
     }
 
@@ -156,5 +168,146 @@ impl<F: FnOnce()> Drop for CleanupFunc<F> {
         if let Some(func) = self.0.take() {
             func();
         }
+    }
+}
+
+static DEFAULT_VENDOR: &str = "Unknown";
+static DEFAULT_PRODUCT: &str = "Fuchsia";
+
+#[derive(Debug)]
+pub(crate) struct ProductMetadata {
+    vendor: String,
+    product: String,
+}
+
+impl ProductMetadata {
+    fn new(vendor: String, product: String) -> Self {
+        Self { vendor, product }
+    }
+
+    pub(crate) fn vendor(&self) -> String {
+        self.vendor.clone()
+    }
+
+    pub(crate) fn product(&self) -> String {
+        self.product.clone()
+    }
+}
+
+impl std::default::Default for ProductMetadata {
+    fn default() -> Self {
+        Self::new(DEFAULT_VENDOR.to_string(), DEFAULT_PRODUCT.to_string())
+    }
+}
+
+pub(crate) async fn get_product_metadata(
+    hw_info_proxy: fidl_fuchsia_hwinfo::ProductProxy,
+) -> ProductMetadata {
+    match hw_info_proxy.get_info().await {
+        Ok(info) => {
+            let vendor = info.manufacturer.unwrap_or_else(|| DEFAULT_VENDOR.to_string());
+            let product = info.model.unwrap_or_else(|| DEFAULT_PRODUCT.to_string());
+            ProductMetadata::new(vendor, product)
+        }
+        Err(err) => {
+            warn!("Unable to get product info: {:?}", err);
+            ProductMetadata::default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy;
+    use fuchsia_async::TestExecutor;
+    use std::pin::pin;
+    use std::task::Poll;
+
+    #[fuchsia::test]
+    fn test_product_metadata() {
+        let vendor = "qwer";
+        let product = "asdf";
+        let product_metadata = ProductMetadata::new(vendor.to_string(), product.to_string());
+
+        assert_eq!(product_metadata.vendor(), vendor.to_string());
+        assert_eq!(product_metadata.product(), product.to_string());
+    }
+
+    #[fuchsia::test]
+    fn test_product_metadata_default() {
+        let product_metadata = ProductMetadata::default();
+
+        assert_eq!(product_metadata.vendor(), DEFAULT_VENDOR.to_string());
+        assert_eq!(product_metadata.product(), DEFAULT_PRODUCT.to_string());
+    }
+
+    #[fuchsia::test]
+    fn test_get_metadata_succeeds() {
+        let mut exec = TestExecutor::new();
+        let (proxy, server) = create_proxy::<fidl_fuchsia_hwinfo::ProductMarker>();
+        let mut req_stream = server.into_stream();
+        let fut = get_product_metadata(proxy);
+        let mut fut = pin!(fut);
+
+        let fake_manufacturer = String::from("asdf");
+        let fake_model = String::from("qwer");
+
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
+            exec.run_until_stalled(&mut req_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_hwinfo::ProductRequest::GetInfo { responder }))) => {
+                responder.send(&fidl_fuchsia_hwinfo::ProductInfo {
+                    manufacturer: Some(fake_manufacturer.clone()),
+                    model: Some(fake_model.clone()),
+                    ..Default::default()
+                }).expect("failed to send response")
+            }
+        );
+
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(metadata) => {
+            assert_eq!(metadata.vendor(), fake_manufacturer.to_string());
+            assert_eq!(metadata.product(), fake_model.to_string());
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_empty_product_info() {
+        let mut exec = TestExecutor::new();
+        let (proxy, server) = create_proxy::<fidl_fuchsia_hwinfo::ProductMarker>();
+        let mut req_stream = server.into_stream();
+        let fut = get_product_metadata(proxy);
+        let mut fut = pin!(fut);
+
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
+            exec.run_until_stalled(&mut req_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_hwinfo::ProductRequest::GetInfo { responder }))) => {
+                responder.send(&fidl_fuchsia_hwinfo::ProductInfo {
+                    ..Default::default()
+                }).expect("failed to send response")
+            }
+        );
+
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(metadata) => {
+            assert_eq!(metadata.vendor(), DEFAULT_VENDOR.to_string());
+            assert_eq!(metadata.product(), DEFAULT_PRODUCT.to_string());
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_info_query_fails() {
+        let mut exec = TestExecutor::new();
+
+        // Drop the server end so the request fails.
+        let (proxy, _) = create_proxy::<fidl_fuchsia_hwinfo::ProductMarker>();
+        let fut = get_product_metadata(proxy);
+        let mut fut = pin!(fut);
+
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(metadata) => {
+            assert_eq!(metadata.vendor(), DEFAULT_VENDOR.to_string());
+            assert_eq!(metadata.product(), DEFAULT_PRODUCT.to_string());
+        });
     }
 }

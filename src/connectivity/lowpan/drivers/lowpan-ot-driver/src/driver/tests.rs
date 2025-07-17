@@ -79,9 +79,16 @@ where
     // so simply drop it.
     let (publisher, _) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_mdns::ServiceInstancePublisherMarker>();
+    let (sender, receiver) = mpsc::channel(100);
 
-    let driver =
-        Arc::new(OtDriver::new(instance, network_interface, backbone_interface, publisher));
+    let driver = Arc::new(OtDriver::new(
+        instance,
+        network_interface,
+        backbone_interface,
+        ProductMetadata::default(),
+        publisher.clone(),
+        sender,
+    ));
 
     // Note that we cannot move this into an async block because
     // `fun` itself doesn't implement `Send`.
@@ -105,7 +112,7 @@ where
     };
 
     async move {
-        let driver_stream = driver.main_loop_stream();
+        let driver_stream = driver.main_loop_stream(receiver, publisher);
 
         let mut driver_stream_count = 0u32;
         futures::select_biased! {
