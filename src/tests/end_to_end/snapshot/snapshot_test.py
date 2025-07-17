@@ -43,7 +43,9 @@ class SnapshotPerfResults(action_timer.ActionTimer[None, None]):
 
     def action(self, _: None) -> None:
         self._device.health_check()
-        memory_before_snapshot = self._device.ffx.run(["profile", "memory"])
+        memory_before_snapshot = self._device.ffx.run(
+            ["--machine", "json", "profile", "memory"]
+        )
         with open(
             os.path.join(self.test_case_path, "memory_before_snapshot"), "w"
         ) as file:
@@ -68,31 +70,26 @@ class SnapshotPerfResults(action_timer.ActionTimer[None, None]):
                 buffer_size=32,
             ):
                 self._device.snapshot(self._directory.name, _SNAPSHOT_ZIP)
-            memory_after_snapshot = self._device.ffx.run(["profile", "memory"])
+            memory_after_snapshot = self._device.ffx.run(
+                ["--machine", "json", "profile", "memory"]
+            )
             with open(
                 os.path.join(self.test_case_path, "memory_after_snapshot"), "w"
             ) as file:
                 file.write(memory_after_snapshot)
             # get CPU and memory usage
             path = os.path.join(self.test_case_path, "trace.fxt")
-            processors = [
-                cpu.CpuMetricsProcessor(),
-                profile.capture_and_compute_metrics(
-                    process_groups={
-                        "feedback": "feedback.cm",
-                        "archivist": "archivist.cm",
-                    },
-                    dut=self._device,
-                    principal_groups={
-                        "feedback": "core/feedback",
-                        "archivist": "bootstrap/archivist",
-                    },
-                ),
-            ]
-            perf_results: list[trace_metrics.TestCaseResult] = []
+            perf_results = profile.process_component_profile(
+                principal_groups={
+                    "feedback": "core/feedback",
+                    "archivist": "bootstrap/archivist",
+                },
+                component_profile=json.loads(memory_after_snapshot),
+            )
             model = trace_importing.create_model_from_trace_file_path(path)
-            for processor in processors:
-                perf_results.extend(processor.process_metrics(model))
+            perf_results.extend(
+                cpu.CpuMetricsProcessor().process_metrics(model)
+            )
 
             perf_path = (
                 pathlib.Path(self._directory.name)
