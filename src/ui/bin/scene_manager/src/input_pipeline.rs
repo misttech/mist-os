@@ -21,12 +21,12 @@ use fidl_fuchsia_recovery_policy::DeviceRequestStream;
 use fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream;
 use fidl_fuchsia_ui_brightness::ControlMarker as BrightnessControlMarker;
 use fidl_fuchsia_ui_pointerinjector_configuration::SetupProxy;
-use fidl_fuchsia_ui_policy::DeviceListenerRegistryRequestStream;
+use fidl_fuchsia_ui_policy::{DeviceListenerRegistryRequest, DeviceListenerRegistryRequestStream};
 use focus_chain_provider::FocusChainProviderPublisher;
 use fsettings::LightMarker;
 use fuchsia_component::client::connect_to_protocol;
 use futures::lock::Mutex;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use input_pipeline::factory_reset_handler::FactoryResetHandler;
 use input_pipeline::ime_handler::ImeHandler;
 use input_pipeline::input_pipeline::{
@@ -98,6 +98,12 @@ pub async fn handle_input(
         FactoryResetHandler::new(&input_handlers_node, metrics_logger.clone());
     let media_buttons_handler =
         MediaButtonsHandler::new(&input_handlers_node, metrics_logger.clone());
+    let touch_injector_handler = create_touchscreen_handler(
+        scene_manager.clone(),
+        &input_handlers_node,
+        metrics_logger.clone(),
+    )
+    .await?;
 
     let supported_input_devices =
         input_device::InputDeviceType::list_from_structured_config_list(&supported_input_devices);
@@ -164,6 +170,7 @@ pub async fn handle_input(
             factory_reset_handler.clone(),
             media_buttons_handler.clone(),
             light_sensor_handler.clone(),
+            touch_injector_handler.clone(),
             HashSet::from_iter(supported_input_devices.iter()),
             focus_chain_publisher,
             input_handlers_node,
@@ -210,6 +217,7 @@ pub async fn handle_input(
     let media_buttons_listener_registry_fut = handle_device_listener_registry_request_stream(
         media_buttons_listener_registry_request_stream_receiver,
         media_buttons_handler.clone(),
+        touch_injector_handler.clone(),
     );
     fasync::Task::local(media_buttons_listener_registry_fut).detach();
 
@@ -231,17 +239,13 @@ fn setup_pointer_injector_config_request_stream(
     setup_proxy
 }
 
-async fn add_touchscreen_handler(
+async fn create_touchscreen_handler(
     scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
-    mut assembly: InputPipelineAssembly,
     input_handlers_node: &inspect::Node,
     metrics_logger: metrics::MetricsLogger,
-) -> InputPipelineAssembly {
+) -> Result<Rc<TouchInjectorHandler>, Error> {
     let setup_proxy = setup_pointer_injector_config_request_stream(scene_manager.clone());
     let size = scene_manager.lock().await.get_pointerinjection_display_size();
-    // touch injector handler is the last handler for touch event handling, it sends out touch
-    // events to scenic. Please double check tracing events, when changing the handlers assembly
-    // order.
     let touch_handler = TouchInjectorHandler::new_with_config_proxy(
         setup_proxy,
         size,
@@ -252,14 +256,13 @@ async fn add_touchscreen_handler(
     match touch_handler {
         Ok(touch_handler) => {
             fasync::Task::local(touch_handler.clone().watch_viewport()).detach();
-            assembly = assembly.add_handler(touch_handler);
+            Ok(touch_handler)
         }
-        Err(e) => error!(
-            "build_input_pipeline_assembly(): Touch injector handler was not installed: {:?}",
-            e
-        ),
-    };
-    assembly
+        Err(e) => {
+            error!("Touch injector handler was not created: {:?}", e);
+            Err(e)
+        }
+    }
 }
 
 async fn add_mouse_handler(
@@ -406,6 +409,7 @@ async fn build_input_pipeline_assembly(
     factory_reset_handler: Rc<FactoryResetHandler>,
     media_buttons_handler: Rc<MediaButtonsHandler>,
     light_sensor_handler: Option<Rc<CalibratedLightSensorHandler>>,
+    touch_injector_handler: Rc<TouchInjectorHandler>,
     supported_input_devices: HashSet<&input_device::InputDeviceType>,
     focus_chain_publisher: FocusChainProviderPublisher,
     input_handlers_node: inspect::Node,
@@ -468,13 +472,10 @@ async fn build_input_pipeline_assembly(
 
         if supported_input_devices.contains(&input_device::InputDeviceType::Touch) {
             info!("Registering touchscreen-related input handlers.");
-            assembly = add_touchscreen_handler(
-                scene_manager.clone(),
-                assembly,
-                &input_handlers_node,
-                metrics_logger,
-            )
-            .await;
+            // TouchInjectorHandler is the last handler for touch event handling. It sends touch
+            // pointer events to Scenic and touch button events to registered listeners. Please
+            // double check tracing events when changing the handler's assembly order.
+            assembly = assembly.add_handler(touch_injector_handler);
         }
     }
 
@@ -632,15 +633,36 @@ pub async fn handle_device_listener_registry_request_stream(
         DeviceListenerRegistryRequestStream,
     >,
     media_buttons_handler: Rc<MediaButtonsHandler>,
+    touch_injector_handler: Rc<TouchInjectorHandler>,
 ) {
-    while let Some(stream) = stream_receiver.next().await {
+    while let Some(mut stream) = stream_receiver.next().await {
         let media_buttons_handler = media_buttons_handler.clone();
+        let touch_injector_handler = touch_injector_handler.clone();
         fasync::Task::local(async move {
-            match media_buttons_handler.handle_device_listener_registry_request_stream(stream).await
-            {
-                Ok(()) => (),
-                Err(e) => {
-                    warn!("failure while serving DeviceListenerRegistry: {}", e);
+            loop {
+                match stream.try_next().await {
+                    Ok(Some(DeviceListenerRegistryRequest::RegisterListener {
+                        listener,
+                        responder,
+                    })) => {
+                        media_buttons_handler.register_listener_proxy(listener.into_proxy()).await;
+                        let _ = responder.send();
+                    }
+                    Ok(Some(DeviceListenerRegistryRequest::RegisterTouchButtonsListener {
+                        listener,
+                        responder,
+                    })) => {
+                        touch_injector_handler.register_listener_proxy(listener.into_proxy()).await;
+                        let _ = responder.send();
+                    }
+                    Ok(Some(_)) => {}
+                    Ok(None) => {
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("Error handling device listener registry request stream: {}", e);
+                        break;
+                    }
                 }
             }
         })
