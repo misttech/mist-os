@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, Context as _, Error};
 use async_trait::async_trait;
+use fetch_url::fetch_url;
 use fidl::endpoints::ProtocolMarker as _;
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_hash::Hash;
@@ -28,7 +29,6 @@ use {
 
 mod config;
 mod environment;
-mod fetch;
 mod genutil;
 mod history;
 mod metrics;
@@ -104,7 +104,7 @@ enum PrepareError {
     ParseUpdatePackageUrl(#[source] fuchsia_url::ParseError),
 
     #[error("while fetching update url")]
-    FetchUrl(#[source] fetch::FetchError),
+    FetchUrl(#[source] fetch_url::errors::FetchUrlError),
 
     #[error("while parsing OTA manifest")]
     ParseManifest(#[source] update_package::manifest::OtaManifestError),
@@ -1175,7 +1175,7 @@ impl AttemptV2<'_> {
             .await
             .map_err(PrepareError::PreparePartitionMetdata)?;
 
-        let manifest_bytes = fetch::fetch_url(self.config.update_url.as_ref())
+        let manifest_bytes = fetch_url(self.config.update_url.as_ref(), None)
             .await
             .map_err(PrepareError::FetchUrl)?;
 
