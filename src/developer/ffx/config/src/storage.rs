@@ -10,9 +10,7 @@ use crate::nested::{nested_get, nested_remove, nested_set};
 use crate::{ConfigLevel, EnvironmentContext};
 use anyhow::{anyhow, bail, Context, Result};
 use config_macros::include_default;
-use fuchsia_lockfile::Lockfile;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use fuchsia_lockfile::{LockContext, Lockfile};
 use log::error;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -230,13 +228,13 @@ impl<T: Write> Write for MaybeFlushWriter<T> {
 
 /// Atomically write to the file by creating a temporary file and passing it
 /// to the closure, and atomically rename it to the destination file.
-async fn with_writer<F>(path: Option<&Path>, f: F, flush: bool) -> Result<()>
+fn with_writer<F>(path: Option<&Path>, f: F, flush: bool) -> Result<()>
 where
     F: FnOnce(Option<BufWriter<&mut MaybeFlushWriter<tempfile::NamedTempFile>>>) -> Result<()>,
 {
     if let Some(path) = path {
         let path = Path::new(path);
-        let _lockfile = Lockfile::lock_for(path, std::time::Duration::from_secs(2)).await.map_err(|e| {
+        let _lockfile = Lockfile::new_for(path, LockContext::current()).map_err(|e| {
             error!("Failed to create a lockfile for {path}. Check that {lockpath} doesn't exist and can be written to. Ownership information: {owner:#?}", path=path.display(), lockpath=e.lock_path.display(), owner=e.owner);
             e
         })?;
@@ -322,7 +320,7 @@ impl ConfigFile {
         nested_remove(&mut self.contents, key, &key_vec[1..])
     }
 
-    async fn save(&mut self) -> Result<()> {
+    fn save(&mut self) -> Result<()> {
         log::debug!("Saving path {:?}", self.path);
 
         // FIXME(81502): There is a race between the ffx CLI and the daemon service
@@ -336,7 +334,6 @@ impl ConfigFile {
                 |writer| write_json(writer, Some(&Value::Object(self.contents.clone()))),
                 self.flush,
             )
-            .await
         } else {
             Ok(())
         };
@@ -415,16 +412,16 @@ impl Config {
         Ok(())
     }
 
-    pub(crate) async fn save(&mut self) -> Result<()> {
+    pub(crate) fn save(&mut self) -> Result<()> {
         let files = [&mut self.global, &mut self.build, &mut self.user];
         // Try to save all files and only fail out if any of them fail afterwards (with the first error). This hopefully mitigates
         // any weird partial-save issues, though there's no way to eliminate them altogether (short of filesystem
         // transactions)
-        FuturesUnordered::from_iter(
-            files.into_iter().filter_map(|file| file.as_mut()).map(ConfigFile::save),
-        )
-        .fold(Ok(()), |res, i| async { res.and(i) })
-        .await
+        files
+            .into_iter()
+            .filter_map(|file| file.as_mut())
+            .map(ConfigFile::save)
+            .try_fold((), |_res, i| i)
     }
 
     pub fn get_level(&self, level: ConfigLevel) -> Option<&ConfigMap> {

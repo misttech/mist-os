@@ -272,7 +272,7 @@ impl<'a> ConfigQuery<'a> {
         log::debug!("Config set got write guard");
         write_guard.set(key, level, value)?;
         log::debug!("Config set performed");
-        write_guard.save().await?;
+        write_guard.save()?;
         log::debug!("Config set saved");
         Ok(())
     }
@@ -284,7 +284,7 @@ impl<'a> ConfigQuery<'a> {
         let config = env.config_from_cache()?;
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
         write_guard.remove(key, level)?;
-        write_guard.save().await
+        write_guard.save()
     }
 
     /// Add this value at the queried location as an array item, converting the location to an array
@@ -311,7 +311,7 @@ impl<'a> ConfigQuery<'a> {
             write_guard.set(key, level, value)?
         };
 
-        write_guard.save().await
+        write_guard.save()
     }
 }
 
