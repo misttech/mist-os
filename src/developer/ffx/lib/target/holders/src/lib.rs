@@ -36,7 +36,7 @@ const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);
 pub async fn init_connection_behavior(
     context: &EnvironmentContext,
 ) -> Result<FhoConnectionBehavior> {
-    if context.is_strict() {
+    if context.is_strict() || context.get_direct_connection_mode() {
         log::info!("Initializing FhoConnectionBehavior::DirectConnector");
         let connector =
             NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(context).await?;
@@ -138,5 +138,13 @@ mod tests {
         let ctx =
             EnvironmentContext::strict(ExecutableKind::Test, ConfigMap::new()).expect("strict env");
         assert!(matches!(init_daemon_connection_behavior(&ctx).await, Err(_)));
+    }
+    #[fuchsia::test]
+    async fn test_direct_connection_behavior() {
+        let runtime_args =
+            serde_json::json!({"connectivity": { "direct": true}}).as_object().unwrap().clone();
+        let ctx = EnvironmentContext::no_context(ExecutableKind::Test, runtime_args, None, true);
+        let behavior = init_connection_behavior(&ctx).await.unwrap();
+        assert!(matches!(behavior, FhoConnectionBehavior::DirectConnector(_)));
     }
 }
