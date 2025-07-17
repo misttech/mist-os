@@ -32,7 +32,7 @@
 			reg = <0x0 A311D_FULL_CBUS_BASE 0x0 A311D_FULL_CBUS_LENGTH>,
 				<0x0 A311D_DOS_BASE 0x0 A311D_DOS_LENGTH>,
 				<0x0 A311D_HIU_BASE 0x0 A311D_HIU_LENGTH>,
-				<0x0 A311D_AOBUS_BASE 0x0 A311D_AOBUS_LENGTH>,
+				<0x0 A311D_AOBUS_BASE 0x0 0x1000>,
 				<0x0 A311D_DMC_BASE 0x0 A311D_DMC_LENGTH>;
 			iommus = <&dummy_iommu VDEC_BTI>;
 			interrupts = <GIC_SPI 23 GIC_IRQ_MODE_EDGE_RISING>,
@@ -334,7 +334,7 @@
 			g-turnaround-time = <9>;
 			dma-burst-len = <5>;
 			boot-metadata = <0x43414D6D 0>, /*ZBI_TYPE_DRV_MAC_ADDRESS*/
-				<0x4e4c5253 0>; /*ZBI_TYPE_SERIAL_NUMBER*/ 
+				<0x4e4c5253 0>; /*ZBI_TYPE_SERIAL_NUMBER*/
 		};
 
 		xhci: usb@ff500000 {
