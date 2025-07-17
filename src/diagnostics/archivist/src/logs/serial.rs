@@ -7,17 +7,14 @@ use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
 use fuchsia_async::OnSignals;
 use fuchsia_trace as ftrace;
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::UnboundedReceiver;
 use futures::channel::{mpsc, oneshot};
 use futures::executor::block_on;
-use futures::future::Either;
 use futures::{select, FutureExt, StreamExt};
 use log::warn;
 use selectors::FastError;
 use std::collections::HashSet;
-use std::fmt::Display;
 use std::io::{self, Write};
-use std::pin::pin;
 use std::sync::Arc;
 use std::{mem, thread};
 use zx::Signals;
@@ -28,21 +25,34 @@ const MAX_SERIAL_WRITE_SIZE: usize = 256;
 /// `allow_serial_log_tags` to include logs in the serial output, and `deny_serial_log_tags` to
 /// exclude specific tags.
 pub async fn launch_serial(
-    allow_serial_log_tags: Vec<String>,
-    deny_serial_log_tags: Vec<String>,
+    allow_serial_log_tags: impl IntoIterator<Item = impl AsRef<str>>,
+    deny_serial_log_tags: impl IntoIterator<Item = impl ToString>,
     logs_repo: Arc<LogsRepository>,
     sink: impl Write + Send + 'static,
     mut freeze_receiver: mpsc::UnboundedReceiver<oneshot::Sender<zx::EventPair>>,
-    flush_receiver: UnboundedReceiver<UnboundedSender<()>>,
+    mut flush_receiver: UnboundedReceiver<oneshot::Sender<()>>,
 ) {
-    let writer = SerialWriter::new(sink, deny_serial_log_tags.into_iter().collect());
+    let mut writer =
+        SerialWriter::new(sink, deny_serial_log_tags.into_iter().map(|s| s.to_string()).collect());
     let mut barrier = writer.get_barrier();
-    let mut write_logs_to_serial = pin!(SerialConfig::new(allow_serial_log_tags)
-        .write_logs(logs_repo, writer, flush_receiver)
-        .fuse());
+    let mut log_stream = logs_repo
+        .logs_cursor(
+            StreamMode::SnapshotThenSubscribe,
+            Some(selectors_from_tags(allow_serial_log_tags)),
+            ftrace::Id::random(),
+        )
+        .fuse();
     loop {
         select! {
-            _ = write_logs_to_serial => break,
+            log = log_stream.next() => {
+                if let Some(log) = log {
+                    // We've received a log
+                    writer.log(&log).await;
+                } else {
+                    // We've hit the end of the log stream and Archivist is shutting down.
+                    break;
+                }
+            }
             freeze_request = freeze_receiver.next() => {
                 if let Some(request) = freeze_request {
                     // We must use the barrier before we send back the event.
@@ -52,98 +62,49 @@ pub async fn launch_serial(
                     let _ = OnSignals::new(&server, Signals::EVENTPAIR_PEER_CLOSED).await;
                 }
             }
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct SerialConfig {
-    selectors: Vec<Selector>,
-}
-
-impl SerialConfig {
-    /// Creates a new serial configuration from the given structured config values.
-    pub fn new<C>(allowed_components: Vec<C>) -> Self
-    where
-        C: AsRef<str> + Display,
-    {
-        let selectors = allowed_components
-            .into_iter()
-            .filter_map(|selector| {
-                match selectors::parse_component_selector::<FastError>(selector.as_ref()) {
-                    Ok(s) => Some(Selector {
-                        component_selector: Some(s),
-                        tree_selector: None,
-                        ..Selector::default()
-                    }),
-                    Err(err) => {
-                        warn!(selector:%, err:?; "Failed to parse component selector");
-                        None
-                    }
-                }
-            })
-            .collect();
-        Self { selectors }
-    }
-
-    /// Returns a future that resolves when there's no more logs to write to serial. This can only
-    /// happen when all log sink connections have been closed for the components that were
-    /// configured to emit logs.
-    async fn write_logs(
-        self,
-        repo: Arc<LogsRepository>,
-        mut writer: SerialWriter,
-        mut flush_receiver: UnboundedReceiver<UnboundedSender<()>>,
-    ) {
-        let mut log_stream = repo
-            .logs_cursor(
-                StreamMode::SnapshotThenSubscribe,
-                Some(self.selectors),
-                ftrace::Id::random(),
-            )
-            .fuse();
-        loop {
-            match select! {
-                log = log_stream.next() => Either::Left(log),
-                flush_request = flush_receiver.next() => Either::Right(flush_request),
-            } {
-                // We've received a log
-                Either::Left(Some(log)) => {
-                    writer.log(&log).await;
-                }
-                // We've hit the end of the log stream and Archivist
-                // is shutting down.
-                Either::Left(None) => {
-                    break;
-                }
-                // We've received a flush request
-                Either::Right(Some(flush_request)) => {
-                    // We have a background thread that polls sockets.
-                    // Ensure the background thread is polled first before
-                    // we write the remaining logs to serial to ensure
-                    // we capture all logs.
-                    repo.flush().await;
+            flush_request = flush_receiver.next() => {
+                if let Some(flush_request) = flush_request {
+                    // We have a background thread that polls sockets.  Ensure the background thread
+                    // is polled first before we write the remaining logs to serial to ensure we
+                    // capture all logs.
+                    logs_repo.flush().await;
 
                     // Write all pending logs to serial
                     while let Some(Some(log)) = log_stream.next().now_or_never() {
                         writer.log(&log).await;
                     }
+
                     // Flush the serial thread (ensuring everything goes to serial)
                     writer.get_barrier().wait().await;
 
-                    // Reply to the flush request and continue normal logging operations.
-                    // Ignore the error, because the channel may have been closed which is OK.
-                    let _ = flush_request.unbounded_send(());
-                }
-                // The flush server has exited, and Archivist is shutting down.
-                Either::Right(None) => {
-                    break;
+                    // Reply to the flush request and continue normal logging operations.  Ignore
+                    // the error, because the channel may have been closed which is OK.
+                    let _ = flush_request.send(());
                 }
             }
         }
-        // Ensure logs are flushed before we finish.
-        writer.get_barrier().wait().await;
     }
+    // Ensure logs are flushed before we finish.
+    writer.get_barrier().wait().await;
+}
+
+fn selectors_from_tags(tags: impl IntoIterator<Item = impl AsRef<str>>) -> Vec<Selector> {
+    tags.into_iter()
+        .filter_map(|selector| {
+            let selector = selector.as_ref();
+            match selectors::parse_component_selector::<FastError>(selector) {
+                Ok(s) => Some(Selector {
+                    component_selector: Some(s),
+                    tree_selector: None,
+                    ..Selector::default()
+                }),
+                Err(err) => {
+                    warn!(selector:%, err:?; "Failed to parse component selector");
+                    None
+                }
+            }
+        })
+        .collect()
 }
 
 /// A sink to write to serial. This Write implementation must be used together with SerialWriter.
@@ -559,8 +520,8 @@ mod tests {
         let cloned_repo = Arc::clone(&repo);
         let (mut sender, receiver) = unbounded();
         let _serial_task = fasync::Task::spawn(async move {
-            let allowed = vec!["bootstrap/**".into(), "/core/foo".into()];
-            let denied = vec!["foo".into()];
+            let allowed = &["bootstrap/**", "/core/foo"];
+            let denied = &["foo"];
             launch_serial(allowed, denied, cloned_repo, sink, receiver, flush_receiver).await;
         });
         bootstrap_bar_container.ingest_message(make_message(
@@ -591,7 +552,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn writes_ingested_logs() {
-        let serial_config = SerialConfig::new(vec!["bootstrap/**", "/core/foo"]);
         let repo = LogsRepository::for_test(fasync::Scope::new());
 
         let bootstrap_foo_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
@@ -620,11 +580,14 @@ mod tests {
         core_baz_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(2)));
         let (sink, rcv) = TestSink::new();
 
-        let writer = SerialWriter::new(sink, HashSet::from_iter(["foo".to_string()]));
+        let (_freeze_sender, freeze_receiver) = unbounded();
         let (_flush_sender, flush_receiver) = unbounded();
-        let _serial_task = fasync::Task::spawn(serial_config.write_logs(
+        let _serial_task = fasync::Task::spawn(launch_serial(
+            &["bootstrap/**", "/core/foo"],
+            &["foo"],
             Arc::clone(&repo),
-            writer,
+            sink,
+            freeze_receiver,
             flush_receiver,
         ));
         bootstrap_bar_container.ingest_message(make_message(
@@ -668,8 +631,8 @@ mod tests {
             let (_freeze_sender, freeze_receiver) = unbounded();
             let (flush_sender, flush_receiver) = unbounded();
             scope.spawn(async move {
-                let allowed = vec!["bootstrap/**".into()];
-                let denied = vec![];
+                let allowed = &["bootstrap/**"];
+                let denied: &[&str] = &[];
                 launch_serial(allowed, denied, cloned_repo, sink, freeze_receiver, flush_receiver)
                     .await;
             });
@@ -696,12 +659,12 @@ mod tests {
             client_socket
                 .write(&encoder.inner().get_ref()[..encoder.inner().position() as usize])
                 .unwrap();
-            let (sender, mut receiver) = unbounded();
+            let (sender, receiver) = oneshot::channel();
             // Send the log flush command
             flush_sender.unbounded_send(sender).unwrap();
             // Wait for flush to complete. Flush involves a background thread,
             // so keep polling until the background thread handles the flush event.
-            assert_eq!(receiver.next().await, Some(()));
+            assert_eq!(receiver.await, Ok(()));
             let received = rcv.next().now_or_never().unwrap().unwrap();
             assert_eq!(received, "[00000.000] 00000:00000> [foo] INFO: a\n");
         }

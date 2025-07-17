@@ -12,10 +12,11 @@ use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_async as fasync;
 use fuchsia_async::condition::{Condition, WakerEntry};
 use fuchsia_sync::Mutex;
-use futures::channel::mpsc::{unbounded, UnboundedSender};
-use futures::{Stream, StreamExt};
+use futures::channel::oneshot;
+use futures::Stream;
 use log::debug;
 use pin_project::{pin_project, pinned_drop};
+use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut, Range};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -43,9 +44,6 @@ pub struct SharedBuffer {
 
     // The thread that we use to service the sockets.
     socket_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
-    /// Some if the thread should flush instead of terminate when receiving
-    /// the terminate messages
-    should_flush: Mutex<Option<UnboundedSender<()>>>,
 }
 
 // We have to do this to avoid "cannot borrow as mutable because it is also borrowed as immutable"
@@ -78,6 +76,17 @@ struct Inner {
 
     // Registered containers.
     containers: Containers,
+
+    // Socket thread message queue.
+    thread_msg_queue: VecDeque<ThreadMessage>,
+}
+
+enum ThreadMessage {
+    // The thread should terminate.
+    Terminate,
+
+    // Process all pending socket messages and report via the Sender when done.
+    Flush(oneshot::Sender<()>),
 }
 
 impl SharedBuffer {
@@ -89,6 +98,7 @@ impl SharedBuffer {
                     head: 0,
                     tail: 0,
                     containers: Containers::default(),
+                    thread_msg_queue: VecDeque::new(),
                 },
                 Slab::default(),
             )),
@@ -96,7 +106,6 @@ impl SharedBuffer {
             port: zx::Port::create(),
             event: zx::Event::create(),
             socket_thread: Mutex::default(),
-            should_flush: Mutex::new(None),
         });
         *this.socket_thread.lock() = Some({
             let this = Arc::clone(&this);
@@ -118,11 +127,11 @@ impl SharedBuffer {
     }
 
     pub async fn flush(&self) {
-        let (sender, mut receiver) = unbounded();
-        *self.should_flush.lock() = Some(sender);
+        let (sender, receiver) = oneshot::channel();
+        self.inner.lock().0.thread_msg_queue.push_back(ThreadMessage::Flush(sender));
         self.event.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         // Ignore failure if Archivist is shutting down.
-        let _ = receiver.next().await;
+        let _ = receiver.await;
     }
 
     /// Returns the number of registered containers in use by the buffer.
@@ -133,6 +142,7 @@ impl SharedBuffer {
 
     /// Terminates the socket thread.  The socket thread will drain the sockets before terminating.
     pub async fn terminate(&self) {
+        self.inner.lock().0.thread_msg_queue.push_back(ThreadMessage::Terminate);
         self.event.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         let join_handle = self.socket_thread.lock().take().unwrap();
         fasync::unblock(|| {
@@ -142,34 +152,28 @@ impl SharedBuffer {
     }
 
     fn socket_thread(&self, ehandle: fasync::EHandle) {
+        const INTERRUPT_KEY: u64 = u64::MAX;
         let mut sockets_ready = Vec::new();
-
-        // Register event used for termination.
-        const TERMINATE_KEY: u64 = u64::MAX;
-        self.event
-            .wait_async_handle(
-                &self.port,
-                TERMINATE_KEY,
-                zx::Signals::USER_0,
-                zx::WaitAsyncOpts::empty(),
-            )
-            .unwrap();
-
-        let mut terminate = false;
-        let mut finished = false;
-        let mut maybe_flush: Option<UnboundedSender<()>> = None;
+        let mut interrupt_needs_arming = true;
         let mut on_inactive = OnInactiveNotifier::new(self);
+        let mut msg = None;
 
-        while !finished {
-            if let Some(sender) = maybe_flush.take() {
-                // Ignore error. FIDL client may have disconnected.
-                let _ = sender.unbounded_send(());
-            }
-            let mut deadline = if terminate {
-                // Run through the sockets one last time.
-                finished = true;
+        loop {
+            let mut deadline = if msg.is_some() {
                 zx::MonotonicInstant::INFINITE_PAST
             } else {
+                if interrupt_needs_arming {
+                    self.event
+                        .wait_async_handle(
+                            &self.port,
+                            INTERRUPT_KEY,
+                            zx::Signals::USER_0,
+                            zx::WaitAsyncOpts::empty(),
+                        )
+                        .unwrap();
+                    interrupt_needs_arming = false;
+                }
+
                 // Wait for 200ms so that we're not constantly waking up for every log message that
                 // is queued.  Ignore errors here.  We only do this on release builds.
                 #[cfg(not(debug_assertions))]
@@ -177,7 +181,6 @@ impl SharedBuffer {
                     zx::Signals::USER_0,
                     zx::MonotonicInstant::after(zx::Duration::from_millis(200)),
                 );
-
                 zx::MonotonicInstant::INFINITE
             };
 
@@ -185,9 +188,15 @@ impl SharedBuffer {
             loop {
                 match self.port.wait(deadline) {
                     Ok(packet) => {
-                        if packet.key() == TERMINATE_KEY {
-                            maybe_flush = self.should_flush.lock().take();
-                            terminate = maybe_flush.is_none();
+                        if packet.key() == INTERRUPT_KEY {
+                            interrupt_needs_arming = true;
+                            // To maintain proper ordering, we must capture the message here whilst
+                            // we are still gathering the list of sockets that are ready to read.
+                            // If we wait till later, we introduce windows where we might miss a
+                            // socket that should be read.
+                            if msg.is_none() {
+                                msg = self.inner.lock().0.thread_msg_queue.pop_front();
+                            }
                         } else {
                             sockets_ready.push(SocketId(packet.key() as u32))
                         }
@@ -198,49 +207,65 @@ impl SharedBuffer {
                 deadline = zx::MonotonicInstant::INFINITE_PAST;
             }
 
-            let mut inner = self.inner.lock();
+            let mut inner_and_sockets = self.inner.lock();
+            let InnerAndSockets(inner, sockets) = &mut *inner_and_sockets;
 
-            {
-                let InnerAndSockets(inner, sockets) = &mut *inner;
+            for socket_id in sockets_ready.drain(..) {
+                let Some(socket) = sockets.get(socket_id.0) else {
+                    // Spurious packet for a removed socket.
+                    continue;
+                };
 
-                for socket_id in sockets_ready.drain(..) {
-                    let Some(socket) = sockets.get(socket_id.0) else {
-                        // Spurious packet for a removed socket.
-                        continue;
-                    };
-
-                    if inner.read_socket(socket, &mut on_inactive) {
-                        let container_id = socket.container_id;
-                        if let Some(container) = inner.containers.get_mut(container_id) {
-                            container.remove_socket(socket_id, sockets);
-                            if !container.is_active() {
-                                if container.should_free() {
-                                    inner.containers.free(container_id);
-                                } else {
-                                    on_inactive.push(&container.identity);
-                                }
+                if inner.read_socket(socket, &mut on_inactive) {
+                    let container_id = socket.container_id;
+                    if let Some(container) = inner.containers.get_mut(container_id) {
+                        container.remove_socket(socket_id, sockets);
+                        if !container.is_active() {
+                            if container.should_free() {
+                                inner.containers.free(container_id);
+                            } else {
+                                on_inactive.push(&container.identity);
                             }
                         }
-                    } else {
-                        socket
-                            .socket
-                            .wait_async_handle(
-                                &self.port,
-                                socket_id.0 as u64,
-                                zx::Signals::OBJECT_READABLE | zx::Signals::OBJECT_PEER_CLOSED,
-                                zx::WaitAsyncOpts::empty(),
-                            )
-                            .unwrap();
                     }
+                } else {
+                    socket
+                        .socket
+                        .wait_async_handle(
+                            &self.port,
+                            socket_id.0 as u64,
+                            zx::Signals::OBJECT_READABLE | zx::Signals::OBJECT_PEER_CLOSED,
+                            zx::WaitAsyncOpts::empty(),
+                        )
+                        .unwrap();
+                }
+            }
+
+            // Now that we've processed the sockets, we can process the message.
+            if let Some(m) = msg.take() {
+                match m {
+                    ThreadMessage::Terminate => return,
+                    ThreadMessage::Flush(sender) => {
+                        let _ = sender.send(());
+                    }
+                }
+
+                // See if there's another message.
+                msg = inner.thread_msg_queue.pop_front();
+                if msg.is_none() {
+                    // If there are no more messages, we must clear the signal so that we get
+                    // notified when the next message arrives. This must be done whilst we are
+                    // holding the lock.
+                    self.event.signal_handle(zx::Signals::USER_0, zx::Signals::empty()).unwrap();
                 }
             }
 
             let wake_tasks = || {
-                for waker in inner.drain_wakers() {
+                for waker in inner_and_sockets.drain_wakers() {
                     waker.wake();
                 }
 
-                std::mem::drop(inner);
+                std::mem::drop(inner_and_sockets);
 
                 on_inactive.notify();
             };
@@ -1003,8 +1028,8 @@ mod tests {
     use fuchsia_inspect::{Inspector, InspectorConfig};
     use fuchsia_inspect_derive::WithInspect;
     use futures::channel::mpsc;
-    use futures::poll;
     use futures::stream::{FuturesUnordered, StreamExt as _};
+    use futures::{poll, FutureExt};
     use std::pin::pin;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1561,5 +1586,36 @@ mod tests {
         while on_inactive.load(Ordering::Relaxed) != 1 {
             fasync::Timer::new(std::time::Duration::from_millis(50)).await;
         }
+    }
+
+    #[fuchsia::test]
+    async fn flush() {
+        let a_identity = Arc::new(vec!["a"].into());
+        let buffer = Arc::new(SharedBuffer::new(1024 * 1024, Box::new(|_| {})));
+        let container_a = Arc::new(buffer.new_container_buffer(a_identity, Arc::default()));
+        let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
+
+        let (local, remote) = zx::Socket::create_datagram();
+        container_a.add_socket(remote);
+
+        let cursor = pin!(container_a.cursor(StreamMode::Subscribe).unwrap());
+
+        const COUNT: usize = 1000;
+        for _ in 0..COUNT {
+            local.write(msg.bytes()).unwrap();
+        }
+
+        // Race two flush futures.
+        let mut flush_futures = FuturesUnordered::from_iter([buffer.flush(), buffer.flush()]);
+        flush_futures.next().await;
+
+        let messages: Option<Vec<_>> = cursor.take(COUNT).collect().now_or_never();
+        assert!(messages.is_some());
+
+        // Make sure the other one finishes too.
+        flush_futures.next().await;
+
+        // Make sure we can still terminate the buffer.
+        buffer.terminate().await;
     }
 }
