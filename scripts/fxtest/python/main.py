@@ -596,6 +596,15 @@ class AsyncMain:
             recorder.emit_end()
             return 0
 
+        # Check if we have a running package server. We do this here so that we
+        # can fail early before running a full build.
+        if not (
+            flags.list_runtime_deps or flags.list
+        ) and not await self._check_if_package_server_needed(
+            selections, exec_env, recorder
+        ):
+            return 1
+
         # If enabled, try to build and update the selected tests.
         if flags.build and not await self._do_build(selections):
             recorder.emit_end("Failed to build.")
@@ -1248,6 +1257,24 @@ class AsyncMain:
 
         return True
 
+    async def _check_if_package_server_needed(
+        self,
+        tests: selection_types.TestSelections,
+        exec_env: environment.ExecutionEnvironment,
+        recorder: event.EventRecorder,
+    ) -> bool:
+        if tests.has_device_test() and not await has_device_connected(
+            exec_env,
+            recorder,
+        ):
+            recorder.emit_instruction_message(
+                "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
+            )
+            recorder.emit_end("Could not find a running package server.")
+            return False
+        else:
+            return True
+
     async def _run_all_tests(
         self,
         tests: selection_types.TestSelections,
@@ -1266,17 +1293,6 @@ class AsyncMain:
         assert exec_env is not None
 
         max_parallel = flags.parallel
-        if tests.has_device_test() and not await has_device_connected(
-            exec_env,
-            recorder,
-        ):
-            recorder.emit_warning_message(
-                "\nCould not find a running package server."
-            )
-            recorder.emit_instruction_message(
-                "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
-            )
-            return False
 
         # This is an error since no tests that were selected involved the device, even if the --host
         # flag was not specified on the command line. If a test selection includes _some_ device tests,
