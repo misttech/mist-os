@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/testing/client-utils/display.h"
+#include "src/graphics/display/bin/display-test/display.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>

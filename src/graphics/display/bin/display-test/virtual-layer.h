@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_VIRTUAL_LAYER_H_
-#define SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_VIRTUAL_LAYER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_BIN_DISPLAY_TEST_VIRTUAL_LAYER_H_
+#define SRC_GRAPHICS_DISPLAY_BIN_DISPLAY_TEST_VIRTUAL_LAYER_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
@@ -13,12 +13,12 @@
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
+#include "src/graphics/display/bin/display-test/display.h"
+#include "src/graphics/display/bin/display-test/image.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
-#include "src/graphics/display/testing/client-utils/display.h"
-#include "src/graphics/display/testing/client-utils/image.h"
 
 namespace display_test {
 
@@ -224,4 +224,4 @@ class ColorLayer : public VirtualLayer {
 
 }  // namespace display_test
 
-#endif  // SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_VIRTUAL_LAYER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_BIN_DISPLAY_TEST_VIRTUAL_LAYER_H_

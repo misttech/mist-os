@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/testing/client-utils/virtual-layer.h"
+#include "src/graphics/display/bin/display-test/virtual-layer.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
@@ -19,10 +19,10 @@
 #include <fbl/algorithm.h>
 
 #include "fidl/fuchsia.hardware.display.types/cpp/wire_types.h"
+#include "src/graphics/display/bin/display-test/utils.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
-#include "src/graphics/display/testing/client-utils/utils.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
