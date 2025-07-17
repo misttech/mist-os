@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/utf-utils/internal/scalar.h>
 #include <lib/utf-utils/utf-utils.h>
 
 #include <cassert>
 
 #include <fuzzer/FuzzedDataProvider.h>
+
+#include "sdk/lib/utf-utils/internal/scalar.h"
 
 // A simple fuzzer that compares the output of the (usually) SIMD-accelerated
 // `utfutils_is_valid_utf8()` with the output of the internal scalar implementation

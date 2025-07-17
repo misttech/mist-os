@@ -20,6 +20,8 @@ sdk_source_set("utf-utils") {
 
   include_base = "//sdk"
 
+  public = [ "utf-utils.h" ]
+
   sources = [
     "internal/arm-neon.h",
     "internal/generic-simd.h",
@@ -28,15 +30,6 @@ sdk_source_set("utf-utils") {
     "internal/x86-avx2.h",
     "internal/x86-ssse3.h",
     "utf-utils.cc",
-    "utf-utils.h",
-  ]
-
-  sdk_headers_for_internal_use = [
-    "internal/arm-neon.h",
-    "internal/generic-simd.h",
-    "internal/scalar.h",
-    "internal/x86-avx2.h",
-    "internal/x86-ssse3.h",
   ]
 
   public_deps = [ "//sdk/lib/stdcompat" ]
@@ -46,6 +39,8 @@ sdk_source_set("utf-utils") {
   }
 
   public_configs = [ "//sdk/config" ]
+
+  friend = [ ":*" ]
 }
 
 # LINT.ThenChange(BUILD.bazel)
