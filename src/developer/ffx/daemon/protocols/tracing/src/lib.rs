@@ -10,7 +10,6 @@ use futures::prelude::*;
 use protocols::prelude::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 use tasks::TaskManager;
@@ -135,27 +134,6 @@ impl TracingProtocol {
                 let config_with_expanded_categories =
                     trace::TraceConfig { categories: expanded_categories, ..trace_config.clone() };
 
-                // Make a callback to clean up the task map.
-                let task_map_for_cleanup = self.task_map.clone();
-                let output_file_for_cleanup = output_file.clone();
-                let on_complete_callback = move || {
-                    let task_map = task_map_for_cleanup.clone();
-                    let output_file = output_file_for_cleanup.clone();
-                    Box::pin(async move {
-                        let mut map = task_map.lock().await;
-                        // The cleanup logic is the same, just inside this async block.
-                        if let Some(nodename) = map.output_file_to_nodename.remove(&output_file) {
-                            map.nodename_to_task.remove(&nodename);
-                            log::debug!("cleaned up task for output file: {}", output_file);
-                        } else {
-                            log::warn!(
-                                "could not find output file '{}' in map for cleanup",
-                                output_file
-                            );
-                        }
-                    }) as Pin<Box<dyn Future<Output = ()> + 'static>>
-                };
-
                 let task = match TraceTask::new(
                     // Use the target info as the task name
                     format!("{target_info:?}"),
@@ -167,7 +145,6 @@ impl TracingProtocol {
                         .map(|tv| tv.iter().map(from_ffx_trigger).collect())
                         .unwrap_or(vec![]),
                     provisioner,
-                    on_complete_callback,
                 )
                 .await
                 {

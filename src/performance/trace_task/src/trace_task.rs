@@ -56,18 +56,14 @@ impl Future for TraceTask {
 }
 
 impl TraceTask {
-    pub async fn new<F>(
+    pub async fn new(
         debug_tag: String,
         output_file: String,
         config: trace::TraceConfig,
         duration: Option<Duration>,
         triggers: Vec<Trigger>,
         provisioner: trace::ProvisionerProxy,
-        on_complete: F,
-    ) -> Result<Self, TracingError>
-    where
-        F: FnOnce() -> Pin<Box<dyn Future<Output = ()>>> + 'static,
-    {
+    ) -> Result<Self, TracingError> {
         // Start the tracing session immediately. Maybe we should consider separating the creating
         // of the session and the actual starting of it. This seems like a side-effect.
         let (client, server) = fidl::Socket::create_stream();
@@ -146,7 +142,6 @@ impl TraceTask {
                 copy_trace_fut,
                 shutdown_fut,
                 triggers_watcher,
-                on_complete,
                 terminate_result,
             ),
         })
@@ -179,18 +174,14 @@ impl TraceTask {
         Ok(terminate_result_guard.clone().unwrap_or_default())
     }
 
-    fn make_task<F>(
+    fn make_task(
         duration: Option<Duration>,
-        output_file: String,
+        _output_file: String,
         copy_trace_fut: impl Future<Output = ()> + 'static,
         shutdown_fut: impl Future<Output = ()> + 'static,
         trigger_watcher: TriggersWatcher<'static>,
-        on_complete: F,
         terminate_result: Rc<Mutex<Option<StopResult>>>,
-    ) -> Task<Option<trace::StopResult>>
-    where
-        F: FnOnce() -> Pin<Box<dyn Future<Output = ()>>> + 'static,
-    {
+    ) -> Task<Option<trace::StopResult>> {
         Task::local(async move {
             let mut timeout_fut = Box::pin(async move {
                 if let Some(duration) = duration {
@@ -202,9 +193,6 @@ impl TraceTask {
             .fuse();
             let mut copy_trace_fut = Box::pin(copy_trace_fut).fuse();
             let mut trigger_fut = trigger_watcher.fuse();
-
-            // Wrap the callback in an Option to ensure it's only called once.
-            let mut on_complete = Some(on_complete);
 
             futures::select! {
                     // If copying the trace completes, that's fine.
@@ -219,12 +207,7 @@ impl TraceTask {
                     drop(trigger_fut);
 
                     // Wait for drop task and copy to complete.
-                    if let Some(on_complete_fn) = on_complete.take() {
-                    log::debug!("running on_complete callback for {}", output_file);
-                    let _ = futures::join!(on_complete_fn(), copy_trace_fut);
-                    } else {
                     copy_trace_fut.await;
-                    }
                 }
                 // Trigger hit, shutdown and copy the trace.
                 action = trigger_fut => {
@@ -238,12 +221,7 @@ impl TraceTask {
                     shutdown_fut.await;
                     drop(trigger_fut);
                     // Wait for drop task and copy to complete.
-                    if let Some(on_complete_fn) = on_complete.take() {
-                    log::debug!("running on_complete callback for {}", output_file);
-                    let _ = futures::join!(on_complete_fn(), copy_trace_fut);
-                    } else {
                     copy_trace_fut.await;
-                    }
                 }
             };
             terminate_result.clone().lock().await.clone()
@@ -289,7 +267,6 @@ mod tests {
     use async_fs::File;
     use fidl_fuchsia_tracing_controller::StartError;
     use futures::AsyncReadExt;
-    use std::sync::atomic::{AtomicBool, Ordering};
     const FAKE_CONTROLLER_TRACE_OUTPUT: &'static str = "HOWDY HOWDY HOWDY";
 
     fn setup_fake_provisioner_proxy(
@@ -325,9 +302,11 @@ mod tests {
                                                 .write(FAKE_CONTROLLER_TRACE_OUTPUT.as_bytes())
                                                 .unwrap()
                                         );
-                                        responder
-                                            .send(Ok(&trace::StopResult::default()))
-                                            .expect("Failed to stop")
+                                        let stop_result = trace::StopResult {
+                                            provider_stats: Some(vec![]),
+                                            ..Default::default()
+                                        };
+                                        responder.send(Ok(&stop_result)).expect("Failed to stop")
                                     }
                                     break;
                                 }
@@ -354,13 +333,6 @@ mod tests {
         let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
 
         let provisioner = setup_fake_provisioner_proxy(None, None);
-        let completed: Rc<AtomicBool> = Rc::new(AtomicBool::new(false));
-        let completed_flag = completed.clone();
-        let on_complete_callback = move || {
-            Box::pin(async move {
-                completed_flag.store(true, Ordering::Relaxed);
-            }) as Pin<Box<dyn Future<Output = ()> + 'static>>
-        };
 
         let trace_task = TraceTask::new(
             "test_trace_start_stop_write_check".into(),
@@ -369,7 +341,6 @@ mod tests {
             None,
             vec![],
             provisioner,
-            on_complete_callback,
         )
         .await
         .expect("tracing task started");
@@ -380,8 +351,8 @@ mod tests {
         let mut res = String::new();
         f.read_to_string(&mut res).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
-        assert!(completed.load(Ordering::Relaxed));
-        assert_eq!(shutdown_result, trace::StopResult::default().into());
+        let expected = trace::StopResult { provider_stats: Some(vec![]), ..Default::default() };
+        assert_eq!(shutdown_result, expected);
     }
 
     #[fuchsia::test]
@@ -391,14 +362,6 @@ mod tests {
 
         let provisioner = setup_fake_provisioner_proxy(Some(StartError::AlreadyStarted), None);
 
-        let completed: Rc<AtomicBool> = Rc::new(AtomicBool::new(false));
-        let completed_flag = completed.clone();
-        let on_complete_callback = move || {
-            Box::pin(async move {
-                completed_flag.store(true, Ordering::Relaxed);
-            }) as Pin<Box<dyn Future<Output = ()> + 'static>>
-        };
-
         let trace_task_result = TraceTask::new(
             "test_trace_error_handling_already_started".into(),
             output.clone(),
@@ -406,15 +369,11 @@ mod tests {
             None,
             vec![],
             provisioner,
-            on_complete_callback,
         )
         .await
         .err();
 
         assert_eq!(trace_task_result, Some(TracingError::RecordingAlreadyStarted));
-
-        // On completed should not be invoked since the tracing never started.
-        assert!(!completed.load(Ordering::Relaxed));
     }
 
     #[fuchsia::test]
@@ -423,13 +382,6 @@ mod tests {
         let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
 
         let provisioner = setup_fake_provisioner_proxy(None, None);
-        let completed: Rc<AtomicBool> = Rc::new(AtomicBool::new(false));
-        let completed_flag = completed.clone();
-        let on_complete_callback = move || {
-            Box::pin(async move {
-                completed_flag.store(true, Ordering::Relaxed);
-            }) as Pin<Box<dyn Future<Output = ()> + 'static>>
-        };
 
         let trace_task = TraceTask::new(
             "test_trace_task_start_with_duration".into(),
@@ -438,18 +390,20 @@ mod tests {
             Some(Duration::from_millis(100)),
             vec![],
             provisioner,
-            on_complete_callback,
         )
         .await
         .expect("tracing task started");
 
-        trace_task.await;
+        if let Some(stop_result) = trace_task.await {
+            assert!(stop_result.provider_stats.is_some());
+        } else {
+            panic!("Expected stop result from trace_task.await");
+        }
 
         let mut f = File::open(std::path::PathBuf::from(output)).await.unwrap();
         let mut res = String::new();
         f.read_to_string(&mut res).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
-        assert!(completed.load(Ordering::Relaxed));
     }
 
     #[fuchsia::test]
@@ -458,13 +412,6 @@ mod tests {
         let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
         let alert_name = "some_alert";
         let provisioner = setup_fake_provisioner_proxy(None, Some(alert_name.into()));
-        let completed: Rc<AtomicBool> = Rc::new(AtomicBool::new(false));
-        let completed_flag = completed.clone();
-        let on_complete_callback = move || {
-            Box::pin(async move {
-                completed_flag.store(true, Ordering::Relaxed);
-            }) as Pin<Box<dyn Future<Output = ()> + 'static>>
-        };
 
         let trace_task = TraceTask::new(
             "test_triggers_valid".into(),
@@ -476,7 +423,6 @@ mod tests {
                 action: Some(TriggerAction::Terminate),
             }],
             provisioner,
-            on_complete_callback,
         )
         .await
         .expect("tracing task started");
@@ -487,6 +433,5 @@ mod tests {
         let mut res = String::new();
         f.read_to_string(&mut res).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
-        assert!(completed.load(Ordering::Relaxed));
     }
 }

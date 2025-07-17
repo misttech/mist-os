@@ -6,8 +6,6 @@ use crate::TraceData;
 use anyhow::Result;
 use fidl_fuchsia_developer_ffx::TraceOptions;
 use fidl_fuchsia_tracing_controller::{ProvisionerProxy, TraceConfig};
-use futures::Future;
-use std::pin::Pin;
 use std::time::Duration;
 use trace_task::TraceTask;
 
@@ -17,9 +15,6 @@ pub(crate) async fn trace(
     options: TraceOptions,
     trace_config: TraceConfig,
 ) -> Result<TraceTask> {
-    let on_complete =
-        move || Box::pin(async move {}) as Pin<Box<dyn Future<Output = ()> + 'static>>;
-
     let duration = options.duration_ns.map(|d| Duration::from_nanos(d as u64));
     let task = TraceTask::new(
         "ffx-trace-direct".into(),
@@ -38,7 +33,6 @@ pub(crate) async fn trace(
             })
             .unwrap_or(vec![]),
         proxy,
-        on_complete,
     )
     .await?;
 
