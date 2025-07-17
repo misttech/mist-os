@@ -205,7 +205,7 @@ pub struct Start {
 
     /// duration of trace capture in seconds.
     #[argh(option)]
-    pub duration: Option<f64>,
+    pub duration: Option<u32>,
 
     /// name of output trace file.  Defaults to trace.fxt.
     #[argh(option, default = "String::from(\"trace.fxt\")")]

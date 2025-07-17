@@ -161,7 +161,7 @@ impl TracingProtocol {
                     format!("{target_info:?}"),
                     output_file.clone(),
                     config_with_expanded_categories,
-                    options.duration.map(|d| Duration::from_secs_f64(d)),
+                    options.duration_ns.map(|d| Duration::from_nanos(d as u64)),
                     options
                         .triggers
                         .map(|tv| tv.iter().map(from_ffx_trigger).collect())
@@ -572,7 +572,7 @@ mod tests {
                     ..Default::default()
                 },
                 &output,
-                &ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
+                &ffx::TraceOptions { duration_ns: Some(500_000_000), ..Default::default() },
                 &trace::TraceConfig::default(),
             )
             .await
@@ -605,7 +605,7 @@ mod tests {
                     ..Default::default()
                 },
                 &output,
-                &ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
+                &ffx::TraceOptions { duration_ns: Some(500_000), ..Default::default() },
                 &trace::TraceConfig::default(),
             )
             .await

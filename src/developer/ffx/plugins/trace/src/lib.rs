@@ -20,11 +20,13 @@ use futures::Future;
 use serde::{Deserialize, Serialize};
 use std::io::{stdin, Stdin};
 use std::path::{Component, PathBuf};
+use std::time::Duration;
 use target_holders::{daemon_protocol, moniker};
 use term_grid::Grid;
 #[cfg_attr(test, allow(unused))]
 use termion::terminal_size;
 use termion::{color, style};
+
 mod daemon;
 mod direct;
 mod process;
@@ -357,8 +359,11 @@ pub async fn trace(
             };
             let output = canonical_path(opts.output)?;
 
-            let options =
-                ffx::TraceOptions { duration: opts.duration, triggers, ..Default::default() };
+            let options = ffx::TraceOptions {
+                duration_ns: opts.duration.map(|d| Duration::from_secs(d.into()).as_nanos() as i64),
+                triggers,
+                ..Default::default()
+            };
             writer.line(format!("Tracing categories: [{}]...", expanded_categories.join(","),))?;
             // For the background we need a background task, so still use the daemon.
             // Otherwise use a direct connection.
@@ -1001,7 +1006,7 @@ mod tests {
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
                     categories: vec!["invalid_categories".to_string()],
-                    duration: Some(1_f64),
+                    duration: Some(1),
                     buffering_mode: tracing::BufferingMode::Oneshot,
                     output: fake_trace_file_name,
                     background: false,
@@ -1381,7 +1386,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
                     categories: vec![],
-                    duration: Some(5.2),
+                    duration: Some(5),
                     buffering_mode: tracing::BufferingMode::Oneshot,
                     output: "foober.fxt".to_owned(),
                     background: true,
@@ -1411,7 +1416,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
                     categories: vec![],
-                    duration: Some(0.8),
+                    duration: Some(1),
                     buffering_mode: tracing::BufferingMode::Oneshot,
                     output: "foober.fxt".to_owned(),
                     background: false,

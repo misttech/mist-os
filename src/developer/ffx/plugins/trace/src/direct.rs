@@ -20,12 +20,12 @@ pub(crate) async fn trace(
     let on_complete =
         move || Box::pin(async move {}) as Pin<Box<dyn Future<Output = ()> + 'static>>;
 
-    let duration = options.duration.map(|d| Duration::from_secs_f64(d));
+    let duration = options.duration_ns.map(|d| Duration::from_nanos(d as u64));
     let task = TraceTask::new(
         "ffx-trace-direct".into(),
         output.clone(),
         trace_config.clone(),
-        options.duration.map(|d| Duration::from_secs_f64(d)),
+        duration,
         options
             .triggers
             .map(|tv| {
