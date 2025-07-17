@@ -2653,6 +2653,12 @@ multiconst!(u32, [
     ZX_PORT_BIND_TO_INTERRUPT = 1 << 0;
 ]);
 
+// Options for zx_interrupt_create
+multiconst!(u32, [
+    ZX_INTERRUPT_VIRTUAL = 0x10;
+    ZX_INTERRUPT_TIMESTAMP_MONO = 1 << 6;
+]);
+
 // Options for zx_interrupt_bind
 multiconst!(u32, [
     ZX_INTERRUPT_BIND = 0;

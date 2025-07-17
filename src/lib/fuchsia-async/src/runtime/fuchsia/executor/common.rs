@@ -112,6 +112,15 @@ pub(crate) struct Executor {
 
 impl Executor {
     pub fn new(time: ExecutorTime, is_local: bool, num_threads: u8) -> Self {
+        Self::new_with_port(time, is_local, num_threads, zx::Port::create())
+    }
+
+    pub fn new_with_port(
+        time: ExecutorTime,
+        is_local: bool,
+        num_threads: u8,
+        port: zx::Port,
+    ) -> Self {
         #[cfg(test)]
         ACTIVE_EXECUTORS.fetch_add(1, Ordering::Relaxed);
 
@@ -122,7 +131,7 @@ impl Executor {
         );
 
         Executor {
-            port: zx::Port::create(),
+            port,
             monotonic_timers: Arc::new(Timers::<MonotonicInstant>::new(is_fake)),
             boot_timers: Arc::new(Timers::<BootInstant>::new(is_fake)),
             done: AtomicBool::new(false),

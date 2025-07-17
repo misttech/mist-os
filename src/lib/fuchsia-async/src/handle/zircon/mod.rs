@@ -4,6 +4,7 @@
 
 pub mod channel;
 pub mod fifo;
+pub mod on_interrupt;
 pub mod on_signals;
 pub mod rwhandle;
 pub mod socket;

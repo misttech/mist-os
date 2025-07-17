@@ -106,6 +106,7 @@ rustc_library("fuchsia-async") {
       "src/handle/zircon/channel.rs",
       "src/handle/zircon/fifo.rs",
       "src/handle/zircon/mod.rs",
+      "src/handle/zircon/on_interrupt.rs",
       "src/handle/zircon/on_signals.rs",
       "src/handle/zircon/rwhandle.rs",
       "src/handle/zircon/socket.rs",
