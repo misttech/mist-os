@@ -967,8 +967,7 @@ impl FsNodeOps for ClassDirectory {
                 mode!(IFDIR, 0o555),
             );
         });
-        // TODO: Validate the mode bits are correct.
-        Ok(dir.into_node(&fs, 0o777))
+        Ok(dir.into_node(&fs, 0o555))
     }
 }
 
