@@ -182,7 +182,7 @@
 &aobus {
 	cpu-controller@0 {
 		compatible = "amlogic,cpu";
-		reg = <0x0 0x0 0x0 A311D_AOBUS_LENGTH>;
+		reg = <0x0 0x0 0x0 0x1000>;
 		clocks = <&clock 0x10000 &clock 0x10001 &clock 0x100000>,
 				<&clock 0x10003 &clock 0x10004 &clock 0x100001>;
 		clock-names = "SYS_PLL_DIV16", "SYS_CPU_DIV16", "SYS_CPU_BIG_CLK",
