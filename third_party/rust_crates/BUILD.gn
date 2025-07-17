@@ -3218,18 +3218,18 @@ rustc_library("bumpalo-v3_17_0") {
   applicable_licenses = [ ":bumpalo-v3_17_0.license" ]
 }
 
-license("bytecount-v0_6_0.license") {
+license("bytecount-v0_6_9.license") {
   public_package_name = "bytecount"
   license_files = [
-    "//third_party/rust_crates/vendor/bytecount-0.6.0/LICENSE.Apache2",
-    "//third_party/rust_crates/vendor/bytecount-0.6.0/LICENSE.MIT",
+    "//third_party/rust_crates/vendor/bytecount-0.6.9/LICENSE.Apache2",
+    "//third_party/rust_crates/vendor/bytecount-0.6.9/LICENSE.MIT",
   ]
 }
 
-rustc_library("bytecount-v0_6_0") {
+rustc_library("bytecount-v0_6_9") {
   crate_name = "bytecount"
-  source_root = "//third_party/rust_crates/vendor/bytecount-0.6.0/src/lib.rs"
-  output_name = "bytecount-b4fade0a2dc4ee4a"
+  source_root = "//third_party/rust_crates/vendor/bytecount-0.6.9/src/lib.rs"
+  output_name = "bytecount-790c236cdc60cdf2"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -3241,13 +3241,13 @@ rustc_library("bytecount-v0_6_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=b4fade0a2dc4ee4a",
-    "-Cextra-filename=-b4fade0a2dc4ee4a",
+    "-Cmetadata=790c236cdc60cdf2",
+    "-Cextra-filename=-790c236cdc60cdf2",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":bytecount-v0_6_0.license" ]
+  applicable_licenses = [ ":bytecount-v0_6_9.license" ]
 }
 
 license("byteorder-v1_5_0.license") {
@@ -10292,7 +10292,7 @@ rustc_library("nom_locate-v5_0_0") {
 
   deps = []
   deps += [ ":memchr-v2_7_4" ]
-  deps += [ ":bytecount-v0_6_0" ]
+  deps += [ ":bytecount-v0_6_9" ]
   deps += [ ":nom-v8_0_0" ]
 
   rustenv = []

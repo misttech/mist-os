@@ -77,7 +77,7 @@ rust_library(
     version = "5.0.0",
     deps = [
         "//third_party/rust_crates/ask2patch/memchr",
-        "//third_party/rust_crates/vendor/bytecount-0.6.0:bytecount",
+        "//third_party/rust_crates/vendor/bytecount-0.6.9:bytecount",
         "//third_party/rust_crates/vendor/nom-8.0.0:nom",
     ],
 )

@@ -2,9 +2,9 @@
 
 Counting bytes really fast
 
-[![Build Status](https://travis-ci.org/llogiq/bytecount.svg?branch=master)](https://travis-ci.org/llogiq/bytecount)
+[![Continuous integration](https://github.com/llogiq/bytecount/actions/workflows/ci.yml/badge.svg)](https://github.com/llogiq/bytecount/actions/workflows/ci.yml)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/github/llogiq/bytecount?svg=true)](https://ci.appveyor.com/project/llogiq/bytecount)
-[![Current Version](http://meritbadge.herokuapp.com/bytecount)](https://crates.io/crates/bytecount)
+[![Current Version](https://img.shields.io/crates/v/bytecount.svg)](https://crates.io/crates/bytecount)
 [![License: Apache 2.0/MIT](https://img.shields.io/crates/l/bytecount.svg)](#license)
 
 This uses the "hyperscreamingcount" algorithm by Joshua Landau to count bytes faster than anything else.
@@ -12,7 +12,7 @@ The [newlinebench](https://github.com/llogiq/newlinebench) repository has furthe
 
 To use bytecount in your crate, if you have [cargo-edit](https://github.com/killercup/cargo-edit), just type
 `cargo add bytecount` in a terminal with the crate root as the current path. Otherwise you can manually edit your
-`Cargo.toml` to add `bytecount = 0.5.1` to your `[dependencies]` section.
+`Cargo.toml` to add `bytecount = 0.6.9` to your `[dependencies]` section.
 
 In your crate root (`lib.rs` or `main.rs`, depending on if you are writing a
 library or application), add `extern crate bytecount;`. Now you can simply use
@@ -46,7 +46,7 @@ Your users can then compile with runtime dispatch using:
 cargo build --release --features runtime-dispatch-simd
 ```
 
-The second, `generic-simd`, uses `packed_simd` to provide a fast
+The second, `generic-simd`, uses [`std::simd`](https://doc.rust-lang.org/std/simd/index.html) and [`#![feature(portable_simd)]`](https://github.com/rust-lang/rust/issues/86656) to provide a fast
 architecture-agnostic SIMD codepath, but requires running on nightly.
 
 Your users can compile with this codepath using:
