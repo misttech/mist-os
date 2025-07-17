@@ -56,7 +56,7 @@ impl AsyncRead for BulkInterface {
                 // Get the bulk in interface
                 for endpoint in inner_ref.endpoints() {
                     if let Endpoint::BulkIn(bie) = endpoint {
-                        let guard = guard_ref.read();
+                        let _guard = guard_ref.read().await;
                         log::debug!(
                             "Found bulk in endpoint, reading to buf of len: {}",
                             buffer.len()
@@ -67,7 +67,6 @@ impl AsyncRead for BulkInterface {
                                 format!("Error reading from bulk endpoint: {}", e),
                             )
                         })?;
-                        drop(guard);
                         return Ok(buffer);
                     }
                 }
