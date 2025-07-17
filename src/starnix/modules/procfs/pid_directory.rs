@@ -12,11 +12,11 @@ use starnix_core::task::{
 };
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectory;
 use starnix_core::vfs::pseudo::simple_file::{
     parse_i32_file, parse_unsigned_file, serialize_for_file, BytesFile, BytesFileOps,
     SimpleFileNode,
 };
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
@@ -213,31 +213,32 @@ impl FsNodeOps for TaskDirectoryNode {
                 Box::new(CommFile::new_node(task_weak, task.persistent_info.clone()))
             }
             b"attr" => {
-                let mut subdir = StaticDirectoryBuilder::new(&fs);
-                subdir.dir_creds(creds);
-                for (attr, name) in [
-                    (security::ProcAttr::Current, "current"),
-                    (security::ProcAttr::Exec, "exec"),
-                    (security::ProcAttr::FsCreate, "fscreate"),
-                    (security::ProcAttr::KeyCreate, "keycreate"),
-                    (security::ProcAttr::SockCreate, "sockcreate"),
-                ] {
-                    subdir.entry_etc(
-                        name,
-                        AttrNode::new(task_weak.clone(), attr),
-                        mode!(IFREG, 0o666),
+                let dir = SimpleDirectory::new();
+                dir.edit(&fs, |dir| {
+                    for (attr, name) in [
+                        (security::ProcAttr::Current, "current"),
+                        (security::ProcAttr::Exec, "exec"),
+                        (security::ProcAttr::FsCreate, "fscreate"),
+                        (security::ProcAttr::KeyCreate, "keycreate"),
+                        (security::ProcAttr::SockCreate, "sockcreate"),
+                    ] {
+                        dir.entry_etc(
+                            name.into(),
+                            AttrNode::new(task_weak.clone(), attr),
+                            mode!(IFREG, 0o666),
+                            DeviceType::NONE,
+                            creds,
+                        );
+                    }
+                    dir.entry_etc(
+                        "prev".into(),
+                        AttrNode::new(task_weak, security::ProcAttr::Previous),
+                        mode!(IFREG, 0o444),
                         DeviceType::NONE,
                         creds,
                     );
-                }
-                subdir.entry_etc(
-                    "prev",
-                    AttrNode::new(task_weak, security::ProcAttr::Previous),
-                    mode!(IFREG, 0o444),
-                    DeviceType::NONE,
-                    creds,
-                );
-                subdir.build_ops()
+                });
+                Box::new(dir)
             }
             b"ns" => Box::new(NsDirectory { task: task_weak }),
             b"mountinfo" => Box::new(ProcMountinfoFile::new_node(task_weak)),
