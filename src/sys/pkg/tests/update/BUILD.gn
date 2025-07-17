@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/dist/renamed_binary.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("driver") {
@@ -42,15 +41,9 @@ fuchsia_test_component("update-integration-test-component") {
   deps = [ ":driver" ]
 }
 
-renamed_binary("update-binary") {
-  source = "$root_out_dir/multi_universal_tool"
-  source_deps = [ "//src/sys/pkg/bin/multi-universal-tool" ]
-  dest = "bin/update"
-}
-
 fuchsia_test_package("update-integration-tests") {
   test_components = [ ":update-integration-test-component" ]
-  deps = [ ":update-binary" ]
+  deps = [ "//src/sys/pkg/bin/update:update-binary" ]
 }
 
 group("hermetic_tests") {
