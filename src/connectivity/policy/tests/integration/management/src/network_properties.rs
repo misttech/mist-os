@@ -5,7 +5,7 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
-use fuchsia_async::{DurationExt as _, Task};
+use fuchsia_async::DurationExt as _;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _};
@@ -116,7 +116,7 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                 let (mut shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
 
                 let last_updates = Arc::new(Mutex::new(Vec::new()));
-                Task::spawn({
+                let background = {
                     let networks = realm
                         .connect_to_protocol::<fnp_properties::NetworksMarker>()
                         .expect("couldn't connect to fuchsia.net.policy.properties/Networks");
@@ -217,98 +217,104 @@ async fn test_track_socket_marks<N: Netstack, M: Manager>(name: &str) {
                             }
                         }
                     }
-                })
-                .detach();
+                };
 
-                let default_network = realm
-                    .connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()
-                    .expect("couldn't connect to fuchsia.net.policy.properties/DefaultNetwork");
+                let test = async move {
+                    let default_network = realm
+                        .connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()
+                        .expect("couldn't connect to fuchsia.net.policy.properties/DefaultNetwork");
 
-                default_network
-                    .update(&network_update(1, marks(Some(1), None)))
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
+                    default_network
+                        .update(&network_update(1, marks(Some(1), None)))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
 
-                // Verify that a second call to update will fail.
-                #[derive(Debug, thiserror::Error)]
-                enum UpdateErrType {
-                    #[error("Error while connecting {0}")]
-                    Connect(#[from] anyhow::Error),
-                    #[error("Error while calling update {0}")]
-                    UpdateError(#[from] fidl::Error),
-                    #[error("Protocol error: {0:?}")]
-                    ProtocolError(fnp_properties::UpdateDefaultNetworkError),
-                }
-                let do_update_again =
-                    async |realm: &netemul::TestRealm<'_>| -> Result<(), UpdateErrType> {
-                        let default_network2 =
-                            realm.connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()?;
-                        default_network2
-                            .update(&network_update(2, marks(Some(2), None)))
-                            .await?
-                            .map_err(UpdateErrType::ProtocolError)?;
+                    // Verify that a second call to update will fail.
+                    #[derive(Debug, thiserror::Error)]
+                    enum UpdateErrType {
+                        #[error("Error while connecting {0}")]
+                        Connect(#[from] anyhow::Error),
+                        #[error("Error while calling update {0}")]
+                        UpdateError(#[from] fidl::Error),
+                        #[error("Protocol error: {0:?}")]
+                        ProtocolError(fnp_properties::UpdateDefaultNetworkError),
+                    }
+                    let do_update_again =
+                        async |realm: &netemul::TestRealm<'_>| -> Result<(), UpdateErrType> {
+                            let default_network2 = realm
+                                .connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()?;
+                            default_network2
+                                .update(&network_update(2, marks(Some(2), None)))
+                                .await?
+                                .map_err(UpdateErrType::ProtocolError)?;
 
-                        Ok(())
-                    };
-                assert_matches!(
-                    do_update_again(&realm).await,
-                    Err(UpdateErrType::UpdateError(fidl::Error::ClientChannelClosed {
-                        status: zx::Status::CONNECTION_ABORTED,
-                        protocol_name: _,
-                        epitaph: _,
-                    }))
-                );
+                            Ok(())
+                        };
+                    assert_matches!(
+                        do_update_again(&realm).await,
+                        Err(UpdateErrType::UpdateError(fidl::Error::ClientChannelClosed {
+                            status: zx::Status::CONNECTION_ABORTED,
+                            protocol_name: _,
+                            epitaph: _,
+                        }))
+                    );
 
-                let _ = rx.next().await;
+                    let _ = rx.next().await;
 
-                default_network
-                    .update(&network_update(1, marks(Some(2), Some(10))))
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
-                let _ = rx.next().await;
+                    default_network
+                        .update(&network_update(1, marks(Some(2), Some(10))))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
 
-                default_network
-                    .update(&network_update(1, marks(Some(4), None)))
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
-                let _ = rx.next().await;
+                    default_network
+                        .update(&network_update(1, marks(Some(4), None)))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
 
-                default_network
-                    .update(&Default::default())
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
-                let _ = rx.next().await;
+                    default_network
+                        .update(&Default::default())
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
 
-                default_network
-                    .update(&network_update(1, marks(Some(8), None)))
-                    .await
-                    .expect("fidl error")
-                    .map_err(|e| anyhow::anyhow!("err {e:?}"))
-                    .expect("protocol error");
-                let _ = rx.next().await;
+                    default_network
+                        .update(&network_update(1, marks(Some(8), None)))
+                        .await
+                        .expect("fidl error")
+                        .map_err(|e| anyhow::anyhow!("err {e:?}"))
+                        .expect("protocol error");
+                    let _ = rx.next().await;
 
-                let updates = last_updates.lock().await.clone();
-                expect_sequence(
-                    &updates,
-                    &vec![
-                        Some(PropertyUpdate::SocketMarks(marks(Some(1), None))),
-                        Some(PropertyUpdate::SocketMarks(marks(Some(2), Some(10)))),
-                        Some(PropertyUpdate::SocketMarks(marks(Some(4), None))),
-                        // None update represents the empty default_network.update call
-                        None,
-                        Some(PropertyUpdate::SocketMarks(marks(Some(8), None))),
-                    ],
-                );
+                    let updates = last_updates.lock().await.clone();
+                    expect_sequence(
+                        &updates,
+                        &vec![
+                            Some(PropertyUpdate::SocketMarks(marks(Some(1), None))),
+                            Some(PropertyUpdate::SocketMarks(marks(Some(2), Some(10)))),
+                            Some(PropertyUpdate::SocketMarks(marks(Some(4), None))),
+                            // None update represents the empty default_network.update call
+                            None,
+                            Some(PropertyUpdate::SocketMarks(marks(Some(8), None))),
+                        ],
+                    );
 
-                shutdown_tx.send(()).await.expect("couldn't trigger clean shutdown");
+                    shutdown_tx.send(()).await.expect("couldn't trigger clean shutdown");
+                };
+
+                // N.B. Waiting for both futures to complete ensures that both
+                // the test and the background task clean themselves up, closing
+                // all open FIDL channels before shutting down the realm.
+                futures::future::join(background, test).await;
             }
             .boxed_local()
         },
