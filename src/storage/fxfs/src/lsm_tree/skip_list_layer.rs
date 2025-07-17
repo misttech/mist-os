@@ -9,8 +9,8 @@ use crate::drop_event::DropEvent;
 use crate::log::*;
 use crate::lsm_tree::merge::{self, MergeFn};
 use crate::lsm_tree::types::{
-    BoxedLayerIterator, Item, ItemCount, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut,
-    LayerValue, OrdLowerBound, OrdUpperBound,
+    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerValue,
+    OrdLowerBound, OrdUpperBound,
 };
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::{bail, Error};
@@ -243,8 +243,8 @@ impl<K: Key, V: LayerValue> Layer<K, V> for SkipListLayer<K, V> {
         self.close_event.lock().clone()
     }
 
-    fn estimated_len(&self) -> ItemCount {
-        ItemCount::Precise(self.inner.lock().item_count)
+    fn len(&self) -> usize {
+        self.inner.lock().item_count
     }
 
     async fn close(&self) {
