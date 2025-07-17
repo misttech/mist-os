@@ -99,7 +99,7 @@ impl MockCoordinator {
         self.listener_proxy
             .on_vsync(
                 &display_types::DisplayId { value: display_id_value },
-                zx::MonotonicInstant::get().into_nanos(),
+                zx::MonotonicInstant::get(),
                 &stamp,
                 &VsyncAckCookie { value: INVALID_DISP_ID },
             )

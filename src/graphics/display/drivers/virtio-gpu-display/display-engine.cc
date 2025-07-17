@@ -358,8 +358,8 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
 void DisplayEngine::virtio_gpu_flusher() {
   fdf::trace("Entering VirtioGpuFlusher()");
 
-  zx_time_t next_deadline = zx_clock_get_monotonic();
-  zx_time_t period = ZX_SEC(1) / kRefreshRateHz;
+  zx_instant_mono_t next_deadline = zx_clock_get_monotonic();
+  zx_instant_mono_t period = ZX_SEC(1) / kRefreshRateHz;
   for (;;) {
     zx_nanosleep(next_deadline);
 
@@ -405,7 +405,8 @@ void DisplayEngine::virtio_gpu_flusher() {
 
     {
       fbl::AutoLock al(&flush_lock_);
-      engine_events_.OnDisplayVsync(kDisplayId, zx::time(next_deadline), displayed_config_stamp_);
+      engine_events_.OnDisplayVsync(kDisplayId, zx::time_monotonic(next_deadline),
+                                    displayed_config_stamp_);
     }
     next_deadline = zx_time_add_duration(next_deadline, period);
   }

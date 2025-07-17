@@ -261,10 +261,10 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayRemovedWithNoListener) {
 
 TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsync) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr zx::time kTimestamp(zx_time_t{42'4242});
+  static constexpr zx::time_monotonic kTimestamp(42'4242);
   static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
-  mock_.ExpectOnDisplayVsync([&](uint64_t banjo_display_id, zx_time_t banjo_timestamp,
+  mock_.ExpectOnDisplayVsync([&](uint64_t banjo_display_id, zx_instant_mono_t banjo_timestamp,
                                  const config_stamp_t* banjo_config_stamp) {
     EXPECT_EQ(42u, banjo_display_id);
     EXPECT_EQ(42'4242u, banjo_timestamp);
@@ -275,7 +275,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsync) {
 
 TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsyncWithNoListener) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr zx::time kTimestamp(zx_time_t{42'4242});
+  static constexpr zx::time_monotonic kTimestamp(42'4242);
   static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
   banjo_adapter_.SetListener(nullptr);

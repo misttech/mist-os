@@ -757,7 +757,7 @@ void DisplayCompositor::ApplyConfig(uint64_t frame_number, uint64_t trace_flow_i
 }
 
 bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
-                                              const zx::time presentation_time,
+                                              const zx::time_monotonic presentation_time,
                                               const std::vector<RenderData>& render_data_list,
                                               std::vector<zx::event> release_fences,
                                               scheduling::FramePresentedCallback callback) {
@@ -875,7 +875,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
 }
 
 DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
-    const uint64_t frame_number, const zx::time presentation_time,
+    const uint64_t frame_number, const zx::time_monotonic presentation_time,
     const std::vector<RenderData>& render_data_list, std::vector<zx::event> release_fences,
     scheduling::FramePresentedCallback callback, RenderFrameTestArgs test_args) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
@@ -976,7 +976,7 @@ bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render
   return true;
 }
 
-void DisplayCompositor::OnVsync(zx::time timestamp,
+void DisplayCompositor::OnVsync(zx::time_monotonic timestamp,
                                 fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "Flatland::DisplayCompositor::OnVsync");

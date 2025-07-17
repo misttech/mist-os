@@ -984,7 +984,7 @@ zx_status_t DisplayEngine::DisplayEngineReleaseCapture(uint64_t capture_handle) 
   return ZX_OK;
 }
 
-void DisplayEngine::OnVsync(zx::time timestamp) {
+void DisplayEngine::OnVsync(zx::time_monotonic timestamp) {
   display::DriverConfigStamp current_config_stamp = display::kInvalidDriverConfigStamp;
   if (fully_initialized()) {
     current_config_stamp = video_input_unit_->GetLastConfigStampApplied();

@@ -1202,7 +1202,7 @@ fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
   return call_result;
 }
 
-fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time timestamp,
+fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                                  display::ConfigStamp config_stamp,
                                  display::VsyncAckCookie vsync_ack_cookie) {
   if (!coordinator_listener_.is_valid()) {
@@ -1210,7 +1210,7 @@ fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time timesta
   }
 
   fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
-      display_id.ToFidl(), timestamp.get(), config_stamp.ToFidl(), vsync_ack_cookie.ToFidl());
+      display_id.ToFidl(), timestamp, config_stamp.ToFidl(), vsync_ack_cookie.ToFidl());
   return send_call_result;
 }
 

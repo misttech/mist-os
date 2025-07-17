@@ -175,11 +175,11 @@ TEST_F(ReleaseFenceManagerTest, SignalingWhenPreviousFrameWasDirectScanout) {
     }
 
     // The fences are signaled when the second frame is displayed, not the first.
-    manager.OnVsync(/*frame_number*/ 1, zx::time(1));
+    manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(1));
     for (auto& fence : release_fences) {
       EXPECT_FALSE(utils::IsEventSignalled(fence, ZX_EVENT_SIGNALED));
     }
-    manager.OnVsync(/*frame_number*/ 2, zx::time(1));
+    manager.OnVsync(/*frame_number*/ 2, zx::time_monotonic(1));
     for (auto& fence : release_fences) {
       EXPECT_TRUE(utils::IsEventSignalled(fence, ZX_EVENT_SIGNALED));
     }
@@ -201,12 +201,12 @@ TEST_F(ReleaseFenceManagerTest, FramePresentedCallbackForGpuCompositedFrame) {
           callback_timestamps = timestamps;
         });
 
-    const zx::time pre_signal_time(zx_clock_get_monotonic());
+    const zx::time_monotonic pre_signal_time(zx_clock_get_monotonic());
     render_finished_fence.signal(0u, ZX_EVENT_SIGNALED);
     RunLoopUntilIdle();
     EXPECT_FALSE(callback_invoked);
 
-    const zx::time vsync_time(zx_clock_get_monotonic());
+    const zx::time_monotonic vsync_time(zx_clock_get_monotonic());
     manager.OnVsync(/*frame_number*/ 1, vsync_time);
     EXPECT_TRUE(callback_invoked);
     EXPECT_GE(callback_timestamps.render_done_time, pre_signal_time);
@@ -229,10 +229,10 @@ TEST_F(ReleaseFenceManagerTest, FramePresentedCallbackForGpuCompositedFrame) {
           callback_timestamps = timestamps;
         });
 
-    const zx::time pre_signal_time(zx_clock_get_monotonic());
+    const zx::time_monotonic pre_signal_time(zx_clock_get_monotonic());
     render_finished_fence.signal(0u, ZX_EVENT_SIGNALED);
 
-    const zx::time vsync_time(zx_clock_get_monotonic());
+    const zx::time_monotonic vsync_time(zx_clock_get_monotonic());
     manager.OnVsync(/*frame_number*/ 1, vsync_time);
     EXPECT_FALSE(callback_invoked);
 
@@ -248,8 +248,8 @@ TEST_F(ReleaseFenceManagerTest, FramePresentedCallbackForGpuCompositedFrame) {
 TEST_F(ReleaseFenceManagerTest, FramePresentedCallbackForDirectScanoutFrame) {
   ReleaseFenceManager manager(dispatcher());
 
-  const zx::time kFrameStartTime(10'000'000);
-  const zx::time kVsyncTime(12'000'000);
+  const zx::time_monotonic kFrameStartTime(10'000'000);
+  const zx::time_monotonic kVsyncTime(12'000'000);
   RunLoopUntil(kFrameStartTime);
 
   bool callback_invoked = false;
@@ -333,11 +333,11 @@ TEST_F(ReleaseFenceManagerTest, OutOfOrderRenderFinished) {
   // scenario is that a direct-scanout frame (such as frame 3) is presented before the previous
   // GPU-composited frame is finished rendering; this scenario is also covered here.
 
-  const zx::time pre_signal_time4(zx_clock_get_monotonic());
+  const zx::time_monotonic pre_signal_time4(zx_clock_get_monotonic());
   render_finished_fence4.signal(0u, ZX_EVENT_SIGNALED);
   RunLoopUntilIdle();
   EXPECT_FALSE(callback_invoked4);
-  const zx::time vsync_time(zx_clock_get_monotonic());
+  const zx::time_monotonic vsync_time(zx_clock_get_monotonic());
   manager.OnVsync(/*frame_number*/ 4, vsync_time);
 
   // Even though frame 4 has been presented, we can only invoke the first callback.  This is because
@@ -351,7 +351,7 @@ TEST_F(ReleaseFenceManagerTest, OutOfOrderRenderFinished) {
   EXPECT_EQ(manager.frame_record_count(), 3u);
 
   // Once frame 2's render-finished fence has been signaled, this "unlocks" the rest of the frames.
-  const zx::time pre_signal_time2(zx_clock_get_monotonic());
+  const zx::time_monotonic pre_signal_time2(zx_clock_get_monotonic());
   render_finished_fence2.signal(0u, ZX_EVENT_SIGNALED);
   RunLoopUntilIdle();
 
@@ -381,7 +381,7 @@ TEST_F(ReleaseFenceManagerTest, ImmediateErasure) {
 
     // First frame can't be erased even after presented.
     manager.OnDirectScanoutFrame(/*frame_number*/ 1, {}, [](scheduling::Timestamps) {});
-    manager.OnVsync(/*frame_number*/ 1, zx::time(100));
+    manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(100));
     EXPECT_EQ(manager.frame_record_count(), 1u);
 
     // Adding the next frame causes the first to be erased.
@@ -394,7 +394,7 @@ TEST_F(ReleaseFenceManagerTest, ImmediateErasure) {
     // Second frame can't be erased even after render-finished and presented.
     render_finished_fence.signal(0u, ZX_EVENT_SIGNALED);
     RunLoopUntilIdle();
-    manager.OnVsync(/*frame_number*/ 2, zx::time(200));
+    manager.OnVsync(/*frame_number*/ 2, zx::time_monotonic(200));
     EXPECT_EQ(manager.frame_record_count(), 1u);
 
     // Adding the next frame causes the second to be erased.
@@ -421,7 +421,7 @@ TEST_F(ReleaseFenceManagerTest, ImmediateErasure) {
     render_finished_fence1.signal(0u, ZX_EVENT_SIGNALED);
     RunLoopUntilIdle();
     EXPECT_EQ(manager.frame_record_count(), 2u);
-    manager.OnVsync(/*frame_number*/ 1, zx::time(100));
+    manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(100));
     EXPECT_EQ(manager.frame_record_count(), 1u);
 
     // Add a third frame, so the second can be erased immediately after its callback is invoked.
@@ -429,7 +429,7 @@ TEST_F(ReleaseFenceManagerTest, ImmediateErasure) {
 
     // Second frame has OnVsync() before fence signal is received.
     render_finished_fence2.signal(0u, ZX_EVENT_SIGNALED);
-    manager.OnVsync(/*frame_number*/ 2, zx::time(200));
+    manager.OnVsync(/*frame_number*/ 2, zx::time_monotonic(200));
     EXPECT_EQ(manager.frame_record_count(), 2u);
     RunLoopUntilIdle();  // handle the signaling of |render_finished_fence2|
     EXPECT_EQ(manager.frame_record_count(), 1u);
@@ -444,7 +444,7 @@ TEST_F(ReleaseFenceManagerTest, ImmediateErasure) {
     manager.OnDirectScanoutFrame(/*frame_number*/ 2, {}, [](scheduling::Timestamps) {});
 
     EXPECT_EQ(manager.frame_record_count(), 2u);
-    manager.OnVsync(/*frame_number*/ 1, zx::time(100));
+    manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(100));
     EXPECT_EQ(manager.frame_record_count(), 1u);
   }
 }
@@ -456,12 +456,12 @@ TEST_F(ReleaseFenceManagerTest, RepeatedOnVsyncFrameNumbers) {
   manager.OnDirectScanoutFrame(/*frame_number*/ 1, {},
                                [&](scheduling::Timestamps) { ++callback_count1; });
 
-  manager.OnVsync(/*frame_number*/ 1, zx::time(100));
+  manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(100));
   EXPECT_EQ(callback_count1, 1u);
-  manager.OnVsync(/*frame_number*/ 1, zx::time(200));
-  manager.OnVsync(/*frame_number*/ 1, zx::time(300));
-  manager.OnVsync(/*frame_number*/ 1, zx::time(400));
-  manager.OnVsync(/*frame_number*/ 1, zx::time(500));
+  manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(200));
+  manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(300));
+  manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(400));
+  manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(500));
   EXPECT_EQ(callback_count1, 1u);
 
   // Register another frame, but have more Vsyncs for the first frame arrive before the second is
@@ -470,11 +470,11 @@ TEST_F(ReleaseFenceManagerTest, RepeatedOnVsyncFrameNumbers) {
   manager.OnDirectScanoutFrame(/*frame_number*/ 2, {},
                                [&](scheduling::Timestamps) { ++callback_count2; });
 
-  manager.OnVsync(/*frame_number*/ 1, zx::time(600));
+  manager.OnVsync(/*frame_number*/ 1, zx::time_monotonic(600));
   EXPECT_EQ(callback_count1, 1u);
   EXPECT_EQ(callback_count2, 0u);
 
-  manager.OnVsync(/*frame_number*/ 2, zx::time(700));
+  manager.OnVsync(/*frame_number*/ 2, zx::time_monotonic(700));
   EXPECT_EQ(callback_count1, 1u);
   EXPECT_EQ(callback_count2, 1u);
 }

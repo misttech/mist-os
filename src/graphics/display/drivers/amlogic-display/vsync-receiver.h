@@ -31,7 +31,7 @@ class VsyncReceiver {
   static constexpr size_t kOnVsyncTargetSize = 16;
 
   // The type of the function called when a Vsync interrupt is triggered.
-  using VsyncHandler = fit::inline_function<void(zx::time timestamp), kOnVsyncTargetSize>;
+  using VsyncHandler = fit::inline_function<void(zx::time_monotonic timestamp), kOnVsyncTargetSize>;
 
   // Factory method intended for production use.
   // Creates a VsyncReceiver that is receiving Vsync interrupts.
@@ -78,7 +78,7 @@ class VsyncReceiver {
   // interrupts before this method is called.
   zx::result<> PostStop();
 
-  void OnVsync(zx::time timestamp);
+  void OnVsync(zx::time_monotonic timestamp);
 
   void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                         const zx_packet_interrupt_t* interrupt);

@@ -125,7 +125,7 @@ zx_status_t ClientProxy::OnCaptureComplete() {
   return ZX_OK;
 }
 
-zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
+zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
                                         display::DriverConfigStamp driver_config_stamp) {
   AssertHeld(*controller_.mtx());
   fidl::Status event_sending_result = fidl::Status::Ok();
@@ -215,9 +215,9 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
   while (!buffered_vsync_messages_.empty()) {
     VsyncMessageData vsync_message_data = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
-    event_sending_result =
-        handler_.NotifyVsync(vsync_message_data.display_id, zx::time{vsync_message_data.timestamp},
-                             vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
+    event_sending_result = handler_.NotifyVsync(
+        vsync_message_data.display_id, zx::time_monotonic{vsync_message_data.timestamp},
+        vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
     if (!event_sending_result.ok()) {
       fdf::error("Failed to send all buffered vsync messages: {}\n",
                  event_sending_result.FormatDescription());
@@ -227,8 +227,8 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
   }
 
   // Send the latest vsync event.
-  event_sending_result =
-      handler_.NotifyVsync(display_id, zx::time{timestamp}, client_stamp, vsync_ack_cookie);
+  event_sending_result = handler_.NotifyVsync(display_id, zx::time_monotonic{timestamp},
+                                              client_stamp, vsync_ack_cookie);
   if (!event_sending_result.ok()) {
     return event_sending_result.status();
   }

@@ -135,7 +135,7 @@ class FramebufferDisplay : public HeapServer, public display::DisplayEngineInter
       fuchsia_images2::wire::PixelFormatModifier::kLinear;
 
   // Only used on the vsync thread.
-  zx::time next_vsync_time_;
+  zx::time_monotonic next_vsync_time_;
 
   display::DisplayEngineEventsInterface& engine_events_;
 };

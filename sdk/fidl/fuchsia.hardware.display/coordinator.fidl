@@ -50,7 +50,7 @@ open protocol CoordinatorListener {
         /// The time when the VSync occurred.
         ///
         /// The accurrancy of this timestamp depends on the display hardware.
-        timestamp zx.Time;
+        timestamp zx.InstantMono;
 
         /// Identifies the lastest configuration fully applied to the display.
         ///

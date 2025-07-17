@@ -139,7 +139,7 @@ closed protocol DisplayEngineListener {
     /// See [`fuchsia.hardware.display.engine/EngineListener.OnDisplayVsync`].
     strict OnDisplayVsync(struct {
         display_id uint64;
-        timestamp zx.Time;
+        timestamp zx.InstantMono;
         config_stamp box<ConfigStamp>;
     });
 

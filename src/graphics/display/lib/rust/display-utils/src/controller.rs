@@ -201,7 +201,7 @@ impl Coordinator {
                 } => {
                     inner.write().handle_vsync(
                         display_id.into(),
-                        zx::MonotonicInstant::from_nanos(timestamp),
+                        timestamp,
                         applied_config_stamp,
                         cookie,
                     )?;

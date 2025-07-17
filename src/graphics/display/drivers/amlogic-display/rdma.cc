@@ -105,7 +105,7 @@ RdmaEngine::RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt 
 void RdmaEngine::TryResolvePendingRdma() {
   ZX_DEBUG_ASSERT(rdma_active_);
 
-  zx::time now = zx::clock::get_monotonic();
+  zx::time_monotonic now = zx::clock::get_monotonic();
   auto rdma_status = RdmaStatusReg::Get().ReadFrom(&vpu_mmio_);
   if (!rdma_status.ChannelDone(kRdmaChannel)) {
     // The configs scheduled to apply on the previous vsync have not been processed by the RDMA

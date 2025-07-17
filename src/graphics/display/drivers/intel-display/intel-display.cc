@@ -193,7 +193,7 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
   }
 }
 
-void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
+void Controller::HandlePipeVsync(PipeId pipe_id, zx_instant_mono_t timestamp) {
   fbl::AutoLock lock(&display_lock_);
 
   if (!engine_listener_.is_valid()) {
@@ -1820,7 +1820,7 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
   }
 
   if (engine_listener_.is_valid()) {
-    zx_time_t now = (fake_vsync_size > 0) ? zx_clock_get_monotonic() : 0;
+    zx_instant_mono_t now = (fake_vsync_size > 0) ? zx_clock_get_monotonic() : 0;
     for (size_t i = 0; i < fake_vsync_size; i++) {
       const uint64_t banjo_display_id = fake_vsync_display_ids[i].ToBanjo();
       engine_listener_.OnDisplayVsync(banjo_display_id, now, banjo_config_stamp);

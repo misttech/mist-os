@@ -48,7 +48,7 @@ void Display::Unclaim() {
   claimed_ = false;
 }
 
-void Display::OnVsync(zx::time timestamp,
+void Display::OnVsync(zx::time_monotonic timestamp,
                       fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp) {
   // Estimate current vsync interval. Need to include a maximum to mitigate any
   // potential issues during long breaks.

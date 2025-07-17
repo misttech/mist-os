@@ -810,7 +810,7 @@ void FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
-  zx::time vsync_timestamp = zx::clock::get_monotonic();
+  zx::time_monotonic vsync_timestamp = zx::clock::get_monotonic();
 
   display::DriverConfigStamp vsync_config_stamp;
   {

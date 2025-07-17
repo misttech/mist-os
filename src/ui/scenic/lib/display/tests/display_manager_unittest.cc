@@ -79,7 +79,7 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
       });
 
   display_manager()->default_display()->SetVsyncCallback(
-      [&num_vsync_display_received](zx::time timestamp,
+      [&num_vsync_display_received](zx::time_monotonic timestamp,
                                     fuchsia_hardware_display::wire::ConfigStamp stamp) {
         ++num_vsync_display_received;
       });
@@ -90,7 +90,7 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
 
     test_loop().AdvanceTimeByEpsilon();
     fidl::OneWayStatus result = mock_display_coordinator.listener().sync()->OnVsync(
-        kDisplayId, test_loop().Now().get(), {1u}, {cookie});
+        kDisplayId, zx::time_monotonic(test_loop().Now().get()), {1u}, {cookie});
     ASSERT_TRUE(result.ok());
     if (cookie) {
       cookies_sent.insert(cookie);

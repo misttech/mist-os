@@ -61,7 +61,7 @@ class ClientProxy {
   void CloseOnControllerLoop();
 
   // Requires holding `controller_.mtx()` lock.
-  zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
+  zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
                              display::DriverConfigStamp driver_config_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                          std::span<const display::DisplayId> removed_display_ids);
@@ -148,7 +148,7 @@ class ClientProxy {
 
   struct VsyncMessageData {
     display::DisplayId display_id;
-    zx_time_t timestamp;
+    zx_instant_mono_t timestamp;
     display::ConfigStamp config_stamp;
   };
 

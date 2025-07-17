@@ -36,7 +36,7 @@ class VsyncMonitor {
   void Deinitialize();
 
   // Called when a display engine driver sends a Vsync event.
-  void OnVsync(zx::time vsync_timestamp, display::DriverConfigStamp vsync_config_stamp);
+  void OnVsync(zx::time_monotonic vsync_timestamp, display::DriverConfigStamp vsync_config_stamp);
 
  private:
   // Periodically reads `last_vsync_timestamp_` and increments
@@ -44,7 +44,7 @@ class VsyncMonitor {
   // period.
   void UpdateStatistics();
 
-  std::atomic<zx::time> last_vsync_timestamp_{};
+  std::atomic<zx::time_monotonic> last_vsync_timestamp_{};
 
   inspect::Node inspect_root_;
   inspect::UintProperty last_vsync_ns_property_;

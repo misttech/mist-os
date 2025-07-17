@@ -703,7 +703,7 @@ zx_status_t DisplayEngine::SetupPrimaryDisplay() {
 
 void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
   zx::duration period = zx::sec(1) / primary_display_device_.refresh_rate_hz;
-  zx::time expected_next_flush = primary_display_device_.expected_next_flush + period;
+  zx::time_monotonic expected_next_flush = primary_display_device_.expected_next_flush + period;
 
   if (primary_display_device_.incoming_config.has_value()) {
     zx_status_t status = PresentPrimaryDisplayConfig(*primary_display_device_.incoming_config);
@@ -714,7 +714,7 @@ void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
     fbl::AutoLock lock(&flush_lock_);
 
     if (engine_listener_.is_valid()) {
-      zx::time now = async::Now(dispatcher);
+      zx::time_monotonic now = async::Now(dispatcher);
       const uint64_t banjo_display_id = kPrimaryDisplayId.ToBanjo();
       const config_stamp_t banjo_config_stamp =
           primary_display_device_.latest_config_stamp.ToBanjo();
@@ -724,7 +724,7 @@ void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
 
   // If we've already passed the |expected_next_flush| deadline, skip the
   // Vsync and adjust the deadline to the earliest next available frame.
-  zx::time now = async::Now(dispatcher);
+  zx::time_monotonic now = async::Now(dispatcher);
   if (now > expected_next_flush) {
     expected_next_flush +=
         period * (((now - expected_next_flush + period).get() - 1L) / period.get());

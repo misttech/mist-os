@@ -70,7 +70,8 @@ class DisplayManager {
   void OnDisplaysChanged(fidl::VectorView<fuchsia_hardware_display::wire::Info> added,
                          fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId> removed);
   void OnClientOwnershipChange(bool has_ownership);
-  void OnVsync(fuchsia_hardware_display_types::wire::DisplayId display_id, zx::time timestamp,
+  void OnVsync(fuchsia_hardware_display_types::wire::DisplayId display_id,
+               zx::time_monotonic timestamp,
                fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp,
                fuchsia_hardware_display::wire::VsyncAckCookie cookie);
 

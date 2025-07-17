@@ -90,7 +90,7 @@ class ReleaseFenceManager final {
 
   // Called when the specified frame has appeared on screen.  |frame_number| must monotonically
   // increase with each subsequent call (repeats are OK).
-  void OnVsync(uint64_t frame_number, zx::time timestamp);
+  void OnVsync(uint64_t frame_number, zx::time_monotonic timestamp);
 
   // For testing.  Return the number of frame records currently held by the manager.
   size_t frame_record_count() const { return frame_records_.size(); }

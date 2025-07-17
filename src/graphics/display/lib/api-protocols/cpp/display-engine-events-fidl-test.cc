@@ -296,7 +296,7 @@ TEST_F(DisplayEngineEventsFidlTest, OnDisplayRemovedWithNoListener) {
 
 TEST_F(DisplayEngineEventsFidlTest, OnDisplayVsync) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr zx::time kTimestamp(zx_time_t{42'4242});
+  static constexpr zx::time_monotonic kTimestamp(42'4242);
   static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
   mock_->ExpectOnDisplayVsync(
@@ -305,7 +305,7 @@ TEST_F(DisplayEngineEventsFidlTest, OnDisplayVsync) {
           fdf::WireServer<fuchsia_hardware_display_engine::EngineListener>::
               OnDisplayVsyncCompleter::Sync& completer) {
         EXPECT_EQ(42u, request->display_id.value);
-        EXPECT_EQ(42'4242u, request->timestamp);
+        EXPECT_EQ(42'4242u, request->timestamp.get());
         EXPECT_EQ(4242'4242u, request->config_stamp.value);
       });
   interface_.OnDisplayVsync(kDisplayId, kTimestamp, kConfigStamp);
@@ -313,7 +313,7 @@ TEST_F(DisplayEngineEventsFidlTest, OnDisplayVsync) {
 
 TEST_F(DisplayEngineEventsFidlTest, OnDisplayVsyncWithNoListener) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr zx::time kTimestamp(zx_time_t{42'4242});
+  static constexpr zx::time_monotonic kTimestamp(42'4242);
   static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
   fidl_adapter_.SetListener(fdf::ClientEnd<fuchsia_hardware_display_engine::EngineListener>());

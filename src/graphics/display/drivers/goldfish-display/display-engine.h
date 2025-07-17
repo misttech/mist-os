@@ -125,7 +125,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
     int32_t height_px = 0;
     int32_t refresh_rate_hz = 60;
 
-    zx::time expected_next_flush = zx::time::infinite_past();
+    zx::time_monotonic expected_next_flush = zx::time_monotonic::infinite_past();
     display::DriverConfigStamp latest_config_stamp = display::kInvalidDriverConfigStamp;
 
     // The next display config to be posted through renderControl protocol.

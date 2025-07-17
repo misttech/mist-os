@@ -134,10 +134,10 @@ zx::result<> PowerController::RequestDisplayVoltageLevel(int voltage_level,
   ZX_ASSERT(voltage_level >= 0);
   ZX_ASSERT(voltage_level <= 3);
 
-  const zx::time deadline =
+  const zx::time_monotonic deadline =
       (retry_behavior == RetryBehavior::kRetryUntilStateChanges)
           ? zx::deadline_after(zx::usec(g_voltage_level_request_total_timeout_us))
-          : zx::time::infinite_past();
+          : zx::time_monotonic::infinite_past();
 
   do {
     zx::result<uint64_t> mailbox_result = Transact({
@@ -166,10 +166,10 @@ zx::result<> PowerController::SetDisplayTypeCColdBlockingTigerLake(bool blocked,
   // IHD-OS-LKF-Vol 12-4.21 also documents the TCCOLD concept, but Lakefield's
   // PCU firmware uses a different API for managing TCCOLD.
 
-  const zx::time deadline =
+  const zx::time_monotonic deadline =
       (retry_behavior == RetryBehavior::kRetryUntilStateChanges)
           ? zx::deadline_after(zx::usec(g_typec_cold_blocking_change_total_timeout_us))
-          : zx::time::infinite_past();
+          : zx::time_monotonic::infinite_past();
 
   const uint64_t command_data = blocked ? 0 : 1;
   do {
@@ -201,10 +201,10 @@ zx::result<> PowerController::SetSystemAgentGeyservilleEnabled(bool enabled,
   // Skylake: IHD-OS-SKL-Vol 12-05.16 "System Agent Geyserville (SAGV)", pages
   //          197-198
 
-  const zx::time deadline =
+  const zx::time_monotonic deadline =
       (retry_behavior == RetryBehavior::kRetryUntilStateChanges)
           ? zx::deadline_after(zx::usec(g_system_agent_enablement_change_total_timeout_us))
-          : zx::time::infinite_past();
+          : zx::time_monotonic::infinite_past();
 
   // The data is documented as the EL_THLD (Threshold) LTR (most likely "Latency
   // Tolerance Reporting") override on Tiger Lake and DG1.

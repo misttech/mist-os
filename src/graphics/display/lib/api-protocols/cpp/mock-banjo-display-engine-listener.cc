@@ -86,7 +86,7 @@ void MockBanjoDisplayEngineListener::DisplayEngineListenerOnDisplayRemoved(
 }
 
 void MockBanjoDisplayEngineListener::DisplayEngineListenerOnDisplayVsync(
-    uint64_t banjo_display_id, zx_time_t banjo_timestamp,
+    uint64_t banjo_display_id, zx_instant_mono_t banjo_timestamp,
     const config_stamp_t* banjo_config_stamp) {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");

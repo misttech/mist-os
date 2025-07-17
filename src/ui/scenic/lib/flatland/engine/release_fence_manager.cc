@@ -52,7 +52,7 @@ void ReleaseFenceManager::OnDirectScanoutFrame(
   StashFrameRecord(frame_number, std::move(record));
 }
 
-void ReleaseFenceManager::OnVsync(uint64_t frame_number, zx::time timestamp) {
+void ReleaseFenceManager::OnVsync(uint64_t frame_number, zx::time_monotonic timestamp) {
   FLATLAND_VERBOSE_LOG << "ReleaseFenceManager::OnVsync() frame_number=" << frame_number
                        << "  timestamp=" << timestamp.get();
 #ifndef NDEBUG
@@ -206,7 +206,7 @@ std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewGpuCom
         }
 
         // The real work is done here.
-        OnRenderFinished(frame_number, zx::time(signal_info->timestamp));
+        OnRenderFinished(frame_number, zx::time_monotonic(signal_info->timestamp));
       });
   FX_DCHECK(wait_status == ZX_OK);
 

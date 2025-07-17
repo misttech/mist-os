@@ -67,7 +67,7 @@ class MockCoordinatorListener
   }
 
   void OnVsync(OnVsyncRequestView request, OnVsyncCompleter::Sync& completer) override {
-    latest_vsync_timestamp_ = zx::time(request->timestamp);
+    latest_vsync_timestamp_ = zx::time_monotonic(request->timestamp);
     latest_applied_config_stamp_ = display::ConfigStamp(request->applied_config_stamp);
   }
 
@@ -89,14 +89,14 @@ class MockCoordinatorListener
     return latest_removed_display_ids_;
   }
   bool client_has_ownership() const { return client_has_ownership_; }
-  zx::time latest_vsync_timestamp() const { return latest_vsync_timestamp_; }
+  zx::time_monotonic latest_vsync_timestamp() const { return latest_vsync_timestamp_; }
   display::ConfigStamp latest_applied_config_stamp() const { return latest_applied_config_stamp_; }
 
  private:
   std::vector<fuchsia_hardware_display::wire::Info> latest_added_display_infos_;
   std::vector<display::DisplayId> latest_removed_display_ids_;
   bool client_has_ownership_ = false;
-  zx::time latest_vsync_timestamp_ = zx::time::infinite_past();
+  zx::time_monotonic latest_vsync_timestamp_ = zx::time_monotonic::infinite_past();
   display::ConfigStamp latest_applied_config_stamp_ = display::kInvalidConfigStamp;
 };
 

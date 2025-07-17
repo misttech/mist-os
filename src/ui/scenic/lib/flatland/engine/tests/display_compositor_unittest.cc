@@ -220,7 +220,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
   }
 
   void SendOnVsyncEvent(fuchsia_hardware_display::wire::ConfigStamp stamp) {
-    display_compositor_->OnVsync(zx::time(), stamp);
+    display_compositor_->OnVsync(zx::time_monotonic(), stamp);
   }
 
   std::deque<DisplayCompositor::ApplyConfigInfo> GetPendingApplyConfigs() {
@@ -949,8 +949,10 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   static constexpr fuchsia_hardware_display::wire::ConfigStamp kConfigStamp1(1);
   static constexpr fuchsia_hardware_display::wire::ConfigStamp kConfigStamp2(2);
   EXPECT_CALL(*mock_display_coordinator_, ApplyConfig3(_, _)).Times(2).WillRepeatedly(Return());
-  display_compositor_->RenderFrame(1, zx::time(1), {}, {}, [](const scheduling::Timestamps&) {});
-  display_compositor_->RenderFrame(2, zx::time(2), {}, {}, [](const scheduling::Timestamps&) {});
+  display_compositor_->RenderFrame(1, zx::time_monotonic(1), {}, {},
+                                   [](const scheduling::Timestamps&) {});
+  display_compositor_->RenderFrame(2, zx::time_monotonic(2), {}, {},
+                                   [](const scheduling::Timestamps&) {});
 
   EXPECT_EQ(2u, GetPendingApplyConfigs().size());
 
@@ -1225,7 +1227,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   EXPECT_CALL(*mock_display_coordinator_, ApplyConfig3(_, _)).Times(1).WillOnce(Return());
 
   display_compositor_->RenderFrame(
-      1, zx::time(1),
+      1, zx::time_monotonic(1),
       GenerateDisplayListForTest({{kDisplayId.value, {display_info, parent_root_handle}}}), {},
       [](const scheduling::Timestamps&) {});
 
@@ -1424,7 +1426,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   EXPECT_CALL(*mock_display_coordinator_, ApplyConfig3(_, _)).Times(1).WillOnce(Return());
 
   display_compositor_->RenderFrame(
-      1, zx::time(1),
+      1, zx::time_monotonic(1),
       GenerateDisplayListForTest({{kDisplayId.value, {display_info, parent_root_handle}}}), {},
       [](const scheduling::Timestamps&) {});
 

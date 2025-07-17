@@ -78,7 +78,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
       std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
       std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
   fidl::Status NotifyOwnershipChange(bool client_has_ownership);
-  fidl::Status NotifyVsync(display::DisplayId display_id, zx::time timestamp,
+  fidl::Status NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                            display::ConfigStamp config_stamp,
                            display::VsyncAckCookie vsync_ack_cookie);
 

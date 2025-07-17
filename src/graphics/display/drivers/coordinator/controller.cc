@@ -284,7 +284,7 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
 }
 
 void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
-                                                     zx_time_t banjo_timestamp,
+                                                     zx_instant_mono_t banjo_timestamp,
                                                      const config_stamp_t* banjo_config_stamp_ptr) {
   ZX_DEBUG_ASSERT(banjo_display_id != INVALID_DISPLAY_ID);
   ZX_DEBUG_ASSERT(banjo_config_stamp_ptr != nullptr);
@@ -301,7 +301,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 
   const display::DisplayId display_id(banjo_display_id);
 
-  const zx::time vsync_timestamp(banjo_timestamp);
+  const zx::time_monotonic vsync_timestamp(banjo_timestamp);
   const display::DriverConfigStamp vsync_config_stamp =
       display::DriverConfigStamp(*banjo_config_stamp_ptr);
   vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
@@ -435,7 +435,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 
 void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
                              display::ConfigStamp client_config_stamp, ClientId client_id) {
-  zx_time_t timestamp = zx_clock_get_monotonic();
+  zx_instant_mono_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
   last_valid_apply_config_timestamp_ = timestamp;

@@ -106,7 +106,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // fuchsia.hardware.display.controller/DisplayEngineListener:
   void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
   void DisplayEngineListenerOnDisplayRemoved(uint64_t display_id);
-  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_instant_mono_t timestamp,
                                            const config_stamp_t* config_stamp);
   void DisplayEngineListenerOnCaptureComplete();
 
@@ -246,7 +246,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   std::unique_ptr<EngineDriverClient> engine_driver_client_;
 
-  zx_time_t last_valid_apply_config_timestamp_{};
+  zx_instant_mono_t last_valid_apply_config_timestamp_{};
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
   inspect::UintProperty last_valid_apply_config_config_stamp_property_;

@@ -266,7 +266,7 @@ open protocol EngineListener {
     ///      status of the configuration with ID `display_id` is related.
     flexible OnDisplayVsync(struct {
         display_id fuchsia.hardware.display.types.DisplayId;
-        timestamp zx.Time;
+        timestamp zx.InstantMono;
         config_stamp ConfigStamp;
     });
 

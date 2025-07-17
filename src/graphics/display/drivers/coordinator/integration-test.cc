@@ -124,7 +124,7 @@ class TestClientState {
   void OnDisplaysChanged(std::span<const fuchsia_hardware_display::wire::Info> added_displays,
                          std::span<const display::DisplayId> removed_display_ids);
   void OnClientOwnershipChange(bool has_ownership);
-  void OnVsync(display::DisplayId display_id, zx::time timestamp,
+  void OnVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                display::ConfigStamp applied_config_stamp, display::VsyncAckCookie vsync_ack_cookie);
 
  private:
@@ -192,7 +192,7 @@ void TestClientState::OnClientOwnershipChange(bool has_ownership) {
   has_display_ownership_ = has_ownership;
 }
 
-void TestClientState::OnVsync(display::DisplayId display_id, zx::time timestamp,
+void TestClientState::OnVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                               display::ConfigStamp applied_config_stamp,
                               display::VsyncAckCookie vsync_ack_cookie) {
   std::lock_guard lock(mutex_);
@@ -1813,7 +1813,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
   // This check can have a false positive pass, due to using a hard-coded
   // timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
@@ -1831,7 +1831,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
   // This check can have a false positive pass, due to using a hard-coded
   // timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
@@ -1928,7 +1928,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   // This check can have a false positive pass, due to using a hard-coded
   // timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
@@ -1947,7 +1947,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
     // This check can have a false positive pass, due to using a hard-coded
     // timeout.
     {
-      zx::time deadline = zx::deadline_after(zx::sec(1));
+      zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
       PollUntilOnLoop([&]() {
         if (zx::clock::get_monotonic() >= deadline)
           return true;
@@ -2570,7 +2570,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // TODO(https://fxbug.dev/388885807): This check can have a false positive
   // pass, due to using a hard-coded timeout.
   {
-    zx::time deadline = zx::deadline_after(zx::sec(1));
+    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;

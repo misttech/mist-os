@@ -82,12 +82,12 @@ void DisplayEngineEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
   display_engine_listener_.OnDisplayRemoved(banjo_display_id);
 }
 
-void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
+void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id,
+                                              zx::time_monotonic timestamp,
                                               display::DriverConfigStamp config_stamp) {
   const uint64_t banjo_display_id = display_id.ToBanjo();
-  const zx_time_t banjo_timestamp = timestamp.get();
+  const zx_instant_mono_t banjo_timestamp = timestamp.get();
   const config_stamp_t banjo_driver_config_stamp = config_stamp.ToBanjo();
-
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
     fdf::warn("OnDisplayVsync() emitted with invalid event listener; event dropped");

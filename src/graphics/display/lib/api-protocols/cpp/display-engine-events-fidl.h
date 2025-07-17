@@ -56,7 +56,7 @@ class DisplayEngineEventsFidl final : public DisplayEngineEventsInterface {
                       cpp20::span<const uint8_t> edid_bytes,
                       cpp20::span<const display::PixelFormat> pixel_formats) override;
   void OnDisplayRemoved(display::DisplayId display_id) override;
-  void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
+  void OnDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                       display::DriverConfigStamp config_stamp) override;
   void OnCaptureComplete() override;
 

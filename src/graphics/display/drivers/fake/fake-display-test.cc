@@ -84,7 +84,7 @@ class TestDisplayEngineListener : public display::DisplayEngineEventsInterface {
   void OnDisplayRemoved(display::DisplayId display_id) override {
     GTEST_FAIL() << "Unexpected call to OnDisplayRemoved";
   }
-  void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
+  void OnDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                       display::DriverConfigStamp config_stamp) override {
     // VSync signals are ignored for now.
   }
@@ -436,7 +436,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
                 zx::error(ZX_ERR_ALREADY_EXISTS));
 
   // Driver sets BufferCollection buffer memory constraints.
-  static constexpr display::ImageBufferUsage kDisplayUsage ({
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
   });
   EXPECT_OK(fake_display_->SetBufferCollectionConstraints(kDisplayUsage, kValidBufferCollectionId));
@@ -473,7 +473,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   ASSERT_OK(fake_display_->ImportBufferCollection(kBufferCollectionId, std::move(token)));
 
   // Driver sets BufferCollection buffer memory constraints.
-  static constexpr display::ImageBufferUsage kDisplayUsage ({
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
   });
   ASSERT_OK(fake_display_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
@@ -631,7 +631,7 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
 
   // Set BufferCollection buffer memory constraints from the display driver's
   // end.
-  static constexpr display::ImageBufferUsage kDisplayUsage ({
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
   });
   ASSERT_OK(

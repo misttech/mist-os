@@ -38,7 +38,7 @@ class DisplayEngineEventsInterface {
                               cpp20::span<const display::ModeAndId> preferred_modes,
                               cpp20::span<const display::PixelFormat> pixel_formats);
   virtual void OnDisplayRemoved(display::DisplayId display_id) = 0;
-  virtual void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
+  virtual void OnDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
                               display::DriverConfigStamp config_stamp) = 0;
 
   // OOT drivers must not use the EDID display API.

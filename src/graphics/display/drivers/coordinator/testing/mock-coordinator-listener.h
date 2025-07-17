@@ -24,9 +24,9 @@ class MockCoordinatorListener
       fit::function<void(std::span<const fuchsia_hardware_display::wire::Info> added_displays,
                          std::span<const display::DisplayId> removed_display_ids)>;
   using OnClientOwnershipChangeCallback = fit::function<void(bool has_ownership)>;
-  using OnVsyncCallback = fit::function<void(display::DisplayId display_id, zx::time timestamp,
-                                             display::ConfigStamp applied_config_stamp,
-                                             display::VsyncAckCookie cookie)>;
+  using OnVsyncCallback = fit::function<void(
+      display::DisplayId display_id, zx::time_monotonic timestamp,
+      display::ConfigStamp applied_config_stamp, display::VsyncAckCookie cookie)>;
 
   MockCoordinatorListener(OnDisplaysChangedCallback on_displays_changed_callback,
                           OnVsyncCallback on_vsync_callback,

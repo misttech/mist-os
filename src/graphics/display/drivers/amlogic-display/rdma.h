@@ -267,7 +267,7 @@ class RdmaEngine {
   inspect::UintProperty last_rdma_pending_in_vsync_interval_ns_;
   inspect::UintProperty last_rdma_pending_in_vsync_timestamp_ns_prop_;
 
-  zx::time last_rdma_pending_in_vsync_timestamp_;
+  zx::time_monotonic last_rdma_pending_in_vsync_timestamp_;
 };
 
 }  // namespace amlogic_display

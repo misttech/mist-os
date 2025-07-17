@@ -198,7 +198,8 @@ static bool bind_display(const char* coordinator, async::Loop& coordinator_liste
 
   while (g_coordinator_listener.displays().empty()) {
     printf("Waiting for display\n");
-    zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
+    zx_status_t status =
+        coordinator_listener_loop.Run(zx::time_monotonic::infinite(), /*once=*/true);
     if (status != ZX_OK || g_coordinator_listener.vsync_count() > 0) {
       printf("Got unexpected message\n");
       return false;
@@ -305,7 +306,7 @@ zx_status_t apply_config(fuchsia_hardware_display::wire::ConfigStamp stamp) {
 
 zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
                            fuchsia_hardware_display::wire::ConfigStamp expected_stamp) {
-  zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
+  zx_status_t status = coordinator_listener_loop.Run(zx::time_monotonic::infinite(), /*once=*/true);
   if (status != ZX_OK) {
     printf("wait_for_vsync(): Failed to run coordinator listener loop: %s",
            zx_status_get_string(status));

@@ -195,7 +195,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Notifies the compositor that a vsync has occurred, in response to a display configuration
   // applied by the compositor.  It is the compositor's responsibility to signal any release fences
   // corresponding to the frame identified by |frame_number|.
-  void OnVsync(zx::time timestamp,
+  void OnVsync(zx::time_monotonic timestamp,
                fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp);
 
   std::vector<allocation::ImageMetadata> AllocateDisplayRenderTargets(

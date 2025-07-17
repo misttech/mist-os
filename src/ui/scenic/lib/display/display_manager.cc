@@ -160,7 +160,7 @@ void DisplayManager::OnClientOwnershipChange(bool has_ownership) {
 }
 
 void DisplayManager::OnVsync(fuchsia_hardware_display_types::wire::DisplayId display_id,
-                             zx::time timestamp,
+                             zx::time_monotonic timestamp,
                              fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp,
                              fuchsia_hardware_display::wire::VsyncAckCookie cookie) {
   if (cookie.value != fuchsia_hardware_display_types::kInvalidDispId) {

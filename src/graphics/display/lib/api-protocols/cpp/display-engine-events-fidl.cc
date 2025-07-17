@@ -97,20 +97,19 @@ void DisplayEngineEventsFidl::OnDisplayRemoved(display::DisplayId display_id) {
   }
 }
 
-void DisplayEngineEventsFidl::OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
+void DisplayEngineEventsFidl::OnDisplayVsync(display::DisplayId display_id,
+                                             zx::time_monotonic timestamp,
                                              display::DriverConfigStamp config_stamp) {
   if (!fidl_client_.is_valid()) {
     fdf::warn("OnDisplayVsync() emitted with invalid event listener; event dropped");
     return;
   }
 
-  const zx_time_t fidl_timestamp = timestamp.get();
-
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
   fidl::OneWayStatus fidl_status = fidl_client_.buffer(arena)->OnDisplayVsync(
-      display_id.ToFidl(), fidl_timestamp, config_stamp.ToFidl());
+      display_id.ToFidl(), timestamp, config_stamp.ToFidl());
   if (!fidl_status.ok()) {
     fdf::error("OnDisplayVsync() FIDL failure: {}", fidl_status.error());
   }

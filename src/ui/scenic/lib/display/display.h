@@ -37,8 +37,9 @@ class Display {
           uint32_t height_in_px);
   virtual ~Display() = default;
 
-  using VsyncCallback = fit::function<void(
-      zx::time timestamp, fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp)>;
+  using VsyncCallback =
+      fit::function<void(zx::time_monotonic timestamp,
+                         fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp)>;
   void SetVsyncCallback(VsyncCallback callback) { vsync_callback_ = std::move(callback); }
 
   using DPRCallback = fit::function<void(const glm::vec2& dpr)>;
@@ -79,7 +80,7 @@ class Display {
   const zx::event& ownership_event() const { return ownership_event_; }
 
   // Called by DisplayManager, other users of Display should probably not call this.  Except tests.
-  void OnVsync(zx::time timestamp,
+  void OnVsync(zx::time_monotonic timestamp,
                fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp);
 
  protected:

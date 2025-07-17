@@ -23,8 +23,8 @@ class DisplayCoordinatorListener final
       fidl::VectorView<fuchsia_hardware_display::wire::Info> added,
       fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId> removed)>;
   using OnClientOwnershipChangeCallback = std::function<void(bool has_ownership)>;
-  using OnVsyncCallback = std::function<void(
-      fuchsia_hardware_display_types::wire::DisplayId display_id, zx::time timestamp,
+  using OnVsyncCallback = fit::function<void(
+      fuchsia_hardware_display_types::wire::DisplayId display_id, zx::time_monotonic timestamp,
       fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp,
       fuchsia_hardware_display::wire::VsyncAckCookie cookie)>;
 

@@ -705,10 +705,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                 let vsync_interval = MonotonicDuration::from_nanos(
                     1_000_000_000_000 / self.display.info.modes[0].refresh_rate_millihertz as i64,
                 );
-                self.handle_vsync_parameters_changed(
-                    MonotonicInstant::from_nanos(timestamp as i64),
-                    vsync_interval,
-                );
+                self.handle_vsync_parameters_changed(timestamp, vsync_interval);
                 if cookie.value != INVALID_DISP_ID {
                     self.display
                         .coordinator
