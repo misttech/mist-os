@@ -315,7 +315,6 @@ mod test {
             .query(PRODUCT_BUNDLE_INDEX_KEY)
             .level(Some(ConfigLevel::User))
             .set(path.to_str().unwrap().into())
-            .await
             .unwrap();
 
         env

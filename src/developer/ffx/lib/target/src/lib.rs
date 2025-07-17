@@ -609,7 +609,6 @@ mod test {
             .query(STATELESS_DEFAULT_TARGET_CONFIGURATION)
             .level(Some(ConfigLevel::User))
             .set(Value::Bool(false))
-            .await
             .unwrap();
     }
 
@@ -663,19 +662,16 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::String("stateful-user-default".to_owned()))
-            .await
             .unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Build))
             .set(Value::String("stateful-build-default".to_owned()))
-            .await
             .unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Global))
             .set(Value::String("stateful-global-default".to_owned()))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
@@ -697,19 +693,16 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::String("stateful-user-default".to_owned()))
-            .await
             .unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Build))
             .set(Value::String("stateful-build-default".to_owned()))
-            .await
             .unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Global))
             .set(Value::String("stateful-global-default".to_owned()))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
@@ -733,19 +726,16 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::String("stateful-user-default".to_owned()))
-            .await
             .unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Build))
             .set(Value::String("stateful-build-default".to_owned()))
-            .await
             .unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Global))
             .set(Value::String("stateful-global-default".to_owned()))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
@@ -780,7 +770,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::String("some_target".to_owned()))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
@@ -796,7 +785,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::String("some_target".to_owned()))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
@@ -812,7 +800,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::Array(ts))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
@@ -829,7 +816,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::Array(ts))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
@@ -846,7 +832,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(Value::Array(ts))
-            .await
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();

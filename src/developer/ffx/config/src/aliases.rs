@@ -129,7 +129,6 @@ mod test {
             .query("ffx.isolated")
             .level(Some(ConfigLevel::User))
             .set(Value::Bool(true))
-            .await
             .unwrap();
 
         assert!(is_usb_discovery_disabled(&env.context));
@@ -147,7 +146,6 @@ mod test {
             // Higher precedence
             .level(Some(ConfigLevel::User))
             .set(Value::Bool(true))
-            .await
             .unwrap();
 
         env.context
@@ -155,7 +153,6 @@ mod test {
             // Lower precedence
             .level(Some(ConfigLevel::Global))
             .set(Value::Bool(false))
-            .await
             .unwrap();
 
         // Isolation is respected, since it is set at a higher level
@@ -171,7 +168,6 @@ mod test {
             // Higher precedence
             .level(Some(ConfigLevel::Global))
             .set(Value::Bool(true))
-            .await
             .unwrap();
 
         env.context
@@ -179,7 +175,6 @@ mod test {
             // Lower precedence
             .level(Some(ConfigLevel::User))
             .set(Value::Bool(false))
-            .await
             .unwrap();
 
         // Isolation is overridden, since it is set at a lower level

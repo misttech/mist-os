@@ -236,7 +236,6 @@ mod tests {
             .query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(env.isolate_root.path().to_string_lossy().into())
-            .await
             .expect("setting test config");
         let tool = EmuShowTool {
             cmd: ShowCommand { device: true, ..Default::default() },

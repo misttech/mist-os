@@ -94,8 +94,7 @@ pub async fn exec_target_default_impl<W: std::io::Write + ToolIO>(
             context
                 .query(TARGET_DEFAULT_KEY)
                 .level(Some(ConfigLevel::User))
-                .set(serde_json::Value::String(args.nodename.clone()))
-                .await?
+                .set(serde_json::Value::String(args.nodename.clone()))?;
         }
 
         SubCommand::Unset(_) => {
@@ -222,7 +221,7 @@ fn unset_target_env_message(context: &EnvironmentContext, env_default: &str) -> 
 }
 
 async fn ensure_unset_at_level(context: &EnvironmentContext, level: ConfigLevel) -> Result<bool> {
-    match context.query(TARGET_DEFAULT_KEY).level(Some(level)).remove().await {
+    match context.query(TARGET_DEFAULT_KEY).level(Some(level)).remove() {
         Ok(()) => {
             // TODO(b/351861659): Re enable this if/when the exception process is finalized
             // eprintln!("Successfully unset the {} level default target.", level);
@@ -332,19 +331,16 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("distraction-target2".into())
-            .await
             .expect("default target setting");
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Build))
             .set("distraction-target3".into())
-            .await
             .expect("default target setting");
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Global))
             .set("distraction-target4".into())
-            .await
             .expect("default target setting");
 
         exec_target_default_impl(
@@ -379,19 +375,16 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("distraction-target2".into())
-            .await
             .expect("default target setting");
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Build))
             .set("distraction-target3".into())
-            .await
             .expect("default target setting");
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Global))
             .set("distraction-target4".into())
-            .await
             .expect("default target setting");
 
         exec_target_default_impl(
@@ -518,7 +511,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("distraction-target3".into())
-            .await
             .expect("default target setting");
 
         let result = exec_target_default_impl(
@@ -562,7 +554,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("distraction-target3".into())
-            .await
             .expect("default target setting");
 
         let result = exec_target_default_impl(
@@ -603,7 +594,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("foo-target".into())
-            .await
             .expect("default target setting");
 
         exec_target_default_impl(
@@ -686,7 +676,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("config-target".into())
-            .await
             .expect("default target setting");
 
         exec_target_default_impl(
@@ -891,7 +880,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("bar-unset-target".into())
-            .await
             .expect("default target setting");
 
         let result = exec_target_default_impl(
@@ -935,7 +923,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("foo-unset-target".into())
-            .await
             .expect("default target setting");
 
         let result = exec_target_default_impl(
@@ -986,7 +973,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("foo-unset-target".into())
-            .await
             .expect("default target setting");
 
         let result = exec_target_default_impl(
@@ -1037,19 +1023,16 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("foo-unset-user-target".into())
-            .await
             .expect("default target setting");
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Build))
             .set("foo-unset-build-target".into())
-            .await
             .expect("default target setting");
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::Global))
             .set("foo-unset-global-target".into())
-            .await
             .expect("default target setting");
 
         let result = exec_target_default_impl(

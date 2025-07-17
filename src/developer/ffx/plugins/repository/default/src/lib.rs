@@ -33,17 +33,13 @@ pub async fn exec_repository_default_impl<W: std::io::Write + ToolIO>(
             let res: String = ffx_config::get(CONFIG_KEY_DEFAULT).unwrap_or_else(|_| "".to_owned());
             writeln!(writer, "{}", res).map_err(|e| bug!(e))?;
         }
-        SubCommand::Set(set) => {
-            ffx_config::query(CONFIG_KEY_DEFAULT)
-                .level(Some(set.level))
-                .set(serde_json::Value::String(set.name.clone()))
-                .await?
-        }
+        SubCommand::Set(set) => ffx_config::query(CONFIG_KEY_DEFAULT)
+            .level(Some(set.level))
+            .set(serde_json::Value::String(set.name.clone()))?,
         SubCommand::Unset(unset) => {
             let _ = ffx_config::query(CONFIG_KEY_DEFAULT)
                 .level(Some(unset.level))
                 .remove()
-                .await
                 .map_err(|e| writeln!(writer.stderr(), "warning: {}", e));
         }
     };

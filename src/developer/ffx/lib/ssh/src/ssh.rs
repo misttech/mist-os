@@ -289,7 +289,6 @@ mod test {
             .query("ssh.auth-sock")
             .level(Some(ConfigLevel::User))
             .set(expect_path.clone().into())
-            .await
             .expect("setting auth sock config");
 
         let mut cmd = Command::new("env");

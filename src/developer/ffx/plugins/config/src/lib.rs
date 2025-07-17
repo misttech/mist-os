@@ -140,21 +140,21 @@ fn exec_get<W: Write>(ctx: &EnvironmentContext, get_cmd: &GetCommand, writer: W)
 
 async fn exec_set(ctx: &EnvironmentContext, set_cmd: &SetCommand) -> Result<()> {
     log::debug!("Set command running...");
-    set_cmd.query(ctx).set(set_cmd.value.clone()).await
+    set_cmd.query(ctx).set(set_cmd.value.clone())
 }
 
 async fn exec_remove(ctx: &EnvironmentContext, remove_cmd: &RemoveCommand) -> Result<()> {
     let entry = remove_cmd.query(ctx);
     // Check that there is a value before removing it.
     if let Ok(Some(_val)) = entry.get_raw::<Option<Value>>() {
-        entry.remove().await
+        entry.remove()
     } else {
         ffx_bail_with_code!(2, "Configuration key not found")
     }
 }
 
 async fn exec_add(ctx: &EnvironmentContext, add_cmd: &AddCommand) -> Result<()> {
-    add_cmd.query(ctx).add(Value::String(format!("{}", add_cmd.value))).await
+    add_cmd.query(ctx).add(Value::String(format!("{}", add_cmd.value)))
 }
 
 async fn exec_env_set<W: Write>(
@@ -298,7 +298,6 @@ mod test {
             .query("some-key")
             .level(Some(ConfigLevel::User))
             .set("a value".into())
-            .await
             .expect("setting value");
 
         let get_cmd = GetCommand {
@@ -320,7 +319,6 @@ mod test {
             .query("some-key")
             .level(Some(ConfigLevel::User))
             .set("a value".into())
-            .await
             .expect("setting value");
 
         let remove_cmd = RemoveCommand { name: "some-key".into() };
@@ -376,7 +374,6 @@ mod test {
                 private_path1.to_string_lossy(),
                 private_path2.to_string_lossy(),
             ]))
-            .await
             .expect("set ssh.priv");
 
         exec_get(
@@ -417,7 +414,6 @@ mod test {
                 private_path1.to_string_lossy(),
                 private_path2.to_string_lossy(),
             ]))
-            .await
             .expect("set ssh.priv");
 
         exec_get(
@@ -459,7 +455,6 @@ mod test {
             .query("ssh.priv")
             .level(Some(ConfigLevel::User))
             .set(json!(["$ENV_SSH_PATH_FOR_TESTING_", private_path2.to_string_lossy(),]))
-            .await
             .expect("set ssh.priv");
 
         exec_get(
@@ -491,7 +486,6 @@ mod test {
             .query("ssh.priv")
             .level(Some(ConfigLevel::User))
             .set(json!([private_path1.to_string_lossy(),]))
-            .await
             .expect("set ssh.priv");
 
         exec_get(
@@ -526,7 +520,6 @@ mod test {
                 private_path1.to_string_lossy(),
                 private_path2.to_string_lossy(),
             ]))
-            .await
             .expect("set ssh.priv");
 
         exec_get(
@@ -564,7 +557,6 @@ mod test {
             .query("ssh.priv")
             .level(Some(ConfigLevel::User))
             .set(json!(["$ENV_SSH_PATH_FOR_TESTING_2", private_path2.to_string_lossy(),]))
-            .await
             .expect("set ssh.priv");
 
         exec_get(
@@ -600,7 +592,6 @@ mod test {
                 auth_key_path2.to_string_lossy(),
                 "someother"
             ]))
-            .await
             .expect("set ssh.pub");
         test_env
             .context
@@ -611,7 +602,6 @@ mod test {
                 private_path1.to_string_lossy(),
                 "someother/place"
             ]))
-            .await
             .expect("set ssh.priv");
 
         let keys = SshKeyFiles {
@@ -677,7 +667,6 @@ mod test {
             .query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!(["$ENV_PATH_THAT_IS_NOT_SET", auth_key_path.to_string_lossy(), "someother"]))
-            .await
             .expect("set ssh.pub");
         test_env
             .context
@@ -688,7 +677,6 @@ mod test {
                 private_path.to_string_lossy(),
                 "someother/place"
             ]))
-            .await
             .expect("set ssh.priv");
 
         let keys = SshKeyFiles::load(Some(&test_env.context)).await.expect("new ssh keys");
@@ -734,7 +722,6 @@ mod test {
             .query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!(["$ENV_PATH_THAT_IS_NOT_SET", auth_key_path.to_string_lossy(), "someother"]))
-            .await
             .expect("set ssh.pub");
         test_env
             .context
@@ -745,7 +732,6 @@ mod test {
                 private_path.to_string_lossy(),
                 "someother/place"
             ]))
-            .await
             .expect("set ssh.priv");
 
         let keys = SshKeyFiles::load(Some(&test_env.context)).await.expect("new ssh keys");

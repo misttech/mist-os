@@ -750,7 +750,6 @@ mod tests {
             .query("sdk.root")
             .level(Some(ConfigLevel::User))
             .set(env.isolate_root.path().to_string_lossy().into())
-            .await
             .expect("sdk.root setting");
         let manifest_path = env.isolate_root.path().join("meta/manifest.json");
         fs::create_dir_all(manifest_path.parent().unwrap()).expect("temp sdk dir");
@@ -774,7 +773,6 @@ mod tests {
             .query("sdk.overrides.uefi_internal_x64")
             .level(Some(ConfigLevel::User))
             .set(ovmf_code.to_string_lossy().into())
-            .await
             .expect("ovmf override");
     }
 
@@ -1065,7 +1063,7 @@ mod tests {
         let env = ffx_config::test_init().await.unwrap();
         make_fake_sdk(&env).await;
 
-        env.context.query("emu.name").level(Some(ConfigLevel::User)).set("".into()).await?;
+        env.context.query("emu.name").level(Some(ConfigLevel::User)).set("".into())?;
 
         let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
 
@@ -1973,13 +1971,11 @@ mod tests {
             .query("emu.vbmeta.key")
             .level(Some(ConfigLevel::User))
             .set(tmpfile.clone().into())
-            .await
             .expect("emu.vbmeta.key setting");
         env.context
             .query("emu.vbmeta.metadata")
             .level(Some(ConfigLevel::User))
             .set(tmpfile.clone().into())
-            .await
             .expect("emu.vbmeta.metadata setting");
 
         let cmd = StartCommand {
@@ -2033,7 +2029,6 @@ mod tests {
             ..Default::default()
         })
         .set("/some/vbmeta/key".into())
-        .await
         .unwrap();
         ffx_config::query(ConfigQuery {
             name: Some("emu.vbmeta.metadata"),
@@ -2042,7 +2037,6 @@ mod tests {
             ..Default::default()
         })
         .set("/some/vbmeta/metadata".into())
-        .await
         .unwrap();
 
         let tmp = tempfile::NamedTempFile::new().unwrap();
@@ -2101,7 +2095,6 @@ mod tests {
             ..Default::default()
         })
         .set("/some/vbmeta/key".into())
-        .await
         .unwrap();
         ffx_config::query(ConfigQuery {
             name: Some("emu.vbmeta.metadata"),
@@ -2110,7 +2103,6 @@ mod tests {
             ..Default::default()
         })
         .set("/some/vbmeta/metadata".into())
-        .await
         .unwrap();
 
         let cmd = StartCommand {

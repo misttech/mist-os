@@ -653,7 +653,6 @@ mod tests {
             .query("product.path")
             .level(Some(ConfigLevel::User))
             .set(pb_path.to_string_lossy().into())
-            .await
             .expect("set pb path");
 
         let virtual_device = pb_path.join("manifest.json");

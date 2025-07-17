@@ -1111,7 +1111,6 @@ mod tests {
             .query("sdk.root")
             .level(Some(ConfigLevel::User))
             .set(env.isolate_root.path().to_string_lossy().into())
-            .await
             .expect("sdk.root setting");
         let manifest_path = env.isolate_root.path().join("meta/manifest.json");
         fs::create_dir_all(manifest_path.parent().unwrap()).expect("temp sdk dir");
@@ -1138,13 +1137,11 @@ mod tests {
             .query("sdk.overrides.qemu_internal")
             .level(Some(ConfigLevel::User))
             .set(fake_qemu.to_string_lossy().into())
-            .await
             .expect("qemu override");
         env.context
             .query("sdk.overrides.crosvm_internal")
             .level(Some(ConfigLevel::User))
             .set(fake_qemu.to_string_lossy().into())
-            .await
             .expect("crosvm override");
 
         let fake_aemu = env.isolate_root.path().join("fake_aemu");
@@ -1155,7 +1152,6 @@ mod tests {
             .query("sdk.overrides.aemu_internal")
             .level(Some(ConfigLevel::User))
             .set(fake_qemu.to_string_lossy().into())
-            .await
             .expect("aemu override");
 
         let fake_fvm = env.isolate_root.path().join("fake_fvm");
@@ -1166,7 +1162,6 @@ mod tests {
             .query("sdk.overrides.fvm")
             .level(Some(ConfigLevel::User))
             .set(fake_fvm.to_string_lossy().into())
-            .await
             .expect("fvm override");
 
         let fake_zbi = env.isolate_root.path().join("fake_zbi");
@@ -1177,7 +1172,6 @@ mod tests {
             .query("sdk.overrides.zbi")
             .level(Some(ConfigLevel::User))
             .set(fake_zbi.to_string_lossy().into())
-            .await
             .expect("zbi override");
     }
     // Note that the caller MUST initialize the ffx_config environment before calling this function
@@ -1221,8 +1215,7 @@ mod tests {
 
         env.query(config::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
-            .set(json!(root.display().to_string()))
-            .await?;
+            .set(json!(root.display().to_string()))?;
 
         guest.kernel_image = Some(kernel_path);
         guest.zbi_image = Some(zbi_path);
@@ -1232,12 +1225,10 @@ mod tests {
         // Set the paths to use for the SSH keys
         env.query("ssh.pub")
             .level(Some(ConfigLevel::User))
-            .set(json!([root.join("test_authorized_keys")]))
-            .await?;
+            .set(json!([root.join("test_authorized_keys")]))?;
         env.query("ssh.priv")
             .level(Some(ConfigLevel::User))
-            .set(json!([root.join("test_ed25519_key")]))
-            .await?;
+            .set(json!([root.join("test_ed25519_key")]))?;
 
         Ok(PathBuf::from(root))
     }

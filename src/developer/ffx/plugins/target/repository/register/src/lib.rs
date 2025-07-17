@@ -397,8 +397,7 @@ mod test {
         context
             .query("repository.process_dir")
             .level(Some(ConfigLevel::User))
-            .set(instance_root.to_string_lossy().into())
-            .await?;
+            .set(instance_root.to_string_lossy().into())?;
 
         let mgr = PkgServerInstances::new(instance_root);
         let repo_config = RepositoryConfigBuilder::new(
@@ -444,7 +443,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
 
         let tool = RegisterTool {
@@ -514,14 +512,12 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
 
         env.context
             .query("repository.default")
             .level(Some(ConfigLevel::User))
             .set("test-repo".into())
-            .await
             .expect("set default repo name");
 
         let tool = RegisterTool {
@@ -557,7 +553,6 @@ mod test {
             .query("repository.default")
             .level(Some(ConfigLevel::User))
             .set(default_repo_name.into())
-            .await
             .unwrap();
 
         make_server_instance(
@@ -608,7 +603,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
 
         make_server_instance(
@@ -653,7 +647,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
 
         make_server_instance(
@@ -693,7 +686,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
         make_server_instance(
             env.isolate_root.path(),
@@ -738,7 +730,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
 
         make_server_instance(
@@ -809,7 +800,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
 
         let tool = RegisterTool {
@@ -849,7 +839,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
         make_server_instance(
             env.isolate_root.path(),
@@ -893,7 +882,6 @@ mod test {
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set(TARGET_NAME.into())
-            .await
             .expect("set default target");
 
         make_server_instance(

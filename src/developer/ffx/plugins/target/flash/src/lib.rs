@@ -702,7 +702,6 @@ mod test {
             .query("product.path")
             .level(Some(ffx_config::ConfigLevel::User))
             .set("foo".into())
-            .await
             .expect("creating temp product.path");
         let buffers = TestBuffers::default();
         let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);

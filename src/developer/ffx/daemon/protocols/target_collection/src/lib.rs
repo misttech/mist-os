@@ -984,7 +984,6 @@ mod tests {
         query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(json!(temp_dir.display().to_string()))
-            .await
             .unwrap();
     }
 
@@ -999,7 +998,6 @@ mod tests {
             .query("discovery.mdns.autoconnect")
             .level(Some(ConfigLevel::User))
             .set(json!(false))
-            .await
             .unwrap();
 
         const NAME: &'static str = "foo";

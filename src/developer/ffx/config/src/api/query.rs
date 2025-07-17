@@ -259,7 +259,7 @@ impl<'a> ConfigQuery<'a> {
     }
 
     /// Set the queried location to the given Value.
-    pub async fn set(&self, value: Value) -> Result<()> {
+    pub fn set(&self, value: Value) -> Result<()> {
         log::debug!("Setting config value");
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env()?;
@@ -278,7 +278,7 @@ impl<'a> ConfigQuery<'a> {
     }
 
     /// Remove the value at the queried location.
-    pub async fn remove(&self) -> Result<()> {
+    pub fn remove(&self) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
         let env = self.get_env()?;
         let config = env.config_from_cache()?;
@@ -289,7 +289,7 @@ impl<'a> ConfigQuery<'a> {
 
     /// Add this value at the queried location as an array item, converting the location to an array
     /// if necessary.
-    pub async fn add(&self, value: Value) -> Result<()> {
+    pub fn add(&self, value: Value) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env()?;
         env.populate_defaults(&level)?;

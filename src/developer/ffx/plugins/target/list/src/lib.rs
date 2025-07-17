@@ -624,8 +624,7 @@ mod test {
         env.context
             .query("ffx.target-list.local-connect")
             .level(Some(ffx_config::ConfigLevel::User))
-            .set(true.into())
-            .await?;
+            .set(true.into())?;
         assert_eq!(true, do_connect_to_target(&env.context, &ListCommand::default()).await);
 
         Ok(())

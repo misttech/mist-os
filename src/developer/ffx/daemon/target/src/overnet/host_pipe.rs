@@ -914,7 +914,6 @@ mod test {
             .query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!([env.isolate_root.path().join("test_authorized_keys")]))
-            .await
             .expect("setting ssh pub key");
 
         let ssh_priv = env.isolate_root.path().join("test_ed25519_key");
@@ -923,7 +922,6 @@ mod test {
             .query("ssh.priv")
             .level(Some(ConfigLevel::User))
             .set(json!([ssh_priv.to_string_lossy()]))
-            .await
             .expect("setting ssh priv key");
     }
 
@@ -994,7 +992,6 @@ mod test {
             .query(ffx_ssh::ssh::KEEPALIVE_TIMEOUT_CONFIG)
             .level(Some(ConfigLevel::User))
             .set(json!(30))
-            .await
             .expect("setting keepalive timeout key");
 
         let addr = SocketAddr::new(Ipv4Addr::new(192, 0, 2, 0).into(), 2345);

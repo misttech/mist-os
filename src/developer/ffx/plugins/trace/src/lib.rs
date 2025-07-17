@@ -1572,7 +1572,6 @@ Current tracing status:
             .query("log.dir")
             .level(Some(ffx_config::ConfigLevel::User))
             .set(log_dir.into())
-            .await
             .unwrap();
 
         struct Test {

@@ -288,7 +288,6 @@ mod test {
             .query(CONFIG_BASE_URLS)
             .level(Some(ConfigLevel::User))
             .set(serde_json::json!([]))
-            .await
             .unwrap();
 
         env

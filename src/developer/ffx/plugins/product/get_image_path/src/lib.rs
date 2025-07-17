@@ -546,7 +546,6 @@ mod tests {
             .query("product.path")
             .level(Some(ConfigLevel::User))
             .set(pb_path.to_string_lossy().into())
-            .await
             .expect("setting default path");
 
         let pb = ProductBundle::V2(ProductBundleV2 {

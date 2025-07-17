@@ -509,7 +509,6 @@ mod test {
             .query("repository.process_dir")
             .level(Some(ConfigLevel::User))
             .set(repo_process_dir.to_string_lossy().into())
-            .await
             .unwrap();
 
         // Create a test repo

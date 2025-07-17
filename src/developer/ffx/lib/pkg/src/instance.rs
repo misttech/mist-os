@@ -369,7 +369,6 @@ mod tests {
             .query("repository.process_dir")
             .level(Some(ConfigLevel::User))
             .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
             .expect("setting isolated process dir");
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         let instance_name = "some-instance";
@@ -410,7 +409,6 @@ mod tests {
             .query("repository.process_dir")
             .level(Some(ConfigLevel::User))
             .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
             .expect("setting isolated process dir");
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         let repo_config =

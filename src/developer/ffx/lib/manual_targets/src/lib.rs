@@ -64,7 +64,7 @@ impl ManualTargets for Config {
     }
 
     async fn storage_set(&self, targets: Value) -> Result<()> {
-        ffx_config::query(MANUAL_TARGETS).level(Some(ConfigLevel::User)).set(targets.into()).await
+        ffx_config::query(MANUAL_TARGETS).level(Some(ConfigLevel::User)).set(targets.into())
     }
 }
 
@@ -122,7 +122,6 @@ mod test {
             ffx_config::query(MANUAL_TARGETS)
                 .level(Some(ConfigLevel::User))
                 .set(json!({"127.0.0.1:8022": 0, "127.0.0.1:8023": 12345}))
-                .await
                 .unwrap();
 
             let mt = Config::default();
@@ -155,7 +154,6 @@ mod test {
             ffx_config::query(MANUAL_TARGETS)
                 .level(Some(ConfigLevel::User))
                 .set(json!({"127.0.0.1:8022": 0, "127.0.0.1:8023": 0}))
-                .await
                 .unwrap();
 
             let mt = Config::default();

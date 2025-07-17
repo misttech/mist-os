@@ -105,8 +105,7 @@ async fn exec_set(context: EnvironmentContext, cmd: &SetCommand) -> Result<()> {
             context
                 .query("sdk.root")
                 .level(Some(ConfigLevel::User))
-                .set(abs_path.to_string_lossy().into())
-                .await?;
+                .set(abs_path.to_string_lossy().into())?;
             Ok(())
         }
     }
