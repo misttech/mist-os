@@ -738,8 +738,12 @@ zx_status_t SdmmcDevice::MmcSelectCard(bool select) {
   req.cmd_idx = MMC_SELECT_CARD;
   req.arg = select ? RcaArg() : 0;
   req.cmd_flags = MMC_SELECT_CARD_FLAGS;
+  // Some cards don't respond to DESELECT_CARD. Wait for a response in case one is sent, but ignore
+  // any errors.
+  req.suppress_error_messages = !select;
   uint32_t unused_response[4];
-  return Request(req, unused_response);
+  zx_status_t status = Request(req, unused_response);
+  return select ? status : ZX_OK;
 }
 
 zx_status_t SdmmcDevice::MmcSwitch(uint8_t index, uint8_t value) {
