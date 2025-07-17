@@ -284,6 +284,7 @@ std::optional<MemoryMapping> parse_mapping_entry(std::string_view line) {
       start, end, std::string(parts[1]), offset, std::string(parts[3]), inode, pathname,
   };
 }
+}  // namespace
 
 std::optional<size_t> parse_field_in_kb(std::string_view value) {
   const std::string_view suffix = " kB";
@@ -298,7 +299,6 @@ std::optional<size_t> parse_field_in_kb(std::string_view value) {
   }
   return result;
 }
-}  // namespace
 
 std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,
                                                  std::string_view maps) {

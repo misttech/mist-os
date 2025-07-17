@@ -104,9 +104,9 @@
                 // TODO(https://fxbug.dev/333132302)
                 "Madvise.MadvRemoveZeroesMemory",
 
-                // TODO(https://fxbug.dev/419882465): Need a more granular API to report Rss values
-                // correctly in smaps
+                // TODO(https://fxbug.dev/419882465): Need a more granular API to report these values correctly
                 "MMapProcTest.SmapsRssSplitMappingsStrict",
+                "MlockProcTest.MlockOnePageIncreasesVmLck",
             ],
         },
         {

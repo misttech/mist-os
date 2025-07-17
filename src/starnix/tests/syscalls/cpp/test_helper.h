@@ -400,6 +400,8 @@ class ScopedMount {
   bool is_mounted_ = false;
 };
 
+std::optional<size_t> parse_field_in_kb(std::string_view value);
+
 // Returns the first memory mapping that matches the given predicate.
 std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,
                                                  std::string_view maps);
