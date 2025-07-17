@@ -7,8 +7,10 @@ use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
 use fuchsia_async::OnSignals;
 use fuchsia_trace as ftrace;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::{mpsc, oneshot};
 use futures::executor::block_on;
+use futures::future::Either;
 use futures::{select, FutureExt, StreamExt};
 use log::warn;
 use selectors::FastError;
@@ -31,11 +33,13 @@ pub async fn launch_serial(
     logs_repo: Arc<LogsRepository>,
     sink: impl Write + Send + 'static,
     mut freeze_receiver: mpsc::UnboundedReceiver<oneshot::Sender<zx::EventPair>>,
+    flush_receiver: UnboundedReceiver<UnboundedSender<()>>,
 ) {
     let writer = SerialWriter::new(sink, deny_serial_log_tags.into_iter().collect());
     let mut barrier = writer.get_barrier();
-    let mut write_logs_to_serial =
-        pin!(SerialConfig::new(allow_serial_log_tags).write_logs(logs_repo, writer).fuse());
+    let mut write_logs_to_serial = pin!(SerialConfig::new(allow_serial_log_tags)
+        .write_logs(logs_repo, writer, flush_receiver)
+        .fuse());
     loop {
         select! {
             _ = write_logs_to_serial => break,
@@ -85,14 +89,57 @@ impl SerialConfig {
     /// Returns a future that resolves when there's no more logs to write to serial. This can only
     /// happen when all log sink connections have been closed for the components that were
     /// configured to emit logs.
-    async fn write_logs(self, repo: Arc<LogsRepository>, mut writer: SerialWriter) {
-        let mut log_stream = repo.logs_cursor(
-            StreamMode::SnapshotThenSubscribe,
-            Some(self.selectors),
-            ftrace::Id::random(),
-        );
-        while let Some(log) = log_stream.next().await {
-            writer.log(&log).await;
+    async fn write_logs(
+        self,
+        repo: Arc<LogsRepository>,
+        mut writer: SerialWriter,
+        mut flush_receiver: UnboundedReceiver<UnboundedSender<()>>,
+    ) {
+        let mut log_stream = repo
+            .logs_cursor(
+                StreamMode::SnapshotThenSubscribe,
+                Some(self.selectors),
+                ftrace::Id::random(),
+            )
+            .fuse();
+        loop {
+            match select! {
+                log = log_stream.next() => Either::Left(log),
+                flush_request = flush_receiver.next() => Either::Right(flush_request),
+            } {
+                // We've received a log
+                Either::Left(Some(log)) => {
+                    writer.log(&log).await;
+                }
+                // We've hit the end of the log stream and Archivist
+                // is shutting down.
+                Either::Left(None) => {
+                    break;
+                }
+                // We've received a flush request
+                Either::Right(Some(flush_request)) => {
+                    // We have a background thread that polls sockets.
+                    // Ensure the background thread is polled first before
+                    // we write the remaining logs to serial to ensure
+                    // we capture all logs.
+                    repo.flush().await;
+
+                    // Write all pending logs to serial
+                    while let Some(Some(log)) = log_stream.next().now_or_never() {
+                        writer.log(&log).await;
+                    }
+                    // Flush the serial thread (ensuring everything goes to serial)
+                    writer.get_barrier().wait().await;
+
+                    // Reply to the flush request and continue normal logging operations.
+                    // Ignore the error, because the channel may have been closed which is OK.
+                    let _ = flush_request.unbounded_send(());
+                }
+                // The flush server has exited, and Archivist is shutting down.
+                Either::Right(None) => {
+                    break;
+                }
+            }
         }
         // Ensure logs are flushed before we finish.
         writer.get_barrier().wait().await;
@@ -330,6 +377,8 @@ mod tests {
     use crate::identity::ComponentIdentity;
     use crate::logs::testing::make_message;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_logger::LogSinkMarker;
     use fuchsia_async::TimeoutExt;
     use futures::FutureExt;
     use moniker::ExtendedMoniker;
@@ -503,6 +552,8 @@ mod tests {
             zx::BootInstant::from_nanos(1),
         ));
 
+        let (_flush_sender, flush_receiver) = unbounded();
+
         core_baz_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(2)));
         let (sink, mut rcv) = TestSink::new();
         let cloned_repo = Arc::clone(&repo);
@@ -510,7 +561,7 @@ mod tests {
         let _serial_task = fasync::Task::spawn(async move {
             let allowed = vec!["bootstrap/**".into(), "/core/foo".into()];
             let denied = vec!["foo".into()];
-            launch_serial(allowed, denied, cloned_repo, sink, receiver).await;
+            launch_serial(allowed, denied, cloned_repo, sink, receiver, flush_receiver).await;
         });
         bootstrap_bar_container.ingest_message(make_message(
             "b",
@@ -570,7 +621,12 @@ mod tests {
         let (sink, rcv) = TestSink::new();
 
         let writer = SerialWriter::new(sink, HashSet::from_iter(["foo".to_string()]));
-        let _serial_task = fasync::Task::spawn(serial_config.write_logs(Arc::clone(&repo), writer));
+        let (_flush_sender, flush_receiver) = unbounded();
+        let _serial_task = fasync::Task::spawn(serial_config.write_logs(
+            Arc::clone(&repo),
+            writer,
+            flush_receiver,
+        ));
         bootstrap_bar_container.ingest_message(make_message(
             "b",
             Some("foo"),
@@ -589,5 +645,65 @@ mod tests {
                 "[00000.000] 00001:00002> [foo] DEBUG: c\n"
             ]
         );
+    }
+
+    #[fuchsia::test]
+    async fn flush_drains_all_logs() {
+        for _ in 0..500 {
+            let scope = fasync::Scope::new();
+            let repo = LogsRepository::for_test(scope.new_child());
+            let identity = Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("./bootstrap/foo").unwrap(),
+                "fuchsia-pkg://bootstrap-foo",
+            ));
+
+            let (log_sink, server_end) = create_proxy::<LogSinkMarker>();
+            let log_container = repo.get_log_container(identity);
+            log_container.handle_log_sink(server_end.into_stream(), scope.as_handle().clone());
+            let (client_socket, server_socket) = zx::Socket::create_datagram();
+            log_sink.connect_structured(server_socket).unwrap();
+
+            let (sink, mut rcv) = TestSink::new();
+            let cloned_repo = Arc::clone(&repo);
+            let (_freeze_sender, freeze_receiver) = unbounded();
+            let (flush_sender, flush_receiver) = unbounded();
+            scope.spawn(async move {
+                let allowed = vec!["bootstrap/**".into()];
+                let denied = vec![];
+                launch_serial(allowed, denied, cloned_repo, sink, freeze_receiver, flush_receiver)
+                    .await;
+            });
+
+            let mut buffer = [0u8; 1024];
+            let cursor = std::io::Cursor::new(&mut buffer[..]);
+            let mut encoder = diagnostics_log_encoding::encode::Encoder::new(
+                cursor,
+                diagnostics_log_encoding::encode::EncoderOpts::default(),
+            );
+            // Wait for initial interest to ensure that the socket is registered.
+            log_sink.wait_for_interest_change().await.unwrap().unwrap();
+
+            encoder
+                .write_record(diagnostics_log_encoding::Record {
+                    timestamp: zx::BootInstant::from_nanos(1),
+                    severity: Severity::Info as u8,
+                    arguments: vec![
+                        diagnostics_log_encoding::Argument::new("tag", "foo"),
+                        diagnostics_log_encoding::Argument::new("message", "a"),
+                    ],
+                })
+                .unwrap();
+            client_socket
+                .write(&encoder.inner().get_ref()[..encoder.inner().position() as usize])
+                .unwrap();
+            let (sender, mut receiver) = unbounded();
+            // Send the log flush command
+            flush_sender.unbounded_send(sender).unwrap();
+            // Wait for flush to complete. Flush involves a background thread,
+            // so keep polling until the background thread handles the flush event.
+            assert_eq!(receiver.next().await, Some(()));
+            let received = rcv.next().now_or_never().unwrap().unwrap();
+            assert_eq!(received, "[00000.000] 00000:00000> [foo] INFO: a\n");
+        }
     }
 }

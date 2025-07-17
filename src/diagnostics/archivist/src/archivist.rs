@@ -22,6 +22,7 @@ use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
+use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
 use log::{debug, error, info, warn};
 use moniker::ExtendedMoniker;
@@ -111,6 +112,7 @@ impl Archivist {
             general_scope.new_child_with_name("logs_repository"),
         );
         let (freeze_server, freeze_receiver) = LogFreezeServer::new();
+        let (flush_sender, flush_receiver) = unbounded();
         if !config.allow_serial_logs.is_empty() {
             let logs_repo_clone = Arc::clone(&logs_repo);
             general_scope.spawn(async move {
@@ -120,6 +122,7 @@ impl Archivist {
                     logs_repo_clone,
                     SerialSink,
                     freeze_receiver,
+                    flush_receiver,
                 )
                 .await;
             });
@@ -143,8 +146,10 @@ impl Archivist {
             servers_scope.new_child_with_name("ArchiveAccessor"),
         ));
 
-        let flush_server =
-            Arc::new(LogFlushServer::new(servers_scope.new_child_with_name("LogFlush")));
+        let flush_server = Arc::new(LogFlushServer::new(
+            servers_scope.new_child_with_name("LogFlush"),
+            flush_sender,
+        ));
 
         let log_server = Arc::new(LogServer::new(
             Arc::clone(&logs_repo),

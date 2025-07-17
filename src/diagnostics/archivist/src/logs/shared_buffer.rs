@@ -12,7 +12,8 @@ use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_async as fasync;
 use fuchsia_async::condition::{Condition, WakerEntry};
 use fuchsia_sync::Mutex;
-use futures::Stream;
+use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::{Stream, StreamExt};
 use log::debug;
 use pin_project::{pin_project, pinned_drop};
 use std::ops::{Deref, DerefMut, Range};
@@ -42,6 +43,9 @@ pub struct SharedBuffer {
 
     // The thread that we use to service the sockets.
     socket_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    /// Some if the thread should flush instead of terminate when receiving
+    /// the terminate messages
+    should_flush: Mutex<Option<UnboundedSender<()>>>,
 }
 
 // We have to do this to avoid "cannot borrow as mutable because it is also borrowed as immutable"
@@ -92,6 +96,7 @@ impl SharedBuffer {
             port: zx::Port::create(),
             event: zx::Event::create(),
             socket_thread: Mutex::default(),
+            should_flush: Mutex::new(None),
         });
         *this.socket_thread.lock() = Some({
             let this = Arc::clone(&this);
@@ -110,6 +115,14 @@ impl SharedBuffer {
             shared_buffer: Arc::clone(self),
             container_id: self.inner.lock().containers.new_container(identity, stats),
         }
+    }
+
+    pub async fn flush(&self) {
+        let (sender, mut receiver) = unbounded();
+        *self.should_flush.lock() = Some(sender);
+        self.event.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
+        // Ignore failure if Archivist is shutting down.
+        let _ = receiver.next().await;
     }
 
     /// Returns the number of registered containers in use by the buffer.
@@ -144,9 +157,14 @@ impl SharedBuffer {
 
         let mut terminate = false;
         let mut finished = false;
+        let mut maybe_flush: Option<UnboundedSender<()>> = None;
         let mut on_inactive = OnInactiveNotifier::new(self);
 
         while !finished {
+            if let Some(sender) = maybe_flush.take() {
+                // Ignore error. FIDL client may have disconnected.
+                let _ = sender.unbounded_send(());
+            }
             let mut deadline = if terminate {
                 // Run through the sockets one last time.
                 finished = true;
@@ -168,7 +186,8 @@ impl SharedBuffer {
                 match self.port.wait(deadline) {
                     Ok(packet) => {
                         if packet.key() == TERMINATE_KEY {
-                            terminate = true;
+                            maybe_flush = self.should_flush.lock().take();
+                            terminate = maybe_flush.is_none();
                         } else {
                             sockets_ready.push(SocketId(packet.key() as u32))
                         }

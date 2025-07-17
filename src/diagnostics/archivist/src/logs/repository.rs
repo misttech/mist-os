@@ -129,6 +129,10 @@ impl LogsRepository {
         })
     }
 
+    pub async fn flush(&self) {
+        self.shared_buffer.flush().await;
+    }
+
     /// Drain the kernel's debug log. The returned future completes once
     /// existing messages have been ingested.
     pub fn drain_debuglog<K>(self: &Arc<Self>, klog_reader: K)
