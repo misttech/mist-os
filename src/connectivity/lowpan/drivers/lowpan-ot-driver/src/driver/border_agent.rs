@@ -11,6 +11,7 @@ use futures::channel::mpsc;
 use futures::future::Fuse;
 use futures::select;
 use openthread::ot::BorderAgentEphemeralKeyState;
+use rand;
 use std::pin::pin;
 
 const BORDER_AGENT_SERVICE_TYPE: &str = "_meshcop._udp.";
@@ -18,6 +19,9 @@ const BORDER_AGENT_EPSKC_SERVICE_TYPE: &str = "_meshcop-e._udp.";
 
 // Port 9 is the old-school discard port.
 const BORDER_AGENT_SERVICE_PLACEHOLDER_PORT: u16 = 9;
+
+// Number of times to attempt to publish services.
+const MAX_PUBLISH_SERVICE_ATTEMPTS: usize = 2;
 
 // These flags are ultimately defined by table 8-5 of the Thread v1.1.1 specification.
 // Additional flags originate from the source code found [here][1].
@@ -119,6 +123,12 @@ where
     txt
 }
 
+enum PublishServiceFailure {
+    PublishInstanceRequestFailure,
+    PublishInstanceFailure,
+    ResponderFailure,
+}
+
 async fn publish_service(
     tag: &str,
     service_type: &str,
@@ -126,7 +136,7 @@ async fn publish_service(
     txt: Option<Vec<(String, Vec<u8>)>>,
     port: u16,
     publisher: ServiceInstancePublisherProxy,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), PublishServiceFailure> {
     let (client, server) = create_endpoints::<ServiceInstancePublicationResponder_Marker>();
     let publish_init_future = publisher
         .publish_service_instance(
@@ -135,11 +145,17 @@ async fn publish_service(
             &ServiceInstancePublicationOptions::default(),
             client,
         )
-        .map(|x| -> Result<(), anyhow::Error> {
+        .map(|x| -> Result<(), PublishServiceFailure> {
             match x {
-                Ok(Ok(x)) => Ok(x),
-                Ok(Err(err)) => Err(anyhow::format_err!("{:?}", err)),
-                Err(zx_err) => Err(zx_err.into()),
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(err)) => {
+                    error!(tag = tag; "publish_init_future failed: {:?}", err);
+                    Err(PublishServiceFailure::PublishInstanceFailure)
+                }
+                Err(zx_err) => {
+                    error!(tag = tag; "publish_init_future failed: {:?}", zx_err);
+                    Err(PublishServiceFailure::PublishInstanceRequestFailure)
+                }
             }
         });
 
@@ -202,17 +218,10 @@ async fn publish_service(
     );
 
     futures::try_join!(
-        publish_init_future.inspect_err(|err| {
-            error!(
-                tag = tag;
-                "publish_init_future failed: {:?}", err
-            );
-        }),
-        publish_responder_future.inspect_err(|err| {
-            error!(
-                tag = tag;
-                "publish_responder_future failed: {:?}", err
-            );
+        publish_init_future,
+        publish_responder_future.map_err(|err| {
+            error!(tag = tag; "publish_responder_future failed: {:?}", err);
+            PublishServiceFailure::ResponderFailure
         }),
     )?;
 
@@ -225,15 +234,36 @@ async fn publish_border_agent_service(
     port: u16,
     publisher: ServiceInstancePublisherProxy,
 ) -> Result<(), anyhow::Error> {
-    publish_service(
-        "meshcop",
-        BORDER_AGENT_SERVICE_TYPE,
-        service_instance.as_str(),
-        Some(txt),
-        port,
-        publisher,
-    )
-    .await
+    let tag = "meshcop";
+
+    for i in 0..MAX_PUBLISH_SERVICE_ATTEMPTS {
+        let service_name = match i {
+            0 => service_instance.clone(),
+            _ => get_alternate_service_instance_name(service_instance.as_str()),
+        };
+
+        match publish_service(
+            tag,
+            BORDER_AGENT_SERVICE_TYPE,
+            service_name.as_str(),
+            Some(txt.clone()),
+            port,
+            publisher.clone(),
+        )
+        .await
+        {
+            Ok(()) => return Ok(()),
+            Err(PublishServiceFailure::PublishInstanceRequestFailure) => {
+                return Err(anyhow::format_err!("Failed to publish border agent service."))
+            }
+            Err(PublishServiceFailure::PublishInstanceFailure)
+            | Err(PublishServiceFailure::ResponderFailure) => {
+                warn!(tag; "Publish attempt failed.",);
+            }
+        }
+    }
+
+    Err(anyhow::format_err!("Exhausted service publication retry attempts."))
 }
 
 pub(crate) enum PublishServiceRequest {
@@ -246,15 +276,36 @@ async fn publish_epskc_service(
     port: u16,
     publisher: ServiceInstancePublisherProxy,
 ) -> Result<(), anyhow::Error> {
-    publish_service(
-        "meshcop-e",
-        BORDER_AGENT_EPSKC_SERVICE_TYPE,
-        service_instance.as_str(),
-        None,
-        port,
-        publisher,
-    )
-    .await
+    let tag = "meshcop-e";
+
+    for i in 0..MAX_PUBLISH_SERVICE_ATTEMPTS {
+        let service_name = match i {
+            0 => service_instance.clone(),
+            _ => get_alternate_service_instance_name(service_instance.as_str()),
+        };
+
+        match publish_service(
+            tag,
+            BORDER_AGENT_EPSKC_SERVICE_TYPE,
+            service_name.as_str(),
+            None,
+            port,
+            publisher.clone(),
+        )
+        .await
+        {
+            Ok(()) => return Ok(()),
+            Err(PublishServiceFailure::PublishInstanceRequestFailure) => {
+                return Err(anyhow::format_err!("Failed to publish ePSKc service."))
+            }
+            Err(PublishServiceFailure::PublishInstanceFailure)
+            | Err(PublishServiceFailure::ResponderFailure) => {
+                warn!(tag; "Publish attempt failed.",);
+            }
+        }
+    }
+
+    Err(anyhow::format_err!("Exhausted service publication retry attempts."))
 }
 
 pub(crate) async fn manage_epskc_service_publisher(
@@ -297,6 +348,11 @@ pub(crate) async fn manage_epskc_service_publisher(
 // Functional equivalent to ot-br-posix's BorderAgent::GetServiceInstanceNameWithExtAddr.
 fn get_service_instance_name_with_ext_addr(vendor: &str, product: &str, ext_addr: &[u8]) -> String {
     format!("{} {} #{:0X}{:0X}", vendor, product, ext_addr[6], ext_addr[7])
+}
+
+fn get_alternate_service_instance_name(base_instance_name: &str) -> String {
+    let rand_u16 = rand::random::<u16>();
+    format!("{} ({})", base_instance_name, rand_u16)
 }
 
 impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
@@ -443,10 +499,10 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, Proxy};
-    use fidl_fuchsia_net_mdns as fidl_mdns;
     use fuchsia_async::TestExecutor;
     use lazy_static::lazy_static;
     use std::task::Poll;
+    use {fidl_fuchsia_net_mdns as fidl_mdns, regex};
 
     const TEST_PORT: u16 = 1234;
     const TEST_SERVICE: &str = "test test test";
@@ -490,23 +546,34 @@ mod tests {
         );
         let mut fut = pin!(fut);
 
-        // Progress the future and expect it to stall while attempting to interact with MDNS.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        for i in 0..MAX_PUBLISH_SERVICE_ATTEMPTS {
+            // Progress the future and expect it to stall while attempting to interact with MDNS.
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // There should now be a request from the publisher.
-        assert_matches!(
-            exec.run_until_stalled(&mut test_vals.publisher_stream.next()),
-            Poll::Ready(Some(Ok(fidl_mdns::ServiceInstancePublisherRequest::PublishServiceInstance {
-                service, instance, options, publication_responder: _, responder,
-            }))) => {
-                assert_eq!(service, BORDER_AGENT_SERVICE_TYPE);
-                assert_eq!(instance, TEST_SERVICE);
-                assert_eq!(options, ServiceInstancePublicationOptions::default());
-                responder
-                    .send(Err(fidl_mdns::PublishServiceInstanceError::AlreadyPublishedLocally))
-                    .expect("Failed to send publish response");
-            }
-        );
+            // There should now be a request from the publisher.
+            assert_matches!(
+                exec.run_until_stalled(&mut test_vals.publisher_stream.next()),
+                Poll::Ready(Some(Ok(fidl_mdns::ServiceInstancePublisherRequest::PublishServiceInstance {
+                    service, instance, options, publication_responder: _, responder,
+                }))) => {
+                        match i {
+
+                            0 => assert_eq!(instance, TEST_SERVICE),
+                            _ => {
+                                let re = regex::Regex::new(
+                                    (TEST_SERVICE.to_owned() + " \\([0-9]+\\)").as_str()
+                                ).unwrap();
+                                assert!(re.is_match(&instance))
+                            }
+                        }
+                    assert_eq!(service, BORDER_AGENT_SERVICE_TYPE);
+                    assert_eq!(options, ServiceInstancePublicationOptions::default());
+                    responder
+                        .send(Err(fidl_mdns::PublishServiceInstanceError::AlreadyPublishedLocally))
+                        .expect("Failed to send publish response");
+                }
+            );
+        }
 
         // The future should complete with an error.
         assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
@@ -520,23 +587,33 @@ mod tests {
         let fut = publish_epskc_service(String::from(TEST_SERVICE), TEST_PORT, test_vals.publisher);
         let mut fut = pin!(fut);
 
-        // Progress the future and expect it to stall while attempting to interact with MDNS.
-        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        for i in 0..MAX_PUBLISH_SERVICE_ATTEMPTS {
+            // Progress the future and expect it to stall while attempting to interact with MDNS.
+            assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // There should now be a request from the publisher.
-        assert_matches!(
-            exec.run_until_stalled(&mut test_vals.publisher_stream.next()),
-            Poll::Ready(Some(Ok(fidl_mdns::ServiceInstancePublisherRequest::PublishServiceInstance {
-                service, instance, options, publication_responder: _, responder,
-            }))) => {
-                assert_eq!(service, BORDER_AGENT_EPSKC_SERVICE_TYPE);
-                assert_eq!(instance, TEST_SERVICE);
-                assert_eq!(options, ServiceInstancePublicationOptions::default());
-                responder
-                    .send(Err(fidl_mdns::PublishServiceInstanceError::AlreadyPublishedLocally))
-                    .expect("Failed to send publish response");
-            }
-        );
+            // There should now be a request from the publisher.
+            assert_matches!(
+                exec.run_until_stalled(&mut test_vals.publisher_stream.next()),
+                Poll::Ready(Some(Ok(fidl_mdns::ServiceInstancePublisherRequest::PublishServiceInstance {
+                    service, instance, options, publication_responder: _, responder,
+                }))) => {
+                        match i {
+                            0 => assert_eq!(instance, TEST_SERVICE),
+                            _ => {
+                                let re = regex::Regex::new(
+                                    (TEST_SERVICE.to_owned() + " \\([0-9]+\\)").as_str()
+                                ).unwrap();
+                                assert!(re.is_match(&instance))
+                            }
+                        }
+                    assert_eq!(service, BORDER_AGENT_EPSKC_SERVICE_TYPE);
+                    assert_eq!(options, ServiceInstancePublicationOptions::default());
+                    responder
+                        .send(Err(fidl_mdns::PublishServiceInstanceError::AlreadyPublishedLocally))
+                        .expect("Failed to send publish response");
+                }
+            );
+        }
 
         // The future should complete with an error.
         assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
