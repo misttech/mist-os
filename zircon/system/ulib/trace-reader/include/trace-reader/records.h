@@ -19,7 +19,6 @@
 #include <variant>
 #include <vector>
 
-#include <fbl/array.h>
 #include <fbl/macros.h>
 #include <fbl/string.h>
 
