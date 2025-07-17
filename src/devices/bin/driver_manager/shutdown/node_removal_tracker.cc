@@ -37,6 +37,10 @@ const char* GetNodeStateDescription(NodeState state) {
 }  // namespace
 
 NodeId NodeRemovalTracker::RegisterNode(NodeInfo info) {
+  if (info.state == NodeState::kStopped) {
+    return next_node_id_;
+  }
+
   if (info.collection == Collection::kPackage) {
     remaining_pkg_nodes_.emplace(next_node_id_);
   } else {

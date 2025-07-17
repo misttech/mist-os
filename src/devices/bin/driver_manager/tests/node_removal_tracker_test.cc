@@ -11,6 +11,9 @@
 struct NodeBank {
   NodeBank(driver_manager::NodeRemovalTracker *tracker) : tracker_(tracker) {}
   void AddNode(driver_manager::Collection collection, driver_manager::NodeState state) {
+    if (state == driver_manager::NodeState::kStopped) {
+      return;
+    }
     ids_.insert(tracker_->RegisterNode(driver_manager::NodeInfo{
         .name = "node",
         .driver_url = "driver",
@@ -46,6 +49,27 @@ TEST_F(NodeRemovalTrackerTest, RegisterOneNode) {
   tracker.FinishEnumeration();
   tracker.Notify(id, driver_manager::NodeState::kStopped);
 
+  EXPECT_EQ(package_callbacks, 1);
+  EXPECT_EQ(all_callbacks, 1);
+}
+
+TEST_F(NodeRemovalTrackerTest, DoNotRegisterStoppedNode) {
+  driver_manager::NodeRemovalTracker tracker(dispatcher());
+  NodeBank node_bank(&tracker);
+  node_bank.AddNode(driver_manager::Collection::kBoot, driver_manager::NodeState::kStopped);
+  int package_callbacks = 0;
+  int all_callbacks = 0;
+  tracker.set_pkg_callback([&package_callbacks]() { package_callbacks++; });
+  tracker.set_all_callback([&all_callbacks]() { all_callbacks++; });
+
+  EXPECT_EQ(package_callbacks, 0);
+  EXPECT_EQ(all_callbacks, 0);
+  node_bank.NotifyRemovalComplete();
+
+  EXPECT_EQ(package_callbacks, 0);
+  EXPECT_EQ(all_callbacks, 0);
+
+  tracker.FinishEnumeration();
   EXPECT_EQ(package_callbacks, 1);
   EXPECT_EQ(all_callbacks, 1);
 }
