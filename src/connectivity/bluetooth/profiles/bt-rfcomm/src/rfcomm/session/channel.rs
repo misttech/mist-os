@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_trait::async_trait;
 use bt_rfcomm::frame::{Frame, UserData};
 use bt_rfcomm::{Role, DLCI};
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_inspect_derive::{AttachError, IValue, Inspect};
 use futures::channel::{mpsc, oneshot};
-use futures::future::{BoxFuture, Shared};
-use futures::{select, FutureExt, SinkExt, StreamExt};
-use log::{error, info, trace, warn};
+use futures::future::{BoxFuture, Fuse, Shared};
+use futures::{
+    select, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, SinkExt, StreamExt,
+};
+use log::{info, trace, warn};
 use std::collections::VecDeque;
+use std::pin::pin;
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::rfcomm::inspect::{DuplexDataStreamInspect, SessionChannelInspect, FLOW_CONTROLLER};
@@ -22,13 +24,90 @@ use crate::rfcomm::types::{Error, SignaledTask};
 /// pending RX packets.
 /// This value is arbitrarily chosen and not derived from the GSM or RFCOMM specifications.
 // TODO(https://fxbug.dev/428738649): Consider setting this dynamically based on negotiated MTU.
-const HIGH_CREDIT_WATER_MARK: usize = 16;
+const HIGH_CREDIT_WATERMARK: usize = 16;
 
 /// Threshold indicating that the number of credits is low on a remote device.
 /// This is used as an indicator to send an empty frame to replenish the remote's credits.
 /// This value is arbitrarily chosen and not derived from the GSM or RFCOMM specifications.
 // TODO(https://fxbug.dev/428738649): Consider setting this dynamically based on negotiated MTU.
-const LOW_CREDIT_WATER_MARK: usize = 4;
+const LOW_CREDIT_WATERMARK: usize = 4;
+
+/// Reads data received from the remote peer and forwards to the flow controller to be sent
+/// to the RFCOMM application.
+async fn rx_task(
+    dlci: DLCI,
+    mut data_from_flow_controller: mpsc::Receiver<UserData>,
+    mut application_writer: impl AsyncWrite + Send + Unpin + 'static,
+) {
+    trace!(dlci:%; "RFCOMM RX task started");
+
+    while let Some(data) = data_from_flow_controller.next().await {
+        // The flow controller task should forward user data. Attempt to write it to the
+        // application.
+        if let Err(e) = application_writer.write_all(&data.information[..]).await {
+            warn!(dlci:%; "Failed to send data to the application: {e:?}");
+            break;
+        }
+    }
+
+    trace!(dlci:%; "RFCOMM RX task finished");
+}
+
+/// Reads data from the RFCOMM application and forwards to the flow controller to be sent
+/// to the remote peer.
+async fn tx_task(
+    dlci: DLCI,
+    max_packet_size: usize,
+    mut client_reader: impl AsyncRead + Send + Unpin + 'static,
+    mut tx_to_flow_controller_sender: mpsc::Sender<UserData>,
+) {
+    trace!(dlci:%; "RFCOMM TX task started");
+    let mut buffer = vec![0; max_packet_size];
+
+    loop {
+        match client_reader.read(&mut buffer).await {
+            Ok(0) => {
+                // A read of 0 bytes indicates that the client has closed its
+                // end of the channel. We can terminate the task.
+                info!(dlci:%; "Application closed the RFCOMM channel");
+                break;
+            }
+            Ok(bytes_read) => {
+                let user_data = UserData { information: buffer[..bytes_read].to_vec() };
+                if let Err(e) = tx_to_flow_controller_sender.send(user_data).await {
+                    // Can occur if the main flow controller task terminates unexpectedly.
+                    warn!(dlci:%; "Error sending TX data to flow controller: {e:?}");
+                    break;
+                }
+            }
+            Err(e) => {
+                warn!(dlci:%; "Failed to read from client channel: {e:?}");
+                break;
+            }
+        }
+    }
+    trace!(dlci:%; "RFCOMM TX task finished");
+}
+
+/// An interface for implementing a data proxy between a remote Bluetooth peer and an RFCOMM
+/// application. Flow controllers typically manage the RX and TX data paths for an active RFCOMM
+/// channel. The amount of internal bookkeeping depends on the type of flow controller.
+trait FlowController: Send + 'static {
+    /// Start the RFCOMM channel relay.
+    /// `tx_to_flow_controller_receiver` is the internal channel containing data received from the
+    /// application intended for the peer.
+    /// `data_from_peer_receiver` is the incoming stream of packets from the peer.
+    /// `flow_controller_to_rx_sender` is the internal channel containing data received from the
+    /// peer intended for the application.
+    /// `data_to_peer_sender` is used to send packets to the peer.
+    fn run(
+        self: Box<Self>,
+        tx_to_flow_controller_receiver: mpsc::Receiver<UserData>,
+        data_from_peer_receiver: mpsc::UnboundedReceiver<FlowControlledData>,
+        flow_controller_to_rx_sender: mpsc::Sender<UserData>,
+        data_to_peer_sender: mpsc::Sender<Frame>,
+    ) -> BoxFuture<'static, ()>;
+}
 
 /// Tracks the credits for each device connected to a given RFCOMM channel.
 #[derive(Debug, Default, Inspect)]
@@ -61,15 +140,6 @@ impl Credits {
         *self.remote
     }
 
-    /// Returns the number of credits to replenish the remote with. Returns None if the remote
-    /// has sufficient credits and does not need any more.
-    fn remote_replenish_amount(&self) -> Option<std::num::NonZeroU8> {
-        HIGH_CREDIT_WATER_MARK
-            .checked_sub(*self.remote)
-            .map(|c| c.try_into().unwrap())
-            .and_then(std::num::NonZeroU8::new)
-    }
-
     /// Increases the local credit amount by `credits`.
     fn replenish_local(&mut self, credits: usize) {
         self.local.iset(*self.local + credits);
@@ -85,23 +155,10 @@ impl Credits {
         self.local.iset(self.local.checked_sub(1).unwrap_or(0));
     }
 
-    /// Reduces the remote credit count by 1. Returns true if the remote credit count is
-    /// low, false otherwise.
-    fn decrement_remote(&mut self) -> bool {
+    /// Reduces the remote credit count by 1.
+    fn decrement_remote(&mut self) {
         self.remote.iset(self.remote.checked_sub(1).unwrap_or(0));
-        *self.remote <= LOW_CREDIT_WATER_MARK
     }
-}
-
-/// Represents an interface to manage the flow control of an RFCOMM channel between a remote peer
-/// and a local RFCOMM client.
-#[async_trait]
-trait FlowController {
-    /// Send `data` received from the local RFCOMM client to the remote peer.
-    async fn send_data_to_peer(&mut self, data: UserData);
-
-    /// Receive `data` from the remote peer to be relayed to the provided RFCOMM `client`.
-    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel);
 }
 
 /// A flow controller that indiscriminantly relays frames between a remote peer and an RFCOMM
@@ -109,8 +166,6 @@ trait FlowController {
 struct SimpleController {
     role: Role,
     dlci: DLCI,
-    /// Used to send frames to the remote peer.
-    outgoing_sender: mpsc::Sender<Frame>,
     /// Inspect object for tracking total bytes sent/received & the current transfer speeds.
     stream_inspect: DuplexDataStreamInspect,
     /// The inspect node for this controller.
@@ -128,56 +183,76 @@ impl Inspect for &mut SimpleController {
 }
 
 impl SimpleController {
-    fn new(role: Role, dlci: DLCI, outgoing_sender: mpsc::Sender<Frame>) -> Self {
+    fn new(role: Role, dlci: DLCI) -> Self {
         Self {
             role,
             dlci,
-            outgoing_sender,
             stream_inspect: DuplexDataStreamInspect::default(),
             inspect: inspect::Node::default(),
         }
     }
 }
 
-#[async_trait]
 impl FlowController for SimpleController {
-    async fn send_data_to_peer(&mut self, data: UserData) {
-        let num_bytes = data.information.len();
-        let user_data_frame = Frame::make_user_data_frame(self.role, self.dlci, data, None);
-        if self.outgoing_sender.send(user_data_frame).await.is_ok() {
-            self.stream_inspect
-                .record_outbound_transfer(num_bytes, fasync::MonotonicInstant::now());
-        };
-    }
-
-    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel) {
-        if let Ok(num_bytes) = client.write(&data.user_data.information[..]) {
-            self.stream_inspect.record_inbound_transfer(num_bytes, fasync::MonotonicInstant::now());
+    fn run(
+        self: Box<Self>,
+        mut tx_to_flow_controller_receiver: mpsc::Receiver<UserData>,
+        mut data_from_peer_receiver: mpsc::UnboundedReceiver<FlowControlledData>,
+        mut flow_controller_to_rx_sender: mpsc::Sender<UserData>,
+        mut data_to_peer_sender: mpsc::Sender<Frame>,
+    ) -> BoxFuture<'static, ()> {
+        async move {
+            trace!(dlci:% = self.dlci; "Starting simple flow controller task");
+            loop {
+                select! {
+                    app_data = tx_to_flow_controller_receiver.select_next_some() => {
+                        let user_data_frame =
+                            Frame::make_user_data_frame(self.role, self.dlci, app_data, None);
+                        if let Err(e) = data_to_peer_sender.send(user_data_frame).await {
+                            warn!(dlci:% = self.dlci; "Couldn't forward application data to peer: {e:?}");
+                            break;
+                        };
+                    }
+                    peer_data = data_from_peer_receiver.select_next_some() => {
+                        if let Err(e) = flow_controller_to_rx_sender.send(peer_data.user_data).await {
+                            warn!(dlci:% = self.dlci; "Couldn't forward peer data to application: {e:?}");
+                            break;
+                        }
+                    }
+                    complete => break,
+                }
+            }
+            trace!(dlci:% = self.dlci; "Simple flow controller task finished");
         }
+        .boxed()
     }
 }
 
 /// Handles the credit-based flow control scheme defined in RFCOMM 6.5.
 ///
 /// Provides an API to send and receive frames between the remote peer and a local
-/// RFCOMM client. Uses a credit based system to control the flow of data. In general,
+/// RFCOMM application. Uses a credit based system to control the flow of data. In general,
 /// when credit-based flow control is in use, each frame contains an extra credit octet,
 /// signaling the amount of credits the sending device is "giving" to the receiving device.
 ///
-/// When the remote's credit count is low (i.e the remote will soon need more credits
+/// When the remote's credit count is low (i.e. the remote will soon need more credits
 /// before they can send frames), we preemptively send an empty user-data frame with a
 /// replenished credit amount. See the last paragraph of RFCOMM 6.5 which states:
-/// "...always allowed to send frames containing no user data (length field = 0)". This is
-/// the mechanism for replenishing the credit count.
+/// "...always allowed to send frames containing no user data (length field = 0)".
+/// This flow controller implements backpressure by withholding remote credits if the RFCOMM
+/// application is slow to process data.
+// TODO(https://fxbug.dev/371346522): Consider adding inspect for the RX & TX queues.
 struct CreditFlowController {
     role: Role,
     dlci: DLCI,
-    /// Used to send frames to the remote peer.
-    outgoing_sender: mpsc::Sender<Frame>,
-    /// Application data intended for the remote peer that is awaiting local credits.
-    outgoing_data_pending_credits: VecDeque<UserData>,
     /// The current credit count for this controller.
     credits: Credits,
+    /// Data from the peer intended for the application that is waiting to be sent.
+    /// For backpressure on the RX datapath.
+    rx_queue: VecDeque<UserData>,
+    /// Data from the application intended for the remote peer that is awaiting local credits.
+    /// For backpressure on the TX datapath.
+    tx_queue: VecDeque<UserData>,
     /// Inspect object for tracking total bytes sent/received & the current transfer speeds.
     stream_inspect: DuplexDataStreamInspect,
     /// The inspect node for this controller.
@@ -196,18 +271,13 @@ impl Inspect for &mut CreditFlowController {
 }
 
 impl CreditFlowController {
-    fn new(
-        role: Role,
-        dlci: DLCI,
-        outgoing_sender: mpsc::Sender<Frame>,
-        initial_credits: Credits,
-    ) -> Self {
-        trace!(initial_credits:?; "Creating credit flow controller");
+    fn new(role: Role, dlci: DLCI, initial_credits: Credits) -> Self {
+        trace!(dlci:%, initial_credits:?; "Creating credit flow controller");
         Self {
             role,
             dlci,
-            outgoing_sender,
-            outgoing_data_pending_credits: VecDeque::new(),
+            rx_queue: VecDeque::with_capacity(HIGH_CREDIT_WATERMARK),
+            tx_queue: VecDeque::with_capacity(HIGH_CREDIT_WATERMARK),
             credits: initial_credits,
             stream_inspect: DuplexDataStreamInspect::default(),
             inspect: inspect::Node::default(),
@@ -216,86 +286,201 @@ impl CreditFlowController {
 
     /// Returns true if there are sufficient credits to send at least one queued packet.
     fn can_send_queued(&self) -> bool {
-        self.credits.local() > 0 && !self.outgoing_data_pending_credits.is_empty()
+        self.credits.local() > 0 && !self.tx_queue.is_empty()
     }
 
-    /// Attempts to send the user `data` as an RFCOMM frame to the remote peer.
-    /// NOTE: Assumes that there are sufficient local credits to send the frame.
-    async fn send_frame_with_credits(&mut self, data: UserData) {
+    fn is_rx_empty(&self) -> bool {
+        self.rx_queue.is_empty()
+    }
+
+    /// Returns true if the RX datapath is congested and cannot accept more data.
+    fn is_rx_congested(&self) -> bool {
+        self.rx_queue.len() >= HIGH_CREDIT_WATERMARK
+    }
+
+    /// Returns true if the TX datapath is congested and cannot accept more data.
+    fn is_tx_congested(&self) -> bool {
+        self.tx_queue.len() >= HIGH_CREDIT_WATERMARK
+    }
+
+    fn remote_credit_count_low(&self) -> bool {
+        self.credits.remote() <= LOW_CREDIT_WATERMARK
+    }
+
+    /// Returns the number of credits to replenish the remote with. Returns None if the remote
+    /// has sufficient credits and does not need any more.
+    fn remote_replenish_amount(&self) -> Option<u8> {
+        if self.is_rx_congested() {
+            return None;
+        }
+
+        if !self.remote_credit_count_low() {
+            return None;
+        }
+
+        // The number of issued credits is contingent on space available in the RX queue.
+        let capacity = HIGH_CREDIT_WATERMARK.saturating_sub(self.rx_queue.len());
+        let granted = capacity.saturating_sub(self.credits.remote());
+        if granted == 0 {
+            None
+        } else {
+            granted.try_into().ok()
+        }
+    }
+
+    /// Returns a user Frame with the replenished remote credit count.
+    /// NOTE: Assumes there is at least one local credit to send the frame.
+    fn make_frame(&mut self, data: UserData) -> Frame {
         let data_size = data.information.len();
-        let credits_to_replenish =
-            self.credits.remote_replenish_amount().map(std::num::NonZeroU8::get);
+        let credits_to_replenish = self.remote_replenish_amount();
         let frame = Frame::make_user_data_frame(self.role, self.dlci, data, credits_to_replenish);
-        if self.outgoing_sender.send(frame).await.is_ok() {
-            // User data frames containing a nonempty payload require a local credit to be sent.
-            if data_size != 0 {
-                self.credits.decrement_local();
-                self.stream_inspect
-                    .record_outbound_transfer(data_size, fasync::MonotonicInstant::now());
-            }
-            // Update our bookkeeping for the remote credit count with what we gave to the peer.
-            self.credits.replenish_remote(credits_to_replenish.map_or(0, Into::into));
+        // User data frames containing a nonempty payload require a local credit to be sent.
+        if data_size != 0 {
+            self.credits.decrement_local();
+            self.stream_inspect
+                .record_outbound_transfer(data_size, fasync::MonotonicInstant::now());
         }
+        // Update our bookkeeping for the remote credit count with what we gave to the peer.
+        self.credits.replenish_remote(credits_to_replenish.map_or(0, Into::into));
+        frame
     }
 
-    /// Attempts to drain the outgoing data queue and send to the remote peer.
-    async fn process_data_queue(&mut self) {
-        let before_length = self.outgoing_data_pending_credits.len();
+    /// Attempts to drain the TX queue and returns as many frames as there are credits for. If there
+    /// are no pending frames, then potentially returns an empty frame to replenish remote credits.
+    pub fn process_tx_queue(&mut self) -> Vec<Frame> {
+        // Attempt to replenish the remote credit count if there are no queued frames.
+        // Otherwise, credits will be issued with any outgoing TX packets.
+        let maybe_credits = self.remote_replenish_amount();
+        if !self.can_send_queued() && maybe_credits.is_some() {
+            trace!(dlci:% = self.dlci; "Replenishing remote with {maybe_credits:?} credits");
+            return vec![self.make_frame(UserData::empty())];
+        }
+
+        let mut frames = Vec::new();
         while self.can_send_queued() {
-            let data = self.outgoing_data_pending_credits.pop_front().expect("queue nonempty");
-            self.send_frame_with_credits(data).await;
+            let data = self.tx_queue.pop_front().expect("queue nonempty");
+            // Internally updates the local credit count.
+            frames.push(self.make_frame(data));
         }
-        trace!(dlci:% = self.dlci; "Processed queue. Before = {before_length}. After = {}", self.outgoing_data_pending_credits.len());
+        frames
     }
-}
 
-#[async_trait]
-impl FlowController for CreditFlowController {
-    async fn send_data_to_peer(&mut self, data: UserData) {
-        let data_size = data.information.len();
-        if data_size != 0 && self.credits.local() == 0 {
-            trace!("No local credits available - staging user data ({data_size} bytes)");
-            self.outgoing_data_pending_credits.push_back(data);
+    /// Attempts to drain the next available packet in the RX queue.
+    pub fn process_rx_queue(&mut self) -> Option<UserData> {
+        self.rx_queue.pop_front()
+    }
+
+    /// Processes an outgoing user data packet to be sent to the remote peer.
+    pub fn handle_outgoing_frame(&mut self, user_data: UserData) {
+        self.tx_queue.push_back(user_data);
+    }
+
+    /// Processes an incoming frame received from the remote peer.
+    pub fn handle_incoming_frame(&mut self, frame: FlowControlledData) {
+        let FlowControlledData { user_data, credits } = frame;
+        let num_bytes = user_data.information.len();
+
+        self.credits.replenish_local(credits.map_or(0, Into::into));
+        if num_bytes == 0 {
+            trace!(dlci:% = self.dlci; "Remote replenished local with {credits:?} credits");
             return;
         }
 
-        self.send_frame_with_credits(data).await;
+        // If provided, stage the user data and update the remote credit count.
+        self.rx_queue.push_back(user_data);
+        self.credits.decrement_remote();
+        self.stream_inspect.record_inbound_transfer(num_bytes, fasync::MonotonicInstant::now());
     }
+}
 
-    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel) {
-        let FlowControlledData { user_data, credits } = data;
-        self.credits.replenish_local(credits.map_or(0, Into::into));
-
-        // Deliver the data to the application if the payload is not empty.
-        if !user_data.is_empty() {
-            if let Err(e) = client.write(&user_data.information[..]) {
-                warn!(dlci:% = self.dlci; "Error forwarding {} bytes to client: {e:?}", user_data.information.len());
-            };
-            self.stream_inspect.record_inbound_transfer(
-                user_data.information.len(),
-                fasync::MonotonicInstant::now(),
-            );
-
-            // Attempt to refresh the remote credits if low. Will be skipped if there are any
-            // pending packets.
-            if self.credits.decrement_remote() && !self.can_send_queued() {
-                trace!(dlci:% = self.dlci; "Remote credit count is low. Replenishing.");
-                // An empty frame can be sent without any credits. It is considered part of the
-                // flow control.
-                self.send_frame_with_credits(UserData::empty()).await;
-                return;
+impl FlowController for CreditFlowController {
+    fn run(
+        mut self: Box<Self>,
+        mut tx_to_flow_controller_receiver: mpsc::Receiver<UserData>,
+        mut data_from_peer_receiver: mpsc::UnboundedReceiver<FlowControlledData>,
+        mut flow_controller_to_rx_sender: mpsc::Sender<UserData>,
+        mut data_to_peer_sender: mpsc::Sender<Frame>,
+    ) -> BoxFuture<'static, ()> {
+        let dlci = self.dlci;
+        let mut send_frames_to_peer_fn = move |frames: Vec<Frame>| {
+            for frame in frames {
+                if let Err(e) = data_to_peer_sender.try_send(frame) {
+                    warn!(dlci:%; "Couldn't forward application data to peer: {e:?}");
+                    return true;
+                }
             }
-        }
+            false
+        };
 
-        // Potentially send queued packets that were blocked on credits. Outgoing packets will
-        // include a credit refresh, if required.
-        self.process_data_queue().await;
+        async move {
+            trace!(dlci:%; "Starting credit-based flow controller task");
+
+            loop {
+                // Only send the flow controller's RX packets if the RX task has space.
+                let mut rx_task_ready_fut = pin!(if self.is_rx_empty() {
+                    Fuse::terminated()
+                } else {
+                    futures::future::poll_fn(|cx| flow_controller_to_rx_sender.poll_ready(cx))
+                        .fuse()
+                });
+
+                // Stop processing TX packets if the flow controller's TX buffer is full.
+                let mut tx_task_ready_fut = pin!(if self.is_tx_congested() {
+                    Fuse::terminated()
+                } else {
+                    tx_to_flow_controller_receiver.next().fuse()
+                });
+
+                select! {
+                    peer_data = data_from_peer_receiver.select_next_some().fuse() => {
+                        // Process the received frame for the user data payload and replenished credits.
+                        self.handle_incoming_frame(peer_data);
+
+                        // Attempt to relay any TX frames that were blocked on local credits.
+                        if send_frames_to_peer_fn(self.process_tx_queue()) {
+                            break;
+                        }
+                    },
+                    app_data_result = tx_task_ready_fut => {
+                        let Some(user_data) = app_data_result else {
+                            trace!(dlci:%; "TX task closed");
+                            break;
+                        };
+
+                        // Attempt to relay the frame to the remote peer. The data will be staged if
+                        // there are insufficient local credits.
+                        self.handle_outgoing_frame(user_data);
+                        if send_frames_to_peer_fn(self.process_tx_queue()) {
+                            break;
+                        }
+                    },
+                    result = rx_task_ready_fut => {
+                        if let Err(e) = result {
+                            warn!(dlci:%; "RX task closed: {e:?}");
+                            break;
+                        }
+                        // Relay the payload to the RX task to be forwarded to the application.
+                        // `rx_task_ready_fut` guarantees that there is space in the channel
+                        let data = self.process_rx_queue().expect("checked RX queue nonempty");
+                        let _ = flow_controller_to_rx_sender.try_send(data);
+
+                        // Potentially refresh remote credits as there is space in the RX queue.
+                        if send_frames_to_peer_fn(self.process_tx_queue()) {
+                            break;
+                        }
+                    }
+                    complete => break,
+                }
+            }
+            trace!(dlci:%; "Credit-based flow controller task finished");
+        }
+        .boxed()
     }
 }
 
 impl Drop for CreditFlowController {
     fn drop(&mut self) {
-        info!(dlci:% = self.dlci; "CreditFlowController closed. Dropping {} user data frames", self.outgoing_data_pending_credits.len());
+        info!(dlci:% = self.dlci; "CreditFlowController closed. Dropping {} RX frames and {} TX fames", self.rx_queue.len(), self.tx_queue.len());
     }
 }
 
@@ -326,23 +511,29 @@ pub struct FlowControlledData {
 
 impl FlowControlledData {
     #[cfg(test)]
+    pub fn new(data: Vec<u8>, credits: u8) -> Self {
+        Self { user_data: UserData { information: data }, credits: Some(credits) }
+    }
+
+    #[cfg(test)]
     pub fn new_no_credits(data: Vec<u8>) -> Self {
         Self { user_data: UserData { information: data }, credits: None }
     }
 }
 
 /// The processing task associated with an established SessionChannel.
-struct SessionChannelTask {
-    /// The processing task.
+struct EstablishedChannelTask {
+    /// The active processing task managing the RX and TX datapaths for the RFCOMM channel.
     _task: fasync::Task<()>,
-    /// The sender used to relay user data received from the peer to the `_task`.
-    user_data_queue: mpsc::Sender<FlowControlledData>,
-    /// Shared future indicating termination status of the `_task`.
+    /// Used to relay user data received from the peer to the active data relay `_task`.
+    data_from_peer_sender: mpsc::UnboundedSender<FlowControlledData>,
+    /// Indicates the termination status of the `_task`.
     terminated: Shared<BoxFuture<'static, ()>>,
 }
 
 /// The RFCOMM Channel associated with a DLCI for an RFCOMM Session. This channel is a client-
-/// interfacing channel - the remote end of the channel is held by a profile as an RFCOMM channel.
+/// interfacing channel - the remote end of the channel is held by a profile or application that
+/// requires RFCOMM functionality.
 ///
 /// Typical usage looks like:
 ///   let (local, remote) = Channel::create();
@@ -356,15 +547,13 @@ struct SessionChannelTask {
 pub struct SessionChannel {
     /// The DLCI associated with this channel.
     dlci: DLCI,
-    /// The local role assigned to us.
+    /// The role assigned to the local RFCOMM session.
     role: Role,
-    /// The flow control used for this SessionChannel. If unset during establishment, the channel
-    /// will default to credit-based flow control.
+    /// The flow control mode used for this SessionChannel. If unset during establishment, the
+    /// channel will default to credit-based flow control.
     flow_control: Option<FlowControlMode>,
-    /// The processing task associated with the channel. This is set through
-    /// `self.establish()`, and indicates whether this SessionChannel is
-    /// currently active.
-    processing_task: Option<SessionChannelTask>,
+    /// The processing task that supports the RX & TX datapaths for the established channel.
+    established_task: Option<EstablishedChannelTask>,
     /// The inspect node for this channel.
     inspect: SessionChannelInspect,
 }
@@ -383,7 +572,7 @@ impl SessionChannel {
             dlci,
             role,
             flow_control: None,
-            processing_task: None,
+            established_task: None,
             inspect: SessionChannelInspect::default(),
         }
     }
@@ -415,100 +604,88 @@ impl SessionChannel {
         Ok(())
     }
 
-    /// A user data relay task that reads data from the `channel` and relays to the `frame_sender`.
-    /// The task also processes user data received from the peer in the `pending_writes` queue
-    /// and sends it to the `channel`.
-    /// The user data relay is flow controlled by the provided `flow_control` mode.
-    async fn user_data_relay(
-        dlci: DLCI,
+    /// Establishes a credit-based flow control session for the provided RFCOMM channel.
+    /// Returns a Task representing the active processing loops for the RX and TX datapaths.
+    fn establish_with_controller(
         role: Role,
-        termination_sender: oneshot::Sender<()>,
-        mut flow_controller: Box<dyn FlowController>,
-        mut channel: Channel,
-        mut pending_writes: mpsc::Receiver<FlowControlledData>,
+        dlci: DLCI,
+        flow_controller: Box<dyn FlowController>,
+        application_channel: Channel,
         mut frame_sender: mpsc::Sender<Frame>,
-    ) {
-        loop {
+        data_from_peer_receiver: mpsc::UnboundedReceiver<FlowControlledData>,
+        termination_sender: oneshot::Sender<()>,
+    ) -> fasync::Task<()> {
+        let max_packet_size = application_channel.max_tx_size();
+        let (client_reader, client_writer) = futures::io::AsyncReadExt::split(application_channel);
+        // TX Processing Task -> Flow Controller Task: Used to send TX data to the peer via the
+        // flow controller.
+        let (tx_to_flow_controller_sender, tx_to_flow_controller_receiver) = mpsc::channel(0);
+        // Flow Controller Task -> RX Processing Task: Used to send RX data to the application.
+        let (flow_controller_to_rx_sender, flow_controller_to_rx_receiver) = mpsc::channel(0);
+
+        let tx_fut = tx_task(dlci, max_packet_size, client_reader, tx_to_flow_controller_sender);
+        let rx_fut = rx_task(dlci, flow_controller_to_rx_receiver, client_writer);
+
+        // The central flow control task that communicates with the RX and TX datapaths.
+        let flow_controller_fut = flow_controller.run(
+            tx_to_flow_controller_receiver,
+            data_from_peer_receiver,
+            flow_controller_to_rx_sender,
+            frame_sender.clone(),
+        );
+        let data_relay_fut = async move {
             select! {
-                data_from_client = channel.next() => {
-                    match data_from_client {
-                        Some(Ok(bytes)) => {
-                            trace!(dlci:%; "Sending user-data packet ({} bytes)", bytes.len());
-                            let user_data = UserData { information: bytes };
-                            flow_controller.send_data_to_peer(user_data).await;
-                        }
-                        Some(Err(e)) => {
-                            error!("Error receiving data from client {e:?}");
-                        }
-                        None => {
-                            trace!(dlci:%; "RFCOMM channel closed by profile");
-                            // The client has disconnected the RFCOMM channel. We should relay
-                            // a Disconnect frame to the remote peer.
-                            let disc = Frame::make_disc_command(role, dlci);
-                            // The result of the send is irrelevant, as failure would indicate
-                            // the Session is closed.
-                            let _ = frame_sender.send(disc).await;
-                            break;
-                        }
-                    };
-                },
-                data_from_peer = pending_writes.select_next_some() => {
-                    flow_controller.receive_data_from_peer(data_from_peer, &channel).await;
-                },
-                complete => break,
-            }
-        }
-        drop(flow_controller);
-        info!(dlci:%; "SessionChannel processing task finished");
-        // Client closed the `channel` - notify listener of termination.
-        let _ = termination_sender.send(());
+                _ = tx_fut.fuse() => {},
+                _ = rx_fut.fuse() => {},
+                _ = flow_controller_fut.fuse() => {},
+            };
+            // The RFCOMM channel tasks have terminated. This can be because the application closed
+            // it, or the peer closed it, or an internal error. Regardless, attempt to send a
+            // Disconnect frame to indicate that this channel no longer established.
+            let disc = Frame::make_disc_command(role, dlci);
+            let _ = frame_sender.send(disc).await;
+            // RFCOMM channel has closed. Notify any listeners.
+            let _ = termination_sender.send(());
+        };
+        fasync::Task::spawn(data_relay_fut)
     }
 
     /// Starts the processing task over the provided RFCOMM `channel`.
-    /// The processing task will:
-    /// 1) Read bytes received from the `channel` - this "user data" is received from the upper
-    ///    layer client (e.g. Bluetooth Profile) and will be relayed to the `frame_sender`.
-    /// 2) Read packets from the `pending_writes` queue, and send the data to the upper layer
-    ///    client.
-    ///
     /// While unusual, it is OK to call establish() multiple times. The currently active
     /// processing task will be terminated and a new task will be created with the provided
     /// `channel`. If the flow control has not been negotiated, the channel will default
     /// to using credit-based flow control.
-    pub fn establish(&mut self, channel: Channel, frame_sender: mpsc::Sender<Frame>) {
-        let (user_data_queue, pending_writes) = mpsc::channel(HIGH_CREDIT_WATER_MARK);
+    pub fn establish(&mut self, channel: Channel, data_to_peer_sender: mpsc::Sender<Frame>) {
+        let (data_from_peer_sender, data_from_peer_receiver) = mpsc::unbounded();
+        let (termination_sender, termination_receiver) = oneshot::channel();
         let flow_controller: Box<dyn FlowController> =
             match self.flow_control.get_or_insert(FlowControlMode::CreditBased(Credits::default()))
             {
-                FlowControlMode::CreditBased(credits) => {
-                    let mut controller = CreditFlowController::new(
-                        self.role,
-                        self.dlci,
-                        frame_sender.clone(),
-                        credits.as_new(),
-                    );
-                    let _ = controller.iattach(self.inspect.node(), FLOW_CONTROLLER);
-                    Box::new(controller)
-                }
                 FlowControlMode::None => {
-                    let mut controller =
-                        SimpleController::new(self.role, self.dlci, frame_sender.clone());
-                    let _ = controller.iattach(self.inspect.node(), FLOW_CONTROLLER);
-                    Box::new(controller)
+                    let mut simple_controller = SimpleController::new(self.role, self.dlci);
+                    let _ = simple_controller.iattach(self.inspect.node(), FLOW_CONTROLLER);
+                    Box::new(simple_controller)
+                }
+                FlowControlMode::CreditBased(credits) => {
+                    let mut credit_flow_controller =
+                        CreditFlowController::new(self.role, self.dlci, credits.as_new());
+                    let _ = credit_flow_controller.iattach(self.inspect.node(), FLOW_CONTROLLER);
+                    Box::new(credit_flow_controller)
                 }
             };
-        let (termination_sender, receiver) = oneshot::channel();
-        let _task = fasync::Task::local(Self::user_data_relay(
-            self.dlci,
+
+        let _task = Self::establish_with_controller(
             self.role,
-            termination_sender,
+            self.dlci,
             flow_controller,
             channel,
-            pending_writes,
-            frame_sender,
-        ));
-        let terminated = receiver.map(|_| ()).boxed().shared();
-        self.processing_task = Some(SessionChannelTask { _task, user_data_queue, terminated });
+            data_to_peer_sender,
+            data_from_peer_receiver,
+            termination_sender,
+        );
+        let terminated = termination_receiver.map(|_| ()).boxed().shared();
+        self.established_task =
+            Some(EstablishedChannelTask { _task, data_from_peer_sender, terminated });
         trace!(dlci:% = self.dlci; "Started SessionChannel processing task");
     }
 
@@ -521,14 +698,14 @@ impl SessionChannel {
 
         // This unwrap is safe because the task is guaranteed to be set if the channel
         // has been established.
-        let queue = &mut self.processing_task.as_mut().unwrap().user_data_queue;
+        let queue = &mut self.established_task.as_mut().unwrap().data_from_peer_sender;
         queue.send(data).await.map_err(|e| anyhow::format_err!("{e:?}").into())
     }
 }
 
 impl SignaledTask for SessionChannel {
     fn finished(&self) -> BoxFuture<'static, ()> {
-        self.processing_task.as_ref().map_or_else(
+        self.established_task.as_ref().map_or_else(
             || futures::future::ready(()).boxed(),
             |task| task.terminated.clone().boxed(),
         )
@@ -540,16 +717,22 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
+    use async_test_helpers::run_while;
     use async_utils::PollExt;
-    use bt_rfcomm::frame::FrameData;
+    use bt_rfcomm::frame::{FrameData, UIHData};
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
-
+    use fuchsia_sync::Mutex;
     use futures::task::Poll;
-    use std::pin::pin;
+    use std::io;
+    use std::pin::{pin, Pin};
+    use std::sync::Arc;
+    use std::task::{Context, Waker};
 
-    use crate::rfcomm::test_util::{expect_frame, expect_user_data_frame, poll_stream};
+    use crate::rfcomm::test_util::{
+        assert_user_data_frame, expect_frame, expect_user_data_frame, poll_stream,
+    };
 
     fn establish_channel(channel: &mut SessionChannel) -> (Channel, mpsc::Receiver<Frame>) {
         let (local, remote) = Channel::create();
@@ -582,30 +765,6 @@ mod tests {
         (inspect, session_channel, remote, frame_receiver)
     }
 
-    /// Creates and returns a CreditFlowController with the initial `credits`. Uses
-    /// an executor set at the provided `time`.
-    fn setup_credit_flow_controller(
-        time: fasync::MonotonicInstant,
-        credits: Credits,
-    ) -> (fasync::TestExecutor, inspect::Inspector, CreditFlowController, mpsc::Receiver<Frame>)
-    {
-        let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(time);
-        let inspect = inspect::Inspector::default();
-
-        let (frame_sender, outgoing_frames) = mpsc::channel(0);
-        let flow_controller = CreditFlowController::new(
-            Role::Initiator,             // Random fixed Role.
-            DLCI::try_from(19).unwrap(), // Random fixed user DLCI.
-            frame_sender,
-            credits,
-        )
-        .with_inspect(inspect.root(), FLOW_CONTROLLER)
-        .unwrap();
-
-        (exec, inspect, flow_controller, outgoing_frames)
-    }
-
     #[test]
     fn test_establish_channel_and_send_data_with_no_flow_control() {
         let mut exec = fasync::TestExecutor::new();
@@ -626,19 +785,19 @@ mod tests {
         poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
 
         // Receive user data to be relayed to the profile-client - no credits.
-        let user_data = UserData { information: vec![0x01, 0x02, 0x03] };
+        let user_data = vec![0x01, 0x02, 0x03];
         {
-            let mut receive_fut = Box::pin(session_channel.receive_user_data(FlowControlledData {
-                user_data: user_data.clone(),
-                credits: None,
-            }));
+            let mut receive_fut = Box::pin(
+                session_channel
+                    .receive_user_data(FlowControlledData::new_no_credits(user_data.clone())),
+            );
             assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
         }
 
         // Data should be relayed to the client.
         match exec.run_until_stalled(&mut data_received_by_client) {
             Poll::Ready(Some(Ok(buf))) => {
-                assert_eq!(buf, user_data.information);
+                assert_eq!(buf, user_data);
             }
             x => panic!("Expected ready with data but got: {:?}", x),
         }
@@ -667,7 +826,7 @@ mod tests {
     /// flow control with 0 initial credits). This is a fairly common case since we only
     /// do PN once, so most RFCOMM channels that are established will not have negotiated
     /// credits.
-    #[test]
+    #[fuchsia::test]
     fn test_session_channel_with_default_credit_flow_control() {
         let mut exec = fasync::TestExecutor::new();
 
@@ -683,27 +842,26 @@ mod tests {
         // extra credits.
         let user_data = vec![0x01, 0x02, 0x03];
         {
-            let mut receive_fut = Box::pin(session_channel.receive_user_data(FlowControlledData {
-                user_data: UserData { information: user_data.clone() },
-                credits: Some(0),
-            }));
+            let mut receive_fut = Box::pin(
+                session_channel.receive_user_data(FlowControlledData::new(user_data.clone(), 0)),
+            );
             assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
         }
 
-        // The data should be relayed to the client.
-        let received_data2 = exec
-            .run_until_stalled(&mut client.select_next_some())
-            .expect("stream ready")
-            .expect("received data");
-        assert_eq!(received_data2, user_data);
         // Because the remote's credit count is low (0, the default), we expect to immediately send
         // an outgoing empty data frame to replenish it.
         expect_user_data_frame(
             &mut exec,
             &mut outgoing_frames,
             UserData::empty(),
-            Some(HIGH_CREDIT_WATER_MARK as u8),
+            Some(15), // HIGH_CREDIT_WATERMARK - 1 (pending RX frame)
         );
+        // The data should be relayed to the client.
+        let received_data2 = exec
+            .run_until_stalled(&mut client.select_next_some())
+            .expect("stream ready")
+            .expect("received data");
+        assert_eq!(received_data2, user_data);
 
         // Application wants to send data to the remote peer. We have no local credits so it should
         // be queued for later.
@@ -712,28 +870,27 @@ mod tests {
         poll_stream(&mut exec, &mut outgoing_frames).expect_pending("no outgoing frame");
 
         // Remote peer sends more user data with a refreshed credit amount.
-        let user_data2 = vec![0x00, 0x00, 0x00, 0x00, 0x00];
+        let user_data2 = vec![0x10, 0x01, 0x20, 0x02, 0x30, 0x03];
         {
-            let mut receive_fut = Box::pin(session_channel.receive_user_data(FlowControlledData {
-                user_data: UserData { information: user_data2.clone() },
-                credits: Some(50),
-            }));
+            let mut receive_fut = Box::pin(
+                session_channel.receive_user_data(FlowControlledData::new(user_data2.clone(), 50)),
+            );
             assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
         }
 
-        // First, the RX frame should be forwarded to the application layer.
+        // The previously queued TX frame should be finally sent due to the credit refresh.
+        expect_user_data_frame(
+            &mut exec,
+            &mut outgoing_frames,
+            UserData { information: client_data },
+            None, // Remote credit count is sufficiently high (15)
+        );
+        // The RX frame should also be forwarded to the application layer.
         let received_data2 = exec
             .run_until_stalled(&mut client.select_next_some())
             .expect("stream ready")
             .expect("received data");
         assert_eq!(received_data2, user_data2);
-        // The previously queued outgoing frame should be finally sent due to the credit refresh.
-        expect_user_data_frame(
-            &mut exec,
-            &mut outgoing_frames,
-            UserData { information: client_data },
-            Some(1), // 16 (HIGH_CREDIT_WATER_MARK) - 15 (current)
-        );
     }
 
     #[test]
@@ -747,7 +904,7 @@ mod tests {
             dlci,
             Some(FlowControlMode::CreditBased(Credits::new(
                 12, // Arbitrary
-                12, // Arbitrary
+                6,  // Arbitrary
             ))),
         );
 
@@ -755,17 +912,15 @@ mod tests {
         poll_stream(&mut exec, &mut outgoing_frames).expect_pending("no frame");
 
         // Peer sends data to us. We expect it to be relayed to the upper layer profile.
-        let user_data = UserData { information: vec![0x01, 0x02, 0x03] };
+        let user_data = vec![0x01, 0x02, 0x03];
         {
-            let mut receive_fut = Box::pin(session_channel.receive_user_data(FlowControlledData {
-                user_data: user_data.clone(),
-                credits: Some(6),
-            }));
+            let mut receive_fut =
+                Box::pin(session_channel.receive_user_data(FlowControlledData::new(user_data, 6)));
             assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
             // Data should be relayed to the client.
             assert!(exec.run_until_stalled(&mut client.next()).is_ready());
-            // Don't expect any outgoing empty frame to refresh remote credit count as it is still
-            // above the LOW_CREDIT_WATER_MARK.
+            // Don't expect any outgoing empty frame to refresh remote credit count (5) as it is
+            // still above the LOW_CREDIT_WATERMARK.
             poll_stream(&mut exec, &mut outgoing_frames).expect_pending("no frame");
         }
 
@@ -774,127 +929,283 @@ mod tests {
         assert!(client.write(&client_data).is_ok());
 
         // Data should be processed by the SessionChannel, packed into an RFCOMM frame, and relayed
-        // using the `frame_sender`. There should be credits associated with the frame - we always
-        // attempt to replenish with the (HIGH_CREDIT_WATER_MARK - remote_credits) amount.
+        // using the `frame_sender`.
         expect_user_data_frame(
             &mut exec,
             &mut outgoing_frames,
             UserData { information: client_data },
-            Some(5), // = 16 (max) - (12 (initial) - 1 (sent frame))
+            None, // Remote credit count is sufficient (5), no credit refresh
         );
-    }
 
-    /// This test exercises the full credit-based flow control path.
-    /// 1. Tests receiving user data from a remote peer is correctly received,
-    /// credits updated, and sent to the local client.
-    /// 2. Tests local client sending user data to the remote peer with insufficient
-    /// credits - the frame should be queued for later.
-    /// 3. Tests receiving an empty user data frame from the remote peer, replenishing our
-    /// credits, and validates the frame from 2 is sent correctly.
-    #[test]
-    fn test_credit_flow_controller() {
-        let initial_credits = Credits::new(2, 4);
-        let (mut exec, _inspect, mut flow_controller, mut outgoing_frames) =
-            setup_credit_flow_controller(
-                /* initial_time= */ fasync::MonotonicInstant::from_nanos(0),
-                initial_credits,
-            );
-        // The endpoints of the RFCOMM channel. The local end is managed by the RFCOMM
-        // component, and the client end is relayed to the RFCOMM-requesting profile.
-        let (local, mut client) = Channel::create();
-        let mut data_received_by_client = Box::pin(client.next());
-
-        // 1. Remote peer sends us user data - they do not provide any new credits.
-        let data1 = UserData { information: vec![0xaa, 0xbb, 0xcc, 0xdd, 0xee] };
+        // Peer sends more data. It should be relayed to the application. Because the remote credit
+        // count is low, we expect to issue an empty frame to the peer with replenished credits.
+        let user_data2 = vec![5, 6, 7, 8, 9, 10, 11, 12, 13];
         {
-            let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
-                FlowControlledData { user_data: data1, credits: Some(0) },
-                &local,
-            ));
-            exec.run_until_stalled(&mut receive_fut)
-                .expect_pending("should wait for outgoing frame");
-            // The user data should be relayed to the RFCOMM client.
-            assert!(exec.run_until_stalled(&mut data_received_by_client).is_ready());
-            // Because the remote credit count is low (see `initial_credits`), we expect to
-            // preemptively send an empty data frame to the peer to refresh their credits.
+            let mut receive_fut = Box::pin(
+                session_channel.receive_user_data(FlowControlledData::new_no_credits(user_data2)),
+            );
+            assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
+            // Data should be relayed to the client.
+            assert!(exec.run_until_stalled(&mut client.next()).is_ready());
             expect_user_data_frame(
                 &mut exec,
                 &mut outgoing_frames,
                 UserData::empty(),
-                Some(13), // 16 (Max) - (4 (initial) - 1 (received))
+                Some(11), // MAX - 1 (RX queue size) - 4 (current remote credits)
             );
-            assert!(exec.run_until_stalled(&mut receive_fut).is_ready());
+        }
+    }
+
+    /// Exercises the credit flow control path for normal `CreditFlowController` operation (low
+    /// throughput).
+    #[fuchsia::test]
+    fn credit_flow_controller_normal_send_and_receive() {
+        let _exec = fasync::TestExecutor::new();
+        let credits = Credits::new(2, 4);
+        let dlci = DLCI::try_from(11).unwrap();
+        let mut flow_controller = CreditFlowController::new(Role::Initiator, dlci, credits);
+
+        // Receive data from the peer with no credits (RX).
+        let data1 = vec![0xaa, 0xbb, 0xcc, 0xdd, 0xee];
+        flow_controller.handle_incoming_frame(FlowControlledData::new_no_credits(data1.clone()));
+        let tx_frames = flow_controller.process_tx_queue();
+        // Because the remote credit count is low, we expect to return an empty packet with a credit
+        // refresh of 16 (max) - 1 (RX queue size) - 3 (current remote credits) = 12.
+        assert_eq!(tx_frames.len(), 1);
+        assert_user_data_frame(&tx_frames[0], UserData::empty(), Some(12));
+        // The RX packet should be staged and the controller should have plenty of space.
+        assert!(!flow_controller.is_rx_congested());
+        let rx_user_data = flow_controller.process_rx_queue().expect("user data queued");
+        assert_eq!(rx_user_data.information, data1);
+
+        // Application attempts to write 4 packets. There are only 2 credits available so 2 packets
+        // should be queued for later.
+        let data2 = UserData { information: vec![0x1, 0x2, 0x3] };
+        let data3 = UserData { information: vec![0x1, 0x1, 0x1, 0x1] };
+        let data4 = UserData { information: vec![0x9, 0x8, 0x7] };
+        let data5 = UserData { information: vec![0x4] };
+        // Remote credit count is at 15 which is well above the low watermark.
+        flow_controller.handle_outgoing_frame(data2.clone());
+        let tx_frame2 = flow_controller.process_tx_queue();
+        assert_user_data_frame(&tx_frame2[0], data2, None);
+        flow_controller.handle_outgoing_frame(data3.clone());
+        let tx_frame3 = flow_controller.process_tx_queue();
+        assert_user_data_frame(&tx_frame3[0], data3, None);
+        flow_controller.handle_outgoing_frame(data4.clone());
+        assert!(flow_controller.process_tx_queue().is_empty());
+        flow_controller.handle_outgoing_frame(data5.clone());
+        assert!(flow_controller.process_tx_queue().is_empty());
+        assert!(!flow_controller.is_tx_congested());
+
+        // Peer gives us a single credit refresh. Expect a TX packet to be ready to be sent.
+        flow_controller.handle_incoming_frame(FlowControlledData::new(vec![], 1));
+        let tx_frame4 = flow_controller.process_tx_queue();
+        assert_eq!(tx_frame4.len(), 1);
+        // No credits issued because the remote credit count is still sufficiently high (15).
+        assert_user_data_frame(&tx_frame4[0], data4, None);
+
+        // Peer sends a few more packets with no credit refreshes, the single TX packet should
+        // still be queued.
+        let data6 = vec![0xaa, 0xbb, 0xcc, 0xdd, 0xee];
+        for _i in 0..3 {
+            flow_controller
+                .handle_incoming_frame(FlowControlledData::new_no_credits(data6.clone()));
+            let tx_frames = flow_controller.process_tx_queue();
+            assert_eq!(tx_frames.len(), 0);
         }
 
-        // 2a. RFCOMM client responds with its own data.
-        let data2a = UserData { information: vec![0x45, 0x34] };
-        {
-            let mut send_fut = Box::pin(flow_controller.send_data_to_peer(data2a.clone()));
-            exec.run_until_stalled(&mut send_fut).expect_pending("should wait for outgoing frame");
-            // We have sufficient local credits (2), so frame should be sent. No credits to refresh.
-            expect_user_data_frame(&mut exec, &mut outgoing_frames, data2a, None);
-            assert!(exec.run_until_stalled(&mut send_fut).is_ready());
-        }
-        // 2b. RFCOMM client sends more data.
-        let data2b = UserData { information: vec![0x99] };
-        {
-            let mut send_fut = Box::pin(flow_controller.send_data_to_peer(data2b.clone()));
-            exec.run_until_stalled(&mut send_fut).expect_pending("should wait for outgoing frame");
-            // We have sufficient local credits (1), so frame should be sent. No credits to refresh.
-            expect_user_data_frame(&mut exec, &mut outgoing_frames, data2b, None);
-            assert!(exec.run_until_stalled(&mut send_fut).is_ready());
-        }
+        // Peer finally gives us more credits. Last TX packet should be sent.
+        flow_controller.handle_incoming_frame(FlowControlledData::new(vec![], 5));
+        let tx_frame5 = flow_controller.process_tx_queue();
+        assert_eq!(tx_frame5.len(), 1);
+        // No credits issued because the remote credit count is still sufficiently high (12).
+        assert_user_data_frame(&tx_frame5[0], data5, None);
+    }
 
-        // 2c. RFCOMM client sends more data.
-        let data2c = UserData { information: vec![0xff, 0x00, 0xaa] };
-        {
-            let mut send_fut = Box::pin(flow_controller.send_data_to_peer(data2c.clone()));
-            // Because we have no local credits, the data should be queued for later.
-            assert!(exec.run_until_stalled(&mut send_fut).is_ready());
-            // No frame should be sent to the peer.
-            poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
-        }
+    #[fuchsia::test]
+    fn credit_flow_controller_high_throughput_backpressure() {
+        let _exec = fasync::TestExecutor::new();
+        // No local credits.
+        let credits = Credits::new(0, 7);
+        let dlci = DLCI::try_from(11).unwrap();
+        let mut flow_controller = CreditFlowController::new(Role::Initiator, dlci, credits);
+        assert!(!flow_controller.is_tx_congested());
+        assert!(!flow_controller.is_rx_congested());
 
-        // 2d. RFCOMM client sends more data.
-        let data2d = UserData { information: vec![0x04, 0x02, 0x00] };
-        {
-            let mut send_fut = Box::pin(flow_controller.send_data_to_peer(data2d.clone()));
-            // Because we have no local credits, the data should be queued for later.
-            assert!(exec.run_until_stalled(&mut send_fut).is_ready());
-            // No frame should be sent to the peer.
-            poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
+        // Application attempts to write many packets at once. All of them should be queued because
+        // we have no local credits.
+        let random_packet = vec![0x00, 0x02, 0x04, 0x06, 0x08, 0x10, 0x12];
+        for _i in 0..HIGH_CREDIT_WATERMARK {
+            flow_controller.handle_outgoing_frame(UserData { information: random_packet.clone() });
+            assert!(flow_controller.process_tx_queue().is_empty());
         }
+        // The entire TX buffer is full, we expect the controller to be in a congested state now.
+        assert!(flow_controller.is_tx_congested());
+        assert!(!flow_controller.is_rx_congested());
 
-        // 3. Remote peer sends an empty frame to "refresh" our credits.
-        let data3 = UserData::empty();
-        {
-            let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
-                FlowControlledData { user_data: data3, credits: Some(10) },
-                &local,
+        // Can process RX frames as normal even if TX is congested.
+        let peer_data = vec![1, 2, 3, 4, 5, 6, 7];
+        flow_controller
+            .handle_incoming_frame(FlowControlledData::new_no_credits(peer_data.clone()));
+        assert!(flow_controller.process_tx_queue().is_empty());
+        flow_controller
+            .handle_incoming_frame(FlowControlledData::new_no_credits(peer_data.clone()));
+        assert!(flow_controller.process_tx_queue().is_empty());
+        // Another RX frame puts the remote credit count low. We expect to replenish even though TX
+        // is congested. 16 (Max) - 3 (RX queue size) - 4 (current credit count)
+        flow_controller.handle_incoming_frame(FlowControlledData::new_no_credits(peer_data));
+        let tx_packet = flow_controller.process_tx_queue();
+        assert_eq!(tx_packet.len(), 1);
+        assert_user_data_frame(&tx_packet[0], UserData::empty(), Some(9));
+        assert!(!flow_controller.is_rx_congested());
+
+        // Peer now has 13 credits. It can fill up the buffer to put the controller in a congested
+        // state.
+        let random_peer_packet = vec![0, 5, 10, 15, 20];
+        for _i in 0..13 {
+            flow_controller.handle_incoming_frame(FlowControlledData::new_no_credits(
+                random_peer_packet.clone(),
             ));
-            exec.run_until_stalled(&mut receive_fut)
-                .expect_pending("should wait for outgoing frame");
-            // Now that we've received 10 credits, we should send the queued user data
-            // frames from 2c & 2d.
-            expect_user_data_frame(
-                &mut exec,
-                &mut outgoing_frames,
-                data2c,
-                None, // Don't expect to replenish (remote = MAX).
-            );
-            exec.run_until_stalled(&mut receive_fut)
-                .expect_pending("should wait for outgoing frame");
-            expect_user_data_frame(
-                &mut exec,
-                &mut outgoing_frames,
-                data2d,
-                None, // Don't expect to replenish (remote = MAX).
-            );
-
-            // `data3` should not be relayed to the client since it's empty.
-            exec.run_until_stalled(&mut data_received_by_client).expect_pending("no data");
-            assert!(exec.run_until_stalled(&mut receive_fut).is_ready());
+            assert!(flow_controller.process_tx_queue().is_empty());
         }
+        // Flow controller is now congested in both directions. Both sides have 0 credits.
+        assert!(flow_controller.is_rx_congested());
+        assert!(flow_controller.is_tx_congested());
+
+        // Peer finally refreshes our credit count. Should send as many frames as credits.
+        flow_controller.handle_incoming_frame(FlowControlledData::new(vec![], 10));
+        let tx_packets = flow_controller.process_tx_queue();
+        assert_eq!(tx_packets.len(), 10);
+        assert!(!flow_controller.is_tx_congested());
+        assert!(flow_controller.is_rx_congested());
+
+        // Slow application finally reads from the flow controller.
+        for _i in 0..10 {
+            assert!(flow_controller.process_rx_queue().is_some());
+        }
+        // There are still 6 queued RX packets, but we are no longer congested.
+        assert!(!flow_controller.is_rx_congested());
+        // Peer refreshes our credit count again. Should drain the rest of the TX packets (6).
+        flow_controller.handle_incoming_frame(FlowControlledData::new(vec![], 10));
+        let tx_packets = flow_controller.process_tx_queue();
+        assert_eq!(tx_packets.len(), 6);
+        for i in 0..6 {
+            // The very first TX frame we send, we should refresh the remote with credits since RX is no
+            // longer congested.
+            // 16 (Max) - 6 (current RX queue) - 0 (current remote count) = 10
+            let expected_credits = if i == 0 { Some(10) } else { None };
+            assert_user_data_frame(
+                &tx_packets[i],
+                UserData { information: random_packet.clone() },
+                expected_credits,
+            );
+        }
+    }
+
+    #[fuchsia::test]
+    fn credit_flow_controller_run_sends_credit_update_when_rx_is_relieved() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let dlci = DLCI::try_from(5).unwrap();
+        let role = Role::Initiator;
+        let credits = Credits::new(0, HIGH_CREDIT_WATERMARK);
+        let controller = Box::new(CreditFlowController::new(role, dlci, credits));
+
+        let (_tx_to_flow_controller_sender, tx_to_flow_controller_receiver) = mpsc::channel(0);
+        let (data_from_peer_sender, data_from_peer_receiver) = mpsc::unbounded();
+        let (flow_controller_to_rx_sender, mut flow_controller_to_rx_receiver) = mpsc::channel(0);
+        let (data_to_peer_sender, mut data_to_peer_receiver) = mpsc::channel(100);
+
+        let mut run_fut = controller.run(
+            tx_to_flow_controller_receiver,
+            data_from_peer_receiver,
+            flow_controller_to_rx_sender,
+            data_to_peer_sender,
+        );
+
+        // Peer sends enough packets to fill the RX queue.
+        for i in 0..HIGH_CREDIT_WATERMARK {
+            let data = FlowControlledData::new_no_credits(vec![i as u8]);
+            data_from_peer_sender.unbounded_send(data).expect("remote peer can send");
+        }
+
+        // The run loop should process all incoming peer packets, and fill the RX queue.
+        // It will then get stuck trying to send the first packet to the application, since
+        // the application is not reading from the channel.
+        exec.run_until_stalled(&mut run_fut).expect_pending("run loop active");
+        // Expect an initial credit refresh because 1 packet was drained from the RX queue but not
+        // delivered to the application.
+        expect_user_data_frame(&mut exec, &mut data_to_peer_receiver, UserData::empty(), Some(1));
+
+        // Application immediately sends another packet with its received credit.
+        let data = FlowControlledData::new_no_credits(vec![16]);
+        data_from_peer_sender.unbounded_send(data).expect("remote peer can send");
+        // Don't expect a credit refresh because the RX path is completely congested.
+        exec.run_until_stalled(&mut data_to_peer_receiver.next())
+            .expect_pending("No outgoing frame");
+
+        // Application finally reads the first packet - should free up space in the internal flow
+        // controller RX queue.
+        let received = exec
+            .run_until_stalled(&mut flow_controller_to_rx_receiver.select_next_some())
+            .expect("user data");
+        assert_eq!(received, UserData { information: vec![0] });
+        exec.run_until_stalled(&mut run_fut).expect_pending("run loop active");
+        // Because the RX path is no longer congested, and the remote has 0 credits, we expect
+        // an empty frame to be sent to replenish credits. Since only one packet was processed, we
+        // expect to replenish the peer with one credit.
+        expect_user_data_frame(&mut exec, &mut data_to_peer_receiver, UserData::empty(), Some(1));
+    }
+
+    #[fuchsia::test]
+    fn credit_flow_controller_run_does_not_read_tx_task_when_congested() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let dlci = DLCI::try_from(5).unwrap();
+        let role = Role::Initiator;
+        // No local credits initially, so any outgoing packets will be queued.
+        let credits = Credits::new(0, 0);
+        let controller = Box::new(CreditFlowController::new(role, dlci, credits));
+
+        let (mut tx_to_flow_controller_sender, tx_to_flow_controller_receiver) = mpsc::channel(0);
+        let (data_from_peer_sender, data_from_peer_receiver) = mpsc::unbounded();
+        let (flow_controller_to_rx_sender, _flow_controller_to_rx_receiver) = mpsc::channel(0);
+        let (data_to_peer_sender, _data_to_peer_receiver) = mpsc::channel(100);
+
+        let mut run_fut = controller.run(
+            tx_to_flow_controller_receiver,
+            data_from_peer_receiver,
+            flow_controller_to_rx_sender,
+            data_to_peer_sender,
+        );
+
+        // Send enough packets from the application to fill the TX queue.
+        for i in 0..HIGH_CREDIT_WATERMARK {
+            let data = UserData { information: vec![i as u8] };
+            let mut send_fut = pin!(tx_to_flow_controller_sender.send(data));
+            exec.run_until_stalled(&mut send_fut).expect_pending("send waiting");
+            exec.run_until_stalled(&mut run_fut).expect_pending("run loop active");
+            let send_result = exec.run_until_stalled(&mut send_fut).expect("send finished");
+            assert_matches!(send_result, Ok(_));
+        }
+
+        // The flow controller's tx_queue is full and should no longer be trying to read data from
+        // the TX task.
+        // Trying to send another packet should not complete.
+        let data = UserData { information: vec![99] };
+        let mut send_fut = tx_to_flow_controller_sender.send(data);
+        exec.run_until_stalled(&mut send_fut).expect_pending("send blocked");
+        exec.run_until_stalled(&mut run_fut).expect_pending("run loop still active");
+        exec.run_until_stalled(&mut send_fut).expect_pending("send still blocked");
+
+        // Peer issues an empty frame with a single credit. The flow controller should update and
+        // attempt to send a queued TX packet. It is no longer congested and the previous write from
+        // the TX task should complete.
+        let empty_data = FlowControlledData::new(vec![], 1);
+        data_from_peer_sender.unbounded_send(empty_data).expect("can send data to main task");
+        exec.run_until_stalled(&mut run_fut).expect_pending("run loop still active");
+        let send_result = exec.run_until_stalled(&mut send_fut).expect("send complete");
+        assert_matches!(send_result, Ok(_));
     }
 
     #[test]
@@ -914,7 +1225,7 @@ mod tests {
         assert_matches!(exec.run_until_stalled(&mut finished), Poll::Ready(_));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn finished_signal_resolves_when_client_disconnects() {
         let mut exec = fasync::TestExecutor::new();
 
@@ -969,6 +1280,342 @@ mod tests {
         // New signal should be pending still.
         let mut finished2 = session_channel.finished();
         assert_matches!(exec.run_until_stalled(&mut finished2), Poll::Pending);
+    }
+
+    #[fuchsia::test]
+    async fn simple_controller_send_and_receive() {
+        let dlci = DLCI::try_from(15).unwrap();
+        let role = Role::Initiator;
+        let controller = Box::new(SimpleController::new(role, dlci));
+
+        let (mut application, local) = Channel::create();
+        let (data_to_peer_sender, mut data_to_peer_receiver) = mpsc::channel(0);
+        let (mut data_from_peer_sender, data_from_peer_receiver) = mpsc::unbounded();
+        let (termination_sender, termination_receiver) = oneshot::channel();
+
+        let _simple_controller_task = SessionChannel::establish_with_controller(
+            role,
+            dlci,
+            controller,
+            local,
+            data_to_peer_sender,
+            data_from_peer_receiver,
+            termination_sender,
+        );
+
+        // Peer can send data. Should be relayed to the application immediately.
+        let data1 = vec![0x00, 0x02, 0x04, 0x06];
+        data_from_peer_sender
+            .send(FlowControlledData::new_no_credits(data1.clone()))
+            .await
+            .expect("can send data");
+        let received1 = application.select_next_some().await.expect("data received");
+        assert_eq!(received1, data1);
+
+        // Application can send data. Should be relayed to the peer immediately.
+        let data2 = vec![0x5, 0x4, 0x3, 0x2, 0x1, 0x0];
+        application.write_all(&data2).await.expect("succesful write");
+        let received2 = data_to_peer_receiver.select_next_some().await;
+        assert_eq!(
+            received2.data,
+            FrameData::UnnumberedInfoHeaderCheck(UIHData::User(UserData { information: data2 }))
+        );
+
+        // Peer can send multiple chunks of data at a time.
+        let data_chunks = [vec![0x22, 0x33, 0x44], vec![0x55, 0x66, 0x77], vec![0x88, 0x99, 0x00]];
+        for chunk in &data_chunks {
+            data_from_peer_sender
+                .send(FlowControlledData::new_no_credits(chunk.clone()))
+                .await
+                .expect("can send data");
+        }
+        // Should be received by the application.
+        for chunk in data_chunks {
+            let received_chunk = application.select_next_some().await.expect("data received");
+            assert_eq!(received_chunk, chunk);
+        }
+
+        // Application no longer needs the channel. We expect an outgoing Disconnect frame and
+        // channel closure.
+        drop(application);
+        let received3 = data_to_peer_receiver.select_next_some().await;
+        assert_eq!(received3.data, FrameData::Disconnect);
+        // Any termination listeners should be notified.
+        let () = termination_receiver.await.expect("termination signaled");
+    }
+
+    /// A mock `AsyncWrite` implementation that can simulate a full buffer.
+    #[derive(Clone)]
+    struct MockApplication(Arc<Mutex<MockApplicationInner>>);
+
+    struct MockApplicationInner {
+        write_buffer: Vec<Vec<u8>>,
+        read_buffer: Vec<Vec<u8>>,
+        /// The maximum capacity of the buffer.
+        capacity: usize,
+        /// The waker for the task that is pending on writing to this writer.
+        waker: Option<Waker>,
+        /// Indicates whether the next write should return error.
+        should_error: bool,
+    }
+
+    impl MockApplication {
+        fn new(capacity: usize) -> Self {
+            Self(Arc::new(Mutex::new(MockApplicationInner {
+                write_buffer: Vec::new(),
+                read_buffer: Vec::new(),
+                capacity,
+                waker: None,
+                should_error: false,
+            })))
+        }
+
+        fn len(&self) -> usize {
+            self.write_buffer().len()
+        }
+
+        pub fn write_buffer(&self) -> Vec<u8> {
+            let copied = self.0.lock().write_buffer.clone();
+            copied.into_iter().flatten().collect()
+        }
+
+        /// Empties the write buffer and wakes the writer waker.
+        pub fn clear_and_wake_writer(&self) {
+            let mut locked = self.0.lock();
+            locked.write_buffer.clear();
+            if let Some(waker) = locked.waker.take() {
+                waker.wake();
+            }
+        }
+
+        pub fn set_and_wake_reader(&self, data: Vec<u8>) {
+            let mut locked = self.0.lock();
+            locked.read_buffer.push(data);
+            if let Some(waker) = locked.waker.take() {
+                waker.wake();
+            }
+        }
+
+        fn set_error(&self) {
+            self.0.lock().should_error = true;
+        }
+    }
+
+    impl AsyncWrite for MockApplication {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            let current_length = self.len();
+            let mut locked = self.0.lock();
+            if locked.should_error {
+                return Poll::Ready(Err(io::ErrorKind::BrokenPipe.into()));
+            }
+
+            if current_length + buf.len() > locked.capacity {
+                // Not enough space in the buffer, simulate the write hanging.
+                locked.waker = Some(cx.waker().clone());
+                return Poll::Pending;
+            }
+
+            locked.write_buffer.push(buf.to_vec());
+            Poll::Ready(Ok(buf.len()))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl AsyncRead for MockApplication {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
+            let mut locked = self.0.lock();
+            if locked.should_error {
+                return Poll::Ready(Err(io::ErrorKind::BrokenPipe.into()));
+            }
+
+            if locked.read_buffer.is_empty() {
+                locked.waker = Some(cx.waker().clone());
+                return Poll::Pending;
+            }
+
+            let data = locked.read_buffer.remove(0);
+            let bytes_to_read = data.len();
+            buf[..bytes_to_read].copy_from_slice(&data[..bytes_to_read]);
+            Poll::Ready(Ok(bytes_to_read))
+        }
+    }
+
+    #[fuchsia::test]
+    fn rx_task_data_path_and_termination() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let dlci = DLCI::try_from(5).unwrap();
+        let (mut sender, receiver) = mpsc::channel(0);
+        let writer_capacity = 10;
+        let writer = MockApplication::new(writer_capacity);
+        let mut rx_task_fut = pin!(rx_task(dlci, receiver, writer.clone()));
+
+        // The task should be pending initially as there is no data.
+        exec.run_until_stalled(&mut rx_task_fut).expect_pending("RX Task active");
+
+        // Send some data. It should be written to the mock writer.
+        let data1 = UserData { information: vec![1, 2, 3, 4, 5] };
+        let mut send_fut1 = pin!(sender.send(data1));
+        let (result1, mut rx_task_fut) = run_while(&mut exec, &mut rx_task_fut, &mut send_fut1);
+        assert_matches!(result1, Ok(_));
+        exec.run_until_stalled(&mut rx_task_fut).expect_pending("RX Task active");
+        assert_eq!(writer.write_buffer().as_slice(), &[1, 2, 3, 4, 5]);
+
+        // Send more data to fill up the writer's buffer.
+        let data2 = UserData { information: vec![6, 7, 8, 9, 10] };
+        let mut send_fut2 = pin!(sender.send(data2));
+        let (result2, mut rx_task_fut) = run_while(&mut exec, &mut rx_task_fut, &mut send_fut2);
+        assert_matches!(result2, Ok(_));
+        exec.run_until_stalled(&mut rx_task_fut).expect_pending("RX Task active");
+        // The writer buffer should be full.
+        assert_eq!(writer.write_buffer().as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        // Sending more data should over the channel should succeed and cause the `write_all` in
+        // the RX task to hang as it is full.
+        let data3 = UserData { information: vec![11] };
+        let mut send_fut3 = pin!(sender.send(data3.clone()));
+        let (result3, mut rx_task_fut) = run_while(&mut exec, &mut rx_task_fut, &mut send_fut3);
+        assert_matches!(result3, Ok(_));
+        exec.run_until_stalled(&mut rx_task_fut).expect_pending("RX Task active");
+        // `data3` shouldn't have been written
+        assert_eq!(writer.write_buffer().as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        // Sending more data should not complete as the RX task is currently blocked.
+        let data4 = UserData { information: vec![12, 13, 14, 15] };
+        let mut send_fut4 = pin!(sender.send(data4.clone()));
+        exec.run_until_stalled(&mut send_fut4).expect_pending("send blocked");
+        exec.run_until_stalled(&mut rx_task_fut).expect_pending("RX Task active");
+        exec.run_until_stalled(&mut send_fut4).expect_pending("send blocked");
+        // `data4` shouldn't have been written
+        assert_eq!(writer.write_buffer().as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        // Clear the writer buffer and wake the writer. Expect both `data3` and `data4` to be
+        // written now that there is space for both.
+        writer.clear_and_wake_writer();
+        exec.run_until_stalled(&mut rx_task_fut).expect_pending("RX Task active");
+        assert_eq!(writer.write_buffer().as_slice(), &[11, 12, 13, 14, 15]);
+
+        // Close the sender channel. This should cause the `rx_task` to terminate because the
+        // stream of data from the flow controller has ended.
+        drop(sender);
+        exec.run_until_stalled(&mut rx_task_fut).expect("RX Task finished");
+    }
+
+    #[fuchsia::test]
+    fn rx_task_terminates_on_writer_error() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let dlci = DLCI::try_from(5).unwrap();
+        let (mut sender, receiver) = mpsc::channel(0);
+        let writer_capacity = 10;
+        let writer = MockApplication::new(writer_capacity);
+        let mut rx_task_fut = pin!(rx_task(dlci, receiver, writer.clone()));
+        exec.run_until_stalled(&mut rx_task_fut).expect_pending("RX Task active");
+
+        // Make the next write fail.
+        writer.set_error();
+
+        let data = UserData { information: vec![1, 2, 3, 4, 5] };
+        let mut send_fut = pin!(sender.send(data));
+        exec.run_until_stalled(&mut send_fut).expect_pending("send blocked");
+        exec.run_until_stalled(&mut rx_task_fut).expect("RX Task terminated");
+        let result = exec.run_until_stalled(&mut send_fut).expect("send finished");
+        assert_matches!(result, Ok(_));
+    }
+
+    #[fuchsia::test]
+    fn tx_task_data_path_and_termination() {
+        let mut exec = fasync::TestExecutor::new();
+        let dlci = DLCI::try_from(5).unwrap();
+        let (sender, mut receiver) = mpsc::channel(0);
+        let reader = MockApplication::new(10);
+        let mut tx_task_fut =
+            pin!(tx_task(dlci, /*max_packet_size=*/ 1000, reader.clone(), sender));
+        exec.run_until_stalled(&mut tx_task_fut).expect_pending("TX Task active");
+
+        // Simulate the application writing data - should be received by the receiver.
+        let data1 = vec![1, 2, 3, 4, 5];
+        reader.set_and_wake_reader(data1.clone());
+        exec.run_until_stalled(&mut tx_task_fut).expect_pending("TX Task active");
+        let received1 =
+            exec.run_until_stalled(&mut receiver.select_next_some()).expect("data received");
+        assert_eq!(received1.information, data1);
+
+        // Application writes multiple data packets before TX task can process it.
+        let data2 = vec![6, 7, 8];
+        reader.set_and_wake_reader(data2.clone());
+        let data3 = vec![9, 10, 11, 12, 13];
+        reader.set_and_wake_reader(data3.clone());
+        let data4 = vec![14, 15, 16, 17, 18, 19, 20];
+        reader.set_and_wake_reader(data4.clone());
+        exec.run_until_stalled(&mut tx_task_fut).expect_pending("TX Task active");
+        let received2 =
+            exec.run_until_stalled(&mut receiver.select_next_some()).expect("data received");
+        assert_eq!(received2.information, data2);
+        exec.run_until_stalled(&mut tx_task_fut).expect_pending("TX Task active");
+        let received3 =
+            exec.run_until_stalled(&mut receiver.select_next_some()).expect("data received");
+        assert_eq!(received3.information, data3);
+        exec.run_until_stalled(&mut tx_task_fut).expect_pending("TX Task active");
+        let received4 =
+            exec.run_until_stalled(&mut receiver.select_next_some()).expect("data received");
+        assert_eq!(received4.information, data4);
+
+        // Application closes the channel (signaled by 0 byte write) - TX task should terminate.
+        reader.set_and_wake_reader(vec![]);
+        exec.run_until_stalled(&mut tx_task_fut).expect("TX Task finished");
+    }
+
+    #[fuchsia::test]
+    fn tx_task_terminates_on_reader_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let dlci = DLCI::try_from(5).unwrap();
+        let (sender, _receiver) = mpsc::channel(0);
+        let reader = MockApplication::new(10);
+        let mut tx_task_fut =
+            pin!(tx_task(dlci, /*max_packet_size=*/ 1000, reader.clone(), sender));
+        exec.run_until_stalled(&mut tx_task_fut).expect_pending("TX Task active");
+
+        // Next read should trigger an error.
+        reader.set_error();
+        reader.set_and_wake_reader(vec![1]); // Add data to trigger a read.
+                                             // The task should terminate because of the read error.
+        exec.run_until_stalled(&mut tx_task_fut).expect("TX Task finished");
+    }
+
+    #[fuchsia::test]
+    fn tx_task_terminates_on_flow_controller_close() {
+        let mut exec = fasync::TestExecutor::new();
+        let dlci = DLCI::try_from(5).unwrap();
+        let (sender, receiver) = mpsc::channel(0);
+        let reader = MockApplication::new(10);
+        let mut tx_task_fut =
+            pin!(tx_task(dlci, /*max_packet_size=*/ 1000, reader.clone(), sender));
+
+        // The task should be pending initially.
+        exec.run_until_stalled(&mut tx_task_fut).expect_pending("TX Task active");
+
+        // Flow control terminates by closing the internal mpsc channel.
+        drop(receiver);
+
+        reader.set_and_wake_reader(vec![1]); // Add data to trigger a read.
+                                             // The task should terminate because it cannot send to the closed channel.
+        exec.run_until_stalled(&mut tx_task_fut).expect("TX Task finished");
     }
 
     #[fuchsia::test]
@@ -1057,25 +1704,45 @@ mod tests {
 
     #[test]
     fn credit_flow_controller_inspect_updates_after_data_exchange() {
-        let initial_time = fasync::MonotonicInstant::from_nanos(987_000_000);
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(987_000_000));
+
         let initial_credits = Credits::new(50, 70);
-        let (mut exec, inspect, mut flow_controller, mut outgoing_frames) =
-            setup_credit_flow_controller(initial_time, initial_credits);
-        let (local, mut client) = Channel::create();
-        let mut data_received_by_client = Box::pin(client.next());
+        let inspect = inspect::Inspector::default();
+        let mut flow_controller = CreditFlowController::new(
+            Role::Initiator,             // Random fixed Role.
+            DLCI::try_from(19).unwrap(), // Random fixed user DLCI.
+            initial_credits,
+        )
+        .with_inspect(inspect.root(), FLOW_CONTROLLER)
+        .unwrap();
+
+        // Initial inspect topology
+        assert_data_tree!(@executor exec, inspect, root: {
+            flow_controller: {
+                controller_type: "credit_flow",
+                local_credits: 50u64,
+                remote_credits: 70u64,
+                inbound_stream: {
+                    bytes_per_second_current: 0u64,
+                    start_time: 987_000_000i64,
+                    streaming_secs: 0u64,
+                    total_bytes: 0u64,
+                },
+                outbound_stream: {
+                    bytes_per_second_current: 0u64,
+                    start_time: 987_000_000i64,
+                    streaming_secs: 0u64,
+                    total_bytes: 0u64,
+                },
+            },
+        });
 
         // After some time, the peer sends us user data with credits.
         exec.set_fake_time(zx::MonotonicDuration::from_seconds(1).after_now());
-        let data1 = UserData { information: vec![0x12, 0x34, 0x56, 0x78, 0x90] };
-        {
-            let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
-                FlowControlledData { user_data: data1, credits: Some(10) },
-                &local,
-            ));
-            assert!(exec.run_until_stalled(&mut receive_fut).is_ready());
-            // The user data should be relayed to the RFCOMM client.
-            assert!(exec.run_until_stalled(&mut data_received_by_client).is_ready());
-        }
+        let data1 = vec![0x12, 0x34, 0x56, 0x78, 0x90];
+        flow_controller.handle_incoming_frame(FlowControlledData::new(data1, 10));
+        assert_eq!(flow_controller.process_tx_queue(), vec![]);
         // Flow controller inspect node should be updated.
         assert_data_tree!(@executor exec, inspect, root: {
             flow_controller: {
@@ -1097,23 +1764,18 @@ mod tests {
             },
         });
 
-        // After some time, the client holding the RFCOMM channel responds with data.
+        // After some time, the application responds with data.
         exec.set_fake_time(zx::MonotonicDuration::from_seconds(2).after_now());
         let data2 = UserData { information: vec![0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22] };
-        {
-            let mut send_fut = Box::pin(flow_controller.send_data_to_peer(data2.clone()));
-            exec.run_until_stalled(&mut send_fut).expect_pending("should wait for outgoing frame");
-            // Frame to peer (No credit refresh because remote is above the watermark).
-            expect_user_data_frame(&mut exec, &mut outgoing_frames, data2, None);
-            assert!(exec.run_until_stalled(&mut send_fut).is_ready());
-        }
+        flow_controller.handle_outgoing_frame(data2.clone());
+        assert!(!flow_controller.process_tx_queue().is_empty());
         // Flow controller inspect node should be updated.
         assert_data_tree!(@executor exec, inspect, root: {
             flow_controller: {
                 controller_type: "credit_flow",
                 local_credits: 59u64, // 60 (previous amount) - 1 (sent frame)
                 remote_credits: 69u64, // 69 (previous amount unchanged)
-                inbound_stream: {
+                inbound_stream: { // Unchanged
                     bytes_per_second_current: 5u64,
                     start_time: 987_000_000i64,
                     streaming_secs: 1u64,

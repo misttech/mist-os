@@ -32,9 +32,9 @@ fn role_to_display_str(role: Role) -> &'static str {
 #[derive(Inspect, Default)]
 pub struct DuplexDataStreamInspect {
     #[inspect(rename = "inbound_stream")]
-    inbound: DataStreamInspect,
+    pub inbound: DataStreamInspect,
     #[inspect(rename = "outbound_stream")]
-    outbound: DataStreamInspect,
+    pub outbound: DataStreamInspect,
 }
 
 impl DuplexDataStreamInspect {
