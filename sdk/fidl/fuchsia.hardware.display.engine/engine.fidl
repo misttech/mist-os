@@ -144,7 +144,7 @@ type Layer = struct {
 
 type DisplayConfig = struct {
     /// the display id to which the configuration applies
-    display_id uint64;
+    display_id fuchsia.hardware.display.types.DisplayId;
 
     mode DisplayMode;
 
@@ -182,7 +182,7 @@ const MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES uint32 = 4;
 /// and converting the information into forms that are more suitable for
 /// higher-level software.
 type RawDisplayInfo = resource struct {
-    display_id uint64;
+    display_id fuchsia.hardware.display.types.DisplayId;
 
     /// Operational modes known to be supported by the display.
     ///
@@ -195,7 +195,8 @@ type RawDisplayInfo = resource struct {
     /// only supported operational mode in this member. Drivers that support
     /// seamless display handoff from a bootloader report the display's initial
     /// mode in this member.
-    preferred_modes vector<DisplayMode>:<MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES>;
+    preferred_modes
+            vector<fuchsia.hardware.display.types.Mode>:<MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES>;
 
     /// Display capabilities, encoded using the E-EDID standard.
     ///
@@ -245,7 +246,7 @@ open protocol EngineListener {
     /// Display Engine drivers must have finished accessing all images which
     /// were on the removed display before calling `OnDisplayRemoved()`.
     flexible OnDisplayRemoved(struct {
-        display_id uint64;
+        display_id fuchsia.hardware.display.types.DisplayId;
     });
 
     /// Called at the start of each display device's vertical synchronization
@@ -264,7 +265,7 @@ open protocol EngineListener {
     ///      configurations with a certain `config_stamp`; Only the application
     ///      status of the configuration with ID `display_id` is related.
     flexible OnDisplayVsync(struct {
-        display_id uint64;
+        display_id fuchsia.hardware.display.types.DisplayId;
         timestamp zx.Time;
         config_stamp ConfigStamp;
     });
@@ -510,7 +511,7 @@ open protocol Engine {
         ///
         /// TODO(https://fxbug.dev/399954526): Update the contract to cover
         /// configurations that reference an unassigned DisplayId.
-        display_id uint64;
+        display_id fuchsia.hardware.display.types.DisplayId;
 
         /// The display's new power state.
         ///

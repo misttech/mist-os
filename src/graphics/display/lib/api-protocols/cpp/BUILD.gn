@@ -14,6 +14,8 @@ source_set("cpp") {
     "display-engine-banjo-adapter.h",
     "display-engine-events-banjo.cc",
     "display-engine-events-banjo.h",
+    "display-engine-events-fidl.cc",
+    "display-engine-events-fidl.h",
     "display-engine-events-interface.cc",
     "display-engine-events-interface.h",
     "display-engine-interface.cc",
@@ -42,6 +44,7 @@ test_sources = [
   "backlight-interface-test.cc",
   "display-engine-banjo-adapter-test.cc",
   "display-engine-events-banjo-test.cc",
+  "display-engine-events-fidl-test.cc",
   "display-engine-events-interface-test.cc",
   "display-engine-interface-test.cc",
   "mock-backlight.cc",
@@ -50,6 +53,8 @@ test_sources = [
   "mock-banjo-display-engine-listener.h",
   "mock-display-engine.cc",
   "mock-display-engine.h",
+  "mock-fidl-display-engine-listener.cc",
+  "mock-fidl-display-engine-listener.h",
 ]
 
 group("test-deps") {
@@ -60,6 +65,7 @@ group("test-deps") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/fit",
     "//src/devices/bin/driver_runtime",
@@ -68,6 +74,7 @@ group("test-deps") {
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/image-format",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
 

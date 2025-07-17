@@ -11,6 +11,7 @@
 #include <zircon/assert.h>
 #include <zircon/time.h>
 
+#include <array>
 #include <cstdint>
 #include <mutex>
 
