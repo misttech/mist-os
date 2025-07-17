@@ -819,6 +819,13 @@ rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 rustflags = ["--cfg=rustc_1_25","--cfg=rustc_1_26",  "--cfg=rustc_1_27",]
 license_files = ["LICENSE-APACHE"]
 
+# TODO(https://fxbug.dev/429231789): Remove after soft transition.
+[gn.package.rand."0.8.4"]
+visibility = [
+  ":*",
+  "//vendor/google/*",
+]
+
 [gn.package.rand_chacha."0.3.1"]
 license_files = ["LICENSE-APACHE"]
 
