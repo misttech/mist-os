@@ -41,18 +41,14 @@ pub fn pressure_directory(kernel: &Kernel, fs: &FileSystemHandle) -> Option<FsNo
     };
 
     let dir = SimpleDirectory::new();
-    dir.edit(fs, |mutator| {
-        mutator.entry("memory", MemoryPressureFile::new_node(psi_provider), mode!(IFREG, 0o666));
-        mutator.entry(
+    dir.edit(fs, |dir| {
+        dir.entry("memory", MemoryPressureFile::new_node(psi_provider), mode!(IFREG, 0o666));
+        dir.entry(
             "cpu",
             StubPressureFile::new_node(StubPressureFileKind::CPU),
             mode!(IFREG, 0o666),
         );
-        mutator.entry(
-            "io",
-            StubPressureFile::new_node(StubPressureFileKind::IO),
-            mode!(IFREG, 0o666),
-        );
+        dir.entry("io", StubPressureFile::new_node(StubPressureFileKind::IO), mode!(IFREG, 0o666));
     });
     // TODO: Validate the mode bits are correct.
     Some(dir.into_node(fs, 0o777))

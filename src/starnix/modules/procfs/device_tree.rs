@@ -8,9 +8,9 @@ use starnix_core::vfs::{FileSystemHandle, FsNodeHandle};
 
 pub fn device_tree_directory(kernel: &Kernel, fs: &FileSystemHandle) -> FsNodeHandle {
     let dir = SimpleDirectory::new();
-    dir.edit(fs, |mutator| {
+    dir.edit(fs, |dir| {
         for setup_function in &kernel.procfs_device_tree_setup {
-            setup_function(mutator);
+            setup_function(dir);
         }
     });
     // TODO: Validate the mode bits are correct.

@@ -12,8 +12,8 @@ use starnix_core::vfs::buffers::{
     Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback,
 };
 use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectory;
 use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
@@ -468,25 +468,26 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
             return error!(ENOENT);
         };
         let fs = node.fs();
-        let mut dir = StaticDirectoryBuilder::new(&fs);
-        dir.set_mode(mode!(IFDIR, 0o500));
-        dir.dir_creds(connection.creds);
-        dir.node(
-            "abort",
-            fs.create_node_and_allocate_node_id(
-                AbortFile::new_node(connection.clone()),
-                FsNodeInfo::new(mode!(IFREG, 0o200), connection.creds),
-            ),
-        );
-        dir.node(
-            "waiting",
-            fs.create_node_and_allocate_node_id(
-                WaitingFile::new_node(connection.clone()),
-                FsNodeInfo::new(mode!(IFREG, 0o400), connection.creds),
-            ),
-        );
+        let dir = SimpleDirectory::new();
+        dir.edit(&fs, |dir| {
+            dir.node(
+                "abort".into(),
+                fs.create_node_and_allocate_node_id(
+                    AbortFile::new_node(connection.clone()),
+                    FsNodeInfo::new(mode!(IFREG, 0o200), connection.creds),
+                ),
+            );
+            dir.node(
+                "waiting".into(),
+                fs.create_node_and_allocate_node_id(
+                    WaitingFile::new_node(connection.clone()),
+                    FsNodeInfo::new(mode!(IFREG, 0o400), connection.creds),
+                ),
+            );
+        });
 
-        Ok(dir.build())
+        let info = FsNodeInfo::new(mode!(IFDIR, 0o500), connection.creds);
+        Ok(fs.create_node_and_allocate_node_id(dir, info))
     }
 }
 
