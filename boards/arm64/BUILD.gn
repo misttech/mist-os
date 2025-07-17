@@ -127,21 +127,14 @@ zbi_item("qemu_psci_cpu_suspend_states") {
     {
       id = 0
 
-      # Bit 31 is not set, marking this as a retention state.
-      # Hex: 0x40000000
-      power_state = 1073741824
-
-      # Nothing special.
-      flags = 0
-    },
-
-    # PSCI CPU_SUSPEND power state without retention.
-    {
-      id = 1
-
-      # Bit 31 is set, marking this as a no retention state.
-      # Hex: 0x80000000
-      power_state = 2147483648
+      # QEMU only supports the "Original format" (section 5.4.2.1 of DEN0022F.b), where bit 16 is
+      # the StateType and bits 15:0 are the StateID.
+      #
+      # Since QEMU does not support powerdown states, we use StateType=0 (meaning
+      # standby/retention).  For the StateID field, QEMU doesn't care so we simply use 1, which if
+      # QEMU were following the recommended encoding would mean core is last in the core power
+      # level, system level is run, cluster level is run, core level is standby.
+      power_state = 1
 
       # Nothing special.
       flags = 0
