@@ -9,8 +9,10 @@ import sys
 from collections import OrderedDict
 
 
-def read_manifest_list(maybe_manifest_list_file_path):
-    manifest_list = OrderedDict()
+def read_manifest_list(
+    maybe_manifest_list_file_path: str,
+) -> OrderedDict[str, str]:
+    manifest_list: OrderedDict[str, str] = OrderedDict()
     if maybe_manifest_list_file_path:
         with open(maybe_manifest_list_file_path) as manifest_list_file:
             contents = manifest_list_file.read()
@@ -27,7 +29,7 @@ def read_manifest_list(maybe_manifest_list_file_path):
     return manifest_list
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Create a single list of packages that are only in the GN metadata-based "
         "'universe' package set, by stripping all assembly-contributed packages from "
@@ -114,6 +116,8 @@ def main():
             deps.extend(metadata_walk_list.values())
 
             f.write(f"{args.output}: {' '.join(deps)}\n")
+
+    return 0
 
 
 if __name__ == "__main__":

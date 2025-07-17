@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", help="Write to this file")
     parser.add_argument(
@@ -45,6 +45,8 @@ def main():
             os.unlink(out.name)
         except FileNotFoundError:
             pass
+
+    return 0
 
 
 if __name__ == "__main__":

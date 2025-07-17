@@ -1,0 +1,70 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Extraction of package lists from a "main" product bundle for package publishing.
+#
+# This file generates the following public targets, which are lists of packages in the respectively
+# named package sets
+#  - 'base_package_manifests.list'
+#  - 'cache_package_manifests.list'
+#  - 'ondemand_package_manifests.list'
+#  - 'bundle_package_manifests.list' - This is all package manifests in the product bundle.
+#
+# These files are created in this file's 'target_out_dir'
+#
+# These files are json files that use the format:
+# ```
+# {
+#    "content": {
+#      "manifests": [
+#        "path/to/a/manifest"
+#      ]
+#    }
+# }
+# ```
+
+assert(current_toolchain == default_toolchain,
+       "//build/images/* are only valid in the Fuchsia toolchain")
+
+import("//build/assembly/packages_from_product_assembler.gni")
+import("//build/images/paths.gni")
+
+assert(use_bazel_images_only)
+assert(bazel_product_bundle_target != "")
+
+# These are the various package sets as determined from the product assembly operation in bazel.
+packages_from_product_assembler("base_package_manifests.list") {
+  package_set = "base"
+  assembly_label = labels.images
+  is_bazel_assembled = true
+  outputs = [ "${target_out_dir}/base_package_manifests.list" ]
+  testonly = true
+}
+
+packages_from_product_assembler("cache_package_manifests.list") {
+  package_set = "cache"
+  assembly_label = labels.images
+  is_bazel_assembled = true
+  outputs = [ "${target_out_dir}/cache_package_manifests.list" ]
+  testonly = true
+}
+
+packages_from_product_assembler("ondemand_package_manifests.list") {
+  package_set = "on_demand"
+  assembly_label = labels.images
+  is_bazel_assembled = true
+  outputs = [ "${target_out_dir}/ondemand_package_manifests.list" ]
+  testonly = true
+}
+
+# The above base packages list is created by product assembly, and _doesn't_ contain either
+# the base (system_image) or update package, so to get a full list of packages to publish,
+# we need a full set of packages from the product bundle.  We'll copy it here to ease things
+# elsewhere
+copy("bundle_package_manifests.list") {
+  testonly = true
+  deps = [ labels.bazel_package_manifests_list ]
+  sources = [ files.bazel_package_manifests_list ]
+  outputs = [ "${target_out_dir}/bundle_package_manifests.list" ]
+}

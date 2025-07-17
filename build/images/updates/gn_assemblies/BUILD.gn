@@ -1,0 +1,107 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Extraction of package lists from a "main" product bundle for package publishing.
+#
+# This file generates the following public targets, which are lists of packages in the respectively
+# named package sets
+#  - 'base_package_manifests.list'
+#  - 'cache_package_manifests.list'
+#  - 'ondemand_package_manifests.list'
+#  - 'bundle_package_manifests.list' - This is all package manifests in the product bundle.
+#
+# These files are created in this file's 'target_out_dir'
+#
+# These files are json files that use the format:
+# ```
+# {
+#    "content": {
+#      "manifests": [
+#        "path/to/a/manifest"
+#      ]
+#    }
+# }
+# ```
+
+assert(current_toolchain == default_toolchain,
+       "//build/images/* are only valid in the Fuchsia toolchain")
+
+import("//build/assembly/package_list.gni")
+import("//build/assembly/packages_from_product_assembler.gni")
+import("//build/images/paths.gni")
+
+assert(!use_bazel_images_only)
+assert(!use_bringup_assembly)
+
+packages_from_product_assembler("base_package_manifests.list") {
+  package_set = "base"
+  assembly_label = labels.images
+  is_bazel_assembled = false
+  outputs = [ "${target_out_dir}/base_package_manifests.list" ]
+  testonly = true
+}
+
+packages_from_product_assembler("cache_package_manifests.list") {
+  package_set = "cache"
+  assembly_label = labels.images
+  is_bazel_assembled = false
+  outputs = [ "${target_out_dir}/cache_package_manifests.list" ]
+  testonly = true
+}
+
+packages_from_product_assembler("ondemand_package_manifests.list") {
+  package_set = "on_demand"
+  assembly_label = labels.images
+  is_bazel_assembled = false
+  outputs = [ "${target_out_dir}/ondemand_package_manifests.list" ]
+  testonly = true
+}
+
+# The above base packages list is created by product assembly, and _doesn't_
+# contain the base (system_image), so to get a full list of packages to
+# publish, we need to get the lists from the assembly outputs
+package_list_from_assembly("internal_use_base_packages") {
+  visibility = [ ":*" ]
+  testonly = true
+  system_label = labels.images
+  package_set = "base"
+  contents = "manifest"
+  outputs = [ "${target_out_dir}/internal_use_base_packages.list" ]
+}
+
+package_list_from_assembly("internal_use_cache_packages") {
+  visibility = [ ":*" ]
+  testonly = true
+  system_label = labels.images
+  package_set = "cache"
+  contents = "manifest"
+  outputs = [ "${target_out_dir}/internal_use_cache_packages.list" ]
+}
+
+# And now those lists are merged to make the bundle_package_manifests.list
+action("bundle_package_manifests.list") {
+  testonly = true
+  script = "//build/images/updates/merge_package_manifests_list.py"
+
+  # GN legacy-defined universe packages
+  deps = [
+    ":internal_use_base_packages",
+    ":internal_use_cache_packages",
+  ]
+  inputs = [
+    "${target_out_dir}/internal_use_base_packages.list",
+    "${target_out_dir}/internal_use_cache_packages.list",
+  ]
+  outputs = [ "${target_out_dir}/bundle_package_manifests.list" ]
+  args = [
+    "--output",
+    rebase_path(outputs[0], root_build_dir),
+  ]
+  foreach(input, inputs) {
+    args += [
+      "--paths",
+      rebase_path(input, root_build_dir),
+    ]
+  }
+}

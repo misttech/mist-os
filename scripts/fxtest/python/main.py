@@ -1185,11 +1185,11 @@ class AsyncMain:
             "base_packages.list", base_file
         )
 
-        manifests: list[str]
+        base_package_names: list[str]
         try:
             with open(base_file) as f:
                 contents = json.load(f)
-            manifests = contents["content"]["manifests"]
+            base_package_names = contents["content"]["names"]
         except (json.JSONDecodeError, KeyError) as e:
             recorder.emit_end(f"Parsing file failed: {e}", id=parse_id)
             raise e
@@ -1198,27 +1198,26 @@ class AsyncMain:
             recorder.emit_end(id=parse_id)
             return False
 
-        manifest_ends = {m.split("/")[-1] for m in manifests}
-        in_base = [
+        test_packagess_in_base = [
             name
             for t in tests.selected
-            if (name := t.package_name()) in manifest_ends
+            if (name := t.package_name()) in base_package_names
         ]
 
-        if in_base:
-            names = ", ".join(in_base[:3])
+        if test_packagess_in_base:
+            names = ", ".join(test_packagess_in_base[:3])
             tests_are_in_base_including = (
                 "tests are in base, including"
-                if len(in_base) > 1
+                if len(test_packagess_in_base) > 1
                 else "test is in base:"
             )
             recorder.emit_info_message(
-                f"\n{len(in_base)} {tests_are_in_base_including} {names}"
+                f"\n{len(test_packagess_in_base)} {tests_are_in_base_including} {names}"
             )
 
         recorder.emit_end(id=parse_id)
 
-        return bool(in_base)
+        return bool(test_packagess_in_base)
 
     async def _post_build_checklist(
         self,

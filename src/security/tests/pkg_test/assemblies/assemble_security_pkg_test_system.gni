@@ -346,7 +346,7 @@ template("assemble_security_pkg_test_system") {
   # package's manifest to create a single list of package manifests.
   action(labels.all_package_manifests_list) {
     testonly = true
-    script = "//build/images/updates/create-all-package-manifests-list.py"
+    script = "//build/images/updates/merge_package_manifests_list.py"
     outputs = [ files.all_package_manifests_list ]
     deps = [
       ":${labels.base_package_manifests_list}",
