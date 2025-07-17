@@ -139,6 +139,10 @@ impl EnvContext {
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
+        log::debug!(
+            "Acquired remote_control_proxy for EnvContext instance: {}",
+            logging::log_id(&self.context)
+        );
         Ok(res)
     }
 
