@@ -12,7 +12,7 @@ import unittest
 import unittest.mock as mock
 from pathlib import Path
 
-from power import monsoon, sampler
+from power import powerserver, sampler
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -42,7 +42,9 @@ class PowerSamplerTest(unittest.TestCase):
     def test_sampler_without_measurepower(self) -> None:
         """Tests that PowerSampler creates zero results when not given a path to a measurepower binary."""
         with mock.patch("os.environ.get", return_value=None):
-            power_sampler = monsoon.create_power_sampler(self.default_config)
+            power_sampler = powerserver.create_power_sampler(
+                self.default_config
+            )
 
         with mock.patch.object(time, "time", return_value=5):
             power_sampler.start()
@@ -59,7 +61,7 @@ class PowerSamplerTest(unittest.TestCase):
         The sampler should interact with the binary via subprocess.Popen
         and an intermediate csv file.
         """
-        power_sampler = monsoon.create_power_sampler(
+        power_sampler = powerserver.create_power_sampler(
             self.config_width_measurepower_path, fallback_to_stub=False
         )
 
@@ -116,7 +118,7 @@ class PowerSamplerTest(unittest.TestCase):
         mock_popen: mock.MagicMock,
     ) -> None:
         """Tests the sampler with a measurepower binary path that times out"""
-        power_sampler = monsoon.create_power_sampler(
+        power_sampler = powerserver.create_power_sampler(
             self.config_width_measurepower_path, fallback_to_stub=False
         )
 
@@ -134,8 +136,10 @@ class PowerSamplerTest(unittest.TestCase):
 
     def test_create_power_sampler_without_measurepower(self) -> None:
         with mock.patch("os.environ.get", return_value=None):
-            power_sampler = monsoon.create_power_sampler(self.default_config)
-            self.assertIsInstance(power_sampler, monsoon._NoopPowerSampler)
+            power_sampler = powerserver.create_power_sampler(
+                self.default_config
+            )
+            self.assertIsInstance(power_sampler, powerserver._NoopPowerSampler)
 
     def test_create_power_sampler_without_measurepower_without_fallback_to_stub(
         self,
@@ -144,56 +148,56 @@ class PowerSamplerTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 RuntimeError, ".* env variable must be set"
             ):
-                monsoon.create_power_sampler(
+                powerserver.create_power_sampler(
                     self.default_config, fallback_to_stub=False
                 )
 
     def test_create_power_sampler_with_measurepower_env_var(self) -> None:
         with mock.patch("os.environ.get", return_value="path/to/power"):
-            power_sampler = monsoon.create_power_sampler(
+            power_sampler = powerserver.create_power_sampler(
                 self.config_width_measurepower_path
             )
-            self.assertIsInstance(power_sampler, monsoon._RealPowerSampler)
+            self.assertIsInstance(power_sampler, powerserver._RealPowerSampler)
 
     def test_weighted_average(self) -> None:
         vals = [3, 2, 3, 4]
         weights = [1, 1, 1, 1]
-        self.assertEqual(monsoon.weighted_average(vals, weights), 3)
+        self.assertEqual(powerserver.weighted_average(vals, weights), 3)
 
         vals = [3, 2, 3, 4]
         weights = [1, 2, 3, 4]
         # (3 + 4 + 9 + 16) / 10 = 3.2
-        self.assertEqual(monsoon.weighted_average(vals, weights), 3.2)
+        self.assertEqual(powerserver.weighted_average(vals, weights), 3.2)
 
     def test_cross_correlate_arg_max(self) -> None:
         signal = [1, 2, 3, 4, 5, 6]
         feature = [1]
         self.assertEqual(
-            monsoon.cross_correlate_arg_max(signal, feature), (6, 5)
+            powerserver.cross_correlate_arg_max(signal, feature), (6, 5)
         )
 
         signal = [1, 2, 3, 4, 5, 6]
         feature = [1, 2]
         self.assertEqual(
-            monsoon.cross_correlate_arg_max(signal, feature), (17, 4)
+            powerserver.cross_correlate_arg_max(signal, feature), (17, 4)
         )
 
         signal = [0, 0, 0, 1, 4, 3, 2, 0]
         feature = [1, 4, 3, 2]
         self.assertEqual(
-            monsoon.cross_correlate_arg_max(signal, feature), (30, 3)
+            powerserver.cross_correlate_arg_max(signal, feature), (30, 3)
         )
 
         large_signal = list(range(30000))
         large_feature = list(range(20000))
         self.assertEqual(
-            monsoon.cross_correlate_arg_max(large_signal, large_feature),
+            powerserver.cross_correlate_arg_max(large_signal, large_feature),
             (4666366670000, 10000),
         )
 
     def test_normalize(self) -> None:
         signal = [0, 1, 2, 3, 4, 5]
-        normalized = monsoon.normalize(signal)
+        normalized = powerserver.normalize(signal)
         expected = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
         self.assertEqual(normalized, expected)
 
@@ -203,7 +207,7 @@ class PowerSamplerTest(unittest.TestCase):
 
         # If we cross correlate without normalizing, we correlate best with the 2s
         self.assertEqual(
-            monsoon.cross_correlate_arg_max(signal, feature), (60, 5)
+            powerserver.cross_correlate_arg_max(signal, feature), (60, 5)
         )
 
         # But if we normalize first
@@ -214,9 +218,9 @@ class PowerSamplerTest(unittest.TestCase):
         #
         # which correctly correlates best with the beginning
         self.assertEqual(
-            monsoon.cross_correlate_arg_max(
-                monsoon.normalize(signal),
-                monsoon.normalize(feature),
+            powerserver.cross_correlate_arg_max(
+                powerserver.normalize(signal),
+                powerserver.normalize(feature),
             ),
             (1.0, 0),
         )
