@@ -1,0 +1,108 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/starnix/build/starnix_linux_rustc_binary.gni")
+import("//src/starnix/kernel/starnix.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":starnix_thermal_module_test" ]
+}
+
+rustc_library("common") {
+  testonly = true
+  edition = "2021"
+  source_root = "src/common.rs"
+  sources = [ "src/common.rs" ]
+}
+
+rustc_binary("bin") {
+  testonly = true
+  edition = "2021"
+  output_name = "starnix_thermal_module_test"
+
+  deps = [
+    ":common",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//sdk/rust/zx",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//src/power/testing/fake-trippoint:test.trippoint_rust",
+    "//src/sys/lib/component-events",
+    "//third_party/rust_crates:log",
+  ]
+  sources = [ "src/main.rs" ]
+}
+
+fuchsia_test_component("integration_test") {
+  manifest = "meta/integration_test.cml"
+  deps = [ ":bin" ]
+  test_type = "starnix"
+}
+
+starnix_linux_rustc_binary("thermal_client_bin") {
+  testonly = true
+  edition = 2021
+  source_root = "src/thermal_client.rs"
+  sources = [ "src/thermal_client.rs" ]
+  deps = [
+    ":common",
+    "//src/starnix/lib/linux_uapi",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_core",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_generic",
+    "//src/starnix/modules/thermal:thermal-netlink",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:nix",
+  ]
+}
+
+fuchsia_component("container_with_thermal_client") {
+  testonly = true
+  manifest = "meta/container_with_thermal_client.cml"
+}
+
+fuchsia_component("thermal_client") {
+  testonly = true
+  manifest = "meta/thermal_client.cml"
+  deps = [ ":thermal_client_bin" ]
+}
+
+fuchsia_component("thermal_container") {
+  testonly = true
+  manifest = "meta/thermal_container.cml"
+}
+
+fuchsia_package("thermal_container_pkg") {
+  testonly = true
+  deps = [
+    ":thermal_container",
+    "//src/starnix/containers/debian:container_resources",
+  ]
+}
+
+fuchsia_test_package("starnix_thermal_module_test") {
+  test_components = [ ":integration_test" ]
+  deps = [
+    ":container_with_thermal_client",
+    ":thermal_client",
+    ":thermal_container",
+    "//src/devices/misc/drivers/test-parent",
+    "//src/power/testing/fake-trippoint:fake_trippoint_component",
+    "//src/starnix/containers/debian:container_resources",
+  ]
+  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+
+  # There's expected error logs that happen due to races in driver enumeration.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
