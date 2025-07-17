@@ -214,7 +214,7 @@ zx::result<std::vector<fdf_power::PowerElementConfiguration>> PDev::GetPowerConf
 }
 
 fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>>
-PDev::GetAndApplyPowerConfiguration(const fdf::Namespace& ns) {
+PDev::GetAndApplyPowerConfiguration(const fdf::Namespace& ns, bool use_element_runner) {
   zx::result configs = GetPowerConfiguration();
   if (configs.is_error()) {
     return fit::error(fdf_power::Error::CONFIGURATION_UNAVAILABLE);
@@ -224,7 +224,7 @@ PDev::GetAndApplyPowerConfiguration(const fdf::Namespace& ns) {
     return fit::success(std::vector<fdf_power::ElementDesc>{});
   }
 
-  return fdf_power::ApplyPowerConfiguration(ns, configs.value());
+  return fdf_power::ApplyPowerConfiguration(ns, configs.value(), use_element_runner);
 }
 
 namespace internal {
