@@ -98,7 +98,7 @@ TEST(SocketTest, PeerClosedError) {
     // remote gets closed here.
   }
 
-  uint32_t data;
+  uint32_t data = 0;
   ASSERT_STATUS(local.write(0u, &data, sizeof(data), nullptr), ZX_ERR_PEER_CLOSED);
 }
 
