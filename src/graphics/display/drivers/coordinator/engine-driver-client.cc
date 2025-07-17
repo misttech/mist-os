@@ -287,7 +287,7 @@ zx::result<> EngineDriverClient::SetBufferCollectionConstraints(
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  const image_buffer_usage_t banjo_usage = display::ToBanjoImageBufferUsage(usage);
+  const image_buffer_usage_t banjo_usage = usage.ToBanjo();
   zx_status_t banjo_status =
       banjo_engine_.SetBufferCollectionConstraints(&banjo_usage, collection_id.ToBanjo());
   return zx::make_result(banjo_status);

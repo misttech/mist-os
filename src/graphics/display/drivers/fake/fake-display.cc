@@ -490,7 +490,7 @@ zx::result<> FakeDisplay::SetBufferCollectionConstraints(
       buffer_collection_it->second;
 
   BufferCollectionUsage buffer_collection_usage =
-      (image_buffer_usage.tiling_type == display::ImageTilingType::kCapture)
+      (image_buffer_usage.tiling_type() == display::ImageTilingType::kCapture)
           ? BufferCollectionUsage::kCapture
           : BufferCollectionUsage::kPrimaryLayer;
 

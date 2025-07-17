@@ -378,12 +378,12 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationMultiLayer) {
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsSuccess) {
-  static constexpr display::ImageBufferUsage kImageBufferUsage{
-      .tiling_type = display::ImageTilingType::kLinear};
+  static constexpr display::ImageBufferUsage kImageBufferUsage({
+      .tiling_type = display::ImageTilingType::kLinear});
   static constexpr display::DriverBufferCollectionId kBufferCollectionId(42);
 
   const image_buffer_usage_t kBanjoImageBufferUsage =
-      display::ToBanjoImageBufferUsage(kImageBufferUsage);
+      kImageBufferUsage.ToBanjo();
 
   mock_.ExpectSetBufferCollectionConstraints(
       [&](const display::ImageBufferUsage& image_buffer_usage,
@@ -397,12 +397,12 @@ TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsSuccess) {
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsError) {
-  static constexpr display::ImageBufferUsage kImageBufferUsage{
-      .tiling_type = display::ImageTilingType::kLinear};
+  static constexpr display::ImageBufferUsage kImageBufferUsage({
+      .tiling_type = display::ImageTilingType::kLinear});
   static constexpr display::DriverBufferCollectionId kBufferCollectionId(42);
 
   const image_buffer_usage_t kBanjoImageBufferUsage =
-      display::ToBanjoImageBufferUsage(kImageBufferUsage);
+      kImageBufferUsage.ToBanjo();
 
   mock_.ExpectSetBufferCollectionConstraints(
       [&](const display::ImageBufferUsage& image_buffer_usage,

@@ -247,8 +247,7 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* banjo_image_buffer_usage,
     uint64_t banjo_driver_buffer_collection_id) {
-  display::ImageBufferUsage image_buffer_usage =
-      display::ToImageBufferUsage(*banjo_image_buffer_usage);
+  display::ImageBufferUsage image_buffer_usage(*banjo_image_buffer_usage);
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::DriverBufferCollectionId(banjo_driver_buffer_collection_id);
   zx::result<> result =

@@ -436,9 +436,9 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
                 zx::error(ZX_ERR_ALREADY_EXISTS));
 
   // Driver sets BufferCollection buffer memory constraints.
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage ({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   EXPECT_OK(fake_display_->SetBufferCollectionConstraints(kDisplayUsage, kValidBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
@@ -473,9 +473,9 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   ASSERT_OK(fake_display_->ImportBufferCollection(kBufferCollectionId, std::move(token)));
 
   // Driver sets BufferCollection buffer memory constraints.
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage ({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   ASSERT_OK(fake_display_->SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
@@ -553,9 +553,9 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   const PixelFormatAndModifier kPixelFormat(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                             fuchsia_images2::PixelFormatModifier::kLinear);
 
-  static constexpr display::ImageBufferUsage kCaptureUsage = {
+  static constexpr display::ImageBufferUsage kCaptureUsage({
       .tiling_type = display::ImageTilingType::kCapture,
-  };
+  });
   ASSERT_OK(fake_display_->SetBufferCollectionConstraints(kCaptureUsage, kBufferCollectionId));
 
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
@@ -631,14 +631,14 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
 
   // Set BufferCollection buffer memory constraints from the display driver's
   // end.
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage ({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   ASSERT_OK(
       fake_display_->SetBufferCollectionConstraints(kDisplayUsage, kFramebufferBufferCollectionId));
-  static constexpr display::ImageBufferUsage kCaptureUsage = {
+  static constexpr display::ImageBufferUsage kCaptureUsage({
       .tiling_type = display::ImageTilingType::kCapture,
-  };
+  });
   ASSERT_OK(
       fake_display_->SetBufferCollectionConstraints(kCaptureUsage, kCaptureBufferCollectionId));
 
@@ -801,9 +801,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
 
   // Set BufferCollection buffer memory constraints from the display driver's
   // end.
-  static constexpr display::ImageBufferUsage kCaptureUsage = {
+  static constexpr display::ImageBufferUsage kCaptureUsage({
       .tiling_type = display::ImageTilingType::kCapture,
-  };
+  });
   ASSERT_OK(
       fake_display_->SetBufferCollectionConstraints(kCaptureUsage, kCaptureBufferCollectionId));
 

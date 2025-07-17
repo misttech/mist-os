@@ -37,6 +37,7 @@ source_set("cpp") {
     "event-id.h",
     "id-type.cc",
     "id-type.h",
+    "image-buffer-usage.cc",
     "image-buffer-usage.h",
     "image-id.h",
     "image-metadata.cc",

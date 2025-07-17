@@ -291,8 +291,7 @@ void Client::SetBufferCollectionConstraints(
   }
   auto& collections = it->second;
 
-  const display::ImageBufferUsage image_buffer_usage =
-      display::ToImageBufferUsage(request->buffer_usage);
+  const display::ImageBufferUsage image_buffer_usage(request->buffer_usage);
   zx::result<> result = controller_.engine_driver_client()->SetBufferCollectionConstraints(
       image_buffer_usage, collections.driver_buffer_collection_id);
   if (result.is_error()) {

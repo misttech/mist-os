@@ -834,7 +834,7 @@ zx::result<> TestFidlClient::SetBufferCollectionConstraints(
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
       buffer_collection_id.ToFidl();
   const fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage =
-      display::ToFidlImageBufferUsage(image_buffer_usage);
+      image_buffer_usage.ToFidl();
 
   fidl::WireResult<fuchsia_hardware_display::Coordinator::SetBufferCollectionConstraints>
       fidl_status = coordinator_fidl_client_->SetBufferCollectionConstraints(
@@ -1016,9 +1016,9 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     return import_buffer_collection_result.take_error();
   }
 
-  const display::ImageBufferUsage image_buffer_usage = {
+  const display::ImageBufferUsage image_buffer_usage({
       .tiling_type = image_metadata.tiling_type(),
-  };
+  });
   zx::result<> set_buffer_constraints_result =
       SetBufferCollectionConstraints(buffer_collection_id, image_buffer_usage);
   if (set_buffer_constraints_result.is_error()) {

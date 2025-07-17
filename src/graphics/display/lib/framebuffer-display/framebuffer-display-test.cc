@@ -391,9 +391,9 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
   EXPECT_OK(display.ImportBufferCollection(kBufferCollectionId, std::move(token_endpoints.client)));
 
   // Set Buffer collection constraints.
-  static constexpr display::ImageBufferUsage kDisplayUsage = {
+  static constexpr display::ImageBufferUsage kDisplayUsage({
       .tiling_type = display::ImageTilingType::kLinear,
-  };
+  });
   EXPECT_OK(display.SetBufferCollectionConstraints(kDisplayUsage, kBufferCollectionId));
 
   auto [heap_client, heap_server] = fidl::Endpoints<fuchsia_hardware_sysmem::Heap>::Create();
