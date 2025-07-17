@@ -73,6 +73,7 @@ fn build_aac_sink(bitrate: u32) -> MediaCodecConfig {
         .try_into()
         .unwrap()
 }
+
 impl Builder {
     pub fn new(
         metrics_logger: bt_metrics::MetricsLogger,

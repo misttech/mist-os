@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Context as _, Error};
+use anyhow::{Context as _, Error};
+use bt_a2dp::media_task::MediaTaskError;
 use fidl_fuchsia_media::{AudioFormat, AudioUncompressedFormat, DomainFormat, PcmFormat};
 use fuchsia_audio_codec::StreamProcessor;
 
@@ -54,8 +55,9 @@ impl EncodedStream {
         let pcm_input_format = DomainFormat::Audio(AudioFormat::Uncompressed(
             AudioUncompressedFormat::Pcm(input_format),
         ));
-        let mut encoder =
-            Box::new(StreamProcessor::create_encoder(pcm_input_format, encoder_settings)?);
+        let processor = StreamProcessor::create_encoder(pcm_input_format.clone(), encoder_settings.clone()).inspect_err(|e| {
+            log::warn!("Couldn't make StreamProcessor for {pcm_input_format:?} {encoder_settings:?}: {e:?}"); })?;
+        let mut encoder = Box::new(processor);
         let encoded_stream = encoder.take_output_stream()?.boxed();
 
         Ok(Self {
@@ -93,20 +95,18 @@ impl EncodedStream {
     pub async fn test(
         input_format: PcmFormat,
         config: &a2dp::codec::MediaCodecConfig,
-    ) -> Result<(), Error> {
+    ) -> Result<(), MediaTaskError> {
         let silence_source = SilenceStream::build(input_format.clone());
         let mut encoder = EncodedStream::build(input_format, silence_source.boxed(), config)
-            .context("Building encoder")?;
+            .context("Building encoder")
+            .map_err(|e| MediaTaskError::Other(e.to_string()))?;
         match encoder.next().await {
-            Some(Ok(encoded_frame)) => {
-                if encoded_frame.is_empty() {
-                    Err(format_err!("Encoded frame was empty"))
-                } else {
-                    Ok(())
-                }
+            Some(Ok(encoded_frame)) if encoded_frame.is_empty() => {
+                Err(MediaTaskError::NotSupported)
             }
-            Some(Err(e)) => Err(e),
-            None => Err(format_err!("Encoder ended stream")),
+            Some(Err(e)) => Err(MediaTaskError::Other(e.to_string())),
+            None => Err(MediaTaskError::NotSupported),
+            _ => Ok(()),
         }
     }
 }
@@ -415,7 +415,7 @@ mod encoder_tests {
 
     pub async fn test_encoding_capability(
         capability: &avdtp::ServiceCapability,
-    ) -> Result<(), Error> {
+    ) -> Result<(), MediaTaskError> {
         let config = a2dp::codec::MediaCodecConfig::try_from(capability)?;
         let channel_map = match config.channel_count()? {
             1 => vec![AudioChannelId::Lf],

@@ -12,9 +12,7 @@ use bt_a2dp::permits::Permits;
 use bt_a2dp::stream;
 use fidl_fuchsia_bluetooth_a2dp::{AudioModeRequest, AudioModeRequestStream, Role};
 use fidl_fuchsia_component::BinderMarker;
-use fidl_fuchsia_media::{
-    AudioChannelId, AudioPcmMode, PcmFormat, SessionAudioConsumerFactoryMarker,
-};
+use fidl_fuchsia_media::SessionAudioConsumerFactoryMarker;
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_bluetooth::assigned_numbers::AssignedNumber;
 use fuchsia_bluetooth::profile::{
@@ -43,7 +41,6 @@ mod stream_controller;
 mod volume_relay;
 
 use config::A2dpConfiguration;
-use encoding::EncodedStream;
 use media::player::Player;
 use pcm_audio::PcmAudio;
 use stream_controller::{add_stream_controller_capability, PermitsManager};
@@ -89,7 +86,7 @@ async fn streams_builder(
     metrics_logger: bt_metrics::MetricsLogger,
     config: &A2dpConfiguration,
 ) -> Result<stream::StreamsBuilder, Error> {
-    // SBC is required to be playable if sink is enabled.
+    // SBC is required to be playable if sink is enabled, check early before AAC.
     if config.enable_sink {
         let sbc_config = MediaCodecConfig::min_sbc();
         if let Err(e) = Player::test_playable(&sbc_config).await {
@@ -132,7 +129,8 @@ async fn streams_builder(
         return Ok(streams_builder);
     };
 
-    let inband_source_builder = media::inband_source::Builder::new(source_type, aac_available);
+    let inband_source_builder =
+        media::inband_source::Builder::new(source_type, aac_available).await?;
 
     streams_builder.add_builder(inband_source_builder);
     Ok(streams_builder)
@@ -229,17 +227,6 @@ fn handle_services_found(
     }
 }
 
-async fn test_encode_sbc() -> Result<(), Error> {
-    // all sinks must support these options
-    let required_format = PcmFormat {
-        pcm_mode: AudioPcmMode::Linear,
-        bits_per_sample: 16,
-        frames_per_second: 48000,
-        channel_map: vec![AudioChannelId::Lf],
-    };
-    EncodedStream::test(required_format, &MediaCodecConfig::min_sbc()).await
-}
-
 /// Handles role change requests from serving AudioMode
 fn handle_audio_mode_connection(peers: Arc<ConnectedPeers>, mut stream: AudioModeRequestStream) {
     fasync::Task::spawn(async move {
@@ -316,13 +303,6 @@ async fn main() -> Result<(), Error> {
     let initiator_delay = (init_delay_ms != 0).then_some(config.initiator_delay);
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-
-    // Check to see that we can encode SBC audio.
-    // This is a requirement of A2DP 1.3: Section 4.2
-    if let Err(e) = test_encode_sbc().await {
-        error!("Can't encode required SBC Audio: {e:?}");
-        return Ok(());
-    }
 
     let controller_pool = Arc::new(ControllerPool::new());
 
@@ -481,7 +461,7 @@ mod tests {
 
         assert!(
             streams_builder.is_err(),
-            "Stream building should fail when it can't reach MediaPlayer"
+            "Stream building should fail when it can't play SBC / encode SBC"
         );
     }
 
@@ -677,15 +657,6 @@ mod tests {
             Poll::Pending => {}
         };
         run_to_stalled(&mut exec);
-    }
-
-    #[cfg(not(feature = "test_encoding"))]
-    #[fuchsia::test]
-    fn test_encoding_fails_in_test_environment() {
-        let mut exec = fasync::TestExecutor::new();
-        let result = exec.run_singlethreaded(test_encode_sbc());
-
-        assert!(result.is_err());
     }
 
     #[fuchsia::test]
