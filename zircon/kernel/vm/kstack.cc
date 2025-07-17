@@ -72,8 +72,10 @@ void stack_canary_write(const Stack& type, void* base) {
 void stack_canary_check(const Stack& stack, void* base) {
   const size_t off = stack_canary_offset(stack);
   if (static_cast<unsigned char*>(base)[off] != kStackCanary) {
-    KERNEL_OOPS("Canary at offset %zu in stack %s as base %p of size %#x was corrupted.\n", off,
-                stack.name, base, stack.size_bytes);
+    // TODO(https://fxbug.dev/431001857): Upgrade this to an OOPS once we have either fixed root
+    // cause or have more diagnostic data to log.
+    printf("Canary at offset %zu in stack %s as base %p of size %#x was corrupted.\n", off,
+           stack.name, base, stack.size_bytes);
   }
 }
 
