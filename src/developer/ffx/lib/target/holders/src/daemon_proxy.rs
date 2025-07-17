@@ -379,6 +379,8 @@ impl Injector for Injection {
         })?
     }
 
+    /// TODO(b/432297777)
+    #[allow(clippy::await_holding_lock)]
     async fn remote_factory(&self) -> anyhow::Result<RemoteControlProxy> {
         let timeout_error = self.daemon_timeout_error();
         // XXX Note: if we are doing local discovery, that will eat into this time.

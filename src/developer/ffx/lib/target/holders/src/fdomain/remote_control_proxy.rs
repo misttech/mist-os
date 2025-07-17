@@ -35,6 +35,8 @@ impl From<RemoteControlProxy> for RemoteControlProxyHolder {
 
 #[async_trait(?Send)]
 impl TryFromEnv for RemoteControlProxyHolder {
+    /// TODO(b/432297777)
+    #[allow(clippy::await_holding_lock)]
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let target_env = target_interface(env);
         let behavior = if let Some(behavior) = target_env.behavior() {
