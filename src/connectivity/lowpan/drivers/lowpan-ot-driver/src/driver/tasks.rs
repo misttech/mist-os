@@ -315,6 +315,10 @@ where
             },
         ));
 
+        driver_state.ot_instance.border_agent_set_ephemeral_key_callback(Some(move || {
+            self.handle_epskc_state_changed()
+        }));
+
         if let Err(err) = driver_state.set_discovery_proxy_enabled(true) {
             warn!("Unable to start SRP discovery proxy: {:?}", err);
         }
