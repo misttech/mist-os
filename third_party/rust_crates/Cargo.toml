@@ -192,6 +192,9 @@ prost-types = "0.11.1"
 rand = { version = "0.8", features = ["small_rng"] }
 rand_core = "0.6.4"
 rand_xorshift = "0.3"
+# NOTE: Use caution when updating to a new major version of `rapidhash` as this may cause hash
+# values to change. We rely on this crate for stable hashes.
+rapidhash = { version = "1.4.0", features = ["unsafe"] }
 rayon = "1.10.0"
 ref-cast = "1.0.24"
 regex = "1.7.3"
@@ -424,6 +427,8 @@ openssl = { path = "forks/openssl-0.10.71" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 #pulldown-cmark = { path = "forks/pulldown-cmark" }
+# Fork of `rapidhash` has quality benchmarks removed; see forks/rapidhash-1.4.0/README.fuchsia.
+rapidhash = { path = "forks/rapidhash-1.4.0" }
 ring = { path = "forks/ring-0.17.8" }
 rustyline = { path = "forks/rustyline" }
 security-framework = { path = "forks/security-framework" }

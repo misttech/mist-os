@@ -772,6 +772,10 @@ group("rand_xorshift") {
   public_deps = [ ":rand_xorshift-v0_3_0" ]
 }
 
+group("rapidhash") {
+  public_deps = [ ":rapidhash-v1_4_0" ]
+}
+
 group("rayon") {
   public_deps = [ ":rayon-v1_10_0" ]
 }
@@ -13684,6 +13688,41 @@ rustc_library("rand_xoshiro-v0_1_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":rand_xoshiro-v0_1_0.license" ]
+}
+
+license("rapidhash-v1_4_0.license") {
+  public_package_name = "rapidhash"
+  license_files = [
+    "//third_party/rust_crates/forks/rapidhash-1.4.0/LICENSE-APACHE",
+    "//third_party/rust_crates/forks/rapidhash-1.4.0/LICENSE-MIT",
+  ]
+}
+
+rustc_library("rapidhash-v1_4_0") {
+  crate_name = "rapidhash"
+  source_root = "//third_party/rust_crates/forks/rapidhash-1.4.0/src/lib.rs"
+  output_name = "rapidhash-808a02235bdf7873"
+  edition = "2021"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=808a02235bdf7873",
+    "-Cextra-filename=-808a02235bdf7873",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+    "--cfg=feature=\"unsafe\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":rapidhash-v1_4_0.license" ]
 }
 
 license("rayon-v1_10_0.license") {

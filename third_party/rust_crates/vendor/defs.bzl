@@ -432,6 +432,7 @@ _NORMAL_DEPENDENCIES = {
             "rand": Label("//third_party/rust_crates/vendor/rand-0.8.4:rand"),
             "rand_core": Label("//third_party/rust_crates/vendor/rand_core-0.6.4:rand_core"),
             "rand_xorshift": Label("//third_party/rust_crates/vendor/rand_xorshift-0.3.0:rand_xorshift"),
+            "rapidhash": Label("//third_party/rust_crates/vendor/rapidhash-1.4.0:rapidhash"),
             "rayon": Label("//third_party/rust_crates/vendor/rayon-1.10.0:rayon"),
             "ref-cast": Label("//third_party/rust_crates/vendor/ref-cast-1.0.24:ref_cast"),
             "regex": Label("//third_party/rust_crates/vendor/regex-1.7.3:regex"),
