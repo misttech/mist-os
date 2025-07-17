@@ -21,7 +21,6 @@ use fidl_fuchsia_update_installer::{
     InstallerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream, RebootControllerMarker,
     UpdateNotStartedReason,
 };
-use fuchsia_url::AbsolutePackageUrl;
 use futures::prelude::*;
 use futures::task::{Context, Poll};
 use log::info;
@@ -98,7 +97,7 @@ impl UpdateAttemptMonitor {
 /// Checks if an update can be started and returns the UpdateAttempt containing
 /// the attempt_id and MonitorRequestStream to the client.
 pub async fn start_update(
-    update_url: &AbsolutePackageUrl,
+    update_url: &url::Url,
     options: Options,
     installer_proxy: &InstallerProxy,
     reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,

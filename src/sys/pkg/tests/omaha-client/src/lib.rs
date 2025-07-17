@@ -1837,7 +1837,17 @@ async fn test_omaha_client_invalid_response() {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_omaha_client_invalid_url() {
-    let env = TestEnvBuilder::new().default_with_response(OmahaResponse::InvalidURL).build().await;
+    let env = TestEnvBuilder::new()
+        .responses_and_metadata(vec![(
+            APP_ID.to_string(),
+            ResponseAndMetadata {
+                response: OmahaResponse::Update,
+                codebase: "invalid-url".into(),
+                ..Default::default()
+            },
+        )])
+        .build()
+        .await;
 
     let mut stream = env.check_now().await;
     expect_states(

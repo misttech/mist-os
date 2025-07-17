@@ -14,7 +14,6 @@ rustc_library("fidl-fuchsia-update-installer-ext") {
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-url",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/lib/event-queue",
     "//third_party/rust_crates:futures",
@@ -25,6 +24,7 @@ rustc_library("fidl-fuchsia-update-installer-ext") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:typed-builder",
+    "//third_party/rust_crates:url",
   ]
 
   test_deps = [

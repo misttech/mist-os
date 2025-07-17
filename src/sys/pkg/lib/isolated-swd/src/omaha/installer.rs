@@ -4,7 +4,6 @@
 
 use crate::updater::Updater;
 use anyhow::anyhow;
-use fuchsia_url::PinnedAbsolutePackageUrl;
 use futures::future::LocalBoxFuture;
 use futures::prelude::*;
 use log::warn;
@@ -66,7 +65,7 @@ impl Installer for IsolatedInstaller {
             };
             let () = self
                 .updater
-                .install_update(Some(&url.clone().into()))
+                .install_update(Some(&url))
                 .await
                 .map_err(IsolatedInstallError::Failure)?;
             if let Some(o) = observer.as_ref() {
@@ -165,14 +164,14 @@ fn try_create_install_plan(
 
     let full_url = url.to_owned() + &package.name;
 
-    match PinnedAbsolutePackageUrl::parse(&full_url) {
+    match full_url.parse() {
         Ok(url) => Ok(FuchsiaInstallPlan {
             update_package_urls: vec![UpdatePackageUrl::System(url)],
             install_source: request_params.source,
             ..FuchsiaInstallPlan::default()
         }),
         Err(err) => Err(IsolatedInstallError::InstallPlan(anyhow!(
-            "Failed to parse {} to PinnedAbsolutePackageUrl: {:#}",
+            "Failed to parse {} to Url: {:#}",
             full_url,
             anyhow!(err),
         ))),

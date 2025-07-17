@@ -11,7 +11,7 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq)]
 pub enum UpdatePackageUrl {
     /// The pinned fuchsia update package URL, e.g. fuchsia-pkg://fuchsia.example/update/0?hash=...
-    System(PinnedAbsolutePackageUrl),
+    System(url::Url),
     /// The pinned package URL for eagerly updated package.
     Package(PinnedAbsolutePackageUrl),
 }
@@ -81,8 +81,8 @@ mod tests {
         let url2 = "fuchsia-pkg://bar.test/bar?hash=1111111111111111111111111111111111111111111111111111111111111111";
         let install_plan = FuchsiaInstallPlan {
             update_package_urls: vec![
-                UpdatePackageUrl::System(PinnedAbsolutePackageUrl::parse(url1).unwrap()),
-                UpdatePackageUrl::Package(PinnedAbsolutePackageUrl::parse(url2).unwrap()),
+                UpdatePackageUrl::System(url1.parse().unwrap()),
+                UpdatePackageUrl::Package(url2.parse().unwrap()),
             ],
             ..FuchsiaInstallPlan::default()
         };

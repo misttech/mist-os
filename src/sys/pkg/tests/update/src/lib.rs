@@ -284,11 +284,11 @@ fn assert_async_output_not_ready(socket: &mut fasync::Socket) {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn force_install_fails_on_invalid_pkg_url() {
+async fn force_install_fails_on_invalid_url() {
     let env = TestEnv::new();
     let output = shell_process::run_process(
         BINARY_PATH,
-        ["force-install", "not-fuchsia-pkg://fuchsia.com/update"],
+        ["force-install", "not-a-valid-url"],
         [("/svc", &env.svc_proxy)],
     )
     .await;
@@ -296,7 +296,7 @@ async fn force_install_fails_on_invalid_pkg_url() {
     assert!(!output.is_ok());
 
     let stderr = output.stderr_str();
-    assert!(stderr.contains("Error: parsing update package url"), "stderr: {stderr}");
+    assert!(stderr.contains("Error: parsing update url"), "stderr: {stderr}");
 
     env.assert_update_installer_called_with(vec![]);
 

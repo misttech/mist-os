@@ -27,7 +27,6 @@ ffx_plugin("ffx_update") {
     "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start_args",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-url",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
@@ -38,6 +37,7 @@ ffx_plugin("ffx_update") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:termion",
+    "//third_party/rust_crates:url",
   ]
 
   test_deps = [
