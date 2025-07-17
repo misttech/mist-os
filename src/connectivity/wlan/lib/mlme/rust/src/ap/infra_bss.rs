@@ -18,7 +18,7 @@ use wlan_common::mac::{self, CapabilityInfo, EthernetIIHdr};
 use wlan_common::{ie, tim, TimeUnit};
 use zerocopy::SplitByteSlice;
 use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace,
 };
 
@@ -79,11 +79,11 @@ impl InfraBss {
         };
 
         ctx.device
-            .set_channel(fidl_common::WlanChannel {
+            .set_channel(fidl_ieee80211::WlanChannel {
                 primary: channel,
 
                 // TODO(https://fxbug.dev/42116942): Correctly support this.
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             })
             .await
@@ -690,9 +690,9 @@ mod tests {
 
         assert_eq!(
             fake_device_state.lock().wlan_channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: 1,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0
             }
         );

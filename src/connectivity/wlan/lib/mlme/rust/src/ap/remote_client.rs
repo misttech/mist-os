@@ -18,9 +18,8 @@ use wlan_common::{ie, TimeUnit};
 use wlan_statemachine::StateMachine;
 use zerocopy::SplitByteSlice;
 use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace as trace, wlan_trace as wtrace,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, wlan_trace as wtrace,
 };
 
 /// dot11BssMaxIdlePeriod (IEEE Std 802.11-2016, 11.24.13 and Annex C.3): This attribute indicates
@@ -436,10 +435,10 @@ impl RemoteClient {
                     bssid: Some(self.addr.to_array()),
                     aid: Some(aid),
                     listen_interval: None, // This field is not used for AP.
-                    channel: Some(fidl_common::WlanChannel {
+                    channel: Some(fidl_ieee80211::WlanChannel {
                         primary: channel,
                         // TODO(https://fxbug.dev/42116942): Correctly support this.
-                        cbw: fidl_common::ChannelBandwidth::Cbw20,
+                        cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                         secondary80: 0,
                     }),
 

@@ -579,9 +579,9 @@ mod tests {
             capability_info: CAPABILITY_INFO_FOO.0,
             ies: BEACON_IES_FOO.to_vec(),
             rssi_dbm: RX_INFO_FOO.rssi_dbm,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: RX_INFO_FOO.channel.primary,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             snr_db: 0,
@@ -613,9 +613,9 @@ mod tests {
             capability_info: CAPABILITY_INFO_BAR.0,
             ies: BEACON_IES_BAR.to_vec(),
             rssi_dbm: RX_INFO_BAR.rssi_dbm,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: RX_INFO_BAR.channel.primary,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             snr_db: 0,

@@ -102,7 +102,7 @@ class SimFirmware {
   };
 
   struct ScanResult {
-    wlan_common::WlanChannel channel;
+    wlan_ieee80211_wire::WlanChannel channel;
     common::MacAddr bssid;
     wlan::CapabilityInfo bss_capability;
     int8_t rssi_dbm;
@@ -156,7 +156,7 @@ class SimFirmware {
     brcmf_bss_info_le target_bss_info;
     uint8_t target_bss_info_ies[BSS_INFO_IES_MAX_LEN];
     // If we need to send disassoc during roam, we need to know the original BSS channel.
-    wlan_common::WlanChannel orig_bss_channel;
+    wlan_ieee80211_wire::WlanChannel orig_bss_channel;
     // Firmware-initiated and SME-initiated roams have slightly different behavior.
     bool firmware_initiated;
   };
@@ -336,8 +336,8 @@ class SimFirmware {
                         bcme_status_t* fw_err);
 
   // channel-chanspec helper functions
-  void convert_chanspec_to_channel(uint16_t chanspec, wlan_common::WlanChannel* ch);
-  uint16_t convert_channel_to_chanspec(wlan_common::WlanChannel* channel);
+  void convert_chanspec_to_channel(uint16_t chanspec, wlan_ieee80211_wire::WlanChannel* ch);
+  uint16_t convert_channel_to_chanspec(wlan_ieee80211_wire::WlanChannel* channel);
 
   // Bus operations: calls from driver
   zx_status_t BusPreinit();
@@ -510,7 +510,7 @@ class SimFirmware {
   void EscanComplete(brcmf_fweh_event_status_t event_status);
 
   // Association operations
-  void AssocInit(std::unique_ptr<AssocOpts> assoc_opts, wlan_common::WlanChannel& channel);
+  void AssocInit(std::unique_ptr<AssocOpts> assoc_opts, wlan_ieee80211_wire::WlanChannel& channel);
   void AssocScanResultSeen(const ScanResult& scan_result);
   void AssocScanDone(brcmf_fweh_event_status_t event_status);
   void AuthStart();  // Scan complete, start authentication process
@@ -528,7 +528,8 @@ class SimFirmware {
                                  const common::MacAddr& bssid);
   // Get the Sim firmware ready for a target_bss_info iovar request.
   void SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::span<uint8_t> ie_buf);
-  void ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts, wlan_common::WlanChannel& channel);
+  void ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts,
+                   wlan_ieee80211_wire::WlanChannel& channel);
   void ReassocStart();
   void ReassocHandleFailure(wlan_ieee80211_wire::StatusCode status);
   zx_status_t ReassocToCurrentAp(std::shared_ptr<const simulation::SimReassocRespFrame> frame);
@@ -551,7 +552,7 @@ class SimFirmware {
   void RxDataFrame(std::shared_ptr<const simulation::SimDataFrame> data_frame,
                    std::shared_ptr<const simulation::WlanRxInfo> info);
   static int8_t RssiDbmFromSignalStrength(double signal_strength);
-  void RxBeacon(const wlan_common::WlanChannel& channel,
+  void RxBeacon(const wlan_ieee80211_wire::WlanChannel& channel,
                 std::shared_ptr<const simulation::SimBeaconFrame> frame, double signal_strength,
                 double noise_level);
   void RxAssocResp(std::shared_ptr<const simulation::SimAssocRespFrame> frame);
@@ -561,13 +562,13 @@ class SimFirmware {
   void RxActionFrame(std::shared_ptr<const simulation::SimActionFrame> action_frame);
   void RxWnmActionFrame(std::shared_ptr<const simulation::SimWnmActionFrame> wnm_frame);
   void RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame> btm_req_frame);
-  void RxProbeResp(const wlan_common::WlanChannel& channel,
+  void RxProbeResp(const wlan_ieee80211_wire::WlanChannel& channel,
                    std::shared_ptr<const simulation::SimProbeRespFrame> frame,
                    double signal_strength, double noise_level);
   void RxAuthFrame(std::shared_ptr<const simulation::SimAuthFrame> frame);
 
   // Handler for channel switch.
-  void ConductChannelSwitch(const wlan_common::WlanChannel& dst_channel, uint8_t mode);
+  void ConductChannelSwitch(const wlan_ieee80211_wire::WlanChannel& dst_channel, uint8_t mode);
   void RxDeauthReq(std::shared_ptr<const simulation::SimDeauthFrame> frame);
 
   void StopSoftAP(uint16_t ifidx);
@@ -602,7 +603,7 @@ class SimFirmware {
 
   // Get the channel of IF the parameter indicates whether we need to find softAP ifidx or client
   // ifidx.
-  wlan_common::WlanChannel GetIfChannel(bool is_ap);
+  wlan_ieee80211_wire::WlanChannel GetIfChannel(bool is_ap);
 
   // Get IF idx of matching bsscfgidx.
   int16_t GetIfidxByBsscfgidx(int32_t bsscfgidx);

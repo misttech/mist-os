@@ -768,9 +768,9 @@ pub mod test_utils {
                 beacon_period: 100,
                 capability_info: 123,
                 ies: vec![1, 2, 3, 2, 1],
-                channel: fidl_common::WlanChannel {
+                channel: fidl_ieee80211::WlanChannel {
                     primary: 1,
-                    cbw: fidl_common::ChannelBandwidth::Cbw20,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                     secondary80: 0,
                 },
                 rssi_dbm: -40,

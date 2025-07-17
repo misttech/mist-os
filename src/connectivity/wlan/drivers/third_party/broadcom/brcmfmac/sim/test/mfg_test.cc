@@ -12,8 +12,8 @@
 namespace wlan::brcmfmac {
 
 constexpr uint16_t kDefaultCh = 149;
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = kDefaultCh, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel = {
+    .primary = kDefaultCh, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kFakeMac({0xde, 0xad, 0xbe, 0xef, 0x00, 0x02});
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};

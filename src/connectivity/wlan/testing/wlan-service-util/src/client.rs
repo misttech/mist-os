@@ -342,15 +342,15 @@ mod tests {
             bssid: (0..6).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>().try_into().unwrap(),
             beacon_period: rng.gen::<u16>(),
             rssi_dbm: rng.gen::<i8>(),
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: rng.gen::<u8>(),
                 cbw: match rng.gen_range(0..5) {
-                    0 => fidl_common::ChannelBandwidth::Cbw20,
-                    1 => fidl_common::ChannelBandwidth::Cbw40,
-                    2 => fidl_common::ChannelBandwidth::Cbw40Below,
-                    3 => fidl_common::ChannelBandwidth::Cbw80,
-                    4 => fidl_common::ChannelBandwidth::Cbw160,
-                    5 => fidl_common::ChannelBandwidth::Cbw80P80,
+                    0 => fidl_ieee80211::ChannelBandwidth::Cbw20,
+                    1 => fidl_ieee80211::ChannelBandwidth::Cbw40,
+                    2 => fidl_ieee80211::ChannelBandwidth::Cbw40Below,
+                    3 => fidl_ieee80211::ChannelBandwidth::Cbw80,
+                    4 => fidl_ieee80211::ChannelBandwidth::Cbw160,
+                    5 => fidl_ieee80211::ChannelBandwidth::Cbw80P80,
                     _ => panic!(),
                 },
                 secondary80: rng.gen::<u8>(),
@@ -1127,9 +1127,9 @@ mod tests {
             ssid: ssid.into(),
             rssi_dbm: -30,
             snr_db: 10,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 1,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             protection: Protection::Wpa2Personal,

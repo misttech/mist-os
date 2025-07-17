@@ -31,42 +31,6 @@
         "type": "uint32"
     },
     {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/ChannelBandwidth.CBW160",
-        "value": "5"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/ChannelBandwidth.CBW20",
-        "value": "1"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/ChannelBandwidth.CBW40",
-        "value": "2"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/ChannelBandwidth.CBW40BELOW",
-        "value": "3"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/ChannelBandwidth.CBW80",
-        "value": "4"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/ChannelBandwidth.CBW80P80",
-        "value": "6"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.wlan.common/ChannelBandwidth",
-        "strictness": "flexible",
-        "type": "uint32"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.wlan.common/DataPlaneExtension.data_plane_type",
         "ordinal": "1",
@@ -393,28 +357,6 @@
         "name": "fuchsia.wlan.common/WLAN_TX_VECTOR_IDX_INVALID",
         "type": "uint16",
         "value": "0"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.wlan.common/WlanChannel.cbw",
-        "ordinal": "2",
-        "type": "fuchsia.wlan.common/ChannelBandwidth"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.wlan.common/WlanChannel.primary",
-        "ordinal": "1",
-        "type": "uint8"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.wlan.common/WlanChannel.secondary80",
-        "ordinal": "3",
-        "type": "uint8"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.wlan.common/WlanChannel"
     },
     {
         "kind": "enum/member",

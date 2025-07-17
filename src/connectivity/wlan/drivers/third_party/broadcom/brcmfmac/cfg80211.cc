@@ -965,9 +965,9 @@ static zx_status_t brcmf_escan_prep(
     return ZX_ERR_INVALID_ARGS;
   } else {
     for (uint32_t i = 0; i < n_channels; i++) {
-      fuchsia_wlan_common::WlanChannel wlan_chan;
+      fuchsia_wlan_ieee80211::WlanChannel wlan_chan;
       wlan_chan.primary() = request->channels().data()[i];
-      wlan_chan.cbw() = fuchsia_wlan_common::ChannelBandwidth::kCbw20;
+      wlan_chan.cbw() = fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20;
       wlan_chan.secondary80() = 0;
       chanspec = channel_to_chanspec(&cfg->d11inf, &wlan_chan);
       BRCMF_DBG(SCAN, "Chan : %d, Channel spec: %x", request->channels().data()[i], chanspec);
@@ -1962,7 +1962,7 @@ void brcmf_return_roam_start(struct net_device* ndev) {
   std::copy(target_bss_info_bssid.begin(), target_bss_info_bssid.end(), selected_bss.bssid.begin());
 
   selected_bss.capability_info = target_bss_info->capability;
-  fuchsia_wlan_common_wire::WlanChannel chan;
+  fuchsia_wlan_ieee80211_wire::WlanChannel chan;
   chanspec_to_channel(&cfg->d11inf, target_bss_info->chanspec, &chan);
 
   selected_bss.channel.cbw = chan.cbw;
@@ -2126,7 +2126,7 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct brcmf_join_params join_params;
-  fuchsia_wlan_common::WlanChannel chan_override;
+  fuchsia_wlan_ieee80211::WlanChannel chan_override;
   uint16_t chanspec;
   size_t join_params_size = 0;
   std::vector<uint8_t> ssid;
@@ -2201,7 +2201,7 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
   // test whether the 40Mhz encoding works properly.
   // TODO(https://fxbug.dev/42144507) - Remove this override.
   chan_override = ifp->connect_req.selected_bss()->channel();
-  chan_override.cbw() = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+  chan_override.cbw() = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw20;
 
   chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
   cfg->channel = chanspec;
@@ -3078,7 +3078,7 @@ static void brcmf_iedump(uint8_t* ies, size_t total_len) {
 }
 
 static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
-                                     fuchsia_wlan_common_wire::ChannelBandwidth chn_bw,
+                                     fuchsia_wlan_ieee80211_wire::ChannelBandwidth chn_bw,
                                      const uint8_t* bssid, uint16_t capability, uint16_t interval,
                                      uint8_t* ie, size_t ie_len, int16_t rssi_dbm,
                                      uint16_t snr_db) {
@@ -3151,7 +3151,7 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   uint8_t* notify_ie;
   size_t notify_ielen;
   int16_t notify_rssi_dbm;
-  fuchsia_wlan_common_wire::ChannelBandwidth notify_chn_bw;
+  fuchsia_wlan_ieee80211_wire::ChannelBandwidth notify_chn_bw;
   uint16_t notify_snr_db;
 
   if (bi->length > WL_BSS_INFO_MAX) {
@@ -3175,24 +3175,24 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   notify_snr_db = bi->SNR;
   switch (bi->chanspec & WL_CHANSPEC_BW_MASK) {
     case WL_CHANSPEC_BW_20:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw20;
       break;
     case WL_CHANSPEC_BW_40:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw40;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw40;
       break;
     case WL_CHANSPEC_BW_80:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw80;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw80;
       break;
     case WL_CHANSPEC_BW_160:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw160;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw160;
       break;
     case WL_CHANSPEC_BW_8080:
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw80P80;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw80P80;
       break;
     default:
       BRCMF_WARN("Invalid channel BW in scan result chanspec: 0x%x", bi->chanspec);
       // Should this be dropped?
-      notify_chn_bw = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+      notify_chn_bw = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw20;
   }
 
   BRCMF_DBG(CONN,
@@ -3685,8 +3685,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
-  fuchsia_wlan_common::WlanChannel channel(req->channel(),
-                                           fuchsia_wlan_common::ChannelBandwidth::kCbw20, 0);
+  fuchsia_wlan_ieee80211::WlanChannel channel(req->channel(),
+                                              fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20, 0);
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state)) {
     BRCMF_ERR("AP already started");
@@ -5872,7 +5872,7 @@ zx_status_t brcmf_cfg80211_roam(struct net_device* ndev) {
   // test whether the 40Mhz encoding works properly.
   // TODO(https://fxbug.dev/42144507) - Remove this override.
   auto chan_override = ifp->roam_req->selected_bss()->channel();
-  chan_override.cbw() = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
+  chan_override.cbw() = fuchsia_wlan_ieee80211_wire::ChannelBandwidth::kCbw20;
 
   const auto chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
   reassoc_params.chanspec_num = 1;

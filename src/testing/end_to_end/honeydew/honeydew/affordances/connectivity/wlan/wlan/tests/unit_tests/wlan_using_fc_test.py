@@ -64,9 +64,9 @@ _TEST_BSS_DESC_1_FC = f_wlan_common.BssDescription(
     beacon_period=2,
     capability_info=3,
     ies=[InformationElementType.SSID, len(_TEST_SSID)] + _TEST_SSID_BYTES,
-    channel=f_wlan_common.WlanChannel(
+    channel=f_wlan_ieee80211.WlanChannel(
         primary=1,
-        cbw=f_wlan_common.ChannelBandwidth.CBW20,
+        cbw=f_wlan_ieee80211.ChannelBandwidth.CBW20,
         secondary80=3,
     ),
     rssi_dbm=4,
@@ -91,9 +91,9 @@ _TEST_BSS_DESC_2_FC = f_wlan_common.BssDescription(
     beacon_period=5,
     capability_info=4,
     ies=[InformationElementType.SSID, len(_TEST_SSID)] + _TEST_SSID_BYTES,
-    channel=f_wlan_common.WlanChannel(
+    channel=f_wlan_ieee80211.WlanChannel(
         primary=2,
-        cbw=f_wlan_common.ChannelBandwidth.CBW40,
+        cbw=f_wlan_ieee80211.ChannelBandwidth.CBW40,
         secondary80=4,
     ),
     rssi_dbm=3,
@@ -136,9 +136,9 @@ _TEST_SERVING_AP_INFO = f_wlan_sme.ServingApInfo(
     ssid=_TEST_SSID_BYTES,
     rssi_dbm=4,
     snr_db=5,
-    channel=f_wlan_common.WlanChannel(
+    channel=f_wlan_ieee80211.WlanChannel(
         primary=1,
-        cbw=f_wlan_common.ChannelBandwidth.CBW20,
+        cbw=f_wlan_ieee80211.ChannelBandwidth.CBW20,
         secondary80=3,
     ),
     protection=f_wlan_sme.Protection.WPA2_PERSONAL,

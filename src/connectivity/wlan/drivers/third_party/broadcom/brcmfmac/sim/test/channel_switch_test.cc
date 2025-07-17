@@ -12,12 +12,12 @@
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_common::WlanChannel kSwitchedChannel = {
-    .primary = 20, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_common::WlanChannel kSecondSwitchedChannel = {
-    .primary = 30, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kSwitchedChannel = {
+    .primary = 20, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kSecondSwitchedChannel = {
+    .primary = 30, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const uint16_t kDefaultCSACount = 3;
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
@@ -30,10 +30,10 @@ class ChannelSwitchTest : public SimTest {
   void Init();
 
   // Schedule a future SetChannel event for the first AP in list
-  void ScheduleChannelSwitch(const wlan_common::WlanChannel& new_channel, zx::duration when);
+  void ScheduleChannelSwitch(const wlan_ieee80211::WlanChannel& new_channel, zx::duration when);
 
   // Send one fake CSA beacon using the identification consistent of default ssid and bssid.
-  void SendFakeCSABeacon(wlan_common::WlanChannel& dst_channel);
+  void SendFakeCSABeacon(wlan_ieee80211::WlanChannel& dst_channel);
 
  protected:
   // Number of received assoc responses.
@@ -44,7 +44,7 @@ class ChannelSwitchTest : public SimTest {
   std::list<simulation::FakeAp*> aps_;
 };
 
-void ChannelSwitchTest::SendFakeCSABeacon(wlan_common::WlanChannel& dst_channel) {
+void ChannelSwitchTest::SendFakeCSABeacon(wlan_ieee80211::WlanChannel& dst_channel) {
   constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};
 
   simulation::SimBeaconFrame fake_csa_beacon(kDefaultSsid, kDefaultBssid);
@@ -60,7 +60,7 @@ void ChannelSwitchTest::Init() {
 }
 
 // This function schedules a Setchannel() event for the first AP in AP list.
-void ChannelSwitchTest::ScheduleChannelSwitch(const wlan_common::WlanChannel& new_channel,
+void ChannelSwitchTest::ScheduleChannelSwitch(const wlan_ieee80211::WlanChannel& new_channel,
                                               zx::duration when) {
   env_->ScheduleNotification(std::bind(&simulation::FakeAp::SetChannel, aps_.front(), new_channel),
                              when);

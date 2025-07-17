@@ -20,20 +20,19 @@
 #include "wlan/common/macaddr.h"
 
 namespace wlan_ieee80211_wire = fuchsia_wlan_ieee80211::wire;
-namespace wlan_common = fuchsia_wlan_common::wire;
 
 namespace wlan::simulation {
 
 class StationIfc;
 
 typedef struct WlanRxInfo {
-  wlan_common::WlanChannel channel;
+  wlan_ieee80211_wire::WlanChannel channel;
   double signal_strength;
   double noise_level;
 } WlanRxInfo;
 
 typedef struct WlanTxInfo {
-  wlan_common::WlanChannel channel;
+  wlan_ieee80211_wire::WlanChannel channel;
 } WlanTxInfo;
 
 // Representative for security protocol, we don't have this field in real situation.
@@ -141,7 +140,7 @@ class SimManagementFrame : public SimFrame {
   // Frame subtype identifier for management frames
   virtual SimMgmtFrameType MgmtFrameType() const = 0;
   void AddSsidIe(const fuchsia_wlan_ieee80211::Ssid& ssid);
-  void AddCsaIe(const wlan_common::WlanChannel& channel, uint8_t channel_switch_count);
+  void AddCsaIe(const wlan_ieee80211_wire::WlanChannel& channel, uint8_t channel_switch_count);
   void AddRawIes(cpp20::span<const uint8_t> raw_ies);
   std::shared_ptr<InformationElement> FindIe(InformationElement::SimIeType ie_type) const;
   void RemoveIe(InformationElement::SimIeType);

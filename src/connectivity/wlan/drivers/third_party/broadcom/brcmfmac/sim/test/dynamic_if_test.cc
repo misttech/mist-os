@@ -19,8 +19,8 @@ namespace wlan::brcmfmac {
 
 // Some default AP and association request values
 constexpr uint16_t kDefaultCh = 149;
-constexpr wlan_common::WlanChannel kDefaultChannel = {
-    .primary = kDefaultCh, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel = {
+    .primary = kDefaultCh, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 // Chanspec value corresponding to kDefaultChannel with current d11 encoder.
 constexpr uint16_t kDefaultChanspec = 53397;
 constexpr uint16_t kTestChanspec = 0xd0a5;
@@ -115,7 +115,7 @@ void DynamicIfTest::ChannelCheck() {
   EXPECT_EQ(softap_chanspec, client_chanspec);
   WithSimDevice([&](brcmfmac::SimDevice* device) {
     brcmf_simdev* sim = device->GetSim();
-    wlan_common::WlanChannel channel;
+    wlan_ieee80211::WlanChannel channel;
     sim->sim_fw->convert_chanspec_to_channel(softap_chanspec, &channel);
     EXPECT_GE(softap_ifc_.stats_.csa_indications.size(), 1U);
     EXPECT_EQ(channel.primary, softap_ifc_.stats_.csa_indications.front().new_channel);

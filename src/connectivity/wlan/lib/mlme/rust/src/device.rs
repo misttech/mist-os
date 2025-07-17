@@ -18,8 +18,9 @@ use wlan_common::mac::FrameControl;
 use wlan_common::{tx_vector, TimeUnit};
 use wlan_ffi_transport::{EthernetRx, EthernetTx, FfiEthernetTx, FfiWlanRx, WlanRx, WlanTx};
 use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, wlan_trace as wtrace,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_trace as trace, wlan_trace as wtrace,
 };
 
 pub use test_utils::*;
@@ -136,7 +137,7 @@ pub trait DeviceOps {
     }
     fn set_channel(
         &mut self,
-        channel: fidl_common::WlanChannel,
+        channel: fidl_ieee80211::WlanChannel,
     ) -> impl Future<Output = Result<(), zx::Status>>;
     fn start_passive_scan(
         &mut self,
@@ -202,7 +203,7 @@ pub trait DeviceOps {
                 tx_vector::TxVector::new(
                     fidl_common::WlanPhyType::Erp,
                     WlanGi::G_800NS,
-                    fidl_common::ChannelBandwidth::Cbw20,
+                    fidl_ieee80211::ChannelBandwidth::Cbw20,
                     mcs_idx,
                 )
                 .unwrap()
@@ -423,7 +424,10 @@ impl DeviceOps for Device {
         })
     }
 
-    async fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
+    async fn set_channel(
+        &mut self,
+        channel: fidl_ieee80211::WlanChannel,
+    ) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
             .set_channel(&fidl_softmac::WlanSoftmacBaseSetChannelRequest {
                 channel: Some(channel),
@@ -868,7 +872,7 @@ pub mod test_utils {
             Option<fidl::endpoints::ClientEnd<fidl_sme::UsmeBootstrapMarker>>,
         pub usme_bootstrap_server_end:
             Option<fidl::endpoints::ServerEnd<fidl_sme::UsmeBootstrapMarker>>,
-        pub wlan_channel: fidl_common::WlanChannel,
+        pub wlan_channel: fidl_ieee80211::WlanChannel,
         pub keys: Vec<fidl_softmac::WlanKeyConfiguration>,
         pub next_scan_id: u64,
         pub captured_passive_scan_request:
@@ -914,9 +918,9 @@ pub mod test_utils {
                 mlme_request_stream: Some(mlme_request_stream),
                 usme_bootstrap_client_end: Some(usme_bootstrap_client_end),
                 usme_bootstrap_server_end: Some(usme_bootstrap_server_end),
-                wlan_channel: fidl_common::WlanChannel {
+                wlan_channel: fidl_ieee80211::WlanChannel {
                     primary: 0,
-                    cbw: fidl_common::ChannelBandwidth::Cbw20,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                     secondary80: 0,
                 },
                 next_scan_id: 0,
@@ -1059,7 +1063,7 @@ pub mod test_utils {
 
         async fn set_channel(
             &mut self,
-            wlan_channel: fidl_common::WlanChannel,
+            wlan_channel: fidl_ieee80211::WlanChannel,
         ) -> Result<(), zx::Status> {
             self.state.lock().wlan_channel = wlan_channel;
             Ok(())
@@ -1481,9 +1485,9 @@ mod tests {
     async fn set_channel() {
         let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device
-            .set_channel(fidl_common::WlanChannel {
+            .set_channel(fidl_ieee80211::WlanChannel {
                 primary: 2,
-                cbw: fidl_common::ChannelBandwidth::Cbw80P80,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw80P80,
                 secondary80: 4,
             })
             .await
@@ -1491,9 +1495,9 @@ mod tests {
         // Check the internal state.
         assert_eq!(
             fake_device_state.lock().wlan_channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: 2,
-                cbw: fidl_common::ChannelBandwidth::Cbw80P80,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw80P80,
                 secondary80: 4
             }
         );
@@ -1681,9 +1685,9 @@ mod tests {
                 bssid: Some([1, 2, 3, 4, 5, 6]),
                 aid: Some(1),
                 listen_interval: Some(2),
-                channel: Some(fidl_common::WlanChannel {
+                channel: Some(fidl_ieee80211::WlanChannel {
                     primary: 3,
-                    cbw: fidl_common::ChannelBandwidth::Cbw20,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                     secondary80: 0,
                 }),
                 qos: Some(false),
@@ -1718,9 +1722,9 @@ mod tests {
         let assoc_cfg = fidl_softmac::WlanAssociationConfig {
             bssid: Some([1, 2, 3, 4, 5, 6]),
             aid: Some(1),
-            channel: Some(fidl_common::WlanChannel {
+            channel: Some(fidl_ieee80211::WlanChannel {
                 primary: 149,
-                cbw: fidl_common::ChannelBandwidth::Cbw40,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                 secondary80: 42,
             }),
             ..Default::default()

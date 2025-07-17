@@ -597,7 +597,7 @@ async fn do_ap(cmd: opts::ApCmd, monitor_proxy: DeviceMonitor) -> Result<(), Err
                 password: password.map_or(vec![], |p| p.as_bytes().to_vec()),
                 radio_cfg: fidl_sme::RadioConfig {
                     phy: PhyArg::Ht.into(),
-                    channel: fidl_common::WlanChannel {
+                    channel: fidl_ieee80211::WlanChannel {
                         primary: channel,
                         cbw: CbwArg::Cbw20.into(),
                         secondary80: 0,

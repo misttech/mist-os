@@ -27,12 +27,12 @@ class BeaconTest : public ::testing::Test, public simulation::StationIfc {
  public:
   // We will use the Beacon structure to keep track of all beacons we receive
   struct Beacon {
-    Beacon(zx::time time, const wlan_common::WlanChannel& channel,
+    Beacon(zx::time time, const wlan_ieee80211::WlanChannel& channel,
            const fuchsia_wlan_ieee80211::Ssid& ssid, const common::MacAddr& bssid)
         : time_(time), channel_(channel), ssid_(ssid), bssid_(bssid) {}
 
     zx::time time_;
-    wlan_common::WlanChannel channel_;
+    wlan_ieee80211::WlanChannel channel_;
     // Using 0 as null value, so make sure not including 0 as the channel to switch to
     uint8_t channel_to_switch_ = 0;
     uint8_t channel_switch_count_ = 0;
@@ -48,7 +48,7 @@ class BeaconTest : public ::testing::Test, public simulation::StationIfc {
   void StartBeaconCallback();
   void UpdateBeaconCallback();
   void AssocCallback();
-  void ChannelSwitchCallback(wlan_common::WlanChannel& channel, zx::duration& interval);
+  void ChannelSwitchCallback(wlan_ieee80211::WlanChannel& channel, zx::duration& interval);
   void SetSecurityCallback(wlan::simulation::FakeAp::Security sec);
   void StopBeaconCallback();
 
@@ -61,9 +61,9 @@ class BeaconTest : public ::testing::Test, public simulation::StationIfc {
   void ValidateErrInjBeacon();
 
   void ScheduleCall(void (BeaconTest::*fn)(), zx::duration when);
-  void ScheduleChannelSwitchCall(void (BeaconTest::*fn)(wlan_common::WlanChannel& channel,
+  void ScheduleChannelSwitchCall(void (BeaconTest::*fn)(wlan_ieee80211::WlanChannel& channel,
                                                         zx::duration& interval),
-                                 zx::duration when, const wlan_common::WlanChannel& channel,
+                                 zx::duration when, const wlan_ieee80211::WlanChannel& channel,
                                  const zx::duration& interval);
 
   void ScheduleSetSecurityCall(void (BeaconTest::*fn)(wlan::simulation::FakeAp::Security sec),
@@ -114,7 +114,7 @@ constexpr zx::duration kStartTime = zx::msec(50);
 constexpr zx::duration kEndTime = zx::sec(3);
 constexpr zx::duration kBeaconPeriod = zx::msec(100);
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+    .channel = {.primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 
 const fuchsia_wlan_ieee80211::Ssid kDefaultSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
                                                    'F', 'a', 'k', 'e', ' ', 'A', 'P'};
@@ -127,8 +127,8 @@ void BeaconTest::ScheduleCall(void (BeaconTest::*fn)(), zx::duration when) {
 }
 
 void BeaconTest::ScheduleChannelSwitchCall(
-    void (BeaconTest::*fn)(wlan_common::WlanChannel& channel, zx::duration& interval),
-    zx::duration when, const wlan_common::WlanChannel& channel, const zx::duration& interval) {
+    void (BeaconTest::*fn)(wlan_ieee80211::WlanChannel& channel, zx::duration& interval),
+    zx::duration when, const wlan_ieee80211::WlanChannel& channel, const zx::duration& interval) {
   env_.ScheduleNotification(std::bind(fn, this, channel, interval), when);
 }
 
@@ -189,8 +189,8 @@ TEST_F(BeaconTest, StartStop) {
 
 constexpr zx::duration kUpdateTime = zx::sec(1);
 constexpr zx::duration kNewBeaconPeriod = zx::msec(42);
-constexpr wlan_common::WlanChannel kNewChannel = {
-    .primary = 136, .cbw = wlan_common::ChannelBandwidth::kCbw80, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kNewChannel = {
+    .primary = 136, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw80, .secondary80 = 0};
 const fuchsia_wlan_ieee80211::Ssid kNewSsid = {'D', 'u', 'm', 'b', 'o'};
 const common::MacAddr new_bssid({0xcb, 0xa9, 0x87, 0x65, 0x43, 0x21});
 
@@ -252,15 +252,15 @@ constexpr zx::duration kAssocTime = zx::msec(60);
 constexpr zx::duration kSwitchTime = zx::sec(1);
 constexpr zx::duration kCsaBeaconInterval = zx::msec(120);
 constexpr zx::duration kLongCsaBeaconInterval = zx::msec(350);
-constexpr wlan_common::WlanChannel kFirstChannelSwitched = {
-    .primary = 10, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kFirstChannelSwitched = {
+    .primary = 10, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kClientMacAddr({0x11, 0x22, 0x33, 0x44, 0x55, 0x66});
 
 // Used in OverlapTest
-constexpr wlan_common::WlanChannel kSecondChannelSwitched = {
-    .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_common::WlanChannel kThirdChannelSwitched = {
-    .primary = 12, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kSecondChannelSwitched = {
+    .primary = 11, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kThirdChannelSwitched = {
+    .primary = 12, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 constexpr zx::duration kShortEndTime = zx::msec(500);
 constexpr zx::duration kFirstSetChannel = zx::msec(80);
 constexpr zx::duration kSecondSetChannel = zx::msec(180);
@@ -278,7 +278,8 @@ void BeaconTest::AssocCallback() {
   env_.Tx(assoc_req_frame, kDefaultTxInfo, this);
 }
 
-void BeaconTest::ChannelSwitchCallback(wlan_common::WlanChannel& channel, zx::duration& interval) {
+void BeaconTest::ChannelSwitchCallback(wlan_ieee80211::WlanChannel& channel,
+                                       zx::duration& interval) {
   ap_.SetCsaBeaconInterval(interval);
   ap_.SetChannel(channel);
 }

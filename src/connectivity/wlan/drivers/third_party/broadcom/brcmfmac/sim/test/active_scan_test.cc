@@ -29,7 +29,8 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 struct ApInfo {
   explicit ApInfo(simulation::Environment* env, const common::MacAddr& bssid,
-                  const fuchsia_wlan_ieee80211::Ssid& ssid, const wlan_common::WlanChannel& channel)
+                  const fuchsia_wlan_ieee80211::Ssid& ssid,
+                  const wlan_ieee80211::WlanChannel& channel)
       : ap_(env, bssid, ssid, channel) {}
 
   simulation::FakeAp ap_;
@@ -66,7 +67,7 @@ class ActiveScanTest : public SimTest {
   void SetUp() override;
 
   void StartFakeAp(const common::MacAddr& bssid, const fuchsia_wlan_ieee80211::Ssid& ssid,
-                   const wlan_common::WlanChannel& channel,
+                   const wlan_ieee80211::WlanChannel& channel,
                    zx::duration beacon_interval = kBeaconInterval);
 
   void StartScan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req);
@@ -146,7 +147,7 @@ void ActiveScanTest::SetUp() {
 
 void ActiveScanTest::StartFakeAp(const common::MacAddr& bssid,
                                  const fuchsia_wlan_ieee80211::Ssid& ssid,
-                                 const wlan_common::WlanChannel& channel,
+                                 const wlan_ieee80211::WlanChannel& channel,
                                  zx::duration beacon_interval) {
   auto ap_info = std::make_unique<ApInfo>(env_.get(), bssid, ssid, channel);
   // Beacon is also enabled here to make sure this is not disturbing the correct result.
@@ -196,7 +197,7 @@ void ActiveScanTest::VerifyScanResults() {
         EXPECT_EQ(ssid, ssid_info);
 
         // Verify channel
-        wlan_common::WlanChannel channel = ap_info->ap_.GetChannel();
+        wlan_ieee80211::WlanChannel channel = ap_info->ap_.GetChannel();
         EXPECT_EQ(result.bss()->channel().primary(), channel.primary);
         EXPECT_EQ(result.bss()->channel().cbw(), channel.cbw);
         EXPECT_EQ(result.bss()->channel().secondary80(), channel.secondary80);
@@ -257,8 +258,8 @@ void ActiveScanTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
 }
 
 // AP 1&2 on channel 2.
-constexpr wlan_common::WlanChannel kDefaultChannel1 = {
-    .primary = 2, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel1 = {
+    .primary = 2, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const fuchsia_wlan_ieee80211::Ssid kAp1Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
                                                'F', 'a', 'k', 'e', ' ', 'A', 'P', '1'};
 const common::MacAddr kAp1Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
@@ -267,8 +268,8 @@ const fuchsia_wlan_ieee80211::Ssid kAp2Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a'
 const common::MacAddr kAp2Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbd});
 
 // AP 3 on channel 4.
-constexpr wlan_common::WlanChannel kDefaultChannel2 = {
-    .primary = 4, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kDefaultChannel2 = {
+    .primary = 4, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const fuchsia_wlan_ieee80211::Ssid kAp3Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
                                                'F', 'a', 'k', 'e', ' ', 'A', 'P', '3'};
 const common::MacAddr kAp3Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbe});

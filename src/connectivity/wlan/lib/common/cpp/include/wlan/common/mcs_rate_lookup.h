@@ -24,17 +24,17 @@
 namespace wlan::common {
 
 // Lookup the data rate for the given HT PHY parameters.
-zx_status_t HtDataRateLookup(const ::fuchsia::wlan::common::ChannelBandwidth& cbw, uint8_t mcs,
+zx_status_t HtDataRateLookup(const ::fuchsia::wlan::ieee80211::ChannelBandwidth& cbw, uint8_t mcs,
                              const ::fuchsia::wlan::common::GuardInterval& gi, uint32_t* out_kbps);
 
 // Lookup the data rate for the given VHT PHY parameters.
-zx_status_t VhtDataRateLookup(const ::fuchsia::wlan::common::ChannelBandwidth& cbw, uint8_t mcs,
+zx_status_t VhtDataRateLookup(const ::fuchsia::wlan::ieee80211::ChannelBandwidth& cbw, uint8_t mcs,
                               const ::fuchsia::wlan::common::GuardInterval& gi, uint8_t num_sts,
                               uint8_t stbc, uint32_t* out_kbps);
 
 // Lookup the data rate for the given VHT PHY parameters. This is a convenience method for callers
 // that have the nss value, but not the num_sts or stbc values.
-zx_status_t VhtDataRateLookup(const ::fuchsia::wlan::common::ChannelBandwidth& cbw, uint8_t mcs,
+zx_status_t VhtDataRateLookup(const ::fuchsia::wlan::ieee80211::ChannelBandwidth& cbw, uint8_t mcs,
                               const ::fuchsia::wlan::common::GuardInterval& gi, uint8_t nss,
                               uint32_t* out_kbps);
 

@@ -99,22 +99,6 @@ const MAX_SUPPORTED_MAC_ROLES uint8 = 16;
 @namespaced
 const MAX_BANDS uint8 = 16;
 
-@available(added=13)
-type ChannelBandwidth = flexible enum {
-    CBW20 = 1;
-    CBW40 = 2;
-    CBW40BELOW = 3;
-    CBW80 = 4;
-    CBW160 = 5;
-    CBW80P80 = 6;
-};
-
-type WlanChannel = struct {
-    primary uint8;
-    cbw ChannelBandwidth;
-    secondary80 uint8;
-};
-
 type ScanType = strict enum {
     ACTIVE = 1;
     PASSIVE = 2;
@@ -301,7 +285,7 @@ type BssDescription = struct {
     ies vector<uint8>:MAX;
 
     /// Channel information for this BSS.
-    channel WlanChannel;
+    channel fuchsia.wlan.ieee80211.WlanChannel;
     /// The running average of received signal strength indicator in units of dBm.
     rssi_dbm int8;
     /// The running average of snr in units of dB.

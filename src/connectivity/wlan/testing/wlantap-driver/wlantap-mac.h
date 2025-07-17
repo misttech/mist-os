@@ -31,7 +31,7 @@ class WlantapMac : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
         fdf::ClientEnd<::fuchsia_wlan_softmac::WlanSoftmacIfc> ifc_client) = 0;
     virtual void WlantapMacStop() = 0;
     virtual void WlantapMacQueueTx(const wlan_softmac::WlanTxPacket& pkt) = 0;
-    virtual void WlantapMacSetChannel(const wlan_common::WlanChannel& channel) = 0;
+    virtual void WlantapMacSetChannel(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel) = 0;
     virtual void WlantapMacJoinBss(const wlan_common::JoinBssRequest& join_request) = 0;
     virtual void WlantapMacStartScan(uint64_t scan_id) = 0;
     virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfiguration& key_config) = 0;

@@ -41,6 +41,42 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/ChannelBandwidth.CBW160",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/ChannelBandwidth.CBW20",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/ChannelBandwidth.CBW40",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/ChannelBandwidth.CBW40BELOW",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/ChannelBandwidth.CBW80",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/ChannelBandwidth.CBW80P80",
+        "value": "6"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.wlan.ieee80211/ChannelBandwidth",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.wlan.ieee80211/CipherSuiteType.BIP_CMAC_128",
         "value": "6"
     },
@@ -1226,6 +1262,28 @@
         "name": "fuchsia.wlan.ieee80211/WlanBand",
         "strictness": "flexible",
         "type": "uint8"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.ieee80211/WlanChannel.cbw",
+        "ordinal": "2",
+        "type": "fuchsia.wlan.ieee80211/ChannelBandwidth"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.ieee80211/WlanChannel.primary",
+        "ordinal": "1",
+        "type": "uint8"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.ieee80211/WlanChannel.secondary80",
+        "ordinal": "3",
+        "type": "uint8"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.ieee80211/WlanChannel"
     },
     {
         "kind": "library",

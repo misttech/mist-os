@@ -27,7 +27,7 @@
         "kind": "table/member",
         "name": "fuchsia.wlan.softmac/WlanAssociationConfig.channel",
         "ordinal": "4",
-        "type": "fuchsia.wlan.common/WlanChannel"
+        "type": "fuchsia.wlan.ieee80211/WlanChannel"
     },
     {
         "kind": "table/member",
@@ -163,7 +163,7 @@
         "kind": "struct/member",
         "name": "fuchsia.wlan.softmac/WlanRxInfo.channel",
         "ordinal": "5",
-        "type": "fuchsia.wlan.common/WlanChannel"
+        "type": "fuchsia.wlan.ieee80211/WlanChannel"
     },
     {
         "kind": "struct/member",
@@ -728,7 +728,7 @@
         "kind": "table/member",
         "name": "fuchsia.wlan.softmac/WlanSoftmacSetChannelRequest.channel",
         "ordinal": "1",
-        "type": "fuchsia.wlan.common/WlanChannel"
+        "type": "fuchsia.wlan.ieee80211/WlanChannel"
     },
     {
         "kind": "table",
@@ -922,7 +922,7 @@
         "kind": "struct/member",
         "name": "fuchsia.wlan.softmac/WlanTxInfo.channel_bandwidth",
         "ordinal": "5",
-        "type": "fuchsia.wlan.common/ChannelBandwidth"
+        "type": "fuchsia.wlan.ieee80211/ChannelBandwidth"
     },
     {
         "kind": "struct/member",

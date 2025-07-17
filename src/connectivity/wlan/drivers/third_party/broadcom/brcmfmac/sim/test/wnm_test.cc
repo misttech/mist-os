@@ -17,10 +17,10 @@ namespace wlan::brcmfmac {
 
 // Some default AP and association request values
 
-constexpr wlan_common::WlanChannel kAp0Channel = {
-    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_common::WlanChannel kAp1Channel = {
-    .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kAp0Channel = {
+    .primary = 9, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::WlanChannel kAp1Channel = {
+    .primary = 11, .cbw = wlan_ieee80211::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const uint8_t kAp1OperatingClass = 101;
 
 const common::MacAddr kAp0Bssid("12:34:56:78:9a:bc");

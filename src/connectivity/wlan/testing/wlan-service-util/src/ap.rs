@@ -7,7 +7,10 @@ use fidl::endpoints;
 use fidl_fuchsia_wlan_common::WlanMacRole;
 use fidl_fuchsia_wlan_device_service::DeviceMonitorProxy;
 use ieee80211::Ssid;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_sme as fidl_sme,
+};
 
 type WlanService = DeviceMonitorProxy;
 
@@ -58,9 +61,9 @@ pub async fn start(
         password: target_pwd,
         radio_cfg: fidl_sme::RadioConfig {
             phy: fidl_common::WlanPhyType::Ht,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: channel,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
         },
@@ -142,9 +145,9 @@ mod tests {
             password: target_password.to_vec(),
             radio_cfg: fidl_sme::RadioConfig {
                 phy: fidl_common::WlanPhyType::Ht,
-                channel: fidl_common::WlanChannel {
+                channel: fidl_ieee80211::WlanChannel {
                     primary: channel,
-                    cbw: fidl_common::ChannelBandwidth::Cbw20,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                     secondary80: 0,
                 },
             },

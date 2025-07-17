@@ -595,9 +595,9 @@ mod tests {
     }
 
     fn mock_rx_info(ap: &Ap<FakeDevice>) -> fidl_softmac::WlanRxInfo {
-        let channel = fidl_common::WlanChannel {
+        let channel = fidl_ieee80211::WlanChannel {
             primary: ap.bss.as_ref().unwrap().channel,
-            cbw: fidl_common::ChannelBandwidth::Cbw20,
+            cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
             secondary80: 0,
         };
         MockWlanRxInfo::with_channel(channel).into()
@@ -808,9 +808,9 @@ mod tests {
                 valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
                 phy: fidl_common::WlanPhyType::Dsss,
                 data_rate: 0,
-                channel: fidl_common::WlanChannel {
+                channel: fidl_ieee80211::WlanChannel {
                     primary: 0,
-                    cbw: fidl_common::ChannelBandwidth::Cbw20,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                     secondary80: 0,
                 },
                 mcs: 0,
@@ -855,9 +855,9 @@ mod tests {
             valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
             phy: fidl_common::WlanPhyType::Dsss,
             data_rate: 0,
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 0,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             mcs: 0,
@@ -871,9 +871,9 @@ mod tests {
 
         // Frame from the same channel must be processed and a probe response sent.
         let rx_info_same_channel = fidl_softmac::WlanRxInfo {
-            channel: fidl_common::WlanChannel {
+            channel: fidl_ieee80211::WlanChannel {
                 primary: 1,
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             ..rx_info_wrong_channel
@@ -898,7 +898,7 @@ mod tests {
             mesh_id: vec![],
             rsne: None,
             phy: fidl_common::WlanPhyType::Erp,
-            channel_bandwidth: fidl_common::ChannelBandwidth::Cbw20,
+            channel_bandwidth: fidl_ieee80211::ChannelBandwidth::Cbw20,
         })
         .await
         .expect("expected Ap::handle_mlme_start_request OK");
@@ -906,10 +906,10 @@ mod tests {
         assert!(ap.bss.is_some());
         assert_eq!(
             fake_device_state.lock().wlan_channel,
-            fidl_common::WlanChannel {
+            fidl_ieee80211::WlanChannel {
                 primary: 2,
                 // TODO(https://fxbug.dev/42116942): Correctly support this.
-                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             }
         );
@@ -955,7 +955,7 @@ mod tests {
             mesh_id: vec![],
             rsne: None,
             phy: fidl_common::WlanPhyType::Erp,
-            channel_bandwidth: fidl_common::ChannelBandwidth::Cbw20,
+            channel_bandwidth: fidl_ieee80211::ChannelBandwidth::Cbw20,
         })
         .await
         .expect("expected Ap::handle_mlme_start_request OK");

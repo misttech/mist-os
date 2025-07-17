@@ -22,7 +22,7 @@
 
 namespace {
 
-static void verify_channel_to_chanspec(const fuchsia_wlan_common::WlanChannel& in_ch,
+static void verify_channel_to_chanspec(const fuchsia_wlan_ieee80211::WlanChannel& in_ch,
                                        const brcmu_chan& expected) {
   brcmu_d11inf d11_inf = {.io_type = BRCMU_D11AC_IOTYPE};
   brcmu_d11_attach(&d11_inf);
@@ -42,7 +42,8 @@ TEST(ChannelConversion, ChannelToChanspec) {
 
   {
     // Try a simple 20 MHz channel in the 2.4 GHz band
-    fuchsia_wlan_common::WlanChannel in_ch(11, fuchsia_wlan_common::ChannelBandwidth::kCbw20, 0);
+    fuchsia_wlan_ieee80211::WlanChannel in_ch(11, fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20,
+                                              0);
     out_ch = {
         .chnum = 11, .band = BRCMU_CHAN_BAND_2G, .bw = BRCMU_CHAN_BW_20, .sb = BRCMU_CHAN_SB_NONE};
     verify_channel_to_chanspec(in_ch, out_ch);
@@ -50,7 +51,8 @@ TEST(ChannelConversion, ChannelToChanspec) {
 
   {
     // Try a 40+ MHz channel in the 5 GHz band
-    fuchsia_wlan_common::WlanChannel in_ch(44, fuchsia_wlan_common::ChannelBandwidth::kCbw40, 0);
+    fuchsia_wlan_ieee80211::WlanChannel in_ch(44, fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw40,
+                                              0);
     out_ch = {
         .chnum = 44, .band = BRCMU_CHAN_BAND_5G, .bw = BRCMU_CHAN_BW_40, .sb = BRCMU_CHAN_SB_U};
     verify_channel_to_chanspec(in_ch, out_ch);
@@ -58,8 +60,8 @@ TEST(ChannelConversion, ChannelToChanspec) {
 
   {
     // Try a 40- MHz channel in the 5 GHz band with invalid secondary80 (which should be ignored)
-    fuchsia_wlan_common::WlanChannel in_ch(112, fuchsia_wlan_common::ChannelBandwidth::kCbw40Below,
-                                           44);
+    fuchsia_wlan_ieee80211::WlanChannel in_ch(
+        112, fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw40Below, 44);
     out_ch = {
         .chnum = 112, .band = BRCMU_CHAN_BAND_5G, .bw = BRCMU_CHAN_BW_40, .sb = BRCMU_CHAN_SB_L};
     verify_channel_to_chanspec(in_ch, out_ch);
@@ -67,18 +69,18 @@ TEST(ChannelConversion, ChannelToChanspec) {
 }
 
 static void verify_chanspec_to_channel(const brcmu_chan& in_ch,
-                                       const fuchsia_wlan_common_wire::WlanChannel& expected) {
+                                       const fuchsia_wlan_ieee80211::WlanChannel& expected) {
   brcmu_d11inf d11_inf = {.io_type = BRCMU_D11AC_IOTYPE};
   brcmu_d11_attach(&d11_inf);
 
   brcmu_chan in_ch_temp = in_ch;
   d11_inf.encchspec(&in_ch_temp);
-  fuchsia_wlan_common_wire::WlanChannel actual;
+  fuchsia_wlan_ieee80211::wire::WlanChannel actual;
   chanspec_to_channel(&d11_inf, in_ch_temp.chspec, &actual);
 
-  EXPECT_EQ(actual.primary, expected.primary);
-  EXPECT_EQ(actual.cbw, expected.cbw);
-  EXPECT_EQ(actual.secondary80, expected.secondary80);
+  EXPECT_EQ(actual.primary, expected.primary());
+  EXPECT_EQ(actual.cbw, expected.cbw());
+  EXPECT_EQ(actual.secondary80, expected.secondary80());
 }
 
 TEST(ChannelConversion, ChanspecToChannel) {
@@ -88,8 +90,8 @@ TEST(ChannelConversion, ChanspecToChannel) {
     // Try a simple 20 MHz channel in the 2.4 GHz band
     in_ch = {
         .chnum = 11, .band = BRCMU_CHAN_BAND_2G, .bw = BRCMU_CHAN_BW_20, .sb = BRCMU_CHAN_SB_NONE};
-    fuchsia_wlan_common_wire::WlanChannel out_ch = {
-        .primary = 11, .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+    fuchsia_wlan_ieee80211::WlanChannel out_ch(11, fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw20,
+                                               0);
     verify_chanspec_to_channel(in_ch, out_ch);
   }
 
@@ -97,8 +99,8 @@ TEST(ChannelConversion, ChanspecToChannel) {
     // Try a 40+ MHz channel in the 5 GHz band
     in_ch = {
         .chnum = 44, .band = BRCMU_CHAN_BAND_5G, .bw = BRCMU_CHAN_BW_40, .sb = BRCMU_CHAN_SB_U};
-    fuchsia_wlan_common_wire::WlanChannel out_ch = {
-        .primary = 44, .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw40, .secondary80 = 0};
+    fuchsia_wlan_ieee80211::WlanChannel out_ch(44, fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw40,
+                                               0);
     verify_chanspec_to_channel(in_ch, out_ch);
   }
 
@@ -106,10 +108,8 @@ TEST(ChannelConversion, ChanspecToChannel) {
     // Try a 40- MHz channel in the 5 GHz band
     in_ch = {
         .chnum = 112, .band = BRCMU_CHAN_BAND_5G, .bw = BRCMU_CHAN_BW_40, .sb = BRCMU_CHAN_SB_L};
-    fuchsia_wlan_common_wire::WlanChannel out_ch = {
-        .primary = 112,
-        .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw40Below,
-        .secondary80 = 0};
+    fuchsia_wlan_ieee80211::WlanChannel out_ch(
+        112, fuchsia_wlan_ieee80211::ChannelBandwidth::kCbw40Below, 0);
     verify_chanspec_to_channel(in_ch, out_ch);
   }
 }

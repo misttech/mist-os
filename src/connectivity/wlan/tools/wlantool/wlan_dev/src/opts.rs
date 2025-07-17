@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use clap::arg_enum;
-use fidl_fuchsia_wlan_common as wlan_common;
 use fidl_fuchsia_wlan_common::PowerSaveType;
 use structopt::StructOpt;
+use {fidl_fuchsia_wlan_common as wlan_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211};
 
 arg_enum! {
     #[derive(PartialEq, Copy, Clone, Debug)]
@@ -70,12 +70,12 @@ impl ::std::convert::From<PhyArg> for wlan_common::WlanPhyType {
     }
 }
 
-impl ::std::convert::From<CbwArg> for wlan_common::ChannelBandwidth {
+impl ::std::convert::From<CbwArg> for fidl_ieee80211::ChannelBandwidth {
     fn from(arg: CbwArg) -> Self {
         match arg {
-            CbwArg::Cbw20 => wlan_common::ChannelBandwidth::Cbw20,
-            CbwArg::Cbw40 => wlan_common::ChannelBandwidth::Cbw40,
-            CbwArg::Cbw80 => wlan_common::ChannelBandwidth::Cbw80,
+            CbwArg::Cbw20 => fidl_ieee80211::ChannelBandwidth::Cbw20,
+            CbwArg::Cbw40 => fidl_ieee80211::ChannelBandwidth::Cbw40,
+            CbwArg::Cbw80 => fidl_ieee80211::ChannelBandwidth::Cbw80,
         }
     }
 }

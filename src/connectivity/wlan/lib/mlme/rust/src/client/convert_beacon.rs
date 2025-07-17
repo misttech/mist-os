@@ -68,6 +68,7 @@ fn get_bss_type(capability_info: CapabilityInfo) -> fidl_common::BssType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
     use lazy_static::lazy_static;
 
     lazy_static! {
@@ -78,9 +79,9 @@ mod tests {
     // Capability information: ESS, privacy, spectrum mgmt, radio msmt
     const CAPABILITY_INFO: CapabilityInfo = CapabilityInfo(0x1111);
     const RX_INFO: fidl_softmac::WlanRxInfo = fidl_softmac::WlanRxInfo {
-        channel: fidl_common::WlanChannel {
+        channel: fidl_ieee80211::WlanChannel {
             primary: 11,
-            cbw: fidl_common::ChannelBandwidth::Cbw20,
+            cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
             secondary80: 0,
         },
         rssi_dbm: -40,
@@ -182,9 +183,9 @@ mod tests {
                 capability_info: CAPABILITY_INFO.0,
                 ies,
                 rssi_dbm: RX_INFO.rssi_dbm,
-                channel: fidl_common::WlanChannel {
+                channel: fidl_ieee80211::WlanChannel {
                     primary: 140,
-                    cbw: fidl_common::ChannelBandwidth::Cbw40,
+                    cbw: fidl_ieee80211::ChannelBandwidth::Cbw40,
                     secondary80: 0,
                 },
                 snr_db: 0,

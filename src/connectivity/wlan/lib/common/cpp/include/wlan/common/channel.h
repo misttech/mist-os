@@ -12,10 +12,10 @@
 
 #include "fidl/fuchsia.wlan.common/cpp/wire_types.h"
 
-bool operator==(const fuchsia_wlan_common::wire::WlanChannel& lhs,
-                const fuchsia_wlan_common::wire::WlanChannel& rhs);
-bool operator!=(const fuchsia_wlan_common::wire::WlanChannel& lhs,
-                const fuchsia_wlan_common::wire::WlanChannel& rhs);
+bool operator==(const fuchsia_wlan_ieee80211::wire::WlanChannel& lhs,
+                const fuchsia_wlan_ieee80211::wire::WlanChannel& rhs);
+bool operator!=(const fuchsia_wlan_ieee80211::wire::WlanChannel& lhs,
+                const fuchsia_wlan_ieee80211::wire::WlanChannel& rhs);
 
 namespace wlan {
 namespace common {
@@ -34,21 +34,21 @@ constexpr Mhz kBaseFreq5Ghz = 5000;
 // TODO(porce): Replace all channel > 14 test throughout the codes
 bool Is5Ghz(uint8_t channel_number);
 bool Is2Ghz(uint8_t channel_number);
-bool Is5Ghz(const fuchsia_wlan_common::wire::WlanChannel& channel);
-bool Is2Ghz(const fuchsia_wlan_common::wire::WlanChannel& channel);
+bool Is5Ghz(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
+bool Is2Ghz(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
 
-bool IsValidChan2Ghz(const fuchsia_wlan_common::wire::WlanChannel& channel);
-bool IsValidChan5Ghz(const fuchsia_wlan_common::wire::WlanChannel& channel);
-bool IsValidChan(const fuchsia_wlan_common::wire::WlanChannel& channel);
+bool IsValidChan2Ghz(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
+bool IsValidChan5Ghz(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
+bool IsValidChan(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
 
-Mhz GetCenterFreq(const fuchsia_wlan_common::wire::WlanChannel& channel);
-uint8_t GetCenterChanIdx(const fuchsia_wlan_common::wire::WlanChannel& channel);
+Mhz GetCenterFreq(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
+uint8_t GetCenterChanIdx(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
 
-std::string ChanStr(const fuchsia_wlan_common::wire::WlanChannel& channel);
-std::string ChanStrLong(const fuchsia_wlan_common::wire::WlanChannel& channel);
+std::string ChanStr(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
+std::string ChanStrLong(const fuchsia_wlan_ieee80211::wire::WlanChannel& channel);
 
 struct Channel {
-  fuchsia_wlan_common::wire::WlanChannel channel;
+  fuchsia_wlan_ieee80211::wire::WlanChannel channel;
   // TODO(porce): Validation
   // TODO(porce): Notation string.
   // TODO(porce): Center frequencies.
@@ -56,8 +56,8 @@ struct Channel {
   // See IEEE Std 802.11-2016 19.3.15
 };
 
-const char* CbwSuffix(fuchsia_wlan_common::wire::ChannelBandwidth cbw);
-const char* CbwStr(fuchsia_wlan_common::wire::ChannelBandwidth cbw);
+const char* CbwSuffix(fuchsia_wlan_ieee80211::wire::ChannelBandwidth cbw);
+const char* CbwStr(fuchsia_wlan_ieee80211::wire::ChannelBandwidth cbw);
 
 }  // namespace common
 }  // namespace wlan
