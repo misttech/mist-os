@@ -40,7 +40,10 @@ class FileReader : public TraceReader {
   // The amount of space in use in |buffer_|.
   size_t buffer_end_ = 0u;
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(FileReader);
+  FileReader(const FileReader&) = delete;
+  FileReader& operator=(const FileReader&) = delete;
+  FileReader(FileReader&&) = delete;
+  FileReader& operator=(FileReader&&) = delete;
 };
 
 }  // namespace trace

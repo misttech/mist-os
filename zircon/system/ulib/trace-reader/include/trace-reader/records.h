@@ -19,7 +19,6 @@
 #include <variant>
 #include <vector>
 
-#include <fbl/macros.h>
 #include <fbl/string.h>
 
 namespace trace {
@@ -249,7 +248,8 @@ class TraceInfoContent final {
     MagicNumberInfo magic_number_info_;
   };
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(TraceInfoContent);
+  TraceInfoContent(const TraceInfoContent&) = delete;
+  TraceInfoContent& operator=(const TraceInfoContent&) = delete;
 };
 
 // Metadata type specific data.
@@ -331,7 +331,8 @@ class MetadataContent final {
     TraceInfo trace_info_;
   };
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(MetadataContent);
+  MetadataContent(const MetadataContent&) = delete;
+  MetadataContent& operator=(const MetadataContent&) = delete;
 };
 
 // Event type specific data.
@@ -507,7 +508,8 @@ class EventData final {
     FlowEnd flow_end_;
   };
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(EventData);
+  EventData(const EventData&) = delete;
+  EventData& operator=(const EventData&) = delete;
 };
 
 // Large record specific data
@@ -570,7 +572,8 @@ class LargeRecordData final {
     Blob blob_;
   };
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(LargeRecordData);
+  LargeRecordData(const LargeRecordData&) = delete;
+  LargeRecordData& operator=(const LargeRecordData&) = delete;
 };
 
 // A decoded record.
@@ -821,7 +824,8 @@ class Record final {
     Large large_;
   };
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Record);
+  Record(const Record&) = delete;
+  Record& operator=(const Record&) = delete;
 };
 
 }  // namespace trace

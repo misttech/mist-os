@@ -17,7 +17,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/intrusive_hash_table.h>
-#include <fbl/macros.h>
 #include <fbl/string.h>
 #include <trace-reader/records.h>
 
@@ -141,7 +140,10 @@ class TraceReader {
   fbl::HashTable<ProviderId, std::unique_ptr<ProviderInfo>> providers_;
   ProviderInfo* current_provider_ = nullptr;
 
-  DISALLOW_COPY_ASSIGN_AND_MOVE(TraceReader);
+  TraceReader(const TraceReader&) = delete;
+  TraceReader& operator=(const TraceReader&) = delete;
+  TraceReader(TraceReader&&) = delete;
+  TraceReader& operator=(TraceReader&&) = delete;
 };
 
 // Provides support for reading sequences of 64-bit words from a contiguous
