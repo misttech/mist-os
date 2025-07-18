@@ -189,7 +189,10 @@ network_unified_binary("bin") {
 
   # Only add the netstack3 configs to the bin, not GUB because O3 in the default
   # config causes binary size increases here.
-  bin_add_configs = [ ":netstack3_configs" ]
+  bin_add_configs = [
+    ":netstack3_configs",
+    ":netstack3_debug_configs",
+  ]
   add_configs = []
 
   # Both debug and release NS3 builds take a long while to run because of
@@ -220,6 +223,23 @@ config("netstack3_configs") {
     configs = [
       # Always optimize speed, even if it increases size.
       "//build/config:optimize_speed",
+    ]
+
+    # Add thinlto config if lto variants are not used.
+    if (!is_lto_variant) {
+      # Allow cross-crate optimization since netstack3 is split between multiple
+      # crates.
+      configs += [ "//build/config/lto:thinlto" ]
+    }
+  }
+}
+
+config("netstack3_debug_configs") {
+  if (is_debug) {
+    configs = [
+      # Minor optimizations that remove a lot of indirection and make zero-cost
+      # closer to zero-cost.
+      "//build/config:optimize_debug",
     ]
 
     # Add thinlto config if lto variants are not used.
