@@ -5,7 +5,6 @@
 pub mod dynamic_file;
 pub mod simple_directory;
 pub mod simple_file;
-pub mod static_directory;
 pub mod stub_bytes_file;
 pub mod stub_empty_file;
 pub mod vec_directory;
