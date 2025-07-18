@@ -704,6 +704,10 @@ async fn create_listener_socket<'a>(
             };
             socket
                 .as_ref()
+                .set_multicast_loop_v4(false)
+                .expect("failed to disable multicast loop for IPv4");
+            socket
+                .as_ref()
                 .join_multicast_v4(&multicast_v4_addr, &iface_addr.addr.into())
                 .expect("join_multicast_v4 failed");
         }
@@ -714,6 +718,10 @@ async fn create_listener_socket<'a>(
                 }
                 std::net::IpAddr::V6(ipv6) => ipv6,
             };
+            socket
+                .as_ref()
+                .set_multicast_loop_v6(false)
+                .expect("failed to disable multicast loop for IPv6");
             socket
                 .as_ref()
                 .join_multicast_v6(
