@@ -136,7 +136,7 @@
 
     <!-- GN from https://gn.googlesource.com/gn/ -->
     <package name="gn/gn/${platform}"
-             version="git_revision:635a71e20e99db0b08520ca0746b501167a5c7e5"
+             version="git_revision:c4748415f12ac92d2781608b8b84fcc0e33e5ff9"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/gn/{{.OS}}-{{.Arch}}"/>
 
