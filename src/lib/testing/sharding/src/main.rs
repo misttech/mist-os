@@ -38,10 +38,8 @@ const SHARD_CONFIG_PATH: &str = "/testshard/config.json5";
 async fn main() {
     let shard_config = fuchsia_fs::file::read_in_namespace_to_string(SHARD_CONFIG_PATH).await;
     let shard_config = match shard_config {
-        // Escape any backslashes in regexes before trying to parse as JSON so
-        // that test authors don't have to escape the backslashes themselves
-        // in GN.
-        Ok(s) => s.replace(r#"\"#, r#"\\"#),
+        // NOTE: Backslashes have already been escaped by GN (see https://fxbug.dev/430527805).
+        Ok(s) => s,
         Err(err) => {
             panic!("failed to read shard config: {err:?}");
         }
