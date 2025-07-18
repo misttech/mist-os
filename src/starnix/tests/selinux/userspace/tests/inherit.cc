@@ -352,4 +352,61 @@ TEST(InheritTest, SiginhAllowedPendingSignalsInherited) {
   }));
 }
 
+// When the `siginh` permission is denied, the signal mask is cleared during `exec`.
+TEST(InheritTest, SiginhDeniedSignalMaskReset) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    sigset_t blocked_signals;
+    sigemptyset(&blocked_signals);
+    ASSERT_THAT(sigaddset(&blocked_signals, SIGCONT), SyscallSucceeds());
+    ASSERT_THAT(sigprocmask(SIG_BLOCK, &blocked_signals, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_blocked_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect no blocked signals for the child program.
+    char* const args[] = {binary_name.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
+// When the `siginh` permission is allowed, the signal mask is inherited during `exec`.
+TEST(InheritTest, SiginhAllowedSignalMaskInherited) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_allow_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    sigset_t blocked_signals;
+    sigemptyset(&blocked_signals);
+    ASSERT_THAT(sigaddset(&blocked_signals, SIGCONT), SyscallSucceeds());
+    ASSERT_THAT(sigprocmask(SIG_BLOCK, &blocked_signals, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_blocked_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect that SIGCONT is blocked for the child program.
+    std::string expect_sigcont = std::to_string(SIGCONT);
+    char* const args[] = {binary_name.data(), expect_sigcont.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
 }  // namespace

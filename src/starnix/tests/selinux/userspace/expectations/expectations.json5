@@ -39,6 +39,9 @@
                 "InheritTest.SiginhDeniedPendingNonFatalSignalsCleared",
                 "InheritTest.SiginhDeniedPendingFatalSignalsCleared",
 
+                // TODO: https://fxbug.dev/378655436 - Clear the signal mask when the `siginh` permission is denied.
+                "InheritTest.SiginhDeniedSignalMaskReset",
+
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of unknown policy class Ids.
                 "SeLinuxFsCreate.InvalidComputeCreateClassId",
                 "SeLinuxFsAccess.UnknownClassIdIsAccepted",
