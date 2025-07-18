@@ -141,7 +141,7 @@ class TestPlatformPort : public testing::Test {
     uint64_t key;
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, port->Wait(&key, 0).get());
 
-    uint32_t dummy;
+    uint32_t dummy = 0;
     EXPECT_EQ(ZX_OK, remote.write(0 /* flags */, &dummy, sizeof(dummy), nullptr /* handles */,
                                   0 /* num_handles*/));
 
