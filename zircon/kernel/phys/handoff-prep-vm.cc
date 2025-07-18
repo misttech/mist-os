@@ -10,6 +10,7 @@
 
 #include <fbl/algorithm.h>
 #include <ktl/bit.h>
+#include <ktl/iterator.h>
 #include <ktl/string_view.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
@@ -66,6 +67,16 @@ constexpr arch::AccessPermissions ToAccessPermissions(PhysMapping::Permissions p
   };
 }
 
+uint64_t PhysmapSize() {
+  // Find the highest RAM address, which gives the size of the physmap given
+  // the nature of the mapping.
+  auto last_ram = ktl::prev(Allocation::GetPool().end());
+  while (!memalloc::IsRamType(last_ram->type)) {  // There can't not be any RAM
+    --last_ram;
+  }
+  return PageAlignUp(last_ram->end());
+}
+
 }  // namespace
 
 HandoffPrep::VirtualAddressAllocator
@@ -73,7 +84,7 @@ HandoffPrep::VirtualAddressAllocator::TemporaryHandoffDataAllocator(const ElfIma
   return {
       /*start=*/kernel.load_address() - k1GiB,
       /*strategy=*/HandoffPrep::VirtualAddressAllocator::Strategy::kDown,
-      /*boundary=*/kArchPhysmapVirtualBase + kArchPhysmapSize,
+      /*boundary=*/kArchPhysmapVirtualBase + PhysmapSize(),
   };
 }
 
@@ -203,11 +214,22 @@ HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver
   ZirconAbi abi{};
 
   // Physmap.
-  {  // Shadowing the entire physmap would be redundantly wasteful.
-    PhysMapping mapping("physmap"sv, PhysMapping::Type::kNormal, kArchPhysmapVirtualBase,
-                        kArchPhysmapSize, 0, PhysMapping::Permissions::Rw(),
-                        /*kasan_shadow=*/false);
-    PublishSingleMappingVmar(ktl::move(mapping));
+  {
+    PhysVmarPrep prep = PrepareVmarAt("physmap"sv, kArchPhysmapVirtualBase, PhysmapSize());
+    auto map = [&prep](const memalloc::Range& range) {
+      uint64_t aligned_paddr = PageAlignDown(range.addr);
+      uint64_t aligned_size = PageAlignUp(range.size + (range.addr - aligned_paddr));
+
+      // Shadowing the physmap would be redundantly wasteful.
+      PhysMapping mapping("RAM"sv, PhysMapping::Type::kNormal,
+                          kArchPhysmapVirtualBase + aligned_paddr, aligned_size, aligned_paddr,
+                          PhysMapping::Permissions::Rw(),
+                          /*kasan_shadow=*/false);
+      prep.PublishMapping(mapping);
+      return true;
+    };
+    memalloc::NormalizeRam(pool, map);
+    ktl::move(prep).Publish();
   }
 
   // The kernel's mapping.
