@@ -78,7 +78,7 @@
              path="third_party/bcmdhd"
              remote="https://fuchsia.googlesource.com/third_party/bcmdhd"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="529e0c2128936bd1d2d6777cd1f61c79a39ac831"/>
+             revision="d0740d3747717e7315ee447e4ad863b86004788e"/>
     <project name="boringssl"
              path="third_party/boringssl/src"
              remote="https://boringssl.googlesource.com/boringssl"
