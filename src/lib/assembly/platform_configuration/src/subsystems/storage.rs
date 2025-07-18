@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{bail, ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
+use assembly_config_schema::platform_config::development_support_config::StorageToolsConfig;
 use assembly_config_schema::platform_config::recovery_config::RecoveryConfig;
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
@@ -14,15 +14,15 @@ use assembly_images_config::{
 };
 
 pub(crate) struct StorageSubsystemConfig;
-impl DefineSubsystemConfiguration<(&StorageConfig, &RecoveryConfig, &DevelopmentSupportConfig)>
+impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &RecoveryConfig)>
     for StorageSubsystemConfig
 {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        configs: &(&StorageConfig, &RecoveryConfig, &DevelopmentSupportConfig),
+        configs: &(&StorageConfig, &StorageToolsConfig, &RecoveryConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let (storage_config, recovery_config, development_config) = *configs;
+        let (storage_config, storage_tools_config, recovery_config) = *configs;
         if matches!(
             context.feature_set_level,
             FeatureSetLevel::Bootstrap | FeatureSetLevel::Embeddable
@@ -42,8 +42,11 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &RecoveryConfig, &Development
         }
 
         // Include fuchsia.fshost/Recovery capabilities if this configuration supports recovery
-        // (flash super via userspace fastboot) or netboot (reprovision partition tables) workflows.
-        if recovery_config.system_recovery.is_some() || development_config.enable_netsvc_netboot {
+        // (e.g. userspace fastboot or FDR), or if we are including partitioning tools that require
+        // recovery functionality (e.g. to reset the device partition tables or flash a new system).
+        if recovery_config.system_recovery.is_some()
+            || storage_tools_config.enable_partitioning_tools
+        {
             builder.platform_bundle("fshost_recovery");
         } else {
             builder.platform_bundle("fshost_non_recovery");

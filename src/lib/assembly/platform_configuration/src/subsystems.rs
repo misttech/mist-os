@@ -419,7 +419,7 @@ fn configure_subsystems(
 
     storage::StorageSubsystemConfig::define_configuration(
         &context_base.for_subsystem("storage"),
-        &(&platform.storage, &platform.recovery, &platform.development_support),
+        &(&platform.storage, &platform.development_support.tools.storage, &platform.recovery),
         builder,
     )
     .context("Configuring the 'storage' subsystem")?;
