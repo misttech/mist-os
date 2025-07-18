@@ -22,9 +22,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use update_package::manifest::OtaManifestV1;
 use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver,
-    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
-    fidl_fuchsia_update_installer_ext as fupdate_installer_ext,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_space as fspace, fidl_fuchsia_update_installer_ext as fupdate_installer_ext,
 };
 
 mod config;
@@ -363,7 +362,7 @@ async fn update(
         info!("flushing cobalt events");
         let () = flush_cobalt(cobalt_forwarder_task, COBALT_FLUSH_TIMEOUT).await;
 
-        let (state, mode, _packages) = match attempt_res {
+        let (state, mode) = match attempt_res {
             Ok(ok) => ok,
             Err(e) => {
                 error!("system update failed: {:#}", anyhow!(e));
@@ -643,10 +642,7 @@ impl Attempt<'_> {
         co: &mut async_generator::Yield<fupdate_installer_ext::State>,
         phase: &mut metrics::Phase,
         target_version: &mut history::Version,
-    ) -> Result<
-        (state::WaitToReboot, update_package::UpdateMode, Vec<fio::DirectoryProxy>),
-        AttemptError,
-    > {
+    ) -> Result<(state::WaitToReboot, update_package::UpdateMode), AttemptError> {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
@@ -697,11 +693,11 @@ impl Attempt<'_> {
         let mut state = state.enter_fetch(co).await;
         *phase = metrics::Phase::PackageDownload;
 
-        let packages = match self
+        let () = match self
             .fetch_packages(co, &mut state, packages_to_fetch, mode, update_pkg.1)
             .await
         {
-            Ok(packages) => packages,
+            Ok(()) => (),
             Err(e) => {
                 state.fail(co, e.reason()).await;
                 return Err(e.into());
@@ -724,7 +720,7 @@ impl Attempt<'_> {
         let state = state.enter_wait_to_reboot(co).await;
         *phase = metrics::Phase::SuccessPendingReboot;
 
-        Ok((state, mode, packages))
+        Ok((state, mode))
     }
 
     /// Acquire the necessary data to perform the update.
@@ -1035,7 +1031,7 @@ impl Attempt<'_> {
         packages_to_fetch: Vec<PinnedAbsolutePackageUrl>,
         mode: update_package::UpdateMode,
         update_pkg: Option<Hash>,
-    ) -> Result<Vec<fio::DirectoryProxy>, FetchError> {
+    ) -> Result<(), FetchError> {
         // Remove ImagesToWrite from the retained_index.
         // GC to remove the ImagesToWrite from blobfs.
         let () = replace_retained_packages(
@@ -1055,17 +1051,13 @@ impl Attempt<'_> {
             error!("unable to gc packages during Fetch state: {:#}", anyhow!(e));
         }
 
-        let mut packages = Vec::with_capacity(packages_to_fetch.len());
-
         let mut package_dir_futs = futures::stream::iter(packages_to_fetch)
             .map(async |url| resolver::resolve_package(&self.env.pkg_resolver, &url.into()).await)
             .buffer_unordered(self.concurrent_package_resolves);
 
-        while let Some(package_dir) =
+        while let Some(_package_dir) =
             package_dir_futs.try_next().await.map_err(FetchError::Resolve)?
         {
-            packages.push(package_dir);
-
             state.add_progress(co, 1).await;
         }
 
@@ -1076,7 +1068,7 @@ impl Attempt<'_> {
             update_package::UpdateMode::ForceRecovery => {}
         }
 
-        Ok(packages)
+        Ok(())
     }
 
     /// Configure the non-current configuration (or recovery) as active for the next boot.
@@ -1122,10 +1114,7 @@ impl AttemptV2<'_> {
         co: &mut async_generator::Yield<fupdate_installer_ext::State>,
         _phase: &mut metrics::Phase,
         target_version: &mut history::Version,
-    ) -> Result<
-        (state::WaitToReboot, update_package::UpdateMode, Vec<fio::DirectoryProxy>),
-        AttemptError,
-    > {
+    ) -> Result<(state::WaitToReboot, update_package::UpdateMode), AttemptError> {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
