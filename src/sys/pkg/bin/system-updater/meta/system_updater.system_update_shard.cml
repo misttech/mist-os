@@ -25,7 +25,9 @@
         },
         {
             protocol: [
+                "fuchsia.pkg.internal.OtaDownloader",
                 "fuchsia.pkg.PackageCache",
+                "fuchsia.pkg.RetainedBlobs",
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.space.Manager",
             ],
@@ -47,12 +49,11 @@
             to: "#system-updater",
         },
         {
-            directory: "system",
-            from: "parent",
-            to: "#system-updater",
-        },
-        {
-            directory: "build-info",
+            directory: [
+                "blob",
+                "build-info",
+                "system",
+            ],
             from: "parent",
             to: "#system-updater",
         },

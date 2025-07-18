@@ -112,6 +112,7 @@
         {
             protocol: [
                 "fuchsia.pkg.PackageCache",
+                "fuchsia.pkg.RetainedBlobs",
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.space.Manager",
             ],

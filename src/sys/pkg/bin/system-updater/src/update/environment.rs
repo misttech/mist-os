@@ -10,7 +10,9 @@ use fidl_fuchsia_hardware_power_statecontrol::{
 };
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_paver::{BootManagerProxy, DataSinkProxy};
-use fidl_fuchsia_pkg::{PackageCacheProxy, PackageResolverProxy, RetainedPackagesProxy};
+use fidl_fuchsia_pkg::{
+    PackageCacheProxy, PackageResolverProxy, RetainedBlobsProxy, RetainedPackagesProxy,
+};
 use fidl_fuchsia_space::ManagerProxy as SpaceManagerProxy;
 use fuchsia_component::client::connect_to_protocol;
 use futures::future::BoxFuture;
@@ -62,8 +64,10 @@ pub struct Environment<
     pub pkg_resolver: PackageResolverProxy,
     pub pkg_cache: PackageCacheProxy,
     pub retained_packages: RetainedPackagesProxy,
+    pub retained_blobs: RetainedBlobsProxy,
     pub space_manager: SpaceManagerProxy,
     pub power_state_control: PowerStateControlProxy,
+    pub ota_downloader: fidl_fuchsia_pkg_internal::OtaDownloaderProxy,
     pub build_info: B,
     pub cobalt_connector: C,
     pub system_info: S,
@@ -85,10 +89,14 @@ impl Environment {
                 .context("connect to fuchsia.pkg.PackageCache")?,
             retained_packages: connect_to_protocol::<fidl_fuchsia_pkg::RetainedPackagesMarker>()
                 .context("connect to fuchsia.pkg.RetainedPackages")?,
+            retained_blobs: connect_to_protocol::<fidl_fuchsia_pkg::RetainedBlobsMarker>()
+                .context("connect to fuchsia.pkg.RetainedBlobs")?,
             space_manager: connect_to_protocol::<fidl_fuchsia_space::ManagerMarker>()
                 .context("connect to fuchsia.space.Manager")?,
             power_state_control: connect_to_protocol::<PowerStateControlMarker>()
                 .context("connect to fuchsia.hardware.power.statecontrol.Admin")?,
+            ota_downloader: connect_to_protocol::<fidl_fuchsia_pkg_internal::OtaDownloaderMarker>()
+                .context("connect to fuchsia.pkg.internal.OtaDownloader")?,
             build_info: NamespaceBuildInfo,
             cobalt_connector: NamespaceCobaltConnector,
             system_info: NamespaceSystemInfo,

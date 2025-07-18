@@ -188,6 +188,7 @@
                 "fuchsia.paver.Paver",
                 "fuchsia.pkg.PackageCache",
                 "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.RetainedBlobs",
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.clientlevel.Connector",

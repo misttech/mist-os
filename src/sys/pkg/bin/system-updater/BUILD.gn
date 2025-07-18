@@ -27,6 +27,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//sdk/fidl/fuchsia.pkg.internal:fuchsia.pkg.internal_rust",
     "//sdk/fidl/fuchsia.space:fuchsia.space_rust",
     "//sdk/rust/zx",
     "//src/lib/cobalt/rust/builders",
@@ -46,6 +47,7 @@ rustc_binary("bin") {
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/lib/async-generator",
+    "//src/sys/pkg/lib/blobfs",
     "//src/sys/pkg/lib/bounded-node",
     "//src/sys/pkg/lib/epoch",
     "//src/sys/pkg/lib/event-queue",
@@ -130,6 +132,7 @@ fuchsia_structured_config_rust_lib("config_lib") {
 
 structured_config_values = {
   concurrent_package_resolves = 5
+  concurrent_blob_fetches = 5
   enable_attempt_v2 = false
 }
 
