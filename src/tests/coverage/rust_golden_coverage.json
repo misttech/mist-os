@@ -65,7 +65,5 @@
                 }
             }
         }
-    ],
-    "type": "llvm.coverage.json.export",
-    "version": "3.0.1"
+    ]
 }

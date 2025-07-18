@@ -111,7 +111,7 @@ func TestCoverage(t *testing.T) {
 	}
 
 	// Compare the generated coverage with a golden coverage.
-	diff := cmp.Diff(goldenCoverageExport, generatedCoverageExport)
+	diff := cmp.Diff(goldenCoverageExport.Data, generatedCoverageExport.Data)
 	if diff != "" {
 		t.Fatalf("unexpected coverage (-golden-coverage +generated-coverage): %s", diff)
 	}
