@@ -55,6 +55,10 @@ pub struct VolumesDirectory {
     /// all volumes.
     pager_dirty_bytes_count: AtomicU64,
 
+    /// Max outstanding dirty bytes under critical memory pressure. This could be hardcoded, but is
+    /// broken out for testing.
+    max_dirty_bytes_when_critical: AtomicU64,
+
     // A callback to invoke when a volume is added.  When the volume is removed, this is called
     // again with `None` as the second parameter.
     on_volume_added: OnceLock<Box<dyn Fn(&str, Option<Arc<ObjectStore>>) + Send + Sync>>,
@@ -372,6 +376,7 @@ impl VolumesDirectory {
             mem_monitor,
             profiling_state: futures::lock::Mutex::new(None),
             pager_dirty_bytes_count: AtomicU64::new(0),
+            max_dirty_bytes_when_critical: AtomicU64::new(zx::system_get_physmem() / 100),
             on_volume_added: OnceLock::new(),
         });
         let mut iter = me.root_volume.volume_directory().iter(&mut merger).await?;
@@ -416,6 +421,10 @@ impl VolumesDirectory {
         }
         warn!(volume_name, profile_name; "Volume not found while deleting profile");
         Err(zx::Status::NOT_FOUND)
+    }
+
+    pub fn memory_pressure_monitor(&self) -> Option<&MemoryPressureMonitor> {
+        self.mem_monitor.as_ref()
     }
 
     /// Stop all ongoing replays, and complete and persist ongoing recordings.
@@ -705,7 +714,7 @@ impl VolumesDirectory {
         }
 
         let total_dirty = self.pager_dirty_bytes_count.load(Ordering::Acquire);
-        total_dirty + byte_count >= Self::get_max_pager_dirty_when_mem_critical()
+        total_dirty + byte_count >= self.max_dirty_bytes_when_critical.load(Ordering::Relaxed)
     }
 
     /// Reports that a certain number of bytes will be dirtied in a pager-backed VMO. If the memory
@@ -733,7 +742,7 @@ impl VolumesDirectory {
                             "Flushing all volumes. Memory pressure is critical & dirty pager bytes \
                             ({} MiB) >= limit ({} MiB)",
                             self.pager_dirty_bytes_count.load(Ordering::Acquire) / MEBIBYTE,
-                            Self::get_max_pager_dirty_when_mem_critical() / MEBIBYTE
+                            self.max_dirty_bytes_when_critical.load(Ordering::Relaxed) / MEBIBYTE
                         );
 
                         let flushes = FuturesUnordered::new();
@@ -763,12 +772,6 @@ impl VolumesDirectory {
             // zero.
             self.pager_dirty_bytes_count.store(0, Ordering::Release);
         }
-    }
-
-    /// Gets the maximum amount of bytes to allow to be dirty when memory pressure is CRITICAL.
-    fn get_max_pager_dirty_when_mem_critical() -> u64 {
-        // Only allow up to 1% of available physical memory
-        zx::system_get_physmem() / 100
     }
 
     async fn handle_check(
@@ -881,7 +884,8 @@ impl StoreOwner for VolumesDirectory {
 
 #[cfg(test)]
 mod tests {
-    use crate::fuchsia::testing::open_file_checked;
+    use crate::fuchsia::memory_pressure::MemoryPressureLevel;
+    use crate::fuchsia::testing::{open_file_checked, TestFixture};
     use crate::fuchsia::volumes_directory::VolumesDirectory;
     use fidl::endpoints::{create_proxy, create_request_stream, DiscoverableProtocolMarker};
     use fidl_fuchsia_fs::AdminMarker;
@@ -2155,6 +2159,58 @@ mod tests {
         volumes_directory.terminate().await;
         std::mem::drop(volumes_directory);
         filesystem.close().await.expect("Filesystem close");
+    }
+
+    // This mostly just ensures that we exercise the code path. It was added because the path at
+    // one point contained a deadlock.
+    #[fuchsia::test(threads = 10)]
+    async fn test_flush_before_mark_dirty_under_critical_memory_pressure() {
+        let fixture = TestFixture::new().await;
+        // Memory is critical, and it's always our fault.
+        let _ = fixture
+            .memory_pressure_proxy()
+            .on_level_changed(MemoryPressureLevel::Critical)
+            .await
+            .expect("memory pressure FIDL");
+        fixture.volumes_directory().max_dirty_bytes_when_critical.store(1, Ordering::Relaxed);
+
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+        )
+        .await;
+
+        file.resize((zx::system_get_page_size() * 2).into())
+            .await
+            .expect("resize (FIDL)")
+            .expect("resize failed");
+
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
+            .await
+            .expect("get_backing_memory (FIDL)")
+            .expect("get_backing_memory");
+
+        let buf = [0xAAu8];
+        // One call to get dirty bytes over 0, the second to force a flush during mark_dirty.
+        vmo.write(&buf, 0).expect("Writing to create dirty bytes");
+        let before = fixture.volumes_directory().pager_dirty_bytes_count.load(Ordering::Relaxed);
+        vmo.write(&buf, zx::system_get_page_size().into())
+            .expect("Writing to force a flush during mark_dirty");
+        // This is still the page size because we forced a flush of the first write during the
+        // second write.
+        assert_eq!(
+            fixture.volumes_directory().pager_dirty_bytes_count.load(Ordering::Relaxed),
+            before,
+        );
+
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]

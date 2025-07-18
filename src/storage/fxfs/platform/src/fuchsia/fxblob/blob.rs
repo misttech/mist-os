@@ -604,7 +604,7 @@ fn read_ahead_size_for_chunk_size(chunk_size: u64, suggested_read_ahead_size: u6
 mod tests {
     use super::*;
     use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
-    use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+    use crate::fuchsia::memory_pressure::MemoryPressureLevel;
     use crate::fuchsia::pager::PagerRange;
     use crate::fuchsia::volume::{MemoryPressureConfig, MAX_READ_AHEAD_SIZE};
     use assert_matches::assert_matches;
@@ -969,10 +969,10 @@ mod tests {
 
         {
             let volume = fixture.volume().volume().clone();
-            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
-            let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
-                .expect("Failed to create MemoryPressureMonitor");
-            volume.start_background_task(MemoryPressureConfig::default(), Some(&mem_pressure));
+            volume.start_background_task(
+                MemoryPressureConfig::default(),
+                fixture.volumes_directory().memory_pressure_monitor(),
+            );
 
             let data = vec![0xffu8; 252 * 1024];
             let hash = fixture.write_blob(&data, CompressionMode::Never).await;
@@ -983,7 +983,8 @@ mod tests {
 
             assert_eq!(&get_chunks(&blob.chunks_supplied), &[1, 1, 1, 1, 0, 0, 0, 0]);
 
-            watcher_proxy
+            fixture
+                .memory_pressure_proxy()
                 .on_level_changed(MemoryPressureLevel::Critical)
                 .await
                 .expect("Failed to send memory pressure level change");

@@ -1006,20 +1006,17 @@ impl RefaultTracker {
 #[cfg(test)]
 mod tests {
     use super::{RefaultTracker, DIRENT_CACHE_LIMIT};
-    use crate::fuchsia::directory::FxDirectory;
-    use crate::fuchsia::file::FxFile;
     use crate::fuchsia::fxblob::testing::{self as blob_testing, BlobFixture};
     use crate::fuchsia::fxblob::BlobDirectory;
-    use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+    use crate::fuchsia::memory_pressure::MemoryPressureLevel;
     use crate::fuchsia::pager::PagerBacked;
     use crate::fuchsia::profile::{new_profile_state, RECORDED};
     use crate::fuchsia::testing::{
         close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
-        open_file_checked, write_at, TestFixture,
+        open_file_checked, TestFixture,
     };
     use crate::fuchsia::volume::{
-        FxVolume, FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
-        BASE_READ_AHEAD_SIZE,
+        FxVolume, MemoryPressureConfig, MemoryPressureLevelConfig, BASE_READ_AHEAD_SIZE,
     };
     use crate::fuchsia::volumes_directory::VolumesDirectory;
     use crate::volume::MAX_READ_AHEAD_SIZE;
@@ -1030,11 +1027,10 @@ mod tests {
     use fuchsia_fs::file;
     use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder};
     use fxfs::fsck::{fsck, fsck_volume};
-    use fxfs::object_handle::ObjectHandle;
     use fxfs::object_store::directory::replace_child;
     use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
     use fxfs::object_store::volume::root_volume;
-    use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore, NO_OWNER};
+    use fxfs::object_store::{HandleOptions, ObjectStore, NO_OWNER};
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::atomic::Ordering;
     use std::sync::{Arc, Weak};
@@ -1325,45 +1321,33 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_background_flush() {
-        // We have to do a bit of set-up ourselves for this test, since we want to be able to access
-        // the underlying DataObjectHandle at the same time as the FxFile which corresponds to it.
-        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
-        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let fixture = TestFixture::new().await;
         {
-            let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume = root_volume
-                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
-                .await
-                .unwrap();
-            let mut transaction = filesystem
-                .clone()
-                .new_transaction(lock_keys![], Options::default())
-                .await
-                .expect("new_transaction failed");
-            let object_id = ObjectStore::create_object(
-                &volume,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
+            let file = open_file_checked(
+                fixture.root(),
+                "file",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
-            .await
-            .expect("create_object failed")
-            .object_id();
-            transaction.commit().await.expect("commit failed");
-            let vol =
-                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), volume.clone(), 0).await.unwrap();
-
-            let file = vol
-                .volume()
-                .get_or_load_node(object_id, ObjectDescriptor::File, None)
+            .await;
+            let object_id = file
+                .get_attributes(fio::NodeAttributesQuery::ID)
                 .await
-                .expect("get_or_load_node failed")
-                .into_any()
-                .downcast::<FxFile>()
-                .expect("Not a file");
+                .expect("Fidl get attr")
+                .expect("get attr")
+                .1
+                .id
+                .unwrap();
 
             // Write some data to the file, which will only go to the cache for now.
-            write_at(&file, 0, &[123u8]).await.expect("write_at failed");
+            file.write_at(&[123u8], 0).await.expect("FIDL write_at").expect("write_at");
+
+            // Initialized to the default size.
+            assert_eq!(fixture.volume().volume().dirent_cache().limit(), DIRENT_CACHE_LIMIT);
+            let volume = fixture.volume().volume().clone();
 
             let data_has_persisted = || async {
                 // We have to reopen the object each time since this is a distinct handle from the
@@ -1377,7 +1361,7 @@ mod tests {
             };
             assert!(!data_has_persisted().await);
 
-            vol.volume().start_background_task(
+            fixture.volume().volume().start_background_task(
                 MemoryPressureConfig {
                     mem_normal: MemoryPressureLevelConfig {
                         background_task_period: Duration::from_millis(100),
@@ -1390,68 +1374,54 @@ mod tests {
                 None,
             );
 
-            let mut wait = 100;
-            loop {
+            const MAX_WAIT: Duration = Duration::from_secs(20);
+            let wait_increments = Duration::from_millis(400);
+            let mut total_waited = Duration::ZERO;
+
+            while total_waited < MAX_WAIT {
+                fasync::Timer::new(wait_increments).await;
+                total_waited += wait_increments;
+
                 if data_has_persisted().await {
                     break;
                 }
-                fasync::Timer::new(Duration::from_millis(wait)).await;
-                wait *= 2;
             }
 
-            std::mem::drop(file);
-            vol.volume().terminate().await;
+            assert!(data_has_persisted().await);
         }
 
-        filesystem.close().await.expect("close filesystem failed");
-        let device = filesystem.take_device().await;
-        device.ensure_unique();
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 2)]
     async fn test_background_flush_with_warning_memory_pressure() {
-        // We have to do a bit of set-up ourselves for this test, since we want to be able to access
-        // the underlying DataObjectHandle at the same time as the FxFile which corresponds to it.
-        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
-        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let fixture = TestFixture::new().await;
         {
-            let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume = root_volume
-                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
-                .await
-                .unwrap();
-            let mut transaction = filesystem
-                .clone()
-                .new_transaction(lock_keys![], Options::default())
-                .await
-                .expect("new_transaction failed");
-            let object_id = ObjectStore::create_object(
-                &volume,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
+            let file = open_file_checked(
+                fixture.root(),
+                "file",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
-            .await
-            .expect("create_object failed")
-            .object_id();
-            transaction.commit().await.expect("commit failed");
-            let vol =
-                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), volume.clone(), 0).await.unwrap();
-
-            let file = vol
-                .volume()
-                .get_or_load_node(object_id, ObjectDescriptor::File, None)
+            .await;
+            let object_id = file
+                .get_attributes(fio::NodeAttributesQuery::ID)
                 .await
-                .expect("get_or_load_node failed")
-                .into_any()
-                .downcast::<FxFile>()
-                .expect("Not a file");
+                .expect("Fidl get attr")
+                .expect("get attr")
+                .1
+                .id
+                .unwrap();
 
             // Write some data to the file, which will only go to the cache for now.
-            write_at(&file, 0, &[123u8]).await.expect("write_at failed");
+            file.write_at(&[123u8], 0).await.expect("FIDL write_at").expect("write_at");
 
             // Initialized to the default size.
-            assert_eq!(vol.volume().dirent_cache().limit(), DIRENT_CACHE_LIMIT);
+            assert_eq!(fixture.volume().volume().dirent_cache().limit(), DIRENT_CACHE_LIMIT);
+            let volume = fixture.volume().volume().clone();
 
             let data_has_persisted = || async {
                 // We have to reopen the object each time since this is a distinct handle from the
@@ -1464,10 +1434,6 @@ mod tests {
                 data.len() == 1 && data[..] == [123u8]
             };
             assert!(!data_has_persisted().await);
-
-            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
-            let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
-                .expect("Failed to create MemoryPressureMonitor");
 
             // Configure the flush task to only flush quickly on warning.
             let flush_config = MemoryPressureConfig {
@@ -1488,10 +1454,14 @@ mod tests {
                     ..Default::default()
                 },
             };
-            vol.volume().start_background_task(flush_config, Some(&mem_pressure));
+            fixture.volume().volume().start_background_task(
+                flush_config,
+                fixture.volumes_directory().memory_pressure_monitor(),
+            );
 
             // Send the memory pressure update.
-            let _ = watcher_proxy
+            fixture
+                .memory_pressure_proxy()
                 .on_level_changed(MemoryPressureLevel::Warning)
                 .await
                 .expect("Failed to send memory pressure level change");
@@ -1512,61 +1482,41 @@ mod tests {
             }
 
             assert!(data_has_persisted().await);
-            assert_eq!(vol.volume().dirent_cache().limit(), 100);
-
-            std::mem::drop(file);
-            vol.volume().terminate().await;
+            assert_eq!(fixture.volume().volume().dirent_cache().limit(), 100);
         }
 
-        filesystem.close().await.expect("close filesystem failed");
-        let device = filesystem.take_device().await;
-        device.ensure_unique();
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 2)]
     async fn test_background_flush_with_critical_memory_pressure() {
-        // We have to do a bit of set-up ourselves for this test, since we want to be able to access
-        // the underlying DataObjectHandle at the same time as the FxFile which corresponds to it.
-        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
-        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let fixture = TestFixture::new().await;
         {
-            let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume = root_volume
-                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
-                .await
-                .unwrap();
-            let mut transaction = filesystem
-                .clone()
-                .new_transaction(lock_keys![], Options::default())
-                .await
-                .expect("new_transaction failed");
-            let object_id = ObjectStore::create_object(
-                &volume,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
+            let file = open_file_checked(
+                fixture.root(),
+                "file",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
-            .await
-            .expect("create_object failed")
-            .object_id();
-            transaction.commit().await.expect("commit failed");
-            let vol =
-                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), volume.clone(), 0).await.unwrap();
-
-            let file = vol
-                .volume()
-                .get_or_load_node(object_id, ObjectDescriptor::File, None)
+            .await;
+            let object_id = file
+                .get_attributes(fio::NodeAttributesQuery::ID)
                 .await
-                .expect("get_or_load_node failed")
-                .into_any()
-                .downcast::<FxFile>()
-                .expect("Not a file");
-
-            // Initialized to the default size.
-            assert_eq!(vol.volume().dirent_cache().limit(), DIRENT_CACHE_LIMIT);
+                .expect("Fidl get attr")
+                .expect("get attr")
+                .1
+                .id
+                .unwrap();
 
             // Write some data to the file, which will only go to the cache for now.
-            write_at(&file, 0, &[123u8]).await.expect("write_at failed");
+            file.write_at(&[123u8], 0).await.expect("FIDL write_at").expect("write_at");
+
+            // Initialized to the default size.
+            assert_eq!(fixture.volume().volume().dirent_cache().limit(), DIRENT_CACHE_LIMIT);
+            let volume = fixture.volume().volume().clone();
 
             let data_has_persisted = || async {
                 // We have to reopen the object each time since this is a distinct handle from the
@@ -1579,10 +1529,6 @@ mod tests {
                 data.len() == 1 && data[..] == [123u8]
             };
             assert!(!data_has_persisted().await);
-
-            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
-            let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
-                .expect("Failed to create MemoryPressureMonitor");
 
             let flush_config = MemoryPressureConfig {
                 mem_normal: MemoryPressureLevelConfig {
@@ -1598,10 +1544,14 @@ mod tests {
                     ..Default::default()
                 },
             };
-            vol.volume().start_background_task(flush_config, Some(&mem_pressure));
+            fixture.volume().volume().start_background_task(
+                flush_config,
+                fixture.volumes_directory().memory_pressure_monitor(),
+            );
 
             // Send the memory pressure update.
-            watcher_proxy
+            fixture
+                .memory_pressure_proxy()
                 .on_level_changed(MemoryPressureLevel::Critical)
                 .await
                 .expect("Failed to send memory pressure level change");
@@ -1621,25 +1571,16 @@ mod tests {
             }
 
             assert!(data_has_persisted().await);
-            assert_eq!(vol.volume().dirent_cache().limit(), 50);
-
-            std::mem::drop(file);
-            vol.volume().terminate().await;
+            assert_eq!(fixture.volume().volume().dirent_cache().limit(), 50);
         }
 
-        filesystem.close().await.expect("close filesystem failed");
-        let device = filesystem.take_device().await;
-        device.ensure_unique();
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 2)]
     async fn test_memory_pressure_signal_updates_read_ahead_size() {
         let fixture = TestFixture::new().await;
         {
-            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
-            let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
-                .expect("Failed to create MemoryPressureMonitor");
-
             let flush_config = MemoryPressureConfig {
                 mem_normal: MemoryPressureLevelConfig {
                     read_ahead_size: 12 * 1024,
@@ -1655,10 +1596,14 @@ mod tests {
                 },
             };
             let volume = fixture.volume().volume().clone();
-            volume.start_background_task(flush_config, Some(&mem_pressure));
+            volume.start_background_task(
+                flush_config,
+                fixture.volumes_directory().memory_pressure_monitor(),
+            );
             let wait_for_read_ahead_to_change =
-                async move |level: MemoryPressureLevel, expected: u64| {
-                    watcher_proxy
+                async |level: MemoryPressureLevel, expected: u64| {
+                    fixture
+                        .memory_pressure_proxy()
                         .on_level_changed(level)
                         .await
                         .expect("Failed to send memory pressure level change");
