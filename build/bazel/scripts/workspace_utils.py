@@ -1140,11 +1140,14 @@ filegroup(
                     f"{build_dir_name}/{dir_link}", build_dir / dir_link
                 )
 
+                # NOTE: allow_empty is necessary when performing queries
+                # before building anything. The glob() might return an empty
+                # list in this case since there is nothing built from Ninja yet.
                 content += """
 # From GN target: {label}
 filegroup(
     name = "{name}",
-    srcs = glob(["{ninja_path}/**"], exclude_directories=1),
+    srcs = glob(["{ninja_path}/**"], exclude_directories=1, allow_empty=True),
 )
 alias(
     name = "{name}.directory",
