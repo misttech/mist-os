@@ -591,7 +591,7 @@ void arm64_feature_init() {
     }
 
     // Check if FEAT_PMUv3 is enabled.
-    uint64_t pmu_version = (__arm_rsr64("id_aa64dfr0_el1") & FEAT_PMUVER_MASK) >> 8;
+    uint64_t pmu_version = (__arm_rsr64("id_aa64dfr0_el1") >> 8) & 0xf;
     feat_pmuv3_enabled = pmu_version > 0b0000 && pmu_version < 0b1111;
   }
 
