@@ -336,13 +336,9 @@ pub fn derive_fuzzy_hash(input: TokenStream) -> TokenStream {
     let syn::DeriveInput { ident, .. } = parse_macro_input!(input);
     TokenStream::from(quote! {
         impl FuzzyHash for #ident {
-            type Iter = std::iter::Once<u64>;
-
-            fn fuzzy_hash(&self) -> Self::Iter {
-                use std::hash::{Hash as _, Hasher as _};
-                let mut hasher = rustc_hash::FxHasher::default();
-                self.hash(&mut hasher);
-                std::iter::once(hasher.finish())
+            fn fuzzy_hash(&self) -> impl std::iter::Iterator<Item = u64> {
+                let hash = crate::stable_hash::stable_hash(self);
+                std::iter::once(hash)
             }
         }
     })
@@ -353,13 +349,9 @@ pub fn impl_fuzzy_hash(input: TokenStream) -> TokenStream {
     let ident: syn::Type = parse_macro_input!(input);
     TokenStream::from(quote! {
         impl FuzzyHash for #ident {
-            type Iter = std::iter::Once<u64>;
-
-            fn fuzzy_hash(&self) -> Self::Iter {
-                use std::hash::{Hash as _, Hasher as _};
-                let mut hasher = rustc_hash::FxHasher::default();
-                self.hash(&mut hasher);
-                std::iter::once(hasher.finish())
+            fn fuzzy_hash(&self) -> impl std::iter::Iterator<Item = u64> {
+                let hash = crate::stable_hash::stable_hash(self);
+                std::iter::once(hash)
             }
         }
     })

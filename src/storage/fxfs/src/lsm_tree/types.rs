@@ -34,14 +34,13 @@ pub trait SortByU64 {
 /// several buckets, `FuzzyHash::fuzzy_hash` must be called to split the key up into each of the
 /// possible values that it overlaps with.
 pub trait FuzzyHash: Hash + Sized {
-    type Iter: Iterator<Item = u64>;
     /// To support range-based keys, multiple hash values may need to be checked for a given key.
     /// For example, an extent [0..1024) might return extents [0..512), [512..1024), each of which
     /// will have a unique return value for `Self::hash`.  For point-based keys, a single hash
     /// suffices, in which case None is returned and the hash value of `self` should be checked.
     /// Note that in general only a small number of partitions (e.g. 2) should be checked at once.
     /// Debug assertions will fire if too large of a range is checked.
-    fn fuzzy_hash(&self) -> Self::Iter;
+    fn fuzzy_hash(&self) -> impl Iterator<Item = u64>;
 
     /// Returns whether the type is a range-based key.
     fn is_range_key(&self) -> bool {

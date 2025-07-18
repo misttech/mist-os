@@ -120,11 +120,10 @@ use fuchsia_inspect::HistogramProperty;
 use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use merge::{filter_marked_for_deletion, filter_tombstones, merge};
-use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::hash::{Hash, Hasher as _};
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::num::Saturating;
 use std::ops::Range;
@@ -326,17 +325,14 @@ impl Iterator for AllocatorKeyPartitionIterator {
             self.device_range.start = start.saturating_add(EXTENT_HASH_BUCKET_SIZE);
             let end = std::cmp::min(self.device_range.start, self.device_range.end);
             let key = AllocatorKey { device_range: start..end };
-            let mut hasher = FxHasher::default();
-            key.hash(&mut hasher);
-            Some(hasher.finish())
+            let hash = crate::stable_hash::stable_hash(key);
+            Some(hash)
         }
     }
 }
 
 impl FuzzyHash for AllocatorKey {
-    type Iter = AllocatorKeyPartitionIterator;
-
-    fn fuzzy_hash(&self) -> Self::Iter {
+    fn fuzzy_hash(&self) -> impl Iterator<Item = u64> {
         AllocatorKeyPartitionIterator {
             device_range: round_down(self.device_range.start, EXTENT_HASH_BUCKET_SIZE)
                 ..round_up(self.device_range.end, EXTENT_HASH_BUCKET_SIZE).unwrap_or(u64::MAX),

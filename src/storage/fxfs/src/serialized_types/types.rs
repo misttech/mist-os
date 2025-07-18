@@ -31,7 +31,7 @@ use crate::serialized_types::{versioned_type, Version, Versioned, VersionedLates
 ///
 /// IMPORTANT: When changing this (major or minor), update the list of possible versions at
 /// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/local_storage/versions.txt.
-pub const LATEST_VERSION: Version = Version { major: 47, minor: 0 };
+pub const LATEST_VERSION: Version = Version { major: 48, minor: 0 };
 
 /// The earliest supported version of the on-disk filesystem format.
 ///
@@ -176,7 +176,7 @@ mod tests {
         success &=
             assert_type_fprint::<PersistentLayerHeader>("struct {magic:[u8;8],block_size:u64}");
         success &= assert_type_fprint::<PersistentLayerInfo>(
-            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_nonces:usize}",
+            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_hashes:usize}",
         );
         success &= assert_type_fprint::<StoreInfo>("struct {guid:[u8;16],last_object_id:u64,layers:Vec<u64>,root_directory_object_id:u64,graveyard_directory_object_id:u64,object_count:u64,mutations_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,mutations_cipher_offset:u64,encrypted_mutations_object_id:u64,object_id_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,internal_directory_object_id:u64}");
         success &= assert_type_fprint::<SuperBlockHeader>("struct {guid:<[u8;16]>,generation:u64,root_parent_store_object_id:u64,root_parent_graveyard_directory_object_id:u64,root_store_object_id:u64,allocator_object_id:u64,journal_object_id:u64,journal_checkpoint:struct {file_offset:u64,checksum:u64,version:struct {major:u32,minor:u8}},super_block_journal_file_offset:u64,journal_file_offsets:HashMap<u64,u64>,borrowed_metadata_space:u64,earliest_version:struct {major:u32,minor:u8}}");
@@ -203,7 +203,7 @@ mod tests {
         success &=
             assert_type_fprint::<PersistentLayerHeaderV39>("struct {magic:[u8;8],block_size:u64}");
         success &= assert_type_fprint::<PersistentLayerInfoV39>(
-            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_nonces:usize}",
+            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_hashes:usize}",
         );
         success &= assert_type_fprint::<StoreInfoV40>("struct {guid:[u8;16],last_object_id:u64,layers:Vec<u64>,root_directory_object_id:u64,graveyard_directory_object_id:u64,object_count:u64,mutations_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,mutations_cipher_offset:u64,encrypted_mutations_object_id:u64,object_id_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,internal_directory_object_id:u64}");
         success &= assert_type_fprint::<SuperBlockHeaderV32>("struct {guid:<[u8;16]>,generation:u64,root_parent_store_object_id:u64,root_parent_graveyard_directory_object_id:u64,root_store_object_id:u64,allocator_object_id:u64,journal_object_id:u64,journal_checkpoint:struct {file_offset:u64,checksum:u64,version:struct {major:u32,minor:u8}},super_block_journal_file_offset:u64,journal_file_offsets:HashMap<u64,u64>,borrowed_metadata_space:u64,earliest_version:struct {major:u32,minor:u8}}");
@@ -230,7 +230,7 @@ mod tests {
         success &=
             assert_type_fprint::<PersistentLayerHeaderV39>("struct {magic:[u8;8],block_size:u64}");
         success &= assert_type_fprint::<PersistentLayerInfoV39>(
-            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_nonces:usize}",
+            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_hashes:usize}",
         );
         success &= assert_type_fprint::<StoreInfoV40>("struct {guid:[u8;16],last_object_id:u64,layers:Vec<u64>,root_directory_object_id:u64,graveyard_directory_object_id:u64,object_count:u64,mutations_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,mutations_cipher_offset:u64,encrypted_mutations_object_id:u64,object_id_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,internal_directory_object_id:u64}");
         success &= assert_type_fprint::<SuperBlockHeaderV32>("struct {guid:<[u8;16]>,generation:u64,root_parent_store_object_id:u64,root_parent_graveyard_directory_object_id:u64,root_store_object_id:u64,allocator_object_id:u64,journal_object_id:u64,journal_checkpoint:struct {file_offset:u64,checksum:u64,version:struct {major:u32,minor:u8}},super_block_journal_file_offset:u64,journal_file_offsets:HashMap<u64,u64>,borrowed_metadata_space:u64,earliest_version:struct {major:u32,minor:u8}}");
@@ -257,7 +257,7 @@ mod tests {
         success &=
             assert_type_fprint::<PersistentLayerHeaderV39>("struct {magic:[u8;8],block_size:u64}");
         success &= assert_type_fprint::<PersistentLayerInfoV39>(
-            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_nonces:usize}",
+            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_hashes:usize}",
         );
         success &= assert_type_fprint::<StoreInfoV40>("struct {guid:[u8;16],last_object_id:u64,layers:Vec<u64>,root_directory_object_id:u64,graveyard_directory_object_id:u64,object_count:u64,mutations_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,mutations_cipher_offset:u64,encrypted_mutations_object_id:u64,object_id_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,internal_directory_object_id:u64}");
         success &= assert_type_fprint::<SuperBlockHeaderV32>("struct {guid:<[u8;16]>,generation:u64,root_parent_store_object_id:u64,root_parent_graveyard_directory_object_id:u64,root_store_object_id:u64,allocator_object_id:u64,journal_object_id:u64,journal_checkpoint:struct {file_offset:u64,checksum:u64,version:struct {major:u32,minor:u8}},super_block_journal_file_offset:u64,journal_file_offsets:HashMap<u64,u64>,borrowed_metadata_space:u64,earliest_version:struct {major:u32,minor:u8}}");
@@ -285,7 +285,7 @@ mod tests {
         success &=
             assert_type_fprint::<PersistentLayerHeaderV39>("struct {magic:[u8;8],block_size:u64}");
         success &= assert_type_fprint::<PersistentLayerInfoV39>(
-            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_nonces:usize}",
+            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_hashes:usize}",
         );
         success &= assert_type_fprint::<StoreInfoV40>("struct {guid:[u8;16],last_object_id:u64,layers:Vec<u64>,root_directory_object_id:u64,graveyard_directory_object_id:u64,object_count:u64,mutations_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,mutations_cipher_offset:u64,encrypted_mutations_object_id:u64,object_id_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,internal_directory_object_id:u64}");
         success &= assert_type_fprint::<SuperBlockHeaderV32>("struct {guid:<[u8;16]>,generation:u64,root_parent_store_object_id:u64,root_parent_graveyard_directory_object_id:u64,root_store_object_id:u64,allocator_object_id:u64,journal_object_id:u64,journal_checkpoint:struct {file_offset:u64,checksum:u64,version:struct {major:u32,minor:u8}},super_block_journal_file_offset:u64,journal_file_offsets:HashMap<u64,u64>,borrowed_metadata_space:u64,earliest_version:struct {major:u32,minor:u8}}");
@@ -313,7 +313,7 @@ mod tests {
         success &=
             assert_type_fprint::<PersistentLayerHeaderV39>("struct {magic:[u8;8],block_size:u64}");
         success &= assert_type_fprint::<PersistentLayerInfoV39>(
-            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_nonces:usize}",
+            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_hashes:usize}",
         );
         success &= assert_type_fprint::<StoreInfoV40>("struct {guid:[u8;16],last_object_id:u64,layers:Vec<u64>,root_directory_object_id:u64,graveyard_directory_object_id:u64,object_count:u64,mutations_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,mutations_cipher_offset:u64,encrypted_mutations_object_id:u64,object_id_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,internal_directory_object_id:u64}");
         success &= assert_type_fprint::<SuperBlockHeaderV32>("struct {guid:<[u8;16]>,generation:u64,root_parent_store_object_id:u64,root_parent_graveyard_directory_object_id:u64,root_store_object_id:u64,allocator_object_id:u64,journal_object_id:u64,journal_checkpoint:struct {file_offset:u64,checksum:u64,version:struct {major:u32,minor:u8}},super_block_journal_file_offset:u64,journal_file_offsets:HashMap<u64,u64>,borrowed_metadata_space:u64,earliest_version:struct {major:u32,minor:u8}}");
@@ -340,7 +340,7 @@ mod tests {
         success &=
             assert_type_fprint::<PersistentLayerHeaderV39>("struct {magic:[u8;8],block_size:u64}");
         success &= assert_type_fprint::<PersistentLayerInfoV39>(
-            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_nonces:usize}",
+            "struct {num_items:usize,num_data_blocks:u64,bloom_filter_size_bytes:usize,bloom_filter_seed:u64,bloom_filter_num_hashes:usize}",
         );
         success &= assert_type_fprint::<StoreInfoV40>("struct {guid:[u8;16],last_object_id:u64,layers:Vec<u64>,root_directory_object_id:u64,graveyard_directory_object_id:u64,object_count:u64,mutations_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,mutations_cipher_offset:u64,encrypted_mutations_object_id:u64,object_id_key:Option<struct {wrapping_key_id:u128,key:WrappedKeyBytes}>,internal_directory_object_id:u64}");
         success &= assert_type_fprint::<SuperBlockHeaderV32>("struct {guid:<[u8;16]>,generation:u64,root_parent_store_object_id:u64,root_parent_graveyard_directory_object_id:u64,root_store_object_id:u64,allocator_object_id:u64,journal_object_id:u64,journal_checkpoint:struct {file_offset:u64,checksum:u64,version:struct {major:u32,minor:u8}},super_block_journal_file_offset:u64,journal_file_offsets:HashMap<u64,u64>,borrowed_metadata_space:u64,earliest_version:struct {major:u32,minor:u8}}");

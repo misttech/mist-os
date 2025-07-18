@@ -115,7 +115,7 @@ pub struct LayerInfoV39 {
     /// The seed for the nonces used in the bloom filter.
     bloom_filter_seed: u64,
     /// How many nonces to use for bloom filter hashing.
-    bloom_filter_num_nonces: usize,
+    bloom_filter_num_hashes: usize,
 }
 
 /// A handle to a persistent layer.
@@ -430,7 +430,7 @@ async fn load_bloom_filter<K: FuzzyHash>(
     Ok(Some(BloomFilterReader::read(
         buffer.as_slice(),
         layer_info.bloom_filter_seed,
-        layer_info.bloom_filter_num_nonces,
+        layer_info.bloom_filter_num_hashes,
     )?))
 }
 
@@ -707,7 +707,7 @@ impl<K: Key, V: LayerValue> Layer<K, V> for PersistentLayer<K, V> {
         if let Some(stats) = self.bloom_filter_stats.as_ref() {
             node.record_child("bloom_filter", move |node| {
                 node.record_uint("size", stats.size as u64);
-                node.record_uint("num_nonces", stats.num_nonces as u64);
+                node.record_uint("num_hashes", stats.num_hashes as u64);
                 node.record_uint("fill_percentage", stats.fill_percentage as u64);
             });
         }
@@ -829,7 +829,7 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
             num_data_blocks,
             bloom_filter_size_bytes,
             bloom_filter_seed: self.bloom_filter.seed(),
-            bloom_filter_num_nonces: self.bloom_filter.num_nonces(),
+            bloom_filter_num_hashes: self.bloom_filter.num_hashes(),
         };
         let actual_len = {
             let mut cursor = std::io::Cursor::new(&mut self.buf);

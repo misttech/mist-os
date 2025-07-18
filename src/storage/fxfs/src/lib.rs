@@ -28,5 +28,6 @@ pub mod object_store;
 pub mod range;
 pub mod round;
 pub mod serialized_types;
+mod stable_hash;
 #[cfg(test)]
 mod testing;

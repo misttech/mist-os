@@ -5,8 +5,6 @@
 use crate::lsm_tree::types::FuzzyHash;
 use anyhow::{Error, Result};
 use bit_vec::BitVec;
-use rustc_hash::FxHasher;
-use std::hash::{Hash as _, Hasher as _};
 use std::marker::PhantomData;
 
 /// A bloom filter provides a probabilistic means of determining if a layer file *might* contain
@@ -35,39 +33,6 @@ use std::marker::PhantomData;
 ///   rate.
 ///
 /// For simplicity we fix a target false-positive rate and derive `k` and `m`.  See estimate_params.
-
-// To avoid the need for storing the nonces, we generate them pseudo-randomly.
-// Changing the generation of these values will require a version update (which is guarded against
-// in a test below).
-fn generate_hash_nonces(seed: u64, num_nonces: usize) -> Vec<u64> {
-    use rand::rngs::SmallRng;
-    use rand::{Rng as _, SeedableRng};
-    let mut output = Vec::with_capacity(num_nonces);
-
-    // TODO(https://fxbug.dev/421432284): The rand crate does not provide a
-    // stability guarantee for PRNG output when rolling new versions. When
-    // migrating bloom filters to use a stable hash function, we should also
-    // choose a better source of hash nonces (e.g. using a sequence number). The
-    // update to rand 0.9 specialized SmallRng's implementation of seed_from_u64
-    // which changed the seeding behavior, causing different hashes. This type
-    // offers a hack around that to use the default implementation from
-    // SeedableRng instead, which matches the hashes produced from rand 0.8.4.
-    struct MyRng(SmallRng);
-
-    impl SeedableRng for MyRng {
-        type Seed = [u8; 32];
-        fn from_seed(seed: [u8; 32]) -> Self {
-            Self(SmallRng::from_seed(seed))
-        }
-    }
-
-    let MyRng(mut rng) = MyRng::seed_from_u64(seed);
-    for _ in 0..num_nonces {
-        let nonce: u64 = rng.random();
-        output.push(nonce);
-    }
-    output
-}
 
 // Returns a tuple (bloom_filter_size_bits, num_hashes).  The bloom filter will always be sized up
 // to the nearest power-of-two, which makes its usage later a bit more efficient (since we take
@@ -101,26 +66,23 @@ fn estimate_params(num_items: usize) -> (usize, usize) {
 /// Note that the bloom filter is *not* versioned; this must be managed by the caller.
 pub struct BloomFilterReader<V> {
     data: BitVec,
-    hash_nonces: Vec<u64>,
+    seed: u64,
+    num_hashes: usize,
     _type: PhantomData<V>,
 }
 
 pub struct BloomFilterStats {
     pub size: usize,
-    pub num_nonces: usize,
+    pub num_hashes: usize,
     // The percentage (rounded up to the nearest whole) of the bits which are set.
     pub fill_percentage: usize,
 }
 
 impl<V: FuzzyHash> BloomFilterReader<V> {
     /// Creates a BloomFilterReader by reading the serialized contents from `buf`.
-    /// `seed` and `num_nonces` must match the values passed into BloomFilterWriter.
-    pub fn read(buf: &[u8], seed: u64, num_nonces: usize) -> Result<Self, Error> {
-        Ok(Self {
-            data: BitVec::from_bytes(buf),
-            hash_nonces: generate_hash_nonces(seed, num_nonces),
-            _type: PhantomData::default(),
-        })
+    /// `seed` and `num_hashes` must match the values passed into BloomFilterWriter.
+    pub fn read(buf: &[u8], seed: u64, num_hashes: usize) -> Result<Self, Error> {
+        Ok(Self { data: BitVec::from_bytes(buf), seed, num_hashes, _type: PhantomData::default() })
     }
 
     /// Returns whether the bloom filter *might* contain the given value (or any part of it, for
@@ -138,11 +100,10 @@ impl<V: FuzzyHash> BloomFilterReader<V> {
     }
 
     fn maybe_contains_inner(&self, initial_hash: u64) -> bool {
-        let mut hasher = FxHasher::default();
-        initial_hash.hash(&mut hasher);
-        for nonce in &self.hash_nonces {
-            hasher.write_u64(*nonce);
-            let idx = hasher.finish() as usize % self.data.len();
+        for i in 0..self.num_hashes as u64 {
+            let seed = self.seed.wrapping_add(i);
+            let hash = crate::stable_hash::stable_hash_seeded(initial_hash, seed);
+            let idx = hash as usize % self.data.len();
             if !self.data.get(idx).unwrap() {
                 return false;
             }
@@ -155,7 +116,7 @@ impl<V: FuzzyHash> BloomFilterReader<V> {
     pub fn stats(&self) -> BloomFilterStats {
         BloomFilterStats {
             size: self.data.len().div_ceil(8),
-            num_nonces: self.hash_nonces.len(),
+            num_hashes: self.num_hashes,
             fill_percentage: self.compute_fill_percentage(),
         }
     }
@@ -170,20 +131,22 @@ impl<V: FuzzyHash> BloomFilterReader<V> {
 
     #[cfg(test)]
     fn new_empty(num_items: usize) -> Self {
-        let (bits, num_nonces) = estimate_params(num_items);
+        let (bits, num_hashes) = estimate_params(num_items);
         Self {
             data: BitVec::from_elem(bits, false),
-            hash_nonces: generate_hash_nonces(0, num_nonces),
+            seed: 0,
+            num_hashes,
             _type: PhantomData::default(),
         }
     }
 
     #[cfg(test)]
     fn new_full(num_items: usize) -> Self {
-        let (bits, num_nonces) = estimate_params(num_items);
+        let (bits, num_hashes) = estimate_params(num_items);
         Self {
             data: BitVec::from_elem(bits, true),
-            hash_nonces: generate_hash_nonces(0, num_nonces),
+            seed: 0,
+            num_hashes,
             _type: PhantomData::default(),
         }
     }
@@ -194,7 +157,7 @@ impl<V: FuzzyHash> BloomFilterReader<V> {
 pub struct BloomFilterWriter<V> {
     data: BitVec,
     seed: u64,
-    hash_nonces: Vec<u64>,
+    num_hashes: usize,
     _type: PhantomData<V>,
 }
 
@@ -205,11 +168,11 @@ impl<V: FuzzyHash> BloomFilterWriter<V> {
     /// in a secure manner so should not contain any secrets.  It should be unpredictable to prevent
     /// timing attacks.
     pub fn new(seed: u64, num_items: usize) -> Self {
-        let (bits, num_nonces) = estimate_params(num_items);
+        let (bits, num_hashes) = estimate_params(num_items);
         Self {
             data: BitVec::from_elem(bits, false),
             seed,
-            hash_nonces: generate_hash_nonces(seed, num_nonces),
+            num_hashes,
             _type: PhantomData::default(),
         }
     }
@@ -223,8 +186,8 @@ impl<V: FuzzyHash> BloomFilterWriter<V> {
         self.seed
     }
 
-    pub fn num_nonces(&self) -> usize {
-        self.hash_nonces.len()
+    pub fn num_hashes(&self) -> usize {
+        self.num_hashes
     }
 
     pub fn write<W>(&self, writer: &mut W) -> Result<(), Error>
@@ -241,11 +204,10 @@ impl<V: FuzzyHash> BloomFilterWriter<V> {
     }
 
     fn insert_inner(&mut self, initial_hash: u64) {
-        let mut hasher = FxHasher::default();
-        initial_hash.hash(&mut hasher);
-        for nonce in &self.hash_nonces {
-            hasher.write_u64(*nonce);
-            let idx = hasher.finish() as usize % self.data.len();
+        for i in 0..self.num_hashes as u64 {
+            let seed = self.seed.wrapping_add(i);
+            let hash = crate::stable_hash::stable_hash_seeded(initial_hash, seed);
+            let idx = hash as usize % self.data.len();
             self.data.set(idx, true);
         }
     }
@@ -261,15 +223,18 @@ impl<V: FuzzyHash> BloomFilterWriter<V> {
 #[cfg(test)]
 impl<T> From<BloomFilterWriter<T>> for BloomFilterReader<T> {
     fn from(writer: BloomFilterWriter<T>) -> Self {
-        Self { data: writer.data, hash_nonces: writer.hash_nonces, _type: PhantomData::default() }
+        Self {
+            data: writer.data,
+            seed: writer.seed,
+            num_hashes: writer.num_hashes,
+            _type: PhantomData::default(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::lsm_tree::bloom_filter::{
-        estimate_params, generate_hash_nonces, BloomFilterReader, BloomFilterWriter,
-    };
+    use crate::lsm_tree::bloom_filter::{estimate_params, BloomFilterReader, BloomFilterWriter};
     use crate::object_store::allocator::AllocatorKey;
 
     #[test]
@@ -281,32 +246,6 @@ mod tests {
         assert_eq!(estimate_params(5000), (131072, 4));
         assert_eq!(estimate_params(50000), (1048576, 4));
         assert_eq!(estimate_params(5_000_000), (134217728, 4));
-    }
-
-    #[test]
-    fn hash_nonces_are_stable() {
-        let expected: [u64; 16] = [
-            15601892068231251798,
-            4249550343631144082,
-            11170505403239506035,
-            3141899402926357684,
-            10455158105512296971,
-            1544954577306875038,
-            7546141422416683882,
-            10809374736430664972,
-            14270886949990153586,
-            12890306703619732195,
-            10531031577317334640,
-            2369458071968706433,
-            8554654157920588268,
-            4945022529079265586,
-            4849687277068177250,
-            11824207122193630909,
-        ];
-        for i in 1..=expected.len() {
-            let generated = generate_hash_nonces(0xfeedbad, i);
-            assert_eq!(&generated[..], &expected[..i]);
-        }
     }
 
     const TEST_KEYS: [i32; 4] = [0, 65535, i32::MAX, i32::MIN];
@@ -362,13 +301,13 @@ mod tests {
             // Use a new filter each time so we don't get false positives.
             let mut filter = BloomFilterWriter::new(0, 1);
             filter.insert(key);
-            let num_nonces = filter.num_nonces();
+            let num_hashes = filter.num_hashes();
             let mut buf = vec![];
             {
                 let mut cursor = std::io::Cursor::new(&mut buf);
                 filter.write(&mut cursor).expect("write failed");
             }
-            let filter = BloomFilterReader::read(&buf[..], 0, num_nonces).expect("read failed");
+            let filter = BloomFilterReader::read(&buf[..], 0, num_hashes).expect("read failed");
             assert!(filter.maybe_contains(key));
         }
     }

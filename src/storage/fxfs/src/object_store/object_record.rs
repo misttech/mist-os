@@ -19,11 +19,10 @@ use fxfs_crypto::{
     WrappedKeysV32, WrappedKeysV40,
 };
 use fxfs_unicode::CasefoldString;
-use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::default::Default;
-use std::hash::{Hash, Hasher as _};
+use std::hash::Hash;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// ObjectDescriptor is the set of possible records in the object store.
@@ -416,9 +415,8 @@ impl Iterator for ObjectKeyFuzzyHashIterator {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::ExtentKey(oid, attr_id, extent_keys) => extent_keys.next().map(|range| {
-                let mut hasher = FxHasher::default();
-                ObjectKey::extent(*oid, *attr_id, range).hash(&mut hasher);
-                hasher.finish()
+                let key = ObjectKey::extent(*oid, *attr_id, range);
+                crate::stable_hash::stable_hash(key)
             }),
             Self::NotExtentKey(hash) => hash.take(),
         }
@@ -426,9 +424,7 @@ impl Iterator for ObjectKeyFuzzyHashIterator {
 }
 
 impl FuzzyHash for ObjectKey {
-    type Iter = ObjectKeyFuzzyHashIterator;
-
-    fn fuzzy_hash(&self) -> Self::Iter {
+    fn fuzzy_hash(&self) -> impl Iterator<Item = u64> {
         match &self.data {
             ObjectKeyData::Attribute(attr_id, AttributeKey::Extent(extent)) => {
                 ObjectKeyFuzzyHashIterator::ExtentKey(
@@ -438,9 +434,8 @@ impl FuzzyHash for ObjectKey {
                 )
             }
             _ => {
-                let mut hasher = FxHasher::default();
-                self.hash(&mut hasher);
-                ObjectKeyFuzzyHashIterator::NotExtentKey(Some(hasher.finish()))
+                let hash = crate::stable_hash::stable_hash(self);
+                ObjectKeyFuzzyHashIterator::NotExtentKey(Some(hash))
             }
         }
     }
@@ -1179,11 +1174,11 @@ mod tests {
         // hashes.
         assert_eq!(
             &ObjectKeyV43::object(100).fuzzy_hash().collect::<Vec<_>>()[..],
-            &[2770938889503972258]
+            &[11885326717398844384]
         );
         assert_eq!(
             &ObjectKeyV43::extent(1, 0, 0..2 * 1024 * 1024).fuzzy_hash().collect::<Vec<_>>()[..],
-            &[2619169106812529315, 13884007937324812898]
+            &[11090579907097549012, 2814892992701560424]
         );
     }
 
