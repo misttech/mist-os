@@ -46,6 +46,12 @@ impl Flash for FlashManifest {
                     .await?;
             }
         }
+        messenger
+            .send(Event::FlashProduct {
+                product_name: product.name.clone(),
+                partition_count: product.bootloader_partitions.len() + product.partitions.len(),
+            })
+            .await?;
         flash_bootloader(&messenger, file_resolver, product, fastboot_interface, &cmd).await?;
         if product.requires_unlock && !is_locked(fastboot_interface).await? {
             lock_device(fastboot_interface).await?;

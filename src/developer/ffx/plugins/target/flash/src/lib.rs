@@ -22,7 +22,7 @@ use ffx_fastboot_interface::fastboot_interface::UploadProgress;
 use ffx_flash_args::FlashCommand;
 use ffx_flash_manifest::OemFile;
 use ffx_ssh::SshKeyFiles;
-use ffx_writer::VerifiedMachineWriter;
+use ffx_writer::{ToolIO, VerifiedMachineWriter};
 use fho::{deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
 use fidl::Error;
 use fidl_fuchsia_developer_ffx::TargetState as FidlTargetState;
@@ -34,10 +34,11 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-use std::io::Write;
+use std::io::{stderr, stdin, stdout, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::rc::Rc;
+use structured_ui::{Interface, TextUi};
 use target_holders::{moniker, TargetInfoHolder};
 use termion::{color, style};
 use tokio::sync::mpsc;
@@ -106,9 +107,100 @@ pub enum FlashProgress {
     UploadError,
 }
 
+#[derive(Debug)]
+pub struct ProgressIndicator {
+    title: String,
+    is_finished: bool,
+
+    // Progress layer 1.
+    partition_subtitle: String,
+    partition_progress: u64,
+    partition_total: u64,
+
+    // Progress layer 2.
+    file_progress: u64,
+    file_subtotal: u64,
+
+    // Progress layer 3.
+    bytes_progress: u64,
+    bytes_subtotal: u64,
+}
+
+impl ProgressIndicator {
+    fn new() -> Self {
+        Self {
+            title: "Flashing unknown product".into(),
+            is_finished: false,
+            partition_subtitle: "Processing next partition...".into(),
+            partition_progress: 0,
+            partition_total: 0,
+            file_progress: 0,
+            file_subtotal: 0,
+            bytes_progress: 0,
+            bytes_subtotal: 0,
+        }
+    }
+
+    fn init(&mut self, product_name: &str, total_partitions: u64) {
+        self.title = format!("Flashing {}", product_name);
+        self.partition_total = total_partitions;
+    }
+
+    fn start_next_partition(&mut self, partition_name: &str, files: u64) {
+        self.partition_subtitle = format!("Flash partition: {}", partition_name);
+        self.partition_progress += 1;
+        self.file_subtotal = files;
+    }
+
+    fn finish_partition(&mut self) {
+        self.partition_subtitle = "Processing next partition...".to_owned();
+        self.is_finished = self.partition_progress == self.partition_total;
+        self.file_progress = 0;
+        self.file_subtotal = 0;
+        self.bytes_subtotal = 0;
+    }
+
+    fn start_next_file(&mut self, file_size: u64) {
+        self.file_progress += 1;
+        self.bytes_progress = 0;
+        self.bytes_subtotal = file_size;
+    }
+
+    fn wrote_bytes(&mut self, bytes_written: u64) {
+        self.bytes_progress += bytes_written;
+    }
+
+    fn present<I: Interface>(&mut self, ui: &mut I) -> Result<()> {
+        // Don't rerender the progress bar if we're done flashing.
+        // Since the TUI is cleared before each `present()` in
+        // `handle_event_text()`.
+        // This avoids having a lingering progress bar after the flash command
+        // is complete.
+        if self.is_finished {
+            return Ok(());
+        }
+
+        let mut progress = structured_ui::Progress::builder();
+        progress.title(&self.title);
+        progress.entry(
+            "Flash partitions",
+            self.partition_progress,
+            self.partition_total,
+            "partitions",
+        );
+        progress.entry(&self.partition_subtitle, self.file_progress, self.file_subtotal, "files");
+        if self.bytes_subtotal > 0 {
+            progress.entry("Upload file", self.bytes_progress, self.bytes_subtotal, "bytes");
+        }
+        let result = structured_ui::Presentation::Progress(progress);
+        ui.present(&result)?;
+        Ok(())
+    }
+}
+
 #[async_trait(?Send)]
 impl FfxMain for FlashTool {
-    // TODO(b/b/380444711): Add tests for schema
+    // TODO(https://fxbug.dev/380444711): Add tests for schema
     type Writer = VerifiedMachineWriter<FlashMessage>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
@@ -410,8 +502,19 @@ Reboot the Target to the bootloader and re-run this command."
                     let serial_num = fastboot_state.serial_number;
                     let mut proxy = usb_proxy(serial_num).await?;
                     let (client, server) = mpsc::channel(1);
-                    try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
+                    if writer.is_machine() {
+                        try_join!(
+                            from_manifest(client, cmd, &mut proxy),
+                            handle_event_machine(writer, server)
+                        )
                         .map_err(fho::Error::from)?;
+                    } else {
+                        try_join!(
+                            from_manifest(client, cmd, &mut proxy),
+                            handle_event_text(writer, server)
+                        )
+                        .map_err(fho::Error::from)?;
+                    }
                     Ok::<(), fho::Error>(())
                 }
                 FastbootConnectionState::Udp(addrs) => {
@@ -441,11 +544,19 @@ Reboot the Target to the bootloader and re-run this command."
                         )
                         .await?;
                         let (client, server) = mpsc::channel(1);
-                        try_join!(
-                            from_manifest(client, cmd, &mut proxy),
-                            handle_event(writer, server)
-                        )
-                        .map_err(fho::Error::from)?;
+                        if writer.is_machine() {
+                            try_join!(
+                                from_manifest(client, cmd, &mut proxy),
+                                handle_event_machine(writer, server)
+                            )
+                            .map_err(fho::Error::from)?;
+                        } else {
+                            try_join!(
+                                from_manifest(client, cmd, &mut proxy),
+                                handle_event_text(writer, server)
+                            )
+                            .map_err(fho::Error::from)?;
+                        }
                         Ok(())
                     } else {
                         ffx_bail!("Could not get a valid address for target");
@@ -478,11 +589,19 @@ Reboot the Target to the bootloader and re-run this command."
                         )
                         .await?;
                         let (client, server) = mpsc::channel(1);
-                        try_join!(
-                            from_manifest(client, cmd, &mut proxy),
-                            handle_event(writer, server)
-                        )
-                        .map_err(fho::Error::from)?;
+                        if writer.is_machine() {
+                            try_join!(
+                                from_manifest(client, cmd, &mut proxy),
+                                handle_event_machine(writer, server)
+                            )
+                            .map_err(fho::Error::from)?;
+                        } else {
+                            try_join!(
+                                from_manifest(client, cmd, &mut proxy),
+                                handle_event_text(writer, server)
+                            )
+                            .map_err(fho::Error::from)?;
+                        }
                         Ok(())
                     } else {
                         ffx_bail!("Could not get a valid address for target");
@@ -497,15 +616,16 @@ Reboot the Target to the bootloader and re-run this command."
         match res {
             Ok(()) => {
                 let duration = Utc::now().signed_duration_since(start_time);
-                let finished_message = format!("Continuing to boot - this could take awhile\n{}Done{}. {}Total Time{} [{}{:.2}s{}]",
-                color::Fg(color::Green),
-                style::Reset,
-                color::Fg(color::Green),
-                style::Reset,
-                color::Fg(color::Blue),
-                (duration.num_milliseconds() as f32) / (1000 as f32),
-                style::Reset
-            );
+                let finished_message = format!(
+                    "Continuing to boot - this could take a while\n{}Done{}. {}Total Time{} [{}{:.2}s{}]",
+                    color::Fg(color::Green),
+                    style::Reset,
+                    color::Fg(color::Green),
+                    style::Reset,
+                    color::Fg(color::Blue),
+                    (duration.num_milliseconds() as f32) / (1000 as f32),
+                    style::Reset,
+                );
 
                 writer.machine_or(
                     &FlashMessage::Finished { success: true, error_message: "".to_string() },
@@ -548,18 +668,101 @@ fn handle_fidl_connection_err(e: Error) -> fho::Result<()> {
     }
 }
 
-fn done_time(duration: Duration) -> String {
+fn done() -> String {
+    format!("{}Done{}", color::Fg(color::Green), style::Reset)
+}
+
+fn time(duration: Duration) -> String {
     format!(
-        "{}Done{} [{}{:.2}s{}]",
-        color::Fg(color::Green),
-        style::Reset,
+        "[{}{:.2}s{}]",
         color::Fg(color::Blue),
         (duration.num_milliseconds() as f32) / (1000 as f32),
         style::Reset
     )
 }
 
-async fn handle_event(
+async fn handle_event_text(
+    writer: &mut VerifiedMachineWriter<FlashMessage>,
+    mut rec: Receiver<Event>,
+) -> Result<()> {
+    let mut input = stdin();
+    // TUI progress presentations are noop in non-TTY cases, so we won't need to
+    // worry about noisy output in non-interactive flash use-cases like CI/CQ.
+    let mut output = stdout();
+    let mut err_out = stderr();
+    let mut ui = TextUi::new(&mut input, &mut output, &mut err_out);
+    let mut progress_indicator = ProgressIndicator::new();
+    loop {
+        // Clear TUI so normal stdout/stderr doesn't instantly get overwritten
+        // by the progress indicator.
+        ui.clear_progress()?;
+        match rec.recv().await {
+            Some(event) => match event {
+                Event::Upload(upload) => match upload {
+                    UploadProgress::OnReady { partition, files } => {
+                        log::info!("Uploading partition {} ({} files)", partition, files);
+                        progress_indicator.start_next_partition(&partition, files);
+                    }
+                    UploadProgress::OnStarted { size } => {
+                        progress_indicator.start_next_file(size);
+                    }
+                    UploadProgress::OnProgress { bytes_written } => {
+                        log::trace!("Made progress, wrote: {}", bytes_written);
+                        progress_indicator.wrote_bytes(bytes_written);
+                    }
+                    UploadProgress::OnFinished => {}
+                    UploadProgress::OnError { error } => {
+                        writeln!(writer, "Error {}", error)?;
+                    }
+                },
+                Event::FlashProduct { product_name, partition_count } => {
+                    log::info!("Flashing {} ({} partitions)", product_name, partition_count);
+                    progress_indicator.init(&product_name, partition_count.try_into()?);
+                }
+                Event::FlashPartition { .. } => {}
+                Event::FlashPartitionFinished { partition_name, duration } => {
+                    progress_indicator.finish_partition();
+                    writeln!(writer, "Flashed {} in {}", partition_name, time(duration))?;
+                }
+                Event::Unlock(unlock_event) => match unlock_event {
+                    UnlockEvent::SearchingForCredentials => {
+                        writeln!(writer, "Looking for unlock credentials...")?
+                    }
+                    UnlockEvent::GeneratingToken => writeln!(writer, "Generating unlock token...")?,
+                    UnlockEvent::FoundCredentials(delta)
+                    | UnlockEvent::FinishedGeneratingToken(delta) => {
+                        writeln!(writer, "{} {}", done(), time(delta))?
+                    }
+                    UnlockEvent::BeginningUploadOfToken => {
+                        writeln!(writer, "Preparing to upload unlock token...")?
+                    }
+                    UnlockEvent::Done => writeln!(writer, "{}", done())?,
+                },
+                Event::Oem { oem_command } => {
+                    writeln!(writer, "Sending command: \"{}\"", oem_command)?;
+                }
+                Event::RebootStarted => {
+                    writeln!(writer, "Rebooting to bootloader... ")?;
+                }
+                Event::Rebooted(delta) => {
+                    writeln!(writer, "{} {}", done(), time(delta))?;
+                }
+                Event::Variable(variable) => {
+                    log::trace!("got variable {:#?}", variable);
+                }
+                Event::Locked => {
+                    let msg = "The flashing library should not lock the device...";
+                    writeln!(writer, "Error: {}", msg)?;
+                    return Err(anyhow!(msg));
+                }
+            },
+            None => return Ok(()),
+        }
+        progress_indicator.present(&mut ui)?;
+    }
+}
+
+async fn handle_event_machine(
     writer: &mut VerifiedMachineWriter<FlashMessage>,
     mut rec: Receiver<Event>,
 ) -> Result<()> {
@@ -567,115 +770,85 @@ async fn handle_event(
         match rec.recv().await {
             Some(event) => match event {
                 Event::Upload(upload) => match upload {
-                    UploadProgress::OnStarted { size: _size } => {
-                        let (machine, message) = (
-                            FlashMessage::Progress(FlashProgress::UploadStarted),
-                            "Uploading... ".to_string(),
-                        );
-                        writer.machine_or_write(&machine, message)?;
+                    UploadProgress::OnReady { partition, files } => {
+                        log::info!("Uploading partition {} ({} files)", partition, files);
+                    }
+                    UploadProgress::OnStarted { size: _ } => {
+                        let output = FlashMessage::Progress(FlashProgress::UploadStarted);
+                        writer.machine(&output)?;
                     }
                     UploadProgress::OnProgress { bytes_written } => {
-                        log::trace!("Made progres, wrote: {}", bytes_written);
+                        log::trace!("Made progress, wrote: {}", bytes_written);
                     }
                     UploadProgress::OnFinished => {
-                        let (machine, message) = (
-                            FlashMessage::Progress(FlashProgress::UploadFinished),
-                            format!("{}Done{}", color::Fg(color::Green), style::Reset),
-                        );
-                        writer.machine_or(&machine, message)?;
+                        let output = FlashMessage::Progress(FlashProgress::UploadFinished);
+                        writer.machine(&output)?;
                     }
-                    UploadProgress::OnError { error } => {
-                        let (machine, message) = (
-                            FlashMessage::Progress(FlashProgress::UploadError),
-                            format!("Error {}", error),
-                        );
-                        writer.machine_or(&machine, message)?;
+                    UploadProgress::OnError { error: _ } => {
+                        let output = FlashMessage::Progress(FlashProgress::UploadError);
+                        writer.machine(&output)?;
                     }
                 },
-                Event::FlashPartition { partition_name } => {
-                    let (machine, message) = (
-                        FlashMessage::Progress(FlashProgress::FlashPartitionStarted {
-                            partition_name: partition_name.clone(),
-                        }),
-                        format!("Beginning flash for partition {}... ", partition_name),
-                    );
-                    writer.machine_or_write(&machine, message)?;
+                Event::FlashProduct { product_name, partition_count } => {
+                    log::info!("Flashing {} ({} partitions)", product_name, partition_count);
                 }
-                Event::FlashPartitionFinished { partition_name, duration } => {
-                    let (machine, message) = (
-                        FlashMessage::Progress(FlashProgress::FlashPartitionFinished {
-                            partition_name: partition_name.clone(),
-                        }),
-                        done_time(duration),
-                    );
-                    writer.machine_or(&machine, message)?;
+                Event::FlashPartition { partition_name } => {
+                    let output = FlashMessage::Progress(FlashProgress::FlashPartitionStarted {
+                        partition_name: partition_name.clone(),
+                    });
+                    writer.machine(&output)?;
+                }
+                Event::FlashPartitionFinished { partition_name, duration: _ } => {
+                    let output = FlashMessage::Progress(FlashProgress::FlashPartitionFinished {
+                        partition_name: partition_name.clone(),
+                    });
+                    writer.machine(&output)?;
                 }
                 Event::Unlock(unlock_event) => {
-                    let (machine, message) = match unlock_event {
-                        UnlockEvent::SearchingForCredentials => (
-                            FlashMessage::Progress(FlashProgress::Unlock),
-                            "Looking for unlock credentials... ".to_string(),
-                        ),
-                        UnlockEvent::FoundCredentials(delta) => (
-                            FlashMessage::Progress(FlashProgress::Unlock),
-                            format!("{}\n", done_time(delta)),
-                        ),
-                        UnlockEvent::GeneratingToken => (
-                            FlashMessage::Progress(FlashProgress::Unlock),
-                            "Generating unlock token... ".to_string(),
-                        ),
-                        UnlockEvent::FinishedGeneratingToken(delta) => (
-                            FlashMessage::Progress(FlashProgress::Unlock),
-                            format!("{}\n", done_time(delta)),
-                        ),
-                        UnlockEvent::BeginningUploadOfToken => (
-                            FlashMessage::Progress(FlashProgress::Unlock),
-                            "Preparing to upload unlock token\n".to_string(),
-                        ),
-                        UnlockEvent::Done => {
-                            (FlashMessage::Progress(FlashProgress::Unlock), "Done\n".to_string())
+                    let output = match unlock_event {
+                        UnlockEvent::SearchingForCredentials => {
+                            FlashMessage::Progress(FlashProgress::Unlock)
                         }
+                        UnlockEvent::FoundCredentials(_) => {
+                            FlashMessage::Progress(FlashProgress::Unlock)
+                        }
+                        UnlockEvent::GeneratingToken => {
+                            FlashMessage::Progress(FlashProgress::Unlock)
+                        }
+                        UnlockEvent::FinishedGeneratingToken(_) => {
+                            FlashMessage::Progress(FlashProgress::Unlock)
+                        }
+                        UnlockEvent::BeginningUploadOfToken => {
+                            FlashMessage::Progress(FlashProgress::Unlock)
+                        }
+                        UnlockEvent::Done => FlashMessage::Progress(FlashProgress::Unlock),
                     };
-                    writer.machine_or_write(&machine, message)?;
+                    writer.machine(&output)?;
                 }
                 Event::Oem { oem_command } => {
-                    let (machine, message) = (
-                        FlashMessage::Progress(FlashProgress::OemCommand {
-                            oem_command: oem_command.clone(),
-                        }),
-                        format!("Sending command: \"{}\"", oem_command),
-                    );
-                    writer.machine_or(&machine, message)?;
+                    let output = FlashMessage::Progress(FlashProgress::OemCommand {
+                        oem_command: oem_command.clone(),
+                    });
+                    writer.machine(&output)?;
                 }
                 Event::RebootStarted => {
-                    let (machine, message) = (
-                        FlashMessage::Progress(FlashProgress::RebootToBootloaderStarted),
-                        "Rebooting to bootloader... ".to_string(),
-                    );
-                    writer.machine_or_write(&machine, message)?;
+                    let output = FlashMessage::Progress(FlashProgress::RebootToBootloaderStarted);
+                    writer.machine(&output)?;
                 }
-                Event::Rebooted(delta) => {
-                    let (machine, message) = (
-                        FlashMessage::Progress(FlashProgress::RebootToBootloaderFinished),
-                        done_time(delta),
-                    );
-                    writer.machine_or(&machine, message)?;
+                Event::Rebooted(_) => {
+                    let output = FlashMessage::Progress(FlashProgress::RebootToBootloaderFinished);
+                    writer.machine(&output)?;
                 }
                 Event::Variable(variable) => {
                     log::trace!("got variable {:#?}", variable);
-                    let (machine, message) = (
-                        FlashMessage::Progress(FlashProgress::GotVariable),
-                        "variable".to_string(),
-                    );
-                    writer.machine_or(&machine, message)?;
+                    let output = FlashMessage::Progress(FlashProgress::GotVariable);
+                    writer.machine(&output)?;
                 }
                 Event::Locked => {
                     let msg = format!("The flashing library should not Lock the device...");
-                    let (machine, message) = (
-                        FlashMessage::Finished { success: false, error_message: msg.clone() },
-                        msg.clone(),
-                    );
-                    writer.machine_or(&machine, message)?;
+                    let output =
+                        FlashMessage::Finished { success: false, error_message: msg.clone() };
+                    writer.machine(&output)?;
                     return Err(anyhow!(msg));
                 }
             },
@@ -813,5 +986,205 @@ Rediscovering the target after bootloader reboot will be impossible.
 Please try --no-bootloader-reboot to avoid a reboot.
 Using address 192.168.1.2:22 as node name",
         );
+    }
+
+    // Refreshes the progress indicator and returns whether it contains required
+    // substrings and excludes disallowed substrings in the output text.
+    fn progress_message_contents(
+        indicator: &mut ProgressIndicator,
+        required_substrings: &[&str],
+        disallowed_substrings: &[&str],
+    ) -> bool {
+        let mut input = "".as_bytes();
+        let mut stdout: Vec<u8> = Vec::new();
+        let mut stderr: Vec<u8> = Vec::new();
+        let mut ui = TextUi::new_for_test(&mut input, &mut stdout, &mut stderr, true);
+        indicator.present(&mut ui).unwrap();
+        let output = format!(
+            "{}\n{}",
+            String::from_utf8(stdout.clone()).expect("decode stdout"),
+            String::from_utf8(stderr.clone()).expect("decode stderr")
+        );
+        for substring in required_substrings {
+            if !output.contains(substring) {
+                eprintln!(
+                    "Progress message does not contain required substring!\n\
+                    Actual output: \"{}\"\n\
+                    Required substring: \"{}\"",
+                    output, substring,
+                );
+                return false;
+            }
+        }
+        for substring in disallowed_substrings {
+            if output.contains(substring) {
+                eprintln!(
+                    "Progress message contains disallowed substring!\n\
+                    Actual output: \"{}\"\n\
+                    Disallowed substring: \"{}\"",
+                    output, substring,
+                );
+                return false;
+            }
+        }
+        true
+    }
+
+    #[test]
+    fn test_progress_indicator() {
+        let mut indicator = ProgressIndicator::new();
+
+        indicator.init("a_product", 2);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "0 of 2 partitions",
+                "Processing next partition...",
+                "0 of 0 files",
+            ],
+            &["Upload", "byte"],
+        ));
+
+        indicator.start_next_partition("foo_partition", 1);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "1 of 2 partitions",
+                "Flash partition: foo_partition",
+                "0 of 1 files",
+            ],
+            &["Upload", "byte"],
+        ));
+
+        indicator.start_next_file(64);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "1 of 2 partitions",
+                "Flash partition: foo_partition",
+                "1 of 1 files",
+                "Upload file",
+                "0 of 64 bytes",
+            ],
+            &[],
+        ));
+
+        indicator.wrote_bytes(32);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "1 of 2 partitions",
+                "Flash partition: foo_partition",
+                "1 of 1 files",
+                "Upload file",
+                "32 of 64 bytes",
+            ],
+            &[],
+        ));
+
+        indicator.wrote_bytes(32);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "1 of 2 partitions",
+                "Flash partition: foo_partition",
+                "1 of 1 files",
+                "Upload file",
+                "64 of 64 bytes",
+            ],
+            &[],
+        ));
+
+        indicator.finish_partition();
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "1 of 2 partitions",
+                "Processing next partition...",
+                "0 of 0 files",
+            ],
+            &["Upload", "byte"],
+        ));
+
+        indicator.start_next_partition("bar_partition", 2);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "2 of 2 partitions",
+                "Flash partition: bar_partition",
+                "0 of 2 files",
+            ],
+            &["Upload", "byte"],
+        ));
+
+        indicator.start_next_file(128);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "2 of 2 partitions",
+                "Flash partition: bar_partition",
+                "1 of 2 files",
+                "Upload file",
+                "0 of 128 bytes",
+            ],
+            &[],
+        ));
+
+        indicator.wrote_bytes(128);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "2 of 2 partitions",
+                "Flash partition: bar_partition",
+                "1 of 2 files",
+                "Upload file",
+                "128 of 128 bytes",
+            ],
+            &[],
+        ));
+
+        indicator.start_next_file(16);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "2 of 2 partitions",
+                "Flash partition: bar_partition",
+                "2 of 2 files",
+                "Upload file",
+                "0 of 16 bytes",
+            ],
+            &[],
+        ));
+
+        indicator.wrote_bytes(16);
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[
+                "Flashing a_product",
+                "2 of 2 partitions",
+                "Flash partition: bar_partition",
+                "2 of 2 files",
+                "Upload file",
+                "16 of 16 bytes",
+            ],
+            &[],
+        ));
+
+        indicator.finish_partition();
+        assert!(progress_message_contents(
+            &mut indicator,
+            &[],
+            &["Flash", "partition", "file", "Upload", "byte"],
+        ));
     }
 }

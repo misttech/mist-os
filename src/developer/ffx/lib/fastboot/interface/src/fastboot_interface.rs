@@ -56,6 +56,7 @@ pub enum RebootEvent {
 
 #[derive(Debug)]
 pub enum UploadProgress {
+    OnReady { partition: String, files: u64 },
     OnStarted { size: u64 },
     OnFinished,
     OnProgress { bytes_written: u64 },
