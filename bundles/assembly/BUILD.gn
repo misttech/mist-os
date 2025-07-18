@@ -1257,26 +1257,6 @@ assembly_input_bundle("networking_basic_packages_gub") {
   base_packages = [ "//src/connectivity/policy/netcfg:package-basic_gub" ]
 }
 
-# networking_test_collection
-#
-# Includes a test collection inside the network realm that has access to all
-# networking administrative capabilities.
-assembly_input_bundle("networking_test_collection") {
-  testonly = true
-  compiled_packages = [
-    {
-      name = "network"
-      components = [
-        {
-          component_name = "network"
-          shards =
-              [ "//src/connectivity/network/meta/test-collection.shard.cml" ]
-        },
-      ]
-    },
-  ]
-}
-
 # This is common across all eng-mode products that include the core realm.
 #
 # This is mutually-exclusive with the `core_realm_user_and_userdebug` AIB.

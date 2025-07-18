@@ -646,9 +646,13 @@
             to: "#testing",
         },
 
-        // TODO(https://fxbug.dev/42163671): Remove once e2e is better supported.
+        // Needed by network-conformance tests.
         {
-            protocol: [ "fuchsia.net.interfaces.State" ],
+            protocol: [
+                "fuchsia.net.debug.Interfaces",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
+            ],
             from: "#network",
             to: "#testing",
         },

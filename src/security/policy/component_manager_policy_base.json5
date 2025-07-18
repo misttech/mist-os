@@ -366,10 +366,22 @@
                 target_monikers: [
                     "/core/network",
                     "/core/network/netstack",
-                    "/core/network/test-components:**",
+                    "/core/testing/netstack-tests:**",
 
                     // TODO(https://fxbug.dev/42062982): Move away from Root API.
                     "/core/weavestack",
+                ],
+            },
+            {
+                source_moniker: "/core/network/netstack",
+                source: "component",
+                source_name: "fuchsia.net.debug.Interfaces",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/network",
+                    "/core/network/netstack",
+                    "/core/network/reachability",
+                    "/core/testing/netstack-tests:**",
                 ],
             },
             {
@@ -382,7 +394,7 @@
                     "/core/network/dhcpd",
                     "/core/network/netstack/dhcp-client",
                     "/core/network/netstack",
-                    "/core/network/test-components:**",
+                    "/core/testing/netstack-tests:**",
                 ],
             },
             {

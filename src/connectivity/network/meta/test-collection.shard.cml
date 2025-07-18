@@ -10,7 +10,8 @@
             // is meant to be embedded in the core network realm, so it can use
             // all available protocols, even the ones that are not routed
             // outside of the network realm.
-            name: "test-components",
+            name: "netstack-tests",
+            environment: "#test-env",
             durability: "transient",
         },
     ],
@@ -18,18 +19,20 @@
         {
             dictionary: "diagnostics",
             from: "parent",
-            to: [ "#test-components" ],
+            to: [ "#netstack-tests" ],
         },
         {
-            // Protocols needed by the Network Test Realm to coordinate its
-            // actions with the system.
             protocol: [
+                "fuchsia.device.NameProvider",
+
+                // Protocols needed by the Network Test Realm to coordinate its
+                // actions with the system.
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
             ],
-            from: "#netstack",
-            to: [ "#test-components" ],
+            from: "parent",
+            to: [ "#netstack-tests" ],
         },
     ],
 }

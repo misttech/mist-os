@@ -192,13 +192,6 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     .field("suspend_enabled", false)?;
             }
 
-            // Add the networking test collection on all eng builds. The test
-            // collection allows components to be launched inside the network
-            // realm with access to all networking related capabilities.
-            if context.build_type == &BuildType::Eng {
-                builder.platform_bundle("networking_test_collection")
-            }
-
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
             let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
             if has_fullmac || has_softmac {

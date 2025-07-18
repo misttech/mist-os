@@ -21,7 +21,7 @@ import (
 
 const NETWORK_TEST_REALM_COMPONENT_NAME = "net-test-realm-controller"
 
-const NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER = "core/network/test-components"
+const NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER = "core/testing/netstack-tests"
 
 const NETWORK_TEST_REALM_MONIKER = "/" + NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER + ":" + NETWORK_TEST_REALM_COMPONENT_NAME
 const NETWORK_TEST_REALM_URL = "fuchsia-pkg://fuchsia.com/network-test-realm#meta/controller.cm"
