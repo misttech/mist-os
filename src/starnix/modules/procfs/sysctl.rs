@@ -7,14 +7,12 @@ use crate::sys_net::{
 };
 use starnix_core::security;
 use starnix_core::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, SeccompAction};
+use starnix_core::vfs::pseudo::simple_directory::{SimpleDirectory, SimpleDirectoryMutator};
 use starnix_core::vfs::pseudo::simple_file::{parse_unsigned_file, BytesFile, BytesFileOps};
-use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::pseudo::stub_bytes_file::StubBytesFile;
-use starnix_core::vfs::{
-    fs_args, inotify, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsNodeOps, FsString,
-};
+use starnix_core::vfs::{fs_args, inotify, FileSystemHandle, FsNodeHandle, FsNodeOps, FsString};
 use starnix_logging::bug_ref;
-use starnix_uapi::auth::{FsCred, CAP_LAST_CAP, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
+use starnix_uapi::auth::{CAP_LAST_CAP, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
@@ -25,7 +23,8 @@ use uuid::Uuid;
 
 pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
-    let mut dir = StaticDirectoryBuilder::new(fs);
+    let root_dir = SimpleDirectory::new();
+    let dir = SimpleDirectoryMutator::new(fs.clone(), root_dir.clone());
     dir.subdir("abi", 0o555, |_dir| {
         #[cfg(target_arch = "aarch64")]
         _dir.entry(
@@ -44,43 +43,29 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
         );
     });
     dir.subdir("crypto", 0o555, |dir| {
-        dir.node(
-            "fips_enabled",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(b"0\n".to_vec()),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-        );
-        dir.node(
+        dir.entry("fips_enabled", BytesFile::new_node(b"0\n".to_vec()), mode!(IFREG, 0o444));
+        dir.entry(
             "fips_name",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(b"Linux Kernel Cryptographic API\n".to_vec()),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            BytesFile::new_node(b"Linux Kernel Cryptographic API\n".to_vec()),
+            mode!(IFREG, 0o444),
         );
-        dir.node(
+        dir.entry(
             "fips_version",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
+            mode!(IFREG, 0o444),
         );
     });
     dir.subdir("kernel", 0o555, |dir| {
-        dir.node(
+        dir.entry(
             "cap_last_cap",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(|| Ok(format!("{}\n", CAP_LAST_CAP))),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            BytesFile::new_node(|| Ok(format!("{}\n", CAP_LAST_CAP))),
+            mode!(IFREG, 0o444),
         );
-        dir.node(
+        dir.entry(
             "core_pattern",
-            fs.create_node_and_allocate_node_id(
-                // TODO(https://fxbug.dev/322873960): Use the core pattern when generating a core dump.
-                BytesFile::new_node(b"core".to_vec()),
-                FsNodeInfo::new(mode, FsCred::root()),
-            ),
+            // TODO(https://fxbug.dev/322873960): Use the core pattern when generating a core dump.
+            BytesFile::new_node(b"core".to_vec()),
+            mode,
         );
         dir.entry(
             "core_pipe_limit",
@@ -288,48 +273,16 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
             ),
             mode,
         );
-        dir.node(
+        dir.entry(
             "osrelease",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_RELEASE))),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_RELEASE))),
+            mode!(IFREG, 0o444),
         );
-        dir.node(
-            "ostype",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(b"Linux\n".to_vec()),
-                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-        );
-        dir.node(
-            "overflowuid",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new(mode, FsCred::root()),
-            ),
-        );
-        dir.node(
-            "overflowgid",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new(mode, FsCred::root()),
-            ),
-        );
-        dir.node(
-            "printk",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(b"4\t4\t1\t7\n".to_vec()),
-                FsNodeInfo::new(mode, FsCred::root()),
-            ),
-        );
-        dir.node(
-            "pid_max",
-            fs.create_node_and_allocate_node_id(
-                BytesFile::new_node(b"4194304".to_vec()),
-                FsNodeInfo::new(mode, FsCred::root()),
-            ),
-        );
+        dir.entry("ostype", BytesFile::new_node(b"Linux\n".to_vec()), mode!(IFREG, 0o444));
+        dir.entry("overflowuid", BytesFile::new_node(b"65534".to_vec()), mode);
+        dir.entry("overflowgid", BytesFile::new_node(b"65534".to_vec()), mode);
+        dir.entry("printk", BytesFile::new_node(b"4\t4\t1\t7\n".to_vec()), mode);
+        dir.entry("pid_max", BytesFile::new_node(b"4194304".to_vec()), mode);
         dir.subdir("random", 0o555, |dir| {
             // Generate random UUID
             let boot_id = Uuid::new_v4().hyphenated().to_string();
@@ -349,13 +302,11 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
             dir.entry("ptrace_scope", PtraceYamaScope::new_node(), mode);
         });
     });
-    dir.node("net", sysctl_net_diretory(fs));
-    dir.node(
+    dir.subdir("net", 0o555, sysctl_net_diretory);
+    dir.entry(
         "version",
-        fs.create_node_and_allocate_node_id(
-            BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
-            FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-        ),
+        BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
+        mode!(IFREG, 0o444),
     );
     dir.subdir("vm", 0o555, |dir| {
         dir.entry(
@@ -482,7 +433,8 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
             dir.entry("require_signatures", VerityRequireSignaturesFile::new_node(), mode);
         });
     });
-    dir.build()
+    // TODO: Validate the mode bits are correct.
+    root_dir.into_node(fs, 0o777)
 }
 
 struct VerityRequireSignaturesFile;
@@ -508,48 +460,54 @@ impl BytesFileOps for VerityRequireSignaturesFile {
 }
 
 pub fn net_directory(fs: &FileSystemHandle) -> FsNodeHandle {
-    let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry(
-        "fib_trie",
-        StubBytesFile::new_node("/proc/net/fib_trie", bug_ref!("https://fxbug.dev/322873635")),
-        mode!(IFREG, 0o400),
-    );
-    dir.entry(
-        "if_inet6",
-        StubBytesFile::new_node("/proc/net/if_inet6", bug_ref!("https://fxbug.dev/322874669")),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(
-        "ip_tables_names",
-        BytesFile::new_node(b"nat\nfilter\nmangle\nraw\n".to_vec()),
-        mode!(IFREG, 0o644),
-    );
-    dir.entry(
-        "ip6_tables_names",
-        BytesFile::new_node(b"filter\nmangle\nraw\n".to_vec()),
-        mode!(IFREG, 0o644),
-    );
-    dir.entry(
-        "psched",
-        StubBytesFile::new_node("/proc/net/psched", bug_ref!("https://fxbug.dev/322874710")),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(
-        "xt_qtaguid",
-        StubBytesFile::new_node("/proc/net/xt_qtaguid", bug_ref!("https://fxbug.dev/322874322")),
-        mode!(IFREG, 0o644),
-    );
-    dir.subdir("xt_quota", 0o555, |dir| {
+    let dir = SimpleDirectory::new();
+    dir.edit(fs, |dir| {
         dir.entry(
-            "globalAlert",
-            StubBytesFile::new_node(
-                "/proc/net/xt_quota/globalAlert",
-                bug_ref!("https://fxbug.dev/322873636"),
-            ),
+            "fib_trie",
+            StubBytesFile::new_node("/proc/net/fib_trie", bug_ref!("https://fxbug.dev/322873635")),
+            mode!(IFREG, 0o400),
+        );
+        dir.entry(
+            "if_inet6",
+            StubBytesFile::new_node("/proc/net/if_inet6", bug_ref!("https://fxbug.dev/322874669")),
             mode!(IFREG, 0o444),
         );
+        dir.entry(
+            "ip_tables_names",
+            BytesFile::new_node(b"nat\nfilter\nmangle\nraw\n".to_vec()),
+            mode!(IFREG, 0o644),
+        );
+        dir.entry(
+            "ip6_tables_names",
+            BytesFile::new_node(b"filter\nmangle\nraw\n".to_vec()),
+            mode!(IFREG, 0o644),
+        );
+        dir.entry(
+            "psched",
+            StubBytesFile::new_node("/proc/net/psched", bug_ref!("https://fxbug.dev/322874710")),
+            mode!(IFREG, 0o444),
+        );
+        dir.entry(
+            "xt_qtaguid",
+            StubBytesFile::new_node(
+                "/proc/net/xt_qtaguid",
+                bug_ref!("https://fxbug.dev/322874322"),
+            ),
+            mode!(IFREG, 0o644),
+        );
+        dir.subdir("xt_quota", 0o555, |dir| {
+            dir.entry(
+                "globalAlert",
+                StubBytesFile::new_node(
+                    "/proc/net/xt_quota/globalAlert",
+                    bug_ref!("https://fxbug.dev/322873636"),
+                ),
+                mode!(IFREG, 0o444),
+            );
+        });
     });
-    dir.build()
+    // TODO: Validate the mode bits are correct.
+    dir.into_node(fs, 0o777)
 }
 
 struct KernelTaintedFile;
@@ -569,8 +527,7 @@ impl BytesFileOps for KernelTaintedFile {
     }
 }
 
-fn sysctl_net_diretory(fs: &FileSystemHandle) -> FsNodeHandle {
-    let mut dir = StaticDirectoryBuilder::new(fs);
+fn sysctl_net_diretory(dir: &SimpleDirectoryMutator) {
     let file_mode = mode!(IFREG, 0o644);
     let dir_mode = mode!(IFDIR, 0o644);
 
@@ -693,7 +650,6 @@ fn sysctl_net_diretory(fs: &FileSystemHandle) -> FsNodeHandle {
             file_mode,
         );
     });
-    dir.build()
 }
 
 struct DmesgRestrict {}
