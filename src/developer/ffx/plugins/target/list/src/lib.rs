@@ -50,12 +50,14 @@ impl FfxMain for ListTool {
         let cmd = self.update_from_target();
         // XXX Shouldn't check `is_strict()`. Eventually we'll _always_ do local discovery,
         // at which point this check goes away.
-        let infos =
-            if !self.context.is_strict() && ffx_target::is_discovery_enabled(&self.context).await {
-                list_targets(self.tc_proxy.await?, &cmd).await?
-            } else {
-                local_list_targets(&self.context, &cmd).await?
-            };
+        let infos = if self.context.is_strict()
+            || self.context.get_direct_connection_mode()
+            || !ffx_target::is_discovery_enabled(&self.context).await
+        {
+            local_list_targets(&self.context, &cmd).await?
+        } else {
+            list_targets(self.tc_proxy.await?, &cmd).await?
+        };
         emit_device_stats_event(infos.len(), &cmd.nodename).await;
         show_targets(cmd, infos, &mut writer, &self.context).await?;
         Ok(())
