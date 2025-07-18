@@ -69,9 +69,6 @@ class DlImplTests : public Base {
   // modules waiting to be loaded in a LinkingSession. See
   // DlTests.SonameFilenameLoadedDep for current vs expected behavior.
   static constexpr bool kSonameLookupInPendingDeps = false;
-  // TODO(https://fxbug.dev/42085429): Implement dlinfo() in libdl.
-  static constexpr bool kImplementsDlInfo = false;
-  static constexpr bool kSupportsDlInfoExtensionFlags = false;
   // The resolver policy that determines symbol resolution order, and that tests
   // use to verify resolved values.
   static constexpr elfldltl::ResolverPolicy kResolverPolicy = ld::kResolverPolicy;
@@ -129,7 +126,7 @@ class DlImplTests : public Base {
       }
       // TODO(https://fxbug.dev/382527519): RuntimeDynamicLinker should have a
       // `RunInitializers` method that will run this with proper synchronization.
-      static_cast<RuntimeModule*>(result.value())->InitializeModuleTree();
+      RuntimeModule::FromPtr(result.value()).InitializeModuleTree();
       Base::TrackModule(result.value(), file);
     }
     return result;
@@ -149,8 +146,8 @@ class DlImplTests : public Base {
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
-    const RuntimeModule* root = static_cast<RuntimeModule*>(module);
-    return dynamic_linker_->LookupSymbol(*root, ref);
+    const RuntimeModule& root = RuntimeModule::FromPtr(module);
+    return dynamic_linker_->LookupSymbol(root, ref);
   }
 
   int DlIteratePhdr(DlIteratePhdrCallback* callback, void* data) {
@@ -170,14 +167,11 @@ class DlImplTests : public Base {
   // Return the `link_map` data structure associated with a module. `handle`
   // should be a valid pointer returned by a successful dlopen() call.
   const link_map* ModuleLinkMap(const void* handle) {
-    return reinterpret_cast<const link_map*>(
-        &static_cast<const RuntimeModule*>(handle)->module().link_map);
+    return RuntimeModule::FromPtr(handle).user_link_map();
   }
 
-  // TODO(https://fxbug.dev/42085429): For now this is a stub function that will
-  // be replaced by a call to libdl's dlinfo implementation.
   fit::result<Error, int> DlInfo(void* module, int request, void* info) {
-    return fit::error(Error{"TODO(https://fxbug.dev/42085429): Implement dlinfo."});
+    return dynamic_linker_->DlInfo(module, request, info);
   }
 
  private:

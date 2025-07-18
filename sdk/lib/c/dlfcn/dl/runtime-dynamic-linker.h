@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DL_RUNTIME_DYNAMIC_LINKER_H_
-#define LIB_DL_RUNTIME_DYNAMIC_LINKER_H_
+#ifndef LIB_C_DLFCN_DL_RUNTIME_DYNAMIC_LINKER_H_
+#define LIB_C_DLFCN_DL_RUNTIME_DYNAMIC_LINKER_H_
 
 #include <dlfcn.h>  // for RTLD_* macros
 #include <lib/elfldltl/soname.h>
@@ -16,34 +16,47 @@
 #include "linking-session.h"
 #include "runtime-module.h"
 
+// TODO(https://fxbug.dev/338239201): These flags should go into the new libc's
+// dlfcn.h.
+#ifndef RTLD_DI_TLS_MODID
+#define RTLD_DI_TLS_MODID 9
+#endif
+
+#ifndef RTLD_DI_TLS_DATA
+#define RTLD_DI_TLS_DATA 10
+#endif
+
+#ifndef RTLD_DI_PHDR
+#define RTLD_DI_PHDR 11
+#endif
+
 namespace dl {
 
 using size_type = Elf::size_type;
 using DlIteratePhdrCallback = int(dl_phdr_info*, size_t, void*);
 
-enum OpenSymbolScope : int {
-  kLocal = RTLD_LOCAL,
-  kGlobal = RTLD_GLOBAL,
-};
+// Supported dlopen flags:
+constexpr int kLocal = RTLD_LOCAL;
+constexpr int kGlobal = RTLD_GLOBAL;
+constexpr int kNow = RTLD_NOW;
+// RTLD_LAZY functionality is not supported, but keep the flag definition
+// because it's a legitimate flag that can be passed in.
+constexpr int kLazy = RTLD_LAZY;
+constexpr int kNoload = RTLD_NOLOAD;
+constexpr int kNodelete = RTLD_NODELETE;
+// TODO(https://fxbug.dev/323425900): support glibc's RTLD_DEEPBIND flag.
+// kDEEPBIND = RTLD_DEEPBIND,
 
-enum OpenBindingMode : int {
-  kNow = RTLD_NOW,
-  // RTLD_LAZY functionality is not supported, but keep the flag definition
-  // because it's a legitimate flag that can be passed in.
-  kLazy = RTLD_LAZY,
-};
-
-enum OpenFlags : int {
-  kNoload = RTLD_NOLOAD,
-  kNodelete = RTLD_NODELETE,
-  // TODO(https://fxbug.dev/323425900): support glibc's RTLD_DEEPBIND flag.
-  // kDEEPBIND = RTLD_DEEPBIND,
-};
+// Supported dlinfo request values:
+constexpr int kLinkMap = RTLD_DI_LINKMAP;
+constexpr int kTlsModid = RTLD_DI_TLS_MODID;
+constexpr int kTlsData = RTLD_DI_TLS_DATA;
+constexpr int kPhdrs = RTLD_DI_PHDR;
 
 // Masks used to validate flag values.
-inline constexpr int kOpenSymbolScopeMask = OpenSymbolScope::kLocal | OpenSymbolScope::kGlobal;
-inline constexpr int kOpenBindingModeMask = OpenBindingMode::kLazy | OpenBindingMode::kNow;
-inline constexpr int kOpenFlagsMask = OpenFlags::kNoload | OpenFlags::kNodelete;
+inline constexpr int kOpenSymbolScopeMask = kLocal | kGlobal;
+inline constexpr int kOpenBindingModeMask = kLazy | kNow;
+inline constexpr int kOpenFlagsMask = kNoload | kNodelete;
 
 class RuntimeDynamicLinker {
  public:
@@ -104,16 +117,16 @@ class RuntimeDynamicLinker {
       if (!found->ReifyModuleTree(diag)) {
         return diag.take_error();
       }
-      if (mode & OpenSymbolScope::kGlobal) {
+      if (mode & kGlobal) {
         MakeGlobal(found->module_tree());
       }
-      if (mode & OpenFlags::kNodelete) {
+      if (mode & kNodelete) {
         found->set_no_delete();
       }
       return diag.ok(found);
     }
 
-    if (mode & OpenFlags::kNoload) {
+    if (mode & kNoload) {
       return diag.ok(nullptr);
     }
 
@@ -146,11 +159,11 @@ class RuntimeDynamicLinker {
     // global. This is done after modules from the linking session have been
     // added to the modules_ list, because this operation may change the
     // ordering of all loaded modules.
-    if (mode & OpenSymbolScope::kGlobal) {
+    if (mode & kGlobal) {
       MakeGlobal(root_module.module_tree());
     }
 
-    if (mode & OpenFlags::kNodelete) {
+    if (mode & kNodelete) {
       root_module.set_no_delete();
     }
 
@@ -162,6 +175,13 @@ class RuntimeDynamicLinker {
   // a non-zero value. The result of the last callback function to run is
   // returned to the caller.
   int IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const;
+
+  // Information specified by `request` is stored in the location pointed to by
+  // `info`. On success:
+  //  - Returns the number of program headers if `request` is `RTLD_DI_PHDR`.
+  //  - Returns 0 for all other valid `RTLD_DI_*` values.
+  // An error message is returned on failure.
+  fit::result<Error, int> DlInfo(void* handle, int request, void* info);
 
   // Allocate and initialize the thread's dynamic TLS blocks. This will iterate
   // through all the currently loaded modules with dynamic TLS and populate this
@@ -224,4 +244,4 @@ class RuntimeDynamicLinker {
 
 }  // namespace dl
 
-#endif  // LIB_DL_RUNTIME_DYNAMIC_LINKER_H_
+#endif  // LIB_C_DLFCN_DL_RUNTIME_DYNAMIC_LINKER_H_

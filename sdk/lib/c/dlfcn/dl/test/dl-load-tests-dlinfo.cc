@@ -35,10 +35,6 @@ TYPED_TEST(DlTests, DlInfoBadFlag) {
   const std::string kRet17File = TestModule("ret17");
   struct link_map *link_map = nullptr;
 
-  if constexpr (!TestFixture::kImplementsDlInfo) {
-    GTEST_SKIP() << "test requires fixture to implement dlinfo";
-  }
-
   this->ExpectRootModule(kRet17File);
 
   auto open = this->DlOpen(kRet17File.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -61,10 +57,6 @@ TYPED_TEST(DlTests, DlInfoBadFlag) {
 TYPED_TEST(DlTests, DlInfoRtldDiLinkMap) {
   const std::string kRet17File = TestModule("ret17");
   struct link_map *link_map = nullptr;
-
-  if constexpr (!TestFixture::kImplementsDlInfo) {
-    GTEST_SKIP() << "test requires fixture to implement dlinfo";
-  }
 
   this->ExpectRootModule(kRet17File);
 
@@ -91,10 +83,6 @@ TYPED_TEST(DlTests, DlInfoRtldDiLinkMap) {
 TYPED_TEST(DlTests, DlInfoRtldDiTlsModid) {
   const std::string kTlsVarFile = "libstatic-tls-var.so";
   size_t tls_modid = 0;
-
-  if constexpr (!TestFixture::kImplementsDlInfo) {
-    GTEST_SKIP() << "test requires fixture to implement dlinfo";
-  }
 
   if (!TestFixture::kSupportsDlInfoExtensionFlags) {
     GTEST_SKIP() << "test requires fixture to support RTLD_DI_TLS_MODID";
@@ -125,10 +113,6 @@ TYPED_TEST(DlTests, DlInfoRtldDiTlsModidNoTls) {
   // Initialize to non-zero value so that dlinfo() correctly sets to zero later.
   size_t tls_modid = 1;
 
-  if constexpr (!TestFixture::kImplementsDlInfo) {
-    GTEST_SKIP() << "test requires fixture to implement dlinfo";
-  }
-
   if (!TestFixture::kSupportsDlInfoExtensionFlags) {
     GTEST_SKIP() << "test requires fixture to support RTLD_DI_TLS_MODID";
   }
@@ -153,10 +137,6 @@ TYPED_TEST(DlTests, DlInfoRtldDiTlsModidNoTls) {
 TYPED_TEST(DlTests, DlInfoRtldDiTlsData) {
   const std::string kTlsVarFile = "libstatic-tls-var.so";
   void *tls_data = nullptr;
-
-  if constexpr (!TestFixture::kImplementsDlInfo) {
-    GTEST_SKIP() << "test requires fixture to implement dlinfo";
-  }
 
   if (!TestFixture::kSupportsDlInfoExtensionFlags) {
     GTEST_SKIP() << "test requires fixture to support RTLD_DI_TLS_DATA";
@@ -190,10 +170,6 @@ TYPED_TEST(DlTests, DlInfoRtldDiTlsDataNoTls) {
   // later.
   void *tls_data = this;
 
-  if constexpr (!TestFixture::kImplementsDlInfo) {
-    GTEST_SKIP() << "test requires fixture to implement dlinfo";
-  }
-
   if (!TestFixture::kSupportsDlInfoExtensionFlags) {
     GTEST_SKIP() << "test requires fixture to support RTLD_DI_TLS_DATA";
   }
@@ -218,10 +194,6 @@ TYPED_TEST(DlTests, DlInfoRtldDiTlsDataNoTls) {
 TYPED_TEST(DlTests, DlInfoRtldDiPhdrs) {
   const std::string kRet17File = TestModule("ret17");
   const ElfW(Phdr) *phdrs = nullptr;
-
-  if constexpr (!TestFixture::kImplementsDlInfo) {
-    GTEST_SKIP() << "test requires fixture to implement dlinfo";
-  }
 
   if (!TestFixture::kSupportsDlInfoExtensionFlags) {
     GTEST_SKIP() << "test requires fixture to support RTLD_DI_PHDRS";

@@ -65,10 +65,6 @@ class DlTestsBase : public ::testing::Test {
   static constexpr elfldltl::ResolverPolicy kResolverPolicy =
       elfldltl::ResolverPolicy::kStrictLinkOrder;
 
-  // TODO(https://fxbug.dev/42085429): This is used in tests until libdl
-  // implements dlinfo().
-  static constexpr bool kImplementsDlInfo = true;
-
   // Whether the test fixture implementation emits the unsupported flag value
   // in its error message.
   static constexpr bool kEmitsDlInfoUnsupportedValue = false;

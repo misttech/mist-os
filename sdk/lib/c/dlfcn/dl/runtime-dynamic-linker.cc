@@ -214,4 +214,29 @@ int RuntimeDynamicLinker::IteratePhdrInfo(DlIteratePhdrCallback* callback, void*
   return fit::ok();
 }
 
+fit::result<Error, int> RuntimeDynamicLinker::DlInfo(void* handle, int request, void* info) {
+  const RuntimeModule& module = RuntimeModule::FromPtr(handle);
+  switch (request) {
+    case kLinkMap:
+      *static_cast<const link_map**>(info) = module.user_link_map();
+      return fit::ok(0);
+
+    case kTlsModid:
+      *static_cast<size_t*>(info) = module.tls_module_id();
+      return fit::ok(0);
+
+    case kTlsData:
+      *static_cast<void**>(info) = module.tls_module_id() == 0 ? nullptr : TlsBlock(module);
+      return fit::ok(0);
+
+    case kPhdrs:
+      *static_cast<ElfW(Phdr)**>(info) = const_cast<ElfW(Phdr)*>(
+          reinterpret_cast<const ElfW(Phdr)*>(module.module().phdrs.data()));
+      return fit::ok(static_cast<int>(module.module().phdrs.size()));
+
+    default:
+      return fit::error{Error{"unsupported dlinfo request"}};
+  };
+}
+
 }  // namespace dl
