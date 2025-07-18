@@ -37,7 +37,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         # to write to the channel.
         coro = admin.perform_reboot(
             options=power_statecontrol.RebootOptions(
-                reasons=[power_statecontrol.RebootReason.USER_REQUEST],
+                reasons=[power_statecontrol.RebootReason2.USER_REQUEST],
             ),
         )
         try:
