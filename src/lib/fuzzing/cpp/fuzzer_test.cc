@@ -28,7 +28,7 @@ TEST(LlvmFuzzerTest, OneInput) {
   EXPECT_EQ(0, LLVMFuzzerTestOneInput(nullptr, 0));
 
   //  Should work with non-null but zero size
-  uint8_t ignored;
+  uint8_t ignored = 0;
   EXPECT_EQ(0, LLVMFuzzerTestOneInput(&ignored, 0));
 }
 
