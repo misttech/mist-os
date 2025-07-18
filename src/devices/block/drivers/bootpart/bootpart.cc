@@ -67,14 +67,6 @@ void BootPartition::BlockImplQueue(block_op_t* bop, block_impl_queue_callback co
   block_impl_client_.Queue(bop, completion_cb, cookie);
 }
 
-void BootPartition::DdkInit(ddk::InitTxn txn) {
-  // Add empty partition map metadata to prevent this driver from binding to its child devices.
-  zx_status_t status = device_add_metadata(zxdev(), DEVICE_METADATA_PARTITION_MAP, nullptr, 0);
-  // Make the device visible after adding metadata. If there was an error, this will schedule
-  // unbinding of the device.
-  txn.Reply(status);
-}
-
 void BootPartition::DdkRelease() { delete this; }
 
 static_assert(ZBI_PARTITION_GUID_LEN == GUID_LENGTH, "GUID length mismatch");
@@ -192,7 +184,8 @@ zx_status_t BootPartition::AddBootPartition() {
          partition_index_, PartitionName().c_str(), type_guid.c_str(), uniq_guid.c_str(),
          zbi_partition_.name, zbi_partition_.first_block, zbi_partition_.last_block);
 
-  zx_status_t status = DdkAdd(PartitionName().c_str());
+  zx_status_t status = DdkAdd(
+      ddk::DeviceAddArgs(PartitionName().c_str()).add_metadata(DEVICE_METADATA_PARTITION_MAP, {}));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed DdkAdd: %s", zx_status_get_string(status));
   }

@@ -110,8 +110,8 @@ class BootPartitionTest : public zxtest::Test {
     memset(partitions[1].uniq_guid, 'J', sizeof(partitions[1].uniq_guid));
     memcpy(partitions[1].name, kLongName, sizeof(partitions[1].name));
 
-    ASSERT_OK(device_add_metadata(parent_.get(), DEVICE_METADATA_PARTITION_MAP,
-                                  partition_map_buffer.data(), partition_map_buffer.size()));
+    parent_->SetMetadata(DEVICE_METADATA_PARTITION_MAP, partition_map_buffer.data(),
+                         partition_map_buffer.size());
 
     ASSERT_OK(BootPartition::Bind(nullptr, parent_.get()));
     ASSERT_EQ(parent_->child_count(), 2);

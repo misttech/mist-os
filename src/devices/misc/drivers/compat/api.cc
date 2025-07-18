@@ -105,11 +105,6 @@ __EXPORT zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* 
   return dev->GetMetadata(type, buf, buflen, actual);
 }
 
-__EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data,
-                                         size_t size) {
-  return dev->AddMetadata(type, data, size);
-}
-
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
   return dev->AddCompositeNodeSpec(name, spec);

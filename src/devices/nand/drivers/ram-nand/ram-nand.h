@@ -52,7 +52,7 @@ struct NandParams : public nand_info_t {
 };
 
 class NandDevice;
-using DeviceType = ddk::Device<NandDevice, ddk::Initializable, ddk::Unbindable,
+using DeviceType = ddk::Device<NandDevice, ddk::Unbindable,
                                ddk::Messageable<fuchsia_hardware_nand::RamNand>::Mixin>;
 
 // Provides the bulk of the functionality for a ram-backed NAND device.
@@ -69,7 +69,6 @@ class NandDevice : public DeviceType, public ddk::NandProtocol<NandDevice, ddk::
   zx::result<DeviceNameType> Init(zx::vmo vmo = {});
 
   zx_status_t Bind(fuchsia_hardware_nand::wire::RamNandInfo& info);
-  void DdkInit(ddk::InitTxn txn);
   void DdkRelease() { delete this; }
 
   // Device protocol implementation.

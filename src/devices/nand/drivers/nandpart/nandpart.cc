@@ -178,19 +178,6 @@ zx_status_t NandPartDevice::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-void NandPartDevice::DdkInit(ddk::InitTxn init_txn) {
-  // Add empty partition map metadata to prevent this driver from binding to its child devices
-  zx_status_t status = DdkAddMetadata(DEVICE_METADATA_PARTITION_MAP, nullptr, 0);
-  if (status != ZX_OK) {
-    init_txn.Reply(status);
-    return;
-  }
-
-  status = DdkAddMetadata(DEVICE_METADATA_PRIVATE, &extra_partition_copy_count_,
-                          sizeof(extra_partition_copy_count_));
-  init_txn.Reply(status);
-}
-
 zx_status_t NandPartDevice::Bind(const char* name, uint32_t copy_count) {
   zxlogf(INFO, "nandpart: Binding %s", name);
   extra_partition_copy_count_ = copy_count;
@@ -199,7 +186,13 @@ zx_status_t NandPartDevice::Bind(const char* name, uint32_t copy_count) {
       ddk::MakeStrProperty(bind_fuchsia::NAND_CLASS, nand_info_.nand_class),
   };
 
-  return DdkAdd(ddk::DeviceAddArgs(name).set_str_props(props));
+  std::vector<uint8_t> metadata(sizeof(extra_partition_copy_count_));
+  memcpy(metadata.data(), &extra_partition_copy_count_, sizeof(extra_partition_copy_count_));
+
+  return DdkAdd(ddk::DeviceAddArgs(name)
+                    .set_str_props(props)
+                    .add_metadata(DEVICE_METADATA_PARTITION_MAP, {})
+                    .add_metadata(DEVICE_METADATA_PRIVATE, std::move(metadata)));
 }
 
 void NandPartDevice::NandQuery(nand_info_t* info_out, size_t* nand_op_size_out) {

@@ -254,6 +254,11 @@ class MetadataList {
     metadata_list_.push_back({type, data_list_.back()->data(), metadata_blob->size()});
     return ZX_OK;
   }
+  zx_status_t AddMetadata(uint32_t type, std::vector<uint8_t> buffer) {
+    data_list_.emplace_back(std::make_shared<std::vector<uint8_t>>(std::move(buffer)));
+    metadata_list_.push_back({type, data_list_.back()->data(), data_list_.back()->size()});
+    return ZX_OK;
+  }
 
   device_metadata_t* data() { return metadata_list_.data(); }
   size_t count() { return metadata_list_.size(); }
@@ -349,6 +354,14 @@ class DeviceAddArgs {
     }
     return *this;
   }
+  DeviceAddArgs& add_metadata(uint32_t type, std::vector<uint8_t> buffer) {
+    if (ZX_OK == metadata_list_.AddMetadata(type, std::move(buffer))) {
+      args_.metadata_list = metadata_list_.data();
+      args_.metadata_count = metadata_list_.count();
+    }
+    return *this;
+  }
+
   DeviceAddArgs& set_outgoing_dir(zx::channel outgoing_dir) {
     args_.outgoing_dir_channel = outgoing_dir.release();
     return *this;
@@ -461,10 +474,6 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     // Uses parent() instead of zxdev() as metadata is usually checked
     // before DdkAdd(). There are few use cases to actually call it on self.
     return device_get_metadata(parent(), type, buf, buf_len, actual);
-  }
-
-  zx_status_t DdkAddMetadata(uint32_t type, const void* data, size_t length) {
-    return device_add_metadata(zxdev(), type, data, length);
   }
 
   zx_status_t DdkGetFragmentMetadata(const char* name, uint32_t type, void* buf, size_t buf_len,

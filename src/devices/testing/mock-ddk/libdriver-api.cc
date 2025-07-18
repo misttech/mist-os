@@ -129,14 +129,6 @@ __EXPORT zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* con
 }
 
 __EXPORT
-zx_status_t device_add_metadata(zx_device_t* device, uint32_t type, const void* data,
-                                size_t length) {
-  std::lock_guard guard(libdriver_lock);
-  device->SetMetadata(type, data, length);
-  return ZX_OK;
-}
-
-__EXPORT
 zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf, size_t buflen,
                                 size_t* actual) {
   std::lock_guard guard(libdriver_lock);

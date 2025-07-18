@@ -71,8 +71,6 @@ TEST(RamNandTest, DdkLifetime) {
   auto config = BuildConfig();
   ASSERT_OK(device->Bind(config));
   auto* child = fake_parent->GetLatestChild();
-  child->InitOp();
-  EXPECT_OK(child->WaitUntilInitReplyCalled());
 
   child->UnbindOp();
   EXPECT_OK(child->WaitUntilUnbindReplyCalled());
@@ -127,8 +125,6 @@ TEST(RamNandTest, ExportNandConfig) {
 
   ASSERT_OK(device->Bind(config));
   auto* child = fake_parent->GetLatestChild();
-  child->InitOp();
-  EXPECT_OK(child->WaitUntilInitReplyCalled());
 
   char metadata_buffer[256] = {};
   size_t actual_size;
@@ -202,8 +198,6 @@ TEST(RamNandTest, ExportPartitionMap) {
 
   ASSERT_OK(device->Bind(config));
   auto* child = fake_parent->GetLatestChild();
-  child->InitOp();
-  EXPECT_OK(child->WaitUntilInitReplyCalled());
 
   char metadata_buffer[256] = {};
   size_t actual_size;
@@ -232,8 +226,6 @@ TEST(RamNandTest, AddMetadata) {
 
   ASSERT_OK(device->Bind(config));
   auto* child = fake_parent->GetLatestChild();
-  child->InitOp();
-  EXPECT_OK(child->WaitUntilInitReplyCalled());
 
   char metadata_buffer[256] = {};
   size_t actual_size;
@@ -844,9 +836,6 @@ TEST_F(NandTest, WearVmo) {
   ASSERT_OK(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS, &config.wear_vmo));
 
   ASSERT_OK(device->Bind(config));
-  auto* child = fake_parent->GetLatestChild();
-  child->InitOp();
-  EXPECT_OK(child->WaitUntilInitReplyCalled());
 
   // Starts as zero.
   uint32_t result;

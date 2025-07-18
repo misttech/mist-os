@@ -73,11 +73,6 @@ __EXPORT zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* 
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data,
-                                         size_t length) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_log_severity_t flag) {
   return false;
 }

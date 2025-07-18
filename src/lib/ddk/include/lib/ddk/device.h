@@ -272,9 +272,6 @@ zx_status_t device_connect_ns_protocol(zx_device_t* device, const char* protocol
 zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* buf, size_t buflen,
                                 size_t* actual);
 
-// Adds metadata to a specific device.
-zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data, size_t length);
-
 // Returns the specific protocol from the named fragment, identified by the name
 // provided when it was created via`device_add_composite`. Returns ZX_ERR_NOT_FOUND if
 // no fragment exists.
