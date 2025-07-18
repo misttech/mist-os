@@ -90,7 +90,7 @@ TEST(SignalHandling, NestedSigpipe) {
     struct sigaction sa;
     sa.sa_handler = [](int signum) {
       ASSERT_EQ(signum, SIGQUIT);
-      char data;
+      char data = 'a';
       ssize_t bytes_written = write(pipefd[1], &data, 1);
       ASSERT_EQ(bytes_written, -1);
       ASSERT_EQ(errno, EPIPE);
