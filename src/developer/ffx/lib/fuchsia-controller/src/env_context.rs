@@ -129,13 +129,22 @@ impl EnvContext {
         Ok(())
     }
 
+    async fn connect_remote_control_helper(
+        &self,
+    ) -> Result<fidl_fuchsia_developer_remotecontrol::RemoteControlProxy> {
+        self.invariant_check().await?;
+        let t = Duration::from_secs_f64(self.context.get(ffx_config::keys::PROXY_TIMEOUT)?);
+        Ok(timeout::timeout(t, self.device_connection.lock().await.as_ref().unwrap().rcs_proxy()).await.map_err(|_| {
+            anyhow::anyhow!("Timed out attempting to get remote control proxy. This happened after verifying that we can connect to the device, so the device has likely disconnected.")
+                })??)
+    }
+
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
         log::debug!(
             "Entering connect_remote_control_proxy for EnvContext instance: {}",
             logging::log_id(&self.context)
         );
-        self.invariant_check().await?;
-        let proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
+        let proxy = self.connect_remote_control_helper().await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
@@ -155,10 +164,11 @@ impl EnvContext {
             "Entering connect_device_proxy for EnvContext instance: {}",
             logging::log_id(&self.context)
         );
-        self.invariant_check().await?;
-        let rcs_proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
+        let rcs_proxy = self.connect_remote_control_helper().await?;
+        let proxy_timeout =
+            Duration::from_secs_f64(self.context.get(ffx_config::keys::PROXY_TIMEOUT)?);
         let proxy = rcs::connect_with_timeout_at::<ControllerMarker>(
-            Duration::from_secs(15),
+            proxy_timeout,
             &moniker,
             &capability_name,
             &rcs_proxy,

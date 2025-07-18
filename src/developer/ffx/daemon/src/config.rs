@@ -13,7 +13,7 @@ use std::time::Duration;
 #[async_trait::async_trait]
 pub trait DaemonConfig {
     const OVERNET_SOCKET_KEY: &'static str = "overnet.socket";
-    const PROXY_TIMEOUT_KEY: &'static str = "proxy.timeout_secs";
+    const PROXY_TIMEOUT_KEY: &'static str = ffx_config::keys::PROXY_TIMEOUT;
 
     /// Returns the path to the configured daemon socket, or the default for this environment
     /// if none is configured.
