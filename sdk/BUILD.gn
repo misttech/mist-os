@@ -513,7 +513,6 @@ if (is_host) {
     deps = [
       ":non_build_host_tools_required_by_bazel_sdk",
       "//src/developer/debug/zxdb:zxdb_sdk",
-      "//src/developer/ffx/plugins/agis:sdk",
       "//src/developer/ffx/plugins/audio:sdk",
       "//src/developer/ffx/plugins/component:sdk",
       "//src/developer/ffx/plugins/coverage:sdk",

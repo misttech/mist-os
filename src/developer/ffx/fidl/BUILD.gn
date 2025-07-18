@@ -9,7 +9,6 @@ assert(is_host || is_fidl_toolchain,
 
 fidl("fuchsia.developer.ffx") {
   sources = [
-    "agis.fidl",
     "daemon.fidl",
     "echo.fidl",
     "fastboot.fidl",
@@ -24,7 +23,6 @@ fidl("fuchsia.developer.ffx") {
     "//sdk/fidl/fuchsia.buildinfo",
     "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle",
     "//sdk/fidl/fuchsia.developer.remotecontrol",
-    "//sdk/fidl/fuchsia.gpu.agis",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.net",
     "//sdk/fidl/fuchsia.tracing.controller",

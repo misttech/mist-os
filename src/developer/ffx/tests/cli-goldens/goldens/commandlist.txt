@@ -1,4 +1,3 @@
-agis
 assembly
 audio
 component

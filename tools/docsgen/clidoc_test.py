@@ -40,7 +40,6 @@ WANT_NAMES = [
 # from the SDK. The list should not include in-tree only commands
 # since it makes the output dependent on which tools are built.
 WANT_FFX_SUBTOOLS = [
-    "agis",
     "assembly",
     "audio",
     "component",

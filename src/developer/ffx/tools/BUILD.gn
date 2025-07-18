@@ -6,7 +6,6 @@ import("//src/developer/ffx/config.gni")
 
 # The list of tools under this directory
 _tools = [
-  "//src/developer/ffx/plugins/agis",
   "//src/developer/ffx/plugins/assembly",
   "//src/developer/ffx/plugins/audio",
   "//src/developer/ffx/plugins/component",
