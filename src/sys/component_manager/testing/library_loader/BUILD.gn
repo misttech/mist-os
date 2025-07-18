@@ -1,0 +1,25 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+executable("library-loader-bin") {
+  output_name = "library_loader_test"
+  sources = [ "library-loader-bin.c" ]
+  deps = [ ":library-loader-helper" ]
+}
+
+shared_library("library-loader-helper") {
+  sources = [ "library-loader-helper.c" ]
+}
+
+loadable_module("library-loader-helper-alt") {
+  sources = [ "library-loader-helper-alt.c" ]
+}
+
+fuchsia_component("library_loader") {
+  testonly = true
+  manifest = "meta/library-loader.cml"
+  deps = [ ":library-loader-bin" ]
+}

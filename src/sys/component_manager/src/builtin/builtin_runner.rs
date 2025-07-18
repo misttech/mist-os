@@ -72,6 +72,7 @@ pub struct ElfRunnerResources {
     pub utc_clock: Option<Arc<UtcClock>>,
     pub crash_records: CrashRecords,
     pub instance_registry: Arc<InstanceRegistry>,
+    pub injected_bundles: Arc<Vec<elf_runner::InjectedBundle>>,
 }
 
 #[derive(Debug, Error)]
@@ -489,6 +490,7 @@ impl ElfRunnerProgram {
             Box::new(connector),
             resources.utc_clock.clone(),
             resources.crash_records.clone(),
+            resources.injected_bundles.clone(),
         );
         let inner = Arc::new(Inner { resources, elf_runner: Arc::new(elf_runner) });
 
@@ -682,6 +684,7 @@ mod tests {
             utc_clock: None,
             crash_records,
             instance_registry,
+            injected_bundles: Arc::new(vec![]),
         })
     }
 

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/cpp/sdk_shared_library.gni")
 import("//build/rust/rustc_library.gni")
@@ -137,4 +138,16 @@ rustc_library("rust") {
     ":instrumentation",
     "//sdk/rust/zx",
   ]
+}
+
+executable("debuglog") {
+  sources = [ "debuglog.cc" ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":instrumentation" ]
 }

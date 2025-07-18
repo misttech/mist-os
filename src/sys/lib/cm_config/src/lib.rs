@@ -979,17 +979,41 @@ impl TryFrom<component_internal::InjectedUseProtocol> for InjectedUseProtocol {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct InjectedLibrary {
+    pub bootfs_file_name: String,
+    pub target_name: String,
+}
+
+impl TryFrom<component_internal::InjectedLibrary> for InjectedLibrary {
+    type Error = Error;
+
+    fn try_from(value: component_internal::InjectedLibrary) -> Result<Self, Error> {
+        Ok(Self {
+            bootfs_file_name: value.bootfs_file_name.context("Missing bootfs_file_name")?,
+            target_name: value.target_name.context("Missing target_name")?,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct InjectedBundle {
     /// Components that will have this bundle injected into.
     pub components: Vec<AllowlistEntry>,
 
     /// Capabilities to be injected.
     pub use_: Vec<InjectedUse>,
+
+    /// Libraries to be injected.
+    pub library: Vec<InjectedLibrary>,
 }
 
 impl InjectedBundle {
-    pub fn new(components: Vec<AllowlistEntry>, use_: Vec<InjectedUse>) -> Self {
-        Self { components, use_ }
+    pub fn new(
+        components: Vec<AllowlistEntry>,
+        use_: Vec<InjectedUse>,
+        library: Vec<InjectedLibrary>,
+    ) -> Self {
+        Self { components, use_, library }
     }
 }
 
@@ -997,7 +1021,11 @@ impl TryFrom<component_internal::InjectedBundle> for InjectedBundle {
     type Error = Error;
 
     fn try_from(value: component_internal::InjectedBundle) -> Result<Self, Error> {
-        Ok(Self::new(parse_allowlist_entries(&value.components)?, parse_optional_vec(value.use_)?))
+        Ok(Self::new(
+            parse_allowlist_entries(&value.components)?,
+            parse_optional_vec(value.use_)?,
+            parse_optional_vec(value.library)?,
+        ))
     }
 }
 

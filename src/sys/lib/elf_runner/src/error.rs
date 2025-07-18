@@ -44,6 +44,14 @@ pub enum StartComponentError {
     StartInfoError(#[from] StartInfoError),
     #[error("failed to create boot clock: {_0}")]
     BootClockCreateFailed(#[source] zx::Status),
+    #[error("failed to open library to inject: {_0}")]
+    InjectLibraryOpenFailed(#[source] fuchsia_fs::node::OpenError),
+    #[error("failed to get executable VMO of library to inject: {_0}")]
+    InjectLibraryGetVmoFidlError(#[source] fidl::Error),
+    #[error("failed to get executable VMO of library to inject: {_0}")]
+    InjectLibraryGetVmoFailed(#[source] zx::Status),
+    #[error("failed to add directory entry for library to inject: {_0}")]
+    InjectLibraryAddEntryFailed(#[source] zx::Status),
 }
 
 impl StartComponentError {

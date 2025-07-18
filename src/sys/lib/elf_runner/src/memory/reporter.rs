@@ -138,7 +138,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let (snapshot_provider, snapshot_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
         runner.serve_memory_reporter(snapshot_request_stream);

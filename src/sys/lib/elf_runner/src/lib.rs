@@ -38,8 +38,11 @@ use log::warn;
 use moniker::Moniker;
 use runner::component::StopInfo;
 use runner::StartInfo;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::file::vmo::VmoFile;
 use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
@@ -93,6 +96,27 @@ pub struct ElfRunner {
 
     /// Tracks reporting memory changes to an observer.
     memory_reporter: MemoryReporter,
+
+    /// Bundles of libraries to be injected into started programs.
+    injected_bundles: Arc<Vec<InjectedBundle>>,
+}
+
+/// An extra library that is made available to launched processes.
+///
+/// If a library with the same name already exists, this will shadow it.
+pub struct InjectedLibrary {
+    /// Name of the library as visible to the launched process.
+    pub target_name: String,
+
+    /// Path to the file containing the library, in elf_runner's namespace.
+    pub file_path: String,
+}
+
+/// A set of libraries to inject and corresponding rules to match affected
+/// processes.
+pub struct InjectedBundle {
+    pub components: Vec<cm_config::AllowlistEntry>,
+    pub libraries: Vec<InjectedLibrary>,
 }
 
 /// The job for a component.
@@ -123,10 +147,19 @@ impl ElfRunner {
         launcher_connector: process_launcher::Connector,
         utc_clock: Option<Arc<UtcClock>>,
         crash_records: CrashRecords,
+        injected_bundles: Arc<Vec<InjectedBundle>>,
     ) -> ElfRunner {
         let components = ComponentSet::new();
         let memory_reporter = MemoryReporter::new(components.clone());
-        ElfRunner { job, launcher_connector, utc_clock, crash_records, components, memory_reporter }
+        ElfRunner {
+            job,
+            launcher_connector,
+            utc_clock,
+            crash_records,
+            components,
+            memory_reporter,
+            injected_bundles,
+        }
     }
 
     /// Returns a UTC clock handle.
@@ -419,6 +452,45 @@ impl ElfRunner {
                 ))
             })?;
 
+        let mut injected_libraries = HashMap::new();
+        for injected_bundle in self.injected_bundles.iter() {
+            // Skip this bundle if it doesn't match the moniker of the component being created.
+            if !injected_bundle.components.iter().any(|filter| filter.matches(&moniker)) {
+                continue;
+            }
+
+            for injected_library in &injected_bundle.libraries {
+                let file_proxy = fuchsia_fs::file::open_in_namespace(
+                    &injected_library.file_path,
+                    fio::PERM_READABLE | fio::PERM_EXECUTABLE,
+                )
+                .map_err(StartComponentError::InjectLibraryOpenFailed)?;
+                let vmo = file_proxy
+                    .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::EXECUTE)
+                    .await
+                    .map_err(StartComponentError::InjectLibraryGetVmoFidlError)?
+                    .map_err(|raw| {
+                        StartComponentError::InjectLibraryGetVmoFailed(zx::Status::from_raw(raw))
+                    })?;
+
+                injected_libraries.insert(
+                    &injected_library.target_name,
+                    VmoFile::new_with_inode_and_executable(vmo, fio::INO_UNKNOWN, true),
+                );
+            }
+        }
+        let extra_lib_dirs = if injected_libraries.is_empty() {
+            Vec::new()
+        } else {
+            let directory = vfs::directory::simple::Simple::new();
+            for (target_name, vmo_file) in injected_libraries {
+                directory
+                    .add_entry(target_name, vmo_file)
+                    .map_err(StartComponentError::InjectLibraryAddEntryFailed)?;
+            }
+            vec![vfs::directory::serve(directory, fio::PERM_READABLE | fio::PERM_EXECUTABLE)]
+        };
+
         let launch_info =
             runner::component::configure_launcher(runner::component::LauncherConfigArgs {
                 bin_path: &program_config.binary,
@@ -431,7 +503,7 @@ impl ElfRunner {
                 name_infos: None,
                 environs: program_config.environ.clone(),
                 launcher: &launcher,
-                loader_proxy_chan: None,
+                loader_proxy_args: runner::component::LoaderProxyArgs::BuiltIn(extra_lib_dirs),
                 executable_vmo: None,
             })
             .await?;
@@ -733,6 +805,7 @@ mod tests {
     use futures::{join, StreamExt};
     use runner::component::Controllable;
     use std::task::Poll;
+    use test_case::test_case;
     use zx::{self as zx, Task};
     use {
         fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
@@ -764,12 +837,13 @@ mod tests {
         Ok((dir, namespace))
     }
 
-    pub fn new_elf_runner_for_test() -> Arc<ElfRunner> {
+    pub fn new_elf_runner_for_test(injected_bundles: Vec<InjectedBundle>) -> Arc<ElfRunner> {
         Arc::new(ElfRunner::new(
             job_default().duplicate(zx::Rights::SAME_RIGHTS).unwrap(),
             Box::new(process_launcher::BuiltInConnector {}),
             None,
             CrashRecords::new(),
+            Arc::new(injected_bundles),
         ))
     }
 
@@ -900,6 +974,35 @@ mod tests {
         }
     }
 
+    /// Creates a component that loads `library-loader-helper.so` and then
+    /// immediately exits with the value contained in the `helper_value`
+    /// variable loaded from it.
+    pub fn library_loader_startinfo(
+        runtime_dir: ServerEnd<fio::DirectoryMarker>,
+    ) -> fcrunner::ComponentStartInfo {
+        let ns = vec![pkg_dir_namespace_entry()];
+
+        fcrunner::ComponentStartInfo {
+            resolved_url: Some(
+                "fuchsia-pkg://fuchsia.com/library-loader#meta/library-loader.cm".to_string(),
+            ),
+            program: Some(fdata::Dictionary {
+                entries: Some(vec![fdata::DictionaryEntry {
+                    key: "binary".to_string(),
+                    value: Some(Box::new(fdata::DictionaryValue::Str(
+                        "bin/library_loader_test".to_string(),
+                    ))),
+                }]),
+                ..Default::default()
+            }),
+            ns: Some(ns),
+            outgoing_dir: None,
+            runtime_dir: Some(runtime_dir),
+            component_instance: Some(zx::Event::create()),
+            ..Default::default()
+        }
+    }
+
     fn create_child_process(job: &zx::Job, name: &str) -> zx::Process {
         let (process, _vmar) = job
             .create_child_process(zx::ProcessOptions::empty(), name.as_bytes())
@@ -946,7 +1049,7 @@ mod tests {
         let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
@@ -1217,7 +1320,7 @@ mod tests {
         let start_info = with_mark_vmo_exec(lifecycle_startinfo(runtime_dir_server));
 
         // Config does not allowlist any monikers to have access to the job policy.
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
@@ -1247,7 +1350,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(policy),
             Moniker::try_from(["foo"]).unwrap(),
@@ -1281,7 +1384,7 @@ mod tests {
         let start_info = with_main_process_critical(hello_world_startinfo(runtime_dir_server));
 
         // Default policy does not allowlist any monikers to be marked as critical
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
@@ -1317,7 +1420,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner =
             runner.get_scoped_runner(ScopedPolicyChecker::new(Arc::new(policy), Moniker::root()));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
@@ -1380,7 +1483,7 @@ mod tests {
             let (_runtime_dir, runtime_dir_server) = create_endpoints::<fio::DirectoryMarker>();
             let start_info = hello_world_startinfo_forward_stdout_to_log(runtime_dir_server, ns);
 
-            let runner = new_elf_runner_for_test();
+            let runner = new_elf_runner_for_test(vec![]);
             let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
                 Arc::new(SecurityPolicy::default()),
                 Moniker::root(),
@@ -1440,7 +1543,7 @@ mod tests {
         let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
@@ -1589,6 +1692,7 @@ mod tests {
             Box::new(connector),
             None,
             CrashRecords::new(),
+            Arc::new(vec![]),
         );
         let policy_checker = ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
@@ -1630,7 +1734,7 @@ mod tests {
         let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let components = runner.components.clone();
 
         // Initially there are zero components.
@@ -1741,7 +1845,7 @@ mod tests {
         let (_, runtime_dir_server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let start_info = immediate_escrow_startinfo(outgoing_dir_server, runtime_dir_server);
 
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
@@ -1810,7 +1914,7 @@ mod tests {
     async fn test_return_code_success() {
         let start_info = exit_with_code_startinfo(0);
 
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
@@ -1828,7 +1932,7 @@ mod tests {
     async fn test_return_code_failure() {
         let start_info = exit_with_code_startinfo(123);
 
-        let runner = new_elf_runner_for_test();
+        let runner = new_elf_runner_for_test(vec![]);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
@@ -1842,6 +1946,57 @@ mod tests {
             i32::try_from(fcomp::Error::InstanceDied.into_primitive()).unwrap(),
         );
         expect_on_stop(&mut event_stream, s, Some(123)).await;
+        expect_channel_closed(&mut event_stream).await;
+    }
+
+    #[test_case(false ; "without injected library (for control)")]
+    #[test_case(true ; "with injected library (actual test)")]
+    #[fuchsia::test]
+    // TODO(https://fxbug.dev/428895045): Injecting libraries into sanitized programs is not
+    // supported yet.
+    #[cfg_attr(feature = "variant_asan", ignore)]
+    #[cfg_attr(feature = "variant_hwasan", ignore)]
+    async fn test_injected_library(do_inject: bool) {
+        let (_runtime_dir, runtime_dir_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let start_info = library_loader_startinfo(runtime_dir_server);
+
+        // Depending on what helper library variant is loaded, the exit code
+        // will be different.
+        let (injected_bundles, expected_exit_code) = if do_inject {
+            // Serve "library-loader-helper-alt.so" in place of the
+            // "library-loader-helper.so" that the ELF program depends on.
+            (
+                vec![InjectedBundle {
+                    components: vec![cm_config::AllowlistEntryBuilder::new()
+                        .exact("foo")
+                        .exact("bar")
+                        .build()],
+                    libraries: vec![InjectedLibrary {
+                        target_name: "library-loader-helper.so".to_string(),
+                        file_path: "/pkg/lib/library-loader-helper-alt.so".to_string(),
+                    }],
+                }],
+                43,
+            )
+        } else {
+            (vec![], 42)
+        };
+
+        let runner = new_elf_runner_for_test(injected_bundles);
+        let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
+            Arc::new(SecurityPolicy::default()),
+            Moniker::try_from("foo/bar").unwrap(),
+        ));
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
+        runner.start(start_info, server_controller).await;
+
+        let mut event_stream = controller.take_event_stream();
+        expect_diagnostics_event(&mut event_stream).await;
+        let s = zx::Status::from_raw(
+            i32::try_from(fcomp::Error::InstanceDied.into_primitive()).unwrap(),
+        );
+        expect_on_stop(&mut event_stream, s, Some(expected_exit_code)).await;
         expect_channel_closed(&mut event_stream).await;
     }
 }

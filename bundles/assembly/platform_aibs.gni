@@ -464,6 +464,7 @@ eng_only_platform_aib_names =
 
       # Memory profiling
       "heapdump_global_collector",
+      "heapdump_injectable_library",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names

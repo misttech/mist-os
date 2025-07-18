@@ -243,11 +243,27 @@ impl BuiltinEnvironmentBuilder {
             .as_ref()
             .ok_or_else(|| format_err!("Runtime config should be set to add builtin runner."))?;
 
+        let mut injected_bundles = Vec::new();
+        for injected_bundle in &runtime_config.inject {
+            let mut libraries = Vec::new();
+            for library in &injected_bundle.library {
+                libraries.push(elf_runner::InjectedLibrary {
+                    target_name: library.target_name.clone(),
+                    file_path: format!("/boot/{}", &library.bootfs_file_name),
+                });
+            }
+            injected_bundles.push(elf_runner::InjectedBundle {
+                components: injected_bundle.components.clone(),
+                libraries,
+            });
+        }
+
         let elf_runner_resources = ElfRunnerResources {
             security_policy: runtime_config.security_policy.clone(),
             utc_clock: self.utc_clock.clone(),
             crash_records: self.crash_records.clone(),
             instance_registry: self.instance_registry.clone(),
+            injected_bundles: Arc::new(injected_bundles),
         };
         let program = BuiltinRunner::get_elf_program(Arc::new(elf_runner_resources));
         self.add_builtin_runner("builtin_elf_runner", program, add_to_env)

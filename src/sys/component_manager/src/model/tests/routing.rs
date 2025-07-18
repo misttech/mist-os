@@ -3892,6 +3892,7 @@ async fn injected_capability(test_shadowing: bool) {
                 source_name: "foo".parse().unwrap(),
                 target_path: "/svc/foo".parse().unwrap(),
             })],
+            library: vec![],
         })
         .build()
         .await;
