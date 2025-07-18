@@ -574,6 +574,13 @@
             from: "parent",
             to: "#session",
         },
+
+        // Proprietary TEE manager's session capabilitites.
+        {
+            dictionary: "tee_session",
+            from: "parent",
+            to: "#session",
+        },
     ],
     expose: [
         // Served by session_manager.
