@@ -20,7 +20,7 @@ use crate::peer::ag_indicators::{
     NetworkInformationIndicator,
 };
 use crate::peer::at_connection::{self, Response as AtResponse};
-use crate::peer::calls::Calls;
+use crate::peer::calls::{CallOutput, Calls};
 use crate::peer::indicated_state::IndicatedState;
 use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
 use crate::peer::procedure_manager::ProcedureManager;
@@ -154,17 +154,15 @@ impl PeerTask {
                         self.handle_procedure_output(procedure_output).await?;
                     }
                 }
-                call_procedure_input_result_option = self.calls.next() => {
-                    info!("Received call procedure input {:?} for peer {:}", call_procedure_input_result_option, self.peer_id);
+                call_output_option = self.calls.next() => {
+                    info!("Received call output {:?} for peer {:}", call_output_option, self.peer_id);
 
                     drop(sco_state);
 
-                    let call_procedure_input_result =
-                        call_procedure_input_result_option
+                    let call_output =
+                        call_output_option
                             .ok_or_else(|| format_err!("Calls stream closed for peer {:}", self.peer_id))?;
-                    let call_procedure_input = call_procedure_input_result?;
-
-                    self.procedure_manager.enqueue(call_procedure_input)
+                    self.handle_call_output(call_output);
                 }
                 sco_connection_result = sco_state.on_connected() => {
                     info!("Received SCO connection for peer {:}", self.peer_id);
@@ -381,6 +379,17 @@ impl PeerTask {
         Ok(())
     }
 
+    fn handle_call_output(&mut self, call_output: CallOutput) {
+        match call_output {
+            CallOutput::ProcedureInput(call_procedure_input) => {
+                self.procedure_manager.enqueue(call_procedure_input)
+            }
+            CallOutput::TransferCallToAg => {
+                self.close_sco();
+            }
+        }
+    }
+
     async fn handle_sco_connection(&mut self, sco_connection: sco::Connection) -> Result<()> {
         self.calls.set_sco_connected(true);
 
@@ -441,6 +450,12 @@ impl PeerTask {
 
     fn start_audio_connection(&mut self) {
         self.enqueue_command_from_hf(CommandFromHf::StartAudioConnection);
+    }
+
+    fn close_sco(&mut self) {
+        // Drop SCO connection before awaiting a new one.
+        self.sco_state.iset(sco::State::Inactive);
+        self.await_remote_sco();
     }
 
     fn get_selected_codec(&self) -> CodecId {
