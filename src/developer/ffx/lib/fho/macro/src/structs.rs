@@ -7,7 +7,7 @@ use crate::types::{FromEnvAttributes, NamedField, NamedFieldTy};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
-use syn::ExprCall;
+use syn::{ExprCall, Ident};
 
 /// Creates the top-level struct declaration before any brackets are used.
 ///
@@ -176,12 +176,17 @@ impl ToTokens for CheckCollection {
     }
 }
 
+enum TargetConnection {
+    Direct,
+    None,
+    Default,
+}
 pub struct NamedFieldStruct<'a> {
     command_field_decl: CommandFieldTypeDecl<'a>,
     struct_decl: StructDecl<'a>,
     checks: CheckCollection,
     vcc: VariableCreationCollection<'a>,
-    pub requires_target: bool,
+    connection: TargetConnection,
 }
 
 fn extract_command_field<'a>(
@@ -195,6 +200,42 @@ fn extract_command_field<'a>(
     Ok(f)
 }
 
+fn parse_target_connection(parent_ast: &syn::DeriveInput) -> Result<TargetConnection, ParseError> {
+    let mut state = TargetConnection::Default;
+    let mut found = false;
+    for attr in &parent_ast.attrs {
+        if attr.path().is_ident("target") {
+            if found {
+                return Err(ParseError::InvalidTargetAttr(
+                    attr.span(),
+                    "Only one #[target] attribute is allowed".into(),
+                ));
+            }
+            found = true;
+            let ident: Ident = match attr.parse_args() {
+                Ok(ident) => ident,
+                Err(e) => {
+                    return Err(ParseError::InvalidTargetAttr(
+                        attr.span(),
+                        format!("Invalid #[target] argument: {e}"),
+                    ))
+                }
+            };
+            match ident.to_string().as_str() {
+                "direct" => state = TargetConnection::Direct,
+                "None" => state = TargetConnection::None,
+                _ => {
+                    return Err(ParseError::InvalidTargetAttr(
+                        ident.span(),
+                        "Expected `direct` or `None`".into(),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(state)
+}
+
 impl<'a> NamedFieldStruct<'a> {
     pub fn new(
         parent_ast: &'a syn::DeriveInput,
@@ -205,26 +246,33 @@ impl<'a> NamedFieldStruct<'a> {
         let command_field_decl = CommandFieldTypeDecl(extract_command_field(&mut fields)?);
         let struct_decl = StructDecl(&parent_ast);
         let attrs = FromEnvAttributes::from_attrs(&parent_ast.attrs)?;
-        let no_target_attr = "no_target".to_string();
-        let requires_target = !(parent_ast
-            .attrs
-            .iter()
-            .any(|a| crate::types::attr_name(a).is_ok_and(|aname| aname == no_target_attr)));
+        let connection = parse_target_connection(parent_ast)?;
         let checks = CheckCollection(attrs.checks);
         let mut vcc = VariableCreationCollection::new();
         for field in fields.into_iter() {
             vcc.add_field(field)?;
         }
-        Ok(Self { command_field_decl, struct_decl, checks, vcc, requires_target })
+        Ok(Self { command_field_decl, struct_decl, checks, vcc, connection })
     }
 }
 
 impl ToTokens for NamedFieldStruct<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Self { command_field_decl, struct_decl, checks, vcc, requires_target } = self;
+        let Self { command_field_decl, struct_decl, checks, vcc, connection } = self;
+        let requires_target = !matches!(connection, TargetConnection::None);
         let command_field_name = command_field_decl.0.field_name;
         let join_results_names = &vcc.join_results_names;
         let span = Span::call_site();
+        let connection_initialization = match connection {
+            TargetConnection::None | TargetConnection::Default => quote! {},
+            TargetConnection::Direct => quote! {
+                {
+                    let target_env = ffx_target::fho::target_interface(&_env);
+                    let b = target_holders::init_direct_connection_behavior(_env.environment_context()).await?;
+                    target_env.set_behavior(b)?;
+                }
+            },
+        };
         let res = quote_spanned! {span=>
             #struct_decl {
                 #command_field_decl
@@ -239,6 +287,8 @@ impl ToTokens for NamedFieldStruct<'_> {
                     use fho::TryFromEnv;
 
                     #checks
+
+                    #connection_initialization
 
                     #vcc
 
@@ -360,7 +410,7 @@ mod tests {
         let ast = parse_macro_derive(
             r#"
             #[derive(FfxTool)]
-            #[no_target]
+            #[target(None)]
             struct Foo {
                 #[command]
                 bar: bool,
@@ -372,7 +422,27 @@ mod tests {
             unreachable!();
         };
         let nfs = NamedFieldStruct::new(&ast, &fields).unwrap();
-        assert!(!nfs.requires_target);
+        assert!(matches!(nfs.connection, TargetConnection::None));
+    }
+
+    #[test]
+    fn test_direct_target() {
+        let ast = parse_macro_derive(
+            r#"
+            #[derive(FfxTool)]
+            #[target(direct)]
+            struct Foo {
+                #[command]
+                bar: bool,
+            }
+            "#,
+        );
+        let ds = crate::extract_struct_info(&ast).unwrap();
+        let syn::Fields::Named(fields) = &ds.fields else {
+            unreachable!();
+        };
+        let nfs = NamedFieldStruct::new(&ast, &fields).unwrap();
+        assert!(matches!(nfs.connection, TargetConnection::Direct));
     }
 
     #[test]
@@ -391,6 +461,6 @@ mod tests {
             unreachable!();
         };
         let nfs = NamedFieldStruct::new(&ast, &fields).unwrap();
-        assert!(nfs.requires_target);
+        assert!(matches!(nfs.connection, TargetConnection::Default));
     }
 }

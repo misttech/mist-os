@@ -31,7 +31,7 @@ fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
 }
 
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct ListTool {
     #[command]
     cmd: ListCommand,

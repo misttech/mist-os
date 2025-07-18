@@ -70,7 +70,7 @@ Using address {} as node name",
 }
 
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct FlashTool {
     #[command]
     cmd: FlashCommand,

@@ -33,6 +33,16 @@ pub use target_proxy::TargetProxyHolder;
 
 const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Explicitly create direct connection behavior
+pub async fn init_direct_connection_behavior(
+    context: &EnvironmentContext,
+) -> Result<FhoConnectionBehavior> {
+    log::info!("Initializing FhoConnectionBehavior::DirectConnector");
+    let connector =
+        NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(context).await?;
+    Ok(FhoConnectionBehavior::DirectConnector(Arc::new(connector)))
+}
+
 pub async fn init_connection_behavior(
     context: &EnvironmentContext,
 ) -> Result<FhoConnectionBehavior> {

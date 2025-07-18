@@ -120,7 +120,7 @@ impl EngineOperations for EngineOperationsData {
 
 /// Sub-sub tool for `emu start`
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct EmuStartTool<T: EngineOperations> {
     #[command]
     cmd: StartCommand,

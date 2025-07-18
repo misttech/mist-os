@@ -22,7 +22,7 @@ use std::io::{stdin, stdout};
 use std::path::Path;
 
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct PbDownloadTool {
     #[command]
     cmd: DownloadCommand,

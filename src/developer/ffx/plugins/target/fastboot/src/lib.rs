@@ -32,7 +32,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct FastbootTool {
     #[command]
     cmd: FastbootCommand,

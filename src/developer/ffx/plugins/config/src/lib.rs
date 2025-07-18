@@ -24,7 +24,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct ConfigTool {
     #[command]
     config: ConfigCommand,

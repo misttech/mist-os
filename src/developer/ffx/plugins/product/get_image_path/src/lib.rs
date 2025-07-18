@@ -31,7 +31,7 @@ pub enum CommandStatus {
 
 /// This plugin will get the path of image from the product bundle, based on the slot and image_type passed in.
 #[derive(FfxTool)]
-#[no_target]
+#[target(None)]
 pub struct PbGetImagePathTool {
     #[command]
     pub cmd: GetImagePathCommand,
