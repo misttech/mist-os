@@ -28,6 +28,7 @@ mod ag_indicators;
 mod at_connection;
 mod calls;
 mod hf_indicators;
+mod indicated_state;
 mod parse_cind_test;
 mod peer_task;
 mod procedure;

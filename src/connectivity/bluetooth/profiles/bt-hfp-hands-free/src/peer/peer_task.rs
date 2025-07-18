@@ -15,9 +15,13 @@ use vigil::{DropWatch, Vigil};
 use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync};
 
 use crate::config::HandsFreeFeatureSupport;
-use crate::peer::ag_indicators::{AgIndicator, AgIndicatorTranslator, CallIndicator};
+use crate::peer::ag_indicators::{
+    AgIndicator, AgIndicatorTranslator, BatteryChargeIndicator, CallIndicator,
+    NetworkInformationIndicator,
+};
 use crate::peer::at_connection::{self, Response as AtResponse};
 use crate::peer::calls::Calls;
+use crate::peer::indicated_state::IndicatedState;
 use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
 use crate::peer::procedure_manager::ProcedureManager;
 
@@ -29,6 +33,7 @@ pub struct PeerTask {
     peer_handler_request_stream: fidl_hfp::PeerHandlerRequestStream,
     at_connection: at_connection::Connection,
     ag_indicator_translator: AgIndicatorTranslator,
+    indicated_state: IndicatedState,
     calls: Calls,
     sco_connector: sco::Connector,
     sco_state: sco::InspectableState,
@@ -49,6 +54,7 @@ impl PeerTask {
         let at_connection = at_connection::Connection::new(peer_id, rfcomm);
         let calls = Calls::new(peer_id);
         let ag_indicator_translator = AgIndicatorTranslator::new();
+        let indicated_state = IndicatedState::default();
         let sco_state = sco::InspectableState::default();
         let a2dp_control = a2dp::Control::connect();
 
@@ -58,6 +64,7 @@ impl PeerTask {
             peer_handler_request_stream,
             at_connection,
             ag_indicator_translator,
+            indicated_state,
             calls,
             sco_connector,
             sco_state,
@@ -223,6 +230,11 @@ impl PeerTask {
                 // TODO(b/321278917) Clean up this control flow.
                 return;
             }
+            fidl_hfp::PeerHandlerRequest::WatchNetworkInformation { responder } => {
+                self.indicated_state.handle_watch_network_information(responder);
+                // TODO(b/321278917) Clean up this control flow.
+                return;
+            }
             other => {
                 error!(
                     "Unimplemented PeerHandler FIDL request {:?} for peer {:}",
@@ -285,10 +297,25 @@ impl PeerTask {
             AgIndicator::Call(call_indicator) => {
                 self.calls.set_call_state_by_indicator(call_indicator)
             }
-            // TODO(https://fxbug.dev/131814) Handle NetworkInformation indicators.
-            // TODO(https://fxbug.dev/131815) Handle BatteryCharge indicators.
-            _ => {
-                error!("Handling indicator {:?} unimplemented.", indicator);
+            AgIndicator::NetworkInformation(network_indicator) => {
+                self.handle_network_information_indicator(network_indicator)
+            }
+            AgIndicator::BatteryCharge(BatteryChargeIndicator { percent }) => {
+                self.indicated_state.set_ag_battery_level(percent)
+            }
+        }
+    }
+
+    fn handle_network_information_indicator(&mut self, indicator: NetworkInformationIndicator) {
+        match indicator {
+            NetworkInformationIndicator::ServiceAvailable(service) => {
+                self.indicated_state.set_service_available(service)
+            }
+            NetworkInformationIndicator::SignalStrength(signal) => {
+                self.indicated_state.set_signal_strength(signal)
+            }
+            NetworkInformationIndicator::Roaming(roaming) => {
+                self.indicated_state.set_roaming(roaming)
             }
         }
     }
@@ -313,7 +340,7 @@ impl PeerTask {
         Ok(())
     }
 
-    fn set_initial_ag_indicator_values(&self, ordered_values: Vec<i64>) -> Result<()> {
+    fn set_initial_ag_indicator_values(&mut self, ordered_values: Vec<i64>) -> Result<()> {
         // Indices are 1-indexed.
         let indices_and_values = std::iter::zip(1i64.., ordered_values.into_iter());
 
@@ -350,16 +377,17 @@ impl PeerTask {
                 }
                 AgIndicator::Call(_) => { // Nothing to do
                 }
-                AgIndicator::NetworkInformation(_) => {
-                    // TODO(https://fxbug.dev/131814) Set initial NetworkInformation indicator value from
-                    // SetInitialIndicatorValues procedure output.
+                AgIndicator::NetworkInformation(network_indicator) => {
+                    self.handle_network_information_indicator(network_indicator);
                 }
-                AgIndicator::BatteryCharge(_) => {
-                    // TODO(https://fxbug.dev/131815) Set initial BatteryCharge indicator value from
-                    // SetInitialIndicatorValues procedure output.
+                AgIndicator::BatteryCharge(BatteryChargeIndicator { percent }) => {
+                    self.indicated_state.set_ag_battery_level(percent)
                 }
             }
         }
+
+        self.indicated_state.initial_indicators_set();
+
         Ok(())
     }
 

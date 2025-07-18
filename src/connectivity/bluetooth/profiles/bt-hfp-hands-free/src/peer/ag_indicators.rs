@@ -159,7 +159,7 @@ impl NetworkInformationIndicator {
 /// expects a percentage.
 #[derive(Debug, PartialEq)]
 pub struct BatteryChargeIndicator {
-    percent: i64,
+    pub percent: i64,
 }
 
 impl TryFrom<i64> for BatteryChargeIndicator {
