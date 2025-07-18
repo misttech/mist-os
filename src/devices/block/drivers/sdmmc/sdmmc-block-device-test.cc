@@ -2419,6 +2419,83 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   EXPECT_FALSE(power_suspended->value());
 }
 
+TEST_P(SdmmcBlockDeviceTest, PowerOffNotification) {
+  libsync::Completion sleep_complete;
+  uint8_t power_off_notification = 0;
+  sdmmc_.set_command_callback(MMC_SWITCH, [&](const sdmmc_req_t& req, uint32_t out_response[4]) {
+    const uint8_t index = (req.arg >> 16) & 0xff;
+    if (index == MMC_EXT_CSD_POWER_OFF_NOTIFICATION) {
+      power_off_notification = (req.arg >> 8) & 0xff;
+    }
+  });
+  bool in_sleep_state = false;
+  sdmmc_.set_command_callback(MMC_SLEEP_AWAKE,
+                              [&](const sdmmc_req_t& req, uint32_t out_response[4]) {
+                                in_sleep_state = (req.arg >> 15) & 0x1;
+                                if (in_sleep_state) {
+                                  out_response[0] |= MMC_STATUS_CURRENT_STATE_STBY;
+                                  sleep_complete.Signal();
+                                } else {
+                                  out_response[0] |= MMC_STATUS_CURRENT_STATE_SLP;
+                                }
+                              });
+
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/true));
+
+  // POWERED_ON should be set by default after probe.
+  EXPECT_EQ(power_off_notification, MMC_EXT_CSD_POWERED_ON);
+
+  EXPECT_TRUE(incoming_.SyncCall([](IncomingNamespace* incoming) {
+    return incoming->cpu_element_manager.execution_state_dependency_added();
+  }));
+
+  fidl::ServerEnd lease_control_server_end = incoming_.SyncCall([](IncomingNamespace* incoming) {
+    return incoming->power_broker.hardware_power_lessor_->TakeLeaseControlServerEnd();
+  });
+  ASSERT_TRUE(lease_control_server_end.is_valid());
+
+  // Move to the ON state so that the transition to OFF can be made after.
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_element_runner_client_
+        ->SetLevel(SdmmcBlockDevice::kPowerLevelOn)
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
+  });
+
+  runtime_.PerformBlockingWork([lease_control_server_end = std::move(lease_control_server_end)] {
+    zx_status_t status;
+    zx_signals_t observed;
+    do {
+      status = lease_control_server_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                           zx::time::infinite_past(), &observed);
+    } while (status != ZX_OK || !(observed & ZX_CHANNEL_PEER_CLOSED));
+  });
+
+  EXPECT_FALSE(in_sleep_state);
+
+  // Transition to off, then Call PrepareStop().
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_element_runner_client_
+        ->SetLevel(SdmmcBlockDevice::kPowerLevelOff)
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
+  });
+  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
+  EXPECT_TRUE(in_sleep_state);
+
+  EXPECT_OK(runtime_.RunToCompletion(dut_.PrepareStop()));
+
+  // The device should have been moved back to TRAN, and a power off notification should have been
+  // sent.
+  EXPECT_FALSE(in_sleep_state);
+  EXPECT_EQ(power_off_notification, MMC_EXT_CSD_POWER_OFF_LONG);
+
+  EXPECT_OK(dut_.Stop());
+  block_device_ = nullptr;
+}
+
 TEST_P(SdmmcBlockDeviceTest, BlockServer) {
   ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/false));
 

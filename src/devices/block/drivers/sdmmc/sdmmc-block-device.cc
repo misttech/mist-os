@@ -462,6 +462,29 @@ void SdmmcBlockDevice::StopWorkerDispatcher(std::optional<fdf::PrepareStopComple
   }
 }
 
+void SdmmcBlockDevice::SendPowerOffNotification() {
+  if (is_sd_ || !parent_->config().storage_power_management_enabled()) {
+    return;
+  }
+
+  fbl::AutoLock worker_lock(&worker_lock_);
+  if (power_suspended_ && vccq_off_with_controller_off_) {
+    // We don't need to send a power off notification if the device is already off.
+    return;
+  }
+
+  // Move the device back to TRAN so we can send the power off notification.
+  if (power_suspended_ && ResumePower() != ZX_OK) {
+    return;
+  }
+
+  zx_status_t status = MmcDoSwitch(MMC_EXT_CSD_POWER_OFF_NOTIFICATION, MMC_EXT_CSD_POWER_OFF_LONG);
+  if (status != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to send power off notification: %s",
+             zx_status_get_string(status));
+  }
+}
+
 template <typename Request>
 zx_status_t SdmmcBlockDevice::ReadWriteWithRetries(std::vector<Request>& requests,
                                                    const EmmcPartition partition) {
@@ -1128,8 +1151,13 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
   }
 
   if (vccq_off_with_controller_off_) {
-    // TODO(388815124): We can't use the sleep state in this case, send a power off notification
-    // instead.
+    if (zx_status_t status =
+            MmcDoSwitch(MMC_EXT_CSD_POWER_OFF_NOTIFICATION, MMC_EXT_CSD_POWER_OFF_SHORT);
+        status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to send power off notification: %s",
+               zx_status_get_string(status));
+      return status;
+    }
   } else {
     if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
       FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",

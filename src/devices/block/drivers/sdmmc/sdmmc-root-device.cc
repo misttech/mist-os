@@ -58,6 +58,7 @@ void SdmmcRootDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
   const auto* block_device = std::get_if<std::unique_ptr<SdmmcBlockDevice>>(&child_device_);
   if (block_device) {
     block_device->get()->StopWorkerDispatcher(std::move(completer));
+    block_device->get()->SendPowerOffNotification();
     return;
   }
 

@@ -143,6 +143,7 @@ class SdmmcBlockDevice : public fidl::Server<fuchsia_power_broker::ElementRunner
 
   void StopWorkerDispatcher(std::optional<fdf::PrepareStopCompleter> completer = std::nullopt)
       TA_EXCL(queue_lock_);
+  void SendPowerOffNotification();
 
   zx_status_t SuspendPower() TA_REQ(worker_lock_);
   zx_status_t ResumePower() TA_REQ(worker_lock_);
