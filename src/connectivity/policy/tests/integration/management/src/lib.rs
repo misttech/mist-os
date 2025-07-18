@@ -61,7 +61,9 @@ use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::parse_ip_packet;
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6 as dhcpv6;
-use policy_testing_common::{with_netcfg_owned_device, NetcfgOwnedDeviceArgs};
+use policy_testing_common::{
+    add_device_to_devfs, verify_interface_added, with_netcfg_owned_device, NetcfgOwnedDeviceArgs,
+};
 use test_case::test_case;
 
 /// Test that NetCfg discovers a newly added device and it adds the device
@@ -201,41 +203,20 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         port_class: fhardware_network::PortClass,
     ) -> (netemul::TestEndpoint<'a>, SocketAddr) {
         // Install a new device via devfs so netcfg can pick it up and install filtering rules.
-        let ep = network
-            .create_endpoint_with(
-                format!("{name}-eth-ep"),
-                fnetemul_network::EndpointConfig {
-                    mtu: netemul::DEFAULT_MTU,
-                    mac: None,
-                    port_class,
-                },
-            )
-            .await
-            .expect("create endpoint");
-        ep.set_link_up(true).await.expect("set link up");
-        let endpoint_mount_path = netemul::devfs_device_path(format!("{name}-eth-ep").as_str());
-        let endpoint_mount_path = endpoint_mount_path.as_path();
-
-        realm.add_virtual_device(&ep, endpoint_mount_path).await.unwrap_or_else(|e| {
-            panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
-        });
+        let ep = add_device_to_devfs::<M>(
+            network,
+            realm,
+            name,
+            Some(fnetemul_network::EndpointConfig {
+                mtu: netemul::DEFAULT_MTU,
+                mac: None,
+                port_class,
+            }),
+        )
+        .await;
 
         // Make sure the Netstack got the new device added.
-        let interface_state = realm
-            .connect_to_protocol::<fnet_interfaces::StateMarker>()
-            .expect("connect to fuchsia.net.interfaces/State service");
-        let wait_for_netmgr =
-            wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None)
-                .fuse();
-        let mut wait_for_netmgr = pin!(wait_for_netmgr);
-        let (if_id, _if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
-            &interface_state,
-            &mut wait_for_netmgr,
-            None,
-            ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
-        )
-        .await
-        .expect("wait for non loopback interface");
+        let (interface_state, if_id, _if_name) = verify_interface_added::<M>(&realm).await;
 
         // Get the link local address for the interface.
         let link_local_addr = interfaces::wait_for_v6_ll(&interface_state, if_id)

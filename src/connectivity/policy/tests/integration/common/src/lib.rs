@@ -4,13 +4,17 @@
 
 use std::pin::pin;
 
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use futures::future::{FutureExt as _, LocalBoxFuture};
+use netemul::{TestEndpoint, TestNetwork, TestRealm};
 use netstack_testing_common::realms::{
     KnownServiceProvider, Manager, ManagerConfig, Netstack, TestSandboxExt,
 };
 use netstack_testing_common::{
     interfaces, wait_for_component_stopped, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
+use {
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_netemul_network as fnetemul_network,
 };
 
 #[derive(Default)]
@@ -79,15 +83,56 @@ pub async fn with_netcfg_owned_device<
 
     // Add a device to the realm.
     let network = sandbox.create_network(name).await.expect("create network");
-    let endpoint = network.create_endpoint(name).await.expect("create endpoint");
+    let _endpoint = add_device_to_devfs::<M>(&network, &realm, name.to_string(), None).await;
+
+    // Make sure the Netstack got the new device added.
+    let (interface_state, if_id, if_name) = verify_interface_added::<M>(&realm).await;
+
+    after_interface_up(if_id, &network, &interface_state, &realm, &sandbox).await;
+
+    // Wait for orderly shutdown of the test realm to complete before allowing
+    // test interfaces to be cleaned up.
+    //
+    // This is necessary to prevent test interfaces from being removed while
+    // NetCfg is still in the process of configuring them after adding them to
+    // the Netstack, which causes spurious errors.
+    realm.shutdown().await.expect("failed to shutdown realm");
+
+    if_name
+}
+
+/// Add a device into devfs to be fully managed by netcfg. Netcfg will discover
+/// and install the device into the Netstack. We cannot assume that netcfg has
+/// observed and installed the device as a result of this function, that
+/// condition must be observed via the interfaces watcher.
+///
+/// Returns the new endpoint that was added to the realm.
+pub async fn add_device_to_devfs<'a, M: Manager>(
+    network: &'a TestNetwork<'a>,
+    realm: &'a TestRealm<'a>,
+    name: String,
+    endpoint_config: Option<fnetemul_network::EndpointConfig>,
+) -> TestEndpoint<'a> {
+    let endpoint = match endpoint_config {
+        Some(config) => network.create_endpoint_with(name, config).await,
+        None => network.create_endpoint(name).await,
+    }
+    .expect("create endpoint");
     endpoint.set_link_up(true).await.expect("set link up");
     let endpoint_mount_path = netemul::devfs_device_path("ep");
     let endpoint_mount_path = endpoint_mount_path.as_path();
     realm.add_virtual_device(&endpoint, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
     });
+    endpoint
+}
 
-    // Make sure the Netstack got the new device added.
+/// Observe a new non-loopback interface via Netstack's interface watcher.
+///
+/// Returns the interface state proxy and the interface's id and name.
+pub async fn verify_interface_added<'a, M: Manager>(
+    realm: &'a TestRealm<'a>,
+) -> (fnet_interfaces::StateProxy, u64, String) {
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("connect to fuchsia.net.interfaces/State service");
@@ -102,16 +147,5 @@ pub async fn with_netcfg_owned_device<
     )
     .await
     .expect("wait for non loopback interface");
-
-    after_interface_up(if_id, &network, &interface_state, &realm, &sandbox).await;
-
-    // Wait for orderly shutdown of the test realm to complete before allowing
-    // test interfaces to be cleaned up.
-    //
-    // This is necessary to prevent test interfaces from being removed while
-    // NetCfg is still in the process of configuring them after adding them to
-    // the Netstack, which causes spurious errors.
-    realm.shutdown().await.expect("failed to shutdown realm");
-
-    if_name
+    (interface_state, if_id, if_name.clone())
 }
