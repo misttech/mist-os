@@ -33,7 +33,7 @@ impl TryFromEnv for TargetProxyHolder {
         let target_env = target_interface(env);
         if target_env.behavior().is_none() {
             let b = init_connection_behavior(env.environment_context()).await?;
-            target_env.set_behavior(b);
+            target_env.set_behavior(b)?;
         }
         match target_env.injector::<Self>(env).await?.target_factory().await.map_err(|e| {
             // This error case happens when there are multiple targets in target list.

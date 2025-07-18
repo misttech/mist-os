@@ -150,7 +150,9 @@ impl TestEnvironment {
             &["some", "test"],
         );
         let target_env = ffx_target::fho::target_interface(&fho_env);
-        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
+        target_env
+            .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .expect("set_behavior");
         Self { fho_env, state, event_rcv: Some(event_rcv), disconnect_snd: disconnect_snd }
     }
 

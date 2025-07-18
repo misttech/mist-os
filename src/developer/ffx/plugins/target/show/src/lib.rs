@@ -631,7 +631,8 @@ mod tests {
         let fho_env = FhoEnvironment::default();
         let target_env = ffx_target::fho::target_interface(&fho_env);
         target_env
-            .set_behavior(FhoConnectionBehavior::DirectConnector(setup_fake_direct_connector()));
+            .set_behavior(FhoConnectionBehavior::DirectConnector(setup_fake_direct_connector()))
+            .expect("set_behavior");
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
             fho_env,

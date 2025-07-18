@@ -53,7 +53,7 @@ impl TryFromEnv for DaemonProxyHolder {
         let target_env = target_interface(env);
         if target_env.behavior().is_none() {
             let b = init_daemon_connection_behavior(env.environment_context()).await?;
-            target_env.set_behavior(b);
+            target_env.set_behavior(b)?;
         }
         // Might need to revisit whether it's necessary to cast every daemon_factory() invocation
         // into a user error. This line originally casted every error into "Failed to create daemon

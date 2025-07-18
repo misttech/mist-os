@@ -756,7 +756,9 @@ mod tests {
 
         let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
         let target_env = ffx_target::fho::target_interface(&fho_env);
-        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
+        target_env
+            .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .expect("set_behavior");
 
         let tool = UpdateTool {
             cmd: Update {
@@ -849,7 +851,9 @@ mod tests {
 
         let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
         let target_env = ffx_target::fho::target_interface(&fho_env);
-        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
+        target_env
+            .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .expect("set_behavior");
 
         let tool = UpdateTool {
             cmd: Update { cmd: args::Command::ForceInstall(args.clone()) },

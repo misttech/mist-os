@@ -41,7 +41,7 @@ impl TryFromEnv for RemoteControlProxyHolder {
             behavior
         } else {
             let b = init_connection_behavior(env.environment_context()).await?;
-            target_env.set_behavior(b.clone());
+            target_env.set_behavior(b.clone())?;
             b
         };
         match behavior {
