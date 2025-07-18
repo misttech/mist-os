@@ -29,6 +29,7 @@ use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
 use std::pin::pin;
 use test_case::{test_case, test_matrix};
+use zx::HandleBased as _;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
@@ -1448,9 +1449,7 @@ async fn unauthenticated_connections_cannot_remove_routes<
 #[variant(I, Ip)]
 async fn main_table_remove<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let route_table = realm
         .connect_to_protocol::<I::RouteTableMarker>()
         .expect("connect to routes-admin RouteTable");
@@ -1466,9 +1465,7 @@ async fn main_table_remove<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>
 #[variant(N, Netstack)]
 async fn unique_main_table_id<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let main_table_v4 = realm
         .connect_to_protocol::<fnet_routes_admin::RouteTableV4Marker>()
         .expect("connect to routes-admin RouteTable");
@@ -1491,9 +1488,7 @@ async fn main_table_authorization<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Ne
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let route_table = realm
         .connect_to_protocol::<I::RouteTableMarker>()
         .expect("connect to routes-admin RouteTable");
@@ -1516,9 +1511,7 @@ async fn route_table_provider_netstack2_closes_channel<I: FidlRouteAdminIpExt + 
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
     let route_table_provider = realm
         .connect_to_protocol::<I::RouteTableProviderMarker>()
         .expect("connect to route table provider");
@@ -1535,9 +1528,7 @@ async fn route_table_provider_netstack2_closes_channel<I: FidlRouteAdminIpExt + 
 async fn add_route_table<I: FidlRouteAdminIpExt + FidlRouteIpExt>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // We don't support multiple route tables in netstack2.
-    let realm = sandbox
-        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
     let main_route_table =
         realm.connect_to_protocol::<I::RouteTableMarker>().expect("connect to main route table");
     let route_table_provider = realm
@@ -1906,11 +1897,8 @@ async fn concurrent_route_table_and_route_set_removal<I: FidlRouteAdminIpExt + F
 #[variant(N, Netstack)]
 async fn del_forwarding_entry_matches_device<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
-    let network =
-        sandbox.create_network(format!("routes-admin-{name}")).await.expect("create network");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
     let if_1 = realm.join_network(&network, "ep1").await.expect("join network");
     let if_2 = realm.join_network(&network, "ep2").await.expect("join network");
 
@@ -1995,4 +1983,227 @@ async fn del_forwarding_entry_matches_device<N: Netstack>(name: &str) {
             next_hop: None,
         })
     );
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn default_no_interface_local_route_table<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let interface = realm.join_network(&network, "ep1").await.expect("join network");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to routes State");
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+        interface.get_authorization().await.expect("failed to get authorization");
+    // By default interface does not have a local route table.
+    assert_matches!(
+        fnet_routes_ext::admin::get_interface_local_table::<I>(
+            &route_table_provider,
+            fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                interface_id,
+                token: token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate"),
+            }
+        )
+        .await,
+        Ok(Err(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable))
+    );
+    // The interface does not exist.
+    assert_matches!(
+        fnet_routes_ext::admin::get_interface_local_table::<I>(
+            &route_table_provider,
+            fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id: 10000, token },
+        )
+        .await,
+        Ok(Err(fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication))
+    );
+    // The token is incorrect.
+    assert_matches!(
+        fnet_routes_ext::admin::get_interface_local_table::<I>(
+            &route_table_provider,
+            fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                interface_id,
+                token: zx::Event::create()
+            },
+        )
+        .await,
+        Ok(Err(fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication))
+    )
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn interface_local_route_table<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let interface = realm
+        .join_network_with_if_config(&network, "ep1", netemul::InterfaceConfig::use_local_table())
+        .await
+        .expect("join network");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to routes State");
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+        interface.get_authorization().await.expect("failed to get authorization");
+
+    let local_table = fnet_routes_ext::admin::get_interface_local_table::<I>(
+        &route_table_provider,
+        fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+    )
+    .await
+    .expect("calling interface local table")
+    .expect("failed to get interface local table");
+
+    let local_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&local_table).await.expect("get table id");
+
+    let route_set =
+        fnet_routes_ext::admin::new_route_set::<I>(&local_table).expect("new route set");
+
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+    let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
+    assert!(fnet_routes_ext::admin::add_route::<I>(
+        &route_set,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("add route"));
+
+    let state = realm.connect_to_protocol::<I::StateMarker>().expect("connect to state");
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("get event stream");
+    let mut routes_stream = pin!(routes_stream);
+
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+    assert!(routes.contains(&fnet_routes_ext::InstalledRoute {
+        route: route_to_add.clone(),
+        table_id: local_table_id,
+        effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: 100 }
+    }));
+
+    // The local table is not allowed to be removed.
+    assert_matches!(
+        fnet_routes_ext::admin::remove_route_table::<I>(&local_table).await,
+        Ok(Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOp))
+    );
+    drop(local_table);
+
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        !routes.iter().any(|installed_route| {
+            &installed_route.route == &route_to_add && installed_route.table_id == local_table_id
+        })
+    })
+    .map(Err)
+    .on_timeout(
+        fuchsia_async::MonotonicInstant::after(
+            netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+        ),
+        || Ok(()),
+    )
+    .await
+    .expect("routes should not be removed");
+
+    let (_endpoint, _device_control) = interface.remove().await.expect("failed to remove");
+
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        !routes.iter().any(|installed_route| {
+            &installed_route.route == &route_to_add && installed_route.table_id == local_table_id
+        })
+    })
+    .await
+    .expect("routes should be removed");
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn interface_local_route_table_outlasts_interface<
+    I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let if_1 = realm
+        .join_network_with_if_config(&network, "ep1", netemul::InterfaceConfig::use_local_table())
+        .await
+        .expect("join network");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to routes State");
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+        if_1.get_authorization().await.expect("failed to get authorization");
+
+    let local_table = fnet_routes_ext::admin::get_interface_local_table::<I>(
+        &route_table_provider,
+        fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+    )
+    .await
+    .expect("calling interface local table")
+    .expect("failed to get interface local table");
+
+    let local_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&local_table).await.expect("get table id");
+
+    let route_set =
+        fnet_routes_ext::admin::new_route_set::<I>(&local_table).expect("new route set");
+    drop(local_table);
+
+    let (endpoint, device_control) = if_1.remove().await.expect("failed to remove");
+    drop(endpoint);
+    let device_channel = device_control
+        .expect("must have the device control")
+        .into_channel()
+        .expect("failed to convert to channel");
+    let _signals = device_channel.on_closed().await.expect("failed to observe the close signal");
+
+    let if_2 = realm.join_network(&network, "ep2").await.expect("join network");
+
+    let grant = if_2.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
+    let route_to_add = test_route(&if_2, METRIC_TRACKS_INTERFACE);
+    assert!(fnet_routes_ext::admin::add_route::<I>(&route_set, &route_to_add.try_into().unwrap(),)
+        .await
+        .expect("no fidl error")
+        .expect("added the route"));
+
+    let state = realm.connect_to_protocol::<I::StateMarker>().expect("connect to state");
+    let routes_stream = fnet_routes_ext::event_stream_from_state_with_options::<I>(
+        &state,
+        fnet_routes_ext::WatcherOptions {
+            table_interest: Some(fnet_routes::TableInterest::Only(local_table_id.get())),
+        },
+    )
+    .expect("get event stream");
+    let mut routes_stream = pin!(routes_stream);
+
+    let routes = fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+        .await
+        .expect("collect routes should succeed");
+
+    let expected = std::iter::once(fnet_routes_ext::InstalledRoute {
+        route: route_to_add.clone(),
+        table_id: local_table_id,
+        effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: 100 },
+    })
+    .collect::<HashSet<_>>();
+    assert_eq!(expected, routes);
 }

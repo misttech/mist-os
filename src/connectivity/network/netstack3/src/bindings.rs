@@ -1122,7 +1122,10 @@ impl Netstack {
         );
 
         let loopback_info = LoopbackInfo {
-            static_common_info: StaticCommonInfo { authorization_token: zx::Event::create() },
+            static_common_info: StaticCommonInfo {
+                authorization_token: zx::Event::create(),
+                local_route_tables: None,
+            },
             dynamic_common_info: CoreRwLock::new(DynamicCommonInfo::new_for_loopback(
                 DEFAULT_LOOPBACK_MTU,
                 events,

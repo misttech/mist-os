@@ -25,6 +25,7 @@ use {
 };
 
 use crate::bindings::devices::StaticCommonInfo;
+use crate::bindings::routes::interface_local::LocalRouteTable;
 use crate::bindings::routes::witness::TableId;
 use crate::bindings::routes::{self, RouteWorkItem, WeakDeviceId};
 use crate::bindings::util::{ScopeExt as _, TryFromFidlWithContext};
@@ -67,14 +68,18 @@ pub(crate) async fn serve_route_set<
     }
 }
 
-pub(crate) fn spawn_user_route_set<
+/// Spawns a new task to handle the user route set and keep a value alive
+/// until finish serving the route set.
+pub(crate) fn spawn_user_route_set_and_keep_alive<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     F: FnOnce() -> UserRouteSet<I>,
+    K: Send + 'static,
 >(
     scope: &fasync::ScopeHandle,
     stream: I::RouteSetRequestStream,
     create_route_set: F,
     ctx: &Ctx,
+    keep_alive: K,
 ) {
     let Some(guard) = scope.active_guard() else {
         warn!("aborted serving user route set because scope is finished");
@@ -90,9 +95,62 @@ pub(crate) fn spawn_user_route_set<
         let result =
             serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, stop, &ctx).await;
         user_route_set.close().await;
-        std::mem::drop(guard);
+        std::mem::drop((guard, keep_alive));
         result
     });
+}
+
+pub(crate) fn spawn_user_route_set<
+    I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    F: FnOnce() -> UserRouteSet<I>,
+>(
+    scope: &fasync::ScopeHandle,
+    stream: I::RouteSetRequestStream,
+    create_route_set: F,
+    ctx: &Ctx,
+) {
+    spawn_user_route_set_and_keep_alive(scope, stream, create_route_set, ctx, ());
+}
+
+// This creates a new reference to the underlying local route table that
+// keeps the table alive.
+fn get_local_route_table<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(
+    ctx: &Ctx,
+    ProofOfInterfaceAuthorization { interface_id, token }: ProofOfInterfaceAuthorization,
+) -> Result<Arc<LocalRouteTable<I>>, fnet_routes_admin::GetInterfaceLocalTableError> {
+    let bindings_id = interface_id
+        .try_into()
+        .map_err(|_| fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication)?;
+
+    let core_id = ctx.bindings_ctx().devices.get_core_id(bindings_id).ok_or_else(|| {
+        warn!("authentication interface {bindings_id} does not exist");
+        fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication
+    })?;
+
+    let external_state = core_id.external_state();
+    let StaticCommonInfo { authorization_token: netstack_token, local_route_tables } =
+        external_state.static_common_info();
+
+    let netstack_koid = netstack_token
+        .basic_info()
+        .expect("failed to get basic info for netstack-owned token")
+        .koid;
+
+    let client_koid = token
+        .basic_info()
+        .map_err(|e| {
+            error!("failed to get basic info for client-provided token: {}", e);
+            fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication
+        })?
+        .koid;
+
+    if netstack_koid != client_koid {
+        return Err(fnet_routes_admin::GetInterfaceLocalTableError::InvalidAuthentication);
+    }
+    let local_tables = local_route_tables
+        .as_ref()
+        .ok_or(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable)?;
+    Ok(Arc::clone(local_tables.get::<I>()))
 }
 
 pub(crate) async fn serve_route_table_provider<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(
@@ -128,12 +186,23 @@ pub(crate) async fn serve_route_table_provider<I: Ip + FidlRouteIpExt + FidlRout
                 );
             }
             fnet_routes_ext::admin::RouteTableProviderRequest::GetInterfaceLocalTable {
-                credential: _,
+                credential,
                 responder,
-            } => {
-                responder
-                    .send(Err(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable))?;
-            }
+            } => match get_local_route_table(&ctx, credential) {
+                Ok(local_table) => {
+                    let (client_end, request_stream) =
+                        fidl::endpoints::create_request_stream::<I::RouteTableMarker>();
+                    let ctx = ctx.clone();
+                    fasync::Scope::current().spawn_request_stream_handler(
+                        request_stream,
+                        |stream| async move {
+                            serve_route_table::<I, _>(stream, local_table, &ctx).await
+                        },
+                    );
+                    responder.send(Ok(client_end))?;
+                }
+                Err(err) => responder.send(Err(err))?,
+            },
         }
     }
     Ok(())
@@ -689,7 +758,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
         })?;
 
         let external_state = core_id.external_state();
-        let StaticCommonInfo { authorization_token: netstack_token } =
+        let StaticCommonInfo { authorization_token: netstack_token, local_route_tables: _ } =
             external_state.static_common_info();
 
         let netstack_koid = netstack_token

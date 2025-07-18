@@ -6,7 +6,7 @@
 
 mod rules;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::pin::pin;
@@ -20,6 +20,7 @@ use fuchsia_async::TimeoutExt;
 use futures::{FutureExt, StreamExt};
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::SpecifiedAddr;
 use netemul::InterfaceConfig;
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::realms::{
@@ -27,11 +28,14 @@ use netstack_testing_common::realms::{
     TestRealmExt as _, TestSandboxExt as _,
 };
 use netstack_testing_macros::netstack_test;
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation, RouteInformation};
 use routes_common::{test_route, TestSetup};
+use test_case::test_case;
 
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
 use {
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx_status,
 };
@@ -1102,4 +1106,215 @@ async fn get_route_table_name<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(name
             routes.get_route_table_name(table_id.get()).await.expect("should not get FIDL error");
         assert_eq!(got, want);
     }
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn interface_local_route_table_initial_routes<
+    I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let interface = realm
+        .join_network_with_if_config(&network, "ep1", netemul::InterfaceConfig::use_local_table())
+        .await
+        .expect("join network");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to routes State");
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+        interface.get_authorization().await.expect("failed to get authorization");
+
+    let local_table = fnet_routes_ext::admin::get_interface_local_table::<I>(
+        &route_table_provider,
+        fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to get interface local table");
+
+    let local_table_id = fnet_routes_ext::admin::get_table_id::<I>(&local_table)
+        .await
+        .expect("failed to get table id")
+        .get();
+    let main_table_id = realm.main_table_id::<I>().await;
+    assert_ne!(local_table_id, main_table_id);
+
+    let state = realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect");
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    let mut routes_stream = pin!(routes_stream);
+    let got_routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct RoutesHolder<I: fnet_routes_ext::FidlRouteIpExt>(
+        HashSet<fnet_routes_ext::InstalledRoute<I>>,
+    );
+    let loopback_id = realm
+        .loopback_properties()
+        .await
+        .expect("failed to get loopback properties")
+        .expect("loopback properties unexpectedly None")
+        .id;
+    let RoutesHolder(expected_routes) = I::map_ip_out(
+        (loopback_id, interface_id),
+        |(loopback_id, interface_id)| {
+            RoutesHolder(
+                initial_loopback_routes_v4::<Netstack3>(loopback_id.get(), main_table_id)
+                    .chain(initial_ethernet_routes_v4(interface_id, local_table_id))
+                    .collect::<HashSet<_>>(),
+            )
+        },
+        |(loopback_id, interface_id)| {
+            RoutesHolder(
+                initial_loopback_routes_v6::<Netstack3>(loopback_id.get(), main_table_id)
+                    .chain(initial_ethernet_routes_v6(interface_id, local_table_id))
+                    .collect::<HashSet<_>>(),
+            )
+        },
+    );
+    assert_eq!(expected_routes, got_routes);
+}
+
+#[netstack_test]
+#[test_case(true; "prefix advertisement")]
+#[test_case(false; "route advertisement")]
+async fn interface_local_route_table_ndp_routes(name: &str, on_link_route: bool) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let (_network, realm, interface, fake_ep) =
+        netstack_testing_common::setup_network_with::<Netstack3, _>(
+            &sandbox,
+            name,
+            netemul::InterfaceConfig::use_local_table(),
+            std::iter::empty::<netstack_testing_common::realms::KnownServiceProvider>(),
+        )
+        .await
+        .expect("failed to set network");
+    let route_table_provider = realm
+        .connect_to_protocol::<<Ipv6 as FidlRouteAdminIpExt>::RouteTableProviderMarker>()
+        .expect("connect to routes State");
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+        interface.get_authorization().await.expect("failed to get authorization");
+
+    let local_table = fnet_routes_ext::admin::get_interface_local_table::<Ipv6>(
+        &route_table_provider,
+        fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to get interface local table");
+
+    let local_table_id = fnet_routes_ext::admin::get_table_id::<Ipv6>(&local_table)
+        .await
+        .expect("failed to get table id")
+        .get();
+
+    let state = realm
+        .connect_to_protocol::<<Ipv6 as FidlRouteIpExt>::StateMarker>()
+        .expect("failed to connect");
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<Ipv6>(&state).expect("should succeed");
+    let mut routes_stream = pin!(routes_stream);
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<Ipv6, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+    let options = if on_link_route {
+        [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+            netstack_testing_common::constants::ipv6::GLOBAL_PREFIX.prefix(),
+            true,
+            false,
+            9999,
+            9999,
+            netstack_testing_common::constants::ipv6::GLOBAL_PREFIX.network(),
+        ))]
+    } else {
+        [NdpOptionBuilder::RouteInformation(RouteInformation::new(
+            netstack_testing_common::constants::ipv6::GLOBAL_PREFIX,
+            9999,
+            Default::default(),
+        ))]
+    };
+
+    netstack_testing_common::ndp::send_ra_with_router_lifetime(
+        &fake_ep,
+        9999,
+        &options,
+        netstack_testing_common::constants::ipv6::LINK_LOCAL_ADDR,
+    )
+    .await
+    .expect("failed to send the RA");
+
+    let expected_routes = [
+        // The default route advertised by the RA.
+        fnet_routes_ext::InstalledRoute {
+            route: fnet_routes_ext::Route {
+                destination: net_types::ip::Subnet::new(
+                    net_types::ip::Ipv6::UNSPECIFIED_ADDRESS,
+                    0,
+                )
+                .unwrap(),
+                action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                    outbound_interface: interface.id(),
+                    next_hop: Some(
+                        SpecifiedAddr::new(
+                            netstack_testing_common::constants::ipv6::LINK_LOCAL_ADDR,
+                        )
+                        .expect("is specified"),
+                    ),
+                }),
+                properties: fnet_routes_ext::RouteProperties {
+                    specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                        metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                            fnet_routes::Empty,
+                        ),
+                    },
+                },
+            },
+            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
+                metric: DEFAULT_INTERFACE_METRIC,
+            },
+            table_id: fnet_routes_ext::TableId::new(local_table_id),
+        },
+        // The route advertised in the NDP option.
+        fnet_routes_ext::InstalledRoute {
+            route: fnet_routes_ext::Route {
+                destination: netstack_testing_common::constants::ipv6::GLOBAL_PREFIX,
+                action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                    outbound_interface: interface.id(),
+                    next_hop: (!on_link_route).then_some(
+                        SpecifiedAddr::new(
+                            netstack_testing_common::constants::ipv6::LINK_LOCAL_ADDR,
+                        )
+                        .expect("is specified"),
+                    ),
+                }),
+                properties: fnet_routes_ext::RouteProperties {
+                    specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                        metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                            fnet_routes::Empty,
+                        ),
+                    },
+                },
+            },
+            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
+                metric: DEFAULT_INTERFACE_METRIC,
+            },
+            table_id: fnet_routes_ext::TableId::new(local_table_id),
+        },
+    ];
+
+    fnet_routes_ext::wait_for_routes(&mut routes_stream, &mut routes, |routes| {
+        expected_routes.iter().all(|expected_route| routes.contains(expected_route))
+    })
+    .await
+    .expect("failed to wait for the NDP route to show up");
 }

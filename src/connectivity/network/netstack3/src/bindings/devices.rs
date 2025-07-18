@@ -33,6 +33,7 @@ use {
 };
 
 use crate::bindings::power::TransmitSuspensionHandler;
+use crate::bindings::routes::interface_local::LocalRouteTables;
 use crate::bindings::util::NeedsDataNotifier;
 use crate::bindings::{
     interfaces_admin, neighbor_worker, netdevice_worker, BindingsCtx, Ctx, InterfaceEventProducer,
@@ -553,11 +554,12 @@ pub(crate) async fn tx_task(
 pub(crate) struct StaticCommonInfo {
     #[derivative(Debug = "ignore")]
     pub(crate) authorization_token: zx::Event,
+    pub(crate) local_route_tables: Option<LocalRouteTables>,
 }
 
-impl Default for StaticCommonInfo {
-    fn default() -> StaticCommonInfo {
-        StaticCommonInfo { authorization_token: zx::Event::create() }
+impl StaticCommonInfo {
+    pub(crate) fn new(local_route_tables: Option<LocalRouteTables>) -> Self {
+        Self { authorization_token: zx::Event::create(), local_route_tables }
     }
 }
 

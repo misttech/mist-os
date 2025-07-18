@@ -468,6 +468,61 @@ where
 
 impl<E: std::fmt::Debug> std::error::Error for TerminalError<E> {}
 
+/// This can be provided on interface creation to appoint a route table into
+/// which netstack managed routes are installed.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetstackManagedRoutesDesignation {
+    /// The netstack managed routes are installed in the main table.
+    #[default]
+    Main,
+    /// The netstack managed routes are installed in an interface-local table.
+    ///
+    /// The interface creates local tables (one for each IP version). When the
+    /// interface is removed and all the outstanding `RouteTableV{4,6}` protocol
+    /// channels are closed, the local table is removed.
+    InterfaceLocal,
+}
+
+/// Unknown FIDL value for NetstackManagedRoutesDesignation.
+#[derive(Error, Debug)]
+#[error("unknown designation for netsack managed routes: {0}")]
+pub struct UnknownNetstackManagedRoutesDesignation(pub u64);
+
+impl TryFrom<fnet_interfaces_admin::NetstackManagedRoutesDesignation>
+    for NetstackManagedRoutesDesignation
+{
+    type Error = UnknownNetstackManagedRoutesDesignation;
+
+    fn try_from(
+        value: fnet_interfaces_admin::NetstackManagedRoutesDesignation,
+    ) -> Result<Self, Self::Error> {
+        match value {
+            fnet_interfaces_admin::NetstackManagedRoutesDesignation::Main(
+                fnet_interfaces_admin::Empty,
+            ) => Ok(Self::Main),
+            fnet_interfaces_admin::NetstackManagedRoutesDesignation::InterfaceLocal(
+                fnet_interfaces_admin::Empty,
+            ) => Ok(Self::InterfaceLocal),
+            fnet_interfaces_admin::NetstackManagedRoutesDesignation::__SourceBreaking {
+                unknown_ordinal,
+            } => Err(UnknownNetstackManagedRoutesDesignation(unknown_ordinal)),
+        }
+    }
+}
+
+impl From<NetstackManagedRoutesDesignation>
+    for fnet_interfaces_admin::NetstackManagedRoutesDesignation
+{
+    fn from(value: NetstackManagedRoutesDesignation) -> Self {
+        match value {
+            NetstackManagedRoutesDesignation::Main => Self::Main(fnet_interfaces_admin::Empty),
+            NetstackManagedRoutesDesignation::InterfaceLocal => {
+                Self::InterfaceLocal(fnet_interfaces_admin::Empty)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::task::Poll;

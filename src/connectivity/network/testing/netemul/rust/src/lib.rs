@@ -263,6 +263,26 @@ pub struct InterfaceConfig<'a> {
     /// If `None`, the interface configuration will not be modified and will remain
     /// the netstack-chosen default.
     pub temporary_addresses: Option<bool>,
+    /// Whether to use interface-local route table.
+    ///
+    /// If `None`, the interface configuration will not be modified and will remain
+    /// the netstack-chosen default.
+    pub netstack_managed_routes_designation:
+        Option<fnet_interfaces_admin::NetstackManagedRoutesDesignation>,
+}
+
+impl InterfaceConfig<'_> {
+    /// Creates a config that uses the interface local tables;
+    pub fn use_local_table() -> Self {
+        Self {
+            netstack_managed_routes_designation: Some(
+                fnet_interfaces_admin::NetstackManagedRoutesDesignation::InterfaceLocal(
+                    fnet_interfaces_admin::Empty,
+                ),
+            ),
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -1158,6 +1178,7 @@ impl<'a> TestEndpoint<'a> {
             ipv4_dad_transmits,
             ipv6_dad_transmits,
             temporary_addresses,
+            netstack_managed_routes_designation,
         }: InterfaceConfig<'_>,
     ) -> Result<(u64, Control, fnet_interfaces_admin::DeviceControlProxy)> {
         let name = name.map(|n| {
@@ -1176,7 +1197,12 @@ impl<'a> TestEndpoint<'a> {
             .create_interface(
                 &port_id,
                 server_end,
-                fnet_interfaces_admin::Options { name, metric, ..Default::default() },
+                fnet_interfaces_admin::Options {
+                    name,
+                    metric,
+                    netstack_managed_routes_designation,
+                    __source_breaking: fidl::marker::SourceBreaking,
+                },
             )
             .context("create interface")?;
         if let Some(ipv4_dad_transmits) = ipv4_dad_transmits {

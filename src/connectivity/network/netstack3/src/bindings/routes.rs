@@ -31,7 +31,7 @@ use futures::{stream, Future, FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6, Subnet};
 use net_types::SpecifiedAddr;
-use netstack3_core::routes::AddableMetric;
+use netstack3_core::routes::{AddableEntry, AddableMetric};
 use thiserror::Error;
 use zx::AsHandleRef as _;
 use {fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin};
@@ -39,9 +39,10 @@ use {fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fn
 use crate::bindings::util::{
     EntryAndTableId, RemoveResourceResultExt as _, ResultExt as _, TryIntoFidlWithContext,
 };
-use crate::bindings::{BindingsCtx, Ctx, IpExt};
+use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt, IpExt};
 
 pub(crate) mod admin;
+pub(crate) mod interface_local;
 pub(crate) mod rules_admin;
 mod rules_state;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
@@ -83,6 +84,26 @@ pub(crate) enum RouteOp<A: IpAddress> {
         gateway: Matcher<Option<SpecifiedAddr<A>>>,
         metric: Matcher<AddableMetric>,
     },
+}
+
+#[derive(Error, Debug)]
+#[error("the device has already been removed")]
+struct DeviceRemovedError;
+
+impl<A: IpAddress> RouteOp<A> {
+    fn get_interface_local_table(&self) -> Result<Option<TableId<A::Version>>, DeviceRemovedError> {
+        let device = match self {
+            RouteOp::Add(AddableEntry { subnet: _, device, gateway: _, metric: _ }) => device,
+            RouteOp::RemoveMatching { subnet: _, device, gateway: _, metric: _ } => device,
+        };
+        let strong = device.upgrade().ok_or(DeviceRemovedError)?;
+        Ok(strong
+            .external_state()
+            .static_common_info()
+            .local_route_tables
+            .as_ref()
+            .map(|t| t.get::<A::Version>().table_id))
+    }
 }
 
 #[derive(GenericOverIp, Debug)]
@@ -1016,11 +1037,23 @@ where
         // The following routes set memberships refer to the main table.
         // TODO(https://fxbug.dev/339567592): GlobalRouteSet should be aware of
         // the route table as well.
-        Change::RouteOp(_, SetMembership::Global)
-        | Change::RouteOp(_, SetMembership::CoreNdp)
-        | Change::RouteOp(_, SetMembership::InitialDeviceRoutes)
-        | Change::RouteOp(_, SetMembership::Loopback) => {
+        Change::RouteOp(_, SetMembership::Global) => {
             itertools::Either::Left(one_table(tables, main_table_id::<I>()))
+        }
+        // The change itself does not carry information about the destination
+        // table, instead we deduce the table from the interface in the route:
+        // use the interface-local route table if configured, otherwise use the
+        // main table.
+        Change::RouteOp(op, SetMembership::CoreNdp)
+        | Change::RouteOp(op, SetMembership::InitialDeviceRoutes)
+        | Change::RouteOp(op, SetMembership::Loopback) => {
+            let local_table_id = op
+                .get_interface_local_table()
+                .map_err(|DeviceRemovedError| ChangeError::DeviceRemoved)?;
+            itertools::Either::Left(one_table(
+                tables,
+                local_table_id.unwrap_or_else(main_table_id::<I>),
+            ))
         }
         Change::RemoveTable(table_id) => itertools::Either::Left(one_table(tables, *table_id)),
     };
