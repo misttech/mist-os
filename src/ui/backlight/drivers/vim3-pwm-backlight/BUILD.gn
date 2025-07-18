@@ -29,18 +29,22 @@ source_set("common") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "vim3-pwm-backlight.cc" ]
-  public_deps = [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp" ]
+  sources = [
+    "vim3-pwm-backlight.cc",
+    "vim3-pwm-backlight.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
+    "//sdk/lib/driver/component/cpp",
+  ]
   deps = [
-    ":vim3-pwm-backlight-bind",
     "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/lib/fidl",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
@@ -48,14 +52,16 @@ source_set("common") {
 }
 
 fuchsia_cc_driver("vim3-pwm-backlight-driver") {
-  legacy = true
   output_name = "vim3-pwm-backlight"
   deps = [ ":common" ]
 }
 
 fuchsia_driver_component("vim3-pwm-backlight") {
   component_name = "vim3-pwm-backlight"
-  deps = [ ":vim3-pwm-backlight-driver" ]
+  deps = [
+    ":vim3-pwm-backlight-bind",
+    ":vim3-pwm-backlight-driver",
+  ]
   info = "meta/vim3-pwm-backlight-info.json"
   manifest = "meta/vim3-pwm-backlight.cml"
 }
@@ -72,22 +78,15 @@ test("vim3-pwm-backlight-test") {
     ":common",
     "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
-    "//sdk/lib/async-default",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/async-testing",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp:cpp",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/inspect/testing/cpp",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/lib/amlogic:amlogic",
     "//src/devices/lib/mmio",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddktl",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 

@@ -8,25 +8,16 @@
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
-#include <lib/inspect/cpp/inspect.h>
-#include <lib/inspect/cpp/vmo/types.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
-#include <optional>
-
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
-
 namespace vim3_pwm_backlight {
-
-class Vim3PwmBacklight;
-using DeviceType =
-    ddk::Device<Vim3PwmBacklight, ddk::Messageable<fuchsia_hardware_backlight::Device>::Mixin>;
 
 // Driver for VIM3's PWM backlight controller, used for Khadas TS050
 // touchscreen.
-class Vim3PwmBacklight : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_BACKLIGHT> {
+class Vim3PwmBacklight : public fdf::DriverBase,
+                         public fidl::WireServer<fuchsia_hardware_backlight::Device> {
  public:
   struct State {
     bool operator==(const State& other) const {
@@ -40,35 +31,29 @@ class Vim3PwmBacklight : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
     double brightness;
   };
 
-  explicit Vim3PwmBacklight(zx_device_t* parent) : DeviceType(parent) {}
+  static constexpr std::string_view kDriverName = "vim3_pwm_backlight";
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-  zx_status_t Bind();
+  Vim3PwmBacklight(fdf::DriverStartArgs start_args,
+                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
-  // Methods required by the DDK mixin.
-  void DdkRelease();
+  // fdf::DriverBase implementation.
+  zx::result<> Start() override;
 
-  zx::vmo InspectVmo() { return inspector_.DuplicateVmo(); }
-
-  // `fuchsia_hardware_backlight::Device`
+  // fidl::WireServer<fuchsia_hardware_backlight::Device> implementation.
   void GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) override;
-
-  // `fuchsia_hardware_backlight::Device`
   void SetStateNormalized(SetStateNormalizedRequestView request,
                           SetStateNormalizedCompleter::Sync& completer) override;
 
-  // `fuchsia_hardware_backlight::Device`
   void GetStateAbsolute(GetStateAbsoluteCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // `fuchsia_hardware_backlight::Device`
   void SetStateAbsolute(SetStateAbsoluteRequestView request,
                         SetStateAbsoluteCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // `fuchsia_hardware_backlight::Device`
   void GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
@@ -103,7 +88,6 @@ class Vim3PwmBacklight : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
 
   void StoreState(State state);
 
-  inspect::Inspector inspector_;
   inspect::Node root_;
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client_;
@@ -113,6 +97,8 @@ class Vim3PwmBacklight : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
 
   inspect::BoolProperty power_property_;
   inspect::DoubleProperty brightness_property_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_backlight::Device> bindings_;
 };
 
 }  // namespace vim3_pwm_backlight
