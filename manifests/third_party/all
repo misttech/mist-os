@@ -37,7 +37,7 @@
     <project name="third_party/android/platform/external/avb"
              path="third_party/android/platform/external/avb"
              remote="https://fuchsia.googlesource.com/third_party/android/platform/external/avb"
-             revision="394bb50c7b67da912765469d79037c6577453b13"/>
+             revision="ca7642716fd4da6eef05e9e8b275092780f4f1b3"/>
     <project name="third_party/android.googlesource.com/platform/bionic"
              path="third_party/android/platform/bionic"
              remote="https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/bionic"
