@@ -264,9 +264,15 @@ impl CallbackState {
                                         // Ignore a failure to write the packet here. We don't
                                         // return immediately because we want to allow the
                                         // remaining records to be recorded as dropped.
-                                        if self.forward_packet(blob_name_ref, rewritten).is_none() {
-                                            log_error!("perfetto_consumer packet was not forwarded successfully");
-                                        }
+                                        //
+                                        // Once we fill a buffer in oneshot mode, we expect to drop
+                                        // the remaining packets here.
+                                        //
+                                        // Rather than logging here, allow the trace system to
+                                        // aggregate the number of records dropped and we can query
+                                        // the trace system later to determine if we dropped
+                                        // records when it's more efficient to do so.
+                                        let _ = self.forward_packet(blob_name_ref, rewritten);
                                     }
                                 }
                             } else {
