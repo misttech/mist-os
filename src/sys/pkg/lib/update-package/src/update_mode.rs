@@ -43,18 +43,14 @@ enum UpdateModeFile {
 }
 
 /// Enum to describe the supported update modes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "kebab-case")]
 pub enum UpdateMode {
     /// Follow the normal system update flow.
+    #[default]
     Normal,
     /// Instead of the normal flow, write a recovery image and reboot into it.
     ForceRecovery,
-}
-
-impl std::default::Default for UpdateMode {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 impl FromStr for UpdateMode {

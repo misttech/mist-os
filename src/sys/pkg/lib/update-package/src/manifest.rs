@@ -5,6 +5,7 @@
 //! Structs for parsing an OTA manifest.
 
 use crate::images::AssetType;
+use crate::update_mode::UpdateMode;
 use crate::SystemVersion;
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +44,9 @@ pub struct OtaManifestV1 {
     pub board: String,
     /// The epoch of this OTA.
     pub epoch: u64,
+    /// The update mode, normal or forced-recovery.
+    #[serde(default, skip_serializing_if = "update_mode_is_normal")]
+    pub mode: UpdateMode,
     /// The base URL of the blobs, the final URL for each blob will be
     /// "{blob_base_url}/{delivery_blob_type}/{fuchsia_merkle_root}".
     pub blob_base_url: url::Url,
@@ -50,6 +54,10 @@ pub struct OtaManifestV1 {
     pub images: Vec<Image>,
     /// The blobs for this version.
     pub blobs: Vec<Blob>,
+}
+
+fn update_mode_is_normal(mode: &UpdateMode) -> bool {
+    *mode == UpdateMode::Normal
 }
 
 /// The slot of an image.
@@ -146,6 +154,7 @@ mod tests {
         assert_eq!(manifest.build_version, SystemVersion::from_str("1.2.3.4").unwrap());
         assert_eq!(manifest.board, "test-board");
         assert_eq!(manifest.epoch, 1);
+        assert_eq!(manifest.mode, UpdateMode::Normal);
         assert_eq!(manifest.blob_base_url.as_str(), "http://example.com/");
 
         assert_eq!(manifest.images.len(), 2);
@@ -175,6 +184,7 @@ mod tests {
             build_version: SystemVersion::from_str("1.2.3.4").unwrap(),
             board: "test-board".to_string(),
             epoch: 1,
+            mode: UpdateMode::Normal,
             blob_base_url: "http://example.com".parse().unwrap(),
             images: vec![
                 Image {

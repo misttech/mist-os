@@ -729,7 +729,7 @@ impl Attempt<'_> {
         let state = state.enter_commit(co).await;
         *phase = metrics::Phase::ImageCommit;
 
-        let () = match self.commit_images(mode, current_configuration).await {
+        let () = match commit_images(&self.env.boot_manager, mode, current_configuration).await {
             Ok(()) => (),
             Err(e) => {
                 state.fail(co).await;
@@ -1060,34 +1060,33 @@ impl Attempt<'_> {
 
         Ok(())
     }
+}
 
-    /// Configure the non-current configuration (or recovery) as active for the next boot.
-    async fn commit_images(
-        &self,
-        mode: update_package::UpdateMode,
-        current_configuration: paver::CurrentConfiguration,
-    ) -> Result<(), Error> {
-        let desired_config = current_configuration.to_non_current_configuration();
+/// Configure the non-current configuration (or recovery) as active for the next boot.
+async fn commit_images(
+    boot_manager: &fpaver::BootManagerProxy,
+    mode: update_package::UpdateMode,
+    current_configuration: paver::CurrentConfiguration,
+) -> Result<(), Error> {
+    let desired_config = current_configuration.to_non_current_configuration();
 
-        match mode {
-            update_package::UpdateMode::Normal => {
-                let () =
-                    paver::set_configuration_active(&self.env.boot_manager, desired_config).await?;
-            }
-            update_package::UpdateMode::ForceRecovery => {
-                let () = paver::set_recovery_configuration_active(&self.env.boot_manager).await?;
-            }
+    match mode {
+        update_package::UpdateMode::Normal => {
+            let () = paver::set_configuration_active(boot_manager, desired_config).await?;
         }
-
-        match desired_config {
-            paver::NonCurrentConfiguration::A | paver::NonCurrentConfiguration::B => {
-                paver::paver_flush_boot_manager(&self.env.boot_manager).await?;
-            }
-            paver::NonCurrentConfiguration::NotSupported => {}
+        update_package::UpdateMode::ForceRecovery => {
+            let () = paver::set_recovery_configuration_active(boot_manager).await?;
         }
-
-        Ok(())
     }
+
+    match desired_config {
+        paver::NonCurrentConfiguration::A | paver::NonCurrentConfiguration::B => {
+            paver::paver_flush_boot_manager(boot_manager).await?;
+        }
+        paver::NonCurrentConfiguration::NotSupported => {}
+    }
+
+    Ok(())
 }
 
 // Update attempt that uses a manifest instead of update package.
@@ -1156,7 +1155,25 @@ impl AttemptV2<'_> {
             }
         };
 
-        unimplemented!("AttemptV2 is still work in progress");
+        // Commit the update
+        let state = state.enter_commit(co).await;
+        *phase = metrics::Phase::ImageCommit;
+
+        let () = match commit_images(&self.env.boot_manager, manifest.mode, current_configuration)
+            .await
+        {
+            Ok(()) => (),
+            Err(e) => {
+                state.fail(co).await;
+                return Err(AttemptError::Commit(e));
+            }
+        };
+
+        // Success!
+        let state = state.enter_wait_to_reboot(co).await;
+        *phase = metrics::Phase::SuccessPendingReboot;
+
+        Ok((state, manifest.mode))
     }
 
     /// Acquire the necessary data to perform the update.
@@ -1198,6 +1215,27 @@ impl AttemptV2<'_> {
             .map_err(PrepareError::ParseManifest)?;
 
         *target_version = history::Version::for_manifest(&manifest);
+
+        match manifest.mode {
+            update_package::UpdateMode::Normal => {}
+            update_package::UpdateMode::ForceRecovery => {
+                if !self.config.should_write_recovery {
+                    return Err(PrepareError::VerifyUpdateMode);
+                }
+                // Must have recovery zbi image in force recovery mode.
+                if !manifest.images.iter().any(|image| {
+                    image.slot == update_package::manifest::Slot::R
+                        && image.image_type
+                            == update_package::manifest::ImageType::Asset(
+                                update_package::images::AssetType::Zbi,
+                            )
+                }) {
+                    return Err(PrepareError::VerifyImages(
+                        update_package::VerifyError::MissingZbi,
+                    ));
+                }
+            }
+        }
 
         let () = verify_board_in_manifest(&self.env.build_info, &manifest)
             .await
