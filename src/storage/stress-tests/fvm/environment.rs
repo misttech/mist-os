@@ -58,7 +58,7 @@ impl FvmEnvironment {
             let volume = VolumeConnection::new(&volume_guid, args.fvm_slice_size).await;
 
             // Create the actor
-            let rng = SmallRng::from_seed(rng.gen());
+            let rng = SmallRng::from_seed(rng.random());
             let volume_actor = Arc::new(Mutex::new(
                 VolumeActor::new(volume, rng, args.max_slices_in_extend, args.max_vslice_count)
                     .await,

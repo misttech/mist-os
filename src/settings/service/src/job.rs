@@ -483,7 +483,6 @@ mod tests {
     use crate::tests::scaffold::workload::Workload;
 
     use assert_matches::assert_matches;
-    use rand::Rng;
 
     #[fuchsia::test]
     fn test_id_generation() {
@@ -511,9 +510,8 @@ mod tests {
             .expect("should create messenger")
             .0;
 
-        let mut rng = rand::thread_rng();
         // The value expected to be conveyed from workload to receptor.
-        let val = rng.gen();
+        let val = rand::random();
 
         // Create job from workload scaffolding.
         let job = Job::new(work::Load::Independent(Workload::new(

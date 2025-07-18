@@ -899,7 +899,6 @@ mod tests {
     use fxfs::object_store::volume::root_volume;
     use fxfs_crypto::Crypt;
     use fxfs_insecure_crypto::InsecureCrypt;
-    use rand::Rng as _;
     use std::sync::atomic::Ordering;
     use std::sync::{Arc, Weak};
     use std::time::Duration;
@@ -1459,7 +1458,7 @@ mod tests {
             },
             async {
                 let volumes_directory = volumes_directory.clone();
-                let wait_time = rand::thread_rng().gen_range(0..5);
+                let wait_time = rand::random_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
                 if let Err(err) = volumes_directory.remove_volume("encrypted").await {
                     assert!(
@@ -1471,7 +1470,7 @@ mod tests {
             },
             async {
                 let volumes_directory = volumes_directory.clone();
-                let wait_time = rand::thread_rng().gen_range(0..5);
+                let wait_time = rand::random_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
                 if let Err(err) = volumes_directory.remove_volume("encrypted").await {
                     assert!(
@@ -1483,7 +1482,7 @@ mod tests {
             },
             async {
                 let volumes_directory = volumes_directory.clone();
-                let wait_time = rand::thread_rng().gen_range(0..5);
+                let wait_time = rand::random_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
                 let mut guard = volumes_directory.lock().await;
                 match guard

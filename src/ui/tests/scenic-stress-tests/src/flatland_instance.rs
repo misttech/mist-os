@@ -7,8 +7,8 @@ use fidl::endpoints::*;
 use fuchsia_component_test::ScopedInstance;
 use futures::StreamExt;
 use log::debug;
-use rand::prelude::SliceRandom;
 use rand::rngs::SmallRng;
+use rand::seq::IndexedMutRandom;
 use rand::Rng;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -332,7 +332,7 @@ impl FlatlandInstance {
         };
 
         let num_sessions = children.len();
-        let index = rng.gen_range(0..num_sessions);
+        let index = rng.random_range(0..num_sessions);
         let (_child_instance, viewport_content_id) = children.remove(index);
         instance.release_viewport(&viewport_content_id).await.expect("fidl error");
     }

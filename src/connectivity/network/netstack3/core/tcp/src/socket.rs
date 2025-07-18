@@ -1398,7 +1398,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
                     Bound::Listen(l) => match l {
                         ListenerAddrState::ExclusiveListener(_)
                         | ListenerAddrState::ExclusiveBound(_) => {
-                            return Err(InsertError::ShadowAddrExists)
+                            return Err(InsertError::ShadowAddrExists);
                         }
                         ListenerAddrState::Shared { listener, bound: _ } => match sharing {
                             SharingState::Exclusive => return Err(InsertError::ShadowAddrExists),
@@ -1419,10 +1419,10 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
             let AddrVecTag { sharing: tag_sharing, has_device: _, state: _ } = tag;
             match (tag_sharing, sharing) {
                 (SharingState::Exclusive, SharingState::Exclusive | SharingState::ReuseAddress) => {
-                    return Err(InsertError::ShadowerExists)
+                    return Err(InsertError::ShadowerExists);
                 }
                 (SharingState::ReuseAddress, SharingState::Exclusive) => {
-                    return Err(InsertError::ShadowerExists)
+                    return Err(InsertError::ShadowerExists);
                 }
                 (SharingState::ReuseAddress, SharingState::ReuseAddress) => (),
             }
@@ -4382,7 +4382,7 @@ where
                 TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => conn,
                 TcpSocketStateInner::Bound(BoundSocketState::Listener(_))
                 | TcpSocketStateInner::Unbound(_) => {
-                    return Err(OriginalDestinationError::NotConnected)
+                    return Err(OriginalDestinationError::NotConnected);
                 }
             };
 
@@ -6552,7 +6552,7 @@ mod tests {
 
         let mut maybe_drop_frame =
             |_: &mut TcpCtx<_>, meta: DualStackSendIpPacketMeta<_>, buffer: Buf<Vec<u8>>| {
-                let x: f64 = rng.r#gen();
+                let x: f64 = rng.random();
                 (x > drop_rate).then_some((meta, buffer))
             };
 

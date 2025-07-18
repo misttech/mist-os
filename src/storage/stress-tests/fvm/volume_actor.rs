@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use log::{debug, info};
 use rand::prelude::IteratorRandom;
 use rand::rngs::SmallRng;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use stress_test::actor::{Actor, ActorError};
@@ -81,7 +81,7 @@ fn generate_data(seed: u64, size: usize) -> Vec<u8> {
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut data = Vec::with_capacity(size as usize);
     for _ in 0..size {
-        data.push(rng.gen());
+        data.push(rng.random());
     }
     data
 }
@@ -107,7 +107,7 @@ impl VolumeActor {
 
         for slice_offset in range.start..range.end {
             // Fill the slice with data
-            let seed = self.rng.gen();
+            let seed = self.rng.random();
             let data = generate_data(seed, slice_size);
             self.volume.write_slice_at(&data, slice_offset).await?;
             seeds.push(seed);

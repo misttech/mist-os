@@ -180,7 +180,7 @@ impl Environment for FlatlandEnvironment {
 
         let flatland_instance_runner = {
             // Create the flatland_instance actor
-            let rng = SmallRng::from_rng(&mut rng).unwrap();
+            let rng = SmallRng::from_rng(&mut rng);
             let flatland_instance_actor = Arc::new(Mutex::new(FlatlandActor::new(
                 rng,
                 root_flatland_instance,

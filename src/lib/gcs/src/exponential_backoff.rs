@@ -36,7 +36,7 @@ impl Backoff<Error> for ExponentialBackoff {
             self.transient_errors += 1;
             if self.backoff_budget > 0 {
                 let backoff_time = cmp::min(
-                    self.rng.gen_range(0..self.backoff_base.pow(self.transient_errors)),
+                    self.rng.random_range(0..self.backoff_base.pow(self.transient_errors)),
                     self.backoff_budget,
                 );
 
@@ -63,7 +63,7 @@ impl Backoff<Error> for ExponentialBackoff {
 /// retries.
 pub fn default_backoff_strategy() -> ExponentialBackoff {
     ExponentialBackoff {
-        rng: StdRng::from_entropy(),
+        rng: StdRng::from_os_rng(),
         backoff_base: 4,
         backoff_budget: 5000,
         transient_errors: 0,

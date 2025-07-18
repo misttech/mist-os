@@ -15,7 +15,8 @@
 
 use anyhow::Error;
 use fidl_fuchsia_io as fio;
-use rand::{distributions, Rng};
+use rand::distr::{Bernoulli, Distribution, StandardUniform};
+use rand::Rng;
 
 /// A random distribution specialized to generation of random directory trees. This distribution
 /// decreases the likelyhood of a directory being generated linearly relative to the depth of the
@@ -46,8 +47,8 @@ impl EntryDistribution {
 
     /// creates a bernoulli distribution where the likelyhood is progressively decreased at further
     /// depths until it's 0% at max_depth.
-    fn directory_distribution(&self) -> distributions::Bernoulli {
-        distributions::Bernoulli::from_ratio(self.max_depth - self.depth, self.max_depth).unwrap()
+    fn directory_distribution(&self) -> Bernoulli {
+        Bernoulli::from_ratio(self.max_depth - self.depth, self.max_depth).unwrap()
     }
 }
 
@@ -59,9 +60,9 @@ pub struct FileEntry {
     contents: Vec<u8>,
 }
 
-impl distributions::Distribution<FileEntry> for distributions::Standard {
+impl Distribution<FileEntry> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> FileEntry {
-        let size = rng.gen_range(1..1 << 16);
+        let size = usize::from(rng.random::<u16>());
         // unfortunately, we can't use sample_iter to generate the content here. the trait
         // definition for distribution requires the Rng type parameter to have ?Sized (or "maybe
         // sized"), but the sample_iter function requires the provided Rng be Sized, either through
@@ -69,7 +70,7 @@ impl distributions::Distribution<FileEntry> for distributions::Standard {
         // on type parameters for the equivalent Distribution function.
         let mut contents = vec![0; size];
         rng.fill(contents.as_mut_slice());
-        FileEntry { name: rng.gen(), contents }
+        FileEntry { name: rng.random(), contents }
     }
 }
 
@@ -96,16 +97,16 @@ pub struct DirectoryEntry {
     entries: Vec<Entry>,
 }
 
-impl distributions::Distribution<DirectoryEntry> for EntryDistribution {
+impl Distribution<DirectoryEntry> for EntryDistribution {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> DirectoryEntry {
         // each directory has a random number of entries in the range [0, 6)
-        let num_entries = rng.gen_range(0..6);
+        let num_entries = rng.random_range(0..6);
         let mut entries = vec![];
         let entry_dist = self.next_level();
         for _ in 0..num_entries {
             entries.push(rng.sample(&entry_dist));
         }
-        DirectoryEntry { name: rng.gen(), entries }
+        DirectoryEntry { name: rng.random(), entries }
     }
 }
 
@@ -148,12 +149,12 @@ pub enum Entry {
     Directory(DirectoryEntry),
 }
 
-impl distributions::Distribution<Entry> for EntryDistribution {
+impl Distribution<Entry> for EntryDistribution {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Entry {
         if rng.sample(self.directory_distribution()) {
             Entry::Directory(rng.sample(self))
         } else {
-            Entry::File(rng.sample(distributions::Standard))
+            Entry::File(rng.sample(StandardUniform))
         }
     }
 }
@@ -171,24 +172,35 @@ mod tests {
     // nature of the change, the comparison logic may have to be changed as well.
     fn get_fixture(initial: u64, increment: u64, depth: u32) -> DirectoryEntry {
         // confirm that the rng and depth used to generate this tree are the same.
-        assert_eq!(initial, 0xdeadbeef, "initial value changed - update fixture");
+        assert_eq!(initial, 0xFFFF0000, "initial value changed - update fixture");
         assert_eq!(increment, 1, "increment value changed - update fixture");
         assert_eq!(depth, 2, "depth value changed - update fixture");
         DirectoryEntry {
-            name: 3735928580,
+            name: 4294901785,
             entries: vec![
-                Entry::File(FileEntry { name: 3735928563, contents: vec![242] }),
-                Entry::File(FileEntry { name: 3735928567, contents: vec![246] }),
-                Entry::File(FileEntry { name: 3735928571, contents: vec![250] }),
-                Entry::File(FileEntry { name: 3735928575, contents: vec![254] }),
-                Entry::File(FileEntry { name: 3735928579, contents: vec![2] }),
+                Entry::File(FileEntry { name: 4294901764, contents: vec![3, 0] }),
+                Entry::File(FileEntry { name: 4294901768, contents: vec![7, 0, 255, 255, 0, 0] }),
+                Entry::File(FileEntry {
+                    name: 4294901773,
+                    contents: vec![11, 0, 255, 255, 0, 0, 0, 0, 12, 0],
+                }),
+                Entry::File(FileEntry {
+                    name: 4294901778,
+                    contents: vec![16, 0, 255, 255, 0, 0, 0, 0, 17, 0, 255, 255, 0, 0, 0],
+                }),
+                Entry::File(FileEntry {
+                    name: 4294901784,
+                    contents: vec![
+                        21, 0, 255, 255, 0, 0, 0, 0, 22, 0, 255, 255, 0, 0, 0, 0, 23, 0, 255, 255,
+                    ],
+                }),
             ],
         }
     }
 
     #[test]
     fn gen_tree() {
-        let initial = 0xdeadbeef;
+        let initial = 0xFFFF0000;
         let increment = 1;
         let depth = 2;
         // make sure we are generating a tree at all.
@@ -227,7 +239,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_tree() {
         let root = "/test-root";
-        let initial = 0xdeadbeef;
+        let initial = 0xFFFF0000;
         let increment = 1;
         let depth = 2;
 

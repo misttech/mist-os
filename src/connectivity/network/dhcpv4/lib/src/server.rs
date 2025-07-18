@@ -1527,7 +1527,6 @@ pub mod tests {
     use net_declare::{fidl_ip_v4, std_ip_v4};
     use net_types::ethernet::Mac as MacAddr;
     use net_types::ip::{Ipv4, PrefixLength};
-    use rand::Rng;
     use std::cell::RefCell;
     use std::collections::{BTreeSet, HashMap, HashSet};
     use std::iter::FromIterator as _;
@@ -1677,20 +1676,20 @@ pub mod tests {
     }
 
     pub fn random_ipv4_generator() -> Ipv4Addr {
-        let octet1: u8 = rand::thread_rng().r#gen();
-        let octet2: u8 = rand::thread_rng().r#gen();
-        let octet3: u8 = rand::thread_rng().r#gen();
-        let octet4: u8 = rand::thread_rng().r#gen();
+        let octet1: u8 = rand::random();
+        let octet2: u8 = rand::random();
+        let octet3: u8 = rand::random();
+        let octet4: u8 = rand::random();
         Ipv4Addr::new(octet1, octet2, octet3, octet4)
     }
 
     pub fn random_mac_generator() -> MacAddr {
-        let octet1: u8 = rand::thread_rng().r#gen();
-        let octet2: u8 = rand::thread_rng().r#gen();
-        let octet3: u8 = rand::thread_rng().r#gen();
-        let octet4: u8 = rand::thread_rng().r#gen();
-        let octet5: u8 = rand::thread_rng().r#gen();
-        let octet6: u8 = rand::thread_rng().r#gen();
+        let octet1: u8 = rand::random();
+        let octet2: u8 = rand::random();
+        let octet3: u8 = rand::random();
+        let octet4: u8 = rand::random();
+        let octet5: u8 = rand::random();
+        let octet6: u8 = rand::random();
         MacAddr::new([octet1, octet2, octet3, octet4, octet5, octet6])
     }
 
@@ -1787,7 +1786,7 @@ pub mod tests {
     fn new_client_message_with_options<T: IntoIterator<Item = DhcpOption>>(options: T) -> Message {
         Message {
             op: OpCode::BOOTREQUEST,
-            xid: rand::thread_rng().r#gen(),
+            xid: rand::random(),
             secs: 0,
             bdcast_flag: true,
             ciaddr: Ipv4Addr::UNSPECIFIED,

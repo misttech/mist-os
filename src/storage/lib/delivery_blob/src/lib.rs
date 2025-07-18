@@ -389,8 +389,8 @@ mod tests {
     #[test]
     fn compression_mode_always() {
         let data: Vec<u8> = {
-            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
-            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+            let range = rand::distr::Uniform::<u8>::new_inclusive(0, 255).unwrap();
+            rand::rng().sample_iter(&range).take(DATA_LEN).collect()
         };
         let delivery_blob = Type1Blob::generate(&data, CompressionMode::Always);
         let (header, _) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
@@ -403,8 +403,8 @@ mod tests {
     #[test]
     fn compression_mode_attempt_uncompressible() {
         let data: Vec<u8> = {
-            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
-            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+            let range = rand::distr::Uniform::<u8>::new_inclusive(0, 255).unwrap();
+            rand::rng().sample_iter(&range).take(DATA_LEN).collect()
         };
         // Data is random and therefore shouldn't be very compressible.
         let delivery_blob = Type1Blob::generate(&data, CompressionMode::Attempt);
@@ -428,8 +428,8 @@ mod tests {
     #[test]
     fn get_decompressed_size() {
         let data: Vec<u8> = {
-            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
-            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+            let range = rand::distr::Uniform::<u8>::new_inclusive(0, 255).unwrap();
+            rand::rng().sample_iter(&range).take(DATA_LEN).collect()
         };
         let delivery_blob = Type1Blob::generate(&data, CompressionMode::Always);
         assert_eq!(decompressed_size(&delivery_blob).unwrap(), DATA_LEN as u64);
@@ -439,8 +439,8 @@ mod tests {
     #[test]
     fn test_calculate_digest() {
         let data: Vec<u8> = {
-            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
-            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+            let range = rand::distr::Uniform::<u8>::new_inclusive(0, 255).unwrap();
+            rand::rng().sample_iter(&range).take(DATA_LEN).collect()
         };
         let delivery_blob = Type1Blob::generate(&data, CompressionMode::Always);
         assert_eq!(

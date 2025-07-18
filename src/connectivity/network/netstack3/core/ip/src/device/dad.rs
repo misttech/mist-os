@@ -487,7 +487,7 @@ impl NonceCollection {
     pub fn evicting_create_and_store_nonce(&mut self, mut rng: impl rand::Rng) -> OwnedNdpNonce {
         let Self { nonces } = self;
         loop {
-            let nonce: OwnedNdpNonce = rng.r#gen();
+            let nonce: OwnedNdpNonce = rng.random();
             if nonces.iter().any(|stored_nonce| stored_nonce == &nonce) {
                 continue;
             }
@@ -1272,7 +1272,7 @@ pub fn ipv4_dad_probe_interval<BC: RngContext>(bindings_ctx: &mut BC) -> NonZero
     //   ... and should then send PROBE_NUM probe packets, each of these
     // probe packets spaced randomly and uniformly, PROBE_MIN to PROBE_MAX
     // seconds apart.
-    let retrans_interval = bindings_ctx.rng().gen_range(IPV4_PROBE_RANGE);
+    let retrans_interval = bindings_ctx.rng().random_range(IPV4_PROBE_RANGE);
     // NB: Safe to unwrap because `IPV4_PROBE_RANGE` contains only non-zero
     // values.
     NonZeroDuration::new(retrans_interval).unwrap()
@@ -1288,7 +1288,7 @@ pub fn ipv4_dad_probe_wait<BC: RngContext>(bindings_ctx: &mut BC) -> Duration {
     //   When ready to begin probing, the host should then wait for a random
     //   time interval selected uniformly in the range zero to PROBE_WAIT
     //   seconds
-    bindings_ctx.rng().gen_range(IPV4_PROBE_WAIT_RANGE)
+    bindings_ctx.rng().random_range(IPV4_PROBE_WAIT_RANGE)
 }
 
 /// As defined in RFC 5227, section 1.1:

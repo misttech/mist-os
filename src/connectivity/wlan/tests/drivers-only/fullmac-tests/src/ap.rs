@@ -8,8 +8,7 @@ use drivers_only_common::sme_helpers::{
 };
 use fullmac_helpers::config::FullmacDriverConfig;
 use fullmac_helpers::recorded_request_stream::FullmacRequest;
-use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::seq::IndexedRandom;
 use wlan_common::assert_variant;
 use wlan_common::ie::rsn::rsne;
 use {
@@ -80,9 +79,9 @@ async fn test_start_2ghz_bss_success() {
         ssid: random_ssid(),
         password: random_password(),
         radio_cfg: fidl_sme::RadioConfig {
-            phy: *phy_types.choose(&mut rand::thread_rng()).unwrap(),
+            phy: *phy_types.choose(&mut rand::rng()).unwrap(),
             channel: fidl_ieee80211::WlanChannel {
-                primary: *supported_channels.choose(&mut rand::thread_rng()).unwrap(),
+                primary: *supported_channels.choose(&mut rand::rng()).unwrap(),
                 cbw: fidl_ieee80211::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
@@ -263,7 +262,7 @@ async fn test_remote_client_connected_open() {
     let (ap_sme_proxy, mut fullmac_driver) =
         setup_test_bss_started(FullmacDriverConfig::default_ap(), &DEFAULT_OPEN_AP_CONFIG).await;
 
-    let remote_sta_address: [u8; 6] = rand::thread_rng().gen();
+    let remote_sta_address: [u8; 6] = rand::random();
     fullmac_driver
         .ifc_proxy
         .auth_ind(&fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {

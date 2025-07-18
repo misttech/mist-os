@@ -7,7 +7,6 @@ use fuchsia_bluetooth::types::Address;
 use hmac::{Hmac, Mac};
 use log::debug;
 use packet_encoding::{decodable_enum, Encodable as PacketEncodable};
-use rand::Rng;
 use sha2::Sha256;
 
 use crate::types::keys::public_key_from_bytes;
@@ -237,7 +236,7 @@ pub fn key_based_pairing_response(key: &SharedSecret, local_address: Address) ->
     local_address_bytes.reverse();
     response[1..7].copy_from_slice(&local_address_bytes);
     // Final 9 bytes is a randomly generated salt value.
-    rand::thread_rng().fill(&mut response[7..16]);
+    rand::fill(&mut response[7..16]);
     key.encrypt(&response).to_vec()
 }
 
@@ -251,7 +250,7 @@ pub fn passkey_response(key: &SharedSecret, passkey: u32) -> Vec<u8> {
     // Next 3 bytes is the passkey in Big Endian.
     response[1..4].copy_from_slice(&passkey.to_be_bytes()[1..4]);
     // Final 12 bytes is a randomly generated salt value.
-    rand::thread_rng().fill(&mut response[4..16]);
+    rand::fill(&mut response[4..16]);
     key.encrypt(&response).to_vec()
 }
 
@@ -259,7 +258,7 @@ pub fn passkey_response(key: &SharedSecret, passkey: u32) -> Vec<u8> {
 /// Defined in https://developers.google.com/nearby/fast-pair/specifications/characteristics#AdditionalData
 pub fn personalized_name_response(key: &SharedSecret, name: String) -> Vec<u8> {
     let mut nonce = [0; 8];
-    rand::thread_rng().fill(&mut nonce[..]);
+    rand::fill(&mut nonce[..]);
     personalized_name_response_internal(key, name, nonce)
 }
 
@@ -647,7 +646,7 @@ pub(crate) mod tests {
     pub fn random_account_key() -> AccountKey {
         let mut bytes = [0; 16];
         bytes[0] = 0x04;
-        rand::thread_rng().fill(&mut bytes[1..16]);
+        rand::fill(&mut bytes[1..16]);
         AccountKey::new(bytes)
     }
 

@@ -14,7 +14,7 @@ use fho::{FfxMain, FfxTool};
 use fuchsia_audio::format::SampleType;
 use fuchsia_audio::Format;
 use rand::rngs::ThreadRng;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 use std::f64::consts::PI;
 use std::io;
 use std::io::Write;
@@ -213,7 +213,7 @@ fn write_signal(command: GenericSignal, cursor_writer: &mut io::Cursor<Vec<u8>>)
         (command.format.frames_per_second as f64) / command.frequency.unwrap_or(1) as f64;
     let rads_per_frame = (2.0 * PI) / frames_per_period;
 
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
     let mut input_history: Vec<HistoryBuffer> =
         Vec::with_capacity(command.format.channels as usize);
     let mut output_history: Vec<HistoryBuffer> =
@@ -256,7 +256,7 @@ fn write_signal(command: GenericSignal, cursor_writer: &mut io::Cursor<Vec<u8>>)
                 SignalType::Triangle => {
                     ((((frame as f64 / frames_per_period) % 1.0) - 0.5).abs() * 4.0) - 1.0
                 }
-                SignalType::WhiteNoise => rng.gen_range(0.0..=1.0) * 2.0 - 1.0,
+                SignalType::WhiteNoise => rng.random_range(0.0..=1.0) * 2.0 - 1.0,
                 SignalType::PinkNoise => next_pink_noise_sample(
                     channel as usize,
                     &mut input_history[..],
@@ -302,7 +302,7 @@ fn next_pink_noise_sample(
     }
 
     // Second, generate the initial white-noise input, boosting to normalize the result.
-    input_history[channel][0] = rng.gen_range(0.0..=1.0) * 2.0 - 1.0;
+    input_history[channel][0] = rng.random_range(0.0..=1.0) * 2.0 - 1.0;
     input_history[channel][0] *= PINK_NOISE_SIGNAL_BOOST_FACTOR;
 
     // Finally, apply the filter to {input + cached input/output values} to get the new output val.

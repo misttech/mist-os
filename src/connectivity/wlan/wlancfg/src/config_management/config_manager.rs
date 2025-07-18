@@ -14,7 +14,6 @@ use anyhow::format_err;
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use log::{error, info};
-use rand::Rng;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use wlan_storage::policy::{PolicyStorage, POLICY_STORAGE_ID};
@@ -568,7 +567,7 @@ pub fn select_subset_potentially_hidden_networks(
             // `hidden_probability > gen_range(0..1)` means that:
             // - hidden_probability of 1 will _always_ be selected
             // - hidden_probability of 0 will _never_ be selected
-            saved_network.hidden_probability > rand::thread_rng().gen_range(0.0..1.0)
+            saved_network.hidden_probability > rand::random_range(0.0..1.0)
         })
         .map(|network| types::NetworkIdentifier {
             ssid: network.ssid,

@@ -234,7 +234,7 @@ impl TestController {
         }
 
         let fraction = {
-            let mut rand_src = rand::thread_rng();
+            let mut rand_src = rand::rng();
             rand_src.next_u32() as f64 / u32::MAX as f64
         };
         info!("fraction is: {}", fraction);

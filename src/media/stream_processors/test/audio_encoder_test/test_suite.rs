@@ -220,7 +220,7 @@ impl AudioEncoderTestCase {
 
         let variable_framelength_stream = self.create_test_stream((0..).map(move |i| {
             let mut rng = StdRng::seed_from_u64(i as u64);
-            rng.gen::<usize>() % max_framelength + 1
+            rng.random_range(1..=max_framelength)
         }));
         let variable_framelength_case = TestCase {
             name: "Timestamp extrapolation test - variable framelength",

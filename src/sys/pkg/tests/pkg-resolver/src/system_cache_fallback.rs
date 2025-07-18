@@ -12,6 +12,7 @@ use fuchsia_pkg_testing::serve::responder;
 use fuchsia_pkg_testing::{Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder};
 use lib::{TestEnvBuilder, EMPTY_REPO_PATH};
 use rand::prelude::*;
+use rand::TryRngCore as _;
 use std::io::Read;
 use std::sync::Arc;
 use zx::Status;
@@ -289,9 +290,8 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages_with_larg
     // blobfs returning out of space.
     const LARGE_ASSET_FILE_SIZE: u64 = 4 * 1024 * 1024;
     let mut rng = StdRng::from_seed([0u8; 32]);
-    let rng = &mut rng as &mut dyn RngCore;
     let repo_pkg = PackageBuilder::new(pkg_name)
-        .add_resource_at("meta/asset", rng.take(LARGE_ASSET_FILE_SIZE))
+        .add_resource_at("meta/asset", rng.read_adapter().take(LARGE_ASSET_FILE_SIZE))
         .build()
         .await
         .expect("build large package");
@@ -359,9 +359,8 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages() {
 
     // A very large version of the same package, to put in the repo.
     let mut rng = StdRng::from_seed([0u8; 32]);
-    let rng = &mut rng as &mut dyn RngCore;
     let repo_pkg = PackageBuilder::new(pkg_name)
-        .add_resource_at("p/t/o", rng.take(4 * 1024 * 1024))
+        .add_resource_at("p/t/o", rng.read_adapter().take(4 * 1024 * 1024))
         .build()
         .await
         .expect("build large package");
@@ -435,9 +434,8 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_previous_ephemeral_packa
 
     // A very large version of the same package, to put in the repo.
     let mut rng = StdRng::from_seed([0u8; 32]);
-    let rng = &mut rng as &mut dyn RngCore;
     let large_pkg = PackageBuilder::new(pkg_name)
-        .add_resource_at("p/t/o", rng.take(4 * 1024 * 1024))
+        .add_resource_at("p/t/o", rng.read_adapter().take(4 * 1024 * 1024))
         .build()
         .await
         .expect("build large package");

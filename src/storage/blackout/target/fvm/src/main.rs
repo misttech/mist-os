@@ -25,7 +25,7 @@ struct OpSampler;
 
 impl blackout_target::random_op::OpSampler for OpSampler {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Op {
-        match rng.gen_range(0..100) {
+        match rng.random_range(0..100) {
             0..40 => Op::Write,
             40..75 => Op::Truncate,
             75..95 => Op::Reopen,

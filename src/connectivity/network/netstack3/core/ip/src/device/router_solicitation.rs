@@ -158,7 +158,7 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
                     // alleviate congestion when many hosts start up on a link at the same
                     // time.
                     let delay =
-                        bindings_ctx.rng().gen_range(Duration::ZERO..MAX_RTR_SOLICITATION_DELAY);
+                        bindings_ctx.rng().random_range(Duration::ZERO..MAX_RTR_SOLICITATION_DELAY);
 
                     let timer = timer.insert(CC::new_timer(
                         bindings_ctx,

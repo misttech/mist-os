@@ -784,7 +784,7 @@ mod tests {
     use fxfs::fsck::fsck;
     use fxfs::object_handle::INVALID_OBJECT_ID;
     use fxfs::object_store::Timestamp;
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use std::sync::atomic::{self, AtomicBool};
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
@@ -1878,7 +1878,7 @@ mod tests {
         .await;
 
         let mut data: Vec<u8> = vec![0x00u8; 1052672];
-        thread_rng().fill(&mut data[..]);
+        rng().fill(&mut data[..]);
 
         for chunk in data.chunks(8192) {
             file.write(chunk)
@@ -2022,7 +2022,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_fsverity_enabled_file_verified_reads() {
         let mut data: Vec<u8> = vec![0x00u8; 1052672];
-        thread_rng().fill(&mut data[..]);
+        rng().fill(&mut data[..]);
         let mut num_chunks = 0;
 
         let reused_device = {
@@ -2184,7 +2184,7 @@ mod tests {
         .await;
 
         let mut data: Vec<u8> = vec![0x00u8; 8192];
-        thread_rng().fill(&mut data[..]);
+        rng().fill(&mut data[..]);
 
         file.write(&data)
             .await

@@ -1749,7 +1749,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
 
-        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let instance_id = InstanceId::new_random(&mut rand::rng());
         let index = {
             let mut index = component_id_index::Index::default();
             index.insert(Moniker::root(), instance_id.clone()).unwrap();

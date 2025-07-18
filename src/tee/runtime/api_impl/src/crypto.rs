@@ -84,14 +84,33 @@ impl RngCore for Rng {
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         zx::cprng_draw(dest)
     }
+}
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.fill_bytes(dest);
+impl CryptoRng for Rng {}
+
+// Add a second implementation for `Rng` to satisfy the mismatched dependency
+// version with crypto_common. This can be removed once crypto_common uses
+// rand_core 0.9+.
+impl crypto_common::rand_core::RngCore for Rng {
+    fn next_u32(&mut self) -> u32 {
+        RngCore::next_u32(self)
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        RngCore::next_u64(self)
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        RngCore::fill_bytes(self, dest)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), crypto_common::rand_core::Error> {
+        RngCore::fill_bytes(self, dest);
         Ok(())
     }
 }
 
-impl CryptoRng for Rng {}
+impl crypto_common::rand_core::CryptoRng for Rng {}
 
 // A MAC abstraction conveniently shaped for our API glue needs.
 trait Mac {

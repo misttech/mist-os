@@ -4,7 +4,7 @@
 
 use crate::FullmacDriverFixture;
 use fullmac_helpers::config::{default_fullmac_query_info, FullmacDriverConfig};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use wlan_common::assert_variant;
 use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac};
 
@@ -16,7 +16,7 @@ async fn test_generic_sme_query() {
     let config = FullmacDriverConfig {
         query_info: fidl_fullmac::WlanFullmacImplQueryResponse {
             sta_addr: Some(rand::random()),
-            role: Some(*roles.choose(&mut rand::thread_rng()).unwrap()),
+            role: Some(*roles.choose(&mut rand::rng()).unwrap()),
             ..default_fullmac_query_info()
         },
         ..Default::default()

@@ -1108,16 +1108,16 @@ async fn test_wmm_status() {
 
     let gen_random_wmm_ac_params = || -> fidl_common::WlanWmmAccessCategoryParameters {
         fidl_common::WlanWmmAccessCategoryParameters {
-            ecw_min: rand::thread_rng().gen(),
-            ecw_max: rand::thread_rng().gen(),
-            aifsn: rand::thread_rng().gen(),
-            txop_limit: rand::thread_rng().gen(),
-            acm: rand::thread_rng().gen(),
+            ecw_min: rand::random(),
+            ecw_max: rand::random(),
+            aifsn: rand::random(),
+            txop_limit: rand::random(),
+            acm: rand::random(),
         }
     };
 
     let wmm_params = fidl_common::WlanWmmParameters {
-        apsd: rand::thread_rng().gen(),
+        apsd: rand::random(),
         ac_be_params: gen_random_wmm_ac_params(),
         ac_bk_params: gen_random_wmm_ac_params(),
         ac_vi_params: gen_random_wmm_ac_params(),

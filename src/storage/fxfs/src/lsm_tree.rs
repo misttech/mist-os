@@ -446,8 +446,8 @@ mod tests {
     use fprint::TypeFingerprint;
     use fuchsia_sync::Mutex;
     use fxfs_macros::FuzzyHash;
+    use rand::rng;
     use rand::seq::SliceRandom;
-    use rand::thread_rng;
     use std::hash::Hash;
     use std::sync::Arc;
 
@@ -666,7 +666,7 @@ mod tests {
         }
         let b = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         let mut shuffled = items.clone();
-        shuffled.shuffle(&mut thread_rng());
+        shuffled.shuffle(&mut rng());
         for item in &shuffled {
             b.insert(item.clone()).expect("insert error");
         }

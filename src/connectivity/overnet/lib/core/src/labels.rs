@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_overnet_protocol::TRANSFER_KEY_LENGTH;
-use rand::Rng;
 
 /// Labels a node with a mesh-unique address
 #[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy, Hash, Debug)]
@@ -67,5 +66,5 @@ impl From<u64> for NodeLinkId {
 pub(crate) type TransferKey = [u8; TRANSFER_KEY_LENGTH as usize];
 
 pub(crate) fn generate_transfer_key() -> TransferKey {
-    rand::thread_rng().gen::<TransferKey>()
+    rand::random::<TransferKey>()
 }

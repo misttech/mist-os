@@ -119,7 +119,7 @@ impl Crypt for InsecureCrypt {
         nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
 
         let mut key = [0u8; 32];
-        StdRng::from_entropy().fill_bytes(&mut key);
+        StdRng::from_os_rng().fill_bytes(&mut key);
 
         let wrapped: Vec<u8> = cipher.encrypt(&nonce, &key[..]).map_err(|e| {
             error!("Failed to wrap key: {:?}", e);
@@ -147,7 +147,7 @@ impl Crypt for InsecureCrypt {
         nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
 
         let mut key = [0u8; 32];
-        StdRng::from_entropy().fill_bytes(&mut key);
+        StdRng::from_os_rng().fill_bytes(&mut key);
 
         let wrapped: Vec<u8> = cipher.encrypt(&nonce, &key[..]).map_err(|e| {
             error!("Failed to wrap key: {:?}", e);

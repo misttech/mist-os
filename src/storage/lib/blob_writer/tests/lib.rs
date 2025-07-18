@@ -11,7 +11,6 @@ mod tests {
     use fs_management::Fxfs;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use ramdevice_client::RamdiskClient;
-    use rand::{thread_rng, Rng};
     const DEVICE_SIZE: u64 = 128 * 1024 * 1024;
     const BLOCK_SIZE: u64 = 4 * 1024;
     const BLOCK_COUNT: u64 = DEVICE_SIZE / BLOCK_SIZE;
@@ -42,7 +41,7 @@ mod tests {
         .expect("failed to connect to the BlobReader");
 
         let mut data = vec![1; 196608];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
 
@@ -96,7 +95,7 @@ mod tests {
         .expect("failed to connect to the BlobReader");
 
         let mut data = vec![1; 499712];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
 

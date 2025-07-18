@@ -15,7 +15,6 @@ use fuchsia_component::client as fclient;
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt, TryStreamExt};
 use log::*;
-use rand::Rng;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 use {
@@ -995,7 +994,7 @@ impl RealmBuilder {
         let collection_name =
             params.collection_name.unwrap_or_else(|| DEFAULT_COLLECTION_NAME.into());
         let realm_name = params.realm_name.unwrap_or_else(|| {
-            let id: u64 = rand::thread_rng().gen();
+            let id: u64 = rand::random();
             format!("auto-{:x}", id)
         });
         Self::create(
@@ -1850,7 +1849,7 @@ impl ScopedInstanceFactory {
         &self,
         url: impl Into<String>,
     ) -> Result<ScopedInstance, anyhow::Error> {
-        let id: u64 = rand::thread_rng().gen();
+        let id: u64 = rand::random();
         let child_name = format!("auto-{:x}", id);
         self.new_named_instance(child_name, url).await
     }
@@ -2988,7 +2987,7 @@ mod tests {
             let _builder_task = builder_task;
             handle_realm_stream(realm_stream, realm_report_requests).await
         });
-        let id: u64 = rand::thread_rng().gen();
+        let id: u64 = rand::random();
         let realm_name = format!("auto-{:x}", id);
         let component_realm_proxy =
             fclient::connect_to_protocol::<fcomponent::RealmMarker>().unwrap();

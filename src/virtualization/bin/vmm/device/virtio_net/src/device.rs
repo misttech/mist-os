@@ -286,7 +286,7 @@ mod tests {
     use async_utils::PollExt;
     use fuchsia_async as fasync;
     use futures::channel::mpsc::{self, UnboundedSender};
-    use rand::distributions::Standard;
+    use rand::distr::StandardUniform;
     use rand::Rng;
     use std::collections::VecDeque;
     use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
@@ -451,8 +451,8 @@ mod tests {
         let context = GuestEthernetContext { context: std::ptr::null_mut() };
         let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
 
-        let random_bytes: Vec<u8> = rand::thread_rng()
-            .sample_iter(Standard)
+        let random_bytes: Vec<u8> = rand::rng()
+            .sample_iter(StandardUniform)
             .take(std::mem::size_of::<wire::VirtioNetHeader>() - 1)
             .collect();
 
@@ -481,8 +481,8 @@ mod tests {
         let context = GuestEthernetContext { context: std::ptr::null_mut() };
         let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
 
-        let random_bytes: Vec<u8> = rand::thread_rng()
-            .sample_iter(Standard)
+        let random_bytes: Vec<u8> = rand::rng()
+            .sample_iter(StandardUniform)
             .take(std::mem::size_of::<wire::VirtioNetHeader>() * 2)
             .collect();
 
@@ -522,8 +522,8 @@ mod tests {
 
         // Actual virtio-net header doesn't matter for TX, so it can be "included" in these
         // random bytes.
-        let random_bytes: Vec<u8> = rand::thread_rng()
-            .sample_iter(Standard)
+        let random_bytes: Vec<u8> = rand::rng()
+            .sample_iter(StandardUniform)
             .take(std::mem::size_of::<wire::VirtioNetHeader>() + data_length)
             .collect();
 
@@ -562,13 +562,13 @@ mod tests {
         let packet_length = header_length + data_length;
 
         let packet1: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(packet_length).collect();
+            rand::rng().sample_iter(StandardUniform).take(packet_length).collect();
 
         let packet2: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(packet_length).collect();
+            rand::rng().sample_iter(StandardUniform).take(packet_length).collect();
 
         let packet3: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(packet_length).collect();
+            rand::rng().sample_iter(StandardUniform).take(packet_length).collect();
 
         // First packet is accepted by the netstack.
         device.ethernet.send_status.borrow_mut().push_back(zx::Status::OK);
@@ -654,7 +654,7 @@ mod tests {
         let buffer_id = 54321;
 
         let packet_data: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(data_length).collect();
+            rand::rng().sample_iter(StandardUniform).take(data_length).collect();
         let rx_packet =
             RxPacket { data: packet_data.as_ptr(), len: packet_data.len(), buffer_id: buffer_id };
 
@@ -700,7 +700,7 @@ mod tests {
 
         // The packet received from the netstack does not include the virtio-net header.
         let packet_data: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(data_length).collect();
+            rand::rng().sample_iter(StandardUniform).take(data_length).collect();
         let rx_packet =
             RxPacket { data: packet_data.as_ptr(), len: packet_data.len(), buffer_id: buffer_id };
 

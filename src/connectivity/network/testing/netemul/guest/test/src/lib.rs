@@ -7,7 +7,7 @@
 use anyhow::{Context as _, Error};
 use assert_matches::assert_matches;
 use packet::ParsablePacket as _;
-use rand::distributions::DistString as _;
+use rand::distr::DistString as _;
 use std::io::Write as _;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_virtualization_guest_interaction as fguest_interaction,
@@ -36,7 +36,7 @@ async fn multiple_guests_disallowed() {
 fn create_file_with_random_data(path: &str) -> Result<(), Error> {
     const FILE_SIZE: usize = 4096;
     let file_contents =
-        rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), FILE_SIZE);
+        rand::distributions::Alphanumeric.sample_string(&mut rand::rng(), FILE_SIZE);
     let mut file = std::fs::File::create(path).context("failed to create file")?;
     file.write_all(file_contents.as_bytes()).context("failed to write to file")?;
     Ok(())

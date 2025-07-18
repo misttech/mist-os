@@ -1492,7 +1492,7 @@ mod tests {
         core_ctx.state.gmp_state().timers.assert_timers([(
             gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
             (),
-            FakeInstant::from(Duration::from_micros(34_751)),
+            FakeInstant::from(Duration::from_micros(34_831)),
         )]);
         let instant2 = bindings_ctx.timers.timers()[0].0.clone();
         // This new timer should be sooner.

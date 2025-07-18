@@ -924,7 +924,7 @@ mod tests {
     // exercise one success and one failure case for each function.
     #[test]
     fn fdio_open_and_open_at() {
-        use rand::distributions::DistString as _;
+        use rand::distr::SampleString as _;
 
         // fdio_open requires paths to be absolute
         {
@@ -937,8 +937,8 @@ mod tests {
 
         // fdio_open/fdio_open_at disallow paths that are too long
         {
-            let path = rand::distributions::Alphanumeric
-                .sample_string(&mut rand::thread_rng(), libc::PATH_MAX.try_into().unwrap());
+            let path = rand::distr::Alphanumeric
+                .sample_string(&mut rand::rng(), libc::PATH_MAX.try_into().unwrap());
             let (_, server) = zx::Channel::create();
             assert_eq!(
                 open_at(&pkg_client, &path, fio::Flags::empty(), server),

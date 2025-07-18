@@ -493,13 +493,13 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
 
     fn insert(&mut self, item: Item<K, V>) {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let max_pointers = self.skip_list.pointers.len();
         // This chooses a random number of pointers such that each level has half the number of
         // pointers of the previous one.
         let pointer_count = max_pointers
             - min(
-                (rng.gen_range(0..2u32.pow(max_pointers as u32) - 1) as f32).log2() as usize,
+                (rng.random_range(0..2u32.pow(max_pointers as u32) - 1) as f32).log2() as usize,
                 max_pointers - 1,
             );
         let node = Box::leak(self.skip_list.alloc_node(item, pointer_count));

@@ -186,16 +186,16 @@ mod tests {
     }
 
     fn make_str_with_len(prefix: &str, len: usize) -> String {
-        let mut rng = rand::thread_rng();
-        let mut res = format!("{}{}{}", prefix, rng.gen::<u64>().to_string(), "a".repeat(len));
+        let mut rng = rand::rng();
+        let mut res = format!("{}{}{}", prefix, rng.random::<u64>().to_string(), "a".repeat(len));
         res.truncate(len);
         res
     }
 
     #[test]
     fn log_info_test() {
-        let mut rng = rand::thread_rng();
-        let logged_value: u64 = rng.gen();
+        let mut rng = rand::rng();
+        let logged_value: u64 = rng.random();
 
         init();
         info!("log_test {}", logged_value);
@@ -205,9 +205,9 @@ mod tests {
 
     #[test]
     fn log_info_newline_test() {
-        let mut rng = rand::thread_rng();
-        let logged_value1: u64 = rng.gen();
-        let logged_value2: u64 = rng.gen();
+        let mut rng = rand::rng();
+        let logged_value1: u64 = rng.random();
+        let logged_value2: u64 = rng.random();
 
         init();
         info!("log_test1 {}\nlog_test2 {}", logged_value1, logged_value2);
@@ -224,9 +224,9 @@ mod tests {
 
     #[test]
     fn log_many_newlines_test() {
-        let mut rng = rand::thread_rng();
-        let logged_value1: u64 = rng.gen();
-        let logged_value2: u64 = rng.gen();
+        let mut rng = rand::rng();
+        let logged_value1: u64 = rng.random();
+        let logged_value2: u64 = rng.random();
 
         init();
         info!("\n\nmnl_log_test1 {}\n\nmnl_log_test2 {}\n\n", logged_value1, logged_value2);
@@ -296,8 +296,8 @@ mod tests {
 
     #[test]
     fn log_warn_test() {
-        let mut rng = rand::thread_rng();
-        let logged_value: u64 = rng.gen();
+        let mut rng = rand::rng();
+        let logged_value: u64 = rng.random();
 
         init();
         warn!("log_test {}", logged_value);
@@ -307,8 +307,8 @@ mod tests {
 
     #[test]
     fn log_error_test() {
-        let mut rng = rand::thread_rng();
-        let logged_value: u64 = rng.gen();
+        let mut rng = rand::rng();
+        let logged_value: u64 = rng.random();
 
         init();
         error!("log_test {}", logged_value);
@@ -322,8 +322,8 @@ mod tests {
     #[cfg_attr(feature = "variant_asan", ignore)]
     #[cfg_attr(feature = "variant_hwasan", ignore)]
     fn log_panic_test() {
-        let mut rng = rand::thread_rng();
-        let logged_value: u64 = rng.gen();
+        let mut rng = rand::rng();
+        let logged_value: u64 = rng.random();
 
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |info| {

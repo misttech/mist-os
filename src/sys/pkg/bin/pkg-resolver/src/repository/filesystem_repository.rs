@@ -283,8 +283,8 @@ mod tests {
     fn get_random_buffer() -> Vec<u8> {
         use rand::prelude::*;
 
-        let mut rng = rand::thread_rng();
-        let len = rng.gen_range(1..100);
+        let mut rng = rand::rng();
+        let len = rng.random_range(1..100);
         let mut buffer = vec![0; len];
         rng.fill_bytes(&mut buffer);
         buffer

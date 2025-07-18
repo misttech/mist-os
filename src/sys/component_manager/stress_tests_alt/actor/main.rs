@@ -10,8 +10,8 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::warn;
 use moniker::Moniker;
-use rand::prelude::SliceRandom;
 use rand::rngs::SmallRng;
+use rand::seq::IndexedRandom;
 use rand::Rng;
 use stress_test_actor::{actor_loop, Action};
 
@@ -42,8 +42,8 @@ pub fn create_child<'a>(
 
         // The root must always be a choice
         let parent_moniker = instances.choose(&mut rng).unwrap();
-        let child_name = format!("C{}", rng.gen::<u64>());
-        let url = if rng.gen_bool(0.5) { ECHO_CLIENT_URL } else { NO_BINARY_URL };
+        let child_name = format!("C{}", rng.random::<u64>());
+        let url = if rng.random_bool(0.5) { ECHO_CLIENT_URL } else { NO_BINARY_URL };
         let url = url.to_string();
 
         let result = stressor

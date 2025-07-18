@@ -8,8 +8,9 @@
 //! Panics if operations fail.
 
 use fuchsia_sync::{Mutex, RwLock};
-use rand::distributions::{Distribution, WeightedIndex};
-use rand::seq::SliceRandom;
+use rand::distr::weighted::WeightedIndex;
+use rand::distr::Distribution;
+use rand::seq::IndexedRandom;
 use rand::Rng;
 use std::fs::File;
 use std::io::ErrorKind;
@@ -112,7 +113,7 @@ impl Stressor {
 
     /// Worker thread function.
     fn worker(&self) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut buf = Vec::new();
         loop {
             let weights: [f64; NUM_OPS] = self.get_weights();
@@ -139,7 +140,7 @@ impl Stressor {
                         if num == 0 {
                             continue;
                         }
-                        open_files.remove(rng.gen_range(0..num))
+                        open_files.remove(rng.random_range(0..num))
                     };
                 }
                 CREATE_FILE => {
@@ -163,7 +164,7 @@ impl Stressor {
                             continue;
                         }
                         let num = all_files.len();
-                        all_files.remove(rng.gen_range(0..num))
+                        all_files.remove(rng.random_range(0..num))
                     };
                     std::fs::remove_file(&file.path).unwrap();
                 }
@@ -171,8 +172,8 @@ impl Stressor {
                     let Some(file) = self.open_files.read().choose(&mut rng).cloned() else {
                         continue;
                     };
-                    let read_offset = rng.gen_range(0..100_000) as u64;
-                    let read_len = (-rng.gen::<f64>().ln() * 100_000.0) as u64;
+                    let read_offset = rng.random_range(0..100_000) as u64;
+                    let read_len = (-rng.random::<f64>().ln() * 100_000.0) as u64;
                     buf.resize(read_len as usize, 1);
                     file.read_at(&mut buf, read_offset).unwrap();
                 }
@@ -180,8 +181,8 @@ impl Stressor {
                     let Some(file) = self.open_files.read().choose(&mut rng).cloned() else {
                         continue;
                     };
-                    let write_len = (-rng.gen::<f64>().ln() * 10_000.0) as u64;
-                    let write_offset = rng.gen_range(0..100_000) as u64;
+                    let write_len = (-rng.random::<f64>().ln() * 10_000.0) as u64;
+                    let write_offset = rng.random_range(0..100_000) as u64;
                     buf.resize(write_len as usize, 1);
                     file.write_at(&buf, write_offset).unwrap();
                 }
@@ -189,7 +190,7 @@ impl Stressor {
                     let Some(file) = self.open_files.read().choose(&mut rng).cloned() else {
                         continue;
                     };
-                    file.set_len(rng.gen_range(0..100_000)).unwrap();
+                    file.set_len(rng.random_range(0..100_000)).unwrap();
                 }
                 _ => unreachable!(),
             }

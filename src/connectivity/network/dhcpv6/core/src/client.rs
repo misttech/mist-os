@@ -12,7 +12,7 @@ use num::rational::Ratio;
 use num::CheckedMul;
 use packet::serialize::InnerPacketBuilder;
 use packet_formats_dhcp::v6;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 use std::collections::hash_map::Entry;
 use std::collections::{BinaryHeap, HashMap, HashSet};
@@ -180,7 +180,7 @@ fn retransmission_timeout<R: Rng>(
     max_retrans_timeout: Duration,
     rng: &mut R,
 ) -> Duration {
-    let rand = rng.gen_range(RANDOMIZATION_FACTOR_MIN..RANDOMIZATION_FACTOR_MAX);
+    let rand = rng.random_range(RANDOMIZATION_FACTOR_MIN..RANDOMIZATION_FACTOR_MAX);
 
     let next_rt = if prev_retrans_timeout.as_nanos() == 0 {
         let irt = initial_retrans_timeout.as_secs_f64();
@@ -215,7 +215,7 @@ fn clipped_duration(secs: f64) -> Duration {
 /// [RFC 8415, Section 16.1]: https://tools.ietf.org/html/rfc8415#section-16.1
 pub fn transaction_id() -> [u8; 3] {
     let mut id = [0u8; 3];
-    thread_rng().fill(&mut id[..]);
+    rand::fill(&mut id[..]);
     id
 }
 
@@ -682,7 +682,9 @@ enum IaOptionError<V: IaValue> {
     // than a string of the debug representation of the invalid option.
     #[error("invalid option: {0:?}")]
     InvalidOption(String),
-    #[error("IA value={value:?} appeared twice with first={first_lifetimes:?} and second={second_lifetimes:?}")]
+    #[error(
+        "IA value={value:?} appeared twice with first={first_lifetimes:?} and second={second_lifetimes:?}"
+    )]
     DuplicateIaValue {
         value: V,
         first_lifetimes: Result<Lifetimes, LifetimesError>,
@@ -810,7 +812,7 @@ fn process_ia<
                         return Ok(IaOption::Failure(ErrorStatusCode(
                             error_status_code,
                             msg.to_string(),
-                        )))
+                        )));
                     }
                 }
             }

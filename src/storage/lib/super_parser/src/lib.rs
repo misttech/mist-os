@@ -223,7 +223,6 @@ impl Device for SuperPartitionDevice {
 #[cfg(test)]
 mod tests {
     use crate::{into_merged_regions, SuperDeviceRange, SuperParser};
-    use rand::Rng as _;
     use std::collections::BTreeSet;
     use std::path::Path;
     use std::sync::Arc;
@@ -294,8 +293,7 @@ mod tests {
         let used_regions = super_parser.used_regions_in_bytes();
         // We expect the used regions to contain [ region_of_metadata, logical_partitions... ]
         let start_of_first_partition = used_regions[1].start;
-        let random_buffer: Vec<u8> =
-            (0..8192).map(|_| rand::thread_rng().gen_range(0..100)).collect();
+        let random_buffer: Vec<u8> = (0..8192).map(|_| rand::random_range(0..100)).collect();
         let mut modified_buffer = parent_device.allocate_buffer(8192).await;
         modified_buffer.as_mut_slice().copy_from_slice(&random_buffer);
         parent_device

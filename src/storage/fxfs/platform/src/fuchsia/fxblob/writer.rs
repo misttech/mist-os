@@ -658,7 +658,6 @@ mod tests {
     use fidl_fuchsia_io::UnlinkOptions;
     use fuchsia_async::{self as fasync, TimeoutExt as _};
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
-    use rand::{thread_rng, Rng};
 
     fn generate_list_of_writes(compressed_data_len: u64) -> Vec<Range<u64>> {
         let mut list_of_writes = vec![];
@@ -780,7 +779,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 65536];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let mut compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -814,7 +813,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 196608];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -925,7 +924,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 196608];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -1001,7 +1000,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 1024921];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
 
         let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -1049,7 +1048,7 @@ mod tests {
 
         // It doesn't matter if these blobs are compressed. We just need to fragment space.
         for _ in 0..NUM_BLOBS {
-            thread_rng().fill(&mut data[..]);
+            rand::fill(&mut data[..]);
             let hash = fixture.write_blob(&data, CompressionMode::Never).await;
             hashes.push(hash);
         }
@@ -1067,7 +1066,7 @@ mod tests {
         // Create one large blob (reusing fragmented extents).
         {
             let mut data = vec![1; 1024921];
-            thread_rng().fill(&mut data[..]);
+            rand::fill(&mut data[..]);
 
             let hash = fuchsia_merkle::from_slice(&data).root();
             let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
@@ -1111,7 +1110,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
         // Generate a delivery blob (size doesn't matter).
         let mut data = vec![1; 196608];
-        thread_rng().fill(&mut data[..]);
+        rand::fill(&mut data[..]);
         let hash = fuchsia_merkle::from_slice(&data).root();
         let blob_data = Type1Blob::generate(&data, CompressionMode::Always);
         // To simplify the test, we make sure to write enough bytes on the first call to bytes_ready

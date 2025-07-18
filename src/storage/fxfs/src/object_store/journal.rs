@@ -64,7 +64,6 @@ use fuchsia_sync::Mutex;
 use futures::future::poll_fn;
 use futures::FutureExt as _;
 use once_cell::sync::OnceCell;
-use rand::Rng;
 use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert;
@@ -424,7 +423,7 @@ impl<S: HandleOwner> JournalHandle for DataObjectHandle<S> {
 #[fxfs_trace::trace]
 impl Journal {
     pub fn new(objects: Arc<ObjectManager>, options: JournalOptions) -> Journal {
-        let starting_checksum = rand::thread_rng().gen_range(1..u64::MAX);
+        let starting_checksum = rand::random_range(1..u64::MAX);
         Journal {
             objects: objects,
             handle: OnceCell::new(),

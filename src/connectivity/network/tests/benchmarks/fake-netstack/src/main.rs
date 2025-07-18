@@ -917,9 +917,9 @@ fn gen_available_loopback_addr<F: Fn(&fnet::SocketAddress) -> bool>(
     domain: fposix_socket::Domain,
     free: F,
 ) -> fnet::SocketAddress {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     loop {
-        let port = rng.gen_range(EPHEMERAL_PORTS);
+        let port = rng.random_range(EPHEMERAL_PORTS);
         let addr = make_loopback_src_addr_with_port(domain, port);
         if free(&addr) {
             break addr;

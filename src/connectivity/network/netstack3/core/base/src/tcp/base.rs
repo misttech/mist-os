@@ -398,7 +398,7 @@ mod test {
                         let len = if slice == slices - 1 {
                             TEST_BYTES.len() - *st
                         } else {
-                            rng.gen_range(0..=(TEST_BYTES.len() - *st))
+                            rng.random_range(0..=(TEST_BYTES.len() - *st))
                         };
                         let start = *st;
                         *st += len;

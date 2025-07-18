@@ -582,7 +582,7 @@ mod tests {
     // Ensures that proper queueing happens amongst Jobs within Execution Groups.
     #[fuchsia::test(allow_stalls = false)]
     async fn test_data() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let (result_tx, mut result_rx) = futures::channel::mpsc::unbounded::<usize>();
 
@@ -591,8 +591,8 @@ mod tests {
 
         let mut handler = Handler::new();
 
-        let data_key = job::data::Key::TestInteger(rng.gen());
-        let initial_value = rng.gen_range(0..9);
+        let data_key = job::data::Key::TestInteger(rng.random_range(0..=usize::MAX));
+        let initial_value = rng.random_range(0..9);
         let signature = job::Signature::new::<usize>();
 
         // Each result is the square of the previous result,

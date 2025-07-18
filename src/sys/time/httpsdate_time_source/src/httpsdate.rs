@@ -20,7 +20,6 @@ use futures::{Future, SinkExt};
 use httpdate_hyper::{HttpsDateError, HttpsDateErrorType};
 use log::{debug, error, info};
 use push_source::Update;
-use rand::Rng;
 
 /// A definition of how long an algorithm should wait between polls. Defines fixed wait durations
 /// following successful poll attempts, and a capped exponential backoff following failed poll
@@ -148,7 +147,7 @@ where
 
         // randomize poll timings somewhat so polls across devices will not be synchronized
         let random_factor = 1f32
-            + rand::thread_rng().gen_range(
+            + rand::random_range(
                 -MAX_TIME_BETWEEN_SAMPLES_RANDOMIZATION..MAX_TIME_BETWEEN_SAMPLES_RANDOMIZATION,
             );
         let converge_time_between_samples =

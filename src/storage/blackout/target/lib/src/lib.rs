@@ -19,8 +19,9 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_fs::directory::readdir;
 use futures::{future, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use rand::distr::StandardUniform;
 use rand::rngs::StdRng;
-use rand::{distributions, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use std::pin::pin;
 use std::sync::Arc;
 use storage_isolated_driver_manager::{
@@ -157,8 +158,8 @@ async fn handle_controller<T: Test + 'static>(
 pub fn generate_content(seed: u64) -> Vec<u8> {
     let mut rng = StdRng::seed_from_u64(seed);
 
-    let size = rng.gen_range(1..1 << 16);
-    rng.sample_iter(&distributions::Standard).take(size).collect()
+    let size = rng.random_range(1..1 << 16);
+    rng.sample_iter(&StandardUniform).take(size).collect()
 }
 
 /// Find the device in /dev/class/block that represents a given topological path. Returns the full

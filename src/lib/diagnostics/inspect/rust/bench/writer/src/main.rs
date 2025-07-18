@@ -215,11 +215,11 @@ macro_rules! bench_numeric_array_property_fn {
                 bench = bench.with_function(
                     format!("{}/set/{array_size}", $Array),
                     move |b| {
-                        let mut rng = rand::thread_rng();
+                        let mut rng = rand::rng();
                         let inspector = Inspector::default();
                         let root = inspector.root();
                         let array = root.[<create_ $name _array>](NAME, array_size);
-                        b.iter_with_large_setup(|| rng.gen_range(0..array_size), |index| {
+                        b.iter_with_large_setup(|| rng.random_range(0..array_size), |index| {
                             array.set(index, 1 as $type);
                         });
                     }
@@ -227,11 +227,11 @@ macro_rules! bench_numeric_array_property_fn {
                 bench = bench.with_function(
                     format!("{}/add/{array_size}", $Array),
                     move |b| {
-                        let mut rng = rand::thread_rng();
+                        let mut rng = rand::rng();
                         let inspector = Inspector::default();
                         let root = inspector.root();
                         let array = root.[<create_ $name _array>](NAME, array_size);
-                        b.iter_with_large_setup(|| rng.gen_range(0..array_size), |index| {
+                        b.iter_with_large_setup(|| rng.random_range(0..array_size), |index| {
                             array.add(index, 1 as $type);
                         });
                     }
@@ -239,14 +239,14 @@ macro_rules! bench_numeric_array_property_fn {
                 bench = bench.with_function(
                     format!("{}/subtract/{array_size}", $Array),
                     move |b| {
-                        let mut rng = rand::thread_rng();
+                        let mut rng = rand::rng();
                         let inspector = Inspector::default();
                         let root = inspector.root();
                         let array = root.[<create_ $name _array>](NAME, array_size);
                         for i in 0..array_size {
                             array.set(i, $type::MAX);
                         }
-                        b.iter_with_large_setup(|| rng.gen_range(0..array_size), |index| {
+                        b.iter_with_large_setup(|| rng.random_range(0..array_size), |index| {
                             array.subtract(index, 1 as $type);
                         });
                     }
@@ -278,12 +278,12 @@ fn string_array_property_benchmarks(
         b.iter_with_large_drop(|| root.create_string_array(NAME, array_size));
     });
     bench = bench.with_function(format!("StringArrayProperty/set/{array_size}"), move |b| {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let inspector = Inspector::default();
         let root = inspector.root();
         let array = root.create_string_array(NAME, array_size);
         b.iter_with_large_setup(
-            || rng.gen_range(0..array_size),
+            || rng.random_range(0..array_size),
             |index| {
                 array.set(index, "one");
             },

@@ -75,7 +75,6 @@ use async_trait::async_trait;
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use fprint::TypeFingerprint;
 use fuchsia_sync::Mutex;
-use rand::Rng as _;
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert;
 use std::cmp::Ordering;
@@ -758,7 +757,7 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
         }
         writer.write_bytes(&buf[..]).await?;
 
-        let seed: u64 = rand::thread_rng().gen();
+        let seed: u64 = rand::random();
         Ok(PersistentLayerWriter {
             writer,
             block_size,

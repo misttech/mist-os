@@ -11,8 +11,8 @@ use fuchsia_scenic::ViewRefPair;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{StreamExt, TryStreamExt};
 use log::{error, info, warn};
-use rand::distributions::{Alphanumeric, DistString};
-use rand::thread_rng;
+use rand::distr::{Alphanumeric, SampleString};
+use rand::rng;
 use std::collections::{HashMap, VecDeque};
 use {
     fidl_fuchsia_element as element, fidl_fuchsia_session_scene as scene,
@@ -153,7 +153,7 @@ impl TilingWm {
                     .add_child(&self.root_transform_id, &viewport_transform_id)
                     .context("GraphicalPresenterPresentView add_child")?;
 
-                let mut view_name = Alphanumeric.sample_string(&mut thread_rng(), 16);
+                let mut view_name = Alphanumeric.sample_string(&mut rng(), 16);
                 view_name.make_ascii_lowercase();
                 let new_tile_id = TileId(view_name);
                 let new_tile = ChildView { viewport_transform_id, viewport_content_id };

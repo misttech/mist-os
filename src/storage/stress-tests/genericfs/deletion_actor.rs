@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use log::{debug, info};
 use rand::rngs::SmallRng;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rand::Rng;
 use storage_stress_test_utils::io::Directory;
 use stress_test::actor::{Actor, ActorError};
@@ -40,7 +40,7 @@ impl Actor for DeletionActor {
             return Err(ActorError::DoNotCount);
         }
 
-        let num_files_to_delete = self.rng.gen_range(0..files.len());
+        let num_files_to_delete = self.rng.random_range(0..files.len());
         debug!("Deleting {} files", num_files_to_delete);
 
         // Randomly select files from the list and remove them

@@ -752,7 +752,7 @@ mod tests {
         );
         let stop_fut = ActionsManager::register(child.clone(), StopAction::new(false));
         let mut futs = vec![start_fut.boxed(), stop_fut.boxed()];
-        futs.shuffle(&mut rand::thread_rng());
+        futs.shuffle(&mut rand::rng());
         let stream: FuturesUnordered<_> = futs.into_iter().collect();
         let _: Vec<_> = stream.collect().await;
 

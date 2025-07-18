@@ -155,7 +155,7 @@ where
     let config = I::TEST_ADDRS;
     let frame_dst = FrameDestination::Individual { local: true };
     let mut rng = new_rng(70812476915813);
-    let mut body: Vec<u8> = core::iter::repeat_with(|| rng.r#gen()).take(100).collect();
+    let mut body: Vec<u8> = core::iter::repeat_with(|| rng.random()).take(100).collect();
     let buf = Buf::new(&mut body[..], ..)
         .wrap_in(I::PacketBuilder::new(
             src_ip.get(),

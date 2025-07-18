@@ -60,7 +60,7 @@ pub async fn recv_message<P: prost::Message + Default>(socket: &mut fasync::Sock
 mod test {
     use super::*;
 
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use vsh_rust_proto::vm_tools::vsh;
 
     fn create_async_sockets() -> Result<(fasync::Socket, fasync::Socket)> {
@@ -126,10 +126,10 @@ mod test {
     }
 
     fn get_random_vec() -> Vec<u8> {
-        let mut rng = thread_rng();
-        let size = rng.gen_range(0..=MAX_DATA_SIZE);
+        let mut rng = rng();
+        let size = rng.random_range(0..=MAX_DATA_SIZE);
         let mut vec = vec![0; size];
-        vec.fill_with(|| rng.gen());
+        rng.fill(&mut vec[..]);
         vec
     }
 

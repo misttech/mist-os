@@ -11,7 +11,7 @@ use fs_management::filesystem::Filesystem;
 use fs_management::Blobfs;
 use fuchsia_fs::directory::readdir;
 use fuchsia_merkle::MerkleTreeBuilder;
-use rand::distributions::Standard;
+use rand::distr::Standard;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;

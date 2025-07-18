@@ -4,7 +4,6 @@ use fidl::{endpoints, HandleBased};
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams};
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use rand::Rng;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use {
@@ -132,7 +131,7 @@ impl ElfComponentLaunchTest {
         let (controller, controller_server) =
             endpoints::create_proxy::<fcomponent::ControllerMarker>();
         let collection_ref = fdecl::CollectionRef { name: "coll".into() };
-        let id: u64 = rand::thread_rng().gen();
+        let id: u64 = rand::random();
         let child_name = format!("auto-{:x}", id);
         let child_decl = fdecl::Child {
             name: Some(child_name.clone().into()),

@@ -10,7 +10,7 @@ use fuchsia_inspect::Inspector;
 use futures::{future, FutureExt};
 use inspect_runtime::service::handle_request_stream;
 use inspect_runtime::TreeServerSendPreference;
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::borrow::Cow;
@@ -75,7 +75,7 @@ impl<R: SeedableRng + Rng> InspectHierarchyGenerator<R> {
 
     /// Generates prufer sequence by sampling uniformly from the rng.
     fn generate_prufer_sequence(&mut self, n: usize) -> Vec<usize> {
-        (0..n - 2).map(|_| self.rng.sample(Uniform::new(0, n))).collect()
+        (0..n - 2).map(|_| self.rng.sample(Uniform::new(0, n).unwrap())).collect()
     }
 
     /// Generate hierarchy from prufer sequence
@@ -175,34 +175,34 @@ mod tests {
         let hierarchy_generator = filled_hierarchy_generator(0, 10);
         assert_json_diff!(
         hierarchy_generator,
-        root:{
-            child_4:{
-                value:4
-            },
-            child_5:{
-                value:5,
-                child_2:{
-                    value:2,
-                    child_7:{
-                        value:7,
-                        child_1:{
-                            value:1
-                        },
-                        child_3:{
-                            value:3
-                        },
-                        child_6:{
-                            value:6
-                        },
-                        child_9:{
-                            value:9
-                        }
-                    },
-                    child_8:{
-                        value:8
-                    }
-                }
+        root: {
+          child_6: {
+            value: 6,
+            child_5: {
+              value: 5,
+              child_3: {
+                value: 3
+              },
+              child_9: {
+                value: 9
+              }
             }
+          },
+          child_8: {
+            value: 8,
+            child_1: {
+              value: 1
+            },
+            child_7: {
+              value: 7,
+              child_2: {
+                value: 2
+              },
+              child_4: {
+                value: 4
+              }
+            }
+          }
         });
     }
 }

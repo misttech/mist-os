@@ -24,7 +24,6 @@ use carnelian::{
     ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
-use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -328,8 +327,7 @@ fn main() -> Result<(), Error> {
 }
 
 fn random_color_element() -> u8 {
-    let mut rng = thread_rng();
-    let e: u8 = rng.gen_range(0..128);
+    let e: u8 = rand::random_range(0..128);
     e + 128
 }
 

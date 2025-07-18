@@ -7330,7 +7330,7 @@ mod tests {
     fn test_log_network_selection_scan_interval() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        let duration = zx::MonotonicDuration::from_seconds(rand::thread_rng().gen_range(0..100));
+        let duration = zx::MonotonicDuration::from_seconds(rand::random_range(0..100));
 
         let event = TelemetryEvent::NetworkSelectionScanInterval { time_since_last_scan: duration };
         test_helper.telemetry_sender.send(event);

@@ -41,11 +41,29 @@ use std::marker::PhantomData;
 // in a test below).
 fn generate_hash_nonces(seed: u64, num_nonces: usize) -> Vec<u64> {
     use rand::rngs::SmallRng;
-    use rand::{Rng as _, SeedableRng as _};
+    use rand::{Rng as _, SeedableRng};
     let mut output = Vec::with_capacity(num_nonces);
-    let mut rng = SmallRng::seed_from_u64(seed);
+
+    // TODO(https://fxbug.dev/421432284): The rand crate does not provide a
+    // stability guarantee for PRNG output when rolling new versions. When
+    // migrating bloom filters to use a stable hash function, we should also
+    // choose a better source of hash nonces (e.g. using a sequence number). The
+    // update to rand 0.9 specialized SmallRng's implementation of seed_from_u64
+    // which changed the seeding behavior, causing different hashes. This type
+    // offers a hack around that to use the default implementation from
+    // SeedableRng instead, which matches the hashes produced from rand 0.8.4.
+    struct MyRng(SmallRng);
+
+    impl SeedableRng for MyRng {
+        type Seed = [u8; 32];
+        fn from_seed(seed: [u8; 32]) -> Self {
+            Self(SmallRng::from_seed(seed))
+        }
+    }
+
+    let MyRng(mut rng) = MyRng::seed_from_u64(seed);
     for _ in 0..num_nonces {
-        let nonce: u64 = rng.gen();
+        let nonce: u64 = rng.random();
         output.push(nonce);
     }
     output

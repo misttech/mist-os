@@ -14,7 +14,6 @@ use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use futures::{select, FutureExt};
 use log::*;
 use pretty_assertions::{assert_eq, StrComparison};
-use rand::Rng;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
@@ -460,7 +459,7 @@ async fn wait_for_inspect_source(realm: &RealmInstance) {
 impl TestRealm {
     async fn new() -> Self {
         let name = {
-            let id: u64 = rand::thread_rng().gen();
+            let id: u64 = rand::random();
             format!("auto-{id:x}")
         };
         let fs = mock_filesystems::TestFs::new();

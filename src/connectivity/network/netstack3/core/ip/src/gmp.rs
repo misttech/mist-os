@@ -403,7 +403,7 @@ fn random_report_timeout<R: Rng>(rng: &mut R, period: Duration) -> Duration {
     {
         // NB: gen_range panics if the range is empty, this must be inclusive
         // end.
-        rng.gen_range(1..=micros.get())
+        rng.random_range(1..=micros.get())
     } else {
         1
     };

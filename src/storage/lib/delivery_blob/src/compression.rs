@@ -767,8 +767,8 @@ mod tests {
     fn test_decompressor() {
         const UNCOMPRESSED_LENGTH: usize = 3_000_000;
         let data: Vec<u8> = {
-            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
-            rand::thread_rng().sample_iter(&range).take(UNCOMPRESSED_LENGTH).collect()
+            let range = rand::distr::Uniform::<u8>::new_inclusive(0, 255).unwrap();
+            rand::rng().sample_iter(&range).take(UNCOMPRESSED_LENGTH).collect()
         };
         let mut compressed: Vec<u8> = vec![];
         ChunkedArchive::new(&data, BLOCK_SIZE)

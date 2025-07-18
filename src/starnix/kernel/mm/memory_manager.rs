@@ -21,7 +21,6 @@ use bitflags::bitflags;
 use cfg_if::cfg_if;
 use flyweights::FlyByteStr;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
-use rand::{thread_rng, Rng};
 use range_map::RangeMap;
 use smallvec::SmallVec;
 use starnix_ext::map_ext::EntryExt;
@@ -560,7 +559,7 @@ impl MemoryManagerState {
         if possible_placements == 0 {
             return None;
         }
-        let chosen_placement_idx = thread_rng().gen_range(0..possible_placements);
+        let chosen_placement_idx = rand::random_range(0..possible_placements);
         self.pick_placement(length, chosen_placement_idx, subrange)
     }
 

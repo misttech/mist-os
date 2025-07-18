@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use async_utils::PollExt;
     use futures::FutureExt;
-    use rand::distributions::Standard;
+    use rand::distr::StandardUniform;
     use rand::Rng;
     use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
 
@@ -156,7 +156,7 @@ mod tests {
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
         let random_bytes: Vec<u8> =
-            rand::thread_rng().sample_iter(Standard).take(total_bytes_to_send).collect();
+            rand::rng().sample_iter(StandardUniform).take(total_bytes_to_send).collect();
 
         let mem = IdentityDriverMem::new();
         let mut queue_state = TestQueue::new(32, &mem);
@@ -207,7 +207,7 @@ mod tests {
         let mut remote = fasync::Socket::from_socket(remote);
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
-        let random_bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(96).collect();
+        let random_bytes: Vec<u8> = rand::rng().sample_iter(StandardUniform).take(96).collect();
         remote
             .write_all(&random_bytes)
             .now_or_never()
@@ -258,7 +258,7 @@ mod tests {
         let mut remote = fasync::Socket::from_socket(remote);
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
-        let random_bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(128).collect();
+        let random_bytes: Vec<u8> = rand::rng().sample_iter(StandardUniform).take(128).collect();
         remote
             .write_all(&random_bytes)
             .now_or_never()
@@ -329,7 +329,7 @@ mod tests {
         let mut remote = fasync::Socket::from_socket(remote);
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
-        let random_bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(64).collect();
+        let random_bytes: Vec<u8> = rand::rng().sample_iter(StandardUniform).take(64).collect();
         remote
             .write_all(&random_bytes)
             .now_or_never()

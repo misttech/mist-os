@@ -298,7 +298,7 @@ pub(crate) async fn auth_code_to_refresh(
 fn random_base64_url_encoded(count: usize) -> String {
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
-    let mut rng = StdRng::from_entropy();
+    let mut rng = StdRng::from_os_rng();
     let mut value = vec![0u8; count];
     rng.fill(&mut *value);
     base64_url(&value)

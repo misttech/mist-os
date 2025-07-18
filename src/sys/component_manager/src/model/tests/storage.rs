@@ -433,7 +433,7 @@ async fn instance_id_from_index() {
 /// index.
 #[fuchsia::test]
 async fn use_restricted_storage_start_failure() {
-    let parent_consumer_instance_id = InstanceId::new_random(&mut rand::thread_rng());
+    let parent_consumer_instance_id = InstanceId::new_random(&mut rand::rng());
     let index = {
         let mut index = component_id_index::Index::default();
         index
@@ -526,7 +526,7 @@ async fn use_restricted_storage_start_failure() {
 /// the component index.
 #[fuchsia::test]
 async fn use_restricted_storage_open_failure() {
-    let parent_consumer_instance_id = InstanceId::new_random(&mut rand::thread_rng());
+    let parent_consumer_instance_id = InstanceId::new_random(&mut rand::rng());
     let index = {
         let mut index = component_id_index::Index::default();
         index
@@ -649,7 +649,7 @@ async fn use_restricted_storage_open_failure() {
 /// Test that a component can open a subdirectory of a storage successfully
 #[fuchsia::test]
 async fn open_storage_subdirectory() {
-    let parent_consumer_instance_id = InstanceId::new_random(&mut rand::thread_rng());
+    let parent_consumer_instance_id = InstanceId::new_random(&mut rand::rng());
     let index = {
         let mut index = component_id_index::Index::default();
         index
@@ -978,7 +978,7 @@ async fn storage_persistence_instance_id_path() {
     ];
 
     // set instance_id for "b/persistent_coll:c" components
-    let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+    let instance_id = InstanceId::new_random(&mut rand::rng());
     let index = {
         let mut index = component_id_index::Index::default();
         index.insert(["b", "persistent_coll:c"].try_into().unwrap(), instance_id.clone()).unwrap();
@@ -1151,7 +1151,7 @@ async fn storage_persistence_inheritance() {
     ];
 
     // set instance_id for "b/persistent_coll:c" components
-    let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+    let instance_id = InstanceId::new_random(&mut rand::rng());
     let index = {
         let mut index = component_id_index::Index::default();
         index.insert(["b", "persistent_coll:c"].try_into().unwrap(), instance_id.clone()).unwrap();
@@ -1363,7 +1363,7 @@ async fn storage_persistence_disablement() {
     ];
 
     // set instance_id for "b/persistent_coll:c" components
-    let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+    let instance_id = InstanceId::new_random(&mut rand::rng());
     let index = {
         let mut index = component_id_index::Index::default();
         index.insert(["b", "persistent_coll:c"].try_into().unwrap(), instance_id.clone()).unwrap();

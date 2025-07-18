@@ -331,14 +331,14 @@ alias(
 )
 
 alias(
-    name = "bitflags-2.8.0",
-    actual = "//third_party/rust_crates/vendor/bitflags-2.8.0:bitflags",
+    name = "bitflags-2.9.1",
+    actual = "//third_party/rust_crates/vendor/bitflags-2.9.1:bitflags",
     tags = ["manual"],
 )
 
 alias(
     name = "bitflags",
-    actual = "//third_party/rust_crates/vendor/bitflags-2.8.0:bitflags",
+    actual = "//third_party/rust_crates/vendor/bitflags-2.9.1:bitflags",
     tags = ["manual"],
 )
 
@@ -1075,14 +1075,14 @@ alias(
 )
 
 alias(
-    name = "getrandom-0.2.10",
-    actual = "//third_party/rust_crates/vendor/getrandom-0.2.10:getrandom",
+    name = "getrandom-0.3.3",
+    actual = "//third_party/rust_crates/vendor/getrandom-0.3.3:getrandom",
     tags = ["manual"],
 )
 
 alias(
     name = "getrandom",
-    actual = "//third_party/rust_crates/vendor/getrandom-0.2.10:getrandom",
+    actual = "//third_party/rust_crates/vendor/getrandom-0.3.3:getrandom",
     tags = ["manual"],
 )
 
@@ -1975,14 +1975,14 @@ alias(
 )
 
 alias(
-    name = "proptest-1.5.0",
-    actual = "//third_party/rust_crates/vendor/proptest-1.5.0:proptest",
+    name = "proptest-1.7.0",
+    actual = "//third_party/rust_crates/vendor/proptest-1.7.0:proptest",
     tags = ["manual"],
 )
 
 alias(
     name = "proptest",
-    actual = "//third_party/rust_crates/vendor/proptest-1.5.0:proptest",
+    actual = "//third_party/rust_crates/vendor/proptest-1.7.0:proptest",
     tags = ["manual"],
 )
 
@@ -2059,38 +2059,38 @@ alias(
 )
 
 alias(
-    name = "rand-0.8.4",
-    actual = "//third_party/rust_crates/vendor/rand-0.8.4:rand",
+    name = "rand-0.9.1",
+    actual = "//third_party/rust_crates/vendor/rand-0.9.1:rand",
     tags = ["manual"],
 )
 
 alias(
     name = "rand",
-    actual = "//third_party/rust_crates/vendor/rand-0.8.4:rand",
+    actual = "//third_party/rust_crates/vendor/rand-0.9.1:rand",
     tags = ["manual"],
 )
 
 alias(
-    name = "rand_core-0.6.4",
-    actual = "//third_party/rust_crates/vendor/rand_core-0.6.4:rand_core",
+    name = "rand_core-0.9.3",
+    actual = "//third_party/rust_crates/vendor/rand_core-0.9.3:rand_core",
     tags = ["manual"],
 )
 
 alias(
     name = "rand_core",
-    actual = "//third_party/rust_crates/vendor/rand_core-0.6.4:rand_core",
+    actual = "//third_party/rust_crates/vendor/rand_core-0.9.3:rand_core",
     tags = ["manual"],
 )
 
 alias(
-    name = "rand_xorshift-0.3.0",
-    actual = "//third_party/rust_crates/vendor/rand_xorshift-0.3.0:rand_xorshift",
+    name = "rand_xorshift-0.4.0",
+    actual = "//third_party/rust_crates/vendor/rand_xorshift-0.4.0:rand_xorshift",
     tags = ["manual"],
 )
 
 alias(
     name = "rand_xorshift",
-    actual = "//third_party/rust_crates/vendor/rand_xorshift-0.3.0:rand_xorshift",
+    actual = "//third_party/rust_crates/vendor/rand_xorshift-0.4.0:rand_xorshift",
     tags = ["manual"],
 )
 

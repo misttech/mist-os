@@ -60,7 +60,7 @@ use futures::{FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use packet::{Buf, BufferMut};
 use rand::rngs::OsRng;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore, TryRngCore as _};
 use util::{ConversionContext, IntoFidl as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
@@ -482,23 +482,19 @@ impl RngImpl {
 /// [`OsRng`] is a zero-sized type that provides randomness from the OS.
 impl RngCore for RngImpl {
     fn next_u32(&mut self) -> u32 {
-        OsRng::default().next_u32()
+        OsRng::default().try_next_u32().unwrap()
     }
 
     fn next_u64(&mut self) -> u64 {
-        OsRng::default().next_u64()
+        OsRng::default().try_next_u64().unwrap()
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        OsRng::default().fill_bytes(dest)
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-        OsRng::default().try_fill_bytes(dest)
+        OsRng::default().try_fill_bytes(dest).unwrap()
     }
 }
 
-impl CryptoRng for RngImpl where OsRng: CryptoRng {}
+impl CryptoRng for RngImpl where OsRng: rand::TryCryptoRng {}
 
 impl RngContext for BindingsCtx {
     type Rng<'a> = RngImpl;

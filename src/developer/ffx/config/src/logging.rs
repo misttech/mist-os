@@ -5,7 +5,6 @@
 use anyhow::{Context as _, Result};
 use log::LevelFilter;
 use logging::{FfxLog, FfxLogSink, Filter, FormatOpts, LogSinkTrait, TargetsFilter, TestWriter};
-use rand::Rng;
 use std::fs::{create_dir_all, remove_file, rename, File, OpenOptions};
 use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -82,7 +81,7 @@ pub fn disable_stdio_logging() {
 }
 
 fn generate_id() -> u64 {
-    rand::thread_rng().gen::<u64>()
+    rand::random::<u64>()
 }
 
 // There are times when we want to change the log file we are writing to. The

@@ -283,10 +283,10 @@ async fn test_err_handling() {
     let (tx, mut rx) = futures::channel::mpsc::unbounded::<(u32, Invocation, AckSender)>();
     let mut authority = create_authority().await;
     let service_context = Rc::new(ServiceContext::new(None, None));
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let agent_1_id = TestAgent::create_and_register(
-        rng.gen(),
+        rng.random(),
         LifespanTarget::Initialization,
         &mut authority,
         tx.clone(),
@@ -297,7 +297,7 @@ async fn test_err_handling() {
     .id();
 
     let agent2_lock = TestAgent::create_and_register(
-        rng.gen(),
+        rng.random(),
         LifespanTarget::Initialization,
         &mut authority,
         tx.clone(),
@@ -331,10 +331,10 @@ async fn create_agents(
     sender: UnboundedSender<(u32, Invocation, AckSender)>,
 ) -> Vec<u32> {
     let mut return_agents = Vec::new();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for _ in 0..count {
-        let id = rng.gen();
+        let id = rng.random();
         return_agents.push(id);
         let _ =
             TestAgent::create_and_register(id, lifespan_target.clone(), authority, sender.clone())

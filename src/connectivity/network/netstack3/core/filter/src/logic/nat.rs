@@ -1078,7 +1078,7 @@ fn rewrite_reply_tuple_port<I: IpExt, BC: FilterBindingsContext, A: PartialEq>(
     const MAX_ATTEMPTS: u16 = 128;
     let len = port_range.end().get() - port_range.start().get() + 1;
     let mut rng = bindings_ctx.rng();
-    let start = rng.gen_range(port_range.start().get()..=port_range.end().get());
+    let start = rng.random_range(port_range.start().get()..=port_range.end().get());
     for i in 0..core::cmp::min(MAX_ATTEMPTS, len) {
         // `offset` is <= the size of `port_range`, which is a range of `NonZerou16`, so
         // `port_range.start()` + `offset` is guaranteed to fit in a `NonZeroU16`.

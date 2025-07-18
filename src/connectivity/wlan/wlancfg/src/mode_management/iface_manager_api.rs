@@ -1546,8 +1546,7 @@ mod tests {
         // Build an SME specifically for scanning.
         let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForScan::new(proxy, iface_id, defect_sender);
 
         sme.log_aborted_scan_defect();
@@ -1576,8 +1575,7 @@ mod tests {
         // Create the SmeForScan
         let (proxy, _server) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForScan::new(proxy, iface_id, defect_sender);
 
         // Issue the scan request.
@@ -1612,8 +1610,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a disconnect and run the future until it stalls.
@@ -1644,8 +1641,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a disconnect and expect an immediate error return.
@@ -1662,8 +1658,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a disconnect and run the future until it stalls.
@@ -1694,8 +1689,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a roam via the sme proxy
@@ -1733,8 +1727,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a connection.
@@ -1793,8 +1786,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a connection.
@@ -1853,8 +1845,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a disconnect and expect an immediate error return.
@@ -1875,8 +1866,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
 
         // Request a connection and run the future until it stalls.
@@ -1973,8 +1963,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Start the AP and run the future until it stalls.
@@ -2007,8 +1996,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Start the AP and observe an immediate failure.
@@ -2026,8 +2014,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Start the AP and run the future until it stalls.
@@ -2059,8 +2046,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Stop the AP and run the future until it stalls.
@@ -2092,8 +2078,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Stop the AP and observe an immediate failure.
@@ -2110,8 +2095,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Stop the AP and run the future until it stalls.
@@ -2142,8 +2126,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Query AP status and run the future until it stalls.
@@ -2175,8 +2158,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Query status and observe an immediate failure.
@@ -2193,8 +2175,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
-        let mut rng = rand::thread_rng();
-        let iface_id = rng.gen::<u16>();
+        let iface_id = rand::random::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
 
         // Query AP status and run the future until it stalls.

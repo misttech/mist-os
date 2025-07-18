@@ -584,7 +584,7 @@ impl AnonymizedAggregateServiceDir {
                         if inner.entries.contains_key(&instance_key) {
                             return Ok(());
                         }
-                        let name = Self::generate_instance_id(&mut rand::thread_rng());
+                        let name = Self::generate_instance_id(&mut rand::rng());
 
                         let Ok(child_proxy) = fuchsia_fs::directory::open_directory_async(
                             proxy,

@@ -285,9 +285,10 @@ mod tests {
 
     #[test]
     fn test_fuzz_serialize() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..100000 {
-            let byte_vec: Vec<u8> = (0..rng.gen_range(0..32)).map(|_| rng.gen::<u8>()).collect();
+            let byte_vec: Vec<u8> =
+                (0..rng.random_range(0..32)).map(|_| rng.random::<u8>()).collect();
             let before = ZXName::from_bytes_lossy(&byte_vec);
             let json = serde_json::to_string(&before).unwrap();
             let after: ZXName = serde_json::from_str(&json).expect("deserialization works");

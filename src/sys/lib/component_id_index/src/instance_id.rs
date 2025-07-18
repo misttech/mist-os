@@ -83,7 +83,7 @@ impl<'de> Deserialize<'de> for InstanceId {
         D: Deserializer<'de>,
     {
         String::deserialize(deserializer)?.parse().map_err(|err| {
-            let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+            let instance_id = InstanceId::new_random(&mut rand::rng());
             serde::de::Error::custom(format!(
                 "Invalid instance ID: {}\n\nHere is a valid, randomly generated ID: {}\n",
                 err, instance_id
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn new_random_is_unique() {
-        let seed = rand::thread_rng().next_u64();
+        let seed = rand::rng().next_u64();
         println!("using seed {}", seed);
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         let mut prev_id = InstanceId::new_random(&mut rng);
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn parse_new_random() {
-        let seed = rand::thread_rng().next_u64();
+        let seed = rand::rng().next_u64();
         println!("using seed {}", seed);
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         for _i in 0..40 {

@@ -1263,9 +1263,9 @@ impl OverlayStack {
         FCreate: Fn(&mut Locked<L>, &ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
         FInit: FnOnce(&mut Locked<L>, &ActiveEntry) -> Result<(), Errno>,
     {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let (temp_name, entry) = loop {
-            let x: u64 = rng.gen();
+            let x: u64 = rng.random();
             let temp_name = FsString::from(format!("tmp{:x}", x));
             match try_create(locked, &self.work, temp_name.as_ref()) {
                 Err(err) if err.code == EEXIST => continue,

@@ -170,7 +170,6 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use futures::StreamExt;
-    use rand::RngCore;
     use test_case::test_case;
 
     #[test_case(Vec::from(b"This is a test string"); "normal test string")]
@@ -253,7 +252,7 @@ mod tests {
         let (mut decoder, mut drx) = Decoder::new();
 
         let mut original_data = vec![0u8; BUFFER_SIZE * 5 + 100];
-        rand::thread_rng().fill_bytes(&mut original_data); // Fill with random data
+        rand::fill(&mut original_data[..]); // Fill with random data
         let chunk_size = 2 * 1024 * 1024; // 2 MB
 
         // Compress the data in chunks

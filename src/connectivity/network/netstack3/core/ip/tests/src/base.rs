@@ -858,7 +858,7 @@ fn test_ipv6_packet_too_big() {
     // body itself is 5000). Note, the final packet will be larger because
     // of IP header data.
     let mut rng = new_rng(70812476915813);
-    let body: Vec<u8> = core::iter::repeat_with(|| rng.r#gen()).take(5000).collect();
+    let body: Vec<u8> = core::iter::repeat_with(|| rng.random()).take(5000).collect();
 
     // Ip packet from some node destined to a remote on this network,
     // arriving locally.

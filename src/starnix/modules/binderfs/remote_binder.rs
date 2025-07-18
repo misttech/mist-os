@@ -1165,7 +1165,7 @@ mod tests {
     use crate::BinderFs;
     use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
     use fidl::HandleBased;
-    use rand::distributions::{Alphanumeric, DistString};
+    use rand::distr::{Alphanumeric, SampleString};
     use starnix_core::mm::MemoryAccessor;
     use starnix_core::power::LockSource;
     use starnix_core::testing::*;
@@ -1212,7 +1212,7 @@ mod tests {
         spawn_kernel_and_run(|_, init_task| {
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async move {
-                let service_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+                let service_name = Alphanumeric.sample_string(&mut rand::rng(), 16);
                 let (remote_controller_client, remote_controller_server) =
                     create_endpoints::<fbinder::RemoteControllerMarker>();
                 REMOTE_CONTROLLER_CLIENT

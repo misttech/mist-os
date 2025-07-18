@@ -5,8 +5,8 @@
 use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use log::{debug, info};
-use rand::prelude::SliceRandom;
 use rand::rngs::SmallRng;
+use rand::seq::IndexedRandom;
 use rand::Rng;
 use storage_stress_test_utils::io::Directory;
 use stress_test::actor::{Actor, ActorError};
@@ -49,10 +49,10 @@ impl ReadActor {
         }
 
         // Choose an offset
-        let offset = self.rng.gen_range(0..data_size_bytes - 1);
+        let offset = self.rng.random_range(0..data_size_bytes - 1);
 
         // Determine the length of this read
-        let end_pos = self.rng.gen_range(offset..data_size_bytes);
+        let end_pos = self.rng.random_range(offset..data_size_bytes);
 
         assert!(end_pos >= offset);
         let length = end_pos - offset;

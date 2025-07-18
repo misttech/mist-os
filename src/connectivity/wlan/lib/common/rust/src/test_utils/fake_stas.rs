@@ -15,7 +15,7 @@ use anyhow::Context;
 use ieee80211::Ssid;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use rand::distributions::{Distribution, Standard};
+use rand::distr::{Distribution, StandardUniform};
 use rand::Rng;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -230,10 +230,11 @@ pub enum FakeProtectionCfg {
     Eap = LAST_FAKE_PROTECTION_CFG_VALUE,
 }
 
-impl Distribution<FakeProtectionCfg> for Standard {
+impl Distribution<FakeProtectionCfg> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> FakeProtectionCfg {
-        let r = rng.gen_range(0..LAST_FAKE_PROTECTION_CFG_VALUE + 1);
-        FromPrimitive::from_isize(r)
+        // NB: rand does not provide uniform distribution for isize.
+        let r = rng.random_range(0..usize::try_from(LAST_FAKE_PROTECTION_CFG_VALUE + 1).unwrap());
+        FromPrimitive::from_usize(r)
             .unwrap_or_else(|| panic!("Out of range random value for FakeProtectionCfg: {:?}", r))
     }
 }
@@ -289,8 +290,8 @@ pub fn build_fake_bss_description_creator__(
 }
 
 fn random_ecw_min_max(rng: &mut rand::prelude::ThreadRng) -> ie::EcwMinMax {
-    let min = rng.gen_range(0x0..0xf);
-    let max = rng.gen_range(min..0xf);
+    let min = rng.random_range(0x0..0xf);
+    let max = rng.random_range(min..0xf);
     ie::EcwMinMax((max << 4) | min)
 }
 
@@ -300,13 +301,14 @@ pub fn build_random_bss_description_creator__(
     // Only the Infrastructure BSS type is supported.
     let bss_type = fidl_common::BssType::Infrastructure;
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Random rates
     let mut rates: Vec<u8> = vec![];
-    for _ in 0..rng.gen_range(1..ie::SUPPORTED_RATES_MAX_LEN + ie::EXTENDED_SUPPORTED_RATES_MAX_LEN)
+    for _ in
+        0..rng.random_range(1..ie::SUPPORTED_RATES_MAX_LEN + ie::EXTENDED_SUPPORTED_RATES_MAX_LEN)
     {
-        rates.push(rng.gen());
+        rates.push(rng.random());
     }
     let rates = rates; // shadow to make rates immutable
 
@@ -314,74 +316,74 @@ pub fn build_random_bss_description_creator__(
     let mut giant_vendor_ies = vec![];
     for _j in 0..8 {
         giant_vendor_ies.extend_from_slice(&[221, 250]);
-        giant_vendor_ies.extend((0..250).map(|_| rng.gen::<u8>()))
+        giant_vendor_ies.extend((0..250).map(|_| rng.random::<u8>()))
     }
     let ies_overrides = IesOverrides::new().set_raw(giant_vendor_ies);
 
-    let qos: bool = rng.gen();
-    let apsd: bool = qos && rng.gen(); // APSD is a QoS capability, so the AP must also be QoS capable
+    let qos: bool = rng.random();
+    let apsd: bool = qos && rng.random(); // APSD is a QoS capability, so the AP must also be QoS capable
 
     BssDescriptionCreator {
-        bssid: (0..6).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>().try_into().unwrap(),
+        bssid: (0..6).map(|_| rng.random::<u8>()).collect::<Vec<u8>>().try_into().unwrap(),
         bss_type,
-        beacon_period: rng.gen::<u16>(),
+        beacon_period: rng.random::<u16>(),
         // TODO(https://fxbug.dev/42162492): Purely random valid channel values is not implemented.
-        channel: Channel::new(rng.gen_range(1..255), Cbw::Cbw20),
-        rssi_dbm: rng.gen::<i8>(),
-        snr_db: rng.gen::<i8>(),
+        channel: Channel::new(rng.random_range(1..255), Cbw::Cbw20),
+        rssi_dbm: rng.random::<i8>(),
+        snr_db: rng.random::<i8>(),
 
         protection_cfg,
         ssid: Ssid::from_bytes_unchecked(
-            (0..fidl_ieee80211::MAX_SSID_BYTE_LEN).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>(),
+            (0..fidl_ieee80211::MAX_SSID_BYTE_LEN).map(|_| rng.random::<u8>()).collect::<Vec<u8>>(),
         ),
         rates,
 
         // WMM is independent of 802.11 QoS, so the capabilities randomly indicated
         // in wmm_param are not related to the QoS and APSD bits in the Capability Information
         // field indicated. See WMM Specification, Section 1.3.
-        wmm_param: if rng.gen() {
+        wmm_param: if rng.random() {
             Some(ie::WmmParam {
                 wmm_info: ie::WmmInfo(0).with_ap_wmm_info(
                     ie::ApWmmInfo(0)
-                        .with_parameter_set_count(rng.gen_range(0x00..0xf))
-                        .with_uapsd(rng.gen()),
+                        .with_parameter_set_count(rng.random_range(0x00..0xf))
+                        .with_uapsd(rng.random()),
                 ),
-                _reserved: rng.gen(),
+                _reserved: rng.random(),
                 ac_be_params: ie::WmmAcParams {
-                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.gen_range(2..0xf)).with_aci(0),
+                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.random_range(2..0xf)).with_aci(0),
                     ecw_min_max: random_ecw_min_max(&mut rng),
-                    txop_limit: rng.gen(),
+                    txop_limit: rng.random(),
                 },
                 ac_bk_params: ie::WmmAcParams {
-                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.gen_range(2..0xf)).with_aci(1),
+                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.random_range(2..0xf)).with_aci(1),
                     ecw_min_max: random_ecw_min_max(&mut rng),
-                    txop_limit: rng.gen(),
+                    txop_limit: rng.random(),
                 },
                 ac_vi_params: ie::WmmAcParams {
-                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.gen_range(2..0xf)).with_aci(2),
+                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.random_range(2..0xf)).with_aci(2),
                     ecw_min_max: random_ecw_min_max(&mut rng),
-                    txop_limit: rng.gen(),
+                    txop_limit: rng.random(),
                 },
                 ac_vo_params: ie::WmmAcParams {
-                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.gen_range(2..0xf)).with_aci(3),
+                    aci_aifsn: ie::WmmAciAifsn(0).with_aifsn(rng.random_range(2..0xf)).with_aci(3),
                     ecw_min_max: random_ecw_min_max(&mut rng),
-                    txop_limit: rng.gen(),
+                    txop_limit: rng.random(),
                 },
             })
         } else {
             None
         },
 
-        cf_pollable: rng.gen(),
-        cf_poll_req: rng.gen(),
-        short_preamble: rng.gen(),
-        spectrum_mgmt: rng.gen(),
+        cf_pollable: rng.random(),
+        cf_poll_req: rng.random(),
+        short_preamble: rng.random(),
+        spectrum_mgmt: rng.random(),
         qos,
-        short_slot_time: rng.gen(),
+        short_slot_time: rng.random(),
         apsd,
-        radio_measurement: rng.gen(),
-        delayed_block_ack: rng.gen(),
-        immediate_block_ack: rng.gen(),
+        radio_measurement: rng.random(),
+        delayed_block_ack: rng.random(),
+        immediate_block_ack: rng.random(),
 
         // Generating completely random IEs would be chaotic at best, so we
         // generate some random vendor ies instead.
@@ -448,10 +450,10 @@ macro_rules! fake_fidl_bss_description {
 #[macro_export]
 macro_rules! random_fidl_bss_description {
     ($($bss_key:ident: $bss_value:expr),* $(,)?) => {{
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         $crate::fake_fidl_bss_description__!(
             $crate::test_utils::fake_stas::build_random_bss_description_creator__,
-            rng.gen::<$crate::test_utils::fake_stas::FakeProtectionCfg>()
+            rng.random::<$crate::test_utils::fake_stas::FakeProtectionCfg>()
                 $(, $bss_key: $bss_value)*)
     }};
     ($protection_name:ident $(, $bss_key:ident: $bss_value:expr)* $(,)?) => {{
@@ -495,10 +497,10 @@ macro_rules! fake_bss_description {
 #[macro_export]
 macro_rules! random_bss_description {
     ($($bss_key:ident: $bss_value:expr),* $(,)?) => {{
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         $crate::fake_bss_description__!(
             random_fidl_bss_description,
-            rng.gen::<$crate::test_utils::fake_stas::FakeProtectionCfg>()
+            rng.random::<$crate::test_utils::fake_stas::FakeProtectionCfg>()
                 $(, $bss_key: $bss_value)*)
     }};
     ($protection_name:ident $(, $bss_key:ident: $bss_value:expr)* $(,)?) => {{
@@ -711,7 +713,7 @@ mod tests {
 
     #[test]
     fn valid_random_ecw_min_max() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..100 {
             let ecw_min_max = random_ecw_min_max(&mut rng);
             assert!(ecw_min_max.ecw_max() >= ecw_min_max.ecw_min());

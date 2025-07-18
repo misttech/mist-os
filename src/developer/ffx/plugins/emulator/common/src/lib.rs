@@ -8,7 +8,7 @@
 
 use anyhow::{anyhow, Result};
 use nix::sys::socket::{connect, socket, AddressFamily, SockFlag, SockType, VsockAddr};
-use rand::{distributions, thread_rng, Rng as _};
+use rand::{distr, Rng as _};
 use std::fs::File;
 use std::io::{BufRead, ErrorKind, Write};
 use std::os::fd::AsRawFd;
@@ -72,8 +72,8 @@ pub fn find_unused_vsock_cid() -> Result<u32> {
     // be defensive with a bit of retry logic.
     const ATTEMPTS: u32 = 3;
 
-    let dist = distributions::Uniform::new_inclusive(VSOCK_CID_BOUNDS.0, VSOCK_CID_BOUNDS.1);
-    let mut cids = thread_rng().sample_iter(dist);
+    let dist = distr::Uniform::new_inclusive(VSOCK_CID_BOUNDS.0, VSOCK_CID_BOUNDS.1).unwrap();
+    let mut cids = rand::rng().sample_iter(dist);
 
     for _ in 0..ATTEMPTS {
         let cid = cids.next().unwrap();

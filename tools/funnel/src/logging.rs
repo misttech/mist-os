@@ -5,7 +5,6 @@
 use anyhow::Result;
 use log::LevelFilter;
 use logging::{FfxLog, FfxLogSink, FormatOpts, LogSinkTrait, TargetsFilter};
-use rand::Rng;
 use std::sync::{Arc, Mutex};
 
 lazy_static::lazy_static! {
@@ -13,7 +12,7 @@ lazy_static::lazy_static! {
 }
 
 fn generate_id() -> u64 {
-    rand::thread_rng().gen::<u64>()
+    rand::random::<u64>()
 }
 
 pub fn init(level: LevelFilter) -> Result<()> {

@@ -205,8 +205,8 @@ mod tests {
     use anyhow::{format_err, Context as _, Error};
     use assert_matches::assert_matches;
     use futures::{try_join, TryStreamExt as _};
-    use rand::distributions::{Alphanumeric, DistString as _};
-    use rand::thread_rng;
+    use rand::distr::{Alphanumeric, SampleString as _};
+    use rand::rng;
     use std::sync::mpsc;
     use test_case::test_case;
 
@@ -422,6 +422,6 @@ mod tests {
     }
 
     fn get_random_string(size: usize) -> String {
-        Alphanumeric.sample_string(&mut thread_rng(), size)
+        Alphanumeric.sample_string(&mut rng(), size)
     }
 }

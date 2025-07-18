@@ -334,8 +334,8 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::future::join_all;
     use futures::pin_mut;
-    use rand::prelude::SliceRandom;
-    use rand::{thread_rng, Rng};
+    use rand::seq::IndexedRandom;
+    use rand::{rng, Rng};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
@@ -450,7 +450,7 @@ mod tests {
         join_all((0..10).map(|_| {
             let allocator = allocator.clone();
             fasync::Task::spawn(async move {
-                let mut rng = thread_rng();
+                let mut rng = rng();
                 enum Op {
                     Alloc,
                     Dealloc,
@@ -464,12 +464,12 @@ mod tests {
                             // then pick a size within that. For example, we might pick order 3,
                             // which would give us 8 * 512..16 * 512 as our possible range.
                             // This way we don't bias towards larger allocations too much.
-                            let order: usize = rng.gen_range(order(1, bs)..order(65536 + 1, bs));
-                            let size: usize = rng.gen_range(
+                            let order: usize = rng.random_range(order(1, bs)..order(65536 + 1, bs));
+                            let size: usize = rng.random_range(
                                 bs * 2_usize.pow(order as u32)..bs * 2_usize.pow(order as u32 + 1),
                             );
                             if let Ok(mut buf) = allocator.try_allocate_buffer(size) {
-                                let val = rng.gen::<u8>();
+                                let val = rng.random::<u8>();
                                 buf.as_mut_slice().fill(val);
                                 for v in buf.as_slice() {
                                     assert_eq!(v, &val);
@@ -478,7 +478,7 @@ mod tests {
                             }
                         }
                         Op::Dealloc if !buffers.is_empty() => {
-                            let idx = rng.gen_range(0..buffers.len());
+                            let idx = rng.random_range(0..buffers.len());
                             buffers.remove(idx);
                         }
                         _ => {}

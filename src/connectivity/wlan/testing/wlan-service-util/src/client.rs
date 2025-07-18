@@ -337,7 +337,7 @@ mod tests {
     };
 
     fn generate_random_wpa2_bss_description() -> fidl_fuchsia_wlan_internal::BssDescription {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         fidl_fuchsia_wlan_internal::BssDescription {
             bssid: (0..6).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>().try_into().unwrap(),
             beacon_period: rng.gen::<u16>(),

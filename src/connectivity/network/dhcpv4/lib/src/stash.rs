@@ -253,8 +253,8 @@ mod tests {
     /// `prefix` must not contain either '-' or ':' as they are used as field delimiters in stash
     /// keys.
     fn new_stash(test_prefix: &str) -> Result<(Stash, String), StashError> {
-        use rand::distributions::DistString as _;
-        let rand_id = rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
+        use rand::distr::SampleString as _;
+        let rand_id = rand::distr::Alphanumeric.sample_string(&mut rand::rng(), 8);
         let stash = Stash::new_with_prefix(&rand_id, test_prefix)?;
         // Clear the Stash of any data leftover from the previous test.
         let () = stash.proxy.delete_prefix(&stash.prefix)?;

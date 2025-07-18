@@ -793,7 +793,7 @@ mod test {
     use futures::future::Either;
     use futures::prelude::*;
     use rand::seq::SliceRandom;
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use std::future::poll_fn;
     use std::pin::pin;
     use zx::MonotonicDuration;
@@ -956,7 +956,7 @@ mod test {
 
         let mut timer_futures = Vec::new();
         let mut nanos: Vec<_> = (0..1000).collect();
-        let mut rng = thread_rng();
+        let mut rng = rng();
         nanos.shuffle(&mut rng);
 
         create_timers(&timers, &nanos, &mut timer_futures);
@@ -1011,13 +1011,13 @@ mod test {
 
         let mut timer_futures = Vec::new();
         let mut nanos: Vec<_> = (1..100).collect();
-        let mut rng = thread_rng();
+        let mut rng = rng();
         nanos.shuffle(&mut rng);
 
         create_timers(&timers, &nanos, &mut timer_futures);
 
         // Create some timers with the same time.
-        let time = rng.gen_range(0..101);
+        let time = rng.random_range(0..101);
         let same_time = [time; 100];
         create_timers(&timers, &same_time, &mut timer_futures);
 
@@ -1075,9 +1075,7 @@ mod test {
             let mut timer = pin!(Timer::new(MonotonicInstant::after(TIMER_DELAY)));
             for _ in 0..10000 {
                 let _ = futures::poll!(timer.as_mut());
-                std::thread::sleep(std::time::Duration::from_micros(
-                    rand::thread_rng().gen_range(80..120),
-                ));
+                std::thread::sleep(std::time::Duration::from_micros(rand::random_range(80..120)));
                 timer.as_mut().reset(MonotonicInstant::after(TIMER_DELAY));
                 timer.set(Timer::new(MonotonicInstant::after(TIMER_DELAY)));
             }

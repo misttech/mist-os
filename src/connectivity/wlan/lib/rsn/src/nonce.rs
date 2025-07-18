@@ -9,7 +9,7 @@ use fuchsia_sync::Mutex;
 use ieee80211::MacAddr;
 use num::bigint::BigUint;
 use rand::rngs::OsRng;
-use rand::Rng as _;
+use rand::{Rng as _, TryRngCore as _};
 use std::sync::Arc;
 
 pub type Nonce = [u8; 32];
@@ -34,7 +34,7 @@ impl NonceReader {
         let epoch_nanos = zx::MonotonicInstant::get().into_nanos();
         buf.put_i64_le(epoch_nanos);
         buf.put_slice(sta_addr.as_slice());
-        let k = OsRng.gen::<[u8; 32]>();
+        let k = OsRng.unwrap_err().random::<[u8; 32]>();
         let init = prf::prf(&k[..], "Init Counter", &buf[..], 8 * std::mem::size_of_val(&k))?;
         Ok(Arc::new(NonceReader { key_counter: Mutex::new(BigUint::from_bytes_le(&init[..])) }))
     }

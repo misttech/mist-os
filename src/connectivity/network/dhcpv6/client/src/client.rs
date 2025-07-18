@@ -284,7 +284,7 @@ fn create_state_machine(
                 Ok(dhcpv6_core::client::ClientStateMachine::start_stateless(
                     transaction_id,
                     information_option_codes,
-                    StdRng::from_entropy(),
+                    StdRng::from_os_rng(),
                     now,
                 ))
             }
@@ -303,7 +303,7 @@ fn create_state_machine(
             configured_non_temporary_addresses,
             configured_delegated_prefixes.unwrap_or_else(Default::default),
             information_option_codes,
-            StdRng::from_entropy(),
+            StdRng::from_os_rng(),
             now,
         )),
     }

@@ -1191,7 +1191,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
     /// Instance IDs defined only for `b` in the component ID index.
     /// Check that the correct storage layout is used when a component has an instance ID.
     pub async fn test_instance_id_from_index(&self) {
-        let b_instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let b_instance_id = InstanceId::new_random(&mut rand::rng());
         let component_id_index = {
             let mut index = component_id_index::Index::default();
             index.insert(Moniker::parse_str("/b").unwrap(), b_instance_id.clone()).unwrap();

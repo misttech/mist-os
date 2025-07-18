@@ -184,11 +184,8 @@ impl StarnixKernel {
 /// tempted to make them load-bearing. We now just generate 7 random alphanumeric
 /// characters.
 fn generate_kernel_name(_start_info: &frunner::ComponentStartInfo) -> Result<String, Error> {
-    let random_id: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(7)
-        .map(char::from)
-        .collect();
+    let random_id: String =
+        rand::rng().sample_iter(&rand::distr::Alphanumeric).take(7).map(char::from).collect();
     Ok(random_id)
 }
 

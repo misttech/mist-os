@@ -210,10 +210,10 @@ mod test_build_with_file_system {
                     meta_package.serialize(&mut v).unwrap();
                     content_map.insert(host_path.to_string(), v);
                 } else {
-                    let file_size = rng.gen_range(0..6000);
+                    let file_size = rng.random_range(0..6000);
                     content_map.insert(
                         host_path.to_string(),
-                        rng.sample_iter(&rand::distributions::Standard).take(file_size).collect(),
+                        rng.sample_iter(&rand::distr::StandardUniform).take(file_size).collect(),
                     );
                 }
             }
@@ -475,9 +475,9 @@ mod test_build {
                         MetaPackage::from_name_and_variant_zero("my-package-name".parse().unwrap());
                     meta_package.serialize(f).unwrap();
                 } else {
-                    let file_size = rng.gen_range(0..6000);
+                    let file_size = rng.random_range(0..6000);
                     f.write_all(
-                        rng.sample_iter(&rand::distributions::Standard)
+                        rng.sample_iter(&rand::distr::StandardUniform)
                             .take(file_size)
                             .collect::<Vec<u8>>()
                             .as_slice(),

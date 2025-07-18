@@ -24,8 +24,8 @@ use futures::future::Fuse;
 use futures::lock::Mutex;
 use futures::{select, FutureExt, StreamExt, TryStreamExt};
 use log::{error, info, warn};
-use rand::distributions::{Alphanumeric, DistString};
-use rand::thread_rng;
+use rand::distr::{Alphanumeric, SampleString};
+use rand::rng;
 use std::collections::HashMap;
 use std::io::Write;
 use std::os::fd::AsRawFd;
@@ -403,7 +403,7 @@ impl ElementManager {
 
         // Generate a random name if we don't have one.
         let name = name.unwrap_or_else(|| {
-            let mut name = Alphanumeric.sample_string(&mut thread_rng(), 16);
+            let mut name = Alphanumeric.sample_string(&mut rng(), 16);
             name.make_ascii_lowercase();
             initial_annotations.push(felement::Annotation {
                 key: name_key,

@@ -10,7 +10,6 @@ use fuchsia_async as fasync;
 use futures::channel::{mpsc, oneshot};
 use futures::future::{select, AbortHandle, Abortable, Either};
 use futures::{AsyncRead, AsyncWrite, FutureExt, SinkExt, Stream, StreamExt};
-use rand::Rng;
 use std::collections::HashMap;
 use std::iter::IntoIterator;
 use std::num::NonZero;
@@ -600,7 +599,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
     /// connection the host initiates.
     fn alloc_port(&self) -> u32 {
         loop {
-            let random_port = rand::thread_rng().gen_range(RANDOM_PORT_RANGE);
+            let random_port = rand::random_range(RANDOM_PORT_RANGE);
 
             if let std::collections::hash_map::Entry::Vacant(entry) =
                 self.inner.lock().unwrap().port_states.entry(random_port)

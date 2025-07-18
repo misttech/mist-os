@@ -1072,8 +1072,8 @@ mod starnix_tests {
     use crate::policy::AccessVector;
     use crate::KernelClass;
 
-    use rand::distributions::Uniform;
-    use rand::{thread_rng, Rng as _};
+    use rand::distr::Uniform;
+    use rand::{rng, Rng as _};
     use std::collections::{HashMap, HashSet};
     use std::sync::atomic::AtomicU32;
     use std::thread::spawn;
@@ -1266,7 +1266,7 @@ mod starnix_tests {
             let sids = sids_for_query_1;
             let mut trace = vec![];
 
-            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
+            for i in rng().sample_iter(&Uniform::new(0, 20).unwrap()).take(2000) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_1.compute_access_decision(
@@ -1279,7 +1279,7 @@ mod starnix_tests {
 
             rx_last_policy_change_1.await.expect("receive last-policy-change signal (1)");
 
-            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
+            for i in rng().sample_iter(&Uniform::new(0, 20).unwrap()).take(10) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_1.compute_access_decision(
@@ -1312,7 +1312,7 @@ mod starnix_tests {
             let sids = sids_for_query_2;
             let mut trace = vec![];
 
-            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
+            for i in rng().sample_iter(&Uniform::new(10, 30).unwrap()).take(2000) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_2.compute_access_decision(
@@ -1325,7 +1325,7 @@ mod starnix_tests {
 
             rx_last_policy_change_2.await.expect("receive last-policy-change signal (2)");
 
-            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
+            for i in rng().sample_iter(&Uniform::new(10, 30).unwrap()).take(10) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_2.compute_access_decision(
@@ -1561,7 +1561,7 @@ mod starnix_tests {
             let sids = sids_for_query_1;
             let mut trace = vec![];
 
-            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
+            for i in rng().sample_iter(&Uniform::new(0, 20).unwrap()).take(2000) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_1.compute_access_decision(
@@ -1574,7 +1574,7 @@ mod starnix_tests {
 
             rx_last_policy_change_1.await.expect("receive last-policy-change signal (1)");
 
-            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
+            for i in rng().sample_iter(&Uniform::new(0, 20).unwrap()).take(10) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_1.compute_access_decision(
@@ -1607,7 +1607,7 @@ mod starnix_tests {
             let sids = sids_for_query_2;
             let mut trace = vec![];
 
-            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
+            for i in rng().sample_iter(&Uniform::new(10, 30).unwrap()).take(2000) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_2.compute_access_decision(
@@ -1620,7 +1620,7 @@ mod starnix_tests {
 
             rx_last_policy_change_2.await.expect("receive last-policy-change signal (2)");
 
-            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
+            for i in rng().sample_iter(&Uniform::new(10, 30).unwrap()).take(10) {
                 trace.push((
                     sids[i].clone(),
                     avc_for_query_2.compute_access_decision(

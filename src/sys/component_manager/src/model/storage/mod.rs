@@ -451,7 +451,7 @@ mod tests {
     use cm_rust::*;
     use cm_rust_testing::*;
     use fidl_fuchsia_io as fio;
-    use rand::distributions::Alphanumeric;
+    use rand::distr::Alphanumeric;
     use rand::Rng;
 
     #[fuchsia::test]
@@ -573,7 +573,7 @@ mod tests {
         let moniker = Moniker::try_from(["c", "coll:d"]).unwrap();
 
         // open the storage directory using instance ID.
-        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let instance_id = InstanceId::new_random(&mut rand::rng());
         let mut dir = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
@@ -603,7 +603,7 @@ mod tests {
 
         // check that the directory is writable by writing a marker file in it.
         let marker_file_name: String =
-            rand::thread_rng().sample_iter(&Alphanumeric).take(7).map(char::from).collect();
+            rand::rng().sample_iter(&Alphanumeric).take(7).map(char::from).collect();
         assert_eq!(test_helpers::list_directory(&dir).await, Vec::<String>::new());
         test_helpers::write_file(&dir, &marker_file_name, "contents").await;
         assert_eq!(test_helpers::list_directory(&dir).await, vec![marker_file_name.clone()]);
@@ -818,7 +818,7 @@ mod tests {
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let parent_moniker = Moniker::try_from(["c"]).unwrap();
         let child_moniker = Moniker::try_from(["c", "coll:d"]).unwrap();
-        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let instance_id = InstanceId::new_random(&mut rand::rng());
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
             &BackingDirectoryInfo {

@@ -1053,9 +1053,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_merge_10_layers() {
         let skip_lists: Vec<_> = (0..10).map(|_| SkipListLayer::new(100)).collect();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for i in 0..100 {
-            skip_lists[rng.gen_range(0..10) as usize]
+            skip_lists[rng.random_range(0..10) as usize]
                 .insert(Item::new(TestKey(i..i), i))
                 .expect("insert error");
         }

@@ -79,7 +79,7 @@ pub struct EphemeralPort<I: PortAllocImpl + ?Sized> {
 impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
     /// Creates a new `EphemeralPort` with a port chosen randomly in `range`.
     pub fn new_random<R: Rng>(rng: &mut R) -> Self {
-        let port = rng.gen_range(I::EPHEMERAL_RANGE);
+        let port = rng.random_range(I::EPHEMERAL_RANGE);
         Self { port, _marker: PhantomData }
     }
 

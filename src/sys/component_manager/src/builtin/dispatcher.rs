@@ -14,7 +14,6 @@ use fuchsia_component::server;
 use futures::{FutureExt, StreamExt};
 use log::Log;
 use namespace::Namespace;
-use rand::Rng;
 use sandbox::{Dict, Router};
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -239,7 +238,7 @@ impl Dispatcher {
             &self.sandbox_retriever_proxy,
         )
         .await?;
-        let child_name = format!("worker-{:x}", rand::thread_rng().gen::<u64>());
+        let child_name = format!("worker-{:x}", rand::random::<u64>());
         let (controller_proxy, controller_server_end) =
             fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>();
         self.realm_proxy
@@ -290,9 +289,9 @@ impl Dispatcher {
             .get_my_sandbox()
             .await
             .context("failed to use framework protocol from built-in component")?;
-        let parent_id = rand::thread_rng().gen::<u64>();
-        let child_id = rand::thread_rng().gen::<u64>();
-        let child_clone_id = rand::thread_rng().gen::<u64>();
+        let parent_id = rand::random::<u64>();
+        let child_id = rand::random::<u64>();
+        let child_clone_id = rand::random::<u64>();
         capability_store_proxy
             .import(parent_id, fsandbox::Capability::Dictionary(sandbox.component_input.unwrap()))
             .await

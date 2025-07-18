@@ -13,8 +13,8 @@ use fidl_fuchsia_component_runner::{
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 use serde::de::Error as _;
 use serde::Deserialize;
 use starnix_core::execution::{create_init_child_process, execute_task_with_prerun_result};
@@ -391,7 +391,7 @@ where
     // Find /container/component/{random} that doesn't already exist
     let component_path = loop {
         let random_string: String =
-            thread_rng().sample_iter(&Alphanumeric).take(10).map(char::from).collect();
+            rng().sample_iter(&Alphanumeric).take(10).map(char::from).collect();
 
         // This returns EEXIST if /container/component/{random} already exists.
         // If so, try again with another {random} string.
