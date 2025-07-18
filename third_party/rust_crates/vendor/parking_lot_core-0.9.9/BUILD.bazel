@@ -77,7 +77,7 @@ rust_library(
     deps = [
         "//third_party/rust_crates/vendor/cfg-if-1.0.0:cfg_if",
         "//third_party/rust_crates/vendor/parking_lot_core-0.9.9:build_script_build",
-        "//third_party/rust_crates/vendor/smallvec-1.14.0:smallvec",
+        "//third_party/rust_crates/vendor/smallvec-1.15.1:smallvec",
     ] + select({
         "@rules_rust//rust/platform:aarch64-apple-darwin": [
             "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(unix)
