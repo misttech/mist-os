@@ -103,7 +103,16 @@ source_set("${raw_packet_test_label}_socket_tests") {
     "//third_party/abseil-cpp/absl/strings",
   ]
 
+  # TODO(https://fxbug.dev/432557482): Resolve the warning and remove this
+  # suppression.
+  configs += [ ":suppress-uninitialized-const-pointer" ]
+
   testonly = true
+}
+
+config("suppress-uninitialized-const-pointer") {
+  visibility = [ ":*" ]
+  cflags = [ "-Wno-uninitialized-const-pointer" ]
 }
 
 source_set("${udp_unbound_test_label}_socket_tests") {
