@@ -105,6 +105,9 @@ pub struct RuntimeConfig {
 
     /// Components that opt into health checks before an update is committed.
     pub health_check: HealthCheck,
+
+    /// Bundles to be injected into allowlisted components.
+    pub inject: Vec<InjectedBundle>,
 }
 
 /// A single security policy allowlist entry.
@@ -607,6 +610,7 @@ impl Default for RuntimeConfig {
             abi_revision_policy: Default::default(),
             vmex_source: Default::default(),
             health_check: Default::default(),
+            inject: Default::default(),
         }
     }
 }
@@ -661,6 +665,13 @@ fn parse_allowlist_entries(strs: &Option<Vec<String>>) -> Result<Vec<AllowlistEn
         entries.push(input.parse()?);
     }
     Ok(entries)
+}
+
+fn parse_optional_vec<T, S: TryInto<T>>(src: Option<Vec<S>>) -> Result<Vec<T>, Error>
+where
+    Result<Vec<T>, Error>: FromIterator<Result<T, <S as TryInto<T>>::Error>>,
+{
+    src.unwrap_or_default().into_iter().map(TryInto::try_into).collect()
 }
 
 fn as_usize_or_default(value: Option<u32>, default: usize) -> usize {
@@ -761,6 +772,8 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
             abi_revision_policy,
             vmex_source,
             health_check,
+            inject: parse_optional_vec(config.inject)
+                .context("Unable to parse injected bundles")?,
         })
     }
 }
@@ -927,6 +940,64 @@ impl TryFrom<component_internal::SecurityPolicy> for SecurityPolicy {
         };
 
         Ok(SecurityPolicy { job_policy, capability_policy, debug_capability_policy, child_policy })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum InjectedUse {
+    Protocol(InjectedUseProtocol),
+}
+
+impl TryFrom<component_internal::InjectedUse> for InjectedUse {
+    type Error = Error;
+
+    fn try_from(value: component_internal::InjectedUse) -> Result<Self, Error> {
+        match value {
+            component_internal::InjectedUse::Protocol(protocol) => {
+                Ok(InjectedUse::Protocol(protocol.try_into()?))
+            }
+            other => Err(format_err!("Invalid InjectedUse value: {other:?}")),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct InjectedUseProtocol {
+    pub source_name: cm_types::Name,
+    pub target_path: cm_types::Path,
+}
+
+impl TryFrom<component_internal::InjectedUseProtocol> for InjectedUseProtocol {
+    type Error = Error;
+
+    fn try_from(value: component_internal::InjectedUseProtocol) -> Result<Self, Error> {
+        Ok(InjectedUseProtocol {
+            source_name: value.source_name.context("Missing source_name")?.parse()?,
+            target_path: value.target_path.context("Missing target_path")?.parse()?,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct InjectedBundle {
+    /// Components that will have this bundle injected into.
+    pub components: Vec<AllowlistEntry>,
+
+    /// Capabilities to be injected.
+    pub use_: Vec<InjectedUse>,
+}
+
+impl InjectedBundle {
+    pub fn new(components: Vec<AllowlistEntry>, use_: Vec<InjectedUse>) -> Self {
+        Self { components, use_ }
+    }
+}
+
+impl TryFrom<component_internal::InjectedBundle> for InjectedBundle {
+    type Error = Error;
+
+    fn try_from(value: component_internal::InjectedBundle) -> Result<Self, Error> {
+        Ok(Self::new(parse_allowlist_entries(&value.components)?, parse_optional_vec(value.use_)?))
     }
 }
 
@@ -1251,6 +1322,7 @@ mod tests {
                 realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
                 vmex_source: VmexSource::Namespace,
                 health_check: HealthCheck{monikers: vec!()},
+                inject: vec![],
             }
         ),
     }

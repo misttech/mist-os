@@ -15,6 +15,7 @@ rustc_library("component_manager_config") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/sys/lib/cm_config",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:itertools",

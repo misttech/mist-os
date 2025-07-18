@@ -484,6 +484,11 @@ impl ResolvedInstanceState {
             &state.resolved_component.decl,
             &component_sandbox.program_input.namespace(),
         );
+        Self::extend_program_input_namespace_with_injected_capabilities(
+            &component,
+            &component_sandbox.program_input.namespace(),
+        )
+        .await;
 
         state.sandbox = component_sandbox;
         state.populate_child_inputs(&state.sandbox.child_inputs).await;
@@ -704,6 +709,42 @@ impl ResolvedInstanceState {
                     Ok(()) => {}
                     Err(e) => warn!("failed to insert {path} in program input dict: {e:?}"),
                 };
+            }
+        }
+    }
+
+    async fn extend_program_input_namespace_with_injected_capabilities(
+        component: &Arc<ComponentInstance>,
+        out_dict: &Dict,
+    ) {
+        let top_instance = component.top_instance().await;
+
+        for inject_bundle in &component.context.runtime_config().inject {
+            // Skip this bundle if it doesn't match the moniker of the component being created.
+            if !inject_bundle.components.iter().any(|filter| filter.matches(&component.moniker)) {
+                continue;
+            }
+
+            for use_ in &inject_bundle.use_ {
+                let (capability, path) = match use_ {
+                    cm_config::InjectedUse::Protocol(use_protocol) => {
+                        let routable = top_instance
+                            .as_ref()
+                            .expect("Failed to get the top instance")
+                            .get_root_exposed_capability_router(use_protocol.source_name.clone());
+                        let router = Router::new(routable);
+                        let capability = Capability::ConnectorRouter(router);
+                        (capability, &use_protocol.target_path)
+                    }
+                };
+
+                // Our injected capability takes precedence over the regular one, if present.
+                if let Some(_) = out_dict.remove_capability(path) {
+                    warn!("injected capability will shadow the one at {path}");
+                }
+                out_dict
+                    .insert_capability(path, capability)
+                    .expect("Failed to insert the injected capability");
             }
         }
     }

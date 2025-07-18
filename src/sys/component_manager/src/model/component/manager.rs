@@ -81,10 +81,6 @@ impl ComponentManagerInstance {
     /// Returns a connector that lazily resolves the given protocol exposed by `/`.
     ///
     /// REQUIRES: The root has already been set. Otherwise panics.
-    // TODO(https://fxbug.dev/422537652): The allow(dead_code) is currently necessary because
-    // this function is only called if #[cfg(feature="heapdump")]. The next CL in the stack
-    // will also call it from other places that are not conditionally compiled.
-    #[allow(dead_code)]
     pub fn get_root_exposed_capability_router(
         &self,
         source_name: cm_types::Name,

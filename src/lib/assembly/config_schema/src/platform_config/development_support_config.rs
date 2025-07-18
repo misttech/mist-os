@@ -152,11 +152,14 @@ pub struct StorageToolsConfig {
 pub struct HeapdumpConfig {
     /// Whether component manager will be instrumented.
     pub component_manager: bool,
+
+    /// Monikers that the ELF runner will inject the instrumentation into.
+    pub monikers: Vec<String>,
 }
 
 impl HeapdumpConfig {
     /// Tells if at least one program will be instrumented.
     pub fn is_enabled(&self) -> bool {
-        self.component_manager
+        self.component_manager || !self.monikers.is_empty()
     }
 }

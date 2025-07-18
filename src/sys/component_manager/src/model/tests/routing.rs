@@ -28,6 +28,7 @@ use {
         bedrock::request_metadata::protocol_metadata,
         capability_source::{
             AggregateCapability, AggregateMember, AnonymizedAggregateSource, CapabilitySource,
+            ComponentCapability, ComponentSource,
         },
         error::ComponentInstanceError,
         resolving::ResolverError,
@@ -69,6 +70,7 @@ use {
         sync::{Arc, Weak},
         task::Poll,
     },
+    test_case::test_case,
     vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
     zx::{self as zx, AsHandleRef},
 };
@@ -3818,4 +3820,119 @@ fn capability_requested_protocol_on_delivery_readable() {
         echo_call.await.unwrap();
     });
     executor.run_until_stalled(&mut test_body).unwrap();
+}
+
+///   r
+///  /|\
+/// a b c
+///
+/// r (root): expose protocol `foo` from `a`
+/// a: expose protocol `foo` from self
+/// b and c: do NOT use `foo` in their manifest (except in the shadowing test
+/// case, see below); however `foo` is injected in `b`` only.
+///
+/// If shadowing == true, an extra `d` component is created that serves `foo`,
+/// and it is routed to `b`. The test checks that injected `foo` from `a`
+/// takes precedence and overrides it.
+#[test_case(false ; "not shadowing")]
+#[test_case(true ; "shadowing")]
+#[fuchsia::test]
+async fn injected_capability(test_shadowing: bool) {
+    let mut components = vec![
+        (
+            "r",
+            ComponentDeclBuilder::new_empty_component()
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("foo")
+                        .source(ExposeSource::Child("a".parse().unwrap())),
+                )
+                .child_default("a")
+                .child_default("b")
+                .child_default("c")
+                .build(),
+        ),
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+                .build(),
+        ),
+        ("c", ComponentDeclBuilder::new_empty_component().build()),
+    ];
+
+    if !test_shadowing {
+        components.push(("b", ComponentDeclBuilder::new_empty_component().build()));
+    } else {
+        components.push((
+            "b",
+            ComponentDeclBuilder::new_empty_component()
+                .use_(
+                    UseBuilder::protocol()
+                        .name("foo")
+                        .source(UseSource::Child("d".parse().unwrap())),
+                )
+                .child_default("d")
+                .build(),
+        ));
+        components.push((
+            "d",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+                .build(),
+        ));
+    }
+
+    let test = RoutingTestBuilder::new("r", components)
+        .add_injected_bundle(cm_config::InjectedBundle {
+            components: vec![cm_config::AllowlistEntryBuilder::new().exact("b").build()],
+            use_: vec![cm_config::InjectedUse::Protocol(cm_config::InjectedUseProtocol {
+                source_name: "foo".parse().unwrap(),
+                target_path: "/svc/foo".parse().unwrap(),
+            })],
+        })
+        .build()
+        .await;
+
+    let use_decl = UseBuilder::protocol().name("foo").path("/svc/foo").build();
+    let UseDecl::Protocol(use_decl) = use_decl else {
+        unreachable!();
+    };
+
+    // Verify that `b` can reach protocol `foo` routed from `a`.
+    let b = test.model.root().find_and_maybe_resolve(&"b".parse().unwrap()).await.unwrap();
+    let source = RouteRequest::UseProtocol(use_decl.clone()).route(&b).await.unwrap();
+    assert_matches!(
+        source,
+        RouteSource {
+            source:
+                CapabilitySource::Component(ComponentSource {
+                    capability: ComponentCapability::Protocol(ProtocolDecl {
+                        name,
+                        source_path: Some(source_path),
+                        ..
+                    }),
+                    moniker,
+                    ..
+                }),
+            relative_path: _,
+        }
+        if name == "foo"
+            && source_path == "/svc/foo".parse().unwrap()
+            && moniker == ["a"].try_into().unwrap());
+
+    // And verify that `c` cannot.
+    let c = test.model.root().find_and_maybe_resolve(&"c".parse().unwrap()).await.unwrap();
+    let err = RouteRequest::UseProtocol(use_decl).route(&c).await.unwrap_err();
+    assert_matches!(
+        err,
+        RoutingError::BedrockNotPresentInDictionary { name, moniker }
+        if name == "svc/foo"
+            && moniker == "c".parse().unwrap());
+
+    // Unresolve b. This should drop the request from `a` and avoid the "receivers must not outlive
+    // their executor" panic on return.
+    b.unresolve().await.unwrap();
 }
