@@ -167,6 +167,12 @@ enum FetchError {
     #[error("while resolving a package")]
     Resolve(#[source] ResolveError),
 
+    #[error("while communicating over fidl")]
+    Fidl(#[source] fidl::Error),
+
+    #[error("while fetching a blob")]
+    FetchBlob(#[source] fpkg_ext::ResolveError),
+
     #[error("while syncing pkg-cache")]
     Sync(#[source] anyhow::Error),
 }
@@ -174,7 +180,8 @@ enum FetchError {
 impl FetchError {
     fn reason(&self) -> fupdate_installer_ext::FetchFailureReason {
         match self {
-            Self::Resolve(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _)) => {
+            Self::Resolve(ResolveError::Error(fpkg_ext::ResolveError::NoSpace, _))
+            | Self::FetchBlob(fpkg_ext::ResolveError::NoSpace) => {
                 fupdate_installer_ext::FetchFailureReason::OutOfSpace
             }
             _ => fupdate_installer_ext::FetchFailureReason::Internal,
@@ -1137,6 +1144,18 @@ impl AttemptV2<'_> {
             }
         };
 
+        // Fetch blobs
+        let mut state = state.enter_fetch(co).await;
+        *phase = metrics::Phase::PackageDownload;
+
+        let () = match self.fetch_blobs(co, &mut state, &manifest, &blobfs).await {
+            Ok(()) => (),
+            Err(e) => {
+                state.fail(co, e.reason()).await;
+                return Err(e.into());
+            }
+        };
+
         unimplemented!("AttemptV2 is still work in progress");
     }
 
@@ -1325,6 +1344,64 @@ impl AttemptV2<'_> {
         }
 
         paver::paver_flush_data_sink(&self.env.data_sink).await.map_err(StageError::PaverFlush)?;
+
+        Ok(())
+    }
+
+    /// Fetch all blobs needed by the target OS.
+    async fn fetch_blobs(
+        &mut self,
+        co: &mut async_generator::Yield<fupdate_installer_ext::State>,
+        state: &mut state::Fetch,
+        manifest: &OtaManifestV1,
+        blobfs: &blobfs::Client,
+    ) -> Result<(), FetchError> {
+        // Remove blobs of images from the retained_index.
+        // GC to remove the blobs of images from blobfs.
+        let () = replace_retained_blobs(
+            manifest.blobs.iter().map(|blob| blob.fuchsia_merkle_root),
+            &self.env.retained_blobs,
+        )
+        .await
+        .unwrap_or_else(|e| {
+            error!(
+                "unable to replace retained blobs set before gc in preparation \
+                 for fetching blobs listed in update manifest: {:#}",
+                anyhow!(e)
+            )
+        });
+
+        if let Err(e) = gc(&self.env.space_manager).await {
+            error!("unable to gc blobs during Fetch state: {:#}", anyhow!(e));
+        }
+
+        let existing_blobs = blobfs.list_known_blobs().await.unwrap_or_else(|e| {
+            error!("unable to list known blobs, assuming empty: {:#}", anyhow!(e));
+            HashSet::new()
+        });
+
+        let mut stream = futures::stream::iter(manifest.blobs.iter())
+            .map(async |blob| {
+                if existing_blobs.contains(&blob.fuchsia_merkle_root) {
+                    return Ok(());
+                }
+                let blob_id = fpkg_ext::BlobId::from(blob.fuchsia_merkle_root).into();
+                let () = self
+                    .env
+                    .ota_downloader
+                    .fetch_blob(&blob_id, manifest.blob_base_url.as_ref())
+                    .await
+                    .map_err(FetchError::Fidl)?
+                    .map_err(|e| FetchError::FetchBlob(e.into()))?;
+                Ok(())
+            })
+            .buffer_unordered(self.concurrent_blob_fetches);
+
+        while let Some(()) = stream.try_next().await? {
+            state.add_progress(co, 1).await;
+        }
+
+        let () = sync_package_cache(&self.env.pkg_cache).await.map_err(FetchError::Sync)?;
 
         Ok(())
     }
