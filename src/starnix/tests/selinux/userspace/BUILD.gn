@@ -124,6 +124,7 @@ test_names = [
 inherit_test_executable_names = [
   # keep-sorted start
   "has_blocked_signals",
+  "has_ignored_signals",
   "has_pending_signals",
   "is_duplicated_fd",
   "is_itimer_real_reset",

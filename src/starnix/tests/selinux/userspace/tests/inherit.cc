@@ -409,4 +409,62 @@ TEST(InheritTest, SiginhAllowedSignalMaskInherited) {
   }));
 }
 
+// When the `siginh` permission is denied, signal dispositions are reset to the default during
+// `exec`.
+TEST(InheritTest, SiginhDeniedSignalDispositionsReset) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_no_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    struct sigaction action;
+    action.sa_handler = SIG_IGN;
+    ASSERT_THAT(sigaction(SIGCONT, &action, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_ignored_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect that the child process has only default signal handlers.
+    char* const args[] = {binary_name.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
+// When the `siginh` permission is allowed, dispositions for ignored signals are inherited
+// across `exec`. (Any dispositions other than `SIG_IGN` or `SIG_DFL` are assumed to have
+// been reset to the default at an earlier point in `exec`.)
+TEST(InheritTest, SiginhAllowedIgnoredSignalDispositionsInherited) {
+  constexpr char kParentSecurityContext[] = "test_u:test_r:test_inherit_parent_t:s0";
+  constexpr char kChildSecurityContext[] = "test_u:test_r:test_inherit_child_allow_siginh_t:s0";
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  ASSERT_TRUE(RunSubprocessAs(kParentSecurityContext, [&] {
+    struct sigaction action;
+    action.sa_handler = SIG_IGN;
+    ASSERT_THAT(sigaction(SIGCONT, &action, NULL), SyscallSucceeds());
+
+    std::string binary_name = "has_ignored_signals_bin";
+    std::string path_for_exec = PathForExec(binary_name);
+    // Expect that the child process ignores SIGCONT.
+    std::string expect_sigcont = std::to_string(SIGCONT);
+    char* const args[] = {binary_name.data(), expect_sigcont.data(), NULL};
+
+    auto set_exec_context = WriteTaskAttr("exec", kChildSecurityContext);
+    ASSERT_TRUE(set_exec_context.is_ok());
+
+    if (execv(path_for_exec.data(), args) < 0) {
+      perror("exec into child domain failed");
+      FAIL();
+    }
+  }));
+}
+
 }  // namespace
