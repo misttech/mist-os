@@ -29,36 +29,34 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
         self.0.get(&id).as_ref().map(|node| &node.0)
     }
 
-    /// Given a dependency graph represented as a set of `edges`, find the set of
-    /// all nodes that the `start` node depends on, directly or indirectly. This
-    /// includes `start` itself.
+    /// Given a dependency graph, find the set of all nodes that have a
+    /// dependency on the `start` node (i.e., the reverse dependency closure).
+    /// This includes `start` itself.
     pub fn get_closure(&self, start: T) -> HashSet<T> {
-        let mut res = HashSet::new();
-        res.insert(start);
-        loop {
-            let mut entries_added = false;
+        let mut reverse_deps: HashMap<&T, Vec<&T>> = HashMap::new();
+        for (source, targets) in &self.0 {
+            for target in &targets.0 {
+                reverse_deps.entry(target).or_default().push(source);
+            }
+        }
 
-            for source in self.0.keys() {
-                match self.get_targets(*source) {
-                    None => continue,
-                    Some(targets) if targets.is_empty() => continue,
-                    Some(targets) => {
-                        for target in targets {
-                            if !res.contains(target) {
-                                continue;
-                            }
-                            if res.insert(source.clone()) {
-                                entries_added = true
-                            }
-                        }
+        let mut closure = HashSet::new();
+        let mut to_visit = VecDeque::new();
+
+        closure.insert(start.clone());
+        to_visit.push_back(start);
+
+        while let Some(current_node) = to_visit.pop_front() {
+            if let Some(parents) = reverse_deps.get(&current_node) {
+                for parent in parents {
+                    if closure.insert((*parent).clone()) {
+                        to_visit.push_back((*parent).clone());
                     }
                 }
             }
-
-            if !entries_added {
-                return res;
-            }
         }
+
+        closure
     }
 
     /// Returns the nodes of the graph in reverse topological order, or an error if the graph
