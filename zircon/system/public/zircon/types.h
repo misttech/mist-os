@@ -222,6 +222,7 @@ typedef struct zx_wait_item {
 #define ZX_VMO_OP_CACHE_INVALIDATE       ((uint32_t)7u)
 #define ZX_VMO_OP_CACHE_CLEAN            ((uint32_t)8u)
 #define ZX_VMO_OP_CACHE_CLEAN_INVALIDATE ((uint32_t)9u)
+// Keep value in sync with ZX_VMAR_OP_ZERO.
 #define ZX_VMO_OP_ZERO                   ((uint32_t)10u)
 #define ZX_VMO_OP_TRY_LOCK               ((uint32_t)11u)
 #define ZX_VMO_OP_DONT_NEED              ((uint32_t)12u)
@@ -250,6 +251,8 @@ typedef struct zx_vmo_lock_state {
 // Keep value in sync with ZX_VMO_OP_DECOMMIT.
 #define ZX_VMAR_OP_DECOMMIT              ((uint32_t)2u)
 #define ZX_VMAR_OP_MAP_RANGE             ((uint32_t)3u)
+// Keep value in sync with ZX_VMO_OP_ZERO.
+#define ZX_VMAR_OP_ZERO                  ((uint32_t)10u)
 // Keep value in sync with ZX_VMO_OP_DONT_NEED.
 #define ZX_VMAR_OP_DONT_NEED             ((uint32_t)12u)
 // Keep value in sync with ZX_VMO_OP_ALWAYS_NEED.
@@ -619,4 +622,4 @@ typedef int zx_futex_storage_t;
 
 __END_CDECLS
 
-#endif // ZIRCON_TYPES_H_
+#endif  // ZIRCON_TYPES_H_

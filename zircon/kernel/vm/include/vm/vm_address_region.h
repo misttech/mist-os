@@ -662,6 +662,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
     Commit,
     Decommit,
     MapRange,
+    Zero,
     DontNeed,
     AlwaysNeed,
     Prefetch,

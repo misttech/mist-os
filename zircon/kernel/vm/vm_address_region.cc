@@ -750,6 +750,13 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
           result = mapping->MapRange(mapping_offset, size, /*commit=*/false,
                                      /*ignore_existing=*/true);
           break;
+        case RangeOpType::Zero:
+          if (!mapping->is_valid_mapping_flags(ARCH_MMU_FLAG_PERM_WRITE)) {
+            result = ZX_ERR_ACCESS_DENIED;
+          } else {
+            result = vmo->ZeroRange(vmo_offset, size);
+          }
+          break;
         case RangeOpType::AlwaysNeed:
           result = vmo->HintRange(vmo_offset, size, VmObject::EvictionHint::AlwaysNeed);
           if (result == ZX_OK) {

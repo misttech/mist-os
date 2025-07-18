@@ -597,6 +597,10 @@ closed protocol Vmar {
     /// for committed pages in the given range. Entries for uncommitted pages in the range are not
     /// populated. Skips entries that already exist for any page in the range.
     ///
+    /// `ZX_VMAR_OP_ZERO` - Writes zeroes to the pages in the given range. Requires that the memory
+    /// in the range is writable. The operation's semantics are otherwise as described by
+    /// [`zx_vmo_op_range()`](/reference/syscalls/vmo_op_range.md) `ZX_VMO_OP_ZERO`.
+    ///
     /// `ZX_VMAR_OP_DONT_NEED` - Hints that pages in the specified range are not needed anymore and should
     /// be considered for memory reclamation. Intended to be used on mappings for VMOs created with
     /// [`zx_pager_create_vmo()`](/reference/syscalls/pager_create_vmo.md); trivially succeeds for
@@ -618,6 +622,8 @@ closed protocol Vmar {
     /// If *op* is `ZX_VMAR_OP_DECOMMIT`, *handle* must have `ZX_RIGHT_WRITE`.
     ///
     /// If *op* is `ZX_VMAR_OP_COMMIT`, *handle* must have `ZX_RIGHT_WRITE`.
+    ///
+    /// If *op* is `ZX_VMAR_OP_ZERO`, *handle* must have `ZX_RIGHT_WRITE`.
     ///
     /// If *op* is `ZX_VMAR_OP_PREFETCH`, *handle* must have `ZX_RIGHT_READ`.
     ///
