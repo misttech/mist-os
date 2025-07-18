@@ -5,14 +5,20 @@ library fuchsia.ui.gfx;
 
 /// Reports metrics information.
 /// This event type is only reported for node resources.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 const kMetricsEventMask uint32 = 1;
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 const kSizeChangeHintEventMask uint32 = 2;
 
 /// These are all of the types of events which can be reported by a `Session`.
 /// Use `SetEventMaskCmd` to enable event delivery for a resource.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type Event = strict union {
     /// Events which are controlled by a mask.
     1: metrics MetricsEvent;
@@ -41,7 +47,9 @@ type Event = strict union {
 ///
 /// Subscribe to this event to receive information about the scale factors you
 /// should apply when generating textures for your nodes.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type MetricsEvent = struct {
     node_id uint32;
     metrics Metrics;
@@ -57,7 +65,9 @@ type MetricsEvent = struct {
 /// Subscribe to this event to receive information about how large textures you
 /// will need in the near future for your nodes. The canonical use case is to
 /// pre-allocate memory to avoid repeated re-allocations.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type SizeChangeHintEvent = struct {
     node_id uint32;
     width_change_factor float32;
@@ -67,13 +77,17 @@ type SizeChangeHintEvent = struct {
 /// Delivered when the imported resource with the given ID is no longer bound to
 /// its host resource, or if the imported resource can not be bound because
 /// the host resource is not available.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ImportUnboundEvent = struct {
     resource_id uint32;
 };
 
 /// Delivered to a ViewHolder's Session when its peer View is connected.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewConnectedEvent = struct {
     view_holder_id uint32;
 };
@@ -83,7 +97,9 @@ type ViewConnectedEvent = struct {
 ///
 /// If the View is destroyed before the connection is established, then this
 /// event will be delivered immediately when the ViewHolder attempts to connect.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewDisconnectedEvent = struct {
     view_holder_id uint32;
 };
@@ -93,7 +109,9 @@ type ViewDisconnectedEvent = struct {
 ///
 /// If the ViewHolder is destroyed before the connection is established, then
 /// this event will be delivered immediately when the View attempts to connect.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewHolderDisconnectedEvent = struct {
     view_id uint32;
 };
@@ -102,7 +120,9 @@ type ViewHolderDisconnectedEvent = struct {
 ///
 /// If the ViewHolder is destroyed before the connection is established, then
 /// this event will not be delivered.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewHolderConnectedEvent = struct {
     view_id uint32;
 };
@@ -113,7 +133,9 @@ type ViewHolderConnectedEvent = struct {
 /// A ViewHolder is considered to be part of a Scene if there is an unbroken
 /// chain of parent-child relationships between the Scene node and the
 /// ViewHolder node.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewAttachedToSceneEvent = struct {
     view_id uint32;
     properties ViewProperties;
@@ -128,21 +150,27 @@ type ViewAttachedToSceneEvent = struct {
 /// A ViewHolder is considered to be part of a Scene if there is an unbroken
 /// chain of parent-child relationships between the Scene node and the
 /// ViewHolder node.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewDetachedFromSceneEvent = struct {
     view_id uint32;
 };
 
 /// Delivered when the parent ViewHolder for the given View makes a change to
 /// the View's properties.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewPropertiesChangedEvent = struct {
     view_id uint32;
     properties ViewProperties;
 };
 
 /// Delivered to a ViewHolder's Session when its peer View's state has changed.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type ViewStateChangedEvent = struct {
     view_holder_id uint32;
     state ViewState;

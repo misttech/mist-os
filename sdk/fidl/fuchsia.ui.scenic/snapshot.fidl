@@ -5,7 +5,8 @@ library fuchsia.ui.scenic;
 
 /// Defines an interface to take view snapshots.
 @discoverable(server="platform")
-@available(deprecated=13, removed=14)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=14)
 closed protocol Snapshot {
         // TODO(https://fxbug.dev/42110460): Implement this interface for non-privileged clients.
         };

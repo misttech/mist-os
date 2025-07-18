@@ -7,7 +7,9 @@ library fuchsia.ui.gfx;
 // an `ObjectNode`, and to define the clip region of a `ClipNode`.
 
 /// Rectangle centered at (0,0).
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type RectangleArgs = struct {
     width Value; // float32
     height Value; // float32
@@ -20,7 +22,9 @@ type RectangleArgs = struct {
 ///   - bottom_left_radius + bottom_right_radius <= width
 ///   - top_left_radius + bottom_left_radius <= height
 ///   - top_right_radius + bottom_right_radius <= height
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type RoundedRectangleArgs = struct {
     width Value; // float32
     height Value; // float32
@@ -30,12 +34,16 @@ type RoundedRectangleArgs = struct {
     bottom_left_radius Value; // float32
 };
 
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type CircleArgs = struct {
     radius Value; // float32
 };
 
 /// A Mesh cannot be rendered until it has been bound to vertex/index buffers;
 /// see BindMeshBuffersCmd.
-@available(deprecated=13, removed=17)
+// NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+// @available(deprecated=13, removed=17)
+@available(added=HEAD, deprecated=HEAD)
 type MeshArgs = struct {};

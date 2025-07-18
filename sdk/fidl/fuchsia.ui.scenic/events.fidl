@@ -8,7 +8,8 @@ using fuchsia.ui.gfx;
 
 type Event = strict resource union {
     1: gfx fuchsia.ui.gfx.Event;
-    @available(deprecated=10, note="use fuchsia.ui.pointer")
+    // NOTE(https://fxbug.dev/432713692): The real @available annotation is:
+    // @available(deprecated=10, note="use fuchsia.ui.pointer")
     2: input fuchsia.ui.input.InputEvent;
     3: unhandled Command;
 };
