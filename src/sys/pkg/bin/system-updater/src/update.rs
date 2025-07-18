@@ -12,7 +12,7 @@ use fuchsia_sync::Mutex;
 use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PinnedAbsolutePackageUrl};
 use futures::channel::oneshot;
 use futures::future::FutureExt as _;
-use futures::stream::{FusedStream, TryStreamExt as _};
+use futures::stream::{FusedStream, StreamExt as _, TryStreamExt as _};
 use futures::Future;
 use include_str_from_working_dir::include_str_from_working_dir_env;
 use log::{error, info, warn};
@@ -500,7 +500,7 @@ impl ImagesToWrite {
 
         let url_directory_map = resolver::resolve_image_packages(
             pkg_resolver,
-            package_urls.iter(),
+            package_urls.into_iter(),
             concurrent_package_resolves,
         )
         .await
@@ -1057,12 +1057,9 @@ impl Attempt<'_> {
 
         let mut packages = Vec::with_capacity(packages_to_fetch.len());
 
-        let package_dir_futs = resolver::resolve_packages(
-            &self.env.pkg_resolver,
-            packages_to_fetch.iter(),
-            self.concurrent_package_resolves,
-        );
-        futures::pin_mut!(package_dir_futs);
+        let mut package_dir_futs = futures::stream::iter(packages_to_fetch)
+            .map(async |url| resolver::resolve_package(&self.env.pkg_resolver, &url.into()).await)
+            .buffer_unordered(self.concurrent_package_resolves);
 
         while let Some(package_dir) =
             package_dir_futs.try_next().await.map_err(FetchError::Resolve)?
