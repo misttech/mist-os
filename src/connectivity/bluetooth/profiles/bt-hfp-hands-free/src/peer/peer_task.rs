@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use bt_hfp::call::{indicators as call_indicators, Direction};
+use bt_hfp::call::indicators as call_indicators;
 use bt_hfp::codec_id::CodecId;
 use bt_hfp::{a2dp, audio, sco};
 use fuchsia_bluetooth::types::{Channel, PeerId};
@@ -196,11 +196,6 @@ impl PeerTask {
                 action: fidl_hfp::CallAction::DialFromNumber(number),
                 responder,
             } => {
-                let _index = self.calls.insert_new_call(
-                    /* state = */ None,
-                    Some(number.clone().into()),
-                    Direction::MobileOriginated,
-                );
                 self.log_responder_error(responder.send(Ok(())));
                 self.enqueue_command_from_hf(CommandFromHf::CallActionDialFromNumber { number });
             }
@@ -208,11 +203,6 @@ impl PeerTask {
                 action: fidl_hfp::CallAction::DialFromLocation(memory),
                 responder,
             } => {
-                let _index = self.calls.insert_new_call(
-                    /* state = */ None,
-                    /* number = */ None,
-                    Direction::MobileOriginated,
-                );
                 self.log_responder_error(responder.send(Ok(())));
                 self.enqueue_command_from_hf(CommandFromHf::CallActionDialFromMemory { memory });
             }
@@ -220,13 +210,15 @@ impl PeerTask {
                 action: fidl_hfp::CallAction::RedialLast(_),
                 responder,
             } => {
-                let _index = self.calls.insert_new_call(
-                    /* state = */ None,
-                    /* number = */ None,
-                    Direction::MobileOriginated,
-                );
                 self.log_responder_error(responder.send(Ok(())));
                 self.enqueue_command_from_hf(CommandFromHf::CallActionRedialLast);
+            }
+            fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
+                action: fidl_hfp::CallAction::TransferActive(_),
+                responder,
+            } => {
+                self.start_audio_connection();
+                self.log_responder_error(responder.send(Ok(())));
             }
             fidl_hfp::PeerHandlerRequest::WatchNextCall { responder } => {
                 self.calls.handle_watch_next_call(responder);
@@ -390,6 +382,8 @@ impl PeerTask {
     }
 
     async fn handle_sco_connection(&mut self, sco_connection: sco::Connection) -> Result<()> {
+        self.calls.set_sco_connected(true);
+
         let pause_token = self.pause_a2dp_audio().await?;
         let vigil = self.watch_active_sco(&sco_connection, pause_token);
         self.start_hfp_audio(sco_connection)?;
@@ -445,8 +439,6 @@ impl PeerTask {
         vigil
     }
 
-    // TODO(https://fxbug.dev/134161) Implement call setup and call transfers.
-    #[allow(unused)]
     fn start_audio_connection(&mut self) {
         self.enqueue_command_from_hf(CommandFromHf::StartAudioConnection);
     }
@@ -457,6 +449,8 @@ impl PeerTask {
     }
 
     fn await_remote_sco(&mut self) {
+        self.calls.set_sco_connected(false);
+
         let codecs = vec![self.get_selected_codec()];
         let fut = self.sco_connector.accept(self.peer_id.clone(), codecs);
         self.sco_state.iset(sco::State::AwaitingRemote(Box::pin(fut)));
