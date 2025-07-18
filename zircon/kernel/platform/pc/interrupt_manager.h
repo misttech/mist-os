@@ -82,8 +82,7 @@ class InterruptManager {
   // its current handler removed.
   //
   // If |handler| is not nullptr and no handler is currently installed for
-  // |vector|, |handler| will be installed and will be invoked with argument
-  // |arg| whenever that interrupt fires.
+  // |vector|, |handler| will be installed and will be invoked whenever that interrupt fires.
   //
   // If |handler| is not nullptr and a handler is already installed, this will
   // return ZX_ERR_ALREADY_BOUND.
@@ -273,9 +272,9 @@ class InterruptManager {
       }
     }
 
-    // Set the handler for this entry.  If |handler| is nullptr, |arg| is
-    // ignored.  Makes no change and returns false if |handler| is not
-    // nullptr and this entry already has a handler assigned.
+    // Set the handler for this entry. If |handler| is nullptr,
+    // clear the entry. Makes no change and returns false if
+    // |handler| is not nullptr and this entry already has a handler assigned.
     bool SetHandler(interrupt_handler_t handler, bool make_permanent) {
       Guard<SpinLock, IrqSave> guard{&lock_};
       // Cannot modify existing permanent handlers.
@@ -291,8 +290,7 @@ class InterruptManager {
       return true;
     }
 
-    // Set the handler for this entry.  If |handler| is nullptr, |arg| is
-    // ignored.
+    // Set the handler for this entry.
     void OverwriteHandler(interrupt_handler_t handler) {
       Guard<SpinLock, IrqSave> guard{&lock_};
       DEBUG_ASSERT(!permanent());

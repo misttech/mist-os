@@ -89,13 +89,13 @@ zx_status_t get_interrupt_config(interrupt_vector_t vector, interrupt_trigger_mo
 // Set the affinity for an interrupt. Intrinsically set to cpu 0 by default.
 zx_status_t set_interrupt_affinity(interrupt_vector_t vector, cpu_mask_t mask);
 
-// Registers a handler+arg to be called for the given interrupt vector. The handler may be called
+// Registers a handler to be called for the given interrupt vector. The handler may be called
 // with internal spinlocks held and should not itself call register_int_handler. This handler may
 // be serialized with other handlers.
 // This can be called repeatedly to change the handler/arg for a given vector.
 zx_status_t register_int_handler(interrupt_vector_t vector, interrupt_handler_t handler);
 
-// Registers a handler+arg to be called for the given interrupt vector. Once this is used to set a
+// Registers a handler to be called for the given interrupt vector. Once this is used to set a
 // handler it is an error to modify the vector again through this or register_int_handler.
 // Registration via this method allows the interrupt manager to avoid needing to synchronize
 // re-registrations with invocations, which can be much more efficient and avoid unneeded
