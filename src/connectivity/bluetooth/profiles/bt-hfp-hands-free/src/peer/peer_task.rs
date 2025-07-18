@@ -92,9 +92,9 @@ impl PeerTask {
     }
 
     async fn run_inner(&mut self) -> Result<()> {
-        self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(CommandFromHf::StartSlci {
+        self.enqueue_command_from_hf(CommandFromHf::StartSlci {
             hf_features: self.procedure_manager.procedure_manipulated_state.hf_features,
-        }));
+        });
 
         loop {
             // Since IOwned doesn't implement DerefMut, we need to get a mutable reference to the
@@ -189,9 +189,9 @@ impl PeerTask {
     }
 
     fn handle_peer_handler_request(&mut self, peer_handler_request: fidl_hfp::PeerHandlerRequest) {
-        // TODO(b/321278917) Refactor this method to be testable. Maybe move it to calls.rs
-        // TODO(fxbug.dev/136796) asynchronously respond to requests when a procedure completes.
-        let (command_from_hf, responder) = match peer_handler_request {
+        debug!("Got peer handler request {:?} from peer {:}", peer_handler_request, self.peer_id);
+
+        match peer_handler_request {
             fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
                 action: fidl_hfp::CallAction::DialFromNumber(number),
                 responder,
@@ -201,7 +201,8 @@ impl PeerTask {
                     Some(number.clone().into()),
                     Direction::MobileOriginated,
                 );
-                (CommandFromHf::CallActionDialFromNumber { number }, responder)
+                self.log_responder_error(responder.send(Ok(())));
+                self.enqueue_command_from_hf(CommandFromHf::CallActionDialFromNumber { number });
             }
             fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
                 action: fidl_hfp::CallAction::DialFromLocation(memory),
@@ -212,7 +213,8 @@ impl PeerTask {
                     /* number = */ None,
                     Direction::MobileOriginated,
                 );
-                (CommandFromHf::CallActionDialFromMemory { memory }, responder)
+                self.log_responder_error(responder.send(Ok(())));
+                self.enqueue_command_from_hf(CommandFromHf::CallActionDialFromMemory { memory });
             }
             fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
                 action: fidl_hfp::CallAction::RedialLast(_),
@@ -223,35 +225,31 @@ impl PeerTask {
                     /* number = */ None,
                     Direction::MobileOriginated,
                 );
-                (CommandFromHf::CallActionRedialLast, responder)
+                self.log_responder_error(responder.send(Ok(())));
+                self.enqueue_command_from_hf(CommandFromHf::CallActionRedialLast);
             }
             fidl_hfp::PeerHandlerRequest::WatchNextCall { responder } => {
                 self.calls.handle_watch_next_call(responder);
-                // TODO(b/321278917) Clean up this control flow.
-                return;
             }
             fidl_hfp::PeerHandlerRequest::WatchNetworkInformation { responder } => {
                 self.indicated_state.handle_watch_network_information(responder);
-                // TODO(b/321278917) Clean up this control flow.
-                return;
             }
             other => {
                 error!(
                     "Unimplemented PeerHandler FIDL request {:?} for peer {:}",
                     other, self.peer_id
                 );
-                // TODO(b/321278917) Clean up this control flow.
-                return;
             }
         };
+    }
 
-        // TODO(fxbug.dev/136796) asynchronously respond to this request when the procedure
-        // completes.
-        let send_result = responder.send(Ok(()));
+    fn log_responder_error(&self, send_result: Result<(), fidl::Error>) {
         if let Err(err) = send_result {
             warn!("Error {:?} sending result to peer {:}", err, self.peer_id);
         }
+    }
 
+    fn enqueue_command_from_hf(&mut self, command_from_hf: CommandFromHf) {
         self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(command_from_hf));
     }
 
@@ -450,8 +448,7 @@ impl PeerTask {
     // TODO(https://fxbug.dev/134161) Implement call setup and call transfers.
     #[allow(unused)]
     fn start_audio_connection(&mut self) {
-        self.procedure_manager
-            .enqueue(ProcedureInput::CommandFromHf(CommandFromHf::StartAudioConnection))
+        self.enqueue_command_from_hf(CommandFromHf::StartAudioConnection);
     }
 
     fn get_selected_codec(&self) -> CodecId {
