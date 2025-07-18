@@ -46,6 +46,7 @@ enum class RebootReason {
   // fully migrated to Netstack3.
   kNetstackMigration,
   kAndroidUnexpectedReason,
+  kDeveloperRequest,
 };
 
 std::string ToString(RebootReason reason);

@@ -91,9 +91,16 @@ type RebootReason = strict(removed=9) flexible(added=9) enum : uint16 {
     // Graceful reboot reasons
     // |graceful| has a value of true in LastReboot above.
 
-    /// The device rebooted because a user of the device initiated the reboot. A user can be a
-    /// human or a program that interacts with the device on behalf of a human, such as SL4F or RCS.
+    /// The device rebooted because the end user of the device initiated the reboot.
+    ///
+    /// DO NOT USE for any code path not directly related to an end user explicit reboot action.
+    /// Use DEVELOPER_REQUEST below instead.
     USER_REQUEST = 9;
+
+    /// The device rebooted because a developer initiated the reboot, typically via a shell command
+    /// or similar interface, including within an automated test.
+    @available(added=NEXT)
+    DEVELOPER_REQUEST = 22;
 
     /// The device rebooted because applying the OTA failed and we want to retry.
     RETRY_SYSTEM_UPDATE = 17;

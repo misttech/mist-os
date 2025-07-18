@@ -93,6 +93,9 @@ impl RebootReasons {
                 (_, fpower::RebootReason2::AndroidUnexpectedReason) => {
                     FoldState::Direct(fpower::RebootReason::UserRequest)
                 }
+                (_, fpower::RebootReason2::DeveloperRequest) => {
+                    FoldState::Direct(fpower::RebootReason::UserRequest)
+                }
                 // If we already have an indirect reason, don't overwrite it
                 // with a new indirect reason.
                 (FoldState::Indirect(_), fpower::RebootReason2::NetstackMigration) => state,

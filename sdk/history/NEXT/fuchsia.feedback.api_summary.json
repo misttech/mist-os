@@ -659,6 +659,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.feedback/RebootReason.DEVELOPER_REQUEST",
+        "value": "22"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.feedback/RebootReason.FACTORY_DATA_RESET",
         "value": "14"
     },

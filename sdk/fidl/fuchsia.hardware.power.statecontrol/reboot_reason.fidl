@@ -43,7 +43,16 @@ type RebootReason = strict enum {
 // TODO(https://fxbug.dev/385742868): Rename this to `RebootReason` once the
 // original `RebootReason` is removed.
 type RebootReason2 = flexible enum {
+    /// The device rebooted because the end user of the device initiated the reboot.
+    ///
+    /// DO NOT USE for any code path not directly related to an end user explicit reboot action.
+    /// Use DEVELOPER_REQUEST below instead.
     USER_REQUEST = 1;
+
+    /// The device rebooted because a developer initiated the reboot, typically via a shell command
+    /// or similar interface, including within an automated test.
+    @available(added=NEXT)
+    DEVELOPER_REQUEST = 13;
 
     /// A new system update has been downloaded.
     SYSTEM_UPDATE = 2;

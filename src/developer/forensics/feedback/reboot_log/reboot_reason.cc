@@ -58,6 +58,8 @@ std::string ToString(const RebootReason reason) {
       return "NETSTACK MIGRATION";
     case RebootReason::kAndroidUnexpectedReason:
       return "ANDROID UNEXPECTED REASON";
+    case RebootReason::kDeveloperRequest:
+      return "DEVELOPER REQUEST";
   }
 }
 
@@ -86,6 +88,7 @@ bool IsCrash(const RebootReason reason) {
     case RebootReason::kCold:
     case RebootReason::kFdr:
     case RebootReason::kNetstackMigration:
+    case RebootReason::kDeveloperRequest:
       return false;
   }
 }
@@ -115,6 +118,7 @@ bool IsFatal(const RebootReason reason) {
     case RebootReason::kSessionFailure:
     case RebootReason::kFdr:
     case RebootReason::kNetstackMigration:
+    case RebootReason::kDeveloperRequest:
       return false;
   }
 }
@@ -134,6 +138,7 @@ std::optional<bool> OptionallyGraceful(const RebootReason reason) {
     case RebootReason::kFdr:
     case RebootReason::kNetstackMigration:
     case RebootReason::kAndroidUnexpectedReason:
+    case RebootReason::kDeveloperRequest:
       return true;
     case RebootReason::kCold:
     case RebootReason::kSpontaneous:
@@ -173,6 +178,7 @@ std::optional<bool> OptionallyPlanned(const RebootReason reason) {
     case RebootReason::kBrownout:
     case RebootReason::kRootJobTermination:
     case RebootReason::kAndroidUnexpectedReason:
+    case RebootReason::kDeveloperRequest:
       return false;
     case RebootReason::kNotParseable:
       return std::nullopt;
@@ -225,6 +231,8 @@ cobalt::LastRebootReason ToCobaltLastRebootReason(RebootReason reason) {
       return cobalt::LastRebootReason::kNetstackMigration;
     case RebootReason::kAndroidUnexpectedReason:
       return cobalt::LastRebootReason::kAndroidUnexpectedReason;
+    case RebootReason::kDeveloperRequest:
+      return cobalt::LastRebootReason::kDeveloperRequest;
   }
 }
 
@@ -272,6 +280,7 @@ std::string ToCrashSignature(const RebootReason reason,
     case RebootReason::kCold:
     case RebootReason::kFdr:
     case RebootReason::kNetstackMigration:
+    case RebootReason::kDeveloperRequest:
       FX_LOGS(FATAL) << "Not expecting a crash for reboot reason: " << ToString(reason);
       return "FATAL ERROR";
   }
@@ -306,6 +315,7 @@ std::string ToCrashProgramName(const RebootReason reason) {
     case RebootReason::kCold:
     case RebootReason::kFdr:
     case RebootReason::kNetstackMigration:
+    case RebootReason::kDeveloperRequest:
       FX_LOGS(FATAL) << "Not expecting a program name request for reboot reason: "
                      << ToString(reason);
       return "FATAL ERROR";
@@ -355,6 +365,8 @@ std::optional<fuchsia::feedback::RebootReason> ToFidlRebootReason(const RebootRe
       return fuchsia::feedback::RebootReason::NETSTACK_MIGRATION;
     case RebootReason::kAndroidUnexpectedReason:
       return fuchsia::feedback::RebootReason::ANDROID_UNEXPECTED_REASON;
+    case RebootReason::kDeveloperRequest:
+      return fuchsia::feedback::RebootReason::DEVELOPER_REQUEST;
     case RebootReason::kNotParseable:
       return std::nullopt;
   }

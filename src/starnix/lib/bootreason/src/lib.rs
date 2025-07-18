@@ -28,6 +28,7 @@ pub fn get_android_bootreason() -> Result<&'static str, Error> {
         Some(RebootReason::SoftwareWatchdogTimeout) => return Ok("watchdog,sw"),
         Some(RebootReason::RootJobTermination) => return Ok("kernel_panic"),
         Some(RebootReason::UserRequest) => return Ok("reboot,userrequested"),
+        Some(RebootReason::DeveloperRequest) => return Ok("reboot,shell"),
         Some(RebootReason::RetrySystemUpdate) => return Ok("reboot,ota"),
         Some(RebootReason::HighTemperature) => return Ok("shutdown,thermal"),
         Some(RebootReason::SessionFailure) => return Ok("kernel_panic"),

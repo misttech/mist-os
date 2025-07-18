@@ -156,6 +156,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.hardware.power.statecontrol/RebootReason2.DEVELOPER_REQUEST",
+        "value": "13"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.hardware.power.statecontrol/RebootReason2.FACTORY_DATA_RESET",
         "value": "6"
     },
