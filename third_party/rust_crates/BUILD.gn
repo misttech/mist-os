@@ -13308,9 +13308,7 @@ rustc_library("rand-v0_8_4") {
     "--cfg=feature=\"std_rng\"",
   ]
 
-  visibility = []
-  visibility += [ ":*" ]
-  visibility += [ "//vendor/google/*" ]
+  visibility = [ ":*" ]
 
   applicable_licenses = [ ":rand-v0_8_4.license" ]
 }
