@@ -199,6 +199,7 @@ MappedMemoryRange HandoffPrep::PublishStackVmar(ZirconAbiSpec::Stack stack, mema
 }
 
 HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
+  const memalloc::Pool& pool = Allocation::GetPool();
   ZirconAbi abi{};
 
   // Physmap.
@@ -250,8 +251,6 @@ HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver
 
   // Periphmap
   {
-    memalloc::Pool& pool = Allocation::GetPool();
-
     auto periph_filter = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
       return type == memalloc::Type::kPeripheral ? ktl::make_optional(type) : ktl::nullopt;
     };
@@ -288,6 +287,16 @@ HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver
       handoff_->uart_mmio = PublishSingleMmioMappingVmar("UART"sv, mmio.address, mmio.size);
     }
   });
+
+  // NVRAM
+  {
+    auto nvram = ktl::find_if(pool.begin(), pool.end(), [](const memalloc::Range& range) {
+      return range.type == memalloc::Type::kNvram;
+    });
+    if (nvram != pool.end()) {
+      handoff_->nvram = PublishSingleWritableDataMappingVmar("NVRAM"sv, nvram->addr, nvram->size);
+    }
+  }
 
   // Construct the arch-specific bits at the end (to give the non-arch-specific
   // placements in the address space a small amount of relative familiarity).

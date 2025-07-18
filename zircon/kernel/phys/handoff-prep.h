@@ -369,6 +369,13 @@ class HandoffPrep {
                                     PhysMapping::Permissions::Rw());
   }
 
+  // A specialization for an MMIO range.
+  MappedRange<ktl::byte> PublishSingleWritableDataMappingVmar(ktl::string_view name, uintptr_t addr,
+                                                              size_t size) {
+    return PublishSingleMappingVmar(name, PhysMapping::Type::kNormal, addr, size,
+                                    PhysMapping::Permissions::Rw());
+  }
+
   MappedMemoryRange PublishStackVmar(ZirconAbiSpec::Stack stack, memalloc::Type type);
 
   // This constructs a PhysElfImage from an ELF file in the KernelStorage.

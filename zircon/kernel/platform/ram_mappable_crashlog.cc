@@ -15,7 +15,6 @@
 #include <ktl/span.h>
 #include <platform/ram_mappable_crashlog.h>
 #include <ram-crashlog/ram-crashlog.h>
-#include <vm/physmap.h>
 
 #include <ktl/enforce.h>
 
@@ -27,10 +26,10 @@ FILE NULL_FILE = FILE{[](void*, ktl::string_view str) -> int {
                       nullptr};
 }  // namespace
 
-RamMappableCrashlog::RamMappableCrashlog(paddr_t phys, size_t len)
-    : crashlog_buffer_(phys && len
-                           ? ktl::span<char>{static_cast<char*>(paddr_to_physmap(phys)), len}
-                           : ktl::span<char>{}),
+RamMappableCrashlog::RamMappableCrashlog(ktl::span<ktl::byte> range)
+    : crashlog_buffer_(range.empty() ? ktl::span<char>{}
+                                     : ktl::span<char>{reinterpret_cast<char*>(range.data()),
+                                                       range.size_bytes()}),
       render_target_(crashlog_buffer_.size() > sizeof(ram_crashlog_v1_t)
                          ? crashlog_buffer_.subspan(sizeof(ram_crashlog_v1_t))
                          : ktl::span<char>{}) {

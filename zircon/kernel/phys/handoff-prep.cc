@@ -202,10 +202,9 @@ void HandoffPrep::SetMemory() {
         return memalloc::Type::kKernelPageTables;
 
       // An NVRAM range should no longer be treated like normal RAM. The kernel
-      // will access it through PhysHandoff::nvram via its own mapping for it.
-      //
-      // TODO(https://fxbug.dev/42164859): Create a dedicated mapping for the
-      // NVRAM range and hand that off.
+      // will access it through the mapping provided with PhysHandoff::nvram,
+      // and will further key off that to restrict userspace access to this
+      // range of memory.
       case memalloc::Type::kNvram:
       // Truncations should now go into effect.
       case memalloc::Type::kTruncatedRam:

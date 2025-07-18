@@ -11,14 +11,17 @@
 #include <kernel/spinlock.h>
 #include <kernel/timer.h>
 #include <ktl/atomic.h>
+#include <ktl/byte.h>
 #include <ktl/span.h>
 #include <platform/crashlog.h>
 #include <ram-crashlog/ram-crashlog.h>
 
+// TODO(https://fxbug.dev/42164859): Rename as MappedRamCrashlog, since it is
+// presented as already mapped to this class.
 class RamMappableCrashlog final : public PlatformCrashlog::Interface {
  public:
   RamMappableCrashlog() = delete;
-  RamMappableCrashlog(paddr_t phys, size_t len);
+  RamMappableCrashlog(ktl::span<ktl::byte> range);
 
   ktl::span<char> GetRenderTarget() final { return render_target_; }
 

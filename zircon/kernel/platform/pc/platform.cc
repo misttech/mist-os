@@ -80,8 +80,7 @@ static void platform_save_bootloader_data(void) {
   // RamMappableCrashlog implementation and configure the generic platform
   // layer to use it.
   if (gPhysHandoff->nvram && !PlatformCrashlog::HasNonTrivialImpl()) {
-    const zbi_nvram_t& nvram = gPhysHandoff->nvram.value();
-    crashlog_impls::ram_mappable.Initialize(nvram.base, nvram.length);
+    crashlog_impls::ram_mappable.Initialize(gPhysHandoff->nvram.value());
     PlatformCrashlog::Bind(crashlog_impls::ram_mappable.Get());
   }
 }

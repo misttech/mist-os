@@ -28,6 +28,7 @@ source_set("generic-riscv64") {
     "//zircon/kernel/lib/jtrace",
     "//zircon/kernel/lib/lockdep",
     "//zircon/kernel/lib/persistent-debuglog",
+    "//zircon/kernel/lib/root_resource_filter",
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/object",
     "//zircon/kernel/phys:handoff",
