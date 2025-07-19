@@ -85,7 +85,8 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
 
 zx_status_t Interrupter::StartIrqThread() {
   wake_lease_.emplace(dispatcher_.async_dispatcher(), "xhci-wake",
-                      std::move(hci_->activity_governer()), &wake_events_);
+                      // TODO(b/431787366) Set log flag to false
+                      std::move(hci_->activity_governer()), &wake_events_, true);
   irq_handler_.set_object(irq_.get());
   irq_handler_.set_handler([&](async_dispatcher_t* dispatcher, async::Irq* irq, zx_status_t status,
                                const zx_packet_interrupt_t* interrupt) {

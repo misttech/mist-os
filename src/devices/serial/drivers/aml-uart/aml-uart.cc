@@ -52,7 +52,8 @@ AmlUart::AmlUart(fdf::PDev pdev,
       power_control_enabled_(power_control_enabled) {
   if (sag.is_valid()) {
     wake_lease_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), "aml-uart-wake",
-                        std::move(sag));
+                        // TODO(b/431787366) Set log flag to false.
+                        std::move(sag), nullptr, true);
   }
 }
 
