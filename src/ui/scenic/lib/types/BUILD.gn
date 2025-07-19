@@ -5,8 +5,12 @@
 source_set("types") {
   sources = [
     "extent2.h",
+    "extent2_f.h",
     "point2.h",
+    "point2_f.h",
     "rectangle.h",
+    "rectangle_f.cc",
+    "rectangle_f.h",
     "util/hash_combine.h",
     "util/to_underlying.h",
   ]

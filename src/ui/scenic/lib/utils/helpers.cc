@@ -154,18 +154,6 @@ fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(
   return constraints;
 }
 
-bool RectFContainsPoint(const fuchsia::math::RectF& rect, float x, float y) {
-  constexpr float kEpsilon = 1e-3f;
-  return rect.x - kEpsilon <= x && x <= rect.x + rect.width + kEpsilon && rect.y - kEpsilon <= y &&
-         y <= rect.y + rect.height + kEpsilon;
-}
-
-bool RectFContainsPoint(const fuchsia_math::RectF& rect, float x, float y) {
-  constexpr float kEpsilon = 1e-3f;
-  return rect.x() - kEpsilon <= x && x <= rect.x() + rect.width() + kEpsilon &&
-         rect.y() - kEpsilon <= y && y <= rect.y() + rect.height() + kEpsilon;
-}
-
 // Prints in row-major order.
 void PrettyPrintMat3(std::string name, const std::array<float, 9>& mat3) {
   FX_LOGS(INFO) << "\n"

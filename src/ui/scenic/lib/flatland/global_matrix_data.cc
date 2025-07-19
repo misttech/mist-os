@@ -16,18 +16,21 @@
 
 namespace flatland {
 
-const ImageSampleRegion kInvalidSampleRegion = {-1.f, -1.f, -1.f - 1.f};
-constexpr TransformClipRegion kUnclippedRegion({-std::numeric_limits<int32_t>::max() / 2,
-                                                -std::numeric_limits<int32_t>::max() / 2,
-                                                std::numeric_limits<int32_t>::max(),
-                                                std::numeric_limits<int32_t>::max()});
+const ImageSampleRegion kInvalidSampleRegion({.x = 0.f, .y = 0.f, .width = 0.f, .height = 0.f});
+
+constexpr TransformClipRegion kUnclippedRegion({.x = -(std::numeric_limits<int32_t>::max() / 2),
+                                                .y = -(std::numeric_limits<int32_t>::max() / 2),
+                                                .width = std::numeric_limits<int32_t>::max(),
+                                                .height = std::numeric_limits<int32_t>::max()});
 
 namespace {
 
 using fuchsia::ui::composition::Orientation;
 
-// TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it here.  Probably also a
-// standard `Overlap()` method.  Or: `Intersect(clip, RectangleF(origin, extent)).IsEmpty()`.
+// TODO(https://fxbug.dev/426028969): `types::RectangleF` exists now; consider using it here after
+// adding helpers such as `Overlap()` or `Intersect(...).IsEmpty()`.  One concern is that we heavily
+// use `glm::vec2` including matrix multiplication, so we want to verify that CPU performance isn't
+// affected by switching formats.
 bool Overlap(const TransformClipRegion& clip, const glm::vec2& origin, const glm::vec2& extent) {
   if (clip == kUnclippedRegion)
     return true;
@@ -70,11 +73,10 @@ std::array<glm::vec3, 4> ConvertRectToVerts(types::Rectangle rect) {
           glm::vec3(static_cast<float>(rect.x()), static_cast<float>(rect.y() + rect.height()), 1)};
 }
 
-// TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it here.
-std::array<glm::vec3, 4> ConvertRectFToVerts(fuchsia::math::RectF rect) {
-  return {glm::vec3(rect.x, rect.y, 1), glm::vec3(rect.x + rect.width, rect.y, 1),
-          glm::vec3(rect.x + rect.width, rect.y + rect.height, 1),
-          glm::vec3(rect.x, rect.y + rect.height, 1)};
+std::array<glm::vec3, 4> ConvertRectFToVerts(const types::RectangleF& rect) {
+  return {glm::vec3(rect.x(), rect.y(), 1), glm::vec3(rect.x() + rect.width(), rect.y(), 1),
+          glm::vec3(rect.x() + rect.width(), rect.y() + rect.height(), 1),
+          glm::vec3(rect.x(), rect.y() + rect.height(), 1)};
 }
 
 // Template to handle both vec2 and vec3 inputs.
@@ -86,11 +88,11 @@ types::Rectangle ConvertVertsToRect(const std::array<T, 4>& verts) {
                            .height = static_cast<int32_t>(fabs(verts[2].y - verts[1].y))});
 }
 
-fuchsia::math::RectF ConvertVertsToRectF(const std::array<glm::vec2, 4>& verts) {
-  return {.x = verts[0].x,
-          .y = verts[0].y,
-          .width = fabs(verts[1].x - verts[0].x),
-          .height = fabs(verts[2].y - verts[1].y)};
+types::RectangleF ConvertVertsToRectF(const std::array<glm::vec2, 4>& verts) {
+  return types::RectangleF({.x = verts[0].x,
+                            .y = verts[0].y,
+                            .width = fabs(verts[1].x - verts[0].x),
+                            .height = fabs(verts[2].y - verts[1].y)});
 }
 
 // Assume that the 4 vertices represent a rectangle, and are provided in clockwise order,
@@ -107,7 +109,7 @@ std::pair<std::array<glm::vec2, 4>, std::array<glm::vec2, 4>> MatrixMultiplyVert
   };
 
   float min_x = FLT_MAX, min_y = FLT_MAX;
-  float max_x = -FLT_MAX, max_y = -FLT_MAX;
+  float max_x = std::numeric_limits<float>::lowest(), max_y = std::numeric_limits<float>::lowest();
   for (uint32_t i = 0; i < 4; i++) {
     min_x = std::min(min_x, verts[i].x);
     min_y = std::min(min_y, verts[i].y);
@@ -128,7 +130,7 @@ types::Rectangle MatrixMultiplyRect(const glm::mat3& matrix, types::Rectangle re
   return ConvertVertsToRect(std::get<1>(MatrixMultiplyVerts(matrix, ConvertRectToVerts(rect))));
 }
 
-fuchsia::math::RectF MatrixMultiplyRectF(const glm::mat3& matrix, fuchsia::math::RectF rect) {
+types::RectangleF MatrixMultiplyRectF(const glm::mat3& matrix, types::RectangleF rect) {
   return ConvertVertsToRectF(std::get<1>(MatrixMultiplyVerts(matrix, ConvertRectFToVerts(rect))));
 }
 
@@ -489,15 +491,15 @@ GlobalRectangleVector ComputeGlobalRectangles(
       const auto h = static_cast<float>(image.height);
 
       if (w > 0 && h > 0) {
-        FX_DCHECK(sample.x >= 0 && (sample.x + sample.width) <= w);
-        FX_DCHECK(sample.y >= 0 && (sample.y + sample.height) <= h);
+        FX_DCHECK(sample.x() >= 0 && (sample.x() + sample.width()) <= w);
+        FX_DCHECK(sample.y() >= 0 && (sample.y() + sample.height()) <= h);
       }
     }
 
     const std::array<glm::ivec2, 4> unclipped_texel_uvs = {
-        glm::ivec2(sample.x, sample.y), glm::ivec2(sample.x + sample.width, sample.y),
-        glm::ivec2(sample.x + sample.width, sample.y + sample.height),
-        glm::ivec2(sample.x, sample.y + sample.height)};
+        glm::ivec2(sample.x(), sample.y()), glm::ivec2(sample.x() + sample.width(), sample.y()),
+        glm::ivec2(sample.x() + sample.width(), sample.y() + sample.height()),
+        glm::ivec2(sample.x(), sample.y() + sample.height())};
 
     rectangles.emplace_back(CreateImageRect(matrix, clip, unclipped_texel_uvs, image.flip));
   }

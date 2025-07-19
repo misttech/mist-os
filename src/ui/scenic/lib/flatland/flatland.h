@@ -179,7 +179,7 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
   // |fuchsia_ui_composition::Flatland|
   void SetImageSampleRegion(SetImageSampleRegionRequest& request,
                             SetImageSampleRegionCompleter::Sync& completer) override;
-  void SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect);
+  void SetImageSampleRegion(ContentId image_id, types::RectangleF rect);
 
   // |fuchsia_ui_composition::Flatland|
   void SetImageDestinationSize(SetImageDestinationSizeRequest& request,

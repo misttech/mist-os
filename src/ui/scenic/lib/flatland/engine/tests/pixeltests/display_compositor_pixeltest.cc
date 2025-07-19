@@ -911,8 +911,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   // Now we can finally render.
@@ -1037,8 +1040,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   display_compositor->SetColorConversionValues({0.2f, 0, 0, 0, 0.2f, 0, 0, 0, 0.2f}, {0, 0, 0},
@@ -1142,8 +1148,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   // Now we can finally render.
@@ -1259,8 +1268,11 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   uberstruct->images[image_handle] = image_metadata;
   uberstruct->local_matrices[image_handle] = glm::scale(
       glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-  uberstruct->local_image_sample_regions[image_handle] = {0.f, 0.f, static_cast<float>(kRectWidth),
-                                                          static_cast<float>(kRectHeight)};
+  uberstruct->local_image_sample_regions[image_handle] =
+      ImageSampleRegion({.x = 0.f,
+                         .y = 0.f,
+                         .width = static_cast<float>(kRectWidth),
+                         .height = static_cast<float>(kRectHeight)});
   session.PushUberStruct(std::move(uberstruct));
 
   display_compositor->SetMinimumRgb(kMinimum);
@@ -1787,8 +1799,11 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
 
     // The child has a built in scale of 2x2.
     uberstruct->local_matrices[child_handle] = glm::scale(glm::mat3(1.0), glm::vec2(2, 2));
-    uberstruct->local_image_sample_regions[child_handle] = {
-        0.f, 0.f, static_cast<float>(kTextureWidth), static_cast<float>(kTextureHeight)};
+    uberstruct->local_image_sample_regions[child_handle] =
+        ImageSampleRegion({.x = 0.f,
+                           .y = 0.f,
+                           .width = static_cast<float>(kTextureWidth),
+                           .height = static_cast<float>(kTextureHeight)});
     session.PushUberStruct(std::move(uberstruct));
   }
 
@@ -2034,8 +2049,11 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
     matrix = glm::rotate(matrix, glm::pi<float>());
     matrix = glm::scale(matrix, glm::vec2(2, 2));
     uberstruct->local_matrices[parent_handle] = matrix;
-    uberstruct->local_image_sample_regions[parent_handle] = {
-        0.f, 0.f, static_cast<float>(kTextureWidth), static_cast<float>(kTextureHeight)};
+    uberstruct->local_image_sample_regions[parent_handle] =
+        ImageSampleRegion({.x = 0.f,
+                           .y = 0.f,
+                           .width = static_cast<float>(kTextureWidth),
+                           .height = static_cast<float>(kTextureHeight)});
     session.PushUberStruct(std::move(uberstruct));
   }
 
@@ -2231,8 +2249,11 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
     uberstruct->images[image_handle] = im;
     uberstruct->local_matrices[image_handle] = glm::scale(
         glm::translate(glm::mat3(1.0), glm::vec2(0, 0)), glm::vec2(kRectWidth, kRectHeight));
-    uberstruct->local_image_sample_regions[image_handle] = {
-        0.f, 0.f, static_cast<float>(kRectWidth), static_cast<float>(kRectHeight)};
+    uberstruct->local_image_sample_regions[image_handle] =
+        ImageSampleRegion({.x = 0.f,
+                           .y = 0.f,
+                           .width = static_cast<float>(kRectWidth),
+                           .height = static_cast<float>(kRectHeight)});
     session.PushUberStruct(std::move(uberstruct));
   };
   push_uberstruct_for_image_into_session(blue_image_metadata);

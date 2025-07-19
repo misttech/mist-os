@@ -60,12 +60,6 @@ fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(
     uint32_t buffer_count, uint32_t kWidth, uint32_t kHeight,
     fuchsia::images2::PixelFormat format = fuchsia::images2::PixelFormat::B8G8R8A8);
 
-// Accounts for floating point rounding errors.
-// TODO(https://fxbug.dev/426028969): add `types::RectangleF` and use it to replace both of these.
-// Probably add `types::RectangleF::Contains(Point2F)`.
-bool RectFContainsPoint(const fuchsia::math::RectF& rect, float x, float y);
-bool RectFContainsPoint(const fuchsia_math::RectF& rect, float x, float y);
-
 void PrettyPrintMat3(std::string, const std::array<float, 9>& mat3);
 
 template <std::size_t Dim>

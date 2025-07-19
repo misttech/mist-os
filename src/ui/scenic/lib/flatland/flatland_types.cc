@@ -46,9 +46,13 @@ bool ImageRect::operator==(const ImageRect& other) const {
          texel_uvs[3] == other.texel_uvs[3];
 }
 
-HitRegion::HitRegion(fuchsia::math::RectF region,
-                     fuchsia::ui::composition::HitTestInteraction interaction)
+HitRegion::HitRegion(const types::RectangleF& region,
+                     const fuchsia::ui::composition::HitTestInteraction& interaction)
     : region_(std::make_optional(region)), interaction_(interaction) {}
+
+HitRegion::HitRegion(types::RectangleF::ConstructorArgs region,
+                     fuchsia::ui::composition::HitTestInteraction interaction)
+    : HitRegion(types::RectangleF(region), interaction) {}
 
 HitRegion HitRegion::Infinite(fuchsia::ui::composition::HitTestInteraction interaction) {
   return HitRegion(interaction);
@@ -56,7 +60,7 @@ HitRegion HitRegion::Infinite(fuchsia::ui::composition::HitTestInteraction inter
 
 bool HitRegion::is_finite() const { return region_.has_value(); }
 
-const fuchsia::math::RectF& HitRegion::region() const {
+const types::RectangleF& HitRegion::region() const {
   FX_DCHECK(region_.has_value()) << "region accessor needs a value";
   return region_.value();
 }

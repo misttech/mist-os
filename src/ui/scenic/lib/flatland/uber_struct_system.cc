@@ -156,16 +156,6 @@ ostream& operator<<(ostream& out, const Indenter& indenter) {
   return out;
 }
 
-inline ostream& operator<<(ostream& out, const fuchsia::math::RectF& rect) {
-  out << "(" << rect.x << "," << rect.y << "),(" << rect.width << "," << rect.height << ")";
-  return out;
-}
-
-inline ostream& operator<<(ostream& out, const fuchsia::math::Rect& rect) {
-  out << "(" << rect.x << "," << rect.y << "),(" << rect.width << "," << rect.height << ")";
-  return out;
-}
-
 inline ostream& operator<<(ostream& out, const fuchsia::ui::views::ViewRef& ref) {
   zx_koid_t koid = utils::ExtractKoid(ref);
   if (koid == ZX_KOID_INVALID) {

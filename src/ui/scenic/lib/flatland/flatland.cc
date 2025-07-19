@@ -1355,8 +1355,11 @@ void Flatland::CreateImage(ContentId image_id,
   image_metadatas_[handle] = metadata;
 
   // Set the default sample region of the image to be the full image.
-  SetImageSampleRegion(image_id, {0, 0, static_cast<float>(properties.size()->width()),
-                                  static_cast<float>(properties.size()->height())});
+  SetImageSampleRegion(
+      image_id, types::RectangleF({.x = 0,
+                                   .y = 0,
+                                   .width = static_cast<float>(properties.size()->width()),
+                                   .height = static_cast<float>(properties.size()->height())}));
 
   // Set the default destination region of the image to be the full image.
   SetImageDestinationSize(image_id, properties.size().value());
@@ -1369,10 +1372,10 @@ void Flatland::CreateImage(ContentId image_id,
 
 void Flatland::SetImageSampleRegion(SetImageSampleRegionRequest& request,
                                     SetImageSampleRegionCompleter::Sync& completer) {
-  SetImageSampleRegion(request.image_id(), request.rect());
+  SetImageSampleRegion(request.image_id(), types::RectangleF::From(request.rect()));
 }
 
-void Flatland::SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect) {
+void Flatland::SetImageSampleRegion(ContentId image_id, types::RectangleF rect) {
   if ((image_id.value()) == kInvalidId) {
     error_reporter_->ERROR() << "SetImageSampleRegion called with content id 0";
     CloseConnection(FlatlandError::kBadOperation);
@@ -1397,8 +1400,8 @@ void Flatland::SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect
   // The provided sample region needs to be within the bounds of the image.
   {
     const auto& metadata = image_kv->second;
-    const auto image_width = static_cast<float>(metadata.width);
-    const auto image_height = static_cast<float>(metadata.height);
+    const float image_width = static_cast<float>(metadata.width);
+    const float image_height = static_cast<float>(metadata.height);
     // This clamping is required in cases where (x+width>image_width) or (y+height>image_height)
     // by a small epsilon. The downstream code expects these numbers to be within the
     // (image_width, image_height) limits, so we only clamp the positive differences. The root
@@ -1406,19 +1409,24 @@ void Flatland::SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect
     // floats within pixel space.
     // TODO(https://fxbug.dev/42082599): Remove floating point precision error checks and use
     // uints instead.
-    ClampIfNear(&rect.width(), rect.x() + rect.width() - image_width);
-    ClampIfNear(&rect.height(), rect.y() + rect.height() - image_height);
-    if (rect.x() < 0.f || rect.width() < 0.f || (rect.x() + rect.width()) > image_width ||
-        rect.y() < 0.f || rect.height() < 0.f || (rect.y() + rect.height()) > image_height) {
-      error_reporter_->ERROR() << "SetImageSampleRegion rect " << rect
+    float clamped_width = rect.width();
+    float clamped_height = rect.height();
+    ClampIfNear(&clamped_width, rect.x() + clamped_width - image_width);
+    ClampIfNear(&clamped_height, rect.y() + clamped_height - image_height);
+    if (rect.x() < 0.f || clamped_width < 0.f || (rect.x() + clamped_width) > image_width ||
+        rect.y() < 0.f || clamped_height < 0.f || (rect.y() + clamped_height) > image_height) {
+      error_reporter_->ERROR() << "SetImageSampleRegion rect " << rect.x() << "," << rect.y() << ","
+                               << clamped_width << "," << clamped_height
                                << " out of bounds for image (" << image_width << ", "
                                << image_height << ")";
       CloseConnection(FlatlandError::kBadOperation);
       return;
     }
+    rect = ImageSampleRegion(
+        {.x = rect.x(), .y = rect.y(), .width = clamped_width, .height = clamped_height});
   }
 
-  image_sample_regions_[content_kv->second] = fidl::NaturalToHLCPP(rect);
+  image_sample_regions_[content_kv->second] = rect;
 }
 
 void Flatland::SetImageDestinationSize(SetImageDestinationSizeRequest& request,
@@ -1727,8 +1735,9 @@ void Flatland::SetHitRegions(TransformId transform_identifier,
 
   // Reformat into internal type.
   std::vector<flatland::HitRegion> list;
+  list.reserve(regions.size());
   for (auto& region : regions) {
-    list.emplace_back(fidl::NaturalToHLCPP(region.region()),
+    list.emplace_back(types::RectangleF::From(region.region()),
                       fidl::NaturalToHLCPP(region.hit_test()));
   }
   hit_regions_[transform_kv->second] = list;
