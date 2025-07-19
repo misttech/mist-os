@@ -11,6 +11,7 @@ rustc_library("delivery_blob") {
   version = "0.1.0"
   visibility = [
     "//src/developer/ffx/plugins/package/blob/*",
+    "//src/developer/ffx/plugins/product/*",
     "//src/lib/assembly/*",
     "//src/security/lib/scrutiny/*",
     "//src/storage/*",
