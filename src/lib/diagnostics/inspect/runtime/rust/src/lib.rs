@@ -87,6 +87,8 @@ pub struct PublishOptions {
 
     /// Channel over which the InspectSink protocol will be used.
     pub(crate) inspect_sink_client: Option<ClientEnd<finspect::InspectSinkMarker>>,
+    /// Channel over which the InspectSink protocol will be used.
+    pub(crate) custom_scope: Option<fasync::ScopeHandle>,
 }
 
 impl PublishOptions {
@@ -105,6 +107,12 @@ impl PublishOptions {
     /// Default behavior is an empty string.
     pub fn inspect_tree_name(mut self, name: impl Into<String>) -> Self {
         self.tree_name = Some(name.into());
+        self
+    }
+
+    /// Sets a custom fuchsia_async::Scope to use for serving Inspect.
+    pub fn custom_scope(mut self, scope: fasync::ScopeHandle) -> Self {
+        self.custom_scope = Some(scope);
         self
     }
 
@@ -132,8 +140,10 @@ pub fn publish(
     inspector: &Inspector,
     options: PublishOptions,
 ) -> Option<PublishedInspectController> {
-    let PublishOptions { vmo_preference, tree_name, inspect_sink_client } = options;
-    let scope = fasync::Scope::new_with_name("inspect_runtime::publish");
+    let PublishOptions { vmo_preference, tree_name, inspect_sink_client, custom_scope } = options;
+    let scope = custom_scope
+        .map(|handle| handle.new_child_with_name("inspect_runtime::publish"))
+        .unwrap_or_else(|| fasync::Scope::new_with_name("inspect_runtime::publish"));
     let tree = service::spawn_tree_server(inspector.clone(), vmo_preference, &scope);
 
     let inspect_sink = inspect_sink_client.map(|client| client.into_proxy()).or_else(|| {
