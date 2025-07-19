@@ -28,9 +28,7 @@ class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
  public:
   explicit InputReport(fidl::ClientEnd<fuchsia_hardware_input::Device> input_device)
       : input_device_(std::move(input_device)),
-        wake_lease_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), "hid-input-report", {},
-                    // TODO(b/431787366) Set log flag to false.
-                    nullptr, true) {}
+        wake_lease_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), "hid-input-report", {}) {}
 
   zx_status_t Start();
 
