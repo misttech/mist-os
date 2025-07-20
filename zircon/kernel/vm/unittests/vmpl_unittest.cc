@@ -305,8 +305,8 @@ static bool vmpl_take_single_page_even_test() {
   EXPECT_TRUE(AddPage(&pl, test_page, 0));
   EXPECT_TRUE(AddPage(&pl, test_page2, PAGE_SIZE));
 
-  VmPageSpliceList splice(0, PAGE_SIZE);
-  pl.TakePages(&splice);
+  VmPageSpliceList splice(PAGE_SIZE);
+  pl.TakePages(0, &splice);
 
   EXPECT_TRUE(splice.IsFinalized());
   EXPECT_EQ(test_page, splice.Pop().ReleasePage(), "wrong page\n");
@@ -334,8 +334,8 @@ static bool vmpl_take_single_page_odd_test() {
   EXPECT_TRUE(AddPage(&pl, test_page, 0));
   EXPECT_TRUE(AddPage(&pl, test_page2, PAGE_SIZE));
 
-  VmPageSpliceList splice(PAGE_SIZE, PAGE_SIZE);
-  pl.TakePages(&splice);
+  VmPageSpliceList splice(PAGE_SIZE);
+  pl.TakePages(PAGE_SIZE, &splice);
 
   EXPECT_TRUE(splice.IsFinalized());
   EXPECT_EQ(test_page2, splice.Pop().ReleasePage(), "wrong page\n");
@@ -364,8 +364,8 @@ static bool vmpl_take_all_pages_test() {
     EXPECT_TRUE(AddMarker(&pl, (i * 2 + 1) * PAGE_SIZE));
   }
 
-  VmPageSpliceList splice(0, kCount * 2 * PAGE_SIZE);
-  pl.TakePages(&splice);
+  VmPageSpliceList splice(kCount * 2 * PAGE_SIZE);
+  pl.TakePages(0, &splice);
   EXPECT_TRUE(splice.IsFinalized());
   EXPECT_TRUE(pl.IsEmpty(), "non-empty list\n");
 
@@ -394,8 +394,8 @@ static bool vmpl_take_middle_pages_test() {
 
   constexpr uint32_t kTakeOffset = VmPageListNode::kPageFanOut - 1;
   constexpr uint32_t kTakeCount = VmPageListNode::kPageFanOut + 2;
-  VmPageSpliceList splice(kTakeOffset * PAGE_SIZE, kTakeCount * PAGE_SIZE);
-  pl.TakePages(&splice);
+  VmPageSpliceList splice(kTakeCount * PAGE_SIZE);
+  pl.TakePages(kTakeOffset * PAGE_SIZE, &splice);
   EXPECT_TRUE(splice.IsFinalized());
   EXPECT_FALSE(pl.IsEmpty(), "non-empty list\n");
 
@@ -430,8 +430,8 @@ static bool vmpl_take_gap_test() {
 
   constexpr uint32_t kListStart = PAGE_SIZE;
   constexpr uint32_t kListLen = (kCount * (kGapSize + 1) - 2) * PAGE_SIZE;
-  VmPageSpliceList splice(kListStart, kListLen);
-  pl.TakePages(&splice);
+  VmPageSpliceList splice(kListLen);
+  pl.TakePages(kListStart, &splice);
 
   EXPECT_TRUE(splice.IsFinalized());
   EXPECT_EQ(test_pages[0], pl.RemoveContent(0).ReleasePage(), "wrong page\n");
@@ -459,8 +459,8 @@ static bool vmpl_take_empty_test() {
 
   VmPageList pl;
 
-  VmPageSpliceList splice(PAGE_SIZE, PAGE_SIZE);
-  pl.TakePages(&splice);
+  VmPageSpliceList splice(PAGE_SIZE);
+  pl.TakePages(PAGE_SIZE, &splice);
 
   EXPECT_TRUE(splice.IsFinalized());
   EXPECT_FALSE(splice.IsProcessed());
@@ -475,7 +475,7 @@ static bool vmpl_append_to_splice_list_test() {
   BEGIN_TEST;
 
   const uint8_t kNumPages = 5;
-  VmPageSpliceList splice(0, kNumPages * PAGE_SIZE);
+  VmPageSpliceList splice(kNumPages * PAGE_SIZE);
 
   // Append kNumPages to the splice list.
   vm_page_t* pages[kNumPages];
@@ -520,8 +520,8 @@ static bool vmpl_take_cleanup_test() {
   VmPageList pl;
   EXPECT_TRUE(AddPage(&pl, page, 0));
 
-  VmPageSpliceList splice(0, PAGE_SIZE);
-  pl.TakePages(&splice);
+  VmPageSpliceList splice(PAGE_SIZE);
+  pl.TakePages(0, &splice);
 
   EXPECT_TRUE(splice.IsFinalized());
   EXPECT_TRUE(!splice.IsProcessed(), "missing page\n");

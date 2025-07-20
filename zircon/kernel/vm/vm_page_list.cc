@@ -1169,10 +1169,9 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
   return ZX_OK;
 }
 
-zx_status_t VmPageList::TakePages(VmPageSpliceList* splice) {
-  splice->InitializeSkew(list_skew_);
+zx_status_t VmPageList::TakePages(uint64_t offset, VmPageSpliceList* splice) {
+  splice->InitializeSkew(offset, list_skew_);
 
-  uint64_t offset = splice->offset_;
   const uint64_t end = offset + splice->length_;
 
   zx_status_t result =
@@ -1197,12 +1196,12 @@ VmPageSpliceList::~VmPageSpliceList() {
 }
 
 // static
-zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
+zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t length, list_node* pages,
                                                  VmPageSpliceList* splice) {
   // TODO(https://fxbug.dev/42170136): This method needs coverage in vmpl_unittests.
   DEBUG_ASSERT(pages);
   DEBUG_ASSERT(list_length(pages) == length / PAGE_SIZE);
-  splice->Initialize(offset, length);
+  splice->Initialize(length);
   while (vm_page_t* page = list_remove_head_type(pages, vm_page_t, queue_node)) {
     zx_status_t status = splice->Append(VmPageOrMarker::Page(page));
     if (status != ZX_OK) {

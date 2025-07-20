@@ -401,8 +401,8 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
         }
       });
 
-      zx_status_t status = VmPageSpliceList::CreateFromPageList(supply_offset, supply_length,
-                                                                &contiguous_pages, &splice_list);
+      zx_status_t status =
+          VmPageSpliceList::CreateFromPageList(supply_length, &contiguous_pages, &splice_list);
       if (status != ZX_OK) {
         // Only possible error is out of memory.
         ASSERT(status == ZX_ERR_NO_MEMORY);

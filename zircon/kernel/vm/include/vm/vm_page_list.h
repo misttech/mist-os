@@ -1175,11 +1175,11 @@ class VmPageList final {
   }
 
   // Takes the content out of this page list and places them in the provided |splice| list, which
-  // must have already been initialized but still be empty. The range to be taken is the range
-  // specified by the |splice| list, and will be |Finalize|d before returning.
-  // May return ZX_ERR_OUT_OF_MEMORY, in which case an unspecified number of pages will have been
-  // moved into |splice|.
-  zx_status_t TakePages(VmPageSpliceList* splice);
+  // must have already been initialized but still be empty. The range to be taken is determined by
+  // the provided |offset| and the length of the |splice| list, and will be |Finalize|d before
+  // returning. May return ZX_ERR_OUT_OF_MEMORY, in which case an unspecified number of pages will
+  // have been moved into |splice|.
+  zx_status_t TakePages(uint64_t offset, VmPageSpliceList* splice);
 
   // Moves the pages in the specified range in |this| onto the |other| with |offset| in this
   // mapping to the offset of 0 in |other|.
@@ -1816,19 +1816,18 @@ class VmPageSpliceList final {
  public:
   VmPageSpliceList() = default;
   // Convenience constructor that calls Initialize.
-  VmPageSpliceList(uint64_t offset, uint64_t length) { Initialize(offset, length); }
+  explicit VmPageSpliceList(uint64_t length) { Initialize(length); }
   ~VmPageSpliceList();
 
   // For use by PhysicalPageProvider.  The user-pager path doesn't use this. This returns a
   // finalized list.
-  static zx_status_t CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
+  static zx_status_t CreateFromPageList(uint64_t length, list_node* pages,
                                         VmPageSpliceList* splice);
 
   // Initialize the list with the given range and skew. Can only be done once, and must be done
   // before providing pages.
-  void Initialize(uint64_t offset, uint64_t length) {
+  void Initialize(uint64_t length) {
     DEBUG_ASSERT(IsEmpty() && state_ == State::Constructed);
-    offset_ = offset;
     length_ = length;
     state_ = State::Initialized;
   }
@@ -1878,12 +1877,11 @@ class VmPageSpliceList final {
 
   // Initialize the skew. Must be done after calling Initialize, but before adding any content. Only
   // necessary if directly moving list nodes where the skew has an impact.
-  void InitializeSkew(uint64_t skew) {
+  void InitializeSkew(uint64_t offset, uint64_t skew) {
     DEBUG_ASSERT(IsInitialized() && IsEmpty());
-    page_list_.InitializeSkew(skew, offset_);
+    page_list_.InitializeSkew(skew, offset);
   }
 
-  uint64_t offset_ = 0;
   uint64_t length_ = 0;
   uint64_t pos_ = 0;
 

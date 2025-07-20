@@ -1714,7 +1714,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
   auto range = *cow_range;
 
   // Initialize the splice list to the right size.
-  pages->Initialize(range.offset, range.len);
+  pages->Initialize(range.len);
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {

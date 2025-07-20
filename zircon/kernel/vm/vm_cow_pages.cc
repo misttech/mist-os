@@ -5599,7 +5599,7 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
   // VMO whose parent is concurrently closed. In this case, we have to append to the splice list
   // one VmPageOrMarker at a time.
   if (likely(pages->IsEmpty())) {
-    zx_status_t status = page_list_.TakePages(pages);
+    zx_status_t status = page_list_.TakePages(range.offset, pages);
     if (status != ZX_OK) {
       DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
       return status;
