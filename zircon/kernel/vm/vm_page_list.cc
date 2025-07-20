@@ -1214,8 +1214,7 @@ zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t length, list_node* pag
 
 void VmPageSpliceList::FreeAllPages() {
   // Free any pages owned by the splice list.
-  while (!IsProcessed()) {
-    VmPageOrMarker page = Pop();
+  page_list_.RemoveAllContent([](VmPageOrMarker&& page) {
     if (page.IsPage()) {
       pmm_free_page(page.ReleasePage());
     } else if (page.IsReference()) {
@@ -1223,7 +1222,8 @@ void VmPageSpliceList::FreeAllPages() {
       DEBUG_ASSERT(compression);
       compression->Free(page.ReleaseReference());
     }
-  }
+  });
+  state_ = State::Processed;
 }
 
 zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
