@@ -24,16 +24,6 @@ type InjectedUseProtocol = table {
     2: target_path string:fuchsia.component.decl.MAX_PATH_LENGTH;
 };
 
-/// Declares a library injected at runtime.
-@available(added=HEAD)
-type InjectedLibrary = table {
-    /// (Required) Source file name as stored in the bootfs.
-    1: bootfs_file_name string:MAX;
-
-    /// (Required) Name of the library to be injected.
-    2: target_name string:MAX;
-};
-
 /// Declares a group of extra elements that are layered at runtime on top of
 /// those coming from the resolved component.
 @available(added=HEAD)
@@ -43,7 +33,4 @@ type InjectedBundle = table {
 
     /// (Optional) Capabilities to be injected.
     2: use vector<InjectedUse>:MAX;
-
-    /// (Optional) Libraries to be injected.
-    3: library vector<InjectedLibrary>:MAX;
 };

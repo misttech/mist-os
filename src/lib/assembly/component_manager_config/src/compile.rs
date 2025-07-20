@@ -192,37 +192,12 @@ impl Into<component_internal::InjectedUseProtocol> for InjectedUseProtocol {
 /// normally present in the matching components.
 #[derive(Deserialize, Debug, Default, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct InjectedLibrary {
-    /// Source file name as stored in the bootfs.
-    pub bootfs_file_name: String,
-
-    /// Name of the library to be injected.
-    pub target_name: String,
-}
-
-impl Into<component_internal::InjectedLibrary> for InjectedLibrary {
-    fn into(self) -> component_internal::InjectedLibrary {
-        component_internal::InjectedLibrary {
-            bootfs_file_name: Some(self.bootfs_file_name),
-            target_name: Some(self.target_name),
-            ..component_internal::InjectedLibrary::default()
-        }
-    }
-}
-
-/// A group of extra elements that are layered at runtime on top of those
-/// normally present in the matching components.
-#[derive(Deserialize, Debug, Default, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct InjectedBundle {
     /// Components that will have this bundle injected into.
     pub components: Vec<cm_config::AllowlistEntry>,
 
     /// Capabilities to be injected.
     pub r#use: Option<Vec<InjectedUse>>,
-
-    /// Libraries to be injected.
-    pub library: Option<Vec<InjectedLibrary>>,
 }
 
 impl Into<component_internal::InjectedBundle> for InjectedBundle {
@@ -230,7 +205,6 @@ impl Into<component_internal::InjectedBundle> for InjectedBundle {
         component_internal::InjectedBundle {
             components: Some(self.components.into_iter().map(|entry| entry.to_string()).collect()),
             use_: Some(self.r#use.unwrap_or_default().into_iter().map(Into::into).collect()),
-            library: Some(self.library.unwrap_or_default().into_iter().map(Into::into).collect()),
             ..component_internal::InjectedBundle::default()
         }
     }
@@ -1013,12 +987,6 @@ mod tests {
                             "target_path": "/svc/fuchsia.foo.baz",
                         },
                     ],
-                    "library": [
-                        {
-                            "bootfs_file_name": "lib/mylibrary_in_bootfs.so",
-                            "target_name": "mylibrary.so",
-                        },
-                    ],
                 },
             ],
         }"#;
@@ -1151,11 +1119,6 @@ mod tests {
                             ..Default::default()
                         }
                     )]),
-                    library: Some(vec![component_internal::InjectedLibrary {
-                        bootfs_file_name: Some("lib/mylibrary_in_bootfs.so".to_string()),
-                        target_name: Some("mylibrary.so".to_string()),
-                        ..Default::default()
-                    }]),
                     ..Default::default()
                 }]),
                 ..Default::default()

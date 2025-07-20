@@ -170,10 +170,7 @@ async fn launch_process_impl(
             name_infos,
             environs,
             launcher: &launcher,
-            loader_proxy_args: match loader_proxy_chan {
-                None => runner::component::LoaderProxyArgs::default(),
-                Some(chan) => runner::component::LoaderProxyArgs::Custom(chan),
-            },
+            loader_proxy_chan,
             executable_vmo,
         })
         .await

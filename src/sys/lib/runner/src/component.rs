@@ -321,25 +321,11 @@ pub struct LauncherConfigArgs<'a> {
     /// proxy for `fuchsia.proc.Launcher`.
     pub launcher: &'a fproc::LauncherProxy,
 
-    /// Loader proxy configuration.
-    pub loader_proxy_args: LoaderProxyArgs,
+    /// Custom loader proxy. If None, /pkg/lib would be used to load libraries.
+    pub loader_proxy_chan: Option<zx::Channel>,
 
     /// VMO containing mapping to executable binary. If None, it would be loaded from /pkg.
     pub executable_vmo: Option<zx::Vmo>,
-}
-
-pub enum LoaderProxyArgs {
-    /// The listed directories and then /pkg/lib are used to load libraries.
-    BuiltIn(Vec<fio::DirectoryProxy>),
-
-    /// Custom loader proxy.
-    Custom(zx::Channel),
-}
-
-impl Default for LoaderProxyArgs {
-    fn default() -> Self {
-        LoaderProxyArgs::BuiltIn(vec![])
-    }
 }
 
 /// Configures launcher to launch process using passed params and creates launch info.
@@ -362,27 +348,22 @@ pub async fn configure_launcher(
             .map_err(|e| LaunchError::LoadingExecutable(e.to_string()))?,
     };
 
-    let ll_client_chan = match config_args.loader_proxy_args {
-        LoaderProxyArgs::BuiltIn(extra_search_dirs) => {
-            // In addition to the provided extra search directories, the loader service should be
-            // able to load files from `/pkg/lib`. Giving it a larger scope is potentially a
-            // security vulnerability, as it could make it trivial for parts of applications to get
-            // handles to things the application author didn't intend.
+    let ll_client_chan = match config_args.loader_proxy_chan {
+        None => {
+            // The loader service should only be able to load files from `/pkg/lib`. Giving it a
+            // larger scope is potentially a security vulnerability, as it could make it trivial for
+            // parts of applications to get handles to things the application author didn't intend.
             let lib_proxy = fuchsia_component::directory::open_directory_async(
                 pkg_dir,
                 "lib",
                 fio::RX_STAR_DIR,
             )
             .map_err(|e| LaunchError::LibLoadError(e.to_string()))?;
-
-            let mut search_dirs = extra_search_dirs;
-            search_dirs.push(lib_proxy);
-
             let (ll_client_chan, ll_service_chan) = zx::Channel::create();
-            library_loader::start_with_multiple_dirs(search_dirs, ll_service_chan);
+            library_loader::start(lib_proxy.into(), ll_service_chan);
             ll_client_chan
         }
-        LoaderProxyArgs::Custom(chan) => chan,
+        Some(chan) => chan,
     };
 
     // Get the provided job to create the new process in, if one was provided, or else create a new
@@ -864,7 +845,7 @@ mod tests {
                     name_infos: None,
                     environs: None,
                     launcher: &launcher_proxy,
-                    loader_proxy_args: LoaderProxyArgs::default(),
+                    loader_proxy_chan: None,
                     executable_vmo: None
                 })
                 .await,
@@ -891,7 +872,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await
@@ -919,7 +900,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await
@@ -948,7 +929,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await?;
@@ -980,7 +961,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: Some(vmo),
             })
             .await?;
@@ -1011,7 +992,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await?;
@@ -1044,7 +1025,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await?;
@@ -1093,7 +1074,7 @@ mod tests {
                 name_infos: Some(names),
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await?;
@@ -1131,7 +1112,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await?;
@@ -1170,7 +1151,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::Custom(c1),
+                loader_proxy_chan: Some(c1),
                 executable_vmo: None,
             })
             .await?;
@@ -1216,7 +1197,7 @@ mod tests {
                 name_infos: None,
                 environs: None,
                 launcher: &launcher_proxy,
-                loader_proxy_args: LoaderProxyArgs::default(),
+                loader_proxy_chan: None,
                 executable_vmo: None,
             })
             .await?;

@@ -1069,16 +1069,6 @@ assembly_input_bundle("heapdump_global_collector") {
   ]
 }
 
-# Heapdump instrumentation library for heap memory profiling
-#
-# This AIB adds the .so file containing the library that hooks malloc/free/..
-# so that it can be injected by component manager into the ELF processes it
-# starts.
-assembly_input_bundle("heapdump_injectable_library") {
-  bootfs_files_labels =
-      [ "//src/performance/memory/heapdump/instrumentation:bootfs" ]
-}
-
 # core_realm_networking
 #
 # This AIB adds all the children of `/core` that are expected to be present if

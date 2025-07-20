@@ -10,9 +10,7 @@ use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConf
 use assembly_config_schema::product_config::ComponentPolicyConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 use camino::Utf8PathBuf;
-use component_manager_config::{
-    compile, Args, InjectedBundle, InjectedLibrary, InjectedUse, InjectedUseProtocol,
-};
+use component_manager_config::{compile, Args, InjectedBundle, InjectedUse, InjectedUseProtocol};
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -108,10 +106,6 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
                     source_name: "fuchsia.memory.heapdump.process.Registry".parse().unwrap(),
                     target_path: "/svc/fuchsia.memory.heapdump.process.Registry".parse().unwrap(),
                 })]),
-                library: Some(vec![InjectedLibrary {
-                    bootfs_file_name: "lib/libheapdump_instrumentation.so".to_string(),
-                    target_name: "libheapdump_instrumentation.so".to_string(),
-                }]),
             };
             let heapdump_monikers_source = write_config(
                 "heapdump_monikers.json",
@@ -124,7 +118,6 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
                 ),
             )?;
             input.push(heapdump_monikers_source);
-            builder.platform_bundle("heapdump_injectable_library");
         }
 
         // Collect the platform policies based on build-type.
