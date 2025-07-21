@@ -67,7 +67,7 @@ closed protocol Admin {
 };
 
 /// Special functionality that is only intended to be used in recovery and device bringup.  All
-/// methods require fuchsia.fshost.Netboot to be set, unless otherwise indicated.
+/// methods require fuchsia.fshost.RamdiskImage to be set, unless otherwise indicated.
 @discoverable
 closed protocol Recovery {
     /// Wipes and re-initializes the system partition table.  This is a destructive operation!

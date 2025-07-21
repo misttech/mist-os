@@ -75,17 +75,13 @@ impl Matchers {
         // We will mount the ramdisk container and its volumes, but we will only mount the on-disk
         // container (which allows enumerating volumes) and will not mount its volumes.
         if config.fxfs_blob {
-            if !config.netboot {
-                matchers.push(Box::new(FxblobMatcher::new(config.ramdisk_image)));
-            }
-            if config.ramdisk_image || config.netboot {
+            matchers.push(Box::new(FxblobMatcher::new(config.ramdisk_image)));
+            if config.ramdisk_image {
                 matchers.push(Box::new(FxblobOnRecoveryMatcher::new()));
             }
         } else {
-            if !config.netboot {
-                matchers.push(Box::new(FvmMatcher::new(config.ramdisk_image, config.storage_host)));
-            }
-            if config.ramdisk_image || config.netboot {
+            matchers.push(Box::new(FvmMatcher::new(config.ramdisk_image, config.storage_host)));
+            if config.ramdisk_image {
                 matchers.push(Box::new(FvmOnRecoveryMatcher::new(config.storage_host)));
             }
         }
@@ -1279,60 +1275,6 @@ mod tests {
         assert!(!matchers
             .match_device(
                 Box::new(MockDevice::new().set_content_format(DiskFormat::Fvm)),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-    }
-
-    #[fuchsia::test]
-    async fn test_netboot_flag_true() {
-        let mut matchers =
-            Matchers::new(&fshost_config::Config { netboot: true, ..default_test_config() });
-
-        assert!(matchers
-            .match_device(
-                Box::new(MockDevice::new().set_content_format(DiskFormat::Fvm)),
-                &mut MockEnv::new().expect_bind_and_enumerate_fvm()
-            )
-            .await
-            .expect("match_device failed"));
-    }
-
-    #[fuchsia::test]
-    async fn test_netboot_flag_true_fxblob() {
-        let mut matchers = Matchers::new(&fshost_config::Config {
-            data_filesystem_format: "fxfs".to_string(),
-            netboot: true,
-            fxfs_blob: true,
-            ..default_test_config()
-        });
-
-        assert!(matchers
-            .match_device(
-                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
-                &mut MockEnv::new().expect_attach_driver(GPT_DRIVER_PATH)
-            )
-            .await
-            .expect("match_device failed"));
-
-        // FVM shouldn't match...
-        assert!(!matchers
-            .match_device(
-                Box::new(MockDevice::new().set_content_format(DiskFormat::Fvm)),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Fxblob should match, but not try and mount.
-        assert!(matchers
-            .match_device(
-                Box::new(
-                    MockDevice::new()
-                        .set_content_format(DiskFormat::Fxfs)
-                        .set_partition_label(FVM_PARTITION_LABEL)
-                ),
                 &mut MockEnv::new()
             )
             .await

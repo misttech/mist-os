@@ -109,7 +109,6 @@ impl FshostBuilder {
             ("gpt", "fuchsia.fshost.Gpt"),
             ("mbr", "fuchsia.fshost.Mbr"),
             ("data", "fuchsia.fshost.Data"),
-            ("netboot", "fuchsia.fshost.Netboot"),
             ("use_disk_migration", "fuchsia.fshost.UseDiskMigration"),
             ("disable_block_watcher", "fuchsia.fshost.DisableBlockWatcher"),
             ("fvm_slice_size", "fuchsia.fshost.FvmSliceSize"),

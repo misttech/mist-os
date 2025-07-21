@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::boot_args::BootArgs;
-use crate::config::apply_boot_args_to_config;
 use crate::environment::{DevicePublisher, Environment, FshostEnvironment};
 use crate::inspect::register_stats;
 use crate::watcher::{DirSource, PathSource, PathSourceType, WatchSource, Watcher};
@@ -22,7 +20,6 @@ use vfs::remote::remote_dir;
 use zx::sys::zx_debug_write;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
-mod boot_args;
 mod config;
 mod copier;
 mod crypt;
@@ -53,10 +50,7 @@ fn debug_log(message: &str) {
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let boot_args = BootArgs::new().await;
-    let mut config = fshost_config::Config::take_from_startup_handle();
-    apply_boot_args_to_config(&mut config, &boot_args);
-    let config = Arc::new(config);
+    let config = Arc::new(fshost_config::Config::take_from_startup_handle());
     // NB There are tests that look for "fshost started".
     log::info!(config:?; "fshost started");
 

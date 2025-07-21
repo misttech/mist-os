@@ -39,8 +39,8 @@ class IsolatedDevmgr {
     // `disable_block_watcher` is ignored when this is set.
     bool enable_storage_host = false;
 
-    // Enable the fuchsia.fshost.Netboot flag, which prevents fshost from binding to the GPT.
-    bool netboot = false;
+    // Enable the fuchsia.fshost.RamdiskImage flag, which prevents fshost from binding to the GPT.
+    bool ramdisk_image = false;
 
     // A board name to appear.
     fbl::String board_name;

@@ -88,9 +88,10 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
 
   // Setup Fshost.
   if (args->enable_storage_host) {
-    if (args->netboot) {
-      realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host-netboot.cm");
-      realm_builder.AddChild("fshost_config", "#meta/test-fshost-storage-host-netboot_config.cm");
+    if (args->ramdisk_image) {
+      realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host-ramdisk-image.cm");
+      realm_builder.AddChild("fshost_config",
+                             "#meta/test-fshost-storage-host-ramdisk-image_config.cm");
     } else {
       realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host.cm");
       realm_builder.AddChild("fshost_config", "#meta/test-fshost-storage-host_config.cm");
@@ -124,7 +125,6 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
               Config{"fuchsia.fshost.GptAll"},
               Config{"fuchsia.fshost.Mbr"},
               Config{"fuchsia.fshost.Nand"},
-              Config{"fuchsia.fshost.Netboot"},
               Config{"fuchsia.fshost.NoZxcrypt"},
               Config{"fuchsia.fshost.RamdiskImage"},
               Config{"fuchsia.fshost.StorageHost"},

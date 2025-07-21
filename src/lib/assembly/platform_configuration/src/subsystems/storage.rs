@@ -248,7 +248,6 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
             ("fuchsia.fshost.Gpt", Config::new_bool(gpt)),
             ("fuchsia.fshost.GptAll", Config::new_bool(gpt_all)),
             ("fuchsia.fshost.Mbr", Config::new_bool(false)),
-            ("fuchsia.fshost.Netboot", Config::new_bool(false)),
             ("fuchsia.fshost.NoZxcrypt", Config::new_bool(no_zxcrypt)),
             ("fuchsia.fshost.FormatDataOnCorruption", Config::new_bool(format_data_on_corruption)),
             ("fuchsia.fshost.BlobfsInitialInodes", Config::new_uint64(blobfs_initial_inodes)),

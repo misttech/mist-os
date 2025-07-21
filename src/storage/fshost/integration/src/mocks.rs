@@ -17,7 +17,6 @@ use {fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsi
 const ZBI_TYPE_STORAGE_RAMDISK: u32 = 0x4b534452;
 
 pub async fn new_mocks(
-    netboot: bool,
     vmo: Option<zx::Vmo>,
     crash_reports_sink: mpsc::Sender<ffeedback::CrashReport>,
     device_config: String,
@@ -27,7 +26,7 @@ pub async fn new_mocks(
     let mock = move |handles: LocalComponentHandles| {
         let vmo_clone = vmo.clone();
         let config_clone = device_config.clone();
-        run_mocks(handles, netboot, vmo_clone, crash_reports_sink.clone(), config_clone).boxed()
+        run_mocks(handles, vmo_clone, crash_reports_sink.clone(), config_clone).boxed()
     };
 
     mock
@@ -35,7 +34,6 @@ pub async fn new_mocks(
 
 async fn run_mocks(
     handles: LocalComponentHandles,
-    netboot: bool,
     vmo: Option<Arc<zx::Vmo>>,
     crash_reports_sink: mpsc::Sender<ffeedback::CrashReport>,
     device_config: String,
@@ -49,9 +47,6 @@ async fn run_mocks(
             },
         },
         "svc" => vfs::pseudo_directory! {
-            fboot::ArgumentsMarker::PROTOCOL_NAME => vfs::service::host(move |stream| {
-                run_boot_args(stream, netboot)
-            }),
             fboot::ItemsMarker::PROTOCOL_NAME => vfs::service::host(move |stream| {
                 let vmo_clone = vmo.clone();
                 run_boot_items(stream, vmo_clone)
@@ -94,47 +89,6 @@ async fn run_boot_items(mut stream: fboot::ItemsRequestStream, vmo: Option<Arc<z
                     "unexpectedly called GetBootloaderFile on {}",
                     fboot::ItemsMarker::PROTOCOL_NAME
                 );
-            }
-        }
-    }
-}
-
-/// fshost expects a set of string and bool arguments to be available. This is a list of all the
-/// arguments it looks for. NOTE: For what we are currently testing for, none of these are required,
-/// so for now we either return None or the provided default depending on the context.
-///
-/// String args -
-///   factory_verity_seal - only used when writing to the factory partition
-/// Bool args -
-///   netsvc.netboot (optional; default false)
-async fn run_boot_args(mut stream: fboot::ArgumentsRequestStream, netboot: bool) {
-    while let Some(request) = stream.next().await {
-        match request.unwrap() {
-            fboot::ArgumentsRequest::GetString { key: _, responder } => {
-                responder.send(None).unwrap();
-            }
-            fboot::ArgumentsRequest::GetStrings { keys, responder } => {
-                responder.send(&vec![None; keys.len()]).unwrap();
-            }
-            fboot::ArgumentsRequest::GetBool { key: _, defaultval, responder } => {
-                responder.send(defaultval).unwrap();
-            }
-            fboot::ArgumentsRequest::GetBools { keys, responder } => {
-                let vec: Vec<_> = keys
-                    .iter()
-                    .map(|bool_pair| {
-                        if bool_pair.key == "netsvc.netboot".to_string() && netboot {
-                            true
-                        } else {
-                            bool_pair.defaultval
-                        }
-                    })
-                    .collect();
-                responder.send(&vec).unwrap();
-            }
-            fboot::ArgumentsRequest::Collect { .. } => {
-                // This seems to be deprecated. Either way, fshost doesn't use it.
-                panic!("unexpectedly called Collect on {}", fboot::ArgumentsMarker::PROTOCOL_NAME);
             }
         }
     }

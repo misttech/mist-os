@@ -32,11 +32,11 @@ fshost_component_and_config("test-fshost-storage-host") {
   }
 }
 
-fshost_component_and_config("test-fshost-storage-host-netboot") {
+fshost_component_and_config("test-fshost-storage-host-ramdisk-image") {
   testonly = true
   options = {
     storage_host = true
-    netboot = true
+    ramdisk_image = true
     gpt_all = true
   }
 }

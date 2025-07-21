@@ -404,7 +404,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
       }
       ERROR(
           "Unable to find a GPT on this device with the expected partitions.\n"
-          "Attempting to reinitialize partition tables; this will only work on netbooted devices!\n"
+          "Attempting to reinitialize partition tables; this only works on recovery builds!\n"
           "If this fails, please run init-partition-tables to re-initialize the device.\n"
           "Device path: %s\n",
           std::get<1>(candidate_gpts[0]).c_str());

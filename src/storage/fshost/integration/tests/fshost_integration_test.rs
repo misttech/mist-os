@@ -730,9 +730,10 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
 }
 
 #[fuchsia::test]
-async fn netboot_set() {
-    // Set the netboot flag
-    let mut builder = new_builder().netboot();
+async fn ramdisk_image_set() {
+    // Set the ramdisk_image flag
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
@@ -1440,7 +1441,7 @@ async fn initialized_gpt() {
 #[fuchsia::test]
 async fn uninitialized_gpt() {
     let mut builder = new_builder().with_uninitialized_disk();
-    builder.fshost().set_config_value("netboot", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
     // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
@@ -1454,7 +1455,7 @@ async fn uninitialized_gpt() {
 #[fuchsia::test]
 async fn reset_uninitialized_gpt() {
     let mut builder = new_builder().with_uninitialized_disk();
-    builder.fshost().set_config_value("netboot", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
     // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
@@ -1486,7 +1487,7 @@ async fn reset_uninitialized_gpt() {
 async fn reset_initialized_gpt() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    builder.fshost().set_config_value("netboot", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
     // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;

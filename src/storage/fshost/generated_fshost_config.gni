@@ -67,7 +67,6 @@ template("generated_fshost_config") {
       gpt = true
       gpt_all = false
       mbr = false
-      netboot = false
       no_zxcrypt = false
       fvm_slice_size = 8388608
       blobfs_initial_inodes = 0
