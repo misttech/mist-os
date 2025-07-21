@@ -20,7 +20,7 @@ namespace tracing {
 
 class FuchsiaTraceParser {
  public:
-  explicit FuchsiaTraceParser(std::ostream* out);
+  explicit FuchsiaTraceParser(std::ofstream* out);
   ~FuchsiaTraceParser();
 
   bool ParseComplete(std::istream*);

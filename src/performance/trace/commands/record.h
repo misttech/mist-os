@@ -43,7 +43,7 @@ class RecordCommand : public CommandWithController {
     std::vector<ProviderSpec> provider_specs;
     fuchsia_tracing::BufferingMode buffering_mode = kDefaultBufferingMode;
     bool binary = false;
-    bool compress = false;
+
     std::string output_file_name = kDefaultOutputFileName;
     std::string benchmark_results_file;
     std::string test_suite;
@@ -72,7 +72,7 @@ class RecordCommand : public CommandWithController {
   zx::process spawned_app_;
   async::WaitMethod<RecordCommand, &RecordCommand::OnSpawnedAppExit> wait_spawned_app_;
 
-  std::unique_ptr<std::ostream> binary_out_;
+  std::unique_ptr<std::ofstream> binary_out_;
   // TODO(https://fxbug.dev/42097007): Remove |exporter_|.
   std::unique_ptr<ChromiumExporter> exporter_;
 

@@ -13,7 +13,6 @@
 #include <iterator>
 #include <vector>
 
-#include <contrib/iostream3/zfstream.h>
 #include <trace-reader/reader.h>
 
 #include "src/performance/trace2json/trace_parser.h"
@@ -43,41 +42,13 @@ bool ConvertTrace(ConvertSettings settings) {
     return false;
   }
 
-  std::unique_ptr<std::ifstream> input_file_stream;
-  std::unique_ptr<std::ofstream> output_file_stream;
-  std::unique_ptr<gzifstream> input_gz_file_stream;
-  std::unique_ptr<gzofstream> output_gz_file_stream;
-
-  std::istream* in_stream;
-  std::ostream* out_stream;
-
-  if (!settings.input_file_name.empty()) {
-    if (settings.compressed_input) {
-      input_gz_file_stream = std::make_unique<gzifstream>(
-          settings.input_file_name.c_str(), std::ios_base::in | std::ios_base::binary);
-      if (!input_gz_file_stream->is_open()) {
-        FX_LOGS(ERROR) << "Error opening input file.";
-        return false;
-      }
-      in_stream = static_cast<std::istream*>(input_gz_file_stream.get());
-    } else {
-      input_file_stream = std::make_unique<std::ifstream>(
-          settings.input_file_name.c_str(), std::ios_base::in | std::ios_base::binary);
-      if (!input_file_stream->is_open()) {
-        FX_LOGS(ERROR) << "Error opening input file.";
-        return false;
-      }
-      in_stream = static_cast<std::istream*>(input_file_stream.get());
-    }
-  } else {
-    if (settings.compressed_input) {
-      input_gz_file_stream =
-          std::make_unique<gzifstream>(STDIN_FILENO, std::ios_base::in | std::ios_base::binary);
-      in_stream = static_cast<std::istream*>(input_gz_file_stream.get());
-    } else {
-      in_stream = &std::cin;
-    }
+  std::ifstream input_file_stream(settings.input_file_name.c_str(),
+                                  std::ios_base::in | std::ios_base::binary);
+  if (!input_file_stream.is_open()) {
+    FX_LOGS(ERROR) << "Error opening input file.";
+    return false;
   }
+  std::istream* in_stream = &input_file_stream;
 
   // Look for the magic number record at the start of the trace file and bail
   // before opening (and thus truncating) the output file if we don't find it.
@@ -92,37 +63,21 @@ bool ConvertTrace(ConvertSettings settings) {
     return false;
   }
 
+  std::unique_ptr<std::ofstream> output_file_stream;
+  std::ofstream* out_stream;
+
   if (!settings.output_file_name.empty()) {
-    if (settings.compressed_output) {
-      output_gz_file_stream = std::make_unique<gzofstream>(
-          settings.output_file_name.c_str(), std::ios_base::out | std::ios_base::trunc);
-      if (!output_gz_file_stream->is_open()) {
-        FX_LOGS(ERROR) << "Error opening output file.";
-        return false;
-      }
-      out_stream = static_cast<std::ostream*>(output_gz_file_stream.get());
-    } else {
-      output_file_stream = std::make_unique<std::ofstream>(
-          settings.output_file_name.c_str(),
-          std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-      if (!output_file_stream->is_open()) {
-        FX_LOGS(ERROR) << "Error opening output file.";
-        return false;
-      }
-      out_stream = static_cast<std::ostream*>(output_file_stream.get());
-    }
-  } else {
-    if (settings.compressed_output) {
-      // TODO(bhamrick): The gzofstream class we're using here does not appear to support writing to
-      // stdout properly. In trying to use STDOUT_FILENO similar to the usage of STDIN_FILENO above,
-      // it seemed that the output would either be truncated to a multiple of 0x1000 bytes, or not
-      // be written at all.
-      FX_LOGS(ERROR) << "Compressed output on stdout is not supported. Please "
-                        "specify --output-file";
+    output_file_stream = std::make_unique<std::ofstream>(
+        settings.output_file_name.c_str(),
+        std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+    if (!output_file_stream->is_open()) {
+      FX_LOGS(ERROR) << "Error opening output file.";
       return false;
-    } else {
-      out_stream = &std::cout;
     }
+    out_stream = static_cast<std::ofstream*>(output_file_stream.get());
+  } else {
+    FX_LOGS(ERROR) << "Stdout is not supported. Please specify --output-file";
+    return false;
   }
 
   tracing::FuchsiaTraceParser parser(out_stream);

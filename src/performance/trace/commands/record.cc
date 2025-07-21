@@ -12,6 +12,7 @@
 #include <string.h>
 #include <zircon/status.h>
 
+#include <fstream>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -29,7 +30,6 @@ const char kCategories[] = "categories";
 const char kAppendArgs[] = "append-args";
 const char kOutputFile[] = "output-file";
 const char kBinary[] = "binary";
-const char kCompress[] = "compress";
 const char kDuration[] = "duration";
 const char kDetach[] = "detach";
 const char kDecouple[] = "decouple";
@@ -58,9 +58,9 @@ zx_status_t Spawn(const std::vector<std::string>& args, zx::process* subprocess)
 
 bool RecordCommand::Options::Setup(const fxl::CommandLine& command_line) {
   const std::unordered_set<std::string> known_options = {
-      kCategories,        kAppendArgs, kOutputFile,         kBinary,        kCompress,
-      kDuration,          kDetach,     kDecouple,           kSpawn,         kEnvironmentName,
-      kReturnChildResult, kBufferSize, kProviderBufferSize, kBufferingMode, kTrigger,
+      kCategories, kAppendArgs,         kOutputFile,    kBinary,          kDuration,
+      kDetach,     kDecouple,           kSpawn,         kEnvironmentName, kReturnChildResult,
+      kBufferSize, kProviderBufferSize, kBufferingMode, kTrigger,
   };
 
   for (auto& option : command_line.options()) {
@@ -96,14 +96,6 @@ bool RecordCommand::Options::Setup(const fxl::CommandLine& command_line) {
   }
   if (binary) {
     output_file_name = kDefaultBinaryOutputFileName;
-  }
-
-  // --compress
-  if (ParseBooleanOption(command_line, kCompress, &compress) == OptionStatus::ERROR) {
-    return false;
-  }
-  if (compress) {
-    output_file_name += ".gz";
   }
 
   // --output-file=<file>
@@ -206,22 +198,20 @@ Command::Info RecordCommand::Describe() {
       []() { return std::make_unique<RecordCommand>(); },
       "record",
       "starts tracing and records data",
-      {{"output-file=[/tmp/trace.json]",
-        "Trace data is stored in this file. "
-        "If the output file is \"tcp:TCP-ADDRESS\" then the output is streamed "
-        "to that address."},
+      {{"output-file=[/tmp/trace.json]", "Trace data is stored in this file."},
        {"binary=[false]",
         "Output the binary trace rather than converting to JSON. "
         "If this is set, then the default output location will be "
         "/tmp/trace.fxt"},
-       {"compress=[false]",
-        "Compress trace output. This option is ignored "
-        "when streaming over a TCP socket."},
+
        {"duration=[10]",
         "Trace will be active for this many seconds after the session has been "
         "started. The provided value must be integral."},
-       {"categories=[\"\"]", "Categories that should be enabled for tracing"},
-       {"append-args=[\"\"]",
+       {"categories=["
+        "]",
+        "Categories that should be enabled for tracing"},
+       {"append-args=["
+        "]",
         "Additional args for the app being traced. The value is a comma-separated list of "
         "arguments to pass. This option may be repeated, arguments are added in order."},
        {"detach=[false]", "Don't stop the traced program when tracing finished"},
@@ -262,8 +252,7 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
     return;
   }
 
-  std::unique_ptr<std::ostream> out_stream =
-      OpenOutputStream(options_.output_file_name, options_.compress);
+  std::unique_ptr<std::ofstream> out_stream = OpenOutputStream(options_.output_file_name);
   if (!out_stream) {
     FX_LOGS(ERROR) << "Failed to open " << options_.output_file_name << " for writing";
     Done(EXIT_FAILURE);

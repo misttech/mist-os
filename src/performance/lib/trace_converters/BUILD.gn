@@ -44,5 +44,6 @@ test("chromium_unittests") {
 }
 
 fuchsia_unittest_package("trace_converter_tests") {
+  manifest = "meta/chromium_unittests.cml"
   deps = [ ":chromium_unittests" ]
 }

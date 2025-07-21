@@ -6,9 +6,11 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <fstream>
+
 namespace tracing {
 
-FuchsiaTraceParser::FuchsiaTraceParser(std::ostream* out)
+FuchsiaTraceParser::FuchsiaTraceParser(std::ofstream* out)
     : exporter_(*out),
       reader_([this](trace::Record record) { exporter_.ExportRecord(record); },
               [](fbl::String error) { FX_LOGS(ERROR) << error.c_str(); }) {}

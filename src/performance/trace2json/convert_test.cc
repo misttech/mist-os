@@ -53,28 +53,11 @@ std::string GetTestDataPath() {
   return path + "test_data/trace2json/";
 }
 
-// The gzip header contains a marker byte at offset 9 that contains which OS the file was generated
-// on. The gzip files in test_data/ were generated on linux, so a naive comparison leads to the
-// tests failing when they run on mac.
-const ssize_t kNoIgnores[] = {-1};
-const ssize_t kIgnoreGzipOs[] = {9, -1};
-
-void ConvertAndCompare(ConvertSettings settings, std::string expected_output_file,
-                       const ssize_t* ignored_offsets) {
+void ConvertAndCompare(ConvertSettings settings, std::string expected_output_file) {
   ASSERT_TRUE(ConvertTrace(settings));
   std::string actual_out, expected_out;
   EXPECT_TRUE(files::ReadFileToString(settings.output_file_name, &actual_out));
   EXPECT_TRUE(files::ReadFileToString(expected_output_file, &expected_out));
-
-  for (int i = 0; ignored_offsets[i] >= 0; i++) {
-    const size_t offset = ignored_offsets[i];
-    if (offset < actual_out.length()) {
-      actual_out[offset] = '\0';
-    }
-    if (offset < expected_out.length()) {
-      expected_out[offset] = '\0';
-    }
-  }
 
   // Not using EXPECT_EQ here as the trace files can be large, so failures create an unreasonable
   // amount of error output.
@@ -97,7 +80,7 @@ TEST(ConvertTest, DISABLED_SimpleTrace) {
   ConvertSettings settings;
   settings.input_file_name = test_data_path + "simple_trace.fxt";
   settings.output_file_name = test_data_path + "simple_trace_actual.json";
-  ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json", kNoIgnores);
+  ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json");
 }
 
 // TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
@@ -118,65 +101,7 @@ TEST(ConvertTest, DISABLED_ExampleBenchmark) {
   ConvertSettings settings;
   settings.input_file_name = test_data_path + "example_benchmark.fxt";
   settings.output_file_name = test_data_path + "example_benchmark_actual.json";
-  ConvertAndCompare(settings, test_data_path + "example_benchmark_expected.json", kNoIgnores);
-}
-
-// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
-// rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
-// implementation, which ever so slightly changes the string representation of
-// certain doubles. Once the roll goes through, we should come back, change the
-// *_expected.json files with the new slightly updated double values, and
-// re-enable these tests.
-TEST(ConvertTest, DISABLED_SimpleTraceCompressedOutput) {
-  // simple_trace.fxt is a small hand-written trace file that exercises a few
-  // basic event types (currently slice begin, slice end, slice complete, async
-  // begin, and async end), and includes both inline and table referenced
-  // strings. It only contains one provider.
-  std::string test_data_path = GetTestDataPath();
-  ConvertSettings settings;
-  settings.input_file_name = test_data_path + "simple_trace.fxt";
-  settings.output_file_name = test_data_path + "simple_trace_actual.json.gz";
-  settings.compressed_output = true;
-  ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json.gz", kIgnoreGzipOs);
-}
-
-// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
-// rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
-// implementation, which ever so slightly changes the string representation of
-// certain doubles. Once the roll goes through, we should come back, change the
-// *_expected.json files with the new slightly updated double values, and
-// re-enable these tests.
-TEST(ConvertTest, DISABLED_SimpleTraceCompressedInput) {
-  // simple_trace.fxt is a small hand-written trace file that exercises a few
-  // basic event types (currently slice begin, slice end, slice complete, async
-  // begin, and async end), and includes both inline and table referenced
-  // strings. It only contains one provider.
-  std::string test_data_path = GetTestDataPath();
-  ConvertSettings settings;
-  settings.input_file_name = test_data_path + "simple_trace.fxt.gz";
-  settings.output_file_name = test_data_path + "simple_trace_gz_actual.json";
-  settings.compressed_input = true;
-  ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json", kNoIgnores);
-}
-
-// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
-// rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
-// implementation, which ever so slightly changes the string representation of
-// certain doubles. Once the roll goes through, we should come back, change the
-// *_expected.json files with the new slightly updated double values, and
-// re-enable these tests.
-TEST(ConvertTest, DISABLED_SimpleTraceCompressedInputAndOutput) {
-  // simple_trace.fxt is a small hand-written trace file that exercises a few
-  // basic event types (currently slice begin, slice end, slice complete, async
-  // begin, and async end), and includes both inline and table referenced
-  // strings. It only contains one provider.
-  std::string test_data_path = GetTestDataPath();
-  ConvertSettings settings;
-  settings.input_file_name = test_data_path + "simple_trace.fxt.gz";
-  settings.output_file_name = test_data_path + "simple_trace_gz_actual.json.gz";
-  settings.compressed_input = true;
-  settings.compressed_output = true;
-  ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json.gz", kIgnoreGzipOs);
+  ConvertAndCompare(settings, test_data_path + "example_benchmark_expected.json");
 }
 
 TEST(ConvertTest, MissingMagicNumber) {

@@ -21,8 +21,8 @@ namespace tracing {
 
 class ChromiumExporter {
  public:
-  explicit ChromiumExporter(std::unique_ptr<std::ostream> stream_out);
-  explicit ChromiumExporter(std::ostream& out);
+  explicit ChromiumExporter(std::unique_ptr<std::ofstream> stream_out);
+  explicit ChromiumExporter(std::ofstream& out);
   ~ChromiumExporter();
 
   void ExportRecord(const trace::Record& record);
@@ -43,7 +43,7 @@ class ChromiumExporter {
   // "args" key object.
   void WriteArgs(const std::vector<trace::Argument>& arguments);
 
-  std::unique_ptr<std::ostream> stream_out_;
+  std::unique_ptr<std::ofstream> stream_out_;
   rapidjson::OStreamWrapper wrapper_;
   rapidjson::Writer<rapidjson::OStreamWrapper> writer_;
 

@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/types.h>
 
+#include <fstream>
 #include <utility>
 #include <variant>
 
@@ -85,12 +86,12 @@ std::string CleanString(fbl::String str) {
 
 }  // namespace
 
-ChromiumExporter::ChromiumExporter(std::unique_ptr<std::ostream> stream_out)
+ChromiumExporter::ChromiumExporter(std::unique_ptr<std::ofstream> stream_out)
     : stream_out_(std::move(stream_out)), wrapper_(*stream_out_), writer_(wrapper_) {
   Start();
 }
 
-ChromiumExporter::ChromiumExporter(std::ostream& out) : wrapper_(out), writer_(wrapper_) {
+ChromiumExporter::ChromiumExporter(std::ofstream& out) : wrapper_(out), writer_(wrapper_) {
   Start();
 }
 
