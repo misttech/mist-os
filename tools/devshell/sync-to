@@ -391,7 +391,7 @@ class SyncToCommand:
             stdout=subprocess.PIPE,
             dry_run_safe=True,
         ).stdout.strip()
-        if local_remote != remote:
+        if self.https_to_sso(local_remote) != self.https_to_sso(remote):
             raise Error(
                 f"Integration remote {remote!r} does not match local"
                 f" checkout remote {local_remote!r}."
@@ -401,6 +401,9 @@ class SyncToCommand:
                 f"\n"
                 f"\nOtherwise, ensure you are using the appropriate internal checkout."
             )
+
+    def https_to_sso(self, url: str) -> str:
+        return url.replace("https://", "sso://").replace(".googlesource.com", "")
 
     def assert_correct_integration_manifest(self, checkout_info: dict) -> None:
         jiri_manifest = self.fuchsia_dir.joinpath(".jiri_manifest")
