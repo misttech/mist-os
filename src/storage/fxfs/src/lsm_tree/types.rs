@@ -42,7 +42,8 @@ pub trait FuzzyHash: Hash + Sized {
     /// Debug assertions will fire if too large of a range is checked.
     fn fuzzy_hash(&self) -> impl Iterator<Item = u64>;
 
-    /// Returns whether the type is a range-based key.
+    /// Returns whether the type is a range-based key. Used to prevent use of range-based keys as
+    /// a point query (see [`crate::lsm_tree::merge::Query::Point`]).
     fn is_range_key(&self) -> bool {
         false
     }

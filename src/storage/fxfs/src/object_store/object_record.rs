@@ -439,6 +439,13 @@ impl FuzzyHash for ObjectKey {
             }
         }
     }
+
+    fn is_range_key(&self) -> bool {
+        match &self.data {
+            ObjectKeyData::Attribute(_, AttributeKey::Extent(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 /// UNIX epoch based timestamp in the UTC timezone.
@@ -1198,6 +1205,11 @@ mod tests {
     }
     #[test]
     fn test_range_key() {
+        // Make sure we disallow using extent keys with point queries. Other object keys should
+        // still be allowed with point queries.
+        assert!(ObjectKeyV43::extent(1, 0, 0..2 * 1024 * 1024).is_range_key());
+        assert!(!ObjectKeyV43::object(100).is_range_key());
+
         assert_eq!(ObjectKey::object(1).overlaps(&ObjectKey::object(1)), true);
         assert_eq!(ObjectKey::object(1).overlaps(&ObjectKey::object(2)), false);
         assert_eq!(ObjectKey::extent(1, 0, 0..100).overlaps(&ObjectKey::object(1)), false);

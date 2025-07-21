@@ -338,6 +338,10 @@ impl FuzzyHash for AllocatorKey {
                 ..round_up(self.device_range.end, EXTENT_HASH_BUCKET_SIZE).unwrap_or(u64::MAX),
         }
     }
+
+    fn is_range_key(&self) -> bool {
+        true
+    }
 }
 
 impl AllocatorKey {
@@ -2134,7 +2138,7 @@ mod tests {
     use crate::fsck::fsck;
     use crate::lsm_tree::cache::NullCache;
     use crate::lsm_tree::skip_list_layer::SkipListLayer;
-    use crate::lsm_tree::types::{Item, ItemRef, Layer, LayerIterator};
+    use crate::lsm_tree::types::{FuzzyHash as _, Item, ItemRef, Layer, LayerIterator};
     use crate::lsm_tree::{LSMTree, Query};
     use crate::object_handle::ObjectHandle;
     use crate::object_store::allocator::merge::merge;
@@ -2153,6 +2157,12 @@ mod tests {
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
+
+    #[test]
+    fn test_allocator_key_is_range_based() {
+        // Make sure we disallow using allocator keys with point queries.
+        assert!(AllocatorKey { device_range: 0..100 }.is_range_key());
+    }
 
     #[fuchsia::test]
     async fn test_coalescing_iterator() {
