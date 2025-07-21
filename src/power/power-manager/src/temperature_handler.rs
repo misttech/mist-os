@@ -690,8 +690,8 @@ impl TemperatureFilter {
             c"power_manager",
             c"temperature",
             0,
-            self.raw_temperature_name.as_str() => raw_temperature.0,
-            self.filtered_temperature_name.as_str() => filtered_temperature.0
+            self.raw_temperature_name => raw_temperature.0,
+            self.filtered_temperature_name => filtered_temperature.0
         );
 
         self.prev_temperature.set(Some(filtered_temperature));

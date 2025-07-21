@@ -320,6 +320,41 @@ impl<'a> ArgValue for &'a str {
     }
 }
 
+impl<'a> ArgValue for sys::trace_string_ref_t {
+    #[inline]
+    fn of<'b>(key: &'b str, val: Self) -> Arg<'b>
+    where
+        Self: 'b,
+    {
+        Arg(
+            sys::trace_arg_t {
+                name_ref: trace_make_inline_string_ref(key),
+                value: sys::trace_arg_value_t {
+                    type_: sys::TRACE_ARG_STRING,
+                    value: sys::trace_arg_union_t { string_value_ref: val },
+                },
+            },
+            PhantomData,
+        )
+    }
+    #[inline]
+    fn of_registered<'b>(name_ref: sys::trace_string_ref_t, val: Self) -> Arg<'b>
+    where
+        Self: 'b,
+    {
+        Arg(
+            sys::trace_arg_t {
+                name_ref,
+                value: sys::trace_arg_value_t {
+                    type_: sys::TRACE_ARG_STRING,
+                    value: sys::trace_arg_union_t { string_value_ref: val },
+                },
+            },
+            PhantomData,
+        )
+    }
+}
+
 /// Convenience macro for the `instant` function.
 ///
 /// Example:
@@ -426,9 +461,10 @@ macro_rules! counter {
     ($category:expr, $name:expr, $counter_id:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::counter(&context, $name, $counter_id,
-                    &[$($crate::ArgValue::of($key, $val)),*])
+                    &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*])
             }
         }
     }
@@ -754,8 +790,9 @@ macro_rules! async_enter {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                Some($crate::AsyncScope::begin($id, $category, $name, &[$($crate::ArgValue::of($key, $val)),*]))
+                Some($crate::AsyncScope::begin($id, $category, $name, &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*]))
             } else {
                 None
             }
@@ -791,8 +828,9 @@ macro_rules! async_instant {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                $crate::async_instant($id, &context, $name, &[$($crate::ArgValue::of($key, $val)),*]);
+                $crate::async_instant($id, &context, $name, &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*]);
             }
         }
     }
@@ -866,8 +904,9 @@ macro_rules! blob {
     ($category:expr, $name:expr, $bytes:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                $crate::blob_fn(&context, $name, $bytes, &[$($crate::ArgValue::of($key, $val)),*])
+                $crate::blob_fn(&context, $name, $bytes, &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*])
             }
         }
     }
@@ -901,9 +940,10 @@ macro_rules! flow_begin {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::flow_begin(&context, $name, $flow_id,
-                                   &[$($crate::ArgValue::of($key, $val)),*])
+                                   &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*])
             }
         }
     }
@@ -928,9 +968,10 @@ macro_rules! flow_step {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::flow_step(&context, $name, $flow_id,
-                                  &[$($crate::ArgValue::of($key, $val)),*])
+                                  &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*])
             }
         }
     }
@@ -955,9 +996,10 @@ macro_rules! flow_end {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::flow_end(&context, $name, $flow_id,
-                                 &[$($crate::ArgValue::of($key, $val)),*])
+                                 &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*])
             }
         }
     }
@@ -1076,13 +1118,14 @@ macro_rules! instaflow_begin {
     ) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_begin(
                     &context,
                     $flow_name,
                     $step_name,
                     $flow_id,
-                    &[$($crate::ArgValue::of($key, $val)),*],
+                    &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*],
                 )
             }
         }
@@ -1113,13 +1156,14 @@ macro_rules! instaflow_end {
     ) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_end(
                     &context,
                     $flow_name,
                     $step_name,
                     $flow_id,
-                    &[$($crate::ArgValue::of($key, $val)),*],
+                    &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*],
                 )
             }
         }
@@ -1150,13 +1194,14 @@ macro_rules! instaflow_step {
     ) => {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_step(
                     &context,
                     $flow_name,
                     $step_name,
                     $flow_id,
-                    &[$($crate::ArgValue::of($key, $val)),*],
+                    &[$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*],
                 )
             }
         }
@@ -2217,9 +2262,10 @@ macro_rules! __impl_trace_future_args {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {{
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            use $crate::AsTraceStrRef;
             let context = $crate::TraceCategoryContext::acquire_cached($category, &CACHE);
-            let args = if context.is_some() {
-                vec![$($crate::ArgValue::of($key, $val)),*]
+            let args = if let Some(ref context) = &context {
+                vec![$($crate::ArgValue::of_registered($key.as_trace_str_ref(&context), $val)),*]
             } else {
                 vec![]
             };
@@ -2316,7 +2362,10 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let flow_id = self.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::BootTicks::get();
         context.write_flow_begin(zx::BootTicks::get(), name_ref, *flow_id, &[]);
-        self.args.push(ArgValue::of("state", "created"));
+        self.args.push(ArgValue::of_registered(
+            context.register_str("state"),
+            context.register_str("created"),
+        ));
         context.write_duration(name_ref, duration_start, &self.args);
         self.args.pop();
     }
@@ -2333,8 +2382,12 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let duration_start = zx::BootTicks::get();
         context.write_flow_step(zx::BootTicks::get(), name_ref, *flow_id, &[]);
         let result = this.future.poll(cx);
-        let result_str: &'static str = if result.is_pending() { "pending" } else { "ready" };
-        this.args.push(ArgValue::of("state", result_str));
+        let result_str: sys::trace_string_ref_t = if result.is_pending() {
+            context.register_str("pending")
+        } else {
+            context.register_str("ready")
+        };
+        this.args.push(ArgValue::of_registered(context.register_str("state"), result_str));
         context.write_duration(name_ref, duration_start, &this.args);
         this.args.pop();
         result
@@ -2347,7 +2400,10 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let flow_id = this.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::BootTicks::get();
         context.write_flow_end(zx::BootTicks::get(), name_ref, *flow_id, &[]);
-        this.args.push(ArgValue::of("state", "dropped"));
+        this.args.push(ArgValue::of_registered(
+            context.register_str("state"),
+            context.register_str("dropped"),
+        ));
         context.write_duration(name_ref, duration_start, &this.args);
         this.args.pop();
     }

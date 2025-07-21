@@ -461,7 +461,7 @@ impl Broker {
 
         fuchsia_trace::counter!(
             c"power-broker", c"current_level", 0,
-            &self.lookup_name(&element_id) => level.level as u32
+            &self.lookup_name(&element_id).into_owned() => level.level as u32
         );
 
         if let Some(transit_level) = self.in_transition.get(element_id) {
@@ -513,7 +513,7 @@ impl Broker {
         inspect_writer.update_required_level(&self.catalog.topology, *element_id, level.level);
         fuchsia_trace::counter!(
             c"power-broker", c"required_level", 0,
-            &self.lookup_name(&element_id) => level.level as u32
+            &self.lookup_name(&element_id).into_owned() => level.level as u32
         );
 
         previous
@@ -546,7 +546,7 @@ impl Broker {
         let counter = self.adjust_lease_counter(element_id, level.level, 1) as i64;
         fuchsia_trace::counter!(
             c"power-broker", c"LeaseCounter", level.level.into(),
-            &self.lookup_name(element_id) => counter
+            &self.lookup_name(element_id).into_owned() => counter
         );
 
         let (lease, assertive_claims) =
@@ -654,7 +654,7 @@ impl Broker {
         ) as i64;
         fuchsia_trace::counter!(
             c"power-broker", c"LeaseCounter", lease.underlying_element_level.level.into(),
-            &self.lookup_name(&lease.underlying_element_id) => counter
+            &self.lookup_name(&lease.underlying_element_id).into_owned() => counter
         );
 
         // Find the set of claims that can be dropped immediately.
