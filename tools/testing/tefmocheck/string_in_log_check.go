@@ -494,7 +494,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			// LINT.IfChange(hrtimer_wait_signaled_sync_tefmo)
 			String: "wait_signaled_sync: not signaled yet. See HrTimer bug: b/428223204",
 			// LINT.ThenChange(//src/starnix/kernel/task/hr_timer_manager.rs:hrtimer_wait_signaled_sync_tefmo)
-			Type: syslogType,
+			Type:               syslogType,
+			SkipAllPassedTests: true,
 		},
 		// For https://fxbug.dev/428030027
 		&stringInLogCheck{
