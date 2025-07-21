@@ -85,7 +85,24 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
 
         #[cfg(test)]
         {
-            assert_matches::assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
+            use std::convert::TryInto as _;
+
+            use packet_formats::ethernet::EthernetFrameLengthCheck;
+
+            let [(device, frame)] = ctx.bindings_ctx.take_ethernet_frames().try_into().unwrap();
+            assert_eq!(device, eth_device);
+            let (_body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
+                packet_formats::testutil::parse_ip_packet_in_ethernet_frame::<Ipv4>(
+                    &frame[..],
+                    EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("parse failed");
+            assert_eq!(src_mac, TEST_ADDRS_V4.local_mac.get());
+            assert_eq!(dst_mac, TEST_ADDRS_V4.remote_mac.get());
+            assert_eq!(src_ip, TEST_ADDRS_V4.remote_ip.get());
+            assert_eq!(dst_ip, TEST_ADDRS_V4.remote_ip.get());
+            assert_eq!(proto, IpProto::Udp.into());
+            assert_eq!(ttl, TTL - 1);
         }
 
         // Since we modified the buffer in-place, it now has the wrong source
