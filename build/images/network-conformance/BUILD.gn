@@ -7,7 +7,7 @@ import(
 
 if (is_fuchsia) {
   assemble_network_conformance_system("network-conformance-base") {
-    additional_base_packages = []
+    additional_cache_packages = []
   }
 }
 
