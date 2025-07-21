@@ -42,7 +42,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "dev.sys.platform.tee.tee.optee",
       "dev.sys.platform.gpio-c.aml-gpio.gpio.gpio-50.spi_0.aml-spi-0.spi.spi-0-0",
       "dev.sys.platform.sherlock-buttons.sherlock-buttons.buttons",
-      "dev.sys.platform.i2c-2.i2c-2.aml-i2c.i2c.i2c-2-44.backlight.ti-lp8556",
+      "dev.sys.platform.i2c-2.i2c-2.aml-i2c.i2c.i2c-2-44.backlight",
       "dev.sys.platform.i2c-0.i2c-0.aml-i2c.i2c.i2c-0-57.tcs3400_light.tcs-3400",
       "dev.sys.platform.aml-secure-mem.aml_securemem.aml-securemem",
       "dev.sys.platform.pwm.aml-pwm-device.pwm-4.pwm_init",

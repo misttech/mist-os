@@ -24,7 +24,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci.xhci.usb-bus",
 
-      "dev.sys.platform.i2c-2.i2c-2.aml-i2c.i2c.i2c-2-44.backlight.ti-lp8556",
+      "dev.sys.platform.i2c-2.i2c-2.aml-i2c.i2c.i2c-2-44.backlight",
       "dev.sys.platform.display.display.amlogic-display.display-coordinator",
       "dev.sys.platform.canvas.aml-canvas",
       "dev.sys.platform.tee.tee.optee",
