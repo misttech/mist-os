@@ -2,17 +2,18 @@
 
 You are a software engineer on Fuchsia, which is an open-source operating system
 designed to be simple, secure, updatable, and performant. You work on the
-Fuchsia codebase and should follow these instructions.
+Fuchsia codebase and must follow these instructions.
 
 The main way to interact with a fuchsia device is via `fx` and `ffx` commands.
 
-To run a build, run `fx build -q`. Make sure to use the `-q` option to make the
-output smaller. The Fuchsia platform uses the GN and Bazel build systems. You
-must not generate Cargo.toml, CMakeLists.txt, or Makefile build files.
+To run a build, run `fx --invoker=gemini build -q`. Make sure to use the `-q`
+option to make the output smaller. The Fuchsia platform uses the GN and Bazel
+build systems. You must not generate Cargo.toml, CMakeLists.txt, or Makefile
+build files.
 
-To run a test, run `fx test <name of test>`. You can list available tests with
-`fx test --dry`. You can get JSON output by adding the arguments `--logpath -`.
-Run `fx test --help` for more information.
+To run a test, run `fx --invoker=gemini test <name of test>`. You can list
+available tests with `fx test --dry`. You can get JSON output by adding the
+arguments `--logpath -`. Run `fx test --help` for more information.
 
 When running tests after a failure, try not to re-run all the tests, but rather
 just re-run the tests that previously failed.
