@@ -751,6 +751,12 @@ func (f *FFXInstance) RunAndGetOutput(ctx context.Context, args ...string) (stri
 	return strings.TrimSpace(s), err
 }
 
+// RunWithTargetOutputAndTimeout runs ffx with the associated target, stdout redirected to the
+// provided writer, and the specified timeout.
+func (f *FFXInstance) RunWithTargetOutputAndTimeout(ctx context.Context, output io.Writer, timeout time.Duration, args ...string) error {
+	return f.invoker(args).setTarget(f.target).setStdout(output).setTimeout(timeout).run(ctx)
+}
+
 func (f *FFXInstance) StartDaemon(ctx context.Context, daemonLog *os.File) *exec.Cmd {
 	args := []string{"daemon", "start"}
 	// Special-case the daemon handling, since it's the one command where we want to redirect the stdout,

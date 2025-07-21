@@ -86,6 +86,12 @@ func (f *FfxInstance) RunWithTargetAndTimeout(ctx context.Context, timeout time.
 
 // This method is relied upon in third_party/network-conformance and changing
 // the definition requires a soft transition.
+func (f *FfxInstance) RunWithTargetOutputAndTimeout(ctx context.Context, output io.Writer, timeout time.Duration, args ...string) error {
+	return f.ffx.RunWithTargetOutputAndTimeout(ctx, output, timeout, args...)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
 func (f *FfxInstance) WaitForDaemon(ctx context.Context) error {
 	return f.ffx.WaitForDaemon(ctx)
 }
@@ -213,13 +219,16 @@ func (f *FfxInstance) IsClosed() bool {
 	return f.mu.isClosed
 }
 
-func (f *FfxInstance) Close() error {
+func (f *FfxInstance) CloseWith(killDaemon bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	f.mu.isClosed = true
 
-	err := f.Stop()
+	var err error
+	if killDaemon {
+		err = f.Stop()
+	}
 	if f.iOwnOutputDir {
 		err = errors.Join(err, os.RemoveAll(f.outputDir))
 	}
@@ -231,6 +240,14 @@ func (f *FfxInstance) Close() error {
 		return nil
 	}
 	return err
+}
+
+func (f *FfxInstance) Close() error {
+	return f.CloseWith(true /* killDaemon */)
+}
+
+func (f *FfxInstance) CloseWithoutKillingDaemon() error {
+	return f.CloseWith(false /* killDaemon */)
 }
 
 const ffxIsolateDirKey = "FFX_ISOLATE_DIR="

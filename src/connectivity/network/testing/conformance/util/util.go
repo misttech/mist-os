@@ -9,6 +9,18 @@ import (
 	"path/filepath"
 )
 
+func GetBuildDirectory() (string, error) {
+	executablePath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	buildDir, err := filepath.Abs(filepath.Dir(filepath.Dir(executablePath)))
+	if err != nil {
+		return "", err
+	}
+	return buildDir, nil
+}
+
 func GetHostOutDirectory() (string, error) {
 	executablePath, err := os.Executable()
 	if err != nil {
