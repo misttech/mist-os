@@ -4,9 +4,18 @@
 
 #include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <lib/zx/vmo.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+
 #include <gtest/gtest.h>
 #include <storage/buffer/vmo_buffer.h>
 #include <storage/buffer/vmoid_registry.h>
+#include <storage/operation/operation.h>
 
 namespace {
 
@@ -31,7 +40,7 @@ TEST(BufferedOperationsBuilderTest, NoRequest) {
 
 class MockVmoidRegistry : public VmoidRegistry {
  public:
-  MockVmoidRegistry(vmoid_t vmoid = kVmoid1) : vmoid_(vmoid) {}
+  explicit MockVmoidRegistry(vmoid_t vmoid = kVmoid1) : vmoid_(vmoid) {}
 
   zx_status_t BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) final {
     *out = storage::Vmoid(vmoid_);

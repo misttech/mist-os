@@ -15,7 +15,7 @@
 #include <gpt/c/gpt.h>
 
 #ifdef __Fuchsia__
-#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"  // nogncheck
 #endif
 
 namespace gpt {
