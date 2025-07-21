@@ -51,6 +51,7 @@ Symbols:
   - { Name: _zx_futex_wake_single_owner, Type: Func }
   - { Name: _zx_guest_create, Type: Func }
   - { Name: _zx_guest_set_trap, Type: Func }
+  - { Name: _zx_handle_check_valid, Type: Func }
   - { Name: _zx_handle_close, Type: Func }
   - { Name: _zx_handle_close_many, Type: Func }
   - { Name: _zx_handle_duplicate, Type: Func }
@@ -267,6 +268,7 @@ Symbols:
   - { Name: zx_futex_wake_single_owner, Type: Func, Weak: true }
   - { Name: zx_guest_create, Type: Func, Weak: true }
   - { Name: zx_guest_set_trap, Type: Func, Weak: true }
+  - { Name: zx_handle_check_valid, Type: Func, Weak: true }
   - { Name: zx_handle_close, Type: Func, Weak: true }
   - { Name: zx_handle_close_many, Type: Func, Weak: true }
   - { Name: zx_handle_duplicate, Type: Func, Weak: true }
