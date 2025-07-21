@@ -895,5 +895,12 @@ func infraToolLogChecks() []FailureModeCheck {
 			Type:            syslogType,
 			AttributeToTest: true,
 		},
+		// For https://fxbug.dev/428551639
+		&stringInLogCheck{
+			String:             "Restarts have not restored connectivity. Giving up.",
+			Type:               swarmingOutputType,
+			SkipAllPassedTests: true,
+			AttributeToTest:    true,
+		},
 	}
 }
