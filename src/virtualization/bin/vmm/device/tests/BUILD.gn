@@ -19,7 +19,6 @@ group("tests") {
     ":virtio_rng_device_tests",
     ":virtio_sound_device_tests",
     ":virtio_vsock_device_tests",
-    ":virtio_wl_device_tests",
   ]
 }
 
@@ -325,35 +324,6 @@ device_test("virtio_vsock_device_tests") {
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//zircon/system/ulib/virtio",
-  ]
-
-  test_specs = {
-    environments = guest_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-device_test("virtio_wl_device_tests") {
-  sources = [ "virtio_wl_test.cc" ]
-  manifest = "meta/virtio_wl_device_tests.cml"
-  device_components =
-      [ "//src/virtualization/bin/vmm/device:virtio_wl_component" ]
-
-  deps = [
-    ":test_with_device",
-    ":virtio_queue_fake",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
-    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_hlcpp",
-    "//sdk/fidl/fuchsia.wayland:fuchsia.wayland_hlcpp",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/virtio",
-    "//zircon/system/ulib/zx",
   ]
 
   test_specs = {
