@@ -221,6 +221,10 @@ group("non_hermetic_deps") {
     "//src/developer/ffx/tools/power/system-activity/application-activity:*",
   ]
 
+  # Allow network-conformance unit test to makes its own amber-files to test
+  # package resolution.
+  visibility += [ "//third_party/network-conformance/orchestrator:*" ]
+
   # This tests accesses `out/<build_dir_name>.json` at runtime.
   # See https://fxbug.dev/352511300
   visibility += [ "//src/developer/ffx/tests/mw-goldens:gen_schema_files" ]
