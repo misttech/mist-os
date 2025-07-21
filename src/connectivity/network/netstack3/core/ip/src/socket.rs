@@ -39,6 +39,20 @@ use crate::internal::routing::PacketOrigin;
 use crate::internal::types::{InternalForwarding, ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};
 
+/// The arguments used for creating an [`IpSock`]
+pub struct IpSocketArgs<'a, D: StrongDeviceIdentifier, I: IpExt, O> {
+    /// The device the socket is bound to.
+    pub device: Option<EitherDeviceId<&'a D, &'a D::Weak>>,
+    /// The local IP to use for the connection. One is selected if not provided
+    /// based on the output route.
+    pub local_ip: Option<IpDeviceAddr<I::Addr>>,
+    /// The remote IP address for this connection.
+    pub remote_ip: RoutableIpAddr<I::Addr>,
+    /// The IP protocol in use.
+    pub proto: I::Proto,
+    /// Additional IP layer options.
+    pub options: &'a O,
+}
 /// An execution context defining a type of IP socket.
 pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     DeviceIdContext<AnyDevice>
@@ -60,11 +74,7 @@ pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     fn new_ip_socket<O>(
         &mut self,
         bindings_ctx: &mut BC,
-        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<IpDeviceAddr<I::Addr>>,
-        remote_ip: SocketIpAddr<I::Addr>,
-        proto: I::Proto,
-        options: &O,
+        args: IpSocketArgs<'_, Self::DeviceId, I, O>,
     ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
     where
         O: RouteResolutionOptions<I>;
@@ -132,11 +142,7 @@ pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     fn send_oneshot_ip_packet_with_fallible_serializer<S, E, F, O>(
         &mut self,
         bindings_ctx: &mut BC,
-        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<IpDeviceAddr<I::Addr>>,
-        remote_ip: RoutableIpAddr<I::Addr>,
-        proto: I::Proto,
-        options: &O,
+        args: IpSocketArgs<'_, Self::DeviceId, I, O>,
         tx_metadata: BC::TxMetadata,
         get_body_from_src_ip: F,
     ) -> Result<(), SendOneShotIpPacketError<E>>
@@ -146,8 +152,9 @@ pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
         F: FnOnce(IpDeviceAddr<I::Addr>) -> Result<S, E>,
         O: SendOptions<I> + RouteResolutionOptions<I>,
     {
+        let options = args.options;
         let tmp = self
-            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, options)
+            .new_ip_socket(bindings_ctx, args)
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
@@ -159,11 +166,7 @@ pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     fn send_oneshot_ip_packet<S, F, O>(
         &mut self,
         bindings_ctx: &mut BC,
-        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<IpDeviceAddr<I::Addr>>,
-        remote_ip: SocketIpAddr<I::Addr>,
-        proto: I::Proto,
-        options: &O,
+        args: IpSocketArgs<'_, Self::DeviceId, I, O>,
         tx_metadata: BC::TxMetadata,
         get_body_from_src_ip: F,
     ) -> Result<(), IpSockCreateAndSendError>
@@ -175,11 +178,7 @@ pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     {
         self.send_oneshot_ip_packet_with_fallible_serializer(
             bindings_ctx,
-            device,
-            local_ip,
-            remote_ip,
-            proto,
-            options,
+            args,
             tx_metadata,
             |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
         )
@@ -448,15 +447,12 @@ where
     fn new_ip_socket<O>(
         &mut self,
         bindings_ctx: &mut BC,
-        device: Option<EitherDeviceId<&CC::DeviceId, &CC::WeakDeviceId>>,
-        local_ip: Option<IpDeviceAddr<I::Addr>>,
-        remote_ip: SocketIpAddr<I::Addr>,
-        proto: I::Proto,
-        options: &O,
+        args: IpSocketArgs<'_, Self::DeviceId, I, O>,
     ) -> Result<IpSock<I, CC::WeakDeviceId>, IpSockCreationError>
     where
         O: RouteResolutionOptions<I>,
     {
+        let IpSocketArgs { device, local_ip, remote_ip, proto, options } = args;
         let device = device
             .as_ref()
             .map(|d| d.as_strong_ref().ok_or(ResolveRouteError::Unreachable))
@@ -1568,22 +1564,12 @@ pub(crate) mod testutil {
         fn new_ip_socket<O>(
             &mut self,
             _bindings_ctx: &mut BC,
-            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<IpDeviceAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-            options: &O,
+            args: IpSocketArgs<'_, Self::DeviceId, I, O>,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
         where
             O: RouteResolutionOptions<I>,
         {
-            self.state.fake_ip_socket_ctx_mut().new_ip_socket(
-                device,
-                local_ip,
-                remote_ip,
-                proto,
-                options.transparent(),
-            )
+            self.state.fake_ip_socket_ctx_mut().new_ip_socket(args)
         }
 
         fn send_ip_packet<S, O>(
@@ -1925,20 +1911,21 @@ pub(crate) mod testutil {
                 .collect()
         }
 
-        fn new_ip_socket(
+        fn new_ip_socket<O>(
             &mut self,
-            device: Option<EitherDeviceId<&D, &D::Weak>>,
-            local_ip: Option<IpDeviceAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-            transparent: bool,
-        ) -> Result<IpSock<I, D::Weak>, IpSockCreationError> {
+            args: IpSocketArgs<'_, D, I, O>,
+        ) -> Result<IpSock<I, D::Weak>, IpSockCreationError>
+        where
+            O: RouteResolutionOptions<I>,
+        {
+            let IpSocketArgs { device, local_ip, remote_ip, proto, options } = args;
             let device = device
                 .as_ref()
                 .map(|d| d.as_strong_ref().ok_or(ResolveRouteError::Unreachable))
                 .transpose()?;
             let device = device.as_ref().map(|d| d.as_ref());
-            let resolved_route = self.lookup_route(device, local_ip, remote_ip, transparent)?;
+            let resolved_route =
+                self.lookup_route(device, local_ip, remote_ip, options.transparent())?;
             Ok(new_ip_socket(device, resolved_route, remote_ip, proto))
         }
 

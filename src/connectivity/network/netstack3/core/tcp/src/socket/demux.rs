@@ -25,7 +25,7 @@ use netstack3_filter::{
     FilterIpExt, SocketIngressFilterResult, SocketOpsFilter, TransportPacketSerializer,
 };
 use netstack3_hashmap::hash_map;
-use netstack3_ip::socket::{IpSockCreationError, MmsError};
+use netstack3_ip::socket::{IpSockCreationError, IpSocketArgs, MmsError};
 use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
     TransportIpContext, TransportReceiveError,
@@ -994,11 +994,13 @@ where
     let bound_device = bound_device.as_ref().map(|d| d.as_ref());
     let ip_sock = match core_ctx.new_ip_socket(
         bindings_ctx,
-        bound_device,
-        IpDeviceAddr::new_from_socket_ip_addr(local_ip),
-        remote_ip,
-        IpProto::Tcp.into(),
-        &ip_options,
+        IpSocketArgs {
+            device: bound_device,
+            local_ip: IpDeviceAddr::new_from_socket_ip_addr(local_ip),
+            remote_ip,
+            proto: IpProto::Tcp.into(),
+            options: &ip_options,
+        },
     ) {
         Ok(ip_sock) => ip_sock,
         err @ Err(IpSockCreationError::Route(_)) => {

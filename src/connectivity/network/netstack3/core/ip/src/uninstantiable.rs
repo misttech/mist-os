@@ -4,18 +4,17 @@
 
 use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
-use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceAddr, IpExt, Mms, TxMetadataBindingsTypes,
-    Uninstantiable, UninstantiableWrapper,
+    AnyDevice, DeviceIdContext, IpExt, Mms, TxMetadataBindingsTypes, Uninstantiable,
+    UninstantiableWrapper,
 };
 use netstack3_filter::{FilterIpExt, Tuple};
 
 use crate::internal::base::{BaseTransportIpContext, HopLimits, IpLayerIpExt};
 use crate::internal::device::Ipv6LinkLayerAddr;
 use crate::internal::socket::{
-    DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, MmsError,
-    RouteResolutionOptions,
+    DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketArgs,
+    IpSocketHandler, MmsError, RouteResolutionOptions,
 };
 
 impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
@@ -43,11 +42,7 @@ impl<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes, P: DeviceIdContext<Any
     fn new_ip_socket<O>(
         &mut self,
         _ctx: &mut BC,
-        _device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        _local_ip: Option<IpDeviceAddr<I::Addr>>,
-        _remote_ip: SocketIpAddr<I::Addr>,
-        _proto: I::Proto,
-        _options: &O,
+        _args: IpSocketArgs<'_, Self::DeviceId, I, O>,
     ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
         self.uninstantiable_unreachable()
     }

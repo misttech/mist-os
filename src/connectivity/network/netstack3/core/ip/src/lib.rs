@@ -180,7 +180,7 @@ pub mod socket {
     pub use crate::internal::socket::{
         DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions,
         DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
-        IpSockDefinition, IpSockSendError, IpSocketBindingsContext, IpSocketContext,
+        IpSockDefinition, IpSockSendError, IpSocketArgs, IpSocketBindingsContext, IpSocketContext,
         IpSocketHandler, MmsError, RouteResolutionOptions, SendOneShotIpPacketError, SendOptions,
         SocketHopLimits,
     };

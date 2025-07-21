@@ -61,8 +61,8 @@ use crate::internal::device::{
 use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta};
 use crate::internal::path_mtu::PmtuHandler;
 use crate::internal::socket::{
-    DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSocketHandler, OptionDelegationMarker,
-    RouteResolutionOptions, SendOptions,
+    DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSocketArgs, IpSocketHandler,
+    OptionDelegationMarker, RouteResolutionOptions, SendOptions,
 };
 
 /// The IP packet hop limit for all NDP packets.
@@ -1556,7 +1556,11 @@ fn receive_ndp_packet<
             // TODO(https://fxbug.dev/42052173): Control whether or not we should
             // update the default hop limit.
             if let Some(hop_limit) = ra.current_hop_limit() {
-                trace!("receive_ndp_packet: NDP RA: updating device's hop limit to {:?} for router: {:?}", ra.current_hop_limit(), src_ip);
+                trace!(
+                    "receive_ndp_packet: NDP RA: updating device's hop limit to {:?} for router: {:?}",
+                    ra.current_hop_limit(),
+                    src_ip
+                );
                 IpDeviceHandler::set_default_hop_limit(core_ctx, &device_id, hop_limit);
             }
 
@@ -1805,16 +1809,22 @@ impl<
                             );
                         }
                         Err(AddrIsMappedError {}) => {
-                            trace!("IpTransportContext<Ipv6>::receive_ip_packet: Received echo request with an ipv4-mapped-ipv6 destination address");
+                            trace!(
+                                "IpTransportContext<Ipv6>::receive_ip_packet: Received echo request with an ipv4-mapped-ipv6 destination address"
+                            );
                         }
                     }
                 } else {
-                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received echo request with an unspecified source address");
+                    trace!(
+                        "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received echo request with an unspecified source address"
+                    );
                 }
             }
             Icmpv6Packet::EchoReply(echo_reply) => {
                 CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx).echo_reply.increment();
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message"
+                );
                 let parse_metadata = echo_reply.parse_metadata();
                 buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
@@ -1835,7 +1845,9 @@ impl<
                 CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx)
                     .packet_too_big
                     .increment();
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message"
+                );
                 let new_mtu = if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     // We are updating the path MTU from the destination address
                     // of this `packet` (which is an IP address on this node) to
@@ -1957,11 +1969,13 @@ fn send_icmp_reply<I, BC, CC, S, F, O>(
     core_ctx
         .send_oneshot_ip_packet(
             bindings_ctx,
-            egress_device,
-            IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
-            original_src_ip,
-            I::ICMP_IP_PROTO,
-            ip_options,
+            IpSocketArgs {
+                device: egress_device,
+                local_ip: IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
+                remote_ip: original_src_ip,
+                proto: I::ICMP_IP_PROTO,
+                options: ip_options,
+            },
             tx_metadata,
             |src_ip| get_body_from_src_ip(src_ip.into()),
         )
@@ -2819,11 +2833,13 @@ fn send_icmpv4_error_message<
                 bindings_ctx,
                 core_ctx.send_oneshot_ip_packet(
                     bindings_ctx,
-                    device.map(EitherDeviceId::Strong),
-                    None,
-                    original_src_ip,
-                    Ipv4Proto::Icmp,
-                    &WithMarks(marks),
+                    IpSocketArgs {
+                        device: device.map(EitherDeviceId::Strong),
+                        local_ip: None,
+                        remote_ip: original_src_ip,
+                        proto: Ipv4Proto::Icmp,
+                        options: &WithMarks(marks),
+                    },
                     tx_metadata,
                     |local_ip| {
                         IcmpPacketBuilder::<Ipv4, _>::new(
@@ -2921,11 +2937,13 @@ fn send_icmpv6_error_message<
                 bindings_ctx,
                 core_ctx.send_oneshot_ip_packet(
                     bindings_ctx,
-                    device.map(EitherDeviceId::Strong),
-                    None,
-                    original_src_ip,
-                    Ipv6Proto::Icmpv6,
-                    &Icmpv6ErrorOptions(marks),
+                    IpSocketArgs {
+                        device: device.map(EitherDeviceId::Strong),
+                        local_ip: None,
+                        remote_ip: original_src_ip,
+                        proto: Ipv6Proto::Icmpv6,
+                        options: &Icmpv6ErrorOptions(marks),
+                    },
                     tx_metadata,
                     |local_ip| {
                         let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
@@ -3583,23 +3601,12 @@ mod tests {
         fn new_ip_socket<O>(
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
-            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<IpDeviceAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-            options: &O,
+            args: IpSocketArgs<'_, Self::DeviceId, I, O>,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
         where
             O: RouteResolutionOptions<I>,
         {
-            self.ip_socket_ctx.new_ip_socket(
-                bindings_ctx,
-                device,
-                local_ip,
-                remote_ip,
-                proto,
-                options,
-            )
+            self.ip_socket_ctx.new_ip_socket(bindings_ctx, args)
         }
 
         fn send_ip_packet<S, O>(

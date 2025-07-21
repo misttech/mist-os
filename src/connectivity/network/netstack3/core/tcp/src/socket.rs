@@ -63,7 +63,8 @@ use netstack3_base::{
 use netstack3_filter::{FilterIpExt, SocketOpsFilterBindingContext, Tuple};
 use netstack3_hashmap::{hash_map, HashMap};
 use netstack3_ip::socket::{
-    DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
+    DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketArgs,
+    IpSocketHandler,
 };
 use netstack3_ip::{self as ip, BaseTransportIpContext, TransportIpContext};
 use netstack3_trace::{trace_duration, TraceResourceId};
@@ -3465,11 +3466,13 @@ where
         let new_socket = core_ctx
             .new_ip_socket(
                 bindings_ctx,
-                new_device.as_ref().map(EitherDeviceId::Strong),
-                IpDeviceAddr::new_from_socket_ip_addr(*local_ip),
-                *remote_ip,
-                IpProto::Tcp.into(),
-                ip_options,
+                IpSocketArgs {
+                    device: new_device.as_ref().map(EitherDeviceId::Strong),
+                    local_ip: IpDeviceAddr::new_from_socket_ip_addr(*local_ip),
+                    remote_ip: *remote_ip,
+                    proto: IpProto::Tcp.into(),
+                    options: ip_options,
+                },
             )
             .map_err(|_: IpSockCreationError| SetDeviceError::Unroutable)?;
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
@@ -5292,11 +5295,13 @@ where
     let ip_sock = core_ctx
         .new_ip_socket(
             bindings_ctx,
-            device.as_ref().map(|d| d.as_ref()),
-            local_ip,
-            remote_ip,
-            IpProto::Tcp.into(),
-            &socket_options.ip_options,
+            IpSocketArgs {
+                device: device.as_ref().map(|d| d.as_ref()),
+                local_ip,
+                remote_ip,
+                proto: IpProto::Tcp.into(),
+                options: &socket_options.ip_options,
+            },
         )
         .map_err(|err| match err {
             IpSockCreationError::Route(_) => ConnectError::NoRoute,
@@ -5560,11 +5565,13 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
             let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
             core_ctx.send_oneshot_ip_packet(
                 bindings_ctx,
-                None,
-                IpDeviceAddr::new_from_socket_ip_addr(local_ip),
-                remote_ip,
-                IpProto::Tcp.into(),
-                ip_sock_options,
+                IpSocketArgs {
+                    device: None,
+                    local_ip: IpDeviceAddr::new_from_socket_ip_addr(local_ip),
+                    remote_ip,
+                    proto: IpProto::Tcp.into(),
+                    options: ip_sock_options,
+                },
                 tx_metadata,
                 |_addr| tcp_serialize_segment(&header, data, conn_addr),
             )
@@ -6041,24 +6048,12 @@ mod tests {
         fn new_ip_socket<O>(
             &mut self,
             bindings_ctx: &mut BC,
-            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<IpDeviceAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-            options: &O,
+            args: IpSocketArgs<'_, Self::DeviceId, I, O>,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
         where
             O: RouteResolutionOptions<I>,
         {
-            IpSocketHandler::<I, BC>::new_ip_socket(
-                &mut self.ip_socket_ctx,
-                bindings_ctx,
-                device,
-                local_ip,
-                remote_ip,
-                proto,
-                options,
-            )
+            IpSocketHandler::<I, BC>::new_ip_socket(&mut self.ip_socket_ctx, bindings_ctx, args)
         }
 
         fn send_ip_packet<S, O>(
