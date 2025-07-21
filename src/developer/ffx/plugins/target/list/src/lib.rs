@@ -242,26 +242,12 @@ async fn handle_to_info(
     })
 }
 
-async fn do_connect_to_target(ctx: &EnvironmentContext, cmd: &ListCommand) -> bool {
-    // Should we probe discovered targets by default?
-    if cmd.no_probe {
-        // It'd be nice to use the FfxConfigBacked functionality, but that only works with Option arguments
-        false
-    } else {
-        // XXX Shouldn't check `is_strict()`. Eventually we'll fix b/340330010,
-        // at which point this check goes away.
-        // TODO(b/340330010) Change the default to "true" when we are ready to roll this out to everyone
-        ctx.is_strict() || ctx.get("ffx.target-list.local-connect").unwrap_or(false)
-    }
-}
-
 async fn local_list_targets(
     ctx: &EnvironmentContext,
     cmd: &ListCommand,
 ) -> Result<Vec<ffx::TargetInfo>> {
-    let connect = do_connect_to_target(ctx, cmd).await;
     let stream = get_handle_stream(cmd, ctx).await?;
-    let targets = handles_to_infos(stream, ctx, connect).await?;
+    let targets = handles_to_infos(stream, ctx, !cmd.no_probe).await?;
     Ok(targets)
 }
 
@@ -611,24 +597,6 @@ mod test {
         assert_eq!(address_types_from_cmd(&cmd_all), AddressTypes::All);
         let cmd_all_default = ListCommand::default();
         assert_eq!(address_types_from_cmd(&cmd_all_default), AddressTypes::All);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_connect_logic() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
-        // Default value is false (see b/340330010)
-        assert_eq!(false, do_connect_to_target(&env.context, &ListCommand::default()).await);
-        // When --no-probe -s specified, false
-        let cmd = ListCommand { no_probe: true, ..Default::default() };
-        assert_eq!(false, do_connect_to_target(&env.context, &cmd).await);
-        // If ffx.target-list.local-connect is specified, use it
-        env.context
-            .query("ffx.target-list.local-connect")
-            .level(Some(ffx_config::ConfigLevel::User))
-            .set(true.into())?;
-        assert_eq!(true, do_connect_to_target(&env.context, &ListCommand::default()).await);
-
         Ok(())
     }
 

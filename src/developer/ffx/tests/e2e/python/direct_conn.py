@@ -45,7 +45,7 @@ class FfxDirectTest(ffxtestcase.FfxTestCase):
         all_args += cmd
         return json.loads(self.run_ffx(all_args))
 
-    def test_direct_target_echo_no_start_daemon(self) -> None:
+    def test_direct_target_echo(self) -> None:
         """Test `ffx --direct target echo` does not affect daemon state."""
         out = self._run_ffx_direct(
             [
@@ -57,7 +57,7 @@ class FfxDirectTest(ffxtestcase.FfxTestCase):
 
         asserts.assert_equal(out["message"], "From a Test")
 
-    def test_direct_target_list_no_start_daemon(self) -> None:
+    def test_direct_target_list(self) -> None:
         """Test `ffx --direct target list` does not affect daemon state."""
         out = self._run_ffx_direct(
             [
@@ -67,6 +67,7 @@ class FfxDirectTest(ffxtestcase.FfxTestCase):
             ],
         )
         asserts.assert_equal(out[0]["target_state"], "Product")
+        asserts.assert_equal(out[0]["rcs_state"], "Y")
 
 
 if __name__ == "__main__":

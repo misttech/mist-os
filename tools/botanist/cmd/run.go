@@ -192,9 +192,8 @@ func (r *RunCommand) setupFFX(ctx context.Context, invokeMode ffxutil.FFXInvokeM
 	extraConfigs := ffxutil.ConfigSettings{
 		Level: "global",
 		Settings: map[string]any{
-			"daemon.autostart":              false,
-			"discovery.mdns.enabled":        false,
-			"ffx.target-list.local-connect": true,
+			"daemon.autostart":       false,
+			"discovery.mdns.enabled": false,
 		},
 	}
 	// By default, the ssh.priv and ssh.pub values are in $HOME, which had earlier been configured to be a tmpdir.

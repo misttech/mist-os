@@ -114,8 +114,6 @@ class FfxTest(ffxtestcase.FfxTestCase):
                 "json",
                 "-c",
                 "ffx.isolated=true",
-                "-c",
-                "ffx.target-list.local-connect=true",
                 "target",
                 "list",
                 self.dut.device_name,
