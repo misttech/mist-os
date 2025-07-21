@@ -43,6 +43,9 @@ namespace driver_runtime {
 
 namespace {
 
+constexpr uint64_t kStallTimeMs = 100;
+constexpr uint64_t kStaleTimeMs = kStallTimeMs * 5;
+
 const async_ops_t g_dispatcher_ops = {
     .version = ASYNC_OPS_V3,
     .reserved = 0,
@@ -1738,6 +1741,18 @@ zx_status_t DispatcherCoordinator::SetThreadLimit(std::string_view scheduler_rol
   return thread_pool->set_max_threads(max_threads);
 }
 
+void DispatcherCoordinator::ScanThreadsForStalls() {
+  fbl::AutoLock lock(&lock_);
+  default_thread_pool_.ScanThreadsForStalls();
+  // Thread safety note: It is important that thread pools be removed from this list before
+  // the threads in them stop so that this function won't try to access memory tied to the lifetime
+  // of the thread. If ASAN triggers anywhere in here, that means this invariant has been broken.
+  // See the comment in `ThreadWakeupPrologue` for more information.
+  for (auto& thread_pool : role_to_thread_pool_) {
+    thread_pool.ScanThreadsForStalls();
+  }
+}
+
 void DispatcherCoordinator::NotifyDispatcherShutdown(
     Dispatcher& dispatcher, fdf_dispatcher_shutdown_observer_t* dispatcher_shutdown_observer) {
   DriverState::DriverShutdownCallback shutdown_callback = nullptr;
@@ -1910,16 +1925,62 @@ void DispatcherCoordinator::DestroyThreadPool(Dispatcher::ThreadPool* thread_poo
 }
 
 void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
-  if (thread_context::GetRoleProfileStatus().has_value()) {
-    // We have already attempted to set the role profile for the current thread.
-    return;
+  zx_instant_mono_t entry_time = zx_clock_get_monotonic();
+  std::atomic_int64_t* task_entry_slot = thread_context::GetTaskEntryTimeSlot();
+  if (unlikely(*task_entry_slot == -1)) {
+    // Store the pointer to our thread's entry time slot in the thread pool's list so that it can be
+    // checked for stalled threads by the environment.
+    //
+    // Thread safety note: While the pointer stored in `thread_entry_time_slots_` may outlive the
+    // runtime of the thread, and so the TLS variable it's stored in, the dispatcher will remove the
+    // thread pool from the list consulted to check for stalled tasks before scheduling the
+    // destruction of the pool, so it should not be accessed after the thread has stopped.
+    fbl::AutoLock guard(&lock_);
+    thread_entry_time_slots_.push_back(task_entry_slot);
   }
-  zx_status_t status = SetRoleProfile();
-  if (status != ZX_OK) {
-    // Failing to set the role profile is not a fatal error.
-    LOGF(WARNING, "Failed to set scheduler role: %d\n", status);
+  task_entry_slot->store(entry_time);
+  if (scheduler_role_ != kNoSchedulerRole) {
+    if (thread_context::GetRoleProfileStatus().has_value()) {
+      // We have already attempted to set the role profile for the current thread.
+      return;
+    }
+    zx_status_t status = SetRoleProfile();
+    if (status != ZX_OK) {
+      // Failing to set the role profile is not a fatal error.
+      LOGF(WARNING, "Failed to set scheduler role: %d\n", status);
+    }
+    thread_context::SetRoleProfileStatus(status);
   }
-  thread_context::SetRoleProfileStatus(status);
+}
+
+void Dispatcher::ThreadPool::ThreadWakeupEpilogue() {
+  thread_context::GetTaskEntryTimeSlot()->store(0);
+}
+
+void Dispatcher::ThreadPool::ScanThreadsForStalls() {
+  fbl::AutoLock lock(&lock_);
+  zx::time current_time = zx::time(zx_clock_get_monotonic());
+  zx::time stalled_time = current_time - zx::msec(kStallTimeMs);
+  zx::time stale_time = current_time - zx::msec(kStaleTimeMs);
+  uint32_t stalled_threads = 0;
+  for (auto& slot : thread_entry_time_slots_) {
+    zx::time timestamp(slot->load());
+    if (timestamp != zx::time(0) && timestamp < stalled_time) {
+      if (timestamp > stale_time) {
+        LOGF(WARNING, "Found a thread that has been stalled for %ld ms\n",
+             (current_time - timestamp).to_msecs());
+      }
+      stalled_threads++;
+    }
+  }
+  if (num_threads_ > 0 && num_threads_ < max_threads_ && stalled_threads >= num_threads_) {
+    LOGF(
+        WARNING,
+        "All threads on thread pool (role: %s) are stalled (%d/%d). Spawning a new thread, if possible (max threads: %d).",
+        scheduler_role_.c_str(), stalled_threads, num_threads_, max_threads_);
+    lock.release();
+    AddThread();
+  }
 }
 
 zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
@@ -1970,10 +2031,18 @@ zx_status_t Dispatcher::ThreadPool::AddThread() {
   // Note this check is before we have incremented |num_dispatchers_| for the current dispatcher.
   // TODO(https://fxbug.dev/42076454): we should be able to remove the scheduler role check.
   if ((scheduler_role_ != kNoSchedulerRole) && (num_threads_ > num_dispatchers_)) [[likely]] {
+    LOGF(
+        DEBUG,
+        "Not spawning thread on thread pool (role: %s) because it would add more threads (%d) than dispatchers (%d)",
+        scheduler_role_.c_str(), num_threads_, num_dispatchers_);
     return ZX_OK;
   }
 
   if (num_threads_ >= dispatcher_threads_needed_ || num_threads_ == max_threads_) {
+    LOGF(
+        DEBUG,
+        "Not spawning thread on thread pool (role: %s) because we already have more threads (%d) than needed (%d) or it would exceed the maximum (%d)",
+        scheduler_role_.c_str(), num_threads_, dispatcher_threads_needed_, max_threads_);
     return ZX_OK;
   }
   auto name = "fdf-dispatcher-thread-" + std::to_string(num_threads_);

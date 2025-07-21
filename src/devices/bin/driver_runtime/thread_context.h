@@ -8,6 +8,8 @@
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
+#include <atomic>
+#include <memory>
 #include <optional>
 
 namespace driver_runtime {
@@ -55,6 +57,9 @@ std::optional<zx_status_t> GetRoleProfileStatus();
 void SetRoleProfileStatus(zx_status_t status);
 
 zx::result<const void*> GetDriverOnTid(zx_koid_t tid);
+
+// Gets the storage for the current thread's task entry time slot.
+std::atomic_int64_t* GetTaskEntryTimeSlot();
 
 }  // namespace thread_context
 

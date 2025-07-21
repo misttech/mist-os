@@ -60,6 +60,7 @@ async fn main() -> Result<(), anyhow::Error> {
     });
     driver_host.clone().run_exception_listener();
     driver_host.clone().run_exception_cleanup_task();
+    driver_host.clone().run_thread_monitor_task();
 
     // Exit if the servicefs exits or all drivers are shutdown.
     futures::select! {

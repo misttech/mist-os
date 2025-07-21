@@ -71,6 +71,9 @@ static thread_local uint32_t g_cached_irqs_generation = 0;
 // The result of setting the role profile for the current thread.
 // May be std::nullopt if no attempt has been made to set the role profile.
 static thread_local std::optional<zx_status_t> g_role_profile_status;
+// A shared_ptr to an atomic time value for when this thread last entered a callback, or 0 if not
+// currently running a task.
+thread_local std::atomic_int64_t g_task_entry_time = -1;
 
 // This global will be used to maintain a mapping to the atomic holding the active driver for each
 // thread. This is then used to service the GetDriverOnTid requests to locate the thread local
@@ -160,5 +163,7 @@ zx::result<const void*> GetDriverOnTid(zx_koid_t tid) {
   }
   return zx::error(ZX_ERR_NOT_FOUND);
 }
+
+std::atomic_int64_t* GetTaskEntryTimeSlot() { return &g_task_entry_time; }
 
 }  // namespace thread_context
