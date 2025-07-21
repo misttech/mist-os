@@ -1,3 +1,28 @@
+### v0.9.6 (2021-10-07)
+
+- Fix build status badge in README ([#185])
+- Add `get_buffer_size`/`get_absolute_path_buffer_size` ([#187])
+
+[#185]: https://github.com/hannobraun/inotify-rs/pull/185
+[#187]: https://github.com/hannobraun/inotify-rs/pull/187
+
+
+### v0.9.5 (2021-10-07)
+
+- Implement `Ord`/`PartialOrd` for `WatchDescriptor` ([#183])
+
+[#183]: https://github.com/hannobraun/inotify-rs/pull/183
+
+
+### v0.9.4 (2021-09-22)
+
+- Make `Event::into_owned` always available ([#179])
+- Implement missing `Debug` implementations ([#180])
+
+[#179]: https://github.com/hannobraun/inotify-rs/pull/179
+[#180]: https://github.com/hannobraun/inotify-rs/pull/180
+
+
 ### v0.9.3 (2021-05-12)
 
 - Improve documentation ([#167], [#169])

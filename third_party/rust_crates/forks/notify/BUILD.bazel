@@ -90,7 +90,7 @@ rust_library(
             "//third_party/rust_crates/vendor/fsevent-sys-4.0.0:fsevent_sys",  # x86_64-apple-darwin
         ],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
-            "//third_party/rust_crates/vendor/inotify-0.9.3:inotify",  # cfg(any(target_os = "linux", target_os = "android"))
+            "//third_party/rust_crates/vendor/inotify-0.9.6:inotify",  # cfg(any(target_os = "linux", target_os = "android"))
             "//third_party/rust_crates/vendor/mio-0.8.9:mio",  # cfg(any(target_os = "linux", target_os = "android"))
         ],
         "//conditions:default": [],
