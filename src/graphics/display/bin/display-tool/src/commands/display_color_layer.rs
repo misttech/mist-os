@@ -9,6 +9,7 @@ use {
     display_utils::{
         Color, Coordinator, DisplayConfig, DisplayInfo, Layer, LayerConfig, PixelFormat, VsyncEvent,
     },
+    fidl_fuchsia_math,
     futures::StreamExt,
     std::io::Write,
 };
@@ -50,6 +51,12 @@ pub async fn run<'a>(coordinator: &Coordinator, args: Args<'a>) -> Result<()> {
             id: layer,
             config: LayerConfig::Color {
                 color: Color { format: pixel_format, bytes: color_bytes },
+                display_destination: fidl_fuchsia_math::RectU {
+                    x: 0,
+                    y: 0,
+                    width: display.0.modes[0].active_area.width,
+                    height: display.0.modes[0].active_area.height,
+                },
             },
         }],
     }];

@@ -612,7 +612,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
     return;
   }
 
-  layer.SetColorConfig(request->color);
+  layer.SetColorConfig(request->color, request->display_destination);
 
   // TODO(https://fxbug.dev/397427767): Check if the layer belongs to the draft
   // config first.
@@ -1034,15 +1034,6 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
       // The formats of layer images are negotiated by sysmem between clients
       // and display engine drivers when being imported, so they are always
       // accepted by the display coordinator.
-    } else {
-      // For now, solid color fill layers take up the entire area.
-      // `SetColorLayer()` will be revised to explicitly configure an area for
-      // the fill.
-      banjo_layer.display_destination = display_area;
-
-      // ApplyConfig() relies on CheckConfig() normalizing the layer. This
-      // workaround can be removed when we revise `SetColorLayer()`.
-      draft_layer_node.layer->draft_layer_config_.display_destination = display_area;
     }
     if (!OriginRectangleContains(display_area, banjo_layer.display_destination)) {
       return display::ConfigCheckResult::kInvalidConfig;

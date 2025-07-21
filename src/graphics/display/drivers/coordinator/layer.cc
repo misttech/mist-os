@@ -237,7 +237,8 @@ void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
   draft_layer_config_differs_from_applied_ = true;
 }
 
-void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
+void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color,
+                           fuchsia_math::wire::RectU display_destination) {
   // Increase the size of the static array when large color formats are introduced
   static_assert(decltype(color.bytes)::size() == sizeof(draft_layer_config_.fallback_color.bytes));
 
@@ -249,7 +250,7 @@ void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
   draft_layer_config_.image_metadata = {.dimensions = {.width = 0, .height = 0},
                                         .tiling_type = IMAGE_TILING_TYPE_LINEAR};
   draft_layer_config_.image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
-  draft_layer_config_.display_destination = {.x = 0, .y = 0, .width = 0, .height = 0};
+  draft_layer_config_.display_destination = display::Rectangle::From(display_destination).ToBanjo();
 
   draft_layer_config_differs_from_applied_ = true;
 

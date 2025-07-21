@@ -628,9 +628,16 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::wire::La
       0,
   };
 
+  const fuchsia_math::wire::RectU display_destination = {
+      .x = static_cast<uint32_t>(rectangle.origin.x),
+      .y = static_cast<uint32_t>(rectangle.origin.y),
+      .width = static_cast<uint32_t>(rectangle.extent.x),
+      .height = static_cast<uint32_t>(rectangle.extent.y),
+  };
+
   const fidl::OneWayStatus set_layer_color_result =
       display_coordinator_.sync()->SetLayerColorConfig(
-          layer_id, {fuchsia_images2::PixelFormat::kB8G8R8A8, color_bytes});
+          layer_id, {fuchsia_images2::PixelFormat::kB8G8R8A8, color_bytes}, display_destination);
   FX_DCHECK(set_layer_color_result.ok()) << "Failed to call FIDL SetLayerColorConfig method: "
                                          << set_layer_color_result.status_string();
 

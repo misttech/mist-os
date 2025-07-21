@@ -383,11 +383,18 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     fidl::Array<uint8_t, 8> bytes;
     std::memcpy(bytes.data(), &color, sizeof(color));
     const fhd::wire::LayerId fidl_layer_id = layer->id.ToFidl();
-    auto result =
-        dc->SetLayerColorConfig(fidl_layer_id, fuchsia_hardware_display_types::wire::Color{
-                                                   .format = kColorLayerFormat,
-                                                   .bytes = bytes,
-                                               });
+    const fuchsia_math::wire::RectU display_destination = {
+        .x = 0,
+        .y = 0,
+        .width = displays_[i]->mode().active_area.width,
+        .height = displays_[i]->mode().active_area.height,
+    };
+    auto result = dc->SetLayerColorConfig(fidl_layer_id,
+                                          fuchsia_hardware_display_types::wire::Color{
+                                              .format = kColorLayerFormat,
+                                              .bytes = bytes,
+                                          },
+                                          display_destination);
 
     if (!result.ok()) {
       printf("Setting layer config failed\n");

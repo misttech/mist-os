@@ -366,6 +366,16 @@ closed protocol Coordinator {
     strict SetLayerColorConfig(struct {
         layer_id LayerId;
         color fuchsia.hardware.display.types.Color;
+
+        /// The display region occupied by the color fill layer.
+        ///
+        /// The rectangle uses the Vulkan coordinate space. The origin is at the
+        /// display's top-left corner. The X axis points to the right, and the Y
+        /// axis points downwards.
+        ///
+        /// A valid layer definition requires a valid non-empty display
+        /// destination rectangle that is entirely contained within the display.
+        display_destination fuchsia.math.RectU;
     });
 
     /// Sets the image for the layer's draft configuration.

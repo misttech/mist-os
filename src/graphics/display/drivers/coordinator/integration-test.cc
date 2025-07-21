@@ -562,9 +562,16 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
 
   const fuchsia_hardware_display::wire::LayerId fidl_layer_id = layer_id.ToFidl();
   const fuchsia_hardware_display_types::wire::Color fidl_fallback_color = fallback_color.ToFidl();
+  const display::ImageMetadata fullscreen_metadata = state_.FullscreenImageMetadata();
+  const fuchsia_math::wire::RectU display_destination = {
+      .x = 0,
+      .y = 0,
+      .width = static_cast<uint32_t>(fullscreen_metadata.width()),
+      .height = static_cast<uint32_t>(fullscreen_metadata.height()),
+  };
 
-  const fidl::OneWayStatus fidl_status =
-      coordinator_fidl_client_->SetLayerColorConfig(fidl_layer_id, fidl_fallback_color);
+  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetLayerColorConfig(
+      fidl_layer_id, fidl_fallback_color, display_destination);
   if (!fidl_status.ok()) {
     fdf::error("SetLayerColorConfig() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());

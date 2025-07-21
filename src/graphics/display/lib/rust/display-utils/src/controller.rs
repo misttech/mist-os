@@ -243,9 +243,13 @@ impl Coordinator {
             )?;
             for layer in &config.layers {
                 match &layer.config {
-                    LayerConfig::Color { color } => {
+                    LayerConfig::Color { color, display_destination } => {
                         let fidl_color = fidl_fuchsia_hardware_display_types::Color::from(color);
-                        proxy.set_layer_color_config(&layer.id.into(), &fidl_color)?;
+                        proxy.set_layer_color_config(
+                            &layer.id.into(),
+                            &fidl_color,
+                            display_destination,
+                        )?;
                     }
                     LayerConfig::Primary { image_id, image_metadata, unblock_event } => {
                         proxy.set_layer_primary_config(&layer.id.into(), &image_metadata)?;

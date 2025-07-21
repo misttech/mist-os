@@ -128,7 +128,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
       fuchsia_hardware_display_types::wire::CoordinateTransformation image_source_transformation,
       fuchsia_math::wire::RectU image_source, fuchsia_math::wire::RectU display_destination);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
-  void SetColorConfig(fuchsia_hardware_display_types::wire::Color color);
+  void SetColorConfig(fuchsia_hardware_display_types::wire::Color color,
+                      fuchsia_math::wire::RectU display_destination);
   void SetImage(fbl::RefPtr<Image> image_id, display::EventId wait_event_id);
 
   // Called on all waiting images when any fence fires. Returns true if an image is ready to
