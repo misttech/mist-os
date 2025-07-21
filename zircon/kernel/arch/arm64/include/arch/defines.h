@@ -36,7 +36,7 @@ static_assert(PAGE_SIZE == (1L << PAGE_SIZE_SHIFT), "Page size mismatch!");
 #define ARCH_HEAP_ALIGN_BITS 21
 
 // The maximum cache line seen on any known ARM hardware.
-#define MAX_CACHE_LINE 128
+#define MAX_CACHE_LINE 64
 
 // Map 512GB at the base of the kernel. this is the max that can be mapped with a
 // single level 1 page table using 1GB pages.
