@@ -117,17 +117,19 @@ func main() {
 		log.Fatalf("Formatting final GN targets: %v", err)
 	}
 
+	gnOut, err = os.Open(*gnOutputPath)
+	if err != nil {
+		log.Fatalf("Failed to open %s for reading: %v", *gnOutputPath, err)
+	}
+	actual, err := io.ReadAll(gnOut)
+	if err != nil {
+		log.Fatalf("Failed to read full content of %s", *gnOutputPath)
+	}
+	diff := cmp.Diff(string(actual), finalContent)
+
 	if *checkOnly {
-		gnOut, err := os.Open(*gnOutputPath)
-		if err != nil {
-			log.Fatalf("Failed to open %s for reading: %v", *gnOutputPath, err)
-		}
-		actual, err := io.ReadAll(gnOut)
-		if err != nil {
-			log.Fatalf("Failed to read full content of %s", *gnOutputPath)
-		}
 		diffPrintout := ""
-		if diff := cmp.Diff(string(actual), finalContent); diff != "" {
+		if diff != "" {
 			diffPrintout = fmt.Sprintf(`
 The following BUILD files are not in sync:
 
@@ -152,8 +154,12 @@ Diff of GN targets (-actual, +expected):
 			log.Fatal(diffPrintout)
 		}
 	} else {
+		//  Avoid touching BUILD.gn when no changes are made, which can trigger unnecessary `gn gen`s.
+		if diff == "" {
+			return
+		}
 		// Open the GN file again for write.
-		gnOut, err = os.OpenFile(*gnOutputPath, os.O_WRONLY|os.O_TRUNC, 0)
+		gnOut, err := os.OpenFile(*gnOutputPath, os.O_WRONLY|os.O_TRUNC, 0)
 		if err != nil {
 			log.Fatalf("Failed to open %s for writing: %v", *gnOutputPath, err)
 		}
