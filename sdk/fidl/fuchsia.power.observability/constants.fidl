@@ -23,6 +23,9 @@ const SUSPEND_EVENTS_NODE string = "suspend_events";
 /// Label of an inspect node keeping suspend statistics.
 const SUSPEND_STATS_NODE string = "suspend_stats";
 
+/// Label of an inspect node tracking boot vs monotonic timestamps.
+const BOOT_TO_MONO_NODE string = "boot_to_monotonic_timeline";
+
 // Lifecycle.
 
 /// Timestamp in nanos for when at least one suspend blocker is acquired.
@@ -183,3 +186,13 @@ const INACTIVE_WAKE_LOCK_NAMES string = "inactive_wake_lock_names";
 /// active / inactive and if we attempted to suspend, but failed
 /// because there were active epolls.
 const ACTIVE_EPOLLS_COUNT string = "active_epolls_count";
+
+// Fuchsia Suspend HAL
+
+/// The boot time captured after resuming from suspend, in nanoseconds.
+const BOOT_TIME string = "boot_time_ns";
+
+/// The delta between the boot and monotonic clocks after resuming from
+/// suspend, in nanoseconds.
+/// Formula: mono_time_ns = boot_time_ns - boot_monotonic_difference_ns
+const BOOT_MONO_DIFF string = "boot_monotonic_difference_ns";
