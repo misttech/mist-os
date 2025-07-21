@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl_fuchsia_ui_gfx::ColorRgba;
 
 pub(crate) fn srgb_to_linear(l: u8) -> f32 {
     let l = l as f32 * 255.0f32.recip();
@@ -73,11 +72,6 @@ impl Color {
             new_color.a = Color::extract_hex_slice(&hash_code, 7)?;
         }
         Ok(new_color)
-    }
-
-    /// Create a Scenic-compatible [`ColorRgba`]
-    pub fn make_color_rgba(&self) -> ColorRgba {
-        ColorRgba { red: self.r, green: self.g, blue: self.b, alpha: self.a }
     }
 
     /// Create a linear, premultiplied RGBA representation

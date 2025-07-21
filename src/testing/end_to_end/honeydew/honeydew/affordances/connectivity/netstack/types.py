@@ -146,7 +146,6 @@ class InterfaceProperties:
             id_=self.id_,
             addresses=addresses,
             online=None,
-            device_class=None,
             has_default_ipv4_route=None,
             has_default_ipv6_route=None,
             name=self.name,

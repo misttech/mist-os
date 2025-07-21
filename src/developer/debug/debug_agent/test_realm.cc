@@ -68,7 +68,7 @@ fit::result<debug::Status, std::vector<uint8_t>> DrainManifestBytesIterator(
 // Gets the component declaration for a realm specified by |realm_query|.
 fit::result<debug::Status, fidl::Box<fuchsia_component_decl::Component>> GetResolvedDeclaration(
     std::string realm_moniker, fidl::SyncClient<fuchsia_sys2::RealmQuery>& realm_query) {
-  auto get_manifest_res = realm_query->GetManifest({std::move(realm_moniker)});
+  auto get_manifest_res = realm_query->GetResolvedDeclaration({std::move(realm_moniker)});
   if (get_manifest_res.is_error()) {
     return fit::error(ErrorToStatus(get_manifest_res.error_value()));
   }

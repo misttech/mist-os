@@ -72,10 +72,6 @@ impl RealmQuery {
                     let result = get_instance(&model, &scope_moniker, &moniker).await;
                     responder.send(result.as_ref().map_err(|e| *e))
                 }
-                fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
-                    let result = get_resolved_declaration(&model, &scope_moniker, &moniker).await;
-                    responder.send(result)
-                }
                 fsys::RealmQueryRequest::GetResolvedDeclaration { moniker, responder } => {
                     let result = get_resolved_declaration(&model, &scope_moniker, &moniker).await;
                     responder.send(result)

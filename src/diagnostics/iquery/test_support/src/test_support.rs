@@ -358,27 +358,6 @@ impl MockRealmQuery {
                         responder.send(Err(fsys2_f::OpenError::InstanceNotFound)).unwrap();
                     }
                 }
-                fsys2_f::RealmQueryRequest::GetManifest { moniker, responder, .. } => {
-                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
-                    let res = self.mapping.get(&query_moniker.to_string()).unwrap();
-                    let manifest = res.make_manifest();
-                    let manifest = fidl::persist(&manifest).unwrap();
-                    let (client_end, server_end) =
-                        client.create_endpoints::<fsys2_f::ManifestBytesIteratorMarker>();
-
-                    fuchsia_async::Task::spawn(async move {
-                        let mut stream = server_end.into_stream();
-                        let fsys2_f::ManifestBytesIteratorRequest::Next { responder } =
-                            stream.next().await.unwrap().unwrap();
-                        responder.send(manifest.as_slice()).unwrap();
-                        let fsys2_f::ManifestBytesIteratorRequest::Next { responder } =
-                            stream.next().await.unwrap().unwrap();
-                        responder.send(&[]).unwrap();
-                    })
-                    .detach();
-
-                    responder.send(Ok(client_end)).unwrap();
-                }
                 fsys2_f::RealmQueryRequest::GetResolvedDeclaration {
                     moniker, responder, ..
                 } => {
@@ -454,27 +433,6 @@ impl MockRealmQuery {
                     } else {
                         responder.send(Err(fsys2::OpenError::InstanceNotFound)).unwrap();
                     }
-                }
-                fsys2::RealmQueryRequest::GetManifest { moniker, responder, .. } => {
-                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
-                    let res = self.mapping.get(&query_moniker.to_string()).unwrap();
-                    let manifest = res.make_manifest();
-                    let manifest = fidl::persist(&manifest).unwrap();
-                    let (client_end, server_end) =
-                        create_endpoints::<fsys2::ManifestBytesIteratorMarker>();
-
-                    fuchsia_async::Task::spawn(async move {
-                        let mut stream = server_end.into_stream();
-                        let fsys2::ManifestBytesIteratorRequest::Next { responder } =
-                            stream.next().await.unwrap().unwrap();
-                        responder.send(manifest.as_slice()).unwrap();
-                        let fsys2::ManifestBytesIteratorRequest::Next { responder } =
-                            stream.next().await.unwrap().unwrap();
-                        responder.send(&[]).unwrap();
-                    })
-                    .detach();
-
-                    responder.send(Ok(client_end)).unwrap();
                 }
                 fsys2::RealmQueryRequest::GetResolvedDeclaration { moniker, responder, .. } => {
                     let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();

@@ -148,12 +148,6 @@ void BufferCollection::V2::Sync(SyncCompleter::Sync& completer) {
   parent_.SyncImpl(ConnectionVersion::kVersion2, completer);
 }
 
-void BufferCollection::V1::SetConstraintsAuxBuffers(
-    SetConstraintsAuxBuffersRequest& request, SetConstraintsAuxBuffersCompleter::Sync& completer) {
-  parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
-                   "SetConstraintsAuxBuffers() is not supported.");
-}
-
 template <typename Completer>
 bool BufferCollection::CommonSetConstraintsStage1(Completer& completer) {
   if (is_set_constraints_seen_) {
@@ -385,11 +379,6 @@ void BufferCollection::V2::CheckAllBuffersAllocated(
   } else {
     completer.Reply(fit::error(*result));
   }
-}
-
-void BufferCollection::V1::GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) {
-  parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
-                   "GetAuxBuffers() is not supported.");
 }
 
 template <typename Completer>

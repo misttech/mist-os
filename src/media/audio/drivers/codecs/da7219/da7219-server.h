@@ -71,9 +71,6 @@ class Server final
   void Start(StartCompleter::Sync& completer) override;
   void GetProperties(GetPropertiesCompleter::Sync& completer) override;
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override;
-  void IsBridgeable(IsBridgeableCompleter::Sync& completer) override;
-  void SetBridgedMode(SetBridgedModeRequestView request,
-                      SetBridgedModeCompleter::Sync& completer) override;
   void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override;
   void SetDaiFormat(SetDaiFormatRequestView request,
                     SetDaiFormatCompleter::Sync& completer) override;

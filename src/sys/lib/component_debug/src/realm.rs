@@ -364,8 +364,7 @@ pub async fn get_resolved_declaration(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<ComponentDecl, GetDeclarationError> {
     let moniker_str = moniker.to_string();
-    // TODO(https://fxbug.dev/42077935) switch to get_resolved_declaration once OK for ffx compat
-    let iterator = match realm_query.get_manifest(&moniker_str).await? {
+    let iterator = match realm_query.get_resolved_declaration(&moniker_str).await? {
         Ok(iterator) => Ok(iterator),
         Err(fsys::GetDeclarationError::InstanceNotFound) => {
             Err(GetDeclarationError::InstanceNotFound(moniker.clone()))

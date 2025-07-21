@@ -30,8 +30,6 @@ pub fn event_name(event_type: &fcomponent::EventType) -> String {
         fcomponent::EventType::Started => "started",
         fcomponent::EventType::Stopped => "stopped",
         fcomponent::EventType::DebugStarted => "debug_started",
-        #[cfg(fuchsia_api_level_at_least = "HEAD")]
-        fcomponent::EventType::DirectoryReady => unreachable!("This isn't used anymore"),
     }
     .to_string()
 }

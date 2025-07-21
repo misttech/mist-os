@@ -157,15 +157,6 @@ class FakeCodec final
   void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override;
   void SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter::Sync& completer) override;
   void WatchPlugState(WatchPlugStateCompleter::Sync& completer) override;
-  // These methods are deprecated and will be removed soon.
-  void IsBridgeable(IsBridgeableCompleter::Sync& completer) override {
-    ADR_LOG_OBJECT(kLogFakeCodec);
-    completer.Reply(false);
-  }
-  void SetBridgedMode(SetBridgedModeRequest& request,
-                      SetBridgedModeCompleter::Sync& completer) override {
-    ADR_LOG_OBJECT(kLogFakeCodec);
-  }
 
   // fuchsia_hardware_audio.Health
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override;

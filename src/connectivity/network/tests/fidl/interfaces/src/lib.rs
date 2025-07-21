@@ -7,9 +7,8 @@
 mod error;
 
 use anyhow::Context as _;
-use assert_matches::assert_matches;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
-use futures::{pin_mut, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet, net_subnet_v4, net_subnet_v6, std_ip};
 use net_types::ip::{Ip, IpVersion};
@@ -25,7 +24,6 @@ use test_case::test_case;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
 use {
-    fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
@@ -1587,9 +1585,6 @@ async fn watcher<N: Netstack>(name: &str) {
         // this may break if Netstack changes how it names interfaces.
         name: Some(format!("eth{}", id)),
         online: Some(false),
-        device_class: Some(fidl_fuchsia_net_interfaces::DeviceClass::Device(
-            fidl_fuchsia_hardware_network::DeviceClass::Virtual,
-        )),
         port_class: Some(fidl_fuchsia_net_interfaces::PortClass::Device(
             fidl_fuchsia_hardware_network::PortClass::Virtual,
         )),
@@ -1624,7 +1619,6 @@ async fn watcher<N: Netstack>(name: &str) {
                 online,
                 addresses,
                 name: None,
-                device_class: None,
                 port_class: None,
                 has_default_ipv4_route: None,
                 has_default_ipv6_route: None,
@@ -1718,7 +1712,6 @@ async fn watcher<N: Netstack>(name: &str) {
                 id: Some(event_id),
                 addresses: Some(addresses),
                 name: None,
-                device_class: None,
                 port_class: None,
                 online: None,
                 has_default_ipv4_route: None,
@@ -1799,7 +1792,6 @@ async fn watcher<N: Netstack>(name: &str) {
                     online,
                     addresses,
                     name: None,
-                    device_class: None,
                     port_class: None,
                     has_default_ipv4_route: None,
                     has_default_ipv6_route: None,
@@ -2035,57 +2027,4 @@ async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
         ) => panic!("violated API expectations while waiting for address to appear: {}", e),
         Err(e) => panic!("wait for address to appear: {}", e),
     }
-}
-
-/// Verifies that the deprecated `device_class` field is populated alongside the
-/// replacement `port_class` in the interface `Properties`, for backwards
-/// compatibility.
-#[netstack_test]
-#[variant(N, Netstack)]
-async fn populate_device_class<N: Netstack>(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-
-    let stream = realm
-        .get_interface_event_stream()
-        .expect("get interface event stream")
-        .map_ok(|e| e.into_inner());
-    pin_mut!(stream);
-
-    // Verify that `Existing` events populate `device_class`.
-    // NB: The loopback interface will always be pre-existing.
-    let fnet_interfaces::Properties { port_class, device_class, .. } = assert_matches!(
-            stream.next().await,
-            Some(Ok(fnet_interfaces::Event::Existing(properties))) => properties);
-    assert_matches!(port_class, Some(fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty)));
-    assert_matches!(
-        device_class,
-        Some(fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty))
-    );
-
-    assert_matches!(
-        stream.next().await,
-        Some(Ok(fnet_interfaces::Event::Idle(fnet_interfaces::Empty)))
-    );
-
-    // Verify that `Added` events populate `device_class`.
-    let dev = sandbox
-        .create_endpoint("ep")
-        .await
-        .expect("create endpoint")
-        .into_interface_in_realm(&realm)
-        .await
-        .expect("add endpoint to Netstack");
-    let () = dev.set_link_up(true).await.expect("bring device up");
-    let fnet_interfaces::Properties { port_class, device_class, .. } = assert_matches!(
-            stream.next().await,
-            Some(Ok(fnet_interfaces::Event::Added(properties))) => properties);
-    assert_eq!(
-        port_class,
-        Some(fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Virtual))
-    );
-    assert_eq!(
-        device_class,
-        Some(fnet_interfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual))
-    );
 }
