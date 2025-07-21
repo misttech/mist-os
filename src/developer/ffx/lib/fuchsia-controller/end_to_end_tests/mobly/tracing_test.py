@@ -5,6 +5,7 @@
 import asyncio
 import json
 import subprocess
+import tempfile
 
 import fidl_fuchsia_tracing as tracing
 import fidl_fuchsia_tracing_controller as tracing_controller
@@ -106,12 +107,23 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         asserts.assert_true(
             len(raw_trace) > 0, msg="Output bytes should not be empty."
         )
-        ps = subprocess.Popen(
-            [TRACE2JSON], stdin=subprocess.PIPE, stdout=subprocess.PIPE
-        )
-        js, _ = ps.communicate(input=raw_trace)
-        js_obj = json.loads(js.decode("utf8"))
-        ps.kill()
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".fxt"
+        ) as trace_fxt, tempfile.NamedTemporaryFile(
+            mode="w+", suffix=".json", encoding="utf8"
+        ) as trace_json:
+            trace_fxt.write(raw_trace)
+            trace_fxt.flush()
+
+            subprocess.check_call(
+                [
+                    TRACE2JSON,
+                    f"--input-file={trace_fxt.name}",
+                    f"--output-file={trace_json.name}",
+                ]
+            )
+            js_obj = json.load(trace_json)
         asserts.assert_true(
             js_obj.get("traceEvents") is not None,
             "Expected traceEvents to be present",
