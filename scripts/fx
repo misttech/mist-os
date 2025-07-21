@@ -250,7 +250,7 @@ declare -r suggest_py="${fuchsia_dir}/tools/devshell/lib/fx-cmd-suggestions.py"
 
 while [[ $# -ne 0 ]]; do
   case $1 in
-    --dir=*|-d=*|-t=*|--target=*|--disable=*|--enable=*)
+    --dir=*|-d=*|-t=*|--target=*|--disable=*|--enable=*|--invoker=*)
       # Turn --switch=value into --switch value.
       arg="$1"
       shift
@@ -339,6 +339,10 @@ while [[ $# -ne 0 ]]; do
       export FUCHSIA_NODENAME_SET_BY_FX_FLAG="FUCHSIA_NODENAME_SET_BY_FX_FLAG"
       # LINT.ThenChange(//tools/devshell/lib/vars.sh)
       _check_default_target="true"
+      ;;
+    --invoker)
+      shift # removes --invoker
+      export FUCHSIA_FX_INVOKER="$1"
       ;;
     -i)
       declare iterative=1
