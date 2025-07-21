@@ -58,7 +58,7 @@ enum class Arch {
   kRiscv64,
 };
 
-constexpr char kOpaqueVolumeContentType[] = "opauqe_volume";
+constexpr char kOpaqueVolumeContentType[] = "opaque_volume";
 
 // Operations on a specific partition take two identifiers, a partition type
 // and a content type.
