@@ -29,11 +29,6 @@ static_library("ipc") {
     "//zircon/system/public",
   ]
 
-  # TODO(https://fxbug.dev/430278476): Don't build on mac.
-  if (is_mac) {
-    deps += [ "//src/developer/debug/shared:elf_h_on_mac" ]
-  }
-
   public_deps = [
     "//src/lib/fxl",
     "//src/lib/unwinder",

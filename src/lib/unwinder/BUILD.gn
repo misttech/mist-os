@@ -54,7 +54,6 @@ static_library("unwinder") {
   friend = [ ":*" ]
 
   if (is_mac) {
-    # TODO(https://fxbug.dev/430278476): Don't build on mac.
     deps += [ "//src/developer/debug/shared:elf_h_on_mac" ]
   } else {
     # UnwindLocal() is only available on ELF systems.
