@@ -2791,9 +2791,10 @@ static zx_status_t brcmf_cfg80211_disconnect(struct net_device* ndev,
   memcpy(&scbval.ea, peer_sta_address, ETH_ALEN);
   scbval.val = reason_code;
 
-  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
+  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
+                                  sizeof(scbval), &fw_err);
   if (status != ZX_OK) {
-    BRCMF_ERR("Failed to disassociate: %s, fw err %s", zx_status_get_string(status),
+    BRCMF_ERR("Failed to deauthenticate: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
     brcmf_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
     brcmf_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,

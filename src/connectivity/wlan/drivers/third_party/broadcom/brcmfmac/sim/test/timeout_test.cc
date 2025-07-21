@@ -104,18 +104,19 @@ TEST_F(TimeoutTest, AssocTimeout) {
             wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 }
 
-// verify the disassociation timeout is triggered.
-TEST_F(TimeoutTest, DisassocTimeout) {
+// Verify the deauthentication timeout is triggered.
+TEST_F(TimeoutTest, DeauthTimeout) {
   Init();
 
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap.EnableBeacon(kBeaconInterval);
   client_ifc_.AssociateWith(ap, zx::msec(10));
 
-  // Ignore disassociation req in sim-fw.
+  // Ignore deauthentication req in sim-fw.
   WithSimDevice([this](brcmfmac::SimDevice* device) {
     brcmf_simdev* sim = device->GetSim();
-    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_DISASSOC, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, ZX_OK, BCME_OK,
+                                       client_ifc_.iface_id_);
   });
   env_->ScheduleNotification(
       std::bind(&SimInterface::DeauthenticateFrom, &client_ifc_, kDefaultBssid,

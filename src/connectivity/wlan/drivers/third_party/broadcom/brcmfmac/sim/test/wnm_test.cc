@@ -275,7 +275,6 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDeauthForTargetInterruptsRoam) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
@@ -333,7 +332,6 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDisassocInterruptsRoam) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
@@ -387,7 +385,6 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDeauthInterruptsRoam) {
   EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);

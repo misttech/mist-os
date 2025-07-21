@@ -949,7 +949,7 @@ TEST_F(ConnectTest, ApIgnoredRequest) {
 }
 
 // Verify that if an AP refuses an association request we return a temporary refusal.  The driver
-// will also send a BRCMF_C_DISASSOC to clear AP state each time when refused.
+// will also send a BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON to clear AP state each time when refused.
 TEST_F(ConnectTest, ApTemporarilyRefusedRequest) {
   // Create our device instance
   Init();
@@ -984,7 +984,7 @@ TEST_F(ConnectTest, ApTemporarilyRefusedRequest) {
 }
 
 // Verify that if an AP refuses an association request we return a failure.  The driver will also
-// send a BRCMF_C_DISASSOC to clear AP state each time when refused.
+// send a BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON to clear AP state each time when refused.
 TEST_F(ConnectTest, ApRefusedRequest) {
   // Create our device instance
   Init();
