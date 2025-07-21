@@ -43,7 +43,7 @@ class BacklightFidlAdapterTest : public ::testing::Test {
     ASSERT_OK(async::PostTask(loop_.dispatcher(), [this]() { fidl_adapter_.reset(); }));
 
     loop_.Shutdown();
-    mock_.CheckAllAccessesReplayed();
+    mock_.CheckAllCallsReplayed();
   }
 
  protected:

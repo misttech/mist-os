@@ -41,7 +41,7 @@ void MockBacklight::ExpectSetState(SetStateChecker checker) {
   expectations_.push_back({.set_state_checker = std::move(checker)});
 }
 
-void MockBacklight::CheckAllAccessesReplayed() {
+void MockBacklight::CheckAllCallsReplayed() {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(expectations_.size() == call_index_, "%zu expected calls were not received",
                 expectations_.size() - call_index_);

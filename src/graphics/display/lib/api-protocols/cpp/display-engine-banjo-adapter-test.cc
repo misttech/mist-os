@@ -55,7 +55,7 @@ constexpr display::DriverLayer kAcceptableLayer({
 
 class DisplayEngineBanjoAdapterTest : public ::testing::Test {
  public:
-  void TearDown() override { mock_.CheckAllAccessesReplayed(); }
+  void TearDown() override { mock_.CheckAllCallsReplayed(); }
 
  protected:
   display::testing::MockDisplayEngine mock_;
