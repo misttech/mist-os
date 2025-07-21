@@ -13,6 +13,9 @@
             "--config",
             "/pkg/data/component_manager_config",
         ],
+
+        // Required because Archivist requires next-vdso
+        use_next_vdso: "true",
     },
     capabilities: [
         {

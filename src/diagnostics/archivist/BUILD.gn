@@ -55,6 +55,7 @@ rustc_library("lib") {
     # include the normal inspect/client.shard.cml.
     "//sdk/rust/zx",
     "//sdk/rust/zx-status",
+    "//src/diagnostics/lib/ring-buffer",
     "//src/lib/diagnostics/inspect/runtime/rust:unchecked_includes",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/encoding/rust",

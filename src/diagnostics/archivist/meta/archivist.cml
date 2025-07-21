@@ -15,6 +15,7 @@
             // TODO(https://fxbug.dev/382623426): revisit this.
             "SCUDO_OPTIONS=release_to_os_interval_ms=0",
         ],
+        use_next_vdso: "true",
     },
     children: [
         {

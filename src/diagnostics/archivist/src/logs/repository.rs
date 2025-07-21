@@ -124,6 +124,7 @@ impl LogsRepository {
                             this.on_container_inactive(&identity);
                         }
                     }),
+                    Default::default(),
                 ),
             }
         })

@@ -8,5 +8,6 @@
     ],
     program: {
         binary: "bin/archivist",
+        use_next_vdso: "true",
     },
 }

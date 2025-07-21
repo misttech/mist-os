@@ -292,7 +292,6 @@ impl LogsArtifactsContainer {
 
     /// Updates log stats in inspect and push the message onto the container's buffer.
     pub fn ingest_message(&self, message: StoredMessage) {
-        self.stats.ingest_message(message.size(), message.severity());
         self.buffer.push_back(message.bytes());
     }
 
@@ -502,7 +501,7 @@ mod tests {
                 .with_inspect(inspect::component::inspector().root(), identity.moniker.to_string())
                 .expect("failed to attach component log stats"),
         );
-        let buffer = SharedBuffer::new(1024 * 1024, Box::new(|_| {}));
+        let buffer = SharedBuffer::new(1024 * 1024, Box::new(|_| {}), Default::default());
         let container = Arc::new(LogsArtifactsContainer::new(
             identity,
             std::iter::empty(),

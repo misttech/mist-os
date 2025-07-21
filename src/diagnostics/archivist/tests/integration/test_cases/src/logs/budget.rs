@@ -4,9 +4,9 @@
 
 use crate::{test_topology, utils};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
+use fidl_fuchsia_archivist_test as ftest;
+use fidl_fuchsia_diagnostics_types::Severity;
 use futures::StreamExt;
-use std::collections::VecDeque;
-use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics_types as fdiagnostics};
 
 const SPAM_COUNT: usize = 1001;
 
@@ -31,12 +31,15 @@ async fn test_budget() {
     spammer_puppet.wait_for_interest_change().await.unwrap();
     victim_puppet.wait_for_interest_change().await.unwrap();
 
-    let letters = ('A'..='Z').map(|c| c.to_string()).collect::<Vec<_>>();
-    let mut letters_iter = letters.iter().cycle();
-    let expected = letters_iter.next().unwrap().repeat(50);
+    let mut counter = 0;
+    let mut next_message = || {
+        counter += 1;
+        format!("{counter:50}")
+    };
+    let expected = next_message();
     victim_puppet
         .log(&ftest::LogPuppetLogRequest {
-            severity: Some(fdiagnostics::Severity::Info),
+            severity: Some(Severity::Info),
             message: Some(expected.clone()),
             ..Default::default()
         })
@@ -61,30 +64,30 @@ async fn test_budget() {
     assert_eq!(expected, msg_a_2.msg().unwrap());
 
     // Spam many logs.
-    let mut expected = VecDeque::new();
+    let mut expected = Vec::new();
     for i in 0..SPAM_COUNT {
-        let message = letters_iter.next().unwrap().repeat(50);
+        let message = next_message();
         spammer_puppet
             .log(&ftest::LogPuppetLogRequest {
-                severity: Some(fdiagnostics::Severity::Info),
+                severity: Some(Severity::Info),
                 message: Some(message.clone()),
                 ..Default::default()
             })
             .await
             .expect("emitted log");
-        expected.push_back(message);
+        expected.push(message);
 
-        // Each message is about 136 bytes.  We always keep 32 KiB free in the buffer, so we can
-        // hold nearly 500 messages before messages get rolled out.  Archivist delays processing
-        // sockets so that it's not constantly waking up, so we process the observer in batches.
-        if i.is_multiple_of(400) {
-            while let Some(message) = expected.pop_front() {
+        // Each message is about 136 bytes.  Archivist delays rolling out messages to reduce CPU
+        // time, so we must take care to observe the messages in batches.  If we don't wait,
+        // the logs will get dropped when we try and send them.
+        if i.is_multiple_of(100) {
+            for message in expected.drain(..) {
                 assert_eq!(message, observed_logs.next().await.unwrap().msg().unwrap());
             }
         }
     }
 
-    while let Some(message) = expected.pop_front() {
+    for message in expected.drain(..) {
         assert_eq!(message, observed_logs.next().await.unwrap().msg().unwrap());
     }
 

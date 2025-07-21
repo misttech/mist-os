@@ -45,7 +45,7 @@ fn get_component_identity() -> Arc<ComponentIdentity> {
 fn bench_fill(b: &mut criterion::Bencher, size: usize) {
     // SharedBuffer needs an executor even though we don't use it in the benchmark.
     let _executor = fasync::SendExecutor::new(1);
-    let buffer = Arc::new(SharedBuffer::new(65536, Box::new(|_| {})));
+    let buffer = Arc::new(SharedBuffer::new(65536, Box::new(|_| {}), Default::default()));
     let msg =
         make_message(std::str::from_utf8(&[65; 100]).unwrap(), zx::BootInstant::from_nanos(1));
     let container = Arc::new(buffer.new_container_buffer(get_component_identity(), Arc::default()));
@@ -67,7 +67,7 @@ fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
     let mut executor = fasync::SendExecutor::new(1);
     let done = Arc::new(AtomicBool::new(false));
     // Messages take up a a little less than 200 bytes in the buffer.
-    let buffer = Arc::new(SharedBuffer::new(200 * args.size, Box::new(|_| {})));
+    let buffer = Arc::new(SharedBuffer::new(200 * args.size, Box::new(|_| {}), Default::default()));
     let msg = Arc::new(make_message(
         std::str::from_utf8(&[65; 100]).unwrap(),
         zx::BootInstant::from_nanos(1),
