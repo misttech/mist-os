@@ -8,7 +8,6 @@
 #include <variant>
 #include <vector>
 
-#include <fbl/algorithm.h>
 #include <fbl/string_printf.h>
 #include <trace-reader/records.h>
 #include <zxtest/zxtest.h>

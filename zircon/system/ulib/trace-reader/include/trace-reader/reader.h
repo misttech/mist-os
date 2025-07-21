@@ -15,7 +15,6 @@
 #include <utility>
 #include <vector>
 
-#include <fbl/algorithm.h>
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/string.h>
 #include <trace-reader/records.h>

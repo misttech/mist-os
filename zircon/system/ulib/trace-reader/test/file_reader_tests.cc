@@ -12,7 +12,6 @@
 #include <utility>
 #include <vector>
 
-#include <fbl/algorithm.h>
 #include <trace-reader/file_reader.h>
 #include <zxtest/zxtest.h>
 
