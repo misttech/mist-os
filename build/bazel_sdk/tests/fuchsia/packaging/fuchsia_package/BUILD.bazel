@@ -29,7 +29,7 @@ REPO_DEFAULT_ABI_REVISION = [
     level.abi_revision
     for level in get_fuchsia_api_levels()
     # TODO(https://fxbug.dev/354047162): Figure out a way to automate the API level name.
-    if level.api_level == "16"
+    if level.api_level == "27"
 ][0]
 
 _COMMON_EXPECTED_BLOBS_IN_PKG_WITH_CC_COMPONENT = {

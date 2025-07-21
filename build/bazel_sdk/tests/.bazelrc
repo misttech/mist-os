@@ -38,4 +38,4 @@ build --flag_alias=default_fuchsia_api_level=@fuchsia_sdk//flags:repository_defa
 
 # This value determines what API level we compile our packages against when they
 # do not specify it themselves.
-build --default_fuchsia_api_level=16
+build --default_fuchsia_api_level=27
