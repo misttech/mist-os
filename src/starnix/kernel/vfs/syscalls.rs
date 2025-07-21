@@ -25,7 +25,7 @@ use crate::vfs::{
     RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
     TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
 };
-use starnix_logging::{log_trace, log_warn, track_stub};
+use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::ownership::TempRef;
@@ -3143,16 +3143,17 @@ pub fn sys_io_cancel(
     user_iocb: IocbPtr,
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
-    let _iocb = current_task.read_multi_arch_object(user_iocb)?;
-    let _ctx = current_task
+    let iocb = current_task.read_multi_arch_object(user_iocb)?;
+    let ctx = current_task
         .mm()
         .ok_or_else(|| errno!(EINVAL))?
         .get_aio_context(ctx_id.into())
         .ok_or_else(|| errno!(EINVAL))?;
 
+    ctx.cancel(current_task, iocb, user_iocb)?;
+    // TODO: Correctly handle return. If the operation is successfully canceled, the event should be copied into the memory pointed to by result without being placed into the completion queue.
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
-    log_warn!("io_cancel not implemented!");
-    return error!(ENOSYS);
+    Ok(())
 }
 
 pub fn sys_io_destroy(
