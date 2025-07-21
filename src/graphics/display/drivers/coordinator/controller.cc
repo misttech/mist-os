@@ -538,8 +538,7 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
     fdf::warn("Attempted to ApplyConfiguration() with {} displays", display_count);
   }
 
-  const config_stamp_t banjo_config_stamp = driver_config_stamp.ToBanjo();
-  engine_driver_client_->ApplyConfiguration(banjo_display_configs, &banjo_config_stamp);
+  engine_driver_client_->ApplyConfiguration(banjo_display_configs, driver_config_stamp);
 }
 
 void Controller::ReleaseImage(display::DriverImageId driver_image_id) {

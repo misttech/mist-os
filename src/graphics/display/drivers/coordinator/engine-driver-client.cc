@@ -180,18 +180,18 @@ display::ConfigCheckResult EngineDriverClient::CheckConfiguration(
 }
 
 void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config,
-                                            const config_stamp_t* config_stamp) {
+                                            display::DriverConfigStamp config_stamp) {
   ZX_DEBUG_ASSERT(display_config != nullptr);
   ZX_DEBUG_ASSERT(display_config->layer_count != 0);
   ZX_DEBUG_ASSERT(display_config->layer_list != nullptr);
-  ZX_DEBUG_ASSERT(config_stamp != nullptr);
 
   if (use_engine_) {
     return;
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.ApplyConfiguration(display_config, config_stamp);
+  const config_stamp_t banjo_config_stamp = config_stamp.ToBanjo();
+  banjo_engine_.ApplyConfiguration(display_config, &banjo_config_stamp);
 }
 
 display::EngineInfo EngineDriverClient::CompleteCoordinatorConnection(
