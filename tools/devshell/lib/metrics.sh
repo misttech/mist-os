@@ -20,7 +20,7 @@
 # depends on FUCHSIA_DIR being defined correctly.
 
 # Increase the metrics version by 1 when analytics is updated
-_METRICS_VERSION="2"
+_METRICS_VERSION="3"
 _METRICS_ALLOWS_CUSTOM_REPORTING=( "test" )
 # If args match the below, then track capture group 1
 _METRICS_TRACK_REGEX=(
@@ -773,6 +773,7 @@ function track-build-event {
   local build_dir="$7"
   local is_no_op="$8"
   local is_clean_build="$9"
+  local quiet="${10}"
 
   local args_gn=""
   local args_json=""
@@ -825,6 +826,12 @@ function track-build-event {
     env_flags="${env_flags}+multi"
   else
     env_flags="${env_flags}-multi"
+  fi
+
+  if [[ "${quiet}" == true ]]; then
+    env_flags="${env_flags}+quiet"
+  else
+    env_flags="${env_flags}-quiet"
   fi
 
   local -i args_json_size=$(wc -c < "${build_dir}"/args.json)
