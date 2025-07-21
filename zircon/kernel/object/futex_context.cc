@@ -17,6 +17,7 @@
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/null_lock.h>
 #include <kernel/auto_preempt_disabler.h>
+#include <kernel/mutex.h>
 #include <kernel/scheduler.h>
 #include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
@@ -236,7 +237,7 @@ class TA_SCOPED_CAP FutexContext::NullableDispatcherGuard {
  public:
   explicit NullableDispatcherGuard(ThreadDispatcher* t) TA_ACQ(t->get_lock()) : t_{t} {
     if (t_ != nullptr) {
-      t_->get_lock()->lock().Acquire();
+      should_clear_ = t_->get_lock()->lock().Acquire();
     }
   }
 
@@ -249,13 +250,14 @@ class TA_SCOPED_CAP FutexContext::NullableDispatcherGuard {
 
   void Release() TA_REL() {
     if (t_ != nullptr) {
-      t_->get_lock()->lock().Release();
+      t_->get_lock()->lock().Release(should_clear_);
       t_ = nullptr;
     }
   }
 
  private:
   ThreadDispatcher* t_;
+  CriticalMutex::ShouldClear should_clear_ = CriticalMutex::ShouldClear::No;
 };
 
 // FutexWait verifies that the integer pointed to by |value_ptr| still equals

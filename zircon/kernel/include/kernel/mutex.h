@@ -221,24 +221,24 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
   CriticalMutex(CriticalMutex&&) = delete;
   CriticalMutex& operator=(CriticalMutex&&) = delete;
 
-  // Acquire the mutex.
-  void Acquire(zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION) TA_ACQ() {
+  // Acquire the mutex. Returns whether or not a time slice extension was set, and must be
+  // subsequently cleared on Release. More simply, the return value must be passed into the Release
+  // method.
+  enum class ShouldClear : bool { No = false, Yes = true };
+  [[nodiscard]] ShouldClear Acquire(zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION)
+      TA_ACQ() {
     // TODO(maniscalco): What's the right duration here?  Is it a function of
     // spin_max_duration?
     const TimesliceExtension<true> timeslice_extension{spin_max_duration};
-    should_clear_ = Mutex::AcquireCommon(spin_max_duration, timeslice_extension);
+    return static_cast<ShouldClear>(Mutex::AcquireCommon(spin_max_duration, timeslice_extension));
   }
 
-  // Release the mutex. Must be held by the current thread.
-  void Release() TA_REL() {
-    // Make a copy because once we have released the mutex we can no longer
-    // access should_clear_.
-    const bool should_clear_copy = should_clear_;
-    should_clear_ = false;
-
+  // Release the mutex. Must be held by the current thread. The |should_clear| parameter is the
+  // return value of the matching |Acquire| call.
+  void Release(ShouldClear should_clear) TA_REL() {
     Mutex::Release();
 
-    if (should_clear_copy) {
+    if (should_clear == ShouldClear::Yes) {
       Thread::Current::preemption_state().ClearTimesliceExtension();
     }
   }
@@ -259,9 +259,6 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
   void SetLockClassId(lockdep::LockClassId lcid) { Mutex::SetLockClassId(lcid); }
 
  private:
-  // This field must not be accessed concurrently.  Be sure to only access it
-  // after |Mutex::Acquire| has returned and before |Mutex::Release| is called.
-  bool should_clear_{false};
 };
 
 // Lock policy for kernel mutexes
@@ -297,9 +294,43 @@ struct MutexPolicy {
   }
 };
 
+// Lock policy for critical kernel mutexes.
+//
+struct CriticalMutexPolicy {
+  struct State {
+    const uint32_t spin_max_duration{Mutex::SPIN_MAX_DURATION};
+    CriticalMutex::ShouldClear should_clear = CriticalMutex::ShouldClear::No;
+  };
+
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
+
+  // No special actions are needed during pre-validation.
+  template <typename LockType>
+  static void PreValidate(LockType*, State*) {}
+
+  // Basic acquire and release operations.
+  template <typename LockType>
+  static bool Acquire(LockType* lock, State* state) TA_ACQ(lock) {
+    state->should_clear = lock->Acquire(state->spin_max_duration);
+    return true;
+  }
+
+  template <typename LockType>
+  static void Release(LockType* lock, State* state) TA_REL(lock) {
+    lock->Release(state->should_clear);
+  }
+
+  // Runtime lock assertions.
+  template <typename LockType>
+  static void AssertHeld(const LockType& lock) TA_ASSERT(lock) {
+    lock.AssertHeld();
+  }
+};
+
 // Configure the lockdep::Guard for kernel mutexes to use MutexPolicy.
 LOCK_DEP_POLICY(Mutex, MutexPolicy);
-LOCK_DEP_POLICY(CriticalMutex, MutexPolicy);
+LOCK_DEP_POLICY(CriticalMutex, CriticalMutexPolicy);
 
 // Declares a Mutex member of the struct or class |containing_type|.
 //

@@ -10,11 +10,10 @@
 
 namespace {
 
-template <typename MutexType>
 bool mutex_lock_unlock() {
   BEGIN_TEST;
 
-  MutexType mutex;
+  Mutex mutex;
 
   mutex.Acquire();
   mutex.Release();
@@ -25,11 +24,10 @@ bool mutex_lock_unlock() {
   END_TEST;
 }
 
-template <typename MutexType>
 bool mutex_is_held() {
   BEGIN_TEST;
 
-  MutexType mutex;
+  Mutex mutex;
 
   EXPECT_FALSE(mutex.IsHeld(), "Lock not held");
   mutex.Acquire();
@@ -40,11 +38,10 @@ bool mutex_is_held() {
   END_TEST;
 }
 
-template <typename MutexType>
 bool mutex_assert_held() {
   BEGIN_TEST;
 
-  MutexType mutex;
+  Mutex mutex;
 
   mutex.Acquire();
   mutex.AssertHeld();  // Lock is held: this should be a no-op.
@@ -54,19 +51,17 @@ bool mutex_assert_held() {
 }
 
 // A struct with a guarded value.
-template <typename MutexType>
-struct ObjectWithLock {
-  MutexType mu;
+struct ObjectWithMutex {
+  Mutex mu;
   int val TA_GUARDED(mu);
 
   void TakeLock() TA_NO_THREAD_SAFETY_ANALYSIS { mu.Acquire(); }
 };
 
-template <typename MutexType>
 bool mutex_assert_held_compile() {
   BEGIN_TEST;
 
-  ObjectWithLock<MutexType> object;
+  ObjectWithMutex object;
 
   // This shouldn't compile with thread analysis enabled.
 #if defined(ENABLE_ERRORS)
@@ -84,6 +79,79 @@ bool mutex_assert_held_compile() {
 
   // Without the assertion, Clang will object to releasing the lock.
   object.mu.Release();
+
+  END_TEST;
+}
+
+bool critical_mutex_lock_unlock() {
+  BEGIN_TEST;
+
+  CriticalMutex mutex;
+
+  auto should_clear = mutex.Acquire();
+  mutex.Release(should_clear);
+
+  should_clear = mutex.Acquire();
+  mutex.Release(should_clear);
+
+  END_TEST;
+}
+
+bool critical_mutex_is_held() {
+  BEGIN_TEST;
+
+  CriticalMutex mutex;
+
+  EXPECT_FALSE(mutex.IsHeld(), "Lock not held");
+  auto should_clear = mutex.Acquire();
+  EXPECT_TRUE(mutex.IsHeld(), "Lock held");
+  mutex.Release(should_clear);
+  EXPECT_FALSE(mutex.IsHeld(), "Lock not held");
+
+  END_TEST;
+}
+
+bool critical_mutex_assert_held() {
+  BEGIN_TEST;
+
+  CriticalMutex mutex;
+
+  auto should_clear = mutex.Acquire();
+  mutex.AssertHeld();  // Lock is held: this should be a no-op.
+  mutex.Release(should_clear);
+
+  END_TEST;
+}
+
+// A struct with a guarded value.
+struct ObjectWithCriticalMutex {
+  CriticalMutex mu;
+  int val TA_GUARDED(mu);
+
+  CriticalMutex::ShouldClear TakeLock() TA_NO_THREAD_SAFETY_ANALYSIS { return mu.Acquire(); }
+};
+
+bool critical_mutex_assert_held_compile() {
+  BEGIN_TEST;
+
+  ObjectWithCriticalMutex object;
+
+  // This shouldn't compile with thread analysis enabled.
+#if defined(ENABLE_ERRORS)
+  object.val = 3;
+#endif
+
+  // We take the lock, but Clang can't see it.
+  auto should_clear = object.TakeLock();
+
+  // Without the assertion, Clang will object to setting "val".
+#if !defined(ENABLE_ERRORS)
+  object.mu.AssertHeld();
+#endif
+  object.val = 3;
+
+  // Without the assertion, Clang will object to releasing the lock.
+  object.mu.Release(should_clear);
 
   END_TEST;
 }
@@ -192,15 +260,15 @@ bool singleton_mutex_threadsafe() {
 
 UNITTEST_START_TESTCASE(mutex_tests)
 
-UNITTEST("mutex_lock_unlock", mutex_lock_unlock<Mutex>)
-UNITTEST("mutex_is_held", mutex_is_held<Mutex>)
-UNITTEST("mutex_assert_held", mutex_assert_held<Mutex>)
-UNITTEST("mutex_assert_held_compile", mutex_assert_held_compile<Mutex>)
+UNITTEST("mutex_lock_unlock", mutex_lock_unlock)
+UNITTEST("mutex_is_held", mutex_is_held)
+UNITTEST("mutex_assert_held", mutex_assert_held)
+UNITTEST("mutex_assert_held_compile", mutex_assert_held_compile)
 
-UNITTEST("critical_mutex_lock_unlock", mutex_lock_unlock<CriticalMutex>)
-UNITTEST("critical_mutex_is_held", mutex_is_held<CriticalMutex>)
-UNITTEST("critical_mutex_assert_held", mutex_assert_held<CriticalMutex>)
-UNITTEST("critical_mutex_assert_held_compile", mutex_assert_held_compile<CriticalMutex>)
+UNITTEST("critical_mutex_lock_unlock", critical_mutex_lock_unlock)
+UNITTEST("critical_mutex_is_held", critical_mutex_is_held)
+UNITTEST("critical_mutex_assert_held", critical_mutex_assert_held)
+UNITTEST("critical_mutex_assert_held_compile", critical_mutex_assert_held_compile)
 
 UNITTEST("singleton mutex has thread-safe init", singleton_mutex_threadsafe)
 
