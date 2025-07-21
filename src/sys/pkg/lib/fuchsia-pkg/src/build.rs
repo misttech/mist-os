@@ -3,15 +3,29 @@
 // found in the LICENSE file.
 
 use crate::errors::BuildError;
-use crate::{
-    MetaContents, MetaPackageError, Package, PackageBuildManifest, PackageManifest, SubpackageEntry,
-};
+use crate::{MetaContents, MetaPackage, MetaPackageError, PackageBuildManifest, PackageManifest};
+use anyhow::Result;
 use fuchsia_merkle::{Hash, MerkleTree};
+use fuchsia_url::RelativePackageUrl;
 use std::collections::{btree_map, BTreeMap};
 use std::io::{Seek, SeekFrom};
 use std::path::PathBuf;
 use std::{fs, io};
 use tempfile::NamedTempFile;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BlobEntry {
+    pub(crate) source_path: PathBuf,
+    pub(crate) hash: Hash,
+    pub(crate) size: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SubpackageEntry {
+    pub name: RelativePackageUrl,
+    pub merkle: Hash,
+    pub package_manifest_path: PathBuf,
+}
 
 pub(crate) fn build(
     creation_manifest: &PackageBuildManifest,
@@ -68,22 +82,22 @@ pub(crate) fn build_with_file_system<'a>(
         return Err(BuildError::MetaPackage(MetaPackageError::MetaPackageMissing));
     };
 
-    let mut package_builder =
-        Package::builder(published_name.parse().map_err(BuildError::PackageName)?);
-
-    for SubpackageEntry { name, merkle, package_manifest_path } in subpackages.into_iter() {
-        package_builder.add_subpackage(name, merkle, package_manifest_path);
-    }
+    let meta_package = MetaPackage::from_name_and_variant_zero(
+        published_name.parse().map_err(BuildError::PackageName)?,
+    );
+    let mut blobs: BTreeMap<String, BlobEntry> = BTreeMap::new();
 
     let external_content_infos =
         get_external_content_infos(creation_manifest.external_contents(), file_system)?;
 
     for (path, info) in external_content_infos.iter() {
-        package_builder.add_entry(
+        blobs.insert(
             path.to_string(),
-            info.hash,
-            PathBuf::from(info.source_path),
-            info.size,
+            BlobEntry {
+                source_path: PathBuf::from(info.source_path),
+                size: info.size,
+                hash: info.hash,
+            },
         );
     }
 
@@ -141,10 +155,13 @@ pub(crate) fn build_with_file_system<'a>(
     }
 
     // Add the meta-far as an entry to the package.
-    package_builder.add_entry("meta/".to_string(), meta_far_merkle, meta_far_path, meta_far_size);
+    blobs.insert(
+        "meta/".to_string(),
+        BlobEntry { source_path: meta_far_path, size: meta_far_size, hash: meta_far_merkle },
+    );
 
-    let package = package_builder.build()?;
-    let package_manifest = PackageManifest::from_package(package, repository)?;
+    let package_manifest =
+        PackageManifest::from_parts(meta_package, repository, blobs, subpackages)?;
     Ok(package_manifest)
 }
 

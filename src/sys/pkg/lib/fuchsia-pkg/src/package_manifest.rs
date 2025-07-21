@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, Package,
-    PackageArchiveBuilder, PackageManifestError, PackageName, PackagePath, PackageVariant,
+    BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, PackageArchiveBuilder,
+    PackageManifestError, PackageName, PackagePath, PackageVariant,
 };
 use anyhow::{Context, Result};
 use camino::Utf8Path;
@@ -338,32 +338,32 @@ impl PackageManifest {
         PackageManifest::from_blobs_dir(blobs_dir, None, meta_far_hash, out_manifest_dir)
     }
 
-    /// Given a Package, verify that all blob and subpackage paths are valid and return the PackageManifest.
-    pub(crate) fn from_package(
-        package: Package,
+    /// Verify that all blob and subpackage paths are valid and return the PackageManifest.
+    pub(crate) fn from_parts(
+        meta_package: MetaPackage,
         repository: Option<String>,
+        mut package_blobs: BTreeMap<String, BlobEntry>,
+        package_subpackages: Vec<crate::SubpackageEntry>,
     ) -> Result<Self, PackageManifestError> {
-        let mut blobs = Vec::with_capacity(package.blobs().len());
+        let mut blobs = Vec::with_capacity(package_blobs.len());
 
         let mut push_blob = |blob_path, blob_entry: BlobEntry| {
-            let source_path = blob_entry.source_path();
+            let source_path = blob_entry.source_path;
 
             blobs.push(BlobInfo {
                 source_path: source_path.into_os_string().into_string().map_err(|source_path| {
                     PackageManifestError::InvalidBlobPath {
-                        merkle: blob_entry.hash(),
+                        merkle: blob_entry.hash,
                         source_path: source_path.into(),
                     }
                 })?,
                 path: blob_path,
-                merkle: blob_entry.hash(),
-                size: blob_entry.size(),
+                merkle: blob_entry.hash,
+                size: blob_entry.size,
             });
 
             Ok::<(), PackageManifestError>(())
         };
-
-        let mut package_blobs = package.blobs();
 
         // Add the meta.far blob. We add this first since some scripts assume the first entry is the
         // meta.far entry.
@@ -375,8 +375,6 @@ impl PackageManifest {
         for (blob_path, blob_entry) in package_blobs {
             push_blob(blob_path, blob_entry)?;
         }
-
-        let package_subpackages = package.subpackages();
 
         let mut subpackages = Vec::with_capacity(package_subpackages.len());
 
@@ -399,8 +397,8 @@ impl PackageManifest {
 
         let manifest_v1 = PackageManifestV1 {
             package: PackageMetadata {
-                name: package.meta_package().name().to_owned(),
-                version: package.meta_package().variant().to_owned(),
+                name: meta_package.name().to_owned(),
+                version: meta_package.variant().to_owned(),
             },
             blobs,
             repository,
@@ -761,13 +759,12 @@ fn resolve_subpackage_manifest_path(
 mod tests {
     use super::*;
     use crate::path_to_string::PathToStringExt;
-    use crate::PackageBuilder;
+    use crate::{BlobEntry, MetaPackage, PackageBuilder};
     use assert_matches::assert_matches;
     use camino::Utf8PathBuf;
     use fuchsia_url::RelativePackageUrl;
     use pretty_assertions::assert_eq;
     use serde_json::{json, Value};
-    use std::path::PathBuf;
     use tempfile::{NamedTempFile, TempDir};
 
     const FAKE_ABI_REVISION: version_history::AbiRevision =
@@ -976,16 +973,16 @@ mod tests {
     }
 
     #[test]
-    fn test_create_package_manifest_from_package() {
-        let mut package_builder = Package::builder("package-name".parse().unwrap());
-        package_builder.add_entry(
-            String::from("bin/my_prog"),
-            HASH_0,
-            PathBuf::from("src/bin/my_prog"),
-            1,
+    fn test_create_package_manifest_from_parts() {
+        let meta_package = MetaPackage::from_name_and_variant_zero("package-name".parse().unwrap());
+        let mut blobs = BTreeMap::new();
+        blobs.insert(
+            "bin/my_prog".to_string(),
+            BlobEntry { source_path: "src/bin/my_prog".into(), hash: HASH_0, size: 1 },
         );
-        let package = package_builder.build().unwrap();
-        let package_manifest = PackageManifest::from_package(package, None).unwrap();
+        let package_manifest =
+            PackageManifest::from_parts(meta_package, None, blobs, vec![]).unwrap();
+
         assert_eq!(&"package-name".parse::<PackageName>().unwrap(), package_manifest.name());
         assert_eq!(None, package_manifest.repository());
     }
