@@ -125,7 +125,7 @@ impl EventQueue {
                     has_default_ipv6_route: *has_default_ipv6_route,
                     port_class: *port_class,
                 }
-                .into_fidl_backwards_compatible(),
+                .into(),
             );
             apply_interest_options(&mut event, watcher_options);
             event
@@ -677,7 +677,7 @@ impl Worker {
                                 has_default_ipv4_route,
                                 has_default_ipv6_route,
                             }
-                            .into_fidl_backwards_compatible(),
+                            .into(),
                         ),
                         ChangedAddressProperties::InterestNotApplicable,
                     ))),
@@ -993,21 +993,6 @@ impl WorkerInterfaceSink {
     }
 }
 
-/// A helper to convert to the backing FIDL type, while maintaining
-/// backwards compatibility of removed fields.
-trait IntoFidlBackwardsCompatible<F> {
-    fn into_fidl_backwards_compatible(self) -> F;
-}
-
-// TODO(https://fxbug.dev/42157740): Remove this implementation.
-impl<I: finterfaces_ext::FieldInterests> IntoFidlBackwardsCompatible<finterfaces::Properties>
-    for finterfaces_ext::Properties<I>
-{
-    fn into_fidl_backwards_compatible(self) -> finterfaces::Properties {
-        finterfaces::Properties { ..finterfaces::Properties::from(self) }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1103,7 +1088,7 @@ mod tests {
                     has_default_ipv6_route: false,
                     name: IFACE1_NAME.to_string(),
                 }
-                .into_fidl_backwards_compatible()
+                .into()
             ))
         );
 
@@ -1198,7 +1183,7 @@ mod tests {
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: false,
                 }
-                .into_fidl_backwards_compatible()
+                .into()
             ))
         );
         assert_eq!(new_watcher.next().await, Some(finterfaces::Event::Idle(finterfaces::Empty {})));
@@ -1290,7 +1275,7 @@ mod tests {
                         has_default_ipv4_route: false,
                         has_default_ipv6_route: false,
                     }
-                    .into_fidl_backwards_compatible()
+                    .into()
                 ),
                 ChangedAddressProperties::InterestNotApplicable
             )))
