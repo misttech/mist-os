@@ -4,6 +4,7 @@
 
 use crate::TraceData;
 use anyhow::Result;
+use async_fs::File;
 use fidl_fuchsia_developer_ffx::TraceOptions;
 use fidl_fuchsia_tracing_controller::{ProvisionerProxy, TraceConfig};
 use std::time::Duration;
@@ -16,9 +17,10 @@ pub(crate) async fn trace(
     trace_config: TraceConfig,
 ) -> Result<TraceTask> {
     let duration = options.duration_ns.map(|d| Duration::from_nanos(d as u64));
+    let output_file = File::create(&output).await?;
     let task = TraceTask::new(
         "ffx-trace-direct".into(),
-        output.clone(),
+        output_file,
         trace_config.clone(),
         duration,
         options
@@ -42,9 +44,9 @@ pub(crate) async fn trace(
     Ok(task)
 }
 
-pub(crate) async fn stop_tracing(task: TraceTask) -> Result<TraceData> {
+pub(crate) async fn stop_tracing(task: TraceTask, output_file: String) -> Result<TraceData> {
     Ok(TraceData {
-        output_file: task.output_file(),
+        output_file,
         categories: task.config().categories.clone().unwrap_or(vec![]),
         stop_result: task.shutdown().await?,
     })

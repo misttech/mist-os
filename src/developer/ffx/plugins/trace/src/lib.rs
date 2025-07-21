@@ -396,7 +396,7 @@ pub async fn trace(
             }
 
             writer.line("Trace completed! Copying trace from device...")?;
-            let mut trace_data = direct::stop_tracing(task).await?;
+            let mut trace_data = direct::stop_tracing(task, output).await?;
             trace_data.categories = opts.categories;
 
             finalize_trace(

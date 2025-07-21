@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
+use async_fs::File;
 use async_lock::{Mutex, MutexGuard};
 use async_trait::async_trait;
 use fidl_fuchsia_tracing_controller::{ProvisionerProxy, TraceConfig};
@@ -21,6 +22,7 @@ use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing_controller as trace
 struct TraceTaskEntry {
     pub task: TraceTask,
     pub target_info: ffx::TargetInfo,
+    pub output_file: String,
 }
 #[derive(Default, Debug)]
 struct TraceMap {
@@ -134,10 +136,17 @@ impl TracingProtocol {
                 let config_with_expanded_categories =
                     trace::TraceConfig { categories: expanded_categories, ..trace_config.clone() };
 
+                let writer = match File::create(output_file.clone()).await {
+                    Ok(f) => f,
+                    Err(e) => {
+                        log::warn!("unable to create trace file: {:?}", e);
+                        return Err(ffx::RecordingError::RecordingStart);
+                    }
+                };
                 let task = match TraceTask::new(
                     // Use the target info as the task name
                     format!("{target_info:?}"),
-                    output_file.clone(),
+                    writer,
                     config_with_expanded_categories,
                     options.duration_ns.map(|d| Duration::from_nanos(d as u64)),
                     options
@@ -155,9 +164,10 @@ impl TracingProtocol {
                     }
                 };
                 e.insert(nodename.clone());
-                task_map
-                    .nodename_to_task
-                    .insert(nodename, TraceTaskEntry { task, target_info: target_info.clone() });
+                task_map.nodename_to_task.insert(
+                    nodename,
+                    TraceTaskEntry { task, target_info: target_info.clone(), output_file },
+                );
             }
         }
         Ok(target_info)
@@ -222,8 +232,7 @@ impl FidlProtocol for TracingProtocol {
                         // If we have found the task using nodename and not output file, the
                         // output_file_to_nodename mapping might still be around. Explicitly
                         // remove it to be sure.
-                        let _ =
-                            task_map.output_file_to_nodename.remove(&task_entry.task.output_file());
+                        let _ = task_map.output_file_to_nodename.remove(&task_entry.output_file);
                         task_entry
                     } else {
                         // TODO(https://fxbug.dev/42167418)
@@ -233,7 +242,7 @@ impl FidlProtocol for TracingProtocol {
                             .map_err(Into::into);
                     }
                 };
-                let output_file = task_entry.task.output_file();
+                let output_file = task_entry.output_file.clone();
                 let target_info = task_entry.target_info.clone();
                 let categories = task_entry.task.config().categories.unwrap_or_default();
                 responder
@@ -253,7 +262,7 @@ impl FidlProtocol for TracingProtocol {
                     .values()
                     .map(|t| ffx::TraceInfo {
                         target: Some(t.target_info.clone()),
-                        output_file: Some(t.task.output_file()),
+                        output_file: Some(t.output_file.clone()),
                         duration: t.task.duration().map(|d| d.as_secs_f64()),
                         remaining_runtime: t.task.duration().map(|d| {
                             d.checked_sub(t.task.start_time().elapsed())

@@ -22,6 +22,7 @@ rustc_library("ffx_daemon_protocol_tracing") {
     "//src/performance/trace_task",
     "//src/performance/trace_task",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-fs",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",

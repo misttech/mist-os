@@ -38,6 +38,7 @@ ffx_plugin("ffx_trace") {
     "//src/performance/lib/fxt/rust",
     "//src/performance/trace_task",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-fs",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",

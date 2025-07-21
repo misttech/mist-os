@@ -4,11 +4,10 @@
 
 use crate::triggers::{Trigger, TriggerAction, TriggersWatcher};
 use crate::{trace_shutdown, TracingError};
-use anyhow::Context as _;
-use async_fs::File;
 use async_lock::Mutex;
 use fidl_fuchsia_tracing_controller::{self as trace, StopResult, TraceConfig};
 use fuchsia_async::Task;
+use futures::io::AsyncWrite;
 use futures::prelude::*;
 use futures::task::{Context as FutContext, Poll};
 use std::pin::Pin;
@@ -24,10 +23,6 @@ pub struct TraceTask {
     task_id: u64,
     /// Tag used to identify this task in the log.
     debug_tag: String,
-    /// Name of the output file for the trace data on the host machine.
-    /// The [TraceTask] instance may use this name to make a temporary file on the device.
-    /// The output_file will be used to rendezvous start and stop requests.
-    output_file: String,
     /// Trace configuration.
     config: trace::TraceConfig,
     /// Duration to capture trace. None indicates capture until canceled.
@@ -56,16 +51,20 @@ impl Future for TraceTask {
 }
 
 impl TraceTask {
-    pub async fn new(
+    pub async fn new<W>(
         debug_tag: String,
-        output_file: String,
+        mut output_writer: W,
         config: trace::TraceConfig,
         duration: Option<Duration>,
         triggers: Vec<Trigger>,
         provisioner: trace::ProvisionerProxy,
-    ) -> Result<Self, TracingError> {
+    ) -> Result<Self, TracingError>
+    where
+        W: AsyncWrite + Unpin + Send + 'static,
+    {
         // Start the tracing session immediately. Maybe we should consider separating the creating
         // of the session and the actual starting of it. This seems like a side-effect.
+        let task_id = SERIAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let (client, server) = fidl::Socket::create_stream();
         let client = fidl::AsyncSocket::from_socket(client);
         let (client_end, server_end) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
@@ -75,25 +74,23 @@ impl TraceTask {
             .await?
             .map_err(Into::<TracingError>::into)?;
 
-        // Set up copying the trace output to a file.
-        let f = File::create(&output_file).await.context("opening file")?;
-        let output_file_clone = output_file.clone();
-        let debug_tag_clone = debug_tag.clone();
+        let logging_prefix_og = format!("Task {task_id} ({debug_tag})");
 
-        let copy_trace_fut = async move {
-            log::debug!("{} -> {output_file_clone} starting trace.", &debug_tag_clone);
-            let mut out_file = f;
-            let res = futures::io::copy(client, &mut out_file)
-                .await
-                .map_err(|e| log::warn!("file error: {:#?}", e));
-            log::debug!(
-                "{} -> {output_file_clone} trace complete, result: {res:#?}",
-                &debug_tag_clone
-            );
-            // async_fs files don't guarantee that the file is flushed on drop, so we need to
-            // explicitly flush the file after writing.
-            if let Err(err) = out_file.flush().await {
-                log::warn!("file error: {:#?}", err);
+        let copy_trace_fut = {
+            let logging_prefix = logging_prefix_og.clone();
+            async move {
+                log::debug!("{logging_prefix} starting background copying of trace data.");
+                let res = futures::io::copy(client, &mut output_writer)
+                    .await
+                    .map_err(|e| log::warn!("output writer error: {:#?}", e));
+                log::debug!("{logging_prefix} copying of trace data complete, result: {res:#?}");
+                // async_fs files don't guarantee that the file is flushed on drop, so we need to
+                // explicitly flush the file after writing.
+                if let Err(err) = output_writer.flush().await {
+                    log::warn!(
+                        "{logging_prefix} error flushing trace data output writer error: {err:#?}"
+                    );
+                }
             }
         };
 
@@ -106,27 +103,30 @@ impl TraceTask {
             TriggersWatcher::new(controller, triggers.clone(), shutdown_receiver);
 
         let terminate_result_clone = terminate_result.clone();
-        let shutdown_fut = async move {
-            log::info!("shutting down trace");
-            let mut done = terminate_result_clone.lock().await;
-            if done.is_none() {
-                let result = trace_shutdown(&shutdown_controller).await;
-                match result {
-                    Ok(stop) => {
-                        log::debug!("recording stop successful");
-                        *done = Some(stop)
-                    }
-                    Err(e) => {
-                        log::error!("error shutting down trace: {:?}", e);
+        let shutdown_fut = {
+            let logging_prefix = logging_prefix_og;
+            async move {
+                log::info!("{logging_prefix} Running shutdown future.");
+                let mut done = terminate_result_clone.lock().await;
+                if done.is_none() {
+                    let result = trace_shutdown(&shutdown_controller).await;
+                    match result {
+                        Ok(stop) => {
+                            log::debug!("{logging_prefix} call to trace_shutdown successful.");
+                            *done = Some(stop)
+                        }
+                        Err(e) => {
+                            log::error!("{logging_prefix} call to trace_shutdown failed: {e:?}");
+                        }
                     }
                 }
+                // Remove the controller.
+                drop(shutdown_controller);
             }
-            // Remove the controller.
-            drop(shutdown_controller);
         };
 
         Ok(Self {
-            task_id: SERIAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            task_id,
             debug_tag: debug_tag.clone(),
             config,
             proxy: Some(client_end),
@@ -135,10 +135,10 @@ impl TraceTask {
             terminate_result: terminate_result.clone(),
             start_time: Instant::now(),
             shutdown_sender,
-            output_file: output_file.clone(),
             task: Self::make_task(
+                task_id,
+                debug_tag,
                 duration,
-                output_file.clone(),
                 copy_trace_fut,
                 shutdown_fut,
                 triggers_watcher,
@@ -158,25 +158,29 @@ impl TraceTask {
                         *terminate_result_guard = trace_result.into();
                     }
                     Err(e) => {
-                        log::warn!("error shutting down trace: {:?}", e);
+                        log::warn!(
+                            "Trace {} ({}) trace_shutdown failed: {e:?}",
+                            self.task_id,
+                            self.debug_tag
+                        );
                     }
                 };
             }
         }
-        let task_tag = self.debug_tag.clone();
+        let debug_tag = self.debug_tag.clone();
         let task_id = self.task_id;
-        let output_file = self.output_file.clone();
         let terminate_result = self.terminate_result.clone();
         let _ = self.shutdown_sender.send(()).await;
         self.await;
-        log::trace!("trace task {task_tag}:{} -> {output_file} shutdown completed.", task_id);
+        log::trace!("trace task {task_id} ({debug_tag}): task completed.");
         let terminate_result_guard = terminate_result.lock().await;
         Ok(terminate_result_guard.clone().unwrap_or_default())
     }
 
     fn make_task(
+        task_id: u64,
+        debug_tag: String,
         duration: Option<Duration>,
-        _output_file: String,
         copy_trace_fut: impl Future<Output = ()> + 'static,
         shutdown_fut: impl Future<Output = ()> + 'static,
         trigger_watcher: TriggersWatcher<'static>,
@@ -195,12 +199,15 @@ impl TraceTask {
             let mut trigger_fut = trigger_watcher.fuse();
 
             futures::select! {
-                    // If copying the trace completes, that's fine.
-                    _ = copy_trace_fut => {},
+                // If copying the trace completes, that's fine.
+                // This means the trace data has been processed, and there is nothing more for the
+                // task to do.
+                _ = copy_trace_fut => (),
 
                 // Timeout, clean up and wait for copying to finish.
                 _ = timeout_fut => {
-                    log::debug!("timeout reached, doing cleanup");
+                    log::info!("Trace {task_id} (debug_tag): timeout of {} successfully completed. Stopping and cleaning up.",
+                     duration.map(|d| format!("{} secs", d.as_secs())).unwrap_or_else(|| "infinite?".into()));
                     // Shutdown the trace.
                     shutdown_fut.await;
                     // Drop triggers, they are no longer needed.
@@ -214,9 +221,12 @@ impl TraceTask {
                     if let Some(action) = action {
                         match action {
                             TriggerAction::Terminate => {
-                                log::debug!("received terminate trigger");
+                                log::info!("Task {task_id} ({debug_tag}): received terminate trigger");
                             }
                         }
+                    } else {
+                        // This usually means the proxy was closed.
+                        log::debug!("Task {task_id} ({debug_tag}): Trigger future completed without an action!");
                     }
                     shutdown_fut.await;
                     drop(trigger_fut);
@@ -243,10 +253,6 @@ impl TraceTask {
         self.duration.clone()
     }
 
-    pub fn output_file(&self) -> String {
-        self.output_file.clone()
-    }
-
     pub async fn wait_for_completion(self) -> Result<StopResult, TracingError> {
         match self.await {
             Some(result) => Ok(result),
@@ -264,9 +270,8 @@ impl TraceTask {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_fs::File;
     use fidl_fuchsia_tracing_controller::StartError;
-    use futures::AsyncReadExt;
+    use futures::io::BufWriter;
     const FAKE_CONTROLLER_TRACE_OUTPUT: &'static str = "HOWDY HOWDY HOWDY";
 
     fn setup_fake_provisioner_proxy(
@@ -328,15 +333,37 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_trace_task_start_stop_write_check() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
-
+    async fn test_trace_task_start_stop_write_check_with_vec() {
         let provisioner = setup_fake_provisioner_proxy(None, None);
+        let writer = BufWriter::new(Vec::new());
 
         let trace_task = TraceTask::new(
             "test_trace_start_stop_write_check".into(),
-            output.clone(),
+            writer,
+            trace::TraceConfig::default(),
+            None,
+            vec![],
+            provisioner,
+        )
+        .await
+        .expect("tracing task started");
+
+        let shutdown_result = trace_task.shutdown().await.expect("tracing shutdown");
+        assert_eq!(shutdown_result, trace::StopResult::default().into());
+    }
+
+    #[cfg(not(target_os = "fuchsia"))]
+    #[fuchsia::test]
+    async fn test_trace_task_start_stop_write_check_with_file() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let output = temp_dir.path().join("trace-test.fxt");
+
+        let provisioner = setup_fake_provisioner_proxy(None, None);
+        let writer = async_fs::File::create(&output).await.unwrap();
+
+        let trace_task = TraceTask::new(
+            "test_trace_start_stop_write_check".into(),
+            writer,
             trace::TraceConfig::default(),
             None,
             vec![],
@@ -347,9 +374,7 @@ mod tests {
 
         let shutdown_result = trace_task.shutdown().await.expect("tracing shutdown");
 
-        let mut f = File::open(std::path::PathBuf::from(output)).await.unwrap();
-        let mut res = String::new();
-        f.read_to_string(&mut res).await.unwrap();
+        let res = async_fs::read_to_string(&output).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
         let expected = trace::StopResult { provider_stats: Some(vec![]), ..Default::default() };
         assert_eq!(shutdown_result, expected);
@@ -357,14 +382,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_trace_error_handling_already_started() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
-
         let provisioner = setup_fake_provisioner_proxy(Some(StartError::AlreadyStarted), None);
+        let writer = BufWriter::new(Vec::new());
 
         let trace_task_result = TraceTask::new(
             "test_trace_error_handling_already_started".into(),
-            output.clone(),
+            writer,
             trace::TraceConfig::default(),
             None,
             vec![],
@@ -376,16 +399,18 @@ mod tests {
         assert_eq!(trace_task_result, Some(TracingError::RecordingAlreadyStarted));
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
     #[fuchsia::test]
     async fn test_trace_task_start_with_duration() {
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
+        let output = temp_dir.path().join("trace-test.fxt");
 
         let provisioner = setup_fake_provisioner_proxy(None, None);
+        let writer = async_fs::File::create(&output).await.unwrap();
 
         let trace_task = TraceTask::new(
             "test_trace_task_start_with_duration".into(),
-            output.clone(),
+            writer,
             trace::TraceConfig::default(),
             Some(Duration::from_millis(100)),
             vec![],
@@ -400,22 +425,24 @@ mod tests {
             panic!("Expected stop result from trace_task.await");
         }
 
-        let mut f = File::open(std::path::PathBuf::from(output)).await.unwrap();
+        let mut f = async_fs::File::open(std::path::PathBuf::from(output)).await.unwrap();
         let mut res = String::new();
         f.read_to_string(&mut res).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
     #[fuchsia::test]
     async fn test_triggers_valid() {
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
+        let output = temp_dir.path().join("trace-test.fxt");
         let alert_name = "some_alert";
         let provisioner = setup_fake_provisioner_proxy(None, Some(alert_name.into()));
+        let writer = async_fs::File::create(output.clone()).await.unwrap();
 
         let trace_task = TraceTask::new(
             "test_triggers_valid".into(),
-            output.clone(),
+            writer,
             trace::TraceConfig::default(),
             None,
             vec![Trigger {
@@ -429,9 +456,7 @@ mod tests {
 
         trace_task.await;
 
-        let mut f = File::open(std::path::PathBuf::from(output)).await.unwrap();
-        let mut res = String::new();
-        f.read_to_string(&mut res).await.unwrap();
+        let res = async_fs::read_to_string(&output).await.unwrap();
         assert_eq!(res, FAKE_CONTROLLER_TRACE_OUTPUT.to_string());
     }
 }
