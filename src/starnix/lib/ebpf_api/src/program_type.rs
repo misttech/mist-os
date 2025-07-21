@@ -415,6 +415,18 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                 },
             ),
             (
+                vec![ProgramType::CgroupSockAddr].into(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_get_socket_cookie,
+                    name: "get_socket_cookie",
+                    signature: FunctionSignature {
+                        args: vec![Type::StructParameter { id: BPF_SOCK_ADDR_ID.clone() }],
+                        return_value: Type::UNKNOWN_SCALAR,
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
                 vec![ProgramType::SchedAct, ProgramType::SchedCls].into(),
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_redirect,

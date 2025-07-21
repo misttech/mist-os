@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::maps::{Map, MapKey, MapValueRef, RingBuffer, RingBufferWakeupPolicy};
-use ebpf::{BpfValue, EbpfHelperImpl, EbpfProgramContext};
+use ebpf::{BpfValue, EbpfHelperImpl, EbpfProgramContext, FromBpfValue};
 use inspect_stubs::track_stub;
 use linux_uapi::{
     bpf_func_id_BPF_FUNC_get_current_pid_tgid, bpf_func_id_BPF_FUNC_get_current_uid_gid,
@@ -320,19 +320,40 @@ where
     ]
 }
 
+pub trait SocketCookieContext<A> {
+    fn get_socket_cookie(&self, arg: A) -> u64;
+}
+
+fn bpf_get_socket_cookie<'a, C: EbpfProgramContext>(
+    context: &mut C::RunContext<'a>,
+    arg: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue
+where
+    for<'b, 'c> C::RunContext<'b>: SocketCookieContext<C::Arg1<'c>>,
+    for<'b> C::Arg1<'b>: FromBpfValue<C::RunContext<'b>>,
+{
+    // SAFETY: Verifier checks that the argument points at a value passed to
+    // program as the first argument.
+    let arg = unsafe { C::Arg1::from_bpf_value(context, arg) };
+
+    context.get_socket_cookie(arg).into()
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LoadBytesBase {
     MacHeader,
     NetworkHeader,
 }
 
-pub trait SocketFilterContext {
-    type SkBuf<'a>;
-    fn get_socket_uid(&self, sk_buf: &Self::SkBuf<'_>) -> Option<uid_t>;
-    fn get_socket_cookie(&self, sk_buf: &Self::SkBuf<'_>) -> u64;
+pub trait SocketFilterContext<B>: SocketCookieContext<B> {
+    fn get_socket_uid(&self, sk_buf: B) -> Option<uid_t>;
     fn load_bytes_relative(
         &self,
-        sk_buf: &Self::SkBuf<'_>,
+        sk_buf: B,
         base: LoadBytesBase,
         offset: usize,
         buf: &mut [u8],
@@ -348,30 +369,15 @@ fn bpf_get_socket_uid<'a, C: EbpfProgramContext>(
     _: BpfValue,
 ) -> BpfValue
 where
-    for<'b> C::RunContext<'b>: SocketFilterContext,
+    for<'b, 'c> C::RunContext<'b>: SocketFilterContext<C::Arg1<'c>>,
+    for<'b> C::Arg1<'b>: FromBpfValue<C::RunContext<'b>>,
 {
-    // SAFETY: Verifier checks that the argument points at the `SkBuf`.
-    let sk_buf: &<C::RunContext<'a> as SocketFilterContext>::SkBuf<'a> =
-        unsafe { &*sk_buf.as_ptr() };
+    // SAFETY: Verifier checks that the argument points at the same value
+    // that was passed to the program as the first argument.
+    let sk_buf = unsafe { C::Arg1::from_bpf_value(context, sk_buf) };
+
     const OVERFLOW_UID: uid_t = 65534;
     context.get_socket_uid(sk_buf).unwrap_or(OVERFLOW_UID).into()
-}
-
-fn bpf_get_socket_cookie<'a, C: EbpfProgramContext>(
-    context: &mut C::RunContext<'a>,
-    sk_buf: BpfValue,
-    _: BpfValue,
-    _: BpfValue,
-    _: BpfValue,
-    _: BpfValue,
-) -> BpfValue
-where
-    for<'b> C::RunContext<'b>: SocketFilterContext,
-{
-    // SAFETY: Verifier checks that the argument points at the `SkBuf`.
-    let sk_buf: &<C::RunContext<'a> as SocketFilterContext>::SkBuf<'a> =
-        unsafe { &*sk_buf.as_ptr() };
-    context.get_socket_cookie(sk_buf).into()
 }
 
 fn bpf_skb_load_bytes_relative<'a, C: EbpfProgramContext>(
@@ -383,11 +389,12 @@ fn bpf_skb_load_bytes_relative<'a, C: EbpfProgramContext>(
     start_header: BpfValue,
 ) -> BpfValue
 where
-    for<'b> C::RunContext<'b>: SocketFilterContext,
+    for<'b, 'c> C::RunContext<'b>: SocketFilterContext<C::Arg1<'c>>,
+    for<'b> C::Arg1<'b>: FromBpfValue<C::RunContext<'b>>,
 {
-    // SAFETY: Verifier checks that the argument points at the `SkBuf`.
-    let sk_buf: &<C::RunContext<'a> as SocketFilterContext>::SkBuf<'a> =
-        unsafe { &*sk_buf.as_ptr() };
+    // SAFETY: Verifier checks that the argument points at the same value
+    // that was passed to the program as the first argument.
+    let sk_buf = unsafe { C::Arg1::from_bpf_value(context, sk_buf) };
 
     let base = match start_header.as_u32() {
         0 => LoadBytesBase::MacHeader,
@@ -433,7 +440,8 @@ fn bpf_sk_fullsock<C: EbpfProgramContext>(
 /// Returns helpers that are supplied to socket filter programs in addition to the common helpers.
 pub fn get_socket_filter_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
 where
-    for<'a> C::RunContext<'a>: SocketFilterContext,
+    for<'b, 'c> C::RunContext<'b>: SocketFilterContext<C::Arg1<'c>>,
+    for<'b> C::Arg1<'b>: FromBpfValue<C::RunContext<'b>>,
 {
     vec![
         (bpf_func_id_BPF_FUNC_get_socket_uid, EbpfHelperImpl(bpf_get_socket_uid)),
@@ -444,39 +452,14 @@ where
     ]
 }
 
-pub trait SocketContext {
-    type BpfSock<'a>;
-
-    fn get_socket_cookie(&self, sock: &Self::BpfSock<'_>) -> u64;
-}
-
-// `bpf_get_socket_cookie()` for `CGROUP_SOCK` programs. Note that unlike
-// the default `bpf_get_socket_cookie()` this one takes bpf_sock as the first argument
-fn bpf_get_socket_cookie_sock<'a, C: EbpfProgramContext>(
-    context: &mut C::RunContext<'a>,
-    bpf_sock: BpfValue,
-    _: BpfValue,
-    _: BpfValue,
-    _: BpfValue,
-    _: BpfValue,
-) -> BpfValue
-where
-    for<'b> C::RunContext<'b>: SocketContext,
-{
-    // SAFETY: Verifier checks that the argument points at the `BpfSock`.
-    let bpf_sock: &<C::RunContext<'a> as SocketContext>::BpfSock<'a> =
-        unsafe { &*bpf_sock.as_ptr() };
-
-    context.get_socket_cookie(bpf_sock).into()
-}
-
 /// Returns helpers for programs of type `BPF_PROG_TYPE_CGROUP_SOCK`.
-pub fn get_cgroup_sock_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
+pub fn get_cgroup_sock_helpers<'a, C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
 where
-    for<'b> C::RunContext<'b>: SocketContext,
+    for<'b, 'c> C::RunContext<'b>: SocketCookieContext<C::Arg1<'c>>,
+    for<'b> C::Arg1<'b>: FromBpfValue<C::RunContext<'b>>,
 {
     vec![
-        (bpf_func_id_BPF_FUNC_get_socket_cookie, EbpfHelperImpl(bpf_get_socket_cookie_sock)),
+        (bpf_func_id_BPF_FUNC_get_socket_cookie, EbpfHelperImpl(bpf_get_socket_cookie)),
         (bpf_func_id_BPF_FUNC_sk_storage_get, EbpfHelperImpl(bpf_sk_storage_get)),
     ]
 }

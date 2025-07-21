@@ -16,7 +16,7 @@ use crate::vfs::FdNumber;
 use ebpf::{EbpfProgram, EbpfProgramContext, ProgramArgument, Type};
 use ebpf_api::{
     AttachType, BaseEbpfRunContext, CurrentTaskContext, MapValueRef, MapsContext, PinnedMap,
-    ProgramType, SocketContext, BPF_SOCK_ADDR_TYPE, BPF_SOCK_TYPE,
+    ProgramType, SocketCookieContext, BPF_SOCK_ADDR_TYPE, BPF_SOCK_TYPE,
 };
 use fidl_fuchsia_net_filter as fnet_filter;
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -160,11 +160,19 @@ impl<'a> CurrentTaskContext for EbpfRunContextImpl<'a> {
     }
 }
 
-impl<'a> SocketContext for EbpfRunContextImpl<'a> {
-    type BpfSock<'b> = BpfSock<'b>;
-
-    fn get_socket_cookie(&self, bpf_sock: &BpfSock<'_>) -> u64 {
+impl<'a, 'b> SocketCookieContext<&'a BpfSock<'a>> for EbpfRunContextImpl<'b> {
+    fn get_socket_cookie(&self, bpf_sock: &'a BpfSock<'a>) -> u64 {
         let v = bpf_sock.socket.get_socket_cookie();
+        v.unwrap_or_else(|errno| {
+            log_error!("Failed to get socket cookie: {:?}", errno);
+            0
+        })
+    }
+}
+
+impl<'a, 'b> SocketCookieContext<&'a mut BpfSockAddr<'a>> for EbpfRunContextImpl<'b> {
+    fn get_socket_cookie(&self, bpf_sock_addr: &'a mut BpfSockAddr<'a>) -> u64 {
+        let v = bpf_sock_addr.socket.get_socket_cookie();
         v.unwrap_or_else(|errno| {
             log_error!("Failed to get socket cookie: {:?}", errno);
             0
@@ -174,23 +182,26 @@ impl<'a> SocketContext for EbpfRunContextImpl<'a> {
 
 // Wrapper for `bpf_sock_addr` used to implement `ProgramArgument` trait.
 #[repr(C)]
-#[derive(Default)]
-pub struct BpfSockAddr(bpf_sock_addr);
+pub struct BpfSockAddr<'a> {
+    sock_addr: bpf_sock_addr,
 
-impl Deref for BpfSockAddr {
+    socket: &'a ZxioBackedSocket,
+}
+
+impl<'a> Deref for BpfSockAddr<'a> {
     type Target = bpf_sock_addr;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.sock_addr
     }
 }
 
-impl DerefMut for BpfSockAddr {
+impl<'a> DerefMut for BpfSockAddr<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.sock_addr
     }
 }
 
-impl ProgramArgument for &'_ mut BpfSockAddr {
+impl<'a> ProgramArgument for &'_ mut BpfSockAddr<'a> {
     fn get_type() -> &'static Type {
         &*BPF_SOCK_ADDR_TYPE
     }
@@ -202,7 +213,7 @@ struct SockAddrProgram(EbpfProgram<SockAddrProgram>);
 impl EbpfProgramContext for SockAddrProgram {
     type RunContext<'a> = EbpfRunContextImpl<'a>;
     type Packet<'a> = ();
-    type Arg1<'a> = &'a mut BpfSockAddr;
+    type Arg1<'a> = &'a mut BpfSockAddr<'a>;
     type Arg2<'a> = ();
     type Arg3<'a> = ();
     type Arg4<'a> = ();
@@ -218,7 +229,11 @@ pub enum SockAddrProgramResult {
 }
 
 impl SockAddrProgram {
-    fn run(&self, current_task: &CurrentTask, addr: &mut BpfSockAddr) -> SockAddrProgramResult {
+    fn run<'a>(
+        &self,
+        current_task: &'a CurrentTask,
+        addr: &'a mut BpfSockAddr<'a>,
+    ) -> SockAddrProgramResult {
         let mut run_context = EbpfRunContextImpl::new(current_task);
         if self.0.run_with_1_argument(&mut run_context, addr) == 0 {
             SockAddrProgramResult::Block
@@ -308,7 +323,7 @@ mod internal {
         // contents is stored in `sockopt`. `Vec::as_mut_ptr()` guarantees that
         // the pointer remains valid only as long as the `Vec` is not modified,
         // so this field should not be updated directly. `take_value()` can be
-        // used to extract the value when `BpfSockOpt` is no longer needed. 
+        // used to extract the value when `BpfSockOpt` is no longer needed.
         value_buf: Vec<u8>,
     }
 
@@ -329,8 +344,9 @@ mod internal {
             unsafe {
                 sockopt.sockopt.__bindgen_anon_2.optval =
                     uaddr { addr: sockopt.value_buf.as_mut_ptr() as u64 };
-                sockopt.sockopt.__bindgen_anon_3.optval_end =
-                    uaddr { addr: sockopt.value_buf.as_mut_ptr().add(sockopt.value_buf.len()) as u64 };
+                sockopt.sockopt.__bindgen_anon_3.optval_end = uaddr {
+                    addr: sockopt.value_buf.as_mut_ptr().add(sockopt.value_buf.len()) as u64,
+                };
             }
 
             sockopt
@@ -472,6 +488,7 @@ impl CgroupEbpfProgramSet {
         socket_type: SocketType,
         protocol: SocketProtocol,
         socket_address: &SocketAddress,
+        socket: &ZxioBackedSocket,
     ) -> Result<SockAddrProgramResult, Errno> {
         let prog_cell = match (domain, op) {
             (SocketDomain::Inet, SockAddrOp::Bind) => Some(&self.inet4_bind),
@@ -487,7 +504,7 @@ impl CgroupEbpfProgramSet {
             return Ok(SockAddrProgramResult::Allow);
         };
 
-        let mut bpf_sockaddr = BpfSockAddr::default();
+        let mut bpf_sockaddr = BpfSockAddr { sock_addr: Default::default(), socket };
         bpf_sockaddr.family = domain.as_raw().into();
         bpf_sockaddr.type_ = socket_type.as_raw();
         bpf_sockaddr.protocol = protocol.as_raw();
@@ -804,7 +821,10 @@ impl EbpfAttachments {
             (AttachLocation::Kernel, ProgramType::CgroupSockAddr) => {
                 check_root_cgroup_fd(locked, current_task, target_fd)?;
 
-                let helpers = ebpf_api::get_current_task_helpers();
+                let helpers: Vec<_> = ebpf_api::get_current_task_helpers()
+                    .into_iter()
+                    .chain(ebpf_api::get_cgroup_sock_helpers().into_iter())
+                    .collect();
                 let linked_program =
                     SockAddrProgram(program.link(attach_type.get_program_type(), &[], &helpers)?);
                 *self.root_cgroup.get_sock_addr_program(attach_type)?.write(locked) =
@@ -816,8 +836,10 @@ impl EbpfAttachments {
             (AttachLocation::Kernel, ProgramType::CgroupSock) => {
                 check_root_cgroup_fd(locked, current_task, target_fd)?;
 
-                let mut helpers = ebpf_api::get_current_task_helpers();
-                helpers.extend(ebpf_api::get_cgroup_sock_helpers().into_iter());
+                let helpers: Vec<_> = ebpf_api::get_current_task_helpers()
+                    .into_iter()
+                    .chain(ebpf_api::get_cgroup_sock_helpers().into_iter())
+                    .collect();
                 let linked_program =
                     SockProgram(program.link(attach_type.get_program_type(), &[], &helpers)?);
                 *self.root_cgroup.get_sock_program(attach_type)?.write(locked) =

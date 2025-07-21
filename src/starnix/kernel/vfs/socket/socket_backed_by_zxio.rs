@@ -311,6 +311,7 @@ impl ZxioBackedSocket {
                 socket.socket_type,
                 socket.protocol,
                 socket_address,
+                self,
             )?;
         match ebpf_result {
             SockAddrProgramResult::Allow => Ok(()),

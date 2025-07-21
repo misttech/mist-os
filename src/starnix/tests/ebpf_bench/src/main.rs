@@ -6,7 +6,7 @@ use criterion::{Benchmark, Criterion};
 use ebpf::{EbpfProgramContext, FieldMapping, ProgramArgument, StructMapping};
 use ebpf_api::{
     AttachType, LoadBytesBase, Map, MapValueRef, PinnedMap, ProgramType, SocketFilterContext,
-    __sk_buff, uid_t, CGROUP_SKB_SK_BUF_TYPE, SK_BUF_ID,
+    __sk_buff, uid_t, SocketCookieContext, CGROUP_SKB_SK_BUF_TYPE, SK_BUF_ID,
 };
 use fuchsia_criterion::FuchsiaCriterion;
 use std::sync::LazyLock;
@@ -81,19 +81,20 @@ impl<'a> ebpf_api::MapsContext<'a> for TestEbpfRunContext<'a> {
     }
 }
 
-impl<'a> SocketFilterContext for TestEbpfRunContext<'a> {
-    type SkBuf<'b> = SkBuff<'b>;
-    fn get_socket_uid(&self, sk_buf: &Self::SkBuf<'_>) -> Option<uid_t> {
-        Some(sk_buf.uid)
-    }
-
-    fn get_socket_cookie(&self, sk_buf: &Self::SkBuf<'_>) -> u64 {
+impl<'a, 'b> SocketCookieContext<&'a SkBuff<'a>> for TestEbpfRunContext<'b> {
+    fn get_socket_cookie(&self, sk_buf: &'a SkBuff<'a>) -> u64 {
         sk_buf.socket_cookie
+    }
+}
+
+impl<'a, 'b> SocketFilterContext<&'a SkBuff<'a>> for TestEbpfRunContext<'b> {
+    fn get_socket_uid(&self, sk_buf: &'a SkBuff<'a>) -> Option<uid_t> {
+        Some(sk_buf.uid)
     }
 
     fn load_bytes_relative(
         &self,
-        sk_buf: &Self::SkBuf<'_>,
+        sk_buf: &'a SkBuff<'a>,
         base: LoadBytesBase,
         offset: usize,
         buf: &mut [u8],
