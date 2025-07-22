@@ -128,7 +128,10 @@ if (current_toolchain == default_toolchain) {
   # TODO(https://fxbug.dev/324656719): Ensure this covers APIs, libraries, etc.
   # that are not present at all levels, especially "PLATFORM".
   group("generate_compatibility_goldens") {
-    visibility += [ "//scripts/versioning:*" ]
+    visibility += [
+      "//:*",
+      "//scripts/versioning:*",
+    ]
     testonly = true
     deps = _all_idk_atoms_affecting_compatibility
   }
