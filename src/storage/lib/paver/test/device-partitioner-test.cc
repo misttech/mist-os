@@ -517,7 +517,19 @@ TEST_F(EfiDevicePartitionerTests, InitializeTwoCandidatesWithoutFvmFails) {
   ASSERT_NOT_OK(CreatePartitioner({}));
 }
 
-TEST_F(EfiDevicePartitionerTests, InitializeWithMultipleCandidateGPTsFailsWithoutExplicitDevice) {
+class EfiDevicePartitionerGptAllTests : public EfiDevicePartitionerTests {
+ protected:
+  IsolatedDevmgr::Args BaseDevmgrArgs() override {
+    IsolatedDevmgr::Args args;
+    args.disable_block_watcher = false;
+    args.fshost_config.emplace_back(component_testing::ConfigCapability{
+        .name = "fuchsia.fshost.GptAll", .value = component_testing::ConfigValue::Bool(true)});
+    return args;
+  }
+};
+
+TEST_F(EfiDevicePartitionerGptAllTests,
+       InitializeWithMultipleCandidateGPTsFailsWithoutExplicitDevice) {
   // Set up a two valid GPTs.
   std::unique_ptr<BlockDevice> gpt, gpt2;
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithUefiGpt(&gpt, 64 * kGibibyte));
@@ -1953,6 +1965,14 @@ class AndroidPartitionerTests : public GptDevicePartitionerTests {
  protected:
   AndroidPartitionerTests() = default;
 
+  IsolatedDevmgr::Args BaseDevmgrArgs() override {
+    IsolatedDevmgr::Args args;
+    args.disable_block_watcher = false;
+    args.fshost_config.emplace_back(component_testing::ConfigCapability{
+        .name = "fuchsia.fshost.GptAll", .value = component_testing::ConfigValue::Bool(true)});
+    return args;
+  }
+
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(
       BlockDevice* gpt = nullptr) {
@@ -2031,13 +2051,11 @@ class AndroidPartitionerWithStorageHostTests : public AndroidPartitionerTests {
   IsolatedDevmgr::Args BaseDevmgrArgs() override {
     IsolatedDevmgr::Args args;
     args.enable_storage_host = true;
+    args.fshost_config.emplace_back(component_testing::ConfigCapability{
+        .name = "fuchsia.fshost.GptAll", .value = component_testing::ConfigValue::Bool(true)});
     return args;
   }
 };
-
-TEST_F(AndroidPartitionerWithStorageHostTests, InitializeWithoutGptFails) {
-  ASSERT_NO_FATAL_FAILURE(InitializeWithoutGptFailsTest());
-}
 
 TEST_F(AndroidPartitionerWithStorageHostTests, Initialize) {
   ASSERT_NO_FATAL_FAILURE(InitializeTest());

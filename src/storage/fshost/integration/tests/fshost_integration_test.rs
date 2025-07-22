@@ -1742,5 +1742,12 @@ async fn gpt_all_binds_multiple_disks() {
     let metadata = volume.get_metadata().await.unwrap().unwrap();
     assert_eq!(metadata.num_blocks, Some(1));
 
+    // One of the disks has one gpt partition and the other has two. Because of a quirk of the
+    // integration tests, the one that actually doesn't have any formatted information (the one
+    // with two partitions) gets registered as the system gpt and exported via the service in
+    // storage-host. We double check that happened how we expect. On storage-host, this function
+    // goes through the PartitionService, confirming that works as well.
+    assert_eq!(gpt_num_partitions(&fixture).await, 2);
+
     fixture.tear_down().await;
 }

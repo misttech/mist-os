@@ -10,7 +10,6 @@ fshost_component_and_config("test-fshost") {
   options = {
     fxfs_blob = false
     data_filesystem_format = "minfs"
-    gpt_all = true
   }
 }
 
@@ -18,6 +17,5 @@ fshost_component_and_config("test-fshost-storage-host") {
   testonly = true
   options = {
     storage_host = true
-    gpt_all = true
   }
 }

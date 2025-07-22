@@ -4,15 +4,18 @@
 
 use crate::device::constants::{
     BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
-    LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
+    LEGACY_DATA_PARTITION_LABEL, LEGACY_FVM_TYPE_GUID, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
 };
 use crate::device::{Device, DeviceTag, Parent};
 use crate::environment::Environment;
 use anyhow::{bail, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_block::Flag as BlockFlag;
-use fs_management::format::constants::ALL_FVM_LABELS;
+use fs_management::format::constants::{
+    ALL_FVM_LABELS, FVM_PARTITION_LABEL, SUPER_PARTITION_LABEL,
+};
 use fs_management::format::DiskFormat;
+use fs_management::FVM_TYPE_GUID;
 
 mod config_matcher;
 pub use config_matcher::get_config_matchers;
@@ -88,24 +91,19 @@ impl Matchers {
 
         // Match the primary GPT.
         if config.gpt {
-            matchers.push(Box::new(SystemGptMatcher::new(if config.storage_host {
+            let gpt_type = if config.storage_host {
                 PartitionMapType::StorageHost
             } else {
                 PartitionMapType::Driver(GPT_DRIVER_PATH)
-            })));
+            };
+            if !config.gpt_all {
+                matchers.push(Box::new(SystemGptMatcher::new(gpt_type)));
+            } else {
+                matchers.push(Box::new(GptAllMatcher::new(gpt_type)))
+            }
         }
 
         // Match non-primary partition tables as configured.
-        if config.gpt_all {
-            matchers.push(Box::new(PartitionMapMatcher::new(
-                DiskFormat::Gpt,
-                if config.storage_host {
-                    PartitionMapType::StorageHost
-                } else {
-                    PartitionMapType::Driver(GPT_DRIVER_PATH)
-                },
-            )));
-        }
         if config.mbr && !config.storage_host {
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Mbr,
@@ -393,9 +391,76 @@ impl Matcher for FvmMatcher {
     }
 }
 
+#[derive(Clone, Copy)]
 enum PartitionMapType {
     StorageHost,
     Driver(&'static str),
+}
+
+/// When gpt_all is enabled, this is the main gpt matcher. Gpt is launched or bound on any
+/// partition that has the gpt disk format. The partitions in the table are snooped to see if any
+/// match a heuristic set of partition labels, and the first gpt that does is registered as the
+/// "system" gpt as well, which will serve it to the paver on the partition service.
+///
+/// Unlike the SystemGptMatcher, this matcher doesn't attempt to tag a partition as the system
+/// partition that doesn't already have a gpt disk format. This means the fidl call for
+/// InitSystemPartitionTables won't work if the gpt isn't formatted or doesn't contain the right
+/// partition to be tagged, but that's okay because if there are multiple gpt devices, we don't
+/// know which would be the right one to initialize.
+struct GptAllMatcher {
+    gpt_type: PartitionMapType,
+    system_gpt_path: Option<String>,
+}
+
+impl GptAllMatcher {
+    fn new(gpt_type: PartitionMapType) -> Self {
+        Self { gpt_type, system_gpt_path: None }
+    }
+}
+
+#[async_trait]
+impl Matcher for GptAllMatcher {
+    async fn match_device(&self, device: &mut dyn Device) -> bool {
+        device.content_format().await.ok() == Some(DiskFormat::Gpt)
+    }
+
+    async fn process_device(
+        &mut self,
+        device: &mut dyn Device,
+        env: &mut dyn Environment,
+    ) -> Result<Option<DeviceTag>, Error> {
+        match self.gpt_type {
+            PartitionMapType::Driver(driver_path) => {
+                // In non-storage-host, just tag the first thing we find.
+                env.attach_driver(device, driver_path).await?;
+                if self.system_gpt_path.is_none() {
+                    self.system_gpt_path = Some(device.topological_path().to_string());
+                    Ok(Some(DeviceTag::SystemPartitionTable))
+                } else {
+                    Ok(None)
+                }
+            }
+            PartitionMapType::StorageHost => {
+                let (gpt, partitions) = env.launch_and_enumerate_gpt_component(device).await?;
+                // TODO(https://fxbug.dev/344018917): remove this heuristic in favor of
+                // assembly-level label configuration options.
+                if self.system_gpt_path.is_none()
+                    && partitions.iter().any(|p| {
+                        p.label == SUPER_PARTITION_LABEL
+                            || (p.label == FVM_PARTITION_LABEL && p.type_guid == FVM_TYPE_GUID)
+                            || p.type_guid == LEGACY_FVM_TYPE_GUID
+                    })
+                {
+                    self.system_gpt_path = Some(device.topological_path().to_string());
+                    env.register_system_gpt(gpt)?;
+                    Ok(Some(DeviceTag::SystemPartitionTable))
+                } else {
+                    env.register_filesystem(gpt);
+                    Ok(None)
+                }
+            }
+        }
+    }
 }
 
 /// Matches the system GPT partition, which is expected to be on a non-removable disk.
@@ -447,7 +512,10 @@ impl Matcher for SystemGptMatcher {
     ) -> Result<Option<DeviceTag>, Error> {
         match self.gpt_type {
             PartitionMapType::Driver(driver_path) => env.attach_driver(device, driver_path).await?,
-            PartitionMapType::StorageHost => env.launch_system_gpt_component(device).await?,
+            PartitionMapType::StorageHost => {
+                let (gpt, _) = env.launch_and_enumerate_gpt_component(device).await?;
+                env.register_system_gpt(gpt)?;
+            }
         };
         self.device_path = Some(device.topological_path().to_string());
         Ok(Some(DeviceTag::SystemPartitionTable))
@@ -485,7 +553,10 @@ impl Matcher for PartitionMapMatcher {
     ) -> Result<Option<DeviceTag>, Error> {
         match self.gpt_type {
             PartitionMapType::Driver(driver_path) => env.attach_driver(device, driver_path).await?,
-            PartitionMapType::StorageHost => env.launch_gpt_component(device).await?,
+            PartitionMapType::StorageHost => {
+                let (gpt, _) = env.launch_and_enumerate_gpt_component(device).await?;
+                env.register_filesystem(gpt);
+            }
         }
         self.device_paths.push(device.topological_path().to_string());
         Ok(None)
@@ -606,10 +677,10 @@ mod tests {
     use crate::config::default_test_config;
     use crate::device::constants::{
         BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
-        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
+        LEGACY_DATA_PARTITION_LABEL, LEGACY_FVM_TYPE_GUID, NAND_BROKER_DRIVER_PATH,
     };
     use crate::device::{DeviceTag, Parent, RegisteredDevices};
-    use crate::environment::{Filesystem, SinglePublisher};
+    use crate::environment::{Filesystem, PartitionInfo, SinglePublisher};
     use crate::matcher::config_matcher::ConfigMatcher;
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
@@ -620,6 +691,7 @@ mod tests {
     use fs_management::format::constants::{
         ALL_FVM_LABELS, FUCHSIA_FVM_PARTITION_LABEL, FVM_PARTITION_LABEL,
     };
+    use fs_management::FVM_TYPE_GUID;
     use fuchsia_sync::Mutex;
     use std::sync::Arc;
 
@@ -764,8 +836,9 @@ mod tests {
         expect_format_data: Mutex<bool>,
         expect_bind_data: Mutex<bool>,
         expect_publish_device: Mutex<Option<String>>,
-        expect_launch_system_gpt_component: Mutex<bool>,
-        expect_launch_gpt_component: Mutex<bool>,
+        expect_launch_and_enumerate_gpt_component: Mutex<Option<Vec<PartitionInfo>>>,
+        expect_register_system_gpt: Mutex<bool>,
+        expect_register_filesystem: Mutex<bool>,
         legacy_data_format: bool,
         create_data_partition: bool,
         registered_devices: Arc<RegisteredDevices>,
@@ -817,14 +890,24 @@ mod tests {
             *self.expect_mount_data_on.get_mut() = true;
             self
         }
-        fn expect_launch_system_gpt_component(mut self) -> Self {
-            *self.expect_launch_system_gpt_component.get_mut() = true;
+        fn expect_launch_and_enumerate_gpt_component(
+            mut self,
+            partitions: Vec<PartitionInfo>,
+        ) -> Self {
+            *self.expect_launch_and_enumerate_gpt_component.get_mut() = Some(partitions);
             self
         }
-        fn expect_launch_gpt_component(mut self) -> Self {
-            *self.expect_launch_gpt_component.get_mut() = true;
+
+        fn expect_register_system_gpt(mut self) -> Self {
+            *self.expect_register_system_gpt.get_mut() = true;
             self
         }
+
+        fn expect_register_filesystem(mut self) -> Self {
+            *self.expect_register_filesystem.get_mut() = true;
+            self
+        }
+
         fn expect_publish_device(mut self, expected_alias: impl ToString) -> Self {
             *self.expect_publish_device.get_mut() = Some(expected_alias.to_string());
             self
@@ -853,23 +936,23 @@ mod tests {
             Ok(())
         }
 
-        async fn launch_system_gpt_component(
+        async fn launch_and_enumerate_gpt_component(
             &mut self,
             _device: &mut dyn Device,
-        ) -> Result<(), Error> {
-            assert_eq!(
-                std::mem::take(&mut *self.expect_launch_system_gpt_component.lock()),
-                true,
-                "Unexpected call to launch_system_gpt_component"
-            );
-            Ok(())
+        ) -> Result<(Filesystem, Vec<PartitionInfo>), Error> {
+            let partitions = self
+                .expect_launch_and_enumerate_gpt_component
+                .lock()
+                .take()
+                .expect("Unexpected call to attach_driver");
+            Ok((Filesystem::Queue(vec![]), partitions))
         }
 
-        async fn launch_gpt_component(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
+        fn register_system_gpt(&mut self, _gpt: Filesystem) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_launch_gpt_component.lock()),
+                std::mem::take(&mut *self.expect_register_system_gpt.lock()),
                 true,
-                "Unexpected call to launch_gpt_component"
+                "Unexpected call to register_system_gpt"
             );
             Ok(())
         }
@@ -1012,7 +1095,11 @@ mod tests {
         }
 
         fn register_filesystem(&mut self, _filesystem: Filesystem) {
-            unreachable!();
+            assert_eq!(
+                std::mem::take(&mut *self.expect_register_filesystem.lock()),
+                true,
+                "Unexpected call to register_filesystem"
+            );
         }
     }
 
@@ -1029,8 +1116,9 @@ mod tests {
             assert!(!*self.expect_mount_data_volume.lock());
             assert!(!*self.expect_format_data.lock());
             assert!(self.expect_publish_device.get_mut().is_none());
-            assert!(!*self.expect_launch_system_gpt_component.lock());
-            assert!(!*self.expect_launch_gpt_component.lock());
+            assert!(self.expect_launch_and_enumerate_gpt_component.get_mut().is_none());
+            assert!(!*self.expect_register_system_gpt.lock());
+            assert!(!*self.expect_register_filesystem.lock());
         }
     }
 
@@ -1495,7 +1583,9 @@ mod tests {
         assert!(matchers
             .match_device(
                 Box::new(MockDevice::new()),
-                &mut MockEnv::new().expect_launch_system_gpt_component()
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(Vec::new())
+                    .expect_register_system_gpt()
             )
             .await
             .expect("match_device failed"));
@@ -1511,41 +1601,134 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_gpt_all_matcher_storage_host() {
+    async fn test_gpt_all_matcher_storage_host_fvm_label() {
         let mut matchers = Matchers::new(&fshost_config::Config {
             storage_host: true,
             gpt_all: true,
             ..default_test_config()
         });
 
-        // The gpt_all matcher will catch this device after SystemGptMatcher passes on it because
-        // the partition type is set.
-        assert!(matchers
-            .match_device(
-                Box::new(
-                    MockDevice::new()
-                        .set_content_format(DiskFormat::Gpt)
-                        .set_partition_type([1u8; 16])
-                ),
-                &mut MockEnv::new().expect_launch_gpt_component()
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Without the partition type, SystemGptMatcher picks it up first.
-        assert!(matchers
-            .match_device(
-                Box::new(MockDevice::new()),
-                &mut MockEnv::new().expect_launch_system_gpt_component()
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Following gpt-formatted devices should get picked up by gpt_all again.
+        // Without the appropriate partitions inside it, this gpt will not be registered as the
+        // system gpt, just registered as a regular filesystem for shutdown.
         assert!(matchers
             .match_device(
                 Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
-                &mut MockEnv::new().expect_launch_gpt_component()
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(vec![PartitionInfo {
+                        label: "test-part".into(),
+                        type_guid: [0; 16]
+                    }])
+                    .expect_register_filesystem()
+            )
+            .await
+            .expect("match_device failed"));
+
+        // With a partition labeled "fvm", it is registered as the system gpt.
+        assert!(matchers
+            .match_device(
+                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(vec![
+                        PartitionInfo { label: "boot_a".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "boot_b".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "fvm".into(), type_guid: FVM_TYPE_GUID }
+                    ])
+                    .expect_register_system_gpt()
+            )
+            .await
+            .expect("match_device failed"));
+
+        // Following gpt-formatted devices, even with the recognized partition labels, just get
+        // registered normally.
+        assert!(matchers
+            .match_device(
+                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(vec![
+                        PartitionInfo { label: "boot_a".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "boot_b".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "fvm".into(), type_guid: FVM_TYPE_GUID }
+                    ])
+                    .expect_register_filesystem()
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_gpt_all_matcher_storage_host_super_label() {
+        let mut matchers = Matchers::new(&fshost_config::Config {
+            storage_host: true,
+            gpt_all: true,
+            ..default_test_config()
+        });
+
+        // Without the appropriate partitions inside it, this gpt will not be registered as the
+        // system gpt, just registered as a regular filesystem for shutdown.
+        assert!(matchers
+            .match_device(
+                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(vec![PartitionInfo {
+                        label: "test-part".into(),
+                        type_guid: [0; 16]
+                    }])
+                    .expect_register_filesystem()
+            )
+            .await
+            .expect("match_device failed"));
+
+        // With a partition labeled "super", it is registered as the system gpt.
+        assert!(matchers
+            .match_device(
+                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(vec![
+                        PartitionInfo { label: "boot_a".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "boot_b".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "super".into(), type_guid: [0; 16] }
+                    ])
+                    .expect_register_system_gpt()
+            )
+            .await
+            .expect("match_device failed"));
+
+        // Following gpt-formatted devices, even with the recognized partition labels, just get
+        // registered normally.
+        assert!(matchers
+            .match_device(
+                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(vec![
+                        PartitionInfo { label: "boot_a".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "boot_b".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "super".into(), type_guid: [0; 16] }
+                    ])
+                    .expect_register_filesystem()
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_gpt_all_matcher_storage_host_legacy_fvm_type_guid() {
+        let mut matchers = Matchers::new(&fshost_config::Config {
+            storage_host: true,
+            gpt_all: true,
+            ..default_test_config()
+        });
+
+        // With a partition with the legacy fvm type guid, it is registered as the system gpt.
+        assert!(matchers
+            .match_device(
+                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
+                &mut MockEnv::new()
+                    .expect_launch_and_enumerate_gpt_component(vec![
+                        PartitionInfo { label: "boot_a".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "boot_b".into(), type_guid: [0; 16] },
+                        PartitionInfo { label: "fvm".into(), type_guid: LEGACY_FVM_TYPE_GUID }
+                    ])
+                    .expect_register_system_gpt()
             )
             .await
             .expect("match_device failed"));
