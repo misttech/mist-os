@@ -21,14 +21,10 @@ ffx_plugin("ffx_target_default") {
 
   deps = [
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:log",
-    "//third_party/rust_crates:serde_json",
   ]
   test_deps = [
     "//src/developer/ffx/lib/writer:lib",

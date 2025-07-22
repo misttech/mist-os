@@ -843,7 +843,6 @@ mod test {
     #[fuchsia::test]
     async fn test_target_identifier() {
         let env = ffx_config::test_env()
-            .runtime_config(ffx_config::keys::STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
             .runtime_config(ffx_config::keys::TARGET_DEFAULT_KEY, "foobar")
             .build()
             .await
@@ -862,11 +861,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_target_identifier_empty() {
-        let env = ffx_config::test_env()
-            .runtime_config(ffx_config::keys::STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
-            .build()
-            .await
-            .expect("initializing config");
+        let env = ffx_config::test_env().build().await.expect("initializing config");
         let mut notifier = ffx_diagnostics::StringNotifier::new();
         let (target, _) = GetTargetSpecifier::new(&env.context)
             .check_with_notifier((), &mut notifier)

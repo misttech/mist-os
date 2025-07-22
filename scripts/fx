@@ -250,7 +250,7 @@ declare -r suggest_py="${fuchsia_dir}/tools/devshell/lib/fx-cmd-suggestions.py"
 
 while [[ $# -ne 0 ]]; do
   case $1 in
-    --dir=*|-d=*|-t=*|--target=*|--disable=*|--enable=*|--invoker=*)
+    --dir=*|-t=*|--target=*|--disable=*|--enable=*|--invoker=*)
       # Turn --switch=value into --switch value.
       arg="$1"
       shift
@@ -310,15 +310,11 @@ while [[ $# -ne 0 ]]; do
       env_name="$(get_disable_feature_env_name "${feature}")"
       export ${env_name}=0
       ;;
-    -d|-t|--target)
+    -t|--target)
       if [[ $# -lt 2 ]]; then
         usage
         fx-error "Missing device name for $1 argument"
         exit 1
-      fi
-      if [[ "$1" == "-d" ]]; then
-        fx-warn "\`fx -d\` will be deprecated and will go away soon."
-        fx-warn "Please use \`fx -t $2 ...\` or \`fx --target $2 ...\` instead."
       fi
       shift # removes -t|--target
       if ! is-valid-device "$1"; then
@@ -338,7 +334,6 @@ while [[ $# -ne 0 ]]; do
       # LINT.IfChange
       export FUCHSIA_NODENAME_SET_BY_FX_FLAG="FUCHSIA_NODENAME_SET_BY_FX_FLAG"
       # LINT.ThenChange(//tools/devshell/lib/vars.sh)
-      _check_default_target="true"
       ;;
     --invoker)
       shift # removes --invoker
@@ -374,7 +369,7 @@ while [[ $# -ne 0 ]]; do
       ;;
     -*)
       usage
-      fx-error "Missing argument to --enable"
+      fx-error "Unknown global argument $1"
       exit 1
       ;;
     *)
@@ -391,12 +386,6 @@ if [[ $# -lt 1 ]]; then
   usage
   fx-error "Missing command name"
   exit 1
-fi
-
-# Check that the $FUCHSIA_NODENAME applied by `-t` is not overridden by ffx
-# user-level configuration.
-if [[ "$_check_default_target" == "true" ]]; then
-  fx-build-dir-if-present && fx-check-ffx-default-target --error || exit 1
 fi
 
 command_name="$1"

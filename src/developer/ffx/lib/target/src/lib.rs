@@ -5,8 +5,8 @@ use addr::TargetIpAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
 use errors::ffx_bail;
-use ffx_config::keys::{STATELESS_DEFAULT_TARGET_CONFIGURATION, TARGET_DEFAULT_KEY};
-use ffx_config::{ConfigError, ConfigLevel, EnvironmentContext};
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::{ConfigLevel, EnvironmentContext};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
@@ -482,22 +482,54 @@ pub async fn knock_target_daemonless(
         .map_err(|e| KnockError::NonCriticalError(e.into()))?
 }
 
-/// Get the target specifier, bypassing stateful configuration
-/// (i.e. ConfigLevel::{User, Build, Global}).
+/// Get the target specifier.
 ///
-/// This is typically how ffx ConfigQueries work under
-/// EnvironmentKind::StrictContext, except ffx strict mode also ignores
-/// environment variables like `$FUCHSIA_NODENAME` and `$FUCHSIA_DEVICE_ADDR`.
-/// This implies default targets aren't supported when using `ffx --strict`;
-/// `--target` must be explicitly specified as an IP address when using
-/// `--strict` to interact with any target.
+/// ## What this function does
 ///
-/// Should be gated behind the `STATELESS_DEFAULT_TARGET_CONFIGURATION`
-/// experimental config flag.
-fn get_target_specifier_stateless(
-    context: &EnvironmentContext,
-) -> Result<Option<String>, ConfigError> {
-    match context
+/// The target specifier is a string taken from the `EnvironmentContext` one of
+/// two ways:
+///
+/// 1. From the top-level `ffx` `-t/--target` command line argument.
+/// 2. From an environment variable. The environment will be searched, in order,
+///    for `$FUCHSIA_DEVICE_ADDR`, and then `$FUCHSIA_NODENAME`. If neither are
+///    set, then this function will return `Ok(None)`.
+///
+/// `ffx` validates that `-t/--target` must be set whenever using `--strict`,
+/// erroring out if the target is not explicitly specified via command line.
+///
+///
+/// ## Underlying config specifics
+///
+/// For more detail: The target specifier always comes from the config key
+/// `target.default`. In step (1) the top level command line argument `--target`
+/// or `-t` sets the `target.default` value for the _runtime config_, which
+/// supersedes all other config levels. For more info see the `ffx_config`
+/// crate.
+///
+/// In step (2) the `target.default` value (at the _default config_) is set to
+/// an array of environment variables. The first environment variable found is
+/// returned. If none are found, this function returns `Ok(None)`.
+/// See the `target.default` field in `//src/developer/ffx/data/config.json`.
+///
+/// Note: Stateful config sources for `target.default` are always bypassed and
+/// ignored here (i.e. ConfigLevel::{User, Build, Global}).
+/// Only stateless config sources (i.e. `ConfigLevel::{Runtime, Default}`) for
+/// `target.default` are used to determine the target specifier.
+/// See https://fxbug.dev/394619603 for the rationale around this decision.
+///
+///
+/// ## How the return value is intended to be used
+///
+/// The result is a string which can be turned into a `TargetInfoQuery` to match
+/// against the available targets (by name, address, etc). We don't return the
+/// query itself because some callers assume the specifier is the name of the
+/// target. This is used for the purposes of error messages or other forms of
+/// presentation. The repo server, for example, only works if an explicit
+/// device name (exact match) is provided.  In other contexts, it is valid for
+/// the specifier to be a substring of the nodename, a network address, serial
+/// number, or vsock identifier.
+pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
+    let target_spec = match context
         .query(TARGET_DEFAULT_KEY)
         .level(Some(ConfigLevel::Runtime))
         .get_optional::<Option<String>>()
@@ -507,30 +539,6 @@ fn get_target_specifier_stateless(
             .level(Some(ConfigLevel::Default))
             .get_optional::<Option<String>>(),
         runtime_result => runtime_result,
-    }
-}
-
-/// Get the target specifier.  This uses the normal config mechanism which
-/// supports flexible config values: it can be a string naming the target, or
-/// a list of strings, in which case the first valid entry is used. (The most
-/// common use of this functionality would be to specify an array of environment
-/// variables, e.g. ["$FUCHSIA_TARGET_ADDR", "FUCHSIA_NODENAME"]).
-/// The result is a string which can be turned into a `TargetInfoQuery` to match
-/// against the available targets (by name, address, etc). We don't return the query
-/// itself, because some callers assume the specifier is the name of the target,
-/// for the purposes of error messages, etc.  E.g. The repo server only works if
-/// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
-/// to be a substring, a network address, etc.
-/// If the `STATELESS_DEFAULT_TARGET_CONFIGURATION` config value is enabled,
-/// only ConfigLevel::{Runtime, Default} will be queried, effectively omitting
-/// default targets set by `ffx config set`/`ffx target default set`.
-pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
-    // TODO(https://fxbug.dev/394619603): Remove the stateful codepath and
-    // cleanup this feature flag once we finish this migration.
-    let target_spec = if context.get(STATELESS_DEFAULT_TARGET_CONFIGURATION)? {
-        get_target_specifier_stateless(context)
-    } else {
-        context.get_optional(TARGET_DEFAULT_KEY)
     }?;
 
     match target_spec {
@@ -600,17 +608,9 @@ mod test {
     use super::*;
     use ffx_command_error::bug;
     use ffx_config::macro_deps::serde_json::Value;
-    use ffx_config::{test_env, test_init, ConfigLevel, TestEnv};
+    use ffx_config::{test_env, test_init, ConfigLevel};
     use futures_lite::future::{pending, ready};
     use tempfile::tempdir;
-
-    async fn rollback_stateless_feature_flag(env: &TestEnv) {
-        env.context
-            .query(STATELESS_DEFAULT_TARGET_CONFIGURATION)
-            .level(Some(ConfigLevel::User))
-            .set(Value::Bool(false))
-            .unwrap();
-    }
 
     #[fuchsia::test]
     async fn test_get_target_specifier_unset() {
@@ -740,102 +740,6 @@ mod test {
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, Some("runtime-default".into()));
-    }
-
-    #[fuchsia::test]
-    async fn test_get_empty_default_target_statefull() {
-        // Explicitly initialize the test with no env vars.
-        // That way, $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are both unset.
-        let env = test_env().build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, None);
-    }
-
-    #[fuchsia::test]
-    async fn test_get_default_target_from_env_statefull() {
-        let env = test_env().env_var("FUCHSIA_NODENAME", "foo-123").build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("foo-123".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_get_default_target_from_config_statefull() {
-        let env = test_init().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(Value::String("some_target".to_owned()))
-            .unwrap();
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("some_target".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_get_default_target_from_runtime_statefull() {
-        let env =
-            test_env().runtime_config(TARGET_DEFAULT_KEY, "runtime-target").build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(Value::String("some_target".to_owned()))
-            .unwrap();
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("runtime-target".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_default_first_target_in_array_statefull() {
-        let env = test_init().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
-        let ts: Vec<Value> = ["t1", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(Value::Array(ts))
-            .unwrap();
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("t1".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_default_missing_env_ignored_statefull() {
-        let env = test_init().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
-        let ts: Vec<Value> =
-            ["$THIS_BETTER_NOT_EXIST", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(Value::Array(ts))
-            .unwrap();
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("t2".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_default_env_present_statefull() {
-        let env = test_env().env_var("MY_LITTLE_TMPKEY", "t1").build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
-        let ts: Vec<Value> =
-            ["$MY_LITTLE_TMPKEY", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(Value::Array(ts))
-            .unwrap();
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("t1".to_owned()));
     }
 
     #[fuchsia::test]

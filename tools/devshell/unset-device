@@ -31,8 +31,6 @@ rm -f "${FUCHSIA_BUILD_DIR}.device"
 # Ensure the below checks will report the correct error message.
 unset FUCHSIA_NODENAME
 
-_status=0
-
 # Check if the user has set a default target via environment variable(s) which
 # can override the effectiveness of this command.
 function overridden-env-var-error {
@@ -40,16 +38,6 @@ function overridden-env-var-error {
   fx-error "However, you've overriden this by setting ${ENV_VARS}."
   fx-error "If you want to clear the default device, please unset the ${ENV_VAR_NAMES} environment variable."
 
-  # Add a newline to distinguish this as a separate warning than the potential
-  # ffx-related warning below.
-  echo >&2
-
-  _status=1
+  exit 1
 }
 fx-if-target-set-by-env overridden-env-var-error
-
-# Check if the user has set a default target via `ffx target default set` which
-# can override the effectiveness of this command.
-fx-check-ffx-default-target --fix
-
-exit "$_status"

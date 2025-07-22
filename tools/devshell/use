@@ -157,17 +157,8 @@ function main {
     else
       fx-warn "If you want to use leave it unset, please unset the ${ENV_VAR_NAMES} environment variable."
     fi
-
-    # Add a newline to distinguish this as a separate warning than the potential
-    # ffx-related warning below.
-    echo >&2
   }
   fx-if-target-set-by-env external-default-target-env-warning
-
-  # Check if the user has set a default target via `ffx target default set`
-  # which can override default targets set by `fx set-device`.
-  # Ignore the return code since this will just be a warning.
-  fx-check-ffx-default-target || true
 }
 
 main "$@"
