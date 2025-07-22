@@ -12,7 +12,7 @@ use diagnostics_log_encoding::{Header, TRACING_FORMAT_LOG_RECORD_TYPE};
 use fidl_fuchsia_diagnostics::StreamMode;
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_async as fasync;
-use fuchsia_async::condition::{Condition, WakerEntry};
+use fuchsia_async::condition::{Condition, ConditionGuard, WakerEntry};
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::Stream;
@@ -20,6 +20,7 @@ use log::debug;
 use pin_project::{pin_project, pinned_drop};
 use ring_buffer::{self, ring_buffer_record_len, RingBuffer};
 use std::collections::VecDeque;
+use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut, Range};
 use std::pin::{pin, Pin};
 use std::sync::{Arc, Weak};
@@ -55,7 +56,11 @@ const IOB_PEER_CLOSED_KEY_BASE: u64 = 0x8000_0000_0000_0000;
 pub type OnInactive = Box<dyn Fn(Arc<ComponentIdentity>) + Send + Sync>;
 
 pub struct SharedBuffer {
-    inner: Condition<InnerAndSockets>,
+    inner: Condition<Inner>,
+
+    // Sockets. This *must* be locked after `inner` and the lock *must* be dropped before
+    // `InnerGuard` is dropped.
+    sockets: Mutex<Slab<Socket>>,
 
     // Callback for when a container is inactive (i.e. no logs and no sockets).
     on_inactive: OnInactive,
@@ -74,20 +79,46 @@ pub struct SharedBuffer {
     _buffer_monitor_task: fasync::Task<()>,
 }
 
-// We have to do this to avoid "cannot borrow as mutable because it is also borrowed as immutable"
-// errors.
-struct InnerAndSockets(Inner, Slab<Socket>);
+struct InnerGuard<'a> {
+    buffer: &'a SharedBuffer,
 
-impl Deref for InnerAndSockets {
-    type Target = Inner;
-    fn deref(&self) -> &Inner {
-        &self.0
+    guard: ManuallyDrop<ConditionGuard<'a, Inner>>,
+
+    // The list of components that should be reported as inactive once the lock is dropped.
+    on_inactive: Vec<Arc<ComponentIdentity>>,
+
+    // If true, wake all the wakers registered with the ConditionGuard.
+    wake: bool,
+}
+
+impl Drop for InnerGuard<'_> {
+    fn drop(&mut self) {
+        if self.wake {
+            for waker in self.guard.drain_wakers() {
+                waker.wake();
+            }
+        }
+        // SAFETY: This is the only place we drop the guard.
+        unsafe {
+            ManuallyDrop::drop(&mut self.guard);
+        }
+        for identity in self.on_inactive.drain(..) {
+            (*self.buffer.on_inactive)(identity);
+        }
     }
 }
 
-impl DerefMut for InnerAndSockets {
-    fn deref_mut(&mut self) -> &mut Inner {
-        &mut self.0
+impl Deref for InnerGuard<'_> {
+    type Target = Inner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.guard
+    }
+}
+
+impl DerefMut for InnerGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.guard
     }
 }
 
@@ -139,17 +170,15 @@ impl SharedBuffer {
         options: SharedBufferOptions,
     ) -> Arc<Self> {
         let this = Arc::new_cyclic(|weak: &Weak<Self>| Self {
-            inner: Condition::new(InnerAndSockets(
-                Inner {
-                    ring_buffer: Arc::clone(&ring_buffer),
-                    containers: Containers::default(),
-                    thread_msg_queue: VecDeque::default(),
-                    last_scanned: 0,
-                    tail: 0,
-                    iob_peers: Slab::default(),
-                },
-                Slab::default(),
-            )),
+            inner: Condition::new(Inner {
+                ring_buffer: Arc::clone(&ring_buffer),
+                containers: Containers::default(),
+                thread_msg_queue: VecDeque::default(),
+                last_scanned: 0,
+                tail: 0,
+                iob_peers: Slab::default(),
+            }),
+            sockets: Mutex::new(Slab::default()),
             on_inactive,
             port: zx::Port::create(),
             event: zx::Event::create(),
@@ -173,8 +202,8 @@ impl SharedBuffer {
         identity: Arc<ComponentIdentity>,
         stats: Arc<LogStreamStats>,
     ) -> ContainerBuffer {
-        let mut inner_and_sockets = self.inner.lock();
-        let Inner { containers, ring_buffer, .. } = &mut inner_and_sockets.0;
+        let mut inner = self.inner.lock();
+        let Inner { containers, ring_buffer, .. } = &mut *inner;
         ContainerBuffer {
             shared_buffer: Arc::clone(self),
             container_id: containers.new_container(ring_buffer, Arc::clone(&identity), stats),
@@ -183,7 +212,7 @@ impl SharedBuffer {
 
     pub async fn flush(&self) {
         let (sender, receiver) = oneshot::channel();
-        self.inner.lock().0.thread_msg_queue.push_back(ThreadMessage::Flush(sender));
+        self.inner.lock().thread_msg_queue.push_back(ThreadMessage::Flush(sender));
         self.event.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         // Ignore failure if Archivist is shutting down.
         let _ = receiver.await;
@@ -192,12 +221,12 @@ impl SharedBuffer {
     /// Returns the number of registered containers in use by the buffer.
     #[cfg(test)]
     pub fn container_count(&self) -> usize {
-        self.inner.lock().0.containers.len()
+        self.inner.lock().containers.len()
     }
 
     /// Terminates the socket thread. The socket thread will drain the sockets before terminating.
     pub async fn terminate(&self) {
-        self.inner.lock().0.thread_msg_queue.push_back(ThreadMessage::Terminate);
+        self.inner.lock().thread_msg_queue.push_back(ThreadMessage::Terminate);
         self.event.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         let join_handle = self.socket_thread.lock().take().unwrap();
         fasync::unblock(|| {
@@ -249,7 +278,7 @@ impl SharedBuffer {
                             // If we wait till later, we introduce windows where we might miss a
                             // socket that should be read.
                             if msg.is_none() {
-                                msg = self.inner.lock().0.thread_msg_queue.pop_front();
+                                msg = self.inner.lock().thread_msg_queue.pop_front();
                             }
                         } else if packet.key() & IOB_PEER_CLOSED_KEY_BASE != 0 {
                             iob_peer_closed.push(packet.key() as u32);
@@ -263,9 +292,7 @@ impl SharedBuffer {
                 deadline = zx::MonotonicInstant::INFINITE_PAST;
             }
 
-            let mut on_inactive = OnInactiveNotifier::new(self);
-            let mut inner_and_sockets = self.inner.lock();
-            let InnerAndSockets(inner, sockets) = &mut *inner_and_sockets;
+            let mut inner = InnerGuard::new(self);
 
             if !iob_peer_closed.is_empty() {
                 // See the comment on `is_active()` for why this is required.
@@ -279,25 +306,29 @@ impl SharedBuffer {
                             if container.should_free() {
                                 inner.containers.free(container_id);
                             } else {
-                                on_inactive.push(&container.identity);
+                                let identity = Arc::clone(&container.identity);
+                                inner.on_inactive.push(identity);
                             }
                         }
                     }
                 }
             }
 
-            for socket_id in sockets_ready.drain(..) {
-                inner.read_socket(sockets, socket_id, &mut on_inactive, |socket| {
-                    socket
-                        .socket
-                        .wait_async_handle(
-                            &self.port,
-                            socket_id.0 as u64,
-                            zx::Signals::OBJECT_READABLE | zx::Signals::OBJECT_PEER_CLOSED,
-                            zx::WaitAsyncOpts::empty(),
-                        )
-                        .unwrap();
-                });
+            {
+                let mut sockets = self.sockets.lock();
+                for socket_id in sockets_ready.drain(..) {
+                    inner.read_socket(&mut sockets, socket_id, |socket| {
+                        socket
+                            .socket
+                            .wait_async_handle(
+                                &self.port,
+                                socket_id.0 as u64,
+                                zx::Signals::OBJECT_READABLE | zx::Signals::OBJECT_PEER_CLOSED,
+                                zx::WaitAsyncOpts::empty(),
+                            )
+                            .unwrap();
+                    });
+                }
             }
 
             // Now that we've processed the sockets, we can process the message.
@@ -332,12 +363,8 @@ impl SharedBuffer {
             fasync::Timer::new(sleep_time).await;
             let head = ring_buffer.wait(last_head).await;
             let Some(this) = this.upgrade() else { return };
-            let mut on_inactive = OnInactiveNotifier::new(&this);
-            let mut inner = this.inner.lock();
-            inner.check_space(head, &mut on_inactive);
-            for waker in inner.drain_wakers() {
-                waker.wake();
-            }
+            let mut inner = InnerGuard::new(&this);
+            inner.check_space(head);
             last_head = head;
         }
     }
@@ -396,52 +423,6 @@ impl Inner {
         }
     }
 
-    /// Pops a message and returns its total size. The caller should call `update_message_ids(head)`
-    /// prior to calling this.
-    ///
-    /// NOTE: This will pop the oldest message in terms of when it was inserted which is *not*
-    /// necessarily the message with the *oldest* timestamp because we might not have received the
-    /// messages in perfect timestamp order. This should be close enough for all use cases we care
-    /// about, and besides, the timestamps can't be trusted anyway.
-    fn pop(&mut self, head: u64, on_inactive: &mut OnInactiveNotifier<'_>) -> Option<usize> {
-        if head == self.tail {
-            return None;
-        }
-
-        // SAFETY: There can be no concurrent writes between `tail..head` and the *only* place
-        // we increment the tail index is just before we leave this function.
-        let record_len = {
-            let (container_id, message, timestamp) = unsafe { self.parse_message(self.tail..head) };
-            let record_len = ring_buffer_record_len(message.len());
-
-            let container = self.containers.get_mut(container_id).unwrap();
-
-            container.stats.increment_rolled_out(record_len);
-            container.msg_ids.start += 1;
-            if let Some(timestamp) = timestamp {
-                container.last_rolled_out_timestamp = timestamp;
-            }
-            if !container.is_active() {
-                if container.should_free() {
-                    self.containers.free(container_id);
-                } else {
-                    on_inactive.push(&container.identity);
-                }
-            }
-
-            record_len
-        };
-
-        // NOTE: This should go last. After incrementing `tail`, the `message` can be overwritten.
-        self.ring_buffer.increment_tail(record_len);
-        self.tail += record_len as u64;
-
-        // The caller should have called `update_message_ids(head)` prior to calling this.
-        assert!(self.last_scanned >= self.tail);
-
-        Some(record_len)
-    }
-
     /// Parses the first message within `range` returns (container_id, message, timestamp).
     ///
     /// # Panics
@@ -468,20 +449,77 @@ impl Inner {
                 .then(|| zx::BootInstant::from_nanos(i64::read_from_bytes(&msg[8..16]).unwrap())),
         )
     }
+}
+
+impl<'a> InnerGuard<'a> {
+    fn new(buffer: &'a SharedBuffer) -> Self {
+        Self {
+            buffer,
+            guard: ManuallyDrop::new(buffer.inner.lock()),
+            on_inactive: Vec::new(),
+            wake: false,
+        }
+    }
+
+    /// Pops a message and returns its total size. The caller should call `update_message_ids(head)`
+    /// prior to calling this.
+    ///
+    /// NOTE: This will pop the oldest message in terms of when it was inserted which is *not*
+    /// necessarily the message with the *oldest* timestamp because we might not have received the
+    /// messages in perfect timestamp order. This should be close enough for all use cases we care
+    /// about, and besides, the timestamps can't be trusted anyway.
+    fn pop(&mut self, head: u64) -> Option<usize> {
+        if head == self.tail {
+            return None;
+        }
+
+        // SAFETY: There can be no concurrent writes between `tail..head` and the *only* place
+        // we increment the tail index is just before we leave this function.
+        let record_len = {
+            let (container_id, message, timestamp) = unsafe { self.parse_message(self.tail..head) };
+            let record_len = ring_buffer_record_len(message.len());
+
+            let container = self.containers.get_mut(container_id).unwrap();
+
+            container.stats.increment_rolled_out(record_len);
+            container.msg_ids.start += 1;
+            if let Some(timestamp) = timestamp {
+                container.last_rolled_out_timestamp = timestamp;
+            }
+            if !container.is_active() {
+                if container.should_free() {
+                    self.containers.free(container_id);
+                } else {
+                    let identity = Arc::clone(&container.identity);
+                    self.on_inactive.push(identity);
+                }
+            }
+
+            record_len
+        };
+
+        // NOTE: This should go last. After incrementing `tail`, the `message` can be overwritten.
+        self.ring_buffer.increment_tail(record_len);
+        self.tail += record_len as u64;
+
+        // The caller should have called `update_message_ids(head)` prior to calling this.
+        assert!(self.last_scanned >= self.tail);
+
+        Some(record_len)
+    }
 
     /// Reads a socket. Calls `rearm` to rearm the socket once it has been drained.
     fn read_socket(
         &mut self,
         sockets: &mut Slab<Socket>,
         socket_id: SocketId,
-        on_inactive: &mut OnInactiveNotifier<'_>,
         rearm: impl FnOnce(&mut Socket),
     ) {
         let Some(socket) = sockets.get_mut(socket_id.0) else { return };
         let container_id = socket.container_id;
 
         loop {
-            self.check_space(self.ring_buffer.head(), on_inactive);
+            self.check_space(self.ring_buffer.head());
 
             let mut data = Vec::with_capacity(MAX_DATAGRAM_LEN_BYTES as usize);
 
@@ -543,7 +581,8 @@ impl Inner {
             if container.should_free() {
                 self.containers.free(container_id);
             } else {
-                on_inactive.push(&container.identity);
+                let identity = Arc::clone(&container.identity);
+                self.on_inactive.push(identity);
             }
         }
     }
@@ -563,11 +602,12 @@ impl Inner {
                 container.stats.ingest_message(msg_len, severity);
             }
             self.last_scanned += ring_buffer_record_len(msg_len) as u64;
+            self.wake = true;
         }
     }
 
     /// Ensures the buffer keeps the required amount of space.
-    fn check_space(&mut self, head: u64, on_inactive: &mut OnInactiveNotifier<'_>) {
+    fn check_space(&mut self, head: u64) {
         self.update_message_ids(head);
         let capacity = self.ring_buffer.capacity();
         let mut space = capacity
@@ -575,7 +615,7 @@ impl Inner {
             .unwrap_or_else(|| panic!("bad range: {:?}", self.tail..head));
         let required_space = capacity * SPACE_THRESHOLD_NUMERATOR / SPACE_THRESHOLD_DENOMINATOR;
         while space < required_space {
-            let Some(amount) = self.pop(head, on_inactive) else { break };
+            let Some(amount) = self.pop(head) else { break };
             space += amount;
         }
     }
@@ -759,7 +799,7 @@ impl ContainerBuffer {
 
     /// Returns a cursor.
     pub fn cursor(&self, mode: StreamMode) -> Option<Cursor> {
-        let mut inner = self.shared_buffer.inner.lock();
+        let mut inner = InnerGuard::new(&self.shared_buffer);
         let Some(mut container) = inner.containers.get_mut(self.container_id) else {
             // We've hit a race where the container has terminated.
             return None;
@@ -799,8 +839,7 @@ impl ContainerBuffer {
     /// The component's data will remain in the buffer until the messages are rolled out. This will
     /// *not* drain sockets or close IOBuffers.
     pub fn terminate(&self) {
-        let mut guard = self.shared_buffer.inner.lock();
-        let InnerAndSockets(inner, sockets) = &mut *guard;
+        let mut inner = InnerGuard::new(&self.shared_buffer);
 
         // See the comment on `is_active()` for why this is required.
         inner.update_message_ids(inner.ring_buffer.head());
@@ -808,8 +847,9 @@ impl ContainerBuffer {
         if let Some(container) = inner.containers.get_mut(self.container_id) {
             container.terminated = true;
             if container.first_socket_id != SocketId::NULL {
+                let mut sockets = self.shared_buffer.sockets.lock();
                 loop {
-                    container.remove_socket(container.first_socket_id, sockets);
+                    container.remove_socket(container.first_socket_id, &mut sockets);
                     if container.first_socket_id == SocketId::NULL {
                         break;
                     }
@@ -818,9 +858,7 @@ impl ContainerBuffer {
             if container.should_free() {
                 inner.containers.free(self.container_id);
             }
-            for waker in guard.drain_wakers() {
-                waker.wake();
-            }
+            inner.wake = true;
         }
     }
 
@@ -836,11 +874,11 @@ impl ContainerBuffer {
 
     /// Adds a socket for this container.
     pub fn add_socket(&self, socket: zx::Socket) {
-        let mut guard = self.shared_buffer.inner.lock();
-        let InnerAndSockets(inner, sockets) = &mut *guard;
+        let mut inner = self.shared_buffer.inner.lock();
         let Some(container) = inner.containers.get_mut(self.container_id) else { return };
         container.stats.open_socket();
         let next = container.first_socket_id;
+        let mut sockets = self.shared_buffer.sockets.lock();
         let socket_id = SocketId(sockets.insert(|socket_id| {
             socket
                 .wait_async_handle(
@@ -886,7 +924,7 @@ pub struct Cursor {
     // waker_entry is used to register a waker for subscribing cursors.
     #[pin]
     #[derivative(Debug = "ignore")]
-    waker_entry: WakerEntry<InnerAndSockets>,
+    waker_entry: WakerEntry<Inner>,
 
     #[derivative(Debug = "ignore")]
     stats: Arc<LogStreamStats>,
@@ -906,9 +944,7 @@ impl Stream for Cursor {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
-        let mut on_inactive = OnInactiveNotifier::new(this.buffer);
-        let mut guard = this.buffer.inner.lock();
-        let InnerAndSockets(inner, sockets) = &mut *guard;
+        let mut inner = InnerGuard::new(this.buffer);
 
         let mut head = inner.ring_buffer.head();
         inner.update_message_ids(head);
@@ -920,6 +956,7 @@ impl Stream for Cursor {
 
         let end_id = match &mut this.end {
             CursorEnd::Snapshot(None) => {
+                let mut sockets = this.buffer.sockets.lock();
                 // Drain the sockets associated with this container first so that we capture
                 // pending messages. Some tests rely on this.
                 let mut socket_id = container.first_socket_id;
@@ -927,7 +964,7 @@ impl Stream for Cursor {
                     let socket = sockets.get_mut(socket_id.0).unwrap();
                     let next = socket.next;
                     // The socket doesn't need to be rearmed here.
-                    inner.read_socket(sockets, socket_id, &mut on_inactive, |_| {});
+                    inner.read_socket(&mut sockets, socket_id, |_| {});
                     socket_id = next;
                 }
 
@@ -996,7 +1033,7 @@ impl Stream for Cursor {
         if container.terminated {
             Poll::Ready(None)
         } else {
-            guard.add_waker(this.waker_entry, cx.waker().clone());
+            inner.guard.add_waker(this.waker_entry, cx.waker().clone());
             Poll::Pending
         }
     }
@@ -1105,32 +1142,6 @@ struct Socket {
     // Sockets are stored as a linked list for each container.
     prev: SocketId,
     next: SocketId,
-}
-
-/// Sends on-inactive notifications when there are no more sockets. This *must* be dropped when no
-/// locks are held.
-struct OnInactiveNotifier<'a>(&'a SharedBuffer, Vec<Arc<ComponentIdentity>>);
-
-impl<'a> OnInactiveNotifier<'a> {
-    fn new(buffer: &'a SharedBuffer) -> Self {
-        Self(buffer, Vec::new())
-    }
-
-    fn push(&mut self, identity: &Arc<ComponentIdentity>) {
-        self.1.push(Arc::clone(identity));
-    }
-
-    fn notify(&mut self) {
-        for identity in self.1.drain(..) {
-            (*self.0.on_inactive)(identity);
-        }
-    }
-}
-
-impl Drop for OnInactiveNotifier<'_> {
-    fn drop(&mut self) {
-        self.notify();
-    }
 }
 
 #[cfg(test)]
