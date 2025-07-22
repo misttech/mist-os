@@ -138,9 +138,10 @@ pub struct MyTool {
 }
 ```
 
-This is only required when a command supports `ffx --strict`, which will verify
-that the target is specified on the command line, unless the tool has this
-declaration.
+This is only _required_ when a command supports `ffx --strict`, which will
+verify that the target is specified on the command line, unless the tool has
+this declaration. However, it is good practice to add this attribute to any tool
+that does not interact with a target device.
 
 ## FIDL protocols {#fidl-proxy}
 
