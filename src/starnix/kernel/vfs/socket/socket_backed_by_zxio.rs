@@ -162,8 +162,11 @@ impl ZxioBackedSocket {
         ZxioBackedSocket { zxio, cookie: Default::default() }
     }
 
-    pub fn sendmsg(
+    fn sendmsg(
         &self,
+        locked: &mut Locked<FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
         addr: &Option<SocketAddress>,
         data: &mut dyn InputBuffer,
         cmsgs: Vec<ControlMessage>,
@@ -178,6 +181,14 @@ impl ZxioBackedSocket {
             Some(_) => return error!(EINVAL),
             None => vec![],
         };
+
+        // Run eBPF programs for UDP sockets.
+        if matches!(
+            (socket.domain, socket.socket_type),
+            (SocketDomain::Inet | SocketDomain::Inet6, SocketType::Datagram)
+        ) {
+            self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::UdpSendMsg, &addr)?;
+        }
 
         let map_errors = |res: Result<Result<usize, ZxioErrorCode>, zx::Status>| {
             res.map_err(|status| match status {
@@ -221,8 +232,11 @@ impl ZxioBackedSocket {
         Ok(sent_bytes)
     }
 
-    pub fn recvmsg(
+    fn recvmsg(
         &self,
+        locked: &mut Locked<FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<RecvMessageInfo, Errno> {
@@ -267,6 +281,20 @@ impl ZxioBackedSocket {
                 info
             }
         };
+
+        // Run eBPF programs for UDP sockets.
+        if matches!(
+            (socket.domain, socket.socket_type),
+            (SocketDomain::Inet | SocketDomain::Inet6, SocketType::Datagram)
+        ) {
+            self.run_sockaddr_ebpf(
+                locked,
+                socket,
+                current_task,
+                SockAddrOp::UdpRecvMsg,
+                &info.address,
+            )?;
+        }
 
         Ok(info)
     }
@@ -466,9 +494,9 @@ impl SocketOps for ZxioBackedSocket {
 
     fn read(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
@@ -478,7 +506,7 @@ impl SocketOps for ZxioBackedSocket {
             return error!(EAGAIN);
         }
 
-        let mut info = self.recvmsg(data, flags)?;
+        let mut info = self.recvmsg(locked, socket, current_task, data, flags)?;
 
         let bytes_read = info.bytes_read;
 
@@ -498,9 +526,9 @@ impl SocketOps for ZxioBackedSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
@@ -516,7 +544,15 @@ impl SocketOps for ZxioBackedSocket {
         // Ignore destination address if this is a stream socket.
         let dest_address =
             if socket.socket_type == SocketType::Stream { &None } else { dest_address };
-        self.sendmsg(dest_address, data, cmsgs, SocketMessageFlags::empty())
+        self.sendmsg(
+            locked,
+            socket,
+            current_task,
+            dest_address,
+            data,
+            cmsgs,
+            SocketMessageFlags::empty(),
+        )
     }
 
     fn wait_async(

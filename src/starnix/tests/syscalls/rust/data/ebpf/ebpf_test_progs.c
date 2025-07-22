@@ -43,6 +43,10 @@ struct test_result {
 
   __u64 optlen;
   __u64 optval_size;
+
+  __u32 sockaddr_family;
+  __u32 sockaddr_port;
+  __u32 sockaddr_ip[4];
 };
 
 // Global variable that will be stored in a .data section (which is a BPF map).
@@ -110,7 +114,7 @@ int sock_release_prog(struct bpf_sock* sock) {
   // by the cookie stored in the `target_cookie` map.
   int zero = 0;
   __u64* cookie = bpf_map_lookup_elem(&target_cookie, &zero);
-  if (!cookie || *cookie != bpf_get_sk_cookie(sock)) {
+  if (!cookie || *cookie != bpf_get_socket_cookie(sock)) {
     return 1;
   }
 
@@ -242,4 +246,60 @@ int getsockopt_prog(struct bpf_sockopt* sockopt) {
   }
 
   return 1;
+}
+
+int udprecv6_prog(struct bpf_sock_addr* sockaddr) {
+  // Check that the packet corresponds to the target socket. It is identified
+  // by the cookie stored in the `target_cookie` map.
+  int zero = 0;
+  __u64* cookie = bpf_map_lookup_elem(&target_cookie, &zero);
+  if (!cookie || *cookie != bpf_get_socket_cookie(sockaddr)) {
+    return 1;
+  }
+
+  int* counter = bpf_map_lookup_elem(&count, &zero);
+  if (!counter) {
+    return 1;
+  }
+
+  __sync_fetch_and_add(counter, 1);
+
+  struct test_result result = {
+      .sockaddr_port = sockaddr->user_port,
+      .sockaddr_family = sockaddr->user_family,
+  };
+  result.sockaddr_ip[0] = sockaddr->user_ip6[0];
+  result.sockaddr_ip[1] = sockaddr->user_ip6[1];
+  result.sockaddr_ip[2] = sockaddr->user_ip6[2];
+  result.sockaddr_ip[3] = sockaddr->user_ip6[3];
+  bpf_map_update_elem(&test_result, &zero, &result, 0);
+
+  return 1;
+}
+
+int udpsend4_prog(struct bpf_sock_addr* sockaddr) {
+  // Check that the packet corresponds to the target socket. It is identified
+  // by the cookie stored in the `target_cookie` map.
+  int zero = 0;
+  __u64* cookie = bpf_map_lookup_elem(&target_cookie, &zero);
+  if (!cookie || *cookie != bpf_get_socket_cookie(sockaddr)) {
+    return 1;
+  }
+
+  int* counter = bpf_map_lookup_elem(&count, &zero);
+  if (!counter) {
+    return 1;
+  }
+
+  __sync_fetch_and_add(counter, 1);
+
+  struct test_result result = {
+      .sockaddr_port = sockaddr->user_port,
+      .sockaddr_family = sockaddr->user_family,
+  };
+  result.sockaddr_ip[0] = sockaddr->user_ip4;
+  bpf_map_update_elem(&test_result, &zero, &result, 0);
+
+  // Fail sendmsg() with EFAIL.
+  return 0;
 }

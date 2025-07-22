@@ -869,6 +869,7 @@ pub static BPF_SOCK_ADDR_INET4_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         BPF_SOCK_ADDR_ID.clone(),
         vec![
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_family)),
             scalar_u32_field(offset_of!(bpf_sock_addr, user_ip4)),
             scalar_u32_field(offset_of!(bpf_sock_addr, user_port)),
             scalar_u32_field(offset_of!(bpf_sock_addr, family)),

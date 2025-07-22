@@ -288,6 +288,10 @@ mod tests {
 
         optlen: u64,
         optval_size: u64,
+
+        sockaddr_family: u32,
+        sockaddr_port: u32,
+        sockaddr_ip: [u32; 4],
     }
 
     #[repr(C)]
@@ -439,7 +443,7 @@ mod tests {
             .expect("Failed to poll ringbuffer FD");
         assert!(signaled == None);
 
-        let socket = UdpSocket::bind("127.0.0.1:0").expect("Failed ot create UPD socket");
+        let socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UPD socket");
         let cookie = get_socket_cookie(socket.as_fd()).expect("Failed to get SO_COOKIE");
         program.maps.set_target_cookie(cookie);
 
@@ -465,7 +469,7 @@ mod tests {
         );
 
         // Setup a listening socket.
-        let recv_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed ot create UPD socket");
+        let recv_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UPD socket");
         let recv_addr = recv_socket.local_addr().expect("Failed to get local socket addr");
 
         let cookie = get_socket_cookie(recv_socket.as_fd()).expect("Failed to get SO_COOKIE");
@@ -474,7 +478,7 @@ mod tests {
         let _attached = program.attach();
 
         // Send a UDP packet.
-        let send_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed ot create UPD socket");
+        let send_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UPD socket");
         send_socket.send_to(&[1, 2, 3], recv_addr).expect("Failed to send UDP packet");
 
         // The ring buffer FD should be signalled by the program.
@@ -659,5 +663,80 @@ mod tests {
         // If the program changes retval then it's returned to the userspace.
         let err = get_rcvbuf(58).expect_err("getsockopt expected to fail");
         assert_eq!(err.raw_os_error(), Some(5));
+    }
+
+    #[test]
+    fn ebpf_udp_recv() {
+        root_required!();
+
+        let program = LoadedProgram::new(
+            "udprecv6_prog",
+            linux_uapi::bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+            linux_uapi::bpf_attach_type_BPF_CGROUP_UDP6_RECVMSG,
+        );
+
+        let recv_socket = UdpSocket::bind("[::]:0").expect("Failed to create UPD socket");
+        let cookie = get_socket_cookie(recv_socket.as_fd()).expect("Failed to get SO_COOKIE");
+        program.maps.set_target_cookie(cookie);
+
+        let _attached = program.attach();
+
+        let send_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UPD socket");
+
+        // Send an IPv4 packet.
+        let dst_port = recv_socket.local_addr().expect("Failed to get local ip").port();
+        send_socket
+            .send_to(&[1, 2, 3], ("127.0.0.1", dst_port))
+            .expect("Failed to send UDP packet");
+
+        // The program shouldn't be called until `recv()`.
+        assert_eq!(program.maps.get_count(), 0);
+
+        let mut buf = [0; 10];
+        recv_socket.recv(&mut buf).expect("Failed to receive a UDP packet");
+
+        assert_eq!(program.maps.get_count(), 1);
+        let test_result = program.maps.get_test_result();
+        let src_port = send_socket.local_addr().expect("Failed to get local ip").port();
+        assert_eq!(test_result.sockaddr_port, src_port.to_be() as u32);
+        assert_eq!(test_result.sockaddr_family, linux_uapi::AF_INET6);
+        assert_eq!(test_result.sockaddr_ip, [0, 0, 0xffff0000, 0x0100007F]);
+    }
+
+    #[test]
+    fn ebpf_udp_send() {
+        root_required!();
+
+        let program = LoadedProgram::new(
+            "udpsend4_prog",
+            linux_uapi::bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+            linux_uapi::bpf_attach_type_BPF_CGROUP_UDP4_SENDMSG,
+        );
+
+        let _attached = program.attach();
+
+        let send_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UPD socket");
+
+        let dst_port = 65535;
+
+        // sendto() should still succeed.
+        send_socket
+            .send_to(&[1, 2, 3], ("127.0.0.1", dst_port))
+            .expect("Failed to send UDP packet");
+
+        // sendto() should be blocked once we set target socket cookie.
+        let cookie = get_socket_cookie(send_socket.as_fd()).expect("Failed to get SO_COOKIE");
+        program.maps.set_target_cookie(cookie);
+
+        let err = send_socket
+            .send_to(&[1, 2, 3], ("127.0.0.1", 65535))
+            .expect_err("sendto expected to fail");
+        assert_eq!(err.raw_os_error(), Some(libc::EPERM));
+
+        assert_eq!(program.maps.get_count(), 1);
+        let test_result = program.maps.get_test_result();
+        assert_eq!(test_result.sockaddr_port, dst_port.to_be() as u32);
+        assert_eq!(test_result.sockaddr_family, linux_uapi::AF_INET);
+        assert_eq!(test_result.sockaddr_ip[0], 0x0100007F);
     }
 }

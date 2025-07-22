@@ -233,12 +233,19 @@ impl SockAddrProgram {
         &self,
         current_task: &'a CurrentTask,
         addr: &'a mut BpfSockAddr<'a>,
+        can_block: bool,
     ) -> SockAddrProgramResult {
         let mut run_context = EbpfRunContextImpl::new(current_task);
-        if self.0.run_with_1_argument(&mut run_context, addr) == 0 {
-            SockAddrProgramResult::Block
-        } else {
-            SockAddrProgramResult::Allow
+        match self.0.run_with_1_argument(&mut run_context, addr) {
+            // UDP_RECVMSG programs are not allowed to block the packet.
+            0 if can_block => SockAddrProgramResult::Block,
+            1 => SockAddrProgramResult::Allow,
+            result => {
+                // TODO(https://fxbug.dev/413490751): Change this to panic once
+                // result validation is implemented in the eBPF verifier.
+                log_error!("eBPF program returned invalid result: {}", result);
+                SockAddrProgramResult::Allow
+            }
         }
     }
 }
@@ -420,19 +427,23 @@ pub struct CgroupEbpfProgramSet {
     inet6_connect: AttachedSockAddrProgramCell,
     udp4_sendmsg: AttachedSockAddrProgramCell,
     udp6_sendmsg: AttachedSockAddrProgramCell,
+    udp4_recvmsg: AttachedSockAddrProgramCell,
+    udp6_recvmsg: AttachedSockAddrProgramCell,
     sock_create: AttachedSockProgramCell,
     sock_release: AttachedSockProgramCell,
     set_sockopt: AttachedSockOptProgramCell,
     get_sockopt: AttachedSockOptProgramCell,
 }
 
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum SockAddrOp {
     Bind,
     Connect,
     UdpSendMsg,
+    UdpRecvMsg,
 }
 
-#[derive(Debug)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum SockOp {
     Create,
     Release,
@@ -452,6 +463,8 @@ impl CgroupEbpfProgramSet {
             AttachType::CgroupInet6Connect => Ok(&self.inet6_connect),
             AttachType::CgroupUdp4Sendmsg => Ok(&self.udp4_sendmsg),
             AttachType::CgroupUdp6Sendmsg => Ok(&self.udp6_sendmsg),
+            AttachType::CgroupUdp4Recvmsg => Ok(&self.udp4_recvmsg),
+            AttachType::CgroupUdp6Recvmsg => Ok(&self.udp6_recvmsg),
             _ => error!(ENOTSUP),
         }
     }
@@ -499,6 +512,8 @@ impl CgroupEbpfProgramSet {
             (SocketDomain::Inet6, SockAddrOp::Connect) => Some(&self.inet6_connect),
             (SocketDomain::Inet, SockAddrOp::UdpSendMsg) => Some(&self.udp4_sendmsg),
             (SocketDomain::Inet6, SockAddrOp::UdpSendMsg) => Some(&self.udp6_sendmsg),
+            (SocketDomain::Inet, SockAddrOp::UdpRecvMsg) => Some(&self.udp4_recvmsg),
+            (SocketDomain::Inet6, SockAddrOp::UdpRecvMsg) => Some(&self.udp6_recvmsg),
             _ => None,
         };
         let prog_guard = prog_cell.map(|cell| cell.read(locked));
@@ -536,7 +551,10 @@ impl CgroupEbpfProgramSet {
             _ => return error!(EAFNOSUPPORT),
         }
 
-        Ok(prog.run(current_task, &mut bpf_sockaddr))
+        // UDP recvmsg programs are not allowed to filter packets.
+        let can_block = op != SockAddrOp::UdpRecvMsg;
+
+        Ok(prog.run(current_task, &mut bpf_sockaddr, can_block))
     }
 
     pub fn run_sock_prog(
@@ -709,10 +727,6 @@ enum AttachLocation {
 
     // Attached in Netstack.
     Netstack,
-
-    // The program type is not attached, but attach operation should not fail
-    // to avoid breaking apps that depend it.
-    Stub,
 }
 
 impl TryFrom<AttachType> for AttachLocation {
@@ -726,6 +740,8 @@ impl TryFrom<AttachType> for AttachLocation {
             | AttachType::CgroupInet6Connect
             | AttachType::CgroupUdp4Sendmsg
             | AttachType::CgroupUdp6Sendmsg
+            | AttachType::CgroupUdp4Recvmsg
+            | AttachType::CgroupUdp6Recvmsg
             | AttachType::CgroupInetSockCreate
             | AttachType::CgroupInetSockRelease
             | AttachType::CgroupGetsockopt
@@ -733,14 +749,6 @@ impl TryFrom<AttachType> for AttachLocation {
 
             AttachType::CgroupInetEgress | AttachType::CgroupInetIngress => {
                 Ok(AttachLocation::Netstack)
-            }
-
-            AttachType::CgroupUdp4Recvmsg | AttachType::CgroupUdp6Recvmsg => {
-                track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_ATTACH", attach_type);
-
-                // Fake success to avoid breaking apps that depends on the attachments above.
-                // TODO(https://fxbug.dev/391380601) Actually implement these attachments.
-                Ok(AttachLocation::Stub)
             }
 
             AttachType::CgroupDevice
@@ -876,8 +884,6 @@ impl EbpfAttachments {
                 check_root_cgroup_fd(locked, current_task, target_fd)?;
                 self.attach_prog_in_netstack(attach_type, program)
             }
-
-            (AttachLocation::Stub, _) => Ok(SUCCESS),
         }
     }
 
@@ -939,10 +945,6 @@ impl EbpfAttachments {
             (AttachLocation::Netstack, _) => {
                 check_root_cgroup_fd(locked, current_task, target_fd)?;
                 self.detach_prog_in_netstack(attach_type)
-            }
-
-            (AttachLocation::Stub, _) => {
-                error!(ENOTSUP)
             }
         }
     }
