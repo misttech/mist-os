@@ -6,6 +6,7 @@ use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
 use crate::identity::ComponentIdentity;
 use crate::logs::repository::LogsRepository;
 use crate::logs::servers::LogServer;
+use crate::logs::shared_buffer::create_ring_buffer;
 use crate::logs::stored_message::StoredMessage;
 use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, WriteEventParams,
@@ -85,8 +86,12 @@ impl TestHarness {
     fn new(hold_sinks: bool) -> Self {
         let scope = fasync::Scope::new();
         let inspector = Inspector::default();
-        let log_manager =
-            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+        let log_manager = LogsRepository::new(
+            create_ring_buffer(1_000_000),
+            std::iter::empty(),
+            inspector.root(),
+            scope.new_child(),
+        );
         let log_server = LogServer::new(Arc::clone(&log_manager), scope.new_child());
 
         let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
@@ -397,8 +402,12 @@ pub async fn debuglog_test(
     scope: fasync::Scope,
 ) -> Inspector {
     let inspector = Inspector::default();
-    let lm =
-        LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+    let lm = LogsRepository::new(
+        create_ring_buffer(1_000_000),
+        std::iter::empty(),
+        inspector.root(),
+        scope.new_child(),
+    );
     let log_server = LogServer::new(Arc::clone(&lm), scope);
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
     log_server.spawn(log_stream);

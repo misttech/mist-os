@@ -844,6 +844,7 @@ impl PerformanceConfig {
 mod tests {
     use super::*;
     use crate::diagnostics::AccessorStats;
+    use crate::logs::shared_buffer::create_ring_buffer;
     use assert_matches::assert_matches;
     use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, BatchIteratorMarker};
     use fuchsia_inspect::{Inspector, Node};
@@ -856,8 +857,12 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo =
-            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+        let log_repo = LogsRepository::new(
+            create_ring_buffer(1_000_000),
+            std::iter::empty(),
+            inspector.root(),
+            scope.new_child(),
+        );
         let inspect_repo =
             Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], scope.new_child()));
         let server = ArchiveAccessorServer::new(
@@ -917,8 +922,12 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo =
-            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+        let log_repo = LogsRepository::new(
+            create_ring_buffer(1_000_000),
+            std::iter::empty(),
+            inspector.root(),
+            scope.new_child(),
+        );
         let inspect_repo =
             Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], scope.new_child()));
         let server = Arc::new(ArchiveAccessorServer::new(
@@ -1060,8 +1069,12 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo =
-            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+        let log_repo = LogsRepository::new(
+            create_ring_buffer(1_000_000),
+            std::iter::empty(),
+            inspector.root(),
+            scope.new_child(),
+        );
         let inspect_repo =
             Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], scope.new_child()));
         let server = ArchiveAccessorServer::new(

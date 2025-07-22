@@ -7,10 +7,6 @@
         "//src/diagnostics/archivist/meta/config_capabilities.shard.cml",
         "syslog/client.shard.cml",
     ],
-    program: {
-        binary: "bin/archivist",
-        use_next_vdso: "true",
-    },
     use: [
         {
             protocol: [ "fuchsia.boot.ReadOnlyLog" ],
@@ -18,12 +14,6 @@
         {
             config: "fuchsia.diagnostics.EnableKlog",
             key: "enable_klog",
-            availability: "optional",
-            type: "bool",
-        },
-        {
-            config: "fuchsia.diagnostics.LogToDebuglog",
-            key: "log_to_debuglog",
             availability: "optional",
             type: "bool",
         },

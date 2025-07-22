@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::identity::ComponentIdentity;
+use crate::logs::repository::ARCHIVIST_MONIKER;
 use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
 use derivative::Derivative;
@@ -34,6 +35,20 @@ const SPACE_THRESHOLD_DENOMINATOR: usize = 4;
 // The default amount of time that Archivist will sleep for to reduce how often it wakes up to
 // handle log messages.
 const DEFAULT_SLEEP_TIME: Duration = Duration::from_millis(200);
+
+pub fn create_ring_buffer(capacity: usize) -> ring_buffer::Reader {
+    RingBuffer::create(calculate_real_size_given_desired_capacity(capacity))
+}
+
+fn calculate_real_size_given_desired_capacity(capacity: usize) -> usize {
+    // We always keep spare space in the buffer so that we don't drop messages.  This is controlled
+    // by SPACE_THRESHOLD_NUMERATOR & SPACE_THRESHOLD_DENOMINATOR.  Round up capacity so that
+    // `capacity` reflects the actual amount of log data we can store.
+    let page_size = zx::system_get_page_size() as usize;
+    (capacity * SPACE_THRESHOLD_DENOMINATOR
+        / (SPACE_THRESHOLD_DENOMINATOR - SPACE_THRESHOLD_NUMERATOR))
+        .next_multiple_of(page_size)
+}
 
 const IOB_PEER_CLOSED_KEY_BASE: u64 = 0x8000_0000_0000_0000;
 
@@ -116,48 +131,34 @@ impl Default for SharedBufferOptions {
     }
 }
 
-fn calculate_real_size_given_desired_capacity(capacity: usize) -> usize {
-    // To reduce how often we drop messages, we always keep spare space in the buffer.
-    capacity * SPACE_THRESHOLD_DENOMINATOR
-        / (SPACE_THRESHOLD_DENOMINATOR - SPACE_THRESHOLD_NUMERATOR)
-}
-
 impl SharedBuffer {
+    /// Returns a new shared buffer and the container for Archivist.
     pub fn new(
-        capacity: usize,
+        ring_buffer: ring_buffer::Reader,
         on_inactive: OnInactive,
         options: SharedBufferOptions,
     ) -> Arc<Self> {
-        let this = Arc::new_cyclic(|weak: &Weak<Self>| {
-            // We always keep spare space in the buffer so that we don't drop messages. This is
-            // controlled by SPACE_THRESHOLD_NUMERATOR & SPACE_THRESHOLD_DENOMINATOR. Round up
-            // capacity so that `capacity` reflects the actual amount of log data we can store.
-            let page_size = zx::system_get_page_size() as usize;
-            let (ring_buffer, reader) = RingBuffer::new(
-                calculate_real_size_given_desired_capacity(capacity).next_multiple_of(page_size),
-            );
-            Self {
-                inner: Condition::new(InnerAndSockets(
-                    Inner {
-                        ring_buffer,
-                        containers: Containers::default(),
-                        thread_msg_queue: VecDeque::default(),
-                        last_scanned: 0,
-                        tail: 0,
-                        iob_peers: Slab::default(),
-                    },
-                    Slab::default(),
-                )),
-                on_inactive,
-                port: zx::Port::create(),
-                event: zx::Event::create(),
-                socket_thread: Mutex::default(),
-                _buffer_monitor_task: fasync::Task::spawn(Self::buffer_monitor_task(
-                    Weak::clone(weak),
-                    reader,
-                    options.sleep_time,
-                )),
-            }
+        let this = Arc::new_cyclic(|weak: &Weak<Self>| Self {
+            inner: Condition::new(InnerAndSockets(
+                Inner {
+                    ring_buffer: Arc::clone(&ring_buffer),
+                    containers: Containers::default(),
+                    thread_msg_queue: VecDeque::default(),
+                    last_scanned: 0,
+                    tail: 0,
+                    iob_peers: Slab::default(),
+                },
+                Slab::default(),
+            )),
+            on_inactive,
+            port: zx::Port::create(),
+            event: zx::Event::create(),
+            socket_thread: Mutex::default(),
+            _buffer_monitor_task: fasync::Task::spawn(Self::buffer_monitor_task(
+                Weak::clone(weak),
+                ring_buffer,
+                options.sleep_time,
+            )),
         });
 
         *this.socket_thread.lock() = Some({
@@ -690,6 +691,7 @@ impl ContainerInfo {
         self.first_socket_id != SocketId::NULL
             || self.iob_count > 0
             || self.msg_ids.end != self.msg_ids.start
+            || ARCHIVIST_MONIKER.get().is_some_and(|m| *self.identity == *m)
     }
 
     // # Panics
@@ -720,6 +722,11 @@ pub struct ContainerBuffer {
 }
 
 impl ContainerBuffer {
+    /// Returns the tag used by IOBuffers used for this component.
+    pub fn iob_tag(&self) -> u64 {
+        self.container_id.0 as u64
+    }
+
     /// Ingests a new message.
     ///
     /// If the message is invalid, it is dropped.
@@ -819,11 +826,12 @@ impl ContainerBuffer {
 
     /// Returns true if the container has messages, sockets or IOBuffers.
     pub fn is_active(&self) -> bool {
-        self.shared_buffer.inner.lock().containers.get(self.container_id).is_some_and(|c| {
-            c.msg_ids.start != c.msg_ids.end
-                || c.first_socket_id != SocketId::NULL
-                || c.iob_count > 0
-        })
+        self.shared_buffer
+            .inner
+            .lock()
+            .containers
+            .get(self.container_id)
+            .is_some_and(|c| c.is_active())
     }
 
     /// Adds a socket for this container.
@@ -1127,7 +1135,7 @@ impl Drop for OnInactiveNotifier<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::{SharedBuffer, SharedBufferOptions};
+    use super::{create_ring_buffer, SharedBuffer, SharedBufferOptions};
     use crate::logs::shared_buffer::LazyItem;
     use crate::logs::stats::LogStreamStats;
     use crate::logs::testing::make_message;
@@ -1166,7 +1174,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn push_one_message() {
-        let buffer = SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default());
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(MAX_MESSAGE_SIZE),
+            Box::new(|_| {}),
+            Default::default(),
+        );
         let container_buffer =
             buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default());
         let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
@@ -1190,7 +1202,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn message_too_short() {
-        let buffer = SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default());
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(MAX_MESSAGE_SIZE),
+            Box::new(|_| {}),
+            Default::default(),
+        );
 
         let container_buffer =
             buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default());
@@ -1201,7 +1217,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn bad_type() {
-        let buffer = SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default());
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(MAX_MESSAGE_SIZE),
+            Box::new(|_| {}),
+            Default::default(),
+        );
         let container_buffer =
             buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default());
         container_buffer.push_back(&[0x77; 16]);
@@ -1211,7 +1231,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn message_truncated() {
-        let buffer = SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default());
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(MAX_MESSAGE_SIZE),
+            Box::new(|_| {}),
+            Default::default(),
+        );
         let container_buffer =
             buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default());
         let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
@@ -1223,7 +1247,7 @@ mod tests {
     #[fuchsia::test]
     async fn buffer_wrapping() {
         let buffer = SharedBuffer::new(
-            MAX_MESSAGE_SIZE,
+            create_ring_buffer(MAX_MESSAGE_SIZE),
             Box::new(|_| {}),
             SharedBufferOptions { sleep_time: Duration::ZERO },
         );
@@ -1281,7 +1305,7 @@ mod tests {
             let on_inactive = Arc::clone(&on_inactive);
             let identity = Arc::clone(&identity);
             Arc::new(SharedBuffer::new(
-                MAX_MESSAGE_SIZE,
+                create_ring_buffer(MAX_MESSAGE_SIZE),
                 Box::new(move |i| {
                     assert_eq!(i, identity);
                     on_inactive.fetch_add(1, Ordering::Relaxed);
@@ -1312,7 +1336,7 @@ mod tests {
         async {}.await;
 
         let buffer = SharedBuffer::new(
-            MAX_MESSAGE_SIZE,
+            create_ring_buffer(MAX_MESSAGE_SIZE),
             Box::new(|_| {}),
             SharedBufferOptions { sleep_time: Duration::ZERO },
         );
@@ -1353,7 +1377,11 @@ mod tests {
     #[fuchsia::test]
     async fn cursor_subscribe() {
         for mode in [StreamMode::Subscribe, StreamMode::SnapshotThenSubscribe] {
-            let buffer = SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default());
+            let buffer = SharedBuffer::new(
+                create_ring_buffer(MAX_MESSAGE_SIZE),
+                Box::new(|_| {}),
+                Default::default(),
+            );
             let container =
                 Arc::new(buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default()));
             let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
@@ -1410,7 +1438,7 @@ mod tests {
         // out after the cursor has started.
         for pass in 0..2 {
             let buffer = SharedBuffer::new(
-                MAX_MESSAGE_SIZE,
+                create_ring_buffer(MAX_MESSAGE_SIZE),
                 Box::new(|_| {}),
                 SharedBufferOptions { sleep_time: Duration::ZERO },
             );
@@ -1464,7 +1492,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn drained_post_termination_cursors() {
-        let buffer = SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default());
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(MAX_MESSAGE_SIZE),
+            Box::new(|_| {}),
+            Default::default(),
+        );
         let container =
             Arc::new(buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default()));
         let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
@@ -1493,7 +1525,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn empty_post_termination_cursors() {
-        let buffer = SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default());
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(MAX_MESSAGE_SIZE),
+            Box::new(|_| {}),
+            Default::default(),
+        );
         let container =
             Arc::new(buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default()));
 
@@ -1511,7 +1547,7 @@ mod tests {
     #[fuchsia::test]
     async fn snapshot_then_subscribe_works_when_only_dropped_notifications_are_returned() {
         let buffer = SharedBuffer::new(
-            MAX_MESSAGE_SIZE,
+            create_ring_buffer(MAX_MESSAGE_SIZE),
             Box::new(|_| {}),
             SharedBufferOptions { sleep_time: Duration::ZERO },
         );
@@ -1544,7 +1580,7 @@ mod tests {
     #[fuchsia::test]
     async fn recycled_container_slot() {
         let buffer = Arc::new(SharedBuffer::new(
-            MAX_MESSAGE_SIZE,
+            create_ring_buffer(MAX_MESSAGE_SIZE),
             Box::new(|_| {}),
             SharedBufferOptions { sleep_time: Duration::ZERO },
         ));
@@ -1584,7 +1620,11 @@ mod tests {
         let inspector = Inspector::new(InspectorConfig::default());
         let stats: Arc<LogStreamStats> =
             Arc::new(LogStreamStats::default().with_inspect(inspector.root(), "test").unwrap());
-        let buffer = Arc::new(SharedBuffer::new(65536, Box::new(|_| {}), Default::default()));
+        let buffer = Arc::new(SharedBuffer::new(
+            create_ring_buffer(65536),
+            Box::new(|_| {}),
+            Default::default(),
+        ));
         let container_a = Arc::new(buffer.new_container_buffer(Arc::new(vec!["a"].into()), stats));
         let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
 
@@ -1674,8 +1714,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn socket() {
-        let buffer =
-            Arc::new(SharedBuffer::new(MAX_MESSAGE_SIZE, Box::new(|_| {}), Default::default()));
+        let buffer = Arc::new(SharedBuffer::new(
+            create_ring_buffer(MAX_MESSAGE_SIZE),
+            Box::new(|_| {}),
+            Default::default(),
+        ));
         let container_a =
             Arc::new(buffer.new_container_buffer(Arc::new(vec!["a"].into()), Arc::default()));
         let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
@@ -1721,7 +1764,7 @@ mod tests {
         let on_inactive = Arc::new(AtomicU64::new(0));
         let a_identity = Arc::new(vec!["a"].into());
         let buffer = Arc::new(SharedBuffer::new(
-            MAX_MESSAGE_SIZE,
+            create_ring_buffer(MAX_MESSAGE_SIZE),
             {
                 let on_inactive = Arc::clone(&on_inactive);
                 let a_identity = Arc::clone(&a_identity);
@@ -1778,7 +1821,11 @@ mod tests {
     #[fuchsia::test]
     async fn flush() {
         let a_identity = Arc::new(vec!["a"].into());
-        let buffer = Arc::new(SharedBuffer::new(1024 * 1024, Box::new(|_| {}), Default::default()));
+        let buffer = Arc::new(SharedBuffer::new(
+            create_ring_buffer(1024 * 1024),
+            Box::new(|_| {}),
+            Default::default(),
+        ));
         let container_a = Arc::new(buffer.new_container_buffer(a_identity, Arc::default()));
         let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
 

@@ -25,7 +25,9 @@ rustc_library("rust") {
 
   deps = [
     "//sdk/rust/zx",
+    "//src/lib/diagnostics/log/types",
     "//third_party/rust_crates:bitfield",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]

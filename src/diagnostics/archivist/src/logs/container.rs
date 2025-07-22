@@ -397,6 +397,10 @@ impl LogsArtifactsContainer {
         self.state.lock().is_initializing = false;
         self.check_inactive();
     }
+
+    pub fn buffer(&self) -> &ContainerBuffer {
+        &self.buffer
+    }
 }
 
 fn maybe_add_rolled_out_error(rolled_out_messages: &mut u64, mut msg: Data<Logs>) -> Data<Logs> {
@@ -479,7 +483,7 @@ impl PartialOrd for Interest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::shared_buffer::SharedBuffer;
+    use crate::logs::shared_buffer::{create_ring_buffer, SharedBuffer};
     use fidl_fuchsia_diagnostics::{ComponentSelector, StringSelector};
     use fidl_fuchsia_diagnostics_types::Severity;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
@@ -501,7 +505,11 @@ mod tests {
                 .with_inspect(inspect::component::inspector().root(), identity.moniker.to_string())
                 .expect("failed to attach component log stats"),
         );
-        let buffer = SharedBuffer::new(1024 * 1024, Box::new(|_| {}), Default::default());
+        let buffer = SharedBuffer::new(
+            create_ring_buffer(1024 * 1024),
+            Box::new(|_| {}),
+            Default::default(),
+        );
         let container = Arc::new(LogsArtifactsContainer::new(
             identity,
             std::iter::empty(),

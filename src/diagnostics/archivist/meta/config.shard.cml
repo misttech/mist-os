@@ -8,9 +8,6 @@
         // Drain klog.
         enable_klog: { type: "bool" },
 
-        // Send archivist logs to klog.
-        log_to_debuglog: { type: "bool" },
-
         // Maximum value of the sum of original (format in which they were written) log message
         // sizes stored in the archivist. Logs are rolled out when this value is exceeded.
         logs_max_cached_original_bytes: { type: "uint64" },

@@ -78,7 +78,7 @@ impl Archivist {
     /// Creates new instance, sets up inspect and adds 'archive' directory to output folder.
     /// Also installs `fuchsia.diagnostics.Archive` service.
     /// Call `install_log_services`
-    pub async fn new(config: Config) -> Self {
+    pub async fn new(ring_buffer: ring_buffer::Reader, config: Config) -> Self {
         let general_scope = fasync::Scope::new_with_name("general");
         let servers_scope = fasync::Scope::new_with_name("servers");
 
@@ -106,7 +106,7 @@ impl Archivist {
                     .ok()
             });
         let logs_repo = LogsRepository::new(
-            config.logs_max_cached_original_bytes,
+            ring_buffer,
             initial_interests,
             component::inspector().root(),
             general_scope.new_child_with_name("logs_repository"),

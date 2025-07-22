@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::{mem, thread};
 use zx::Signals;
 
-const MAX_SERIAL_WRITE_SIZE: usize = 256;
+pub const MAX_SERIAL_WRITE_SIZE: usize = 256;
 
 /// Function that forwards logs from Archivist to the serial port. Logs will be filtered by
 /// `allow_serial_log_tags` to include logs in the serial output, and `deny_serial_log_tags` to

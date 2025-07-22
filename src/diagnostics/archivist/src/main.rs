@@ -10,87 +10,28 @@ use anyhow::{Context, Error};
 use archivist_config::Config;
 use archivist_lib::archivist::Archivist;
 use archivist_lib::component_lifecycle;
-use diagnostics_log::PublishOptions;
+use archivist_lib::logs::repository::{ARCHIVIST_MONIKER, ARCHIVIST_TAG};
+use archivist_lib::logs::serial::MAX_SERIAL_WRITE_SIZE;
+use archivist_lib::logs::shared_buffer::create_ring_buffer;
+use diagnostics_log_encoding::encode::{
+    Encoder, EncoderOpts, LogEvent, MutableBuffer, WriteEventParams,
+};
+use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_component::client;
 use fuchsia_component::server::{MissingStartupHandle, ServiceFs};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
-use log::{debug, info, LevelFilter};
-use std::fmt::Write;
+use fuchsia_runtime as rt;
+use log::{debug, LevelFilter};
+use moniker::Moniker;
+use std::fmt;
+use std::io::Cursor;
+use std::sync::atomic::{AtomicU64, Ordering};
+use zx::AsHandleRef;
 
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
-
-struct GlobalLogger;
-
-struct StringVisitor(String);
-impl log::kv::VisitSource<'_> for StringVisitor {
-    fn visit_pair(
-        &mut self,
-        key: log::kv::Key<'_>,
-        value: log::kv::Value<'_>,
-    ) -> Result<(), log::kv::Error> {
-        value.visit(StringValueVisitor { buf: &mut self.0, key: key.as_str() })
-    }
-}
-struct StringValueVisitor<'a> {
-    buf: &'a mut String,
-    key: &'a str,
-}
-impl log::kv::VisitValue<'_> for StringValueVisitor<'_> {
-    fn visit_any(&mut self, value: log::kv::Value<'_>) -> Result<(), log::kv::Error> {
-        write!(self.buf, " {}={}", self.key, value).expect("writing into strings does not fail");
-        Ok(())
-    }
-}
-
-impl log::Log for GlobalLogger {
-    fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
-        // Always true, because the actual severity
-        // is controlled with log::set_max_level
-        // and log::max_level.
-        true
-    }
-
-    fn log(&self, record: &log::Record<'_>) {
-        if self.enabled(record.metadata()) {
-            let msg_buffer = format!("{}", record.args());
-            let mut visitor = StringVisitor(msg_buffer);
-            let _ = record.key_values().visit(&mut visitor);
-            let msg_buffer = visitor.0;
-
-            let msg_prefix = format!("[archivist] {}: ", record.level());
-
-            // &str pointing to the remains of the message.
-            let mut msg = msg_buffer.as_str();
-            while !msg.is_empty() {
-                // Split the message if it contains a newline or is too long for
-                // the debug log.
-                let mut split_point = if let Some(newline_pos) = msg.find('\n') {
-                    newline_pos + 1
-                } else {
-                    msg.len()
-                };
-                split_point =
-                    std::cmp::min(split_point, zx::sys::ZX_LOG_RECORD_DATA_MAX - msg_prefix.len());
-
-                // Ensure the split point is at a character boundary - splitting
-                // in the middle of a unicode character causes a panic.
-                while !msg.is_char_boundary(split_point) {
-                    split_point -= 1;
-                }
-
-                let msg_to_write = format!("{}{}\n", msg_prefix, &msg[..split_point]);
-
-                std::io::Write::write_all(&mut std::io::stdout(), msg_to_write.as_bytes()).unwrap();
-                msg = &msg[split_point..];
-            }
-        }
-    }
-
-    fn flush(&self) {}
-}
 
 fn main() -> Result<(), Error> {
     let config = Config::take_from_startup_handle();
@@ -105,13 +46,27 @@ fn main() -> Result<(), Error> {
 }
 
 async fn async_main(config: Config) -> Result<(), Error> {
-    init_diagnostics(&config).await.context("initializing diagnostics")?;
+    let ring_buffer = create_ring_buffer(config.logs_max_cached_original_bytes as usize);
+
+    // We assume that this is the embedded version of Archivist if enable_klog is false.
+    let is_embedded = !config.enable_klog;
+
+    if let Err(e) = init_diagnostics(&ring_buffer, is_embedded).await {
+        let msg = format!("archivist: init_diagnostics failed: {e:?}\n");
+        let msg = msg.as_bytes();
+        for chunk in msg.chunks(MAX_SERIAL_WRITE_SIZE) {
+            unsafe {
+                zx::sys::zx_debug_write(chunk.as_ptr(), chunk.len());
+            }
+        }
+        return Err(e).context("init_diagnostics");
+    }
+
     component::inspector()
         .root()
         .record_child("config", |config_node| config.record_inspect(config_node));
 
-    let is_embedded = !config.log_to_debuglog;
-    let archivist = Archivist::new(config).await;
+    let archivist = Archivist::new(ring_buffer, config).await;
     debug!("Archivist initialized from configuration.");
 
     let startup_handle =
@@ -128,18 +83,136 @@ async fn async_main(config: Config) -> Result<(), Error> {
     Ok(())
 }
 
-async fn init_diagnostics(config: &Config) -> Result<(), Error> {
-    if config.log_to_debuglog {
-        stdout_to_debuglog::init().await.unwrap();
-        log::set_max_level(LevelFilter::Info);
-        log::set_logger(&GlobalLogger).unwrap();
-    } else {
-        diagnostics_log::initialize(PublishOptions::default().tags(&["embedded"]))?;
+async fn init_diagnostics(
+    ring_buffer: &ring_buffer::Reader,
+    is_embedded: bool,
+) -> Result<(), Error> {
+    struct Logger {
+        iob: zx::Iob,
+        dropped: AtomicU64,
     }
 
-    if config.log_to_debuglog {
-        info!("archivist: started.");
+    // Used for redirecting stdout and stderr.
+    struct Redirector {
+        severity: log::Level,
     }
+
+    impl fdio_zxio::FdOps for Redirector {
+        fn writev(&self, iovecs: &[zx::sys::zx_iovec_t]) -> Result<usize, zx::Status> {
+            struct Iovecs<'a>(&'a [zx::sys::zx_iovec_t]);
+
+            impl fmt::Display for Iovecs<'_> {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    let mut iter = self.0.iter();
+                    let last = iter.next_back();
+                    for vec in iter {
+                        f.write_str(&String::from_utf8_lossy(unsafe {
+                            std::slice::from_raw_parts(vec.buffer, vec.capacity)
+                        }))?;
+                    }
+                    // Strip the trailing \n if there is one.
+                    if let Some(last) = last {
+                        let amount = if last.capacity > 0
+                            && unsafe { *last.buffer.add(last.capacity - 1) } == b'\n'
+                        {
+                            last.capacity - 1
+                        } else {
+                            last.capacity
+                        };
+                        f.write_str(&String::from_utf8_lossy(unsafe {
+                            std::slice::from_raw_parts(last.buffer, amount)
+                        }))?;
+                    }
+                    Ok(())
+                }
+            }
+
+            log::log!(self.severity, "{}", Iovecs(iovecs));
+
+            Ok(iovecs.iter().map(|i| i.capacity).sum())
+        }
+
+        fn isatty(&self) -> Result<bool, zx::Status> {
+            Ok(true)
+        }
+    }
+
+    thread_local! {
+        static PID_AND_TID: (zx::Koid, zx::Koid) = (
+            rt::process_self()
+                .get_koid()
+                .unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX)),
+            rt::with_thread_self(|thread| {
+                thread.get_koid().unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX))
+            }),
+        );
+    }
+
+    impl log::Log for Logger {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            // NOTE: we handle minimum severity directly through the log max_level. So we call,
+            // log::set_max_level, log::max_level where appropriate.
+            true
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
+            let mut encoder = Encoder::new(Cursor::new(&mut buf[..]), EncoderOpts::default());
+            let (pid, tid) = PID_AND_TID.with(|r| *r);
+            let tags: &[&str] = &[];
+            let dropped = self.dropped.swap(0, Ordering::Relaxed);
+            if encoder
+                .write_event(WriteEventParams {
+                    event: LogEvent::new(record),
+                    tags,
+                    metatags: std::iter::empty(),
+                    pid,
+                    tid,
+                    dropped,
+                })
+                .is_err()
+            {
+                self.dropped.fetch_add(dropped + 1, Ordering::Relaxed);
+                return;
+            }
+            let end = encoder.inner().cursor();
+            if self.iob.write(Default::default(), 0, &encoder.inner().get_ref()[..end]).is_err() {
+                self.dropped.fetch_add(dropped + 1, Ordering::Relaxed);
+            }
+        }
+
+        fn flush(&self) {}
+    }
+
+    // To set up logging for Archivist, we need to create the ring buffer early. Later, we will
+    // create a container for it with this moniker.
+    ARCHIVIST_MONIKER
+        .set(if is_embedded {
+            Moniker::parse_str("archivist").unwrap()
+        } else {
+            Moniker::parse_str("bootstrap/archivist").unwrap()
+        })
+        .unwrap();
+
+    log::set_max_level(LevelFilter::Info);
+    log::set_boxed_logger(Box::new(Logger {
+        iob: ring_buffer.new_iob_writer(ARCHIVIST_TAG)?.0,
+        dropped: AtomicU64::new(0),
+    }))?;
+
+    // NOTE: For the embedded archivist, we use the Debug level because there are integration tests
+    // that will fail if they spuriously see log messages from Archivist. As an example, the
+    // fuchsia-async library can write to stderr when tasks appear to be stalled, and that can
+    // happen on slow builders (through no fault of Archivist). If that happens, then it can cause
+    // some integration tests that are particular about what log messages are produced to fail.
+    fdio_zxio::bind_to_fd_with_ops(
+        Redirector { severity: if is_embedded { log::Level::Debug } else { log::Level::Info } },
+        1,
+    )?;
+    fdio_zxio::bind_to_fd_with_ops(
+        Redirector { severity: if is_embedded { log::Level::Debug } else { log::Level::Warn } },
+        2,
+    )?;
 
     component::init_inspector_with_size(INSPECTOR_SIZE);
     component::health().set_starting_up();
