@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use argh::FromArgs;
 use cm_rust::DictionaryDecl;
 use component_events::events::*;
@@ -11,10 +11,11 @@ use diagnostics_log_encoding::encode::EncoderOpts;
 use diagnostics_log_encoding::parse::parse_record;
 use diagnostics_log_encoding::{Argument, Record};
 use diagnostics_log_validator_utils as utils;
+use fidl::endpoints::RequestStream;
 use fidl_fuchsia_diagnostics_types::{Interest, Severity};
 use fidl_fuchsia_logger::{
-    LogSinkMarker, LogSinkRequest, LogSinkRequestStream, LogSinkWaitForInterestChangeResponder,
-    MAX_DATAGRAM_LEN_BYTES,
+    LogSinkMarker, LogSinkOnInitRequest, LogSinkRequest, LogSinkRequestStream,
+    LogSinkWaitForInterestChangeResponder, MAX_DATAGRAM_LEN_BYTES,
 };
 use fidl_fuchsia_validate_logs::{
     self as fvalidate, LogSinkPuppetMarker, LogSinkPuppetProxy, PuppetInfo, RecordSpec, MAX_ARGS,
@@ -33,6 +34,7 @@ use proptest::prelude::{any, Arbitrary, Just, ProptestConfig, Strategy, TestCase
 use proptest::prop_oneof;
 use proptest::test_runner::{Reason, RngAlgorithm, TestRng, TestRunner};
 use proptest_derive::Arbitrary;
+use ring_buffer::{self, RingBuffer};
 use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::ops::Range;
@@ -50,17 +52,47 @@ struct Opt {
     /// if true, invalid unicode will be generated in the initial puppet started message.
     #[argh(switch, long = "test-invalid-unicode")]
     test_invalid_unicode: bool,
+    /// if true, use an IOBuffer rather than a socket.
+    #[argh(switch)]
+    use_iob: bool,
 }
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let Opt { test_stop_listener, ignored_tags, test_invalid_unicode } = argh::from_env();
-    Puppet::launch(true, test_stop_listener, test_invalid_unicode, ignored_tags).await?.test().await
+    let Opt { test_stop_listener, ignored_tags, test_invalid_unicode, use_iob } = argh::from_env();
+    Puppet::launch(true, test_stop_listener, test_invalid_unicode, ignored_tags, use_iob)
+        .await?
+        .test()
+        .await
+}
+
+enum SocketOrIob {
+    Socket(Socket),
+    Iob(ring_buffer::Reader),
+}
+
+impl SocketOrIob {
+    async fn read_datagram(&mut self, buf: &mut Vec<u8>) -> Result<usize, zx::Status> {
+        match self {
+            SocketOrIob::Socket(socket) => socket.read_datagram(buf).await,
+            SocketOrIob::Iob(ring_buffer) => {
+                *buf = ring_buffer.read_message().await.unwrap().1;
+                Ok(buf.len())
+            }
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        match self {
+            SocketOrIob::Socket(socket) => socket.is_closed(),
+            _ => false,
+        }
+    }
 }
 
 struct Puppet {
     start_time: zx::BootInstant,
-    socket: Socket,
+    socket_or_iob: SocketOrIob,
     info: PuppetInfo,
     proxy: LogSinkPuppetProxy,
     _puppet_stopped_watchdog: Task<()>,
@@ -71,17 +103,30 @@ struct Puppet {
 
 async fn demux_fidl(
     stream: &mut LogSinkRequestStream,
-) -> Result<(Socket, LogSinkWaitForInterestChangeResponder), Error> {
+    use_iob: bool,
+) -> Result<(SocketOrIob, LogSinkWaitForInterestChangeResponder), Error> {
     let mut interest_listener = None;
     let mut log_socket = None;
     let mut got_initial_interest_request = false;
+
+    // Always send an iob.
+    let ring_buffer = RingBuffer::create(zx::system_get_page_size() as usize * 32);
+
+    stream
+        .control_handle()
+        .send_on_init(LogSinkOnInitRequest {
+            buffer: Some(ring_buffer.new_iob_writer(1).unwrap().0),
+            ..Default::default()
+        })
+        .unwrap();
+
     loop {
         match stream.next().await.unwrap()? {
             LogSinkRequest::Connect { socket: _, control_handle: _ } => {
-                return Err(anyhow::format_err!("shouldn't ever receive legacy connections"));
+                return Err(anyhow!("shouldn't ever receive legacy connections"));
             }
             LogSinkRequest::WaitForInterestChange { responder } => {
-                if got_initial_interest_request {
+                if got_initial_interest_request || use_iob {
                     interest_listener = Some(responder);
                 } else {
                     info!("Unblocking component by sending an empty interest.");
@@ -90,17 +135,24 @@ async fn demux_fidl(
                 }
             }
             LogSinkRequest::ConnectStructured { socket, control_handle: _ } => {
-                log_socket = Some(socket);
+                if use_iob {
+                    return Err(anyhow!("ConnectStructured unexpected"));
+                } else {
+                    log_socket = Some(socket);
+                }
             }
             LogSinkRequest::_UnknownMethod { .. } => unreachable!(),
         }
-        match (log_socket, interest_listener) {
-            (Some(socket), Some(listener)) => {
-                return Ok((Socket::from_socket(socket), listener));
-            }
-            (s, i) => {
-                log_socket = s;
-                interest_listener = i;
+        if use_iob || log_socket.is_some() {
+            if let Some(listener) = interest_listener {
+                return Ok((
+                    if use_iob {
+                        SocketOrIob::Iob(ring_buffer)
+                    } else {
+                        SocketOrIob::Socket(Socket::from_socket(log_socket.unwrap()))
+                    },
+                    listener,
+                ));
             }
         }
     }
@@ -116,7 +168,7 @@ async fn wait_for_severity(
 ) -> Result<LogSinkWaitForInterestChangeResponder, Error> {
     match stream.next().await.unwrap()? {
         LogSinkRequest::WaitForInterestChange { responder } => Ok(responder),
-        _ => Err(anyhow::format_err!("Unexpected FIDL message")),
+        _ => Err(anyhow!("Unexpected FIDL message")),
     }
 }
 
@@ -126,6 +178,7 @@ impl Puppet {
         supports_stopping_listener: bool,
         test_invalid_unicode: bool,
         ignored_tags: Vec<String>,
+        use_iob: bool,
     ) -> Result<Self, Error> {
         let builder = RealmBuilder::new().await?;
         let puppet = builder.add_child("puppet", "#meta/puppet.cm", ChildOptions::new()).await?;
@@ -200,15 +253,19 @@ impl Puppet {
         info!("Waiting for LogSink connection.");
         let mut stream = incoming_log_sink_requests.next().await.unwrap();
 
-        info!("Waiting for LogSink.ConnectStructured call.");
-        let (socket, interest_listener) = demux_fidl(&mut stream).await?;
+        if use_iob {
+            info!("Using IOBuffer. Waiting for LogSink.WaitForInterestChange");
+        } else {
+            info!("Waiting for LogSink.ConnectStructured call.");
+        }
+        let (socket_or_iob, interest_listener) = demux_fidl(&mut stream, use_iob).await?;
 
         info!("Requesting info from the puppet.");
         let info = proxy.get_info().await?;
         info!("Ensuring we received the init message.");
-        assert!(!socket.is_closed());
+        assert!(!socket_or_iob.is_closed());
         let mut puppet = Self {
-            socket,
+            socket_or_iob,
             proxy,
             info,
             start_time,
@@ -255,10 +312,10 @@ impl Puppet {
         Ok(puppet)
     }
 
-    async fn read_record(&self, args: ReadRecordArgs) -> Result<Option<TestRecord>, Error> {
+    async fn read_record(&mut self, args: ReadRecordArgs) -> Result<Option<TestRecord>, Error> {
         loop {
             let mut buf: Vec<u8> = vec![];
-            let bytes_read = self.socket.read_datagram(&mut buf).await.unwrap();
+            let bytes_read = self.socket_or_iob.read_datagram(&mut buf).await.unwrap();
             if bytes_read == 0 {
                 continue;
             }
@@ -273,10 +330,10 @@ impl Puppet {
 
     // For the CPP puppet it's necessary to strip out the TID from the comparison
     // as interest events happen outside the main thread due to HLCPP.
-    async fn read_record_no_tid(&self, expected_tid: u64) -> Result<Option<TestRecord>, Error> {
+    async fn read_record_no_tid(&mut self, expected_tid: u64) -> Result<Option<TestRecord>, Error> {
         loop {
             let mut buf: Vec<u8> = vec![];
-            let bytes_read = self.socket.read_datagram(&mut buf).await.unwrap();
+            let bytes_read = self.socket_or_iob.read_datagram(&mut buf).await.unwrap();
             if bytes_read == 0 {
                 continue;
             }
@@ -296,8 +353,11 @@ impl Puppet {
         }
     }
 
-    async fn test(&self) -> Result<(), Error> {
-        info!("Starting the LogSink socket test.");
+    async fn test(&mut self) -> Result<(), Error> {
+        info!(
+            "Starting the LogSink {} test.",
+            if matches!(self.socket_or_iob, SocketOrIob::Socket(_)) { "socket" } else { "iob" }
+        );
 
         let mut runner = TestRunner::new_with_rng(
             ProptestConfig { cases: 2048, failure_persistence: None, ..Default::default() },
@@ -343,12 +403,12 @@ impl Puppet {
         }
 
         proptest_thread.join().unwrap();
-        info!("Tested LogSink socket successfully.");
+        info!("Tested LogSink successfully.");
         Ok(())
     }
 
     async fn run_spec(
-        &self,
+        &mut self,
         spec: RecordSpec,
         new_file_line_rules: bool,
     ) -> Result<(TestRecord, Range<zx::BootInstant>), Error> {
@@ -383,7 +443,7 @@ fn severity_to_string(severity: Severity) -> String {
 }
 
 async fn assert_logged_severities(
-    puppet: &Puppet,
+    puppet: &mut Puppet,
     severities: &[Severity],
     new_file_line_rules: bool,
 ) -> Result<(), Error> {
@@ -498,7 +558,7 @@ where
         if let LogSinkRequest::ConnectStructured { socket, control_handle: _ } =
             stream.next().await.unwrap()?
         {
-            puppet.socket = Socket::from_socket(socket);
+            puppet.socket_or_iob = SocketOrIob::Socket(Socket::from_socket(socket));
         }
     } else {
         // Reset severity to TRACE so we get all messages
