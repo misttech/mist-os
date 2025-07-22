@@ -75,10 +75,10 @@ constexpr zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights
 }
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(27)
-void ForwardRequestToRemote(fio::wire::DirectoryOpenRequest* request, Vfs::Open2Result open_result,
+void ForwardRequestToRemote(fio::wire::DirectoryOpenRequest* request, Vfs::OpenResult open_result,
                             fio::Rights parent_rights) {
 #else
-void ForwardRequestToRemote(fio::wire::DirectoryOpen3Request* request, Vfs::Open2Result open_result,
+void ForwardRequestToRemote(fio::wire::DirectoryOpen3Request* request, Vfs::OpenResult open_result,
                             fio::Rights parent_rights) {
 #endif
   ZX_DEBUG_ASSERT(open_result.vnode()->IsRemote());
@@ -242,7 +242,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     if (path.back() == '/') {
       flags |= fio::OpenFlags::kDirectory;
     }
-    zx::result open_options = VnodeConnectionOptions::FromOpen1Flags(flags);
+    zx::result open_options = DeprecatedOptions::FromOpen1Flags(flags);
     if (open_options.is_error()) {
       FS_PRETTY_TRACE_DEBUG("[DirectoryDeprecatedOpen] invalid flags: ", request->flags,
                             ", path: ", request->path);
@@ -277,17 +277,17 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     if (!fs)
       return ZX_ERR_CANCELED;
 
-    return fs->Open(vnode(), path, *open_options, rights())
+    return fs->DeprecatedOpen(vnode(), path, *open_options, rights())
         .visit([&](auto&& result) -> zx_status_t {
           using ResultT = std::decay_t<decltype(result)>;
-          if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Error>) {
+          if constexpr (std::is_same_v<ResultT, Vfs::DeprecatedOpenResult::Error>) {
             return result;
-          } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Remote>) {
+          } else if constexpr (std::is_same_v<ResultT, Vfs::DeprecatedOpenResult::Remote>) {
             result.vnode->DeprecatedOpenRemote(open_options->ToIoV1Flags(), {},
                                                fidl::StringView::FromExternal(result.path),
                                                std::move(request->object));
             return ZX_OK;
-          } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Ok>) {
+          } else if constexpr (std::is_same_v<ResultT, Vfs::DeprecatedOpenResult::Ok>) {
             return fs->ServeDeprecated(result.vnode, request->object.TakeChannel(), result.options);
           }
         });
@@ -296,7 +296,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   // On any errors, if the channel wasn't consumed, we send an OnOpen event if required, and try
   // closing the channel with an epitaph describing the error.
   if (status != ZX_OK) {
-    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] error: ", zx_status_get_string(status));
+    FS_PRETTY_TRACE_DEBUG("[DirectoryDeprecatedOpen] error: ", zx_status_get_string(status));
     if (request->object.is_valid()) {
       if (request->flags & fio::wire::OpenFlags::kDescribe) {
         // Ignore errors since there is nothing we can do if this fails.
@@ -335,9 +335,9 @@ void DirectoryConnection::Open3(Open3RequestView request, Open3Completer::Sync& 
       return zx::error(ZX_ERR_CANCELED);
     // Handle opening (or creating) the vnode.
     std::string_view path(request->path.data(), request->path.size());
-    zx::result open_result = fs->Open3(vnode(), path, request->flags, &request->options, rights);
+    zx::result open_result = fs->Open(vnode(), path, request->flags, &request->options, rights);
     if (open_result.is_error()) {
-      FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open] Vfs::Open3 failed: ",
+      FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open] Vfs::Open failed: ",
                             open_result.status_string());
       return open_result.take_error();
     }

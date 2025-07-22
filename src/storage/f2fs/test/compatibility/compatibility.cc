@@ -371,7 +371,7 @@ void FuchsiaOperator::Mount(MountOptions opt) {
   auto vnode_or = fs_->GetVnode(fs_->GetSuperblockInfo().GetRootIno());
   ASSERT_TRUE(vnode_or.is_ok());
   root_ = *std::move(vnode_or);
-  ASSERT_EQ(root_->Open(root_->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
+  ASSERT_EQ(root_->Open(root_->DeprecatedValidateOptions(fs::DeprecatedOptions()).value(), nullptr),
             ZX_OK);
 }
 
@@ -483,8 +483,8 @@ FuchsiaOperator::GetLastDirVnodeAndFileName(std::string_view absolute_path) {
   return zx::ok(make_pair(std::move(vnode), path.filename().string()));
 }
 
-fs::VnodeConnectionOptions ConvertFlag(int flags) {
-  fs::VnodeConnectionOptions options;
+fs::DeprecatedOptions ConvertFlag(int flags) {
+  fs::DeprecatedOptions options;
 
   // TODO: O_PATH, O_DIRECT, O_TRUNC, O_APPEND
   switch (flags & O_ACCMODE) {

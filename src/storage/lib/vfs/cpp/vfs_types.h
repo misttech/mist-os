@@ -67,7 +67,7 @@ enum class VnodeProtocol : uint8_t {
 };
 
 // Options specified during opening and cloning.
-struct VnodeConnectionOptions {
+struct DeprecatedOptions {
   fuchsia_io::OpenFlags flags;
   fuchsia_io::Rights rights;
 
@@ -89,15 +89,15 @@ struct VnodeConnectionOptions {
     return kSupportedIo1Protocols;
   }
 
-  // Converts from fuchsia.io/Directory.Open1 flags to |VnodeConnectionOptions|. Note that in io1,
+  // Converts from fuchsia.io/Directory.Open1 flags to |DeprecatedOptions|. Note that in io1,
   // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
-  static zx::result<VnodeConnectionOptions> FromOpen1Flags(fuchsia_io::OpenFlags flags);
+  static zx::result<DeprecatedOptions> FromOpen1Flags(fuchsia_io::OpenFlags flags);
 
-  // Converts from fuchsia.io/Directory.Clone flags to |VnodeConnectionOptions|.
-  static zx::result<VnodeConnectionOptions> FromCloneFlags(fuchsia_io::OpenFlags flags,
-                                                           VnodeProtocol protocol);
+  // Converts from fuchsia.io/Directory.Clone flags to |DeprecatedOptions|.
+  static zx::result<DeprecatedOptions> FromCloneFlags(fuchsia_io::OpenFlags flags,
+                                                      VnodeProtocol protocol);
 
-  // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
+  // Converts from |DeprecatedOptions| to fuchsia.io flags.
   fuchsia_io::OpenFlags ToIoV1Flags() const;
 };
 

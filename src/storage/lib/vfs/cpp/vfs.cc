@@ -100,9 +100,10 @@ constexpr zx::result<CreationType> GetCreationType(fio::Flags flags) {
 
 Vfs::Vfs() = default;
 
-Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                          VnodeConnectionOptions options, fuchsia_io::Rights connection_rights) {
-  FS_PRETTY_TRACE_DEBUG("Vfs::Open: path='", path, "' options=", options,
+Vfs::DeprecatedOpenResult Vfs::DeprecatedOpen(fbl::RefPtr<Vnode> vndir, std::string_view path,
+                                              DeprecatedOptions options,
+                                              fuchsia_io::Rights connection_rights) {
+  FS_PRETTY_TRACE_DEBUG("Vfs::DeprecatedOpen: path='", path, "' options=", options,
                         ", connection_rights=", connection_rights);
   std::lock_guard lock(vfs_lock_);
   // Traverse directory tree until last component, updating |vndir| and |path| in-place.
@@ -111,7 +112,7 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
   }
   if (vndir->IsRemote()) {
     // remote filesystem, return handle and path to caller
-    return OpenResult::Remote{.vnode = std::move(vndir), .path = path};
+    return DeprecatedOpenResult::Remote{.vnode = std::move(vndir), .path = path};
   }
   // |Traverse()| should guarantee |path| is only a single and valid component.
   ZX_DEBUG_ASSERT(!path.empty() && path.find('/') == std::string_view::npos && path != "..");
@@ -134,7 +135,7 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
 
   if (vn->IsRemote()) {
     // Opening a mount point: Traverse across remote.
-    return OpenResult::Remote{.vnode = std::move(vn), .path = "."};
+    return DeprecatedOpenResult::Remote{.vnode = std::move(vn), .path = "."};
   }
 
   if (ReadonlyLocked() && (options.rights & fio::Rights::kWriteBytes) &&
@@ -158,7 +159,7 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
     }
     options.rights |= connection_rights & inheritable_rights;
   }
-  if (zx::result validated = vn->ValidateOptions(options); validated.is_error()) {
+  if (zx::result validated = vn->DeprecatedValidateOptions(options); validated.is_error()) {
     return validated.error_value();
   }
 
@@ -171,7 +172,7 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
 
     if (vn->IsRemote()) {
       // |OpenVnode| redirected us to a remote vnode; traverse across mount point.
-      return OpenResult::Remote{.vnode = std::move(vn), .path = "."};
+      return DeprecatedOpenResult::Remote{.vnode = std::move(vn), .path = "."};
     }
 
     if (options.flags & fuchsia_io::OpenFlags::kTruncate) {
@@ -182,21 +183,21 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
     }
   }
 
-  return OpenResult::Ok{.vnode = std::move(vn), .options = options};
+  return DeprecatedOpenResult::Ok{.vnode = std::move(vn), .options = options};
 }
 
-zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                        fuchsia_io::Flags flags,
-                                        const fuchsia_io::wire::Options* options,
-                                        fuchsia_io::Rights connection_rights)
+zx::result<Vfs::OpenResult> Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
+                                      fuchsia_io::Flags flags,
+                                      const fuchsia_io::wire::Options* options,
+                                      fuchsia_io::Rights connection_rights)
     __TA_EXCLUDES(vfs_lock_) {
-  FS_PRETTY_TRACE_DEBUG("Vfs::Open3: path: '", path, "', flags: ", flags, ", options: ", *options,
+  FS_PRETTY_TRACE_DEBUG("Vfs::Open: path: '", path, "', flags: ", flags, ", options: ", *options,
                         ", rights: ", connection_rights);
 
   std::lock_guard lock(vfs_lock_);
 
   if (ReadonlyLocked() && (connection_rights & fs::kAllMutableIo2Rights)) {
-    FS_PRETTY_TRACE_DEBUG("Vfs::Open3: Rights incompatible, filesystem is read-only.");
+    FS_PRETTY_TRACE_DEBUG("Vfs::Open: Rights incompatible, filesystem is read-only.");
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
   // Traverse directory tree until last component, updating |vndir| and |path| in-place.
@@ -205,7 +206,7 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
   }
   if (vndir->IsRemote()) {
     // If we encountered a remote filesystem, forward the remainder of the request there.
-    return Open2Result::Remote(std::move(vndir), path);
+    return OpenResult::Remote(std::move(vndir), path);
   }
   // |Traverse()| should guarantee |path| is only a single and valid component.
   ZX_DEBUG_ASSERT(!path.empty() && path.find('/') == std::string_view::npos && path != "..");
@@ -261,7 +262,7 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
 
   if (vn->IsRemote()) {
     // Opening a mount point: Traverse across remote.
-    return Open2Result::Remote(std::move(vn), ".");
+    return OpenResult::Remote(std::move(vn), ".");
   }
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
@@ -281,11 +282,11 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
 
   // If the Vnode is already opened (e.g. it was just created) we can return early.
   if (vn_is_open) {
-    return Open2Result::Local(std::move(vn), *protocol);
+    return OpenResult::Local(std::move(vn), *protocol);
   }
 
   // Open the Vnode with the negotiated protocol.
-  zx::result open_result = Open2Result::OpenVnode(std::move(vn), *protocol);
+  zx::result open_result = OpenResult::OpenVnode(std::move(vn), *protocol);
   // Handle truncating the vnode if we opened a file and the request requires it.
   const bool truncate = (*protocol == VnodeProtocol::kFile) && (flags & fio::Flags::kFileTruncate);
   if (open_result.is_ok() && truncate) {

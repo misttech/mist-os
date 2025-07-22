@@ -22,7 +22,7 @@
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
-std::ostream& operator<<(std::ostream& os, const fs::VnodeConnectionOptions& options);
+std::ostream& operator<<(std::ostream& os, const fs::DeprecatedOptions& options);
 std::ostream& operator<<(std::ostream& os, fs::CreationType type);
 namespace fs::debug_internal {
 
@@ -31,7 +31,7 @@ inline void PrintEach(std::ostream& stream) {}
 template <typename T, typename... Args>
 void PrintEach(std::ostream& stream, T val, Args... args) {
   if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, std::string_view> ||
-                std::is_same_v<T, fs::VnodeConnectionOptions>) {
+                std::is_same_v<T, fs::DeprecatedOptions>) {
     stream << val;
   } else if constexpr (std::is_same_v<T, fidl::StringView>) {
     stream << val.get();

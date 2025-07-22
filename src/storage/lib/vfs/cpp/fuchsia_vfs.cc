@@ -320,7 +320,7 @@ zx_status_t FuchsiaVfs::Link(zx::event token, fbl::RefPtr<Vnode> oldparent, std:
 }
 
 zx_status_t FuchsiaVfs::ServeDeprecated(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
-                                        VnodeConnectionOptions options) {
+                                        DeprecatedOptions options) {
   zx_status_t status = ServeDeprecatedImpl(vnode, server_end, options);
   if (status != ZX_OK) {
     FS_PRETTY_TRACE_DEBUG("[FuchsiaVfs::Serve] Error: ", zx_status_get_string(status));
@@ -342,9 +342,8 @@ zx_status_t FuchsiaVfs::ServeDeprecated(const fbl::RefPtr<Vnode>& vnode, zx::cha
 }
 
 zx_status_t FuchsiaVfs::ServeDeprecatedImpl(const fbl::RefPtr<Vnode>& vnode,
-                                            zx::channel& server_end,
-                                            VnodeConnectionOptions options) {
-  if (zx::result result = vnode->ValidateOptions(options); result.is_error()) {
+                                            zx::channel& server_end, DeprecatedOptions options) {
+  if (zx::result result = vnode->DeprecatedValidateOptions(options); result.is_error()) {
     return result.error_value();
   }
   // Determine the protocol we should use to serve |vnode| based on |options|.
@@ -460,7 +459,7 @@ zx_status_t FuchsiaVfs::ServeImpl(fbl::RefPtr<Vnode> vn, zx::channel& server_end
     return ZX_ERR_ACCESS_DENIED;
   }
   // Open and serve |vn|.
-  zx::result opened_node = Open2Result::OpenVnode(std::move(vn), *protocol);
+  zx::result opened_node = OpenResult::OpenVnode(std::move(vn), *protocol);
   if (opened_node.is_error()) {
     return opened_node.error_value();
   }
@@ -471,7 +470,7 @@ zx_status_t FuchsiaVfs::ServeImpl(fbl::RefPtr<Vnode> vn, zx::channel& server_end
   return ZX_OK;
 }
 
-zx::result<> FuchsiaVfs::ServeResult(Open2Result open_result, fuchsia_io::Rights rights,
+zx::result<> FuchsiaVfs::ServeResult(OpenResult open_result, fuchsia_io::Rights rights,
                                      zx::channel& object_request, fuchsia_io::Flags flags,
                                      const fuchsia_io::wire::Options& options) {
   rights = internal::DownscopeRights(rights, open_result.protocol());

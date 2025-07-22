@@ -110,7 +110,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   virtual bool ValidateRights(fuchsia_io::Rights rights) const;
 
   // Ensures that it is valid to access the vnode with given io1 connection options.
-  zx::result<> ValidateOptions(VnodeConnectionOptions options) const;
+  zx::result<> DeprecatedValidateOptions(DeprecatedOptions options) const;
 
   // Opens the vnode. This is a callback to signal that a new connection is about to be created and
   // I/O operations will follow. In addition, it provides an opportunity to redirect subsequent I/O.

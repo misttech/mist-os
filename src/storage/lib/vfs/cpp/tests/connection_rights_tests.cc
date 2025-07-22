@@ -104,7 +104,7 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServeDeprecated) {
     for (test_row_t& row : test_data) {
       // Set up a vfs connection with the testcase's connection flags
       auto file = fidl::Endpoints<fio::File>::Create();
-      zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(row.connection_flags);
+      zx::result options = fs::DeprecatedOptions::FromOpen1Flags(row.connection_flags);
       ASSERT_TRUE(options.is_ok());
       vfs->ServeDeprecated(vnode, file.server.TakeChannel(), *options);
 

@@ -110,7 +110,7 @@ bool Vnode::DeleteFileLockInTeardown(zx_koid_t owner) {
 
 bool Vnode::ValidateRights([[maybe_unused]] fuchsia_io::Rights rights) const { return true; }
 
-zx::result<> Vnode::ValidateOptions(VnodeConnectionOptions options) const {
+zx::result<> Vnode::DeprecatedValidateOptions(DeprecatedOptions options) const {
   // The connection should ensure only one of DIRECTORY and NOT_DIRECTORY is set.
   ZX_DEBUG_ASSERT(!((options.flags & fuchsia_io::OpenFlags::kDirectory) &&
                     options.flags & fuchsia_io::OpenFlags::kNotDirectory));

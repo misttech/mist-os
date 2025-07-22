@@ -43,9 +43,9 @@ TEST(PseudoDir, ApiTest) {
   EXPECT_EQ(ZX_ERR_NOT_FOUND, dir->RemoveEntry("file2"));
 
   // open as directory
-  fs::VnodeConnectionOptions options_directory{.flags = fuchsia_io::OpenFlags::kDirectory};
+  fs::DeprecatedOptions options_directory{.flags = fuchsia_io::OpenFlags::kDirectory};
   fbl::RefPtr<fs::Vnode> redirect;
-  auto validated_options = dir->ValidateOptions(options_directory);
+  auto validated_options = dir->DeprecatedValidateOptions(options_directory);
   EXPECT_TRUE(validated_options.is_ok());
   EXPECT_EQ(ZX_OK, dir->Open(&redirect));
   EXPECT_EQ(redirect, nullptr);
@@ -136,7 +136,7 @@ TEST(PseudoDir, ApiTest) {
 
 TEST(PseudoDir, RejectOpenFlagNotDirectory) {
   auto dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  auto result = dir->ValidateOptions(fs::VnodeConnectionOptions{
+  auto result = dir->DeprecatedValidateOptions(fs::DeprecatedOptions{
       .flags = fuchsia_io::OpenFlags::kNotDirectory, .rights = fuchsia_io::kRStarDir});
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(ZX_ERR_NOT_FILE, result.status_value());

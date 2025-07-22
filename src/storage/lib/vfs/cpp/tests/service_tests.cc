@@ -59,7 +59,7 @@ TEST(Service, ApiTest) {
 
   // open
   fbl::RefPtr<fs::Vnode> redirect;
-  auto result = svc->ValidateOptions({});
+  auto result = svc->DeprecatedValidateOptions({});
   ASSERT_TRUE(result.is_ok());
   ASSERT_EQ(svc->Open(&redirect), ZX_OK);
   EXPECT_TRUE(!redirect);
@@ -131,8 +131,8 @@ TEST(Service, ServiceNodeIsNotDirectory) {
   directory->AddEntry("abc", vnode);
   ASSERT_EQ(vfs.ServeDirectory(directory, std::move(root_server)), ZX_OK);
 
-  // Call |ValidateOptions| with the directory flag should fail.
-  auto result = vnode->ValidateOptions(fs::VnodeConnectionOptions{
+  // Call |DeprecatedValidateOptions| with the directory flag should fail.
+  auto result = vnode->DeprecatedValidateOptions(fs::DeprecatedOptions{
       .flags = fuchsia_io::OpenFlags::kDirectory,
       .rights = fuchsia_io::kRwStarDir,
   });

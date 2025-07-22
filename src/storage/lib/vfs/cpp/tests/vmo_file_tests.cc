@@ -27,7 +27,7 @@
 
 namespace {
 
-using VnodeOptions = fs::VnodeConnectionOptions;
+using VnodeOptions = fs::DeprecatedOptions;
 
 const size_t VMO_SIZE = zx_system_get_page_size() * 3u;
 const size_t PAGE_0 = 0u;
@@ -124,22 +124,22 @@ TEST(VmoFile, Open) {
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, 0u);
     fbl::RefPtr<fs::Vnode> redirect;
-    auto result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
+    auto result = file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
     EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
-                        file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRwStarDir}));
+    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->DeprecatedValidateOptions(
+                                                  VnodeOptions{.rights = fuchsia_io::kRwStarDir}));
     EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
-                        file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kWStarDir}));
+    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->DeprecatedValidateOptions(
+                                                  VnodeOptions{.rights = fuchsia_io::kWStarDir}));
     EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
-                        file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
+    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->DeprecatedValidateOptions(
+                                                  VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
     EXPECT_EQ(redirect, nullptr);
     EXPECT_RESULT_ERROR(
         ZX_ERR_NOT_DIR,
-        file->ValidateOptions(VnodeOptions{.flags = fuchsia_io::OpenFlags::kDirectory}));
+        file->DeprecatedValidateOptions(VnodeOptions{.flags = fuchsia_io::OpenFlags::kDirectory}));
     EXPECT_EQ(redirect, nullptr);
   }
 
@@ -151,28 +151,31 @@ TEST(VmoFile, Open) {
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, true);
     fbl::RefPtr<fs::Vnode> redirect;
     {
-      zx::result result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
+      zx::result result =
+          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_EQ(redirect, nullptr);
     }
     {
-      zx::result result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRwStarDir});
+      zx::result result =
+          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRwStarDir});
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_EQ(redirect, nullptr);
     }
     {
-      zx::result result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kWStarDir});
+      zx::result result =
+          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kWStarDir});
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
-      EXPECT_EQ(redirect, nullptr);
-      EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
-                          file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
       EXPECT_EQ(redirect, nullptr);
       EXPECT_RESULT_ERROR(
-          ZX_ERR_NOT_DIR,
-          file->ValidateOptions(VnodeOptions{.flags = fuchsia_io::OpenFlags::kDirectory}));
+          ZX_ERR_ACCESS_DENIED,
+          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
+      EXPECT_EQ(redirect, nullptr);
+      EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR, file->DeprecatedValidateOptions(VnodeOptions{
+                                              .flags = fuchsia_io::OpenFlags::kDirectory}));
       EXPECT_EQ(redirect, nullptr);
     }
   }

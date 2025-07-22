@@ -282,7 +282,7 @@ class F2fsGuestTest : public GuestTest<F2fsDebianGuest> {
   }
 };
 
-fs::VnodeConnectionOptions ConvertFlag(int flags);
+fs::DeprecatedOptions ConvertFlag(int flags);
 void CompareStat(const struct stat& a, const struct stat& b);
 
 }  // namespace f2fs

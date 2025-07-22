@@ -36,8 +36,8 @@ namespace fs {
 
 namespace {
 
-constexpr VnodeConnectionOptions FlagsToConnectionOptions(fio::OpenFlags flags) {
-  VnodeConnectionOptions options;
+constexpr DeprecatedOptions FlagsToConnectionOptions(fio::OpenFlags flags) {
+  DeprecatedOptions options;
   // Filter out io1 OpenFlags.RIGHT_* flags, translated to io2 Rights below.
   options.flags = flags & ~kAllIo1Rights;
 
@@ -62,7 +62,7 @@ constexpr VnodeConnectionOptions FlagsToConnectionOptions(fio::OpenFlags flags) 
 
 }  // namespace
 
-zx::result<VnodeConnectionOptions> VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags flags) {
+zx::result<DeprecatedOptions> DeprecatedOptions::FromOpen1Flags(fio::OpenFlags flags) {
   if ((flags & fio::OpenFlags::kNodeReference) &&
       (flags - fio::kOpenFlagsAllowedWithNodeReference)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -80,8 +80,8 @@ zx::result<VnodeConnectionOptions> VnodeConnectionOptions::FromOpen1Flags(fio::O
   return zx::ok(FlagsToConnectionOptions(flags));
 }
 
-zx::result<VnodeConnectionOptions> VnodeConnectionOptions::FromCloneFlags(fio::OpenFlags flags,
-                                                                          VnodeProtocol protocol) {
+zx::result<DeprecatedOptions> DeprecatedOptions::FromCloneFlags(fio::OpenFlags flags,
+                                                                VnodeProtocol protocol) {
   constexpr fio::OpenFlags kValidCloneFlags = kAllIo1Rights | fio::OpenFlags::kAppend |
                                               fio::OpenFlags::kDescribe |
                                               fio::OpenFlags::kCloneSameRights;
@@ -109,7 +109,7 @@ zx::result<VnodeConnectionOptions> VnodeConnectionOptions::FromCloneFlags(fio::O
     }
   }
 
-  VnodeConnectionOptions options = FlagsToConnectionOptions(flags);
+  DeprecatedOptions options = FlagsToConnectionOptions(flags);
 
   // Downscope the rights specified by |flags| to match those that were granted to this node
   // based on |protocol|. io1 OpenFlags expand to a set of rights which may not be compatible
@@ -120,9 +120,7 @@ zx::result<VnodeConnectionOptions> VnodeConnectionOptions::FromCloneFlags(fio::O
   return zx::ok(options);
 }
 
-fio::OpenFlags VnodeConnectionOptions::ToIoV1Flags() const {
-  return flags | RightsToOpenFlags(rights);
-}
+fio::OpenFlags DeprecatedOptions::ToIoV1Flags() const { return flags | RightsToOpenFlags(rights); }
 
 fio::OpenFlags RightsToOpenFlags(fio::Rights rights) {
   fio::OpenFlags flags = {};
