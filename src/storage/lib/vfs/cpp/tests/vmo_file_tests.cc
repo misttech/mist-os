@@ -27,8 +27,6 @@
 
 namespace {
 
-using VnodeOptions = fs::DeprecatedOptions;
-
 const size_t VMO_SIZE = zx_system_get_page_size() * 3u;
 const size_t PAGE_0 = 0u;
 const size_t PAGE_1 = zx_system_get_page_size();
@@ -108,12 +106,23 @@ TEST(VmoFile, Constructor) {
   }
 }
 
-#define EXPECT_RESULT_OK(expr) EXPECT_TRUE((expr).is_ok())
-#define EXPECT_RESULT_ERROR(error_val, expr) \
-  EXPECT_TRUE((expr).is_error());            \
-  EXPECT_EQ(error_val, (expr).status_value())
-
 TEST(VmoFile, Open) {
+  zx::vmo abc;
+  CreateVmoABC(&abc);
+  auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(abc), 0u, /*writable=*/false);
+  fbl::RefPtr<fs::Vnode> redirect;
+  ASSERT_EQ(ZX_OK, file->Open(&redirect));
+  ASSERT_EQ(redirect, nullptr);
+}
+
+TEST(VmoFile, Protocols) {
+  zx::vmo abc;
+  CreateVmoABC(&abc);
+  auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(abc), 0u, /*writable=*/false);
+  ASSERT_EQ(file->GetProtocols(), fuchsia_io::NodeProtocolKinds::kFile);
+}
+
+TEST(VmoFile, ValidateRights) {
   zx::vmo abc;
   CreateVmoABC(&abc);
 
@@ -122,25 +131,10 @@ TEST(VmoFile, Open) {
     zx::vmo dup;
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
-    auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, 0u);
-    fbl::RefPtr<fs::Vnode> redirect;
-    auto result = file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
-    EXPECT_RESULT_OK(result);
-    EXPECT_EQ(ZX_OK, file->Open(&redirect));
-    EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->DeprecatedValidateOptions(
-                                                  VnodeOptions{.rights = fuchsia_io::kRwStarDir}));
-    EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->DeprecatedValidateOptions(
-                                                  VnodeOptions{.rights = fuchsia_io::kWStarDir}));
-    EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->DeprecatedValidateOptions(
-                                                  VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
-    EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(
-        ZX_ERR_NOT_DIR,
-        file->DeprecatedValidateOptions(VnodeOptions{.flags = fuchsia_io::OpenFlags::kDirectory}));
-    EXPECT_EQ(redirect, nullptr);
+    auto read_only = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, /*writable=*/false);
+    ASSERT_TRUE(read_only->ValidateRights(fuchsia_io::Rights::kReadBytes));
+    ASSERT_FALSE(read_only->ValidateRights(fuchsia_io::Rights::kWriteBytes));
+    ASSERT_FALSE(read_only->ValidateRights(fuchsia_io::Rights::kExecute));
   }
 
   // writable
@@ -148,36 +142,10 @@ TEST(VmoFile, Open) {
     zx::vmo dup;
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
-    auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, true);
-    fbl::RefPtr<fs::Vnode> redirect;
-    {
-      zx::result result =
-          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
-      EXPECT_RESULT_OK(result);
-      EXPECT_EQ(ZX_OK, file->Open(&redirect));
-      EXPECT_EQ(redirect, nullptr);
-    }
-    {
-      zx::result result =
-          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRwStarDir});
-      EXPECT_RESULT_OK(result);
-      EXPECT_EQ(ZX_OK, file->Open(&redirect));
-      EXPECT_EQ(redirect, nullptr);
-    }
-    {
-      zx::result result =
-          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kWStarDir});
-      EXPECT_RESULT_OK(result);
-      EXPECT_EQ(ZX_OK, file->Open(&redirect));
-      EXPECT_EQ(redirect, nullptr);
-      EXPECT_RESULT_ERROR(
-          ZX_ERR_ACCESS_DENIED,
-          file->DeprecatedValidateOptions(VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
-      EXPECT_EQ(redirect, nullptr);
-      EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR, file->DeprecatedValidateOptions(VnodeOptions{
-                                              .flags = fuchsia_io::OpenFlags::kDirectory}));
-      EXPECT_EQ(redirect, nullptr);
-    }
+    auto writable = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, /*writable=*/true);
+    ASSERT_TRUE(writable->ValidateRights(fuchsia_io::Rights::kReadBytes));
+    ASSERT_TRUE(writable->ValidateRights(fuchsia_io::Rights::kWriteBytes));
+    ASSERT_FALSE(writable->ValidateRights(fuchsia_io::Rights::kExecute));
   }
 }
 
@@ -192,7 +160,7 @@ TEST(VmoFile, Read) {
     SCOPED_TRACE("empty-read-nonempty-file");
     zx::vmo dup;
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
-    auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, zx_system_get_page_size());
+    auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u);
     size_t actual = UINT64_MAX;
     EXPECT_EQ(ZX_OK, file->Read(data.get(), 0u, 0u, &actual));
     EXPECT_EQ(0u, actual);

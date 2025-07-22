@@ -134,7 +134,6 @@ test("fs-vnode-test") {
     "tests/service_tests.cc",
     "tests/teardown_tests.cc",
     "tests/vfs_tests.cc",
-    "tests/vfs_types_tests.cc",
     "tests/vmo_file_tests.cc",
     "tests/watcher_test.cc",
   ]

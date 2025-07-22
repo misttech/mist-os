@@ -251,49 +251,6 @@ TEST_F(ConnectionTest, InheritPermissionsDirectoryRightExpansion) {
   }
 }
 
-TEST_F(ConnectionTest, DeprecatedGetSetAttrs) {
-  // Create connection to vfs
-  auto root = fidl::Endpoints<fio::Directory>::Create();
-  ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
-
-  // Connect to File
-  zx::result fc = fidl::CreateEndpoints<fio::File>();
-  ASSERT_EQ(fc.status_value(), ZX_OK);
-  ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "file_or_dir",
-                          static_cast<uint64_t>(fio::kPermReadable | fio::kPermWritable),
-                          fc->server.TakeChannel().release()),
-            ZX_OK);
-  {
-    auto io1_attrs = fidl::WireCall(fc->client)->DeprecatedGetAttr();
-    ASSERT_EQ(io1_attrs.status(), ZX_OK);
-    EXPECT_EQ(io1_attrs->attributes.modification_time, 0u);
-  }
-
-  // Ensure we can't set creation time.
-  {
-    auto io1_attrs =
-        fidl::WireCall(fc->client)->DeprecatedSetAttr(fio::NodeAttributeFlags::kCreationTime, {});
-    ASSERT_EQ(io1_attrs.status(), ZX_OK);
-    // ASSERT_EQ(io1_attrs->s, ZX_ERR_NOT_SUPPORTED);
-  }
-
-  // Update modification time.
-  {
-    auto io1_attrs = fidl::WireCall(fc->client)
-                         ->DeprecatedSetAttr(fio::NodeAttributeFlags::kModificationTime,
-                                             fio::wire::NodeAttributes{.modification_time = 1234});
-    ASSERT_EQ(io1_attrs.status(), ZX_OK);
-    ASSERT_EQ(io1_attrs->s, ZX_OK);
-  }
-
-  // Check modification time was updated.
-  {
-    auto io1_attrs = fidl::WireCall(fc->client)->DeprecatedGetAttr();
-    ASSERT_EQ(io1_attrs.status(), ZX_OK);
-    EXPECT_EQ(io1_attrs->attributes.modification_time, 1234u);
-  }
-}
-
 // Test that the GetAttributes and UpdateAttributes methods work as expected.
 TEST_F(ConnectionTest, GetUpdateAttributes) {
   // Create connection to vfs
