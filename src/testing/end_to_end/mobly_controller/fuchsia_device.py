@@ -141,6 +141,7 @@ def _get_fuchsia_device_info(
     Returns:
         dict containing information of a fuchsia device.
     """
+    _LOGGER.debug("Loading device info")
     device_info: dict[str, Any] = {
         "device_class": fuchsia_device.__class__.__name__,
         "persistent": {},
@@ -154,12 +155,15 @@ def _get_fuchsia_device_info(
         try:
             attr_type: Any = getattr(type(fuchsia_device), attr, None)
             if isinstance(attr_type, properties.DynamicProperty):
+                _LOGGER.debug("Loading dynamic device property: {attr}")
                 device_info["dynamic"][attr] = getattr(fuchsia_device, attr)
             elif isinstance(attr_type, properties.PersistentProperty):
+                _LOGGER.debug("Loading persistent device property: {attr}")
                 device_info["persistent"][attr] = getattr(fuchsia_device, attr)
         except NotImplementedError:
             pass
 
+    _LOGGER.debug("Device info complete")
     return device_info
 
 
