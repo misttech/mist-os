@@ -107,6 +107,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    ZLIB_DIR="${DEV_ROOT}/zlib"
    ZLIB_BUILD_DIR="${DEV_ROOT}/build/zlib"
    ZLIB_INSTALL_DIR="${DEV_ROOT}/install/zlib"
+   HOST_SYSROOT="${CIPD_DIR}/linux"
 
    if [[ ! -e  "$ZLIB_DIR" ]]; then
      git clone https://fuchsia.googlesource.com/third_party/zlib $ZLIB_DIR
@@ -134,7 +135,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
      -DCMAKE_CXX_COMPILER=${CIPD_DIR}/bin/clang++ \
      -DCMAKE_ASM_COMPILER=${CIPD_DIR}/bin/clang \
      -DCMAKE_LINKER=${CIPD_DIR}/bin/ld.lld \
-     -DCMAKE_SYSROOT=${CIPD_DIR}/linux \
+     -DCMAKE_SYSROOT=${HOST_SYSROOT} \
      -DCMAKE_AR=${CIPD_DIR}/bin/llvm-ar \
      -DCMAKE_NM=${CIPD_DIR}/bin/llvm-nm \
      -DCMAKE_OBJCOPY=${CIPD_DIR}/bin/llvm-objcopy \
@@ -164,6 +165,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    ZSTD_DIR=$DEV_ROOT/zstd
    ZSTD_BUILD_DIR=$DEV_ROOT/build/zstd
    ZSTD_INSTALL_DIR=$DEV_ROOT/install/zstd
+   HOST_SYSROOT="${CIPD_DIR}/linux"
 
    if [[ ! -e "$ZSTD_DIR" ]]; then
      git clone https://fuchsia.googlesource.com/third_party/zstd $ZSTD_DIR
@@ -191,7 +193,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
      -DCMAKE_CXX_COMPILER=$CIPD_DIR/bin/clang++ \
      -DCMAKE_ASM_COMPILER=$CIPD_DIR/bin/clang \
      -DCMAKE_LINKER=$CIPD_DIR/bin/ld.lld \
-     -DCMAKE_SYSROOT=$CIPD_DIR/linux \
+     -DCMAKE_SYSROOT=$HOST_SYSROOT \
      -DCMAKE_AR=$CIPD_DIR/bin/llvm-ar \
      -DCMAKE_NM=$CIPD_DIR/bin/llvm-nm \
      -DCMAKE_OBJCOPY=$CIPD_DIR/bin/llvm-objcopy \
@@ -239,7 +241,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
          --clang-prefix=$CIPD_DIR \
          --stage0="${STAGE0_DIR}" \
          --prefix="${DEV_ROOT}/install/fuchsia-rust" \
-         --host-sysroot="${DEV_ROOT}/sysroot/linux" \
+         --host-sysroot="${HOST_SYSROOT}" \
          --channel=nightly \
          --zlib-path="${ZLIB_INSTALL_DIR}" \
          --zstd-path="${ZSTD_INSTALL_DIR}" \
@@ -254,7 +256,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
            --stage0="${STAGE0_DIR}" \
            --clang-prefix="${CIPD_DIR}" \
            --sdk-dir="${CIPD_DIR}/sdk" \
-           --linux-sysroot="${CIPD_DIR}/linux" \
+           --linux-sysroot="${HOST_SYSROOT}" \
            --linux-riscv64-sysroot="${CIPD_DIR}/ubuntu20.04" \
            --eval \
         | tee "${DEV_ROOT}/fuchsia-env.sh" \
