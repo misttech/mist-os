@@ -69,6 +69,17 @@ class FfxDirectTest(ffxtestcase.FfxTestCase):
         asserts.assert_equal(out[0]["target_state"], "Product")
         asserts.assert_equal(out[0]["rcs_state"], "Y")
 
+    def test_direct_version(self) -> None:
+        """Test `ffx --direct version -v` does not query the daemon."""
+        out = self._run_ffx_direct(
+            [
+                "version",
+                "-v",
+            ],
+        )
+        asserts.assert_is_none(out["daemon_version"])
+        asserts.assert_is_not_none(out["tool_version"])
+
 
 if __name__ == "__main__":
     test_runner.main()

@@ -34,7 +34,8 @@ impl FfxMain for VersionTool {
     type Writer = MachineWriter<Versions>;
     async fn main(self, mut writer: Self::Writer) -> Result<()> {
         let tool_version = self.context.build_info().into();
-        let daemon_version = if self.cmd.verbose {
+        let should_query_daemon = self.cmd.verbose && !self.context.get_direct_connection_mode();
+        let daemon_version = if should_query_daemon {
             Some(get_daemon_version(self.daemon_proxy.await?).await?.into())
         } else {
             None
