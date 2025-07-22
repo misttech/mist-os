@@ -10,7 +10,7 @@ use crate::bpf::program::ProgramHandle;
 use crate::mm::PAGE_SIZE;
 use crate::task::CurrentTask;
 use crate::vfs::socket::{
-    SockOptValue, SocketAddress, SocketDomain, SocketProtocol, SocketType, ZxioBackedSocket,
+    SockOptValue, SocketDomain, SocketProtocol, SocketType, ZxioBackedSocket,
 };
 use crate::vfs::FdNumber;
 use ebpf::{EbpfProgram, EbpfProgramContext, ProgramArgument, Type};
@@ -479,6 +479,8 @@ impl CgroupEbpfProgramSet {
         }
     }
 
+    // Executes eBPF program for the operation `op`. `socket_address` contains
+    // socket address as a `sockaddr` struct.
     pub fn run_sock_addr_prog(
         &self,
         locked: &mut Locked<FileOpsCore>,
@@ -487,7 +489,7 @@ impl CgroupEbpfProgramSet {
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
-        socket_address: &SocketAddress,
+        socket_address: &[u8],
         socket: &ZxioBackedSocket,
     ) -> Result<SockAddrProgramResult, Errno> {
         let prog_cell = match (domain, op) {
@@ -509,24 +511,30 @@ impl CgroupEbpfProgramSet {
         bpf_sockaddr.type_ = socket_type.as_raw();
         bpf_sockaddr.protocol = protocol.as_raw();
 
-        match socket_address {
-            SocketAddress::Inet(addr) => {
-                let sockaddr =
-                    linux_uapi::sockaddr_in::ref_from_prefix(&addr).map_err(|_| errno!(EINVAL))?.0;
-                bpf_sockaddr.user_family = linux_uapi::AF_INET;
+        let (sa_family, _) = u16::read_from_prefix(socket_address).map_err(|_| errno!(EINVAL))?;
+
+        if domain.as_raw() != sa_family {
+            return error!(EAFNOSUPPORT);
+        }
+        bpf_sockaddr.user_family = sa_family.into();
+
+        match sa_family.into() {
+            linux_uapi::AF_INET => {
+                let (sockaddr, _) = linux_uapi::sockaddr_in::ref_from_prefix(socket_address)
+                    .map_err(|_| errno!(EINVAL))?;
                 bpf_sockaddr.user_port = sockaddr.sin_port.into();
                 bpf_sockaddr.user_ip4 = sockaddr.sin_addr.s_addr;
             }
-            SocketAddress::Inet6(addr) => {
-                let sockaddr =
-                    linux_uapi::sockaddr_in6::ref_from_prefix(&addr).map_err(|_| errno!(EINVAL))?.0;
-                bpf_sockaddr.user_family = linux_uapi::AF_INET6;
+            linux_uapi::AF_INET6 => {
+                let sockaddr = linux_uapi::sockaddr_in6::ref_from_prefix(socket_address)
+                    .map_err(|_| errno!(EINVAL))?
+                    .0;
                 bpf_sockaddr.user_port = sockaddr.sin6_port.into();
                 // SAFETY: reading an array of u32 from a union is safe.
                 bpf_sockaddr.user_ip6 = unsafe { sockaddr.sin6_addr.in6_u.u6_addr32 };
             }
-            _ => (),
-        };
+            _ => return error!(EAFNOSUPPORT),
+        }
 
         Ok(prog.run(current_task, &mut bpf_sockaddr))
     }

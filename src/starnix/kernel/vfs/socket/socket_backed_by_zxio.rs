@@ -84,6 +84,28 @@ impl ServiceConnector for SocketProviderServiceConnector {
     }
 }
 
+// Trait for types that can be converted to a byte vector that contains a
+// `sockaddr` value.
+trait AsSockAddrBytes {
+    fn as_sockaddr_bytes(&self) -> Result<&[u8], Errno>;
+}
+
+impl AsSockAddrBytes for &SocketAddress {
+    fn as_sockaddr_bytes(&self) -> Result<&[u8], Errno> {
+        match self {
+            SocketAddress::Inet(addr) => Ok(&addr[..]),
+            SocketAddress::Inet6(addr) => Ok(&addr[..]),
+            _ => error!(EAFNOSUPPORT),
+        }
+    }
+}
+
+impl AsSockAddrBytes for &Vec<u8> {
+    fn as_sockaddr_bytes(&self) -> Result<&[u8], Errno> {
+        Ok(self.as_slice())
+    }
+}
+
 /// A socket backed by an underlying Zircon I/O object.
 pub struct ZxioBackedSocket {
     /// The underlying Zircon I/O object.
@@ -300,8 +322,13 @@ impl ZxioBackedSocket {
         socket: &Socket,
         current_task: &CurrentTask,
         op: SockAddrOp,
-        socket_address: &SocketAddress,
+        socket_address: impl AsSockAddrBytes,
     ) -> Result<(), Errno> {
+        // BPF_PROG_TYPE_CGROUP_SOCK_ADDR programs are executed only for IPv4 and IPv6 sockets.
+        if !matches!(socket.domain, SocketDomain::Inet | SocketDomain::Inet6) {
+            return Ok(());
+        }
+
         let ebpf_result =
             current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_addr_prog(
                 locked,
@@ -310,7 +337,7 @@ impl ZxioBackedSocket {
                 socket.domain,
                 socket.socket_type,
                 socket.protocol,
-                socket_address,
+                socket_address.as_sockaddr_bytes()?,
                 self,
             )?;
         match ebpf_result {
