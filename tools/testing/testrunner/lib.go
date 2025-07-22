@@ -401,8 +401,6 @@ func runAndOutputTests(
 	// the length check in the for loop condition.
 	testIndex := 0
 	shouldRunHealthCheck := false
-	againstDevice := (os.Getenv(botanistconstants.NodenameEnvKey) != targets.DefaultEmulatorNodename &&
-		os.Getenv(botanistconstants.NodenameEnvKey) != "")
 	for len(testQueue) > 0 {
 		if shouldRunHealthCheck && fuchsiaTester != nil {
 			if err := runHealthCheck(ctx, fuchsiaTester); err != nil {
@@ -448,7 +446,7 @@ func runAndOutputTests(
 		}
 		testIndex++
 
-		if againstDevice && !result.Passed() {
+		if againstDevice() && !result.Passed() {
 			shouldRunHealthCheck = true
 		}
 		if shouldKeepGoing(test.Test, result, test.totalDuration) {
@@ -490,6 +488,11 @@ func retryOnConnectionFailure(ctx context.Context, t Tester, execFunc func() err
 		}
 		return retry.Fatal(err)
 	}, nil)
+}
+
+func againstDevice() bool {
+	return (os.Getenv(botanistconstants.NodenameEnvKey) != targets.DefaultEmulatorNodename &&
+		os.Getenv(botanistconstants.NodenameEnvKey) != "")
 }
 
 func runHealthCheck(ctx context.Context, t Tester) error {
