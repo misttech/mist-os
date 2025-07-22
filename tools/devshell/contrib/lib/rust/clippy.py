@@ -66,8 +66,15 @@ def main():
                 t
                 for t in rust_target_mapping
                 for l in args.input
-                if str(GnTarget(l, args.fuchsia_dir))
-                in possible_labels(t, build_dir)
+                if (
+                    any(
+                        pl.startswith(l[:-2])
+                        for pl in possible_labels(t, build_dir)
+                    )
+                    if l.endswith("**")
+                    else str(GnTarget(l, args.fuchsia_dir))
+                    in possible_labels(t, build_dir)
+                )
             ]
 
     clippy_outputs = list(
@@ -208,7 +215,12 @@ def parse_args():
         help="treat the inputs as source files rather than gn targets",
     )
     inputs = parser.add_mutually_exclusive_group(required=True)
-    inputs.add_argument("input", nargs="*", default=[])
+    inputs.add_argument(
+        "input",
+        nargs="*",
+        help="GN targets to run. Strings ending in '**' match any targets up to the glob",
+        default=[],
+    )
     inputs.add_argument(
         "--all", action="store_true", help="run on all clippy targets"
     )
