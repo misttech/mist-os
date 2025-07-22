@@ -19,6 +19,7 @@
 
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
+#include "src/performance/lib/trace_converters/chromium_exporter.h"
 #include "src/performance/trace/utils.h"
 
 namespace tracing {

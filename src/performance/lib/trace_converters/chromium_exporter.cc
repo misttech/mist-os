@@ -106,7 +106,7 @@ void ChromiumExporter::Start() {
   writer_.StartArray();
 }
 
-void ChromiumExporter::Stop() {
+void ChromiumExporter::StartSchedulerPass() {
   writer_.EndArray();
   writer_.Key("systemTraceEvents");
   writer_.StartObject();
@@ -151,14 +151,15 @@ void ChromiumExporter::Stop() {
       writer_.EndObject();
     }
   }
+  pass_ = Pass::kScheduler;
+}
 
-  for (const auto& record : scheduler_event_records_) {
-    ExportSchedulerEvent(record);
+void ChromiumExporter::Stop() {
+  if (pass_ == Pass::kMain) {
+    ChromiumExporter::StartSchedulerPass();
   }
-
   writer_.EndArray();
   writer_.EndObject();  // Finishes systemTraceEvents
-
   if (last_branch_records_.size() > 0) {
     writer_.Key("lastBranch");
     writer_.StartObject();
@@ -175,6 +176,12 @@ void ChromiumExporter::Stop() {
 }
 
 void ChromiumExporter::ExportRecord(const trace::Record& record) {
+  if (pass_ == Pass::kScheduler) {
+    if (record.type() == trace::RecordType::kScheduler) {
+      ExportSchedulerEvent(record.GetSchedulerEvent());
+    }
+    return;
+  }
   switch (record.type()) {
     case trace::RecordType::kMetadata:
       ExportMetadata(record.GetMetadata());
@@ -206,9 +213,6 @@ void ChromiumExporter::ExportRecord(const trace::Record& record) {
       ExportLog(record.GetLog());
       break;
     case trace::RecordType::kScheduler:
-      // We can't emit these into the regular stream, save them for later.
-      scheduler_event_records_.emplace_back(record.GetSchedulerEvent());
-      break;
     case trace::RecordType::kString:
     case trace::RecordType::kThread:
       // We can ignore these, trace::TraceReader consumes them and maintains

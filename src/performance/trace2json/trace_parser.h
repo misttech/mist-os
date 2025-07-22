@@ -31,6 +31,7 @@ class FuchsiaTraceParser {
   std::array<char, kReadBufferSize> buffer_;
   // The number of bytes of |buffer_| in use.
   size_t buffer_end_ = 0;
+
   trace::TraceReader reader_;
 };
 

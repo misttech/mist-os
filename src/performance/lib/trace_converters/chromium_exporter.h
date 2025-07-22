@@ -25,7 +25,15 @@ class ChromiumExporter {
   explicit ChromiumExporter(std::ofstream& out);
   ~ChromiumExporter();
 
+  enum class Pass {
+    // First pass: read all records except scheduler events.
+    kMain,
+    // Second pass: read only scheduler events.
+    kScheduler,
+  };
+  Pass pass_ = Pass::kMain;
   void ExportRecord(const trace::Record& record);
+  void StartSchedulerPass();
 
  private:
   void Start();
@@ -57,11 +65,6 @@ class ChromiumExporter {
   std::unordered_map<zx_koid_t /* process id */,
                      std::unordered_map<zx_koid_t /* thread id */, std::string /* thread name */>>
       threads_;
-
-  // The chromium/catapult trace file format doesn't support scheduler event
-  // records, so we can't emit them inline. Save them for later emission to
-  // the systemTraceEvents section.
-  std::vector<trace::Record::SchedulerEvent> scheduler_event_records_;
 
   // The chromium/catapult trace file format doesn't support random blobs,
   // so we can't emit them inline. Save them for later emission.
