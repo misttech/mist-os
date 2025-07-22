@@ -25,6 +25,7 @@
         },
         {
             protocol: [
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.pkg.internal.OtaDownloader",
                 "fuchsia.pkg.PackageCache",
                 "fuchsia.pkg.RetainedBlobs",

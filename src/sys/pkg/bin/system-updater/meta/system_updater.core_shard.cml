@@ -18,6 +18,7 @@
         },
         {
             protocol: [
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.pkg.PackageCache",
                 "fuchsia.pkg.RetainedBlobs",
                 "fuchsia.pkg.RetainedPackages",

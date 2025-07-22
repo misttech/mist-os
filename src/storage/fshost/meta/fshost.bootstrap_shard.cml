@@ -129,6 +129,7 @@
             protocol: [
                 "fuchsia.fs.startup.Volumes",
                 "fuchsia.fshost.Admin",
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "#fshost",
