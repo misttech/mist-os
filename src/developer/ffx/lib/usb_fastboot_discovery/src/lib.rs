@@ -236,8 +236,10 @@ async fn find_serial_numbers() -> Vec<String> {
                 device_is_fastboot(&device, usb_device, interface)
             }) {
                 Ok(_) => true,
+                // This error is encountered when all scanning options for this device have been
+                // exhausted, meaning we've not been able to identify it.
                 Err(usb_rs::Error::InterfaceNotFound) => {
-                    log::warn!(device = device.debug_name().as_str(); "Interface not found");
+                    log::debug!(device = device.debug_name().as_str(); "No intefaces found from scan");
                     false
                 }
                 Err(e) => {
@@ -246,13 +248,15 @@ async fn find_serial_numbers() -> Vec<String> {
                     false
                 }
             };
-            log::info!("Serial: {:?} valid: {}", device.serial(), valid);
             if valid {
+                log::info!(device = device.debug_name().as_str(); "Fastboot usb device with serial {:?} found", device.serial());
                 serials.push(serial);
+            } else {
+                log::debug!(device = device.debug_name().as_str(); "Non-Fastboot usb device with serial {:?} found", device.serial());
             }
         }
     }
-    log::info!("About to return serials: {:?}", serials);
+    log::debug!("Serials found: {:?}", serials);
     return serials;
 }
 
@@ -269,7 +273,7 @@ where
             }) {
                 Ok(iface) => iface,
                 Err(usb_rs::Error::InterfaceNotFound) => {
-                    return Err(anyhow!("Interface not found"));
+                    return Err(anyhow!("No valid interface found"));
                 }
                 Err(e) => {
                     log::warn!(device = device.debug_name().as_str(), error:? = e;
@@ -280,7 +284,7 @@ where
             return Ok(Interface::new(interface));
         }
     }
-    Err(anyhow!("Interface not found"))
+    Err(anyhow!("No valid interface found"))
 }
 
 #[cfg(test)]
