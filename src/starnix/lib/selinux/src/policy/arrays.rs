@@ -1,21 +1,17 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Special cases of `Array<Bytes, Metadata, Data>` and instances of `Metadata` and `Data` that
-//! appear in binary SELinux policies.
-
-use super::error::{ParseError, ValidateError};
-use super::extensible_bitmap::ExtensibleBitmap;
-use super::parser::ParseStrategy;
-use super::symbols::{MlsLevel, MlsRange};
+use super::parser::ByValue;
 use super::{
     array_type, array_type_validate_deref_both, AccessVector, Array, ClassId, Counted, Parse,
-    RoleId, TypeId, UserId, Validate, ValidateArray,
+    RoleId, TypeId, Validate, ValidateArray,
 };
-
+use crate::policy::error::{ParseError, ValidateError};
+use crate::policy::extensible_bitmap::ExtensibleBitmap;
+use crate::policy::symbols::{MlsLevel, MlsRange};
+use crate::policy::UserId;
 use anyhow::Context as _;
-use std::fmt::Debug;
 use std::num::NonZeroU32;
 use std::ops::Shl;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
@@ -90,9 +86,9 @@ pub(super) const XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES: u8 = 1;
 pub(super) const XPERMS_TYPE_IOCTL_PREFIXES: u8 = 2;
 
 #[allow(type_alias_bounds)]
-pub(super) type SimpleArray<PS: ParseStrategy, T> = Array<PS, PS::Output<le::U32>, T>;
+pub(super) type SimpleArray<T> = Array<le::U32, T>;
 
-impl<PS: ParseStrategy, T: Validate> Validate for SimpleArray<PS, T> {
+impl<T: Validate> Validate for SimpleArray<T> {
     type Error = <T as Validate>::Error;
 
     /// Defers to `self.data` for validation. `self.data` has access to all information, including
@@ -108,9 +104,9 @@ impl Counted for le::U32 {
     }
 }
 
-pub(super) type ConditionalNodes<PS> = Vec<ConditionalNode<PS>>;
+pub(super) type ConditionalNodes = Vec<ConditionalNode>;
 
-impl<PS: ParseStrategy> Validate for ConditionalNodes<PS> {
+impl Validate for ConditionalNodes {
     type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`ConditionalNode`] instances.
@@ -119,18 +115,11 @@ impl<PS: ParseStrategy> Validate for ConditionalNodes<PS> {
     }
 }
 
-array_type!(
-    ConditionalNodeItems,
-    PS,
-    PS::Output<ConditionalNodeMetadata>,
-    PS::Slice<ConditionalNodeDatum>
-);
+array_type!(ConditionalNodeItems, ConditionalNodeMetadata, Vec<ConditionalNodeDatum>);
 
 array_type_validate_deref_both!(ConditionalNodeItems);
 
-impl<PS: ParseStrategy> ValidateArray<ConditionalNodeMetadata, ConditionalNodeDatum>
-    for ConditionalNodeItems<PS>
-{
+impl ValidateArray<ConditionalNodeMetadata, ConditionalNodeDatum> for ConditionalNodeItems {
     type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between [`ConditionalNodeMetadata`] consecutive
@@ -144,31 +133,31 @@ impl<PS: ParseStrategy> ValidateArray<ConditionalNodeMetadata, ConditionalNodeDa
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct ConditionalNode<PS: ParseStrategy> {
-    items: ConditionalNodeItems<PS>,
-    true_list: SimpleArray<PS, AccessVectorRules<PS>>,
-    false_list: SimpleArray<PS, AccessVectorRules<PS>>,
+pub(super) struct ConditionalNode {
+    items: ConditionalNodeItems,
+    true_list: SimpleArray<AccessVectorRules>,
+    false_list: SimpleArray<AccessVectorRules>,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for ConditionalNode<PS>
+impl Parse for ConditionalNode
 where
-    ConditionalNodeItems<PS>: Parse<PS>,
-    SimpleArray<PS, AccessVectorRules<PS>>: Parse<PS>,
+    ConditionalNodeItems: Parse,
+    SimpleArray<AccessVectorRules>: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (items, tail) = ConditionalNodeItems::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional node items")?;
 
-        let (true_list, tail) = SimpleArray::<PS, AccessVectorRules<PS>>::parse(tail)
+        let (true_list, tail) = SimpleArray::<AccessVectorRules>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional node true list")?;
 
-        let (false_list, tail) = SimpleArray::<PS, AccessVectorRules<PS>>::parse(tail)
+        let (false_list, tail) = SimpleArray::<AccessVectorRules>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional node false list")?;
 
@@ -222,9 +211,9 @@ impl Validate for [ConditionalNodeDatum] {
 ///   of extended permissions.
 /// - `type_transition`, `type_change`, and `type_member', which include
 ///   a type id describing a permitted new type.
-pub(super) type AccessVectorRules<PS> = Vec<AccessVectorRule<PS>>;
+pub(super) type AccessVectorRules = Vec<AccessVectorRule>;
 
-impl<PS: ParseStrategy> Validate for AccessVectorRules<PS> {
+impl Validate for AccessVectorRules {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -236,76 +225,69 @@ impl<PS: ParseStrategy> Validate for AccessVectorRules<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct AccessVectorRule<PS: ParseStrategy> {
-    pub metadata: PS::Output<AccessVectorRuleMetadata>,
-    permission_data: PermissionData<PS>,
+pub(super) struct AccessVectorRule {
+    pub metadata: AccessVectorRuleMetadata,
+    permission_data: PermissionData,
 }
 
-impl<PS: ParseStrategy> AccessVectorRule<PS> {
+impl AccessVectorRule {
     /// Returns whether this access vector rule comes from an
     /// `allow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_allow(&self) -> bool {
-        (PS::deref(&self.metadata).access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_ALLOW) != 0
+        (self.metadata.access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_ALLOW) != 0
     }
 
     /// Returns whether this access vector rule comes from an
     /// `auditallow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_auditallow(&self) -> bool {
-        (PS::deref(&self.metadata).access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_AUDITALLOW)
-            != 0
+        (self.metadata.access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_AUDITALLOW) != 0
     }
 
     /// Returns whether this access vector rule comes from an
     /// `dontaudit [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_dontaudit(&self) -> bool {
-        (PS::deref(&self.metadata).access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_DONTAUDIT) != 0
+        (self.metadata.access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_DONTAUDIT) != 0
     }
 
     /// Returns whether this access vector rule comes from a
     /// `type_transition [source] [target]:[class] [new_type];` policy statement.
     pub fn is_type_transition(&self) -> bool {
-        (PS::deref(&self.metadata).access_vector_rule_type
-            & ACCESS_VECTOR_RULE_TYPE_TYPE_TRANSITION)
-            != 0
+        (self.metadata.access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_TYPE_TRANSITION) != 0
     }
 
     /// Returns whether this access vector rule comes from an
     /// `allowxperm [source] [target]:[class] [permission] {
     /// [extended_permissions] };` policy statement.
     pub fn is_allowxperm(&self) -> bool {
-        (PS::deref(&self.metadata).access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_ALLOWXPERM)
-            != 0
+        (self.metadata.access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_ALLOWXPERM) != 0
     }
 
     /// Returns whether this access vector rule comes from an
     /// `auditallowxperm [source] [target]:[class] [permission] {
     /// [extended_permissions] };` policy statement.
     pub fn is_auditallowxperm(&self) -> bool {
-        (PS::deref(&self.metadata).access_vector_rule_type
-            & ACCESS_VECTOR_RULE_TYPE_AUDITALLOWXPERM)
-            != 0
+        (self.metadata.access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_AUDITALLOWXPERM) != 0
     }
 
     /// Returns whether this access vector rule comes from a
     /// `dontauditxperm [source] [target]:[class] [permission] {
     /// [extended_permissions] };` policy statement.
     pub fn is_dontauditxperm(&self) -> bool {
-        (PS::deref(&self.metadata).access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_DONTAUDITXPERM)
-            != 0
+        (self.metadata.access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_DONTAUDITXPERM) != 0
     }
 
     /// Returns the source type id in this access vector rule. This id
     /// corresponds to the [`super::symbols::Type`] `id()` of some type or
     /// attribute in the same policy.
     pub fn source_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).source_type.into()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.source_type.into()).unwrap())
     }
 
     /// Returns the target type id in this access vector rule. This id
     /// corresponds to the [`super::symbols::Type`] `id()` of some type or
     /// attribute in the same policy.
     pub fn target_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).target_type.into()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.target_type.into()).unwrap())
     }
 
     /// Returns the target class id in this access vector rule. This id
@@ -313,7 +295,7 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     /// same policy. Although the index is returned as a 32-bit value, the field
     /// itself is 16-bit
     pub fn target_class(&self) -> ClassId {
-        ClassId(NonZeroU32::new(PS::deref(&self.metadata).class.into()).unwrap())
+        ClassId(NonZeroU32::new(self.metadata.class.into()).unwrap())
     }
 
     /// An access vector that corresponds to the `[access_vector]` in an
@@ -324,7 +306,7 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     pub fn access_vector(&self) -> Option<AccessVector> {
         match &self.permission_data {
             PermissionData::AccessVector(access_vector_raw) => {
-                Some(AccessVector((*PS::deref(access_vector_raw)).get()))
+                Some(AccessVector(access_vector_raw.get()))
             }
             _ => None,
         }
@@ -338,7 +320,7 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     pub fn new_type(&self) -> Option<TypeId> {
         match &self.permission_data {
             PermissionData::NewType(new_type) => {
-                Some(TypeId(NonZeroU32::new(PS::deref(new_type).get().into()).unwrap()))
+                Some(TypeId(NonZeroU32::new(new_type.get().into()).unwrap()))
             }
             _ => None,
         }
@@ -357,20 +339,22 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for AccessVectorRule<PS> {
+impl Parse for AccessVectorRule {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
         let (metadata, tail) =
-            PS::parse::<AccessVectorRuleMetadata>(tail).ok_or_else(|| ParseError::MissingData {
-                type_name: std::any::type_name::<AccessVectorRuleMetadata>(),
-                type_size: std::mem::size_of::<AccessVectorRuleMetadata>(),
-                num_bytes,
+            ByValue::parse::<AccessVectorRuleMetadata>(tail).ok_or_else(|| {
+                ParseError::MissingData {
+                    type_name: std::any::type_name::<AccessVectorRuleMetadata>(),
+                    type_size: std::mem::size_of::<AccessVectorRuleMetadata>(),
+                    num_bytes,
+                }
             })?;
-        let access_vector_rule_type = PS::deref(&metadata).access_vector_rule_type;
+        let access_vector_rule_type = metadata.access_vector_rule_type;
         let num_bytes = tail.len();
         let (permission_data, tail) =
             if (access_vector_rule_type & ACCESS_VECTOR_RULE_DATA_IS_XPERM_MASK) != 0 {
@@ -380,7 +364,7 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVectorRule<PS> {
                 (PermissionData::ExtendedPermissions(xperms), tail)
             } else if (access_vector_rule_type & ACCESS_VECTOR_RULE_DATA_IS_TYPE_ID_MASK) != 0 {
                 let (new_type, tail) =
-                    PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                    ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                         type_name: "PermissionData::NewType",
                         type_size: std::mem::size_of::<le::U32>(),
                         num_bytes,
@@ -388,7 +372,7 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVectorRule<PS> {
                 (PermissionData::NewType(new_type), tail)
             } else {
                 let (access_vector, tail) =
-                    PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                    ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                         type_name: "PermissionData::AccessVector",
                         type_size: std::mem::size_of::<le::U32>(),
                         num_bytes,
@@ -399,11 +383,11 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVectorRule<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Validate for AccessVectorRule<PS> {
+impl Validate for AccessVectorRule {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
-        if PS::deref(&self.metadata).class.get() == 0 {
+        if self.metadata.class.get() == 0 {
             return Err(ValidateError::NonOptionalIdIsZero.into());
         }
         if let PermissionData::ExtendedPermissions(xperms) = &self.permission_data {
@@ -430,9 +414,9 @@ pub(super) struct AccessVectorRuleMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) enum PermissionData<PS: ParseStrategy> {
-    AccessVector(PS::Output<le::U32>),
-    NewType(PS::Output<le::U32>),
+pub(super) enum PermissionData {
+    AccessVector(le::U32),
+    NewType(le::U32),
     ExtendedPermissions(ExtendedPermissions),
 }
 
@@ -443,36 +427,37 @@ pub(super) struct ExtendedPermissions {
     pub(super) xperms_bitmap: XpermsBitmap,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for ExtendedPermissions {
+impl Parse for ExtendedPermissions {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
         let num_bytes = tail.len();
-        let (type_, tail) = PS::parse::<u8>(tail).ok_or(ParseError::MissingData {
+        let (type_, tail) = ByValue::parse::<u8>(tail).ok_or(ParseError::MissingData {
             type_name: "ExtendedPermissions::xperms_type",
             type_size: std::mem::size_of::<u8>(),
             num_bytes,
         })?;
-        let xperms_type = *PS::deref(&type_);
+        let xperms_type = type_;
         let num_bytes = tail.len();
-        let (prefix, tail) = PS::parse::<u8>(tail).ok_or(ParseError::MissingData {
+        let (prefix, tail) = ByValue::parse::<u8>(tail).ok_or(ParseError::MissingData {
             type_name: "ExtendedPermissions::xperms_optional_prefix",
             type_size: std::mem::size_of::<u8>(),
             num_bytes,
         })?;
-        let xperms_optional_prefix = *PS::deref(&prefix);
+        let xperms_optional_prefix = prefix;
         let num_bytes = tail.len();
-        let (bitmap, tail) = PS::parse::<[le::U32; 8]>(tail).ok_or(ParseError::MissingData {
-            type_name: "ExtendedPermissions::xperms_bitmap",
-            type_size: std::mem::size_of::<[le::U32; 8]>(),
-            num_bytes,
-        })?;
+        let (bitmap, tail) =
+            ByValue::parse::<[le::U32; 8]>(tail).ok_or(ParseError::MissingData {
+                type_name: "ExtendedPermissions::xperms_bitmap",
+                type_size: std::mem::size_of::<[le::U32; 8]>(),
+                num_bytes,
+            })?;
         Ok((
             ExtendedPermissions {
                 xperms_type,
                 xperms_optional_prefix,
-                xperms_bitmap: XpermsBitmap(*PS::deref(&bitmap)),
+                xperms_bitmap: XpermsBitmap(bitmap),
             },
             tail,
         ))
@@ -544,11 +529,11 @@ impl std::ops::SubAssign<&Self> for XpermsBitmap {
     }
 }
 
-array_type!(RoleTransitions, PS, PS::Output<le::U32>, PS::Slice<RoleTransition>);
+array_type!(RoleTransitions, le::U32, Vec<RoleTransition>);
 
 array_type_validate_deref_both!(RoleTransitions);
 
-impl<PS: ParseStrategy> ValidateArray<le::U32, RoleTransition> for RoleTransitions<PS> {
+impl ValidateArray<le::U32, RoleTransition> for RoleTransitions {
     type Error = anyhow::Error;
 
     /// [`RoleTransitions`] have no additional metadata (beyond length encoding).
@@ -605,11 +590,11 @@ impl Validate for [RoleTransition] {
     }
 }
 
-array_type!(RoleAllows, PS, PS::Output<le::U32>, PS::Slice<RoleAllow>);
+array_type!(RoleAllows, le::U32, Vec<RoleAllow>);
 
 array_type_validate_deref_both!(RoleAllows);
 
-impl<PS: ParseStrategy> ValidateArray<le::U32, RoleAllow> for RoleAllows<PS> {
+impl ValidateArray<le::U32, RoleAllow> for RoleAllows {
     type Error = anyhow::Error;
 
     /// [`RoleAllows`] have no additional metadata (beyond length encoding).
@@ -651,12 +636,12 @@ impl Validate for [RoleAllow] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) enum FilenameTransitionList<PS: ParseStrategy> {
-    PolicyVersionGeq33(SimpleArray<PS, FilenameTransitions<PS>>),
-    PolicyVersionLeq32(SimpleArray<PS, DeprecatedFilenameTransitions<PS>>),
+pub(super) enum FilenameTransitionList {
+    PolicyVersionGeq33(SimpleArray<FilenameTransitions>),
+    PolicyVersionLeq32(SimpleArray<DeprecatedFilenameTransitions>),
 }
 
-impl<PS: ParseStrategy> Validate for FilenameTransitionList<PS> {
+impl Validate for FilenameTransitionList {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -667,9 +652,9 @@ impl<PS: ParseStrategy> Validate for FilenameTransitionList<PS> {
     }
 }
 
-pub(super) type FilenameTransitions<PS> = Vec<FilenameTransition<PS>>;
+pub(super) type FilenameTransitions = Vec<FilenameTransition>;
 
-impl<PS: ParseStrategy> Validate for FilenameTransitions<PS> {
+impl Validate for FilenameTransitions {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`FilenameTransition`] objects.
@@ -679,48 +664,48 @@ impl<PS: ParseStrategy> Validate for FilenameTransitions<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct FilenameTransition<PS: ParseStrategy> {
-    filename: SimpleArray<PS, PS::Slice<u8>>,
-    transition_type: PS::Output<le::U32>,
-    transition_class: PS::Output<le::U32>,
-    items: SimpleArray<PS, FilenameTransitionItems<PS>>,
+pub(super) struct FilenameTransition {
+    filename: SimpleArray<Vec<u8>>,
+    transition_type: le::U32,
+    transition_class: le::U32,
+    items: SimpleArray<FilenameTransitionItems>,
 }
 
-impl<PS: ParseStrategy> FilenameTransition<PS> {
+impl FilenameTransition {
     pub(super) fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.filename.data)
+        &self.filename.data
     }
 
     pub(super) fn target_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.transition_type).get()).unwrap())
+        TypeId(NonZeroU32::new(self.transition_type.get()).unwrap())
     }
 
     pub(super) fn target_class(&self) -> ClassId {
-        ClassId(NonZeroU32::new(PS::deref(&self.transition_class).get()).unwrap())
+        ClassId(NonZeroU32::new(self.transition_class.get()).unwrap())
     }
 
-    pub(super) fn outputs(&self) -> &[FilenameTransitionItem<PS>] {
+    pub(super) fn outputs(&self) -> &[FilenameTransitionItem] {
         &self.items.data
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for FilenameTransition<PS>
+impl Parse for FilenameTransition
 where
-    SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
-    SimpleArray<PS, FilenameTransitionItems<PS>>: Parse<PS>,
+    SimpleArray<Vec<u8>>: Parse,
+    SimpleArray<FilenameTransitionItems>: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (filename, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
+        let (filename, tail) = SimpleArray::<Vec<u8>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing filename for filename transition")?;
 
         let num_bytes = tail.len();
         let (transition_type, tail) =
-            PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                 type_name: "FilenameTransition::transition_type",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
@@ -728,13 +713,13 @@ where
 
         let num_bytes = tail.len();
         let (transition_class, tail) =
-            PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                 type_name: "FilenameTransition::transition_class",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
             })?;
 
-        let (items, tail) = SimpleArray::<PS, FilenameTransitionItems<PS>>::parse(tail)
+        let (items, tail) = SimpleArray::<FilenameTransitionItems>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing items for filename transition")?;
 
@@ -742,31 +727,31 @@ where
     }
 }
 
-pub(super) type FilenameTransitionItems<PS> = Vec<FilenameTransitionItem<PS>>;
+pub(super) type FilenameTransitionItems = Vec<FilenameTransitionItem>;
 
 #[derive(Debug, PartialEq)]
-pub(super) struct FilenameTransitionItem<PS: ParseStrategy> {
-    stypes: ExtensibleBitmap<PS>,
-    out_type: PS::Output<le::U32>,
+pub(super) struct FilenameTransitionItem {
+    stypes: ExtensibleBitmap,
+    out_type: le::U32,
 }
 
-impl<PS: ParseStrategy> FilenameTransitionItem<PS> {
+impl FilenameTransitionItem {
     pub(super) fn has_source_type(&self, source_type: TypeId) -> bool {
         self.stypes.is_set(source_type.0.get() - 1)
     }
 
     pub(super) fn out_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.out_type).get()).unwrap())
+        TypeId(NonZeroU32::new(self.out_type.get()).unwrap())
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for FilenameTransitionItem<PS>
+impl Parse for FilenameTransitionItem
 where
-    ExtensibleBitmap<PS>: Parse<PS>,
+    ExtensibleBitmap: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (stypes, tail) = ExtensibleBitmap::parse(tail)
@@ -774,7 +759,7 @@ where
             .context("parsing stypes extensible bitmap for file transition")?;
 
         let num_bytes = tail.len();
-        let (out_type, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (out_type, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "FilenameTransitionItem::out_type",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -784,9 +769,9 @@ where
     }
 }
 
-pub(super) type DeprecatedFilenameTransitions<PS> = Vec<DeprecatedFilenameTransition<PS>>;
+pub(super) type DeprecatedFilenameTransitions = Vec<DeprecatedFilenameTransition>;
 
-impl<PS: ParseStrategy> Validate for DeprecatedFilenameTransitions<PS> {
+impl Validate for DeprecatedFilenameTransitions {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`DeprecatedFilenameTransition`] objects.
@@ -796,54 +781,55 @@ impl<PS: ParseStrategy> Validate for DeprecatedFilenameTransitions<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct DeprecatedFilenameTransition<PS: ParseStrategy> {
-    filename: SimpleArray<PS, PS::Slice<u8>>,
-    metadata: PS::Output<DeprecatedFilenameTransitionMetadata>,
+pub(super) struct DeprecatedFilenameTransition {
+    filename: SimpleArray<Vec<u8>>,
+    metadata: DeprecatedFilenameTransitionMetadata,
 }
 
-impl<PS: ParseStrategy> DeprecatedFilenameTransition<PS> {
+impl DeprecatedFilenameTransition {
     pub(super) fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.filename.data)
+        &self.filename.data
     }
 
     pub(super) fn source_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).source_type.get()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.source_type.get()).unwrap())
     }
 
     pub(super) fn target_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).transition_type.get()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.transition_type.get()).unwrap())
     }
 
     pub(super) fn target_class(&self) -> ClassId {
-        ClassId(NonZeroU32::new(PS::deref(&self.metadata).transition_class.get()).unwrap())
+        ClassId(NonZeroU32::new(self.metadata.transition_class.get()).unwrap())
     }
 
     pub(super) fn out_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).out_type.get()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.out_type.get()).unwrap())
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for DeprecatedFilenameTransition<PS>
+impl Parse for DeprecatedFilenameTransition
 where
-    SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
+    SimpleArray<Vec<u8>>: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (filename, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
+        let (filename, tail) = SimpleArray::<Vec<u8>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing filename for deprecated filename transition")?;
 
         let num_bytes = tail.len();
-        let (metadata, tail) = PS::parse::<DeprecatedFilenameTransitionMetadata>(tail).ok_or({
-            ParseError::MissingData {
-                type_name: "DeprecatedFilenameTransition::metadata",
-                type_size: std::mem::size_of::<le::U32>(),
-                num_bytes,
-            }
-        })?;
+        let (metadata, tail) =
+            ByValue::parse::<DeprecatedFilenameTransitionMetadata>(tail).ok_or({
+                ParseError::MissingData {
+                    type_name: "DeprecatedFilenameTransition::metadata",
+                    type_size: std::mem::size_of::<le::U32>(),
+                    num_bytes,
+                }
+            })?;
 
         Ok((Self { filename, metadata }, tail))
     }
@@ -858,9 +844,9 @@ pub(super) struct DeprecatedFilenameTransitionMetadata {
     out_type: le::U32,
 }
 
-pub(super) type InitialSids<PS> = Vec<InitialSid<PS>>;
+pub(super) type InitialSids = Vec<InitialSid>;
 
-impl<PS: ParseStrategy> Validate for InitialSids<PS> {
+impl Validate for InitialSids {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`InitialSid`] objects.
@@ -875,32 +861,32 @@ impl<PS: ParseStrategy> Validate for InitialSids<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct InitialSid<PS: ParseStrategy> {
-    id: PS::Output<le::U32>,
-    context: Context<PS>,
+pub(super) struct InitialSid {
+    id: le::U32,
+    context: Context,
 }
 
-impl<PS: ParseStrategy> InitialSid<PS> {
+impl InitialSid {
     pub(super) fn id(&self) -> le::U32 {
-        *PS::deref(&self.id)
+        self.id
     }
 
-    pub(super) fn context(&self) -> &Context<PS> {
+    pub(super) fn context(&self) -> &Context {
         &self.context
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for InitialSid<PS>
+impl Parse for InitialSid
 where
-    Context<PS>: Parse<PS>,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (id, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (id, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "InitialSid::sid",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -915,40 +901,40 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Context<PS: ParseStrategy> {
-    metadata: PS::Output<ContextMetadata>,
-    mls_range: MlsRange<PS>,
+pub(super) struct Context {
+    metadata: ContextMetadata,
+    mls_range: MlsRange,
 }
 
-impl<PS: ParseStrategy> Context<PS> {
+impl Context {
     pub(super) fn user_id(&self) -> UserId {
-        UserId(NonZeroU32::new(PS::deref(&self.metadata).user.get()).unwrap())
+        UserId(NonZeroU32::new(self.metadata.user.get()).unwrap())
     }
     pub(super) fn role_id(&self) -> RoleId {
-        RoleId(NonZeroU32::new(PS::deref(&self.metadata).role.get()).unwrap())
+        RoleId(NonZeroU32::new(self.metadata.role.get()).unwrap())
     }
     pub(super) fn type_id(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).context_type.get()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.context_type.get()).unwrap())
     }
-    pub(super) fn low_level(&self) -> &MlsLevel<PS> {
+    pub(super) fn low_level(&self) -> &MlsLevel {
         self.mls_range.low()
     }
-    pub(super) fn high_level(&self) -> &Option<MlsLevel<PS>> {
+    pub(super) fn high_level(&self) -> &Option<MlsLevel> {
         self.mls_range.high()
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Context<PS>
+impl Parse for Context
 where
-    MlsRange<PS>: Parse<PS>,
+    MlsRange: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) =
-            PS::parse::<ContextMetadata>(tail).context("parsing metadata for context")?;
+            ByValue::parse::<ContextMetadata>(tail).context("parsing metadata for context")?;
 
         let (mls_range, tail) = MlsRange::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
@@ -966,9 +952,9 @@ pub(super) struct ContextMetadata {
     context_type: le::U32,
 }
 
-pub(super) type NamedContextPairs<PS> = Vec<NamedContextPair<PS>>;
+pub(super) type NamedContextPairs = Vec<NamedContextPair>;
 
-impl<PS: ParseStrategy> Validate for NamedContextPairs<PS> {
+impl Validate for NamedContextPairs {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`NamedContextPairs`] objects.
@@ -981,20 +967,20 @@ impl<PS: ParseStrategy> Validate for NamedContextPairs<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct NamedContextPair<PS: ParseStrategy> {
-    name: SimpleArray<PS, PS::Slice<u8>>,
-    context1: Context<PS>,
-    context2: Context<PS>,
+pub(super) struct NamedContextPair {
+    name: SimpleArray<Vec<u8>>,
+    context1: Context,
+    context2: Context,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for NamedContextPair<PS>
+impl Parse for NamedContextPair
 where
-    SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
-    Context<PS>: Parse<PS>,
+    SimpleArray<Vec<u8>>: Parse,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (name, tail) = SimpleArray::parse(tail)
@@ -1013,9 +999,9 @@ where
     }
 }
 
-pub(super) type Ports<PS> = Vec<Port<PS>>;
+pub(super) type Ports = Vec<Port>;
 
-impl<PS: ParseStrategy> Validate for Ports<PS> {
+impl Validate for Ports {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Ports`] objects.
@@ -1025,22 +1011,22 @@ impl<PS: ParseStrategy> Validate for Ports<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Port<PS: ParseStrategy> {
-    metadata: PS::Output<PortMetadata>,
-    context: Context<PS>,
+pub(super) struct Port {
+    metadata: PortMetadata,
+    context: Context,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Port<PS>
+impl Parse for Port
 where
-    Context<PS>: Parse<PS>,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) =
-            PS::parse::<PortMetadata>(tail).context("parsing metadata for context")?;
+            ByValue::parse::<PortMetadata>(tail).context("parsing metadata for context")?;
 
         let (context, tail) = Context::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
@@ -1058,9 +1044,9 @@ pub(super) struct PortMetadata {
     high_port: le::U32,
 }
 
-pub(super) type Nodes<PS> = Vec<Node<PS>>;
+pub(super) type Nodes = Vec<Node>;
 
-impl<PS: ParseStrategy> Validate for Nodes<PS> {
+impl Validate for Nodes {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Node`] objects.
@@ -1070,30 +1056,30 @@ impl<PS: ParseStrategy> Validate for Nodes<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Node<PS: ParseStrategy> {
-    address: PS::Output<le::U32>,
-    mask: PS::Output<le::U32>,
-    context: Context<PS>,
+pub(super) struct Node {
+    address: le::U32,
+    mask: le::U32,
+    context: Context,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Node<PS>
+impl Parse for Node
 where
-    Context<PS>: Parse<PS>,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (address, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (address, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "Node::address",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
         })?;
 
         let num_bytes = tail.len();
-        let (mask, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (mask, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "Node::mask",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -1107,7 +1093,7 @@ where
     }
 }
 
-impl<PS: ParseStrategy> Validate for Node<PS> {
+impl Validate for Node {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between fields of [`Node`].
@@ -1116,9 +1102,9 @@ impl<PS: ParseStrategy> Validate for Node<PS> {
     }
 }
 
-pub(super) type FsUses<PS> = Vec<FsUse<PS>>;
+pub(super) type FsUses = Vec<FsUse>;
 
-impl<PS: ParseStrategy> Validate for FsUses<PS> {
+impl Validate for FsUses {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -1130,39 +1116,38 @@ impl<PS: ParseStrategy> Validate for FsUses<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct FsUse<PS: ParseStrategy> {
-    behavior_and_name: Array<PS, PS::Output<FsUseMetadata>, PS::Slice<u8>>,
-    context: Context<PS>,
+pub(super) struct FsUse {
+    behavior_and_name: Array<FsUseMetadata, Vec<u8>>,
+    context: Context,
 }
 
-impl<PS: ParseStrategy> FsUse<PS> {
+impl FsUse {
     pub fn fs_type(&self) -> &[u8] {
-        PS::deref_slice(&self.behavior_and_name.data)
+        &self.behavior_and_name.data
     }
 
     pub(super) fn behavior(&self) -> FsUseType {
-        FsUseType::try_from(PS::deref(&self.behavior_and_name.metadata).behavior).unwrap()
+        FsUseType::try_from(self.behavior_and_name.metadata.behavior).unwrap()
     }
 
-    pub(super) fn context(&self) -> &Context<PS> {
+    pub(super) fn context(&self) -> &Context {
         &self.context
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for FsUse<PS>
+impl Parse for FsUse
 where
-    Array<PS, PS::Output<FsUseMetadata>, PS::Slice<u8>>: Parse<PS>,
-    Context<PS>: Parse<PS>,
+    Array<FsUseMetadata, Vec<u8>>: Parse,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (behavior_and_name, tail) =
-            Array::<PS, PS::Output<FsUseMetadata>, PS::Slice<u8>>::parse(tail)
-                .map_err(Into::<anyhow::Error>::into)
-                .context("parsing fs use metadata")?;
+        let (behavior_and_name, tail) = Array::<FsUseMetadata, Vec<u8>>::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing fs use metadata")?;
 
         let (context, tail) = Context::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
@@ -1172,11 +1157,11 @@ where
     }
 }
 
-impl<PS: ParseStrategy> Validate for FsUse<PS> {
+impl Validate for FsUse {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
-        FsUseType::try_from(PS::deref(&self.behavior_and_name.metadata).behavior)?;
+        FsUseType::try_from(self.behavior_and_name.metadata.behavior)?;
 
         Ok(())
     }
@@ -1219,9 +1204,9 @@ impl TryFrom<le::U32> for FsUseType {
     }
 }
 
-pub(super) type IPv6Nodes<PS> = Vec<IPv6Node<PS>>;
+pub(super) type IPv6Nodes = Vec<IPv6Node>;
 
-impl<PS: ParseStrategy> Validate for IPv6Nodes<PS> {
+impl Validate for IPv6Nodes {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`IPv6Node`] objects.
@@ -1231,30 +1216,31 @@ impl<PS: ParseStrategy> Validate for IPv6Nodes<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct IPv6Node<PS: ParseStrategy> {
-    address: PS::Output<[le::U32; 4]>,
-    mask: PS::Output<[le::U32; 4]>,
-    context: Context<PS>,
+pub(super) struct IPv6Node {
+    address: [le::U32; 4],
+    mask: [le::U32; 4],
+    context: Context,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for IPv6Node<PS>
+impl Parse for IPv6Node
 where
-    Context<PS>: Parse<PS>,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (address, tail) = PS::parse::<[le::U32; 4]>(tail).ok_or(ParseError::MissingData {
-            type_name: "IPv6Node::address",
-            type_size: std::mem::size_of::<le::U32>(),
-            num_bytes,
-        })?;
+        let (address, tail) =
+            ByValue::parse::<[le::U32; 4]>(tail).ok_or(ParseError::MissingData {
+                type_name: "IPv6Node::address",
+                type_size: std::mem::size_of::<le::U32>(),
+                num_bytes,
+            })?;
 
         let num_bytes = tail.len();
-        let (mask, tail) = PS::parse::<[le::U32; 4]>(tail).ok_or(ParseError::MissingData {
+        let (mask, tail) = ByValue::parse::<[le::U32; 4]>(tail).ok_or(ParseError::MissingData {
             type_name: "IPv6Node::mask",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -1268,9 +1254,9 @@ where
     }
 }
 
-pub(super) type InfinitiBandPartitionKeys<PS> = Vec<InfinitiBandPartitionKey<PS>>;
+pub(super) type InfinitiBandPartitionKeys = Vec<InfinitiBandPartitionKey>;
 
-impl<PS: ParseStrategy> Validate for InfinitiBandPartitionKeys<PS> {
+impl Validate for InfinitiBandPartitionKeys {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`InfinitiBandPartitionKey`] objects.
@@ -1280,30 +1266,30 @@ impl<PS: ParseStrategy> Validate for InfinitiBandPartitionKeys<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct InfinitiBandPartitionKey<PS: ParseStrategy> {
-    low: PS::Output<le::U32>,
-    high: PS::Output<le::U32>,
-    context: Context<PS>,
+pub(super) struct InfinitiBandPartitionKey {
+    low: le::U32,
+    high: le::U32,
+    context: Context,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for InfinitiBandPartitionKey<PS>
+impl Parse for InfinitiBandPartitionKey
 where
-    Context<PS>: Parse<PS>,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (low, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (low, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "InfinitiBandPartitionKey::low",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
         })?;
 
         let num_bytes = tail.len();
-        let (high, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (high, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "InfinitiBandPartitionKey::high",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -1317,7 +1303,7 @@ where
     }
 }
 
-impl<PS: ParseStrategy> Validate for InfinitiBandPartitionKey<PS> {
+impl Validate for InfinitiBandPartitionKey {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between fields of [`InfinitiBandPartitionKey`].
@@ -1326,9 +1312,9 @@ impl<PS: ParseStrategy> Validate for InfinitiBandPartitionKey<PS> {
     }
 }
 
-pub(super) type InfinitiBandEndPorts<PS> = Vec<InfinitiBandEndPort<PS>>;
+pub(super) type InfinitiBandEndPorts = Vec<InfinitiBandEndPort>;
 
-impl<PS: ParseStrategy> Validate for InfinitiBandEndPorts<PS> {
+impl Validate for InfinitiBandEndPorts {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`InfinitiBandEndPort`] objects.
@@ -1338,25 +1324,24 @@ impl<PS: ParseStrategy> Validate for InfinitiBandEndPorts<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct InfinitiBandEndPort<PS: ParseStrategy> {
-    port_and_name: Array<PS, PS::Output<InfinitiBandEndPortMetadata>, PS::Slice<u8>>,
-    context: Context<PS>,
+pub(super) struct InfinitiBandEndPort {
+    port_and_name: Array<InfinitiBandEndPortMetadata, Vec<u8>>,
+    context: Context,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for InfinitiBandEndPort<PS>
+impl Parse for InfinitiBandEndPort
 where
-    Array<PS, PS::Output<InfinitiBandEndPortMetadata>, PS::Slice<u8>>: Parse<PS>,
-    Context<PS>: Parse<PS>,
+    Array<InfinitiBandEndPortMetadata, Vec<u8>>: Parse,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (port_and_name, tail) =
-            Array::<PS, PS::Output<InfinitiBandEndPortMetadata>, PS::Slice<u8>>::parse(tail)
-                .map_err(Into::<anyhow::Error>::into)
-                .context("parsing infiniti band end port metadata")?;
+        let (port_and_name, tail) = Array::<InfinitiBandEndPortMetadata, Vec<u8>>::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing infiniti band end port metadata")?;
 
         let (context, tail) = Context::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
@@ -1379,9 +1364,9 @@ impl Counted for InfinitiBandEndPortMetadata {
     }
 }
 
-pub(super) type GenericFsContexts<PS> = Vec<GenericFsContext<PS>>;
+pub(super) type GenericFsContexts = Vec<GenericFsContext>;
 
-impl<PS: ParseStrategy> Validate for GenericFsContexts<PS> {
+impl Validate for GenericFsContexts {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of  [`GenericFsContext`] objects.
@@ -1393,38 +1378,38 @@ impl<PS: ParseStrategy> Validate for GenericFsContexts<PS> {
 /// Information parsed parsed from `genfscon [fs_type] [partial_path] [fs_context]` statements
 /// about a specific filesystem type.
 #[derive(Debug, PartialEq)]
-pub(super) struct GenericFsContext<PS: ParseStrategy> {
+pub(super) struct GenericFsContext {
     /// The filesystem type.
-    fs_type: SimpleArray<PS, PS::Slice<u8>>,
+    fs_type: SimpleArray<Vec<u8>>,
     /// The set of contexts defined for this filesystem.
-    contexts: SimpleArray<PS, FsContexts<PS>>,
+    contexts: SimpleArray<FsContexts>,
 }
 
-impl<PS: ParseStrategy> GenericFsContext<PS> {
+impl GenericFsContext {
     pub(super) fn fs_type(&self) -> &[u8] {
-        PS::deref_slice(&self.fs_type.data)
+        &self.fs_type.data
     }
 
-    pub(super) fn contexts(&self) -> &FsContexts<PS> {
+    pub(super) fn contexts(&self) -> &FsContexts {
         &self.contexts.data
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for GenericFsContext<PS>
+impl Parse for GenericFsContext
 where
-    SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
-    SimpleArray<PS, FsContexts<PS>>: Parse<PS>,
+    SimpleArray<Vec<u8>>: Parse,
+    SimpleArray<FsContexts>: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (fs_type, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
+        let (fs_type, tail) = SimpleArray::<Vec<u8>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem context name")?;
 
-        let (contexts, tail) = SimpleArray::<PS, FsContexts<PS>>::parse(tail)
+        let (contexts, tail) = SimpleArray::<FsContexts>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem contexts")?;
 
@@ -1432,51 +1417,51 @@ where
     }
 }
 
-pub(super) type FsContexts<PS> = Vec<FsContext<PS>>;
+pub(super) type FsContexts = Vec<FsContext>;
 
 #[derive(Debug, PartialEq)]
-pub(super) struct FsContext<PS: ParseStrategy> {
+pub(super) struct FsContext {
     /// The partial path, relative to the root of the filesystem. The partial path can only be set for
     /// virtual filesystems, like `proc/`. Otherwise, this must be `/`
-    partial_path: SimpleArray<PS, PS::Slice<u8>>,
+    partial_path: SimpleArray<Vec<u8>>,
     /// Optional. When provided, the context will only be applied to files of this type. Allowed files
     /// types are: blk_file, chr_file, dir, fifo_file, lnk_file, sock_file, file. When set to 0, the
     /// context applies to all file types.
-    class: PS::Output<le::U32>,
+    class: le::U32,
     /// The security context allocated to the filesystem.
-    context: Context<PS>,
+    context: Context,
 }
 
-impl<PS: ParseStrategy> FsContext<PS> {
+impl FsContext {
     pub(super) fn partial_path(&self) -> &[u8] {
-        PS::deref_slice(&self.partial_path.data)
+        &self.partial_path.data
     }
 
-    pub(super) fn context(&self) -> &Context<PS> {
+    pub(super) fn context(&self) -> &Context {
         &self.context
     }
 
     pub(super) fn class(&self) -> Option<ClassId> {
-        NonZeroU32::new((*PS::deref(&self.class)).into()).map(ClassId)
+        NonZeroU32::new(self.class.into()).map(ClassId)
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for FsContext<PS>
+impl Parse for FsContext
 where
-    SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
-    Context<PS>: Parse<PS>,
+    SimpleArray<Vec<u8>>: Parse,
+    Context: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (partial_path, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
+        let (partial_path, tail) = SimpleArray::<Vec<u8>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing filesystem context partial path")?;
 
         let num_bytes = tail.len();
-        let (class, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (class, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "FsContext::class",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -1490,15 +1475,15 @@ where
     }
 }
 
-pub(super) type RangeTransitions<PS> = Vec<RangeTransition<PS>>;
+pub(super) type RangeTransitions = Vec<RangeTransition>;
 
-impl<PS: ParseStrategy> Validate for RangeTransitions<PS> {
+impl Validate for RangeTransitions {
     type Error = anyhow::Error;
 
     /// TODO: Validate sequence of [`RangeTransition`] objects.
     fn validate(&self) -> Result<(), Self::Error> {
         for range_transition in self {
-            if PS::deref(&range_transition.metadata).target_class.get() == 0 {
+            if range_transition.metadata.target_class.get() == 0 {
                 return Err(ValidateError::NonOptionalIdIsZero.into());
             }
         }
@@ -1507,39 +1492,39 @@ impl<PS: ParseStrategy> Validate for RangeTransitions<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct RangeTransition<PS: ParseStrategy> {
-    metadata: PS::Output<RangeTransitionMetadata>,
-    mls_range: MlsRange<PS>,
+pub(super) struct RangeTransition {
+    metadata: RangeTransitionMetadata,
+    mls_range: MlsRange,
 }
 
-impl<PS: ParseStrategy> RangeTransition<PS> {
+impl RangeTransition {
     pub fn source_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).source_type.get()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.source_type.get()).unwrap())
     }
 
     pub fn target_type(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).target_type.get()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.target_type.get()).unwrap())
     }
 
     pub fn target_class(&self) -> ClassId {
-        ClassId(NonZeroU32::new(PS::deref(&self.metadata).target_class.get()).unwrap())
+        ClassId(NonZeroU32::new(self.metadata.target_class.get()).unwrap())
     }
 
-    pub fn mls_range(&self) -> &MlsRange<PS> {
+    pub fn mls_range(&self) -> &MlsRange {
         &self.mls_range
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for RangeTransition<PS>
+impl Parse for RangeTransition
 where
-    MlsRange<PS>: Parse<PS>,
+    MlsRange: Parse,
 {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (metadata, tail) = PS::parse::<RangeTransitionMetadata>(tail)
+        let (metadata, tail) = ByValue::parse::<RangeTransitionMetadata>(tail)
             .context("parsing range transition metadata")?;
 
         let (mls_range, tail) = MlsRange::parse(tail)

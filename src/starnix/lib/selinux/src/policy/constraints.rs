@@ -17,7 +17,7 @@ use super::symbols::{
     CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES, CONSTRAINT_TERM_TYPE_NOT_OPERATOR,
     CONSTRAINT_TERM_TYPE_OR_OPERATOR,
 };
-use super::{ParseStrategy, RoleId, TypeId, UserId};
+use super::{RoleId, TypeId, UserId};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -59,8 +59,8 @@ pub(super) enum ConstraintError {
 /// access decisions.
 // TODO: https://fxbug.dev/372400976 - Consider optimizations if this is a
 // performance bottleneck.
-pub(super) fn evaluate_constraint<PS: ParseStrategy>(
-    constraint_expr: &ConstraintExpr<PS>,
+pub(super) fn evaluate_constraint(
+    constraint_expr: &ConstraintExpr,
     source: &SecurityContext,
     target: &SecurityContext,
 ) -> Result<bool, ConstraintError> {
@@ -106,8 +106,8 @@ enum ConstraintNode {
 }
 
 impl ConstraintNode {
-    fn try_from_constraint_term<PS: ParseStrategy>(
-        value: &ConstraintTerm<PS>,
+    fn try_from_constraint_term(
+        value: &ConstraintTerm,
         source: &SecurityContext,
         target: &SecurityContext,
     ) -> Result<ConstraintNode, ConstraintError> {
@@ -132,8 +132,8 @@ enum BooleanOperator {
 }
 
 impl BooleanOperator {
-    fn try_from_constraint_term<PS: ParseStrategy>(
-        value: &ConstraintTerm<PS>,
+    fn try_from_constraint_term(
+        value: &ConstraintTerm,
     ) -> Result<BooleanOperator, ConstraintError> {
         match value.constraint_term_type() {
             CONSTRAINT_TERM_TYPE_NOT_OPERATOR => Ok(BooleanOperator::Not),
@@ -232,8 +232,8 @@ impl ContextExpression {
         }
     }
 
-    fn try_from_constraint_term<PS: ParseStrategy>(
-        value: &ConstraintTerm<PS>,
+    fn try_from_constraint_term(
+        value: &ConstraintTerm,
         source: &SecurityContext,
         target: &SecurityContext,
     ) -> Result<ContextExpression, ConstraintError> {
@@ -311,9 +311,9 @@ impl ContextExpression {
         }
     }
 
-    fn operands_from_expr_with_names<PS: ParseStrategy>(
+    fn operands_from_expr_with_names(
         operand_type: u32,
-        names: &ExtensibleBitmap<PS>,
+        names: &ExtensibleBitmap,
         source: &SecurityContext,
         target: &SecurityContext,
     ) -> Result<(ContextOperand, ContextOperand), ConstraintError> {

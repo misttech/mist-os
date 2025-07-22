@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::policy::parser::ByValue;
 use crate::policy::{Policy, SecurityContext, SecurityContextError};
 use crate::{InitialSid, SecurityId, FIRST_UNUSED_SID};
 
@@ -26,7 +25,7 @@ enum Entry {
 /// `SecurityContext` before.
 pub struct SidTable {
     /// The policy associated with this [`SidTable`].
-    policy: Arc<Policy<ByValue<Vec<u8>>>>,
+    policy: Arc<Policy>,
 
     /// The mapping from [`SecurityId`] (represented by integer position) to
     /// [`SecurityContext`] (or for some [`SecurityId`]s, something other than a valid
@@ -35,14 +34,14 @@ pub struct SidTable {
 }
 
 impl SidTable {
-    pub fn new(policy: Arc<Policy<ByValue<Vec<u8>>>>) -> Self {
+    pub fn new(policy: Arc<Policy>) -> Self {
         Self::new_from(
             policy,
             vec![Entry::Invalid { context_string: Vec::new() }; FIRST_UNUSED_SID as usize],
         )
     }
 
-    pub fn new_from_previous(policy: Arc<Policy<ByValue<Vec<u8>>>>, previous: &Self) -> Self {
+    pub fn new_from_previous(policy: Arc<Policy>, previous: &Self) -> Self {
         let mut new_entries =
             vec![Entry::Invalid { context_string: Vec::new() }; FIRST_UNUSED_SID as usize];
         new_entries.reserve(previous.entries.len());
@@ -117,7 +116,7 @@ impl SidTable {
         }
     }
 
-    fn new_from(policy: Arc<Policy<ByValue<Vec<u8>>>>, mut new_entries: Vec<Entry>) -> Self {
+    fn new_from(policy: Arc<Policy>, mut new_entries: Vec<Entry>) -> Self {
         for initial_sid in InitialSid::all_variants() {
             let initial_context = policy.initial_context(*initial_sid);
             new_entries[*initial_sid as usize] =
@@ -137,7 +136,7 @@ mod tests {
     const TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
 
-    fn test_policy() -> Arc<Policy<ByValue<Vec<u8>>>> {
+    fn test_policy() -> Arc<Policy> {
         let (unvalidated, _binary) = parse_policy_by_value(TESTS_BINARY_POLICY.to_vec()).unwrap();
         Arc::new(unvalidated.validate().unwrap())
     }

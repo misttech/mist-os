@@ -7,13 +7,13 @@ use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::{
     ExtensibleBitmap, ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator,
 };
-use super::parser::ParseStrategy;
+use super::parser::ByValue;
 use super::security_context::{CategoryIterator, Level, SecurityContext};
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
     array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec,
-    AccessVector, Array, CategoryId, ClassId, ClassPermissionId, Counted, Parse, ParseSlice,
-    RoleId, SensitivityId, TypeId, UserId, Validate, ValidateArray,
+    AccessVector, Array, CategoryId, ClassId, ClassPermissionId, Counted, Parse, RoleId,
+    SensitivityId, TypeId, UserId, Validate, ValidateArray,
 };
 
 use anyhow::{anyhow, Context as _};
@@ -154,29 +154,26 @@ pub(super) const TYPE_PROPERTIES_ATTRIBUTE: u32 = 0;
 /// [`SymbolList`] is an [`Array`] of items with the count of items determined by [`Metadata`] as
 /// [`Counted`].
 #[derive(Debug, PartialEq)]
-pub(super) struct SymbolList<PS: ParseStrategy, T>(Array<PS, PS::Output<Metadata>, Vec<T>>);
+pub(super) struct SymbolList<T>(Array<Metadata, Vec<T>>);
 
-impl<PS: ParseStrategy, T> Deref for SymbolList<PS, T> {
-    type Target = Array<PS, PS::Output<Metadata>, Vec<T>>;
+impl<T> Deref for SymbolList<T> {
+    type Target = Array<Metadata, Vec<T>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<PS: ParseStrategy, T> Parse<PS> for SymbolList<PS, T>
-where
-    Array<PS, PS::Output<Metadata>, Vec<T>>: Parse<PS>,
-{
-    type Error = <Array<PS, PS::Output<Metadata>, Vec<T>> as Parse<PS>>::Error;
+impl<T: Parse> Parse for SymbolList<T> {
+    type Error = <Array<Metadata, Vec<T>> as Parse>::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
-        let (array, tail) = Array::<PS, PS::Output<Metadata>, Vec<T>>::parse(bytes)?;
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+        let (array, tail) = Array::<Metadata, Vec<T>>::parse(bytes)?;
         Ok((Self(array), tail))
     }
 }
 
-impl<PS: ParseStrategy, T> Validate for SymbolList<PS, T>
+impl<T> Validate for SymbolList<T>
 where
     [T]: Validate,
 {
@@ -184,7 +181,7 @@ where
 
     /// [`SymbolList`] has no internal constraints beyond those imposed by [`Array`].
     fn validate(&self) -> Result<(), Self::Error> {
-        PS::deref(&self.metadata).validate().map_err(Into::<anyhow::Error>::into)?;
+        self.metadata.validate().map_err(Into::<anyhow::Error>::into)?;
         self.data.as_slice().validate().map_err(Into::<anyhow::Error>::into)?;
 
         Ok(())
@@ -224,8 +221,8 @@ impl Validate for Metadata {
     }
 }
 
-impl<PS: ParseStrategy> Validate for [CommonSymbol<PS>] {
-    type Error = <CommonSymbol<PS> as Validate>::Error;
+impl Validate for [CommonSymbol] {
+    type Error = <CommonSymbol as Validate>::Error;
 
     /// [`CommonSymbols`] have no internal constraints beyond those imposed by individual
     /// [`CommonSymbol`] objects.
@@ -234,35 +231,28 @@ impl<PS: ParseStrategy> Validate for [CommonSymbol<PS>] {
     }
 }
 
-array_type!(CommonSymbol, PS, CommonSymbolMetadata<PS>, Permissions<PS>);
+array_type!(CommonSymbol, CommonSymbolMetadata, Permissions);
 
 array_type_validate_deref_none_data_vec!(CommonSymbol);
 
-impl<PS: ParseStrategy> CommonSymbol<PS> {
-    pub fn permissions(&self) -> &Permissions<PS> {
+impl CommonSymbol {
+    pub fn permissions(&self) -> &Permissions {
         &self.data
     }
 }
 
-pub(super) type CommonSymbols<PS> = Vec<CommonSymbol<PS>>;
+pub(super) type CommonSymbols = Vec<CommonSymbol>;
 
-impl<PS: ParseStrategy> CommonSymbol<PS> {
+impl CommonSymbol {
     /// Returns the name of this common symbol (a string), encoded a borrow of a byte slice. For
     /// example, the policy statement `common file { common_file_perm }` induces a [`CommonSymbol`]
     /// where `name_bytes() == "file".as_slice()`.
     pub fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.metadata.data)
+        &self.metadata.data
     }
 }
 
-impl<PS: ParseStrategy> Counted for CommonSymbol<PS>
-where
-    CommonSymbolMetadata<PS>: Parse<PS> + Validate,
-    Array<PS, PS::Output<CommonSymbolStaticMetadata>, PS::Slice<u8>>: Parse<PS>,
-    Array<PS, PS::Output<PermissionMetadata>, PS::Slice<u8>>: Parse<PS>,
-    Array<PS, CommonSymbolMetadata<PS>, Vec<Permission<PS>>>: Parse<PS>,
-    Vec<Permission<PS>>: ParseSlice<PS>,
-{
+impl Counted for CommonSymbol {
     /// The count of items in the associated [`Permissions`] is exposed via
     /// `CommonSymbolMetadata::count()`.
     fn count(&self) -> u32 {
@@ -270,33 +260,31 @@ where
     }
 }
 
-impl<PS: ParseStrategy> ValidateArray<CommonSymbolMetadata<PS>, Permission<PS>>
-    for CommonSymbol<PS>
-{
+impl ValidateArray<CommonSymbolMetadata, Permission> for CommonSymbol {
     type Error = anyhow::Error;
 
     /// [`CommonSymbol`] have no internal constraints beyond those imposed by [`Array`].
     fn validate_array<'a>(
-        _metadata: &'a CommonSymbolMetadata<PS>,
-        _data: &'a [Permission<PS>],
+        _metadata: &'a CommonSymbolMetadata,
+        _data: &'a [Permission],
     ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-array_type!(CommonSymbolMetadata, PS, PS::Output<CommonSymbolStaticMetadata>, PS::Slice<u8>);
+array_type!(CommonSymbolMetadata, CommonSymbolStaticMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(CommonSymbolMetadata);
 
-impl<PS: ParseStrategy> Counted for CommonSymbolMetadata<PS> {
+impl Counted for CommonSymbolMetadata {
     /// The count of items in the associated [`Permissions`] is stored in the associated
     /// `CommonSymbolStaticMetadata::count` field.
     fn count(&self) -> u32 {
-        PS::deref(&self.metadata).count.get()
+        self.metadata.count.get()
     }
 }
 
-impl<PS: ParseStrategy> ValidateArray<CommonSymbolStaticMetadata, u8> for CommonSymbolMetadata<PS> {
+impl ValidateArray<CommonSymbolStaticMetadata, u8> for CommonSymbolMetadata {
     type Error = anyhow::Error;
 
     /// Array of [`u8`] sized by [`CommonSymbolStaticMetadata`] requires no additional validation.
@@ -340,9 +328,9 @@ impl Counted for CommonSymbolStaticMetadata {
 }
 
 /// [`Permissions`] is a dynamically allocated slice (that is, [`Vec`]) of [`Permission`].
-pub(super) type Permissions<PS> = Vec<Permission<PS>>;
+pub(super) type Permissions = Vec<Permission>;
 
-impl<PS: ParseStrategy> Validate for Permissions<PS> {
+impl Validate for Permissions {
     type Error = anyhow::Error;
 
     /// [`Permissions`] have no internal constraints beyond those imposed by individual
@@ -352,25 +340,25 @@ impl<PS: ParseStrategy> Validate for Permissions<PS> {
     }
 }
 
-array_type!(Permission, PS, PS::Output<PermissionMetadata>, PS::Slice<u8>);
+array_type!(Permission, PermissionMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(Permission);
 
-impl<PS: ParseStrategy> Permission<PS> {
+impl Permission {
     /// Returns the name of this permission (a string), encoded a borrow of a byte slice. For
     /// example the class named `"file"` class has a permission named `"entrypoint"` and the
     /// `"process"` class has a permission named `"fork"`.
     pub fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.data)
+        &self.data
     }
 
     /// Returns the ID of this permission in the scope of its associated class.
     pub fn id(&self) -> ClassPermissionId {
-        ClassPermissionId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
+        ClassPermissionId(NonZeroU32::new(self.metadata.id.get()).unwrap())
     }
 }
 
-impl<PS: ParseStrategy> ValidateArray<PermissionMetadata, u8> for Permission<PS> {
+impl ValidateArray<PermissionMetadata, u8> for Permission {
     type Error = anyhow::Error;
 
     /// [`Permission`] has no internal constraints beyond those imposed by [`Array`].
@@ -407,9 +395,9 @@ impl Validate for PermissionMetadata {
 }
 
 /// The list of [`Constraints`] associated with a class.
-pub(super) type Constraints<PS> = Vec<Constraint<PS>>;
+pub(super) type Constraints = Vec<Constraint>;
 
-impl<PS: ParseStrategy> Validate for Constraints<PS> {
+impl Validate for Constraints {
     type Error = anyhow::Error;
 
     /// [`Constraints`] has no internal constraints beyond those imposed by individual
@@ -423,35 +411,29 @@ impl<PS: ParseStrategy> Validate for Constraints<PS> {
 /// permissions, for a particular class. Corresponds to a single `constrain` or
 /// `mlsconstrain` statement in policy language.
 #[derive(Debug, PartialEq)]
-pub(super) struct Constraint<PS: ParseStrategy>
-where
-    ConstraintExpr<PS>: Debug + PartialEq,
-{
-    access_vector: PS::Output<le::U32>,
-    constraint_expr: ConstraintExpr<PS>,
+pub(super) struct Constraint {
+    access_vector: le::U32,
+    constraint_expr: ConstraintExpr,
 }
 
-impl<PS: ParseStrategy> Constraint<PS> {
+impl Constraint {
     pub(super) fn access_vector(&self) -> AccessVector {
-        AccessVector((*PS::deref(&self.access_vector)).get())
+        AccessVector(self.access_vector.get())
     }
 
-    pub(super) fn constraint_expr(&self) -> &ConstraintExpr<PS> {
+    pub(super) fn constraint_expr(&self) -> &ConstraintExpr {
         &self.constraint_expr
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Constraint<PS>
-where
-    ConstraintExpr<PS>: Debug + PartialEq + Parse<PS>,
-{
+impl Parse for Constraint {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (access_vector, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
+        let (access_vector, tail) = ByValue::parse::<le::U32>(tail).ok_or_else(|| {
             Into::<anyhow::Error>::into(ParseError::MissingData {
                 type_name: "AccessVector",
                 type_size: std::mem::size_of::<le::U32>(),
@@ -459,7 +441,7 @@ where
             })
         })?;
         let (constraint_expr, tail) = ConstraintExpr::parse(tail)
-            .map_err(|error| error.into() as anyhow::Error)
+            .map_err(|error| anyhow!(error))
             .context("parsing constraint expression")?;
 
         Ok((Self { access_vector, constraint_expr }, tail))
@@ -468,13 +450,11 @@ where
 
 // A [`ConstraintExpr`] describes a constraint expression, represented as a
 // postfix-ordered list of terms.
-array_type!(ConstraintExpr, PS, PS::Output<ConstraintTermCount>, ConstraintTerms<PS>);
+array_type!(ConstraintExpr, ConstraintTermCount, ConstraintTerms);
 
 array_type_validate_deref_metadata_data_vec!(ConstraintExpr);
 
-impl<PS: ParseStrategy> ValidateArray<ConstraintTermCount, ConstraintTerm<PS>>
-    for ConstraintExpr<PS>
-{
+impl ValidateArray<ConstraintTermCount, ConstraintTerm> for ConstraintExpr {
     type Error = anyhow::Error;
 
     /// [`ConstraintExpr`] has no internal constraints beyond those imposed by
@@ -482,13 +462,13 @@ impl<PS: ParseStrategy> ValidateArray<ConstraintTermCount, ConstraintTerm<PS>>
     /// that the constraint expression is well-formed.
     fn validate_array<'a>(
         _metadata: &'a ConstraintTermCount,
-        _data: &'a [ConstraintTerm<PS>],
+        _data: &'a [ConstraintTerm],
     ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-impl<PS: ParseStrategy> ConstraintExpr<PS> {
+impl ConstraintExpr {
     pub(super) fn evaluate(
         &self,
         source_context: &SecurityContext,
@@ -497,7 +477,7 @@ impl<PS: ParseStrategy> ConstraintExpr<PS> {
         evaluate_constraint(&self, source_context, target_context)
     }
 
-    pub(super) fn constraint_terms(&self) -> &[ConstraintTerm<PS>] {
+    pub(super) fn constraint_terms(&self) -> &[ConstraintTerm] {
         &self.data
     }
 }
@@ -520,7 +500,7 @@ impl Validate for ConstraintTermCount {
     }
 }
 
-impl<PS: ParseStrategy> Validate for ConstraintTerms<PS> {
+impl Validate for ConstraintTerms {
     type Error = anyhow::Error;
 
     /// [`ConstraintTerms`] have no internal constraints beyond those imposed by
@@ -533,27 +513,24 @@ impl<PS: ParseStrategy> Validate for ConstraintTerms<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct ConstraintTerm<PS: ParseStrategy> {
-    metadata: PS::Output<ConstraintTermMetadata>,
-    names: Option<ExtensibleBitmap<PS>>,
-    names_type_set: Option<TypeSet<PS>>,
+pub(super) struct ConstraintTerm {
+    metadata: ConstraintTermMetadata,
+    names: Option<ExtensibleBitmap>,
+    names_type_set: Option<TypeSet>,
 }
 
-pub(super) type ConstraintTerms<PS> = Vec<ConstraintTerm<PS>>;
+pub(super) type ConstraintTerms = Vec<ConstraintTerm>;
 
-impl<PS: ParseStrategy> Parse<PS> for ConstraintTerm<PS>
-where
-    ExtensibleBitmap<PS>: Parse<PS>,
-{
+impl Parse for ConstraintTerm {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
-        let (metadata, tail) = PS::parse::<ConstraintTermMetadata>(tail)
+        let (metadata, tail) = ByValue::parse::<ConstraintTermMetadata>(tail)
             .context("parsing constraint term metadata")?;
 
-        let (names, names_type_set, tail) = match PS::deref(&metadata).constraint_term_type.get() {
+        let (names, names_type_set, tail) = match metadata.constraint_term_type.get() {
             CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES => {
                 let (names, tail) = ExtensibleBitmap::parse(tail)
                     .map_err(Into::<anyhow::Error>::into)
@@ -569,20 +546,20 @@ where
     }
 }
 
-impl<PS: ParseStrategy> ConstraintTerm<PS> {
+impl ConstraintTerm {
     pub(super) fn constraint_term_type(&self) -> u32 {
-        PS::deref(&self.metadata).constraint_term_type.get()
+        self.metadata.constraint_term_type.get()
     }
 
     pub(super) fn expr_operand_type(&self) -> u32 {
-        PS::deref(&self.metadata).expr_operand_type.get()
+        self.metadata.expr_operand_type.get()
     }
 
     pub(super) fn expr_operator_type(&self) -> u32 {
-        PS::deref(&self.metadata).expr_operator_type.get()
+        self.metadata.expr_operator_type.get()
     }
 
-    pub(super) fn names(&self) -> Option<&ExtensibleBitmap<PS>> {
+    pub(super) fn names(&self) -> Option<&ExtensibleBitmap> {
         self.names.as_ref()
     }
 
@@ -590,7 +567,7 @@ impl<PS: ParseStrategy> ConstraintTerm<PS> {
     // Possibly becomes interesting when the policy contains type
     // attributes.
     #[allow(dead_code)]
-    pub(super) fn names_type_set(&self) -> &Option<TypeSet<PS>> {
+    pub(super) fn names_type_set(&self) -> &Option<TypeSet> {
         &self.names_type_set
     }
 }
@@ -639,19 +616,16 @@ impl Validate for ConstraintTermMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct TypeSet<PS: ParseStrategy> {
-    types: ExtensibleBitmap<PS>,
-    negative_set: ExtensibleBitmap<PS>,
-    flags: PS::Output<le::U32>,
+pub(super) struct TypeSet {
+    types: ExtensibleBitmap,
+    negative_set: ExtensibleBitmap,
+    flags: le::U32,
 }
 
-impl<PS: ParseStrategy> Parse<PS> for TypeSet<PS>
-where
-    ExtensibleBitmap<PS>: Parse<PS>,
-{
+impl Parse for TypeSet {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (types, tail) = ExtensibleBitmap::parse(tail)
@@ -663,7 +637,7 @@ where
             .context("parsing type set negative set")?;
 
         let num_bytes = tail.len();
-        let (flags, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
+        let (flags, tail) = ByValue::parse::<le::U32>(tail).ok_or_else(|| {
             Into::<anyhow::Error>::into(ParseError::MissingData {
                 type_name: "TypeSetFlags",
                 type_size: std::mem::size_of::<le::U32>(),
@@ -677,17 +651,11 @@ where
 
 /// Locates a class named `name` among `classes`. Returns the first such class found, though policy
 /// validation should ensure that only one such class exists.
-pub(super) fn find_class_by_name<'a, PS: ParseStrategy>(
-    classes: &'a Classes<PS>,
-    name: &str,
-) -> Option<&'a Class<PS>> {
+pub(super) fn find_class_by_name<'a>(classes: &'a Classes, name: &str) -> Option<&'a Class> {
     find_class_by_name_bytes(classes, name.as_bytes())
 }
 
-fn find_class_by_name_bytes<'a, PS: ParseStrategy>(
-    classes: &'a Classes<PS>,
-    name_bytes: &[u8],
-) -> Option<&'a Class<PS>> {
+fn find_class_by_name_bytes<'a>(classes: &'a Classes, name_bytes: &[u8]) -> Option<&'a Class> {
     for cls in classes.into_iter() {
         if cls.name_bytes() == name_bytes {
             return Some(cls);
@@ -700,10 +668,10 @@ fn find_class_by_name_bytes<'a, PS: ParseStrategy>(
 /// Locates a symbol named `name_bytes` among `common_symbols`. Returns
 /// the first such symbol found, though policy validation should ensure
 /// that only one exists.
-pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
-    common_symbols: &'a CommonSymbols<PS>,
+pub(super) fn find_common_symbol_by_name_bytes<'a>(
+    common_symbols: &'a CommonSymbols,
     name_bytes: &[u8],
-) -> Option<&'a CommonSymbol<PS>> {
+) -> Option<&'a CommonSymbol> {
     for common_symbol in common_symbols.into_iter() {
         if common_symbol.name_bytes() == name_bytes {
             return Some(common_symbol);
@@ -713,7 +681,7 @@ pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
     None
 }
 
-impl<PS: ParseStrategy> Validate for [Class<PS>] {
+impl Validate for [Class] {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -727,15 +695,15 @@ impl<PS: ParseStrategy> Validate for [Class<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Class<PS: ParseStrategy> {
-    constraints: ClassConstraints<PS>,
-    validate_transitions: ClassValidateTransitions<PS>,
-    defaults: PS::Output<ClassDefaults>,
+pub(super) struct Class {
+    constraints: ClassConstraints,
+    validate_transitions: ClassValidateTransitions,
+    defaults: ClassDefaults,
 }
 
-pub(super) type Classes<PS> = Vec<Class<PS>>;
+pub(super) type Classes = Vec<Class>;
 
-impl<PS: ParseStrategy> Class<PS> {
+impl Class {
     /// Returns the name of the `common` from which this `class` inherits as a borrow of a byte
     /// slice. For example, `common file { common_file_perm }`,
     /// `class file inherits file { file_perm }` yields two [`Class`] objects, one that refers to a
@@ -747,8 +715,8 @@ impl<PS: ParseStrategy> Class<PS> {
         // `ClassKey::count()` returns the `common_key_length` field. That is, the `[u8]` string
         // on `ClassCommonKey` is the "common key" (name in the inherited `common` statement) for
         // this class.
-        let class_common_key: &ClassCommonKey<PS> = &self.constraints.metadata.metadata;
-        PS::deref_slice(&class_common_key.data)
+        let class_common_key: &ClassCommonKey = &self.constraints.metadata.metadata;
+        &class_common_key.data
     }
 
     /// Returns the name of this class as a borrow of a byte slice.
@@ -756,21 +724,20 @@ impl<PS: ParseStrategy> Class<PS> {
         // `ClassKey` is an `Array` of `[u8]` with metadata `ClassMetadata`, and
         // `ClassMetadata::count()` returns the `key_length` field. That is, the `[u8]` string on
         // `ClassKey` is the "class key" (name in the `class` or `common` statement) for this class.
-        let class_key: &ClassKey<PS> = &self.constraints.metadata.metadata.metadata;
-        PS::deref_slice(&class_key.data)
+        let class_key: &ClassKey = &self.constraints.metadata.metadata.metadata;
+        &class_key.data
     }
 
     /// Returns the id associated with this class. The id is used to index into collections
     /// and bitmaps associated with this class. The id is 1-indexed, whereas most collections and
     /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
     pub fn id(&self) -> ClassId {
-        let class_metadata: &ClassMetadata =
-            &PS::deref(&self.constraints.metadata.metadata.metadata.metadata);
+        let class_metadata: &ClassMetadata = &self.constraints.metadata.metadata.metadata.metadata;
         ClassId(NonZeroU32::new(class_metadata.id.get()).unwrap())
     }
 
     /// Returns the full listing of permissions used in this policy.
-    pub fn permissions(&self) -> &Permissions<PS> {
+    pub fn permissions(&self) -> &Permissions {
         &self.constraints.metadata.data
     }
 
@@ -781,23 +748,19 @@ impl<PS: ParseStrategy> Class<PS> {
     /// The same permission may appear in multiple entries in the returned list.
     // TODO: https://fxbug.dev/372400976 - Is it accurate to change "may be
     // granted to "are granted" above?
-    pub fn constraints(&self) -> &Vec<Constraint<PS>> {
+    pub fn constraints(&self) -> &Vec<Constraint> {
         &self.constraints.data
     }
 
     pub fn defaults(&self) -> &ClassDefaults {
-        PS::deref(&self.defaults)
+        &self.defaults
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Class<PS>
-where
-    ClassConstraints<PS>: Parse<PS>,
-    ClassValidateTransitions<PS>: Parse<PS>,
-{
+impl Parse for Class {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (constraints, tail) = ClassConstraints::parse(tail)
@@ -809,7 +772,7 @@ where
             .context("parsing class validate transitions")?;
 
         let (defaults, tail) =
-            PS::parse::<ClassDefaults>(tail).context("parsing class defaults")?;
+            ByValue::parse::<ClassDefaults>(tail).context("parsing class defaults")?;
 
         Ok((Self { constraints, validate_transitions, defaults }, tail))
     }
@@ -955,24 +918,17 @@ impl From<u32> for ClassDefaultRange {
     }
 }
 
-array_type!(
-    ClassValidateTransitions,
-    PS,
-    PS::Output<ClassValidateTransitionsCount>,
-    ConstraintTerms<PS>
-);
+array_type!(ClassValidateTransitions, ClassValidateTransitionsCount, ConstraintTerms);
 
 array_type_validate_deref_metadata_data_vec!(ClassValidateTransitions);
 
-impl<PS: ParseStrategy> ValidateArray<ClassValidateTransitionsCount, ConstraintTerm<PS>>
-    for ClassValidateTransitions<PS>
-{
+impl ValidateArray<ClassValidateTransitionsCount, ConstraintTerm> for ClassValidateTransitions {
     type Error = anyhow::Error;
 
     /// [`ClassValidateTransitions`] has no internal constraints beyond those imposed by [`Array`].
     fn validate_array<'a>(
         _metadata: &'a ClassValidateTransitionsCount,
-        _data: &'a [ConstraintTerm<PS>],
+        _data: &'a [ConstraintTerm],
     ) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -997,86 +953,70 @@ impl Validate for ClassValidateTransitionsCount {
     }
 }
 
-array_type!(ClassConstraints, PS, ClassPermissions<PS>, Constraints<PS>);
+array_type!(ClassConstraints, ClassPermissions, Constraints);
 
 array_type_validate_deref_none_data_vec!(ClassConstraints);
 
-impl<PS: ParseStrategy> ValidateArray<ClassPermissions<PS>, Constraint<PS>>
-    for ClassConstraints<PS>
-{
+impl ValidateArray<ClassPermissions, Constraint> for ClassConstraints {
     type Error = anyhow::Error;
 
     /// [`ClassConstraints`] has no internal constraints beyond those imposed by [`Array`].
     fn validate_array<'a>(
-        _metadata: &'a ClassPermissions<PS>,
-        _data: &'a [Constraint<PS>],
+        _metadata: &'a ClassPermissions,
+        _data: &'a [Constraint],
     ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-array_type!(ClassPermissions, PS, ClassCommonKey<PS>, Permissions<PS>);
+array_type!(ClassPermissions, ClassCommonKey, Permissions);
 
 array_type_validate_deref_none_data_vec!(ClassPermissions);
 
-impl<PS: ParseStrategy> ValidateArray<ClassCommonKey<PS>, Permission<PS>> for ClassPermissions<PS> {
+impl ValidateArray<ClassCommonKey, Permission> for ClassPermissions {
     type Error = anyhow::Error;
 
     /// [`ClassPermissions`] has no internal constraints beyond those imposed by [`Array`].
     fn validate_array<'a>(
-        _metadata: &'a ClassCommonKey<PS>,
-        _data: &'a [Permission<PS>],
+        _metadata: &'a ClassCommonKey,
+        _data: &'a [Permission],
     ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-impl<PS: ParseStrategy> Counted for ClassPermissions<PS>
-where
-    ClassCommonKey<PS>: Parse<PS>,
-    Array<PS, ClassKey<PS>, PS::Slice<u8>>: Parse<PS>,
-    Array<PS, PS::Output<ClassMetadata>, PS::Slice<u8>>: Parse<PS>,
-    ClassKey<PS>: Parse<PS>,
-    Vec<Permission<PS>>: ParseSlice<PS>,
-    Array<PS, PS::Output<PermissionMetadata>, PS::Slice<u8>>: Parse<PS>,
-    Array<PS, ClassCommonKey<PS>, Vec<Permission<PS>>>: Parse<PS>,
-{
+impl Counted for ClassPermissions {
     /// [`ClassPermissions`] acts as counted metadata for [`ClassConstraints`].
     fn count(&self) -> u32 {
-        PS::deref(&self.metadata.metadata.metadata).constraint_count.get()
+        self.metadata.metadata.metadata.constraint_count.get()
     }
 }
 
-array_type!(ClassCommonKey, PS, ClassKey<PS>, PS::Slice<u8>);
+array_type!(ClassCommonKey, ClassKey, Vec<u8>);
 
 array_type_validate_deref_data!(ClassCommonKey);
 
-impl<PS: ParseStrategy> ValidateArray<ClassKey<PS>, u8> for ClassCommonKey<PS> {
+impl ValidateArray<ClassKey, u8> for ClassCommonKey {
     type Error = anyhow::Error;
 
     /// [`ClassCommonKey`] has no internal constraints beyond those imposed by [`Array`].
-    fn validate_array<'a>(_metadata: &'a ClassKey<PS>, _data: &'a [u8]) -> Result<(), Self::Error> {
+    fn validate_array<'a>(_metadata: &'a ClassKey, _data: &'a [u8]) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-impl<PS: ParseStrategy> Counted for ClassCommonKey<PS>
-where
-    Array<PS, ClassKey<PS>, PS::Slice<u8>>: Parse<PS>,
-    Array<PS, PS::Output<ClassMetadata>, PS::Slice<u8>>: Parse<PS>,
-    ClassKey<PS>: Parse<PS>,
-{
+impl Counted for ClassCommonKey {
     /// [`ClassCommonKey`] acts as counted metadata for [`ClassPermissions`].
     fn count(&self) -> u32 {
-        PS::deref(&self.metadata.metadata).elements_count.get()
+        self.metadata.metadata.elements_count.get()
     }
 }
 
-array_type!(ClassKey, PS, PS::Output<ClassMetadata>, PS::Slice<u8>);
+array_type!(ClassKey, ClassMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(ClassKey);
 
-impl<PS: ParseStrategy> ValidateArray<ClassMetadata, u8> for ClassKey<PS> {
+impl ValidateArray<ClassMetadata, u8> for ClassKey {
     type Error = anyhow::Error;
 
     /// [`ClassKey`] has no internal constraints beyond those imposed by [`Array`].
@@ -1088,13 +1028,10 @@ impl<PS: ParseStrategy> ValidateArray<ClassMetadata, u8> for ClassKey<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Counted for ClassKey<PS>
-where
-    Array<PS, PS::Output<ClassMetadata>, PS::Slice<u8>>: Parse<PS>,
-{
+impl Counted for ClassKey {
     /// [`ClassKey`] acts as counted metadata for [`ClassCommonKey`].
     fn count(&self) -> u32 {
-        PS::deref(&self.metadata).common_key_length.get()
+        self.metadata.common_key_length.get()
     }
 }
 
@@ -1128,7 +1065,7 @@ impl Validate for ClassMetadata {
     }
 }
 
-impl<PS: ParseStrategy> Validate for [Role<PS>] {
+impl Validate for [Role] {
     type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`Role`] instances.
@@ -1138,34 +1075,30 @@ impl<PS: ParseStrategy> Validate for [Role<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Role<PS: ParseStrategy> {
-    metadata: RoleMetadata<PS>,
-    role_dominates: ExtensibleBitmap<PS>,
-    role_types: ExtensibleBitmap<PS>,
+pub(super) struct Role {
+    metadata: RoleMetadata,
+    role_dominates: ExtensibleBitmap,
+    role_types: ExtensibleBitmap,
 }
 
-impl<PS: ParseStrategy> Role<PS> {
+impl Role {
     pub(super) fn id(&self) -> RoleId {
-        RoleId(NonZeroU32::new(PS::deref(&self.metadata.metadata).id.get()).unwrap())
+        RoleId(NonZeroU32::new(self.metadata.metadata.id.get()).unwrap())
     }
 
     pub(super) fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.metadata.data)
+        &self.metadata.data
     }
 
-    pub(super) fn types(&self) -> &ExtensibleBitmap<PS> {
+    pub(super) fn types(&self) -> &ExtensibleBitmap {
         &self.role_types
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Role<PS>
-where
-    RoleMetadata<PS>: Parse<PS>,
-    ExtensibleBitmap<PS>: Parse<PS>,
-{
+impl Parse for Role {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) = RoleMetadata::parse(tail)
@@ -1184,11 +1117,11 @@ where
     }
 }
 
-array_type!(RoleMetadata, PS, PS::Output<RoleStaticMetadata>, PS::Slice<u8>);
+array_type!(RoleMetadata, RoleStaticMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(RoleMetadata);
 
-impl<PS: ParseStrategy> ValidateArray<RoleStaticMetadata, u8> for RoleMetadata<PS> {
+impl ValidateArray<RoleStaticMetadata, u8> for RoleMetadata {
     type Error = anyhow::Error;
 
     /// [`RoleMetadata`] has no internal constraints beyond those imposed by [`Array`].
@@ -1224,7 +1157,7 @@ impl Validate for RoleStaticMetadata {
     }
 }
 
-impl<PS: ParseStrategy> Validate for [Type<PS>] {
+impl Validate for [Type] {
     type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`Type`] instances.
@@ -1233,26 +1166,26 @@ impl<PS: ParseStrategy> Validate for [Type<PS>] {
     }
 }
 
-array_type!(Type, PS, PS::Output<TypeMetadata>, PS::Slice<u8>);
+array_type!(Type, TypeMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(Type);
 
-impl<PS: ParseStrategy> Type<PS> {
+impl Type {
     /// Returns the name of this type.
     pub fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.data)
+        &self.data
     }
 
     /// Returns the id associated with this type. The id is used to index into collections and
     /// bitmaps associated with this type. The id is 1-indexed, whereas most collections and
     /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
     pub fn id(&self) -> TypeId {
-        TypeId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
+        TypeId(NonZeroU32::new(self.metadata.id.get()).unwrap())
     }
 
     /// Returns the Id of the bounding type, if any.
     pub fn bounded_by(&self) -> Option<TypeId> {
-        NonZeroU32::new(PS::deref(&self.metadata).bounds.get()).map(|id| TypeId(id))
+        NonZeroU32::new(self.metadata.bounds.get()).map(|id| TypeId(id))
     }
 
     /// Returns whether this type is from a `type [name];` policy statement.
@@ -1260,7 +1193,7 @@ impl<PS: ParseStrategy> Type<PS> {
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
     pub fn is_type(&self) -> bool {
-        PS::deref(&self.metadata).properties.get() == TYPE_PROPERTIES_TYPE
+        self.metadata.properties.get() == TYPE_PROPERTIES_TYPE
     }
 
     /// Returns whether this type is from a `typealias [typename] alias [aliasname];` policy
@@ -1269,7 +1202,7 @@ impl<PS: ParseStrategy> Type<PS> {
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
     pub fn is_alias(&self) -> bool {
-        PS::deref(&self.metadata).properties.get() == TYPE_PROPERTIES_ALIAS
+        self.metadata.properties.get() == TYPE_PROPERTIES_ALIAS
     }
 
     /// Returns whether this type is from an `attribute [name];` policy statement.
@@ -1277,11 +1210,11 @@ impl<PS: ParseStrategy> Type<PS> {
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
     pub fn is_attribute(&self) -> bool {
-        PS::deref(&self.metadata).properties.get() == TYPE_PROPERTIES_ATTRIBUTE
+        self.metadata.properties.get() == TYPE_PROPERTIES_ATTRIBUTE
     }
 }
 
-impl<PS: ParseStrategy> ValidateArray<TypeMetadata, u8> for Type<PS> {
+impl ValidateArray<TypeMetadata, u8> for Type {
     type Error = anyhow::Error;
 
     /// TODO: Validate that `PS::deref(&self.data)` is an ascii string that contains a valid type name.
@@ -1314,7 +1247,7 @@ impl Validate for TypeMetadata {
     }
 }
 
-impl<PS: ParseStrategy> Validate for [User<PS>] {
+impl Validate for [User] {
     type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency between consecutive [`User`] instances.
@@ -1324,39 +1257,35 @@ impl<PS: ParseStrategy> Validate for [User<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct User<PS: ParseStrategy> {
-    user_data: UserData<PS>,
-    roles: ExtensibleBitmap<PS>,
-    expanded_range: MlsRange<PS>,
-    default_level: MlsLevel<PS>,
+pub(super) struct User {
+    user_data: UserData,
+    roles: ExtensibleBitmap,
+    expanded_range: MlsRange,
+    default_level: MlsLevel,
 }
 
-impl<PS: ParseStrategy> User<PS> {
+impl User {
     pub(super) fn id(&self) -> UserId {
-        UserId(NonZeroU32::new(PS::deref(&self.user_data.metadata).id.get()).unwrap())
+        UserId(NonZeroU32::new(self.user_data.metadata.id.get()).unwrap())
     }
 
     pub(super) fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.user_data.data)
+        &self.user_data.data
     }
 
-    pub(super) fn roles(&self) -> &ExtensibleBitmap<PS> {
+    pub(super) fn roles(&self) -> &ExtensibleBitmap {
         &self.roles
     }
 
-    pub(super) fn mls_range(&self) -> &MlsRange<PS> {
+    pub(super) fn mls_range(&self) -> &MlsRange {
         &self.expanded_range
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for User<PS>
-where
-    UserData<PS>: Parse<PS>,
-    ExtensibleBitmap<PS>: Parse<PS>,
-{
+impl Parse for User {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (user_data, tail) = UserData::parse(tail)
@@ -1376,11 +1305,11 @@ where
     }
 }
 
-array_type!(UserData, PS, PS::Output<UserMetadata>, PS::Slice<u8>);
+array_type!(UserData, UserMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(UserData);
 
-impl<PS: ParseStrategy> ValidateArray<UserMetadata, u8> for UserData<PS> {
+impl ValidateArray<UserMetadata, u8> for UserData {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`UserMetadata`] in `self.metadata` and `[u8]` key in `self.data`.
@@ -1413,34 +1342,32 @@ impl Validate for UserMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct MlsLevel<PS: ParseStrategy> {
-    sensitivity: PS::Output<le::U32>,
-    categories: ExtensibleBitmap<PS>,
+pub(super) struct MlsLevel {
+    sensitivity: le::U32,
+    categories: ExtensibleBitmap,
 }
 
-impl<PS: ParseStrategy> MlsLevel<PS> {
-    pub fn category_ids(&self) -> impl Iterator<Item = CategoryId> + use<'_, PS> {
+impl MlsLevel {
+    pub fn category_ids(&self) -> impl Iterator<Item = CategoryId> + use<'_> {
         self.categories.spans().flat_map(|span| {
             (span.low..=span.high).map(|i| CategoryId(NonZeroU32::new(i + 1).unwrap()))
         })
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for MlsLevel<PS>
-where
-    ExtensibleBitmap<PS>: Parse<PS>,
-{
+impl Parse for MlsLevel {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (sensitivity, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-            type_name: "MlsLevelSensitivity",
-            type_size: std::mem::size_of::<le::U32>(),
-            num_bytes,
-        })?;
+        let (sensitivity, tail) =
+            ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                type_name: "MlsLevelSensitivity",
+                type_size: std::mem::size_of::<le::U32>(),
+                num_bytes,
+            })?;
 
         let (categories, tail) = ExtensibleBitmap::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
@@ -1450,48 +1377,43 @@ where
     }
 }
 
-impl<'a, PS: ParseStrategy> Level<'a, ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator<'a, PS>>
-    for MlsLevel<PS>
-{
+impl<'a> Level<'a, ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator<'a>> for MlsLevel {
     fn sensitivity(&self) -> SensitivityId {
-        SensitivityId(NonZeroU32::new(PS::deref(&self.sensitivity).get()).unwrap())
+        SensitivityId(NonZeroU32::new(self.sensitivity.get()).unwrap())
     }
 
     fn category_spans(
         &'a self,
-    ) -> CategoryIterator<ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator<'a, PS>> {
+    ) -> CategoryIterator<ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator<'a>> {
         CategoryIterator::new(self.categories.spans())
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct MlsRange<PS: ParseStrategy> {
-    count: PS::Output<le::U32>,
-    low: MlsLevel<PS>,
-    high: Option<MlsLevel<PS>>,
+pub(super) struct MlsRange {
+    count: le::U32,
+    low: MlsLevel,
+    high: Option<MlsLevel>,
 }
 
-impl<PS: ParseStrategy> MlsRange<PS> {
-    pub fn low(&self) -> &MlsLevel<PS> {
+impl MlsRange {
+    pub fn low(&self) -> &MlsLevel {
         &self.low
     }
 
-    pub fn high(&self) -> &Option<MlsLevel<PS>> {
+    pub fn high(&self) -> &Option<MlsLevel> {
         &self.high
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for MlsRange<PS>
-where
-    ExtensibleBitmap<PS>: Parse<PS>,
-{
+impl Parse for MlsRange {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (count, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (count, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "MlsLevelCount",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -1502,16 +1424,16 @@ where
         // category bitmap fields appear.
         let num_bytes = tail.len();
         let (sensitivity_low, tail) =
-            PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                 type_name: "MlsLevelSensitivityLow",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
             })?;
 
-        let (low_categories, high_level, tail) = if PS::deref(&count).get() > 1 {
+        let (low_categories, high_level, tail) = if count.get() > 1 {
             let num_bytes = tail.len();
             let (sensitivity_high, tail) =
-                PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                     type_name: "MlsLevelSensitivityHigh",
                     type_size: std::mem::size_of::<le::U32>(),
                     num_bytes,
@@ -1547,7 +1469,7 @@ where
     }
 }
 
-impl<PS: ParseStrategy> Validate for [ConditionalBoolean<PS>] {
+impl Validate for [ConditionalBoolean] {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`ConditionalBoolean`].
@@ -1556,11 +1478,11 @@ impl<PS: ParseStrategy> Validate for [ConditionalBoolean<PS>] {
     }
 }
 
-array_type!(ConditionalBoolean, PS, PS::Output<ConditionalBooleanMetadata>, PS::Slice<u8>);
+array_type!(ConditionalBoolean, ConditionalBooleanMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(ConditionalBoolean);
 
-impl<PS: ParseStrategy> ValidateArray<ConditionalBooleanMetadata, u8> for ConditionalBoolean<PS> {
+impl ValidateArray<ConditionalBooleanMetadata, u8> for ConditionalBoolean {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`ConditionalBooleanMetadata`] and `[u8]` key.
@@ -1605,7 +1527,7 @@ impl Validate for ConditionalBooleanMetadata {
     }
 }
 
-impl<PS: ParseStrategy> Validate for [Sensitivity<PS>] {
+impl Validate for [Sensitivity] {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Sensitivity`].
@@ -1615,29 +1537,25 @@ impl<PS: ParseStrategy> Validate for [Sensitivity<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Sensitivity<PS: ParseStrategy> {
-    metadata: SensitivityMetadata<PS>,
-    level: MlsLevel<PS>,
+pub(super) struct Sensitivity {
+    metadata: SensitivityMetadata,
+    level: MlsLevel,
 }
 
-impl<PS: ParseStrategy> Sensitivity<PS> {
+impl Sensitivity {
     pub fn id(&self) -> SensitivityId {
-        SensitivityId(NonZeroU32::new(PS::deref(&self.level.sensitivity).get()).unwrap())
+        SensitivityId(NonZeroU32::new(self.level.sensitivity.get()).unwrap())
     }
 
     pub fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.metadata.data)
+        &self.metadata.data
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Sensitivity<PS>
-where
-    SensitivityMetadata<PS>: Parse<PS>,
-    MlsLevel<PS>: Parse<PS>,
-{
+impl Parse for Sensitivity {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) = SensitivityMetadata::parse(tail)
@@ -1652,22 +1570,21 @@ where
     }
 }
 
-impl<PS: ParseStrategy> Validate for Sensitivity<PS> {
+impl Validate for Sensitivity {
     type Error = anyhow::Error;
 
     /// TODO: Validate internal consistency of `self.metadata` and `self.level`.
     fn validate(&self) -> Result<(), Self::Error> {
-        NonZeroU32::new(PS::deref(&self.level.sensitivity).get())
-            .ok_or(ValidateError::NonOptionalIdIsZero)?;
+        NonZeroU32::new(self.level.sensitivity.get()).ok_or(ValidateError::NonOptionalIdIsZero)?;
         Ok(())
     }
 }
 
-array_type!(SensitivityMetadata, PS, PS::Output<SensitivityStaticMetadata>, PS::Slice<u8>);
+array_type!(SensitivityMetadata, SensitivityStaticMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(SensitivityMetadata);
 
-impl<PS: ParseStrategy> ValidateArray<SensitivityStaticMetadata, u8> for SensitivityMetadata<PS> {
+impl ValidateArray<SensitivityStaticMetadata, u8> for SensitivityMetadata {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`SensitivityMetadata`] and `[u8]` key.
@@ -1703,7 +1620,7 @@ impl Validate for SensitivityStaticMetadata {
     }
 }
 
-impl<PS: ParseStrategy> Validate for [Category<PS>] {
+impl Validate for [Category] {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`Category`].
@@ -1712,21 +1629,21 @@ impl<PS: ParseStrategy> Validate for [Category<PS>] {
     }
 }
 
-array_type!(Category, PS, PS::Output<CategoryMetadata>, PS::Slice<u8>);
+array_type!(Category, CategoryMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(Category);
 
-impl<PS: ParseStrategy> Category<PS> {
+impl Category {
     pub fn id(&self) -> CategoryId {
-        CategoryId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
+        CategoryId(NonZeroU32::new(self.metadata.id.get()).unwrap())
     }
 
     pub fn name_bytes(&self) -> &[u8] {
-        PS::deref_slice(&self.data)
+        &self.data
     }
 }
 
-impl<PS: ParseStrategy> ValidateArray<CategoryMetadata, u8> for Category<PS> {
+impl ValidateArray<CategoryMetadata, u8> for Category {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency between [`CategoryMetadata`] and `[u8]` key.

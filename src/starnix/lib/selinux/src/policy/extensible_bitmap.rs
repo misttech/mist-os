@@ -2,26 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::error::ValidateError;
-use super::parser::ParseStrategy;
-use super::{array_type, array_type_validate_deref_both, Array, Counted, Validate, ValidateArray};
-
+use super::parser::ByValue;
+use super::{array_type, array_type_validate_deref_both, Counted, Validate, ValidateArray};
+use crate::policy::error::ValidateError;
+use crate::policy::Array;
 use std::cmp::Ordering;
-use std::fmt::Debug;
-use std::mem;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
 /// Maximum number of [`MapItem`] objects in a single [`ExtensibleBitmap`].
 pub(super) const MAX_BITMAP_ITEMS: u32 = 0x40;
 
 /// Fixed expectation for number of bits per [`MapItem`] in every [`ExtensibleBitmap`].
-pub(super) const MAP_NODE_BITS: u32 = 8 * mem::size_of::<u64>() as u32;
+pub(super) const MAP_NODE_BITS: u32 = 8 * std::mem::size_of::<u64>() as u32;
 
-array_type!(ExtensibleBitmap, PS, PS::Output<Metadata>, PS::Slice<MapItem>);
+array_type!(ExtensibleBitmap, Metadata, Vec<MapItem>);
 
 array_type_validate_deref_both!(ExtensibleBitmap);
 
-impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
+impl ExtensibleBitmap {
     /// Returns the number of bits described by this [`ExtensibleBitmap`].
     pub fn num_elements(&self) -> u32 {
         self.high_bit()
@@ -33,7 +31,7 @@ impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
             return false;
         }
 
-        let map_items = PS::deref_slice(&self.data);
+        let map_items = &self.data;
         if let Ok(i) = map_items.binary_search_by(|map_item| self.item_ordering(map_item, index)) {
             let map_item = &map_items[i];
             let item_index = index - map_item.start_bit.get();
@@ -45,21 +43,21 @@ impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
 
     /// Returns an iterator that returns a set of spans of continuous set bits.
     /// Each span consists of inclusive low and high bit indexes (i.e. zero-based).
-    pub fn spans<'a>(&'a self) -> ExtensibleBitmapSpansIterator<'a, PS> {
-        ExtensibleBitmapSpansIterator::<'a, PS> { bitmap: self, map_item: 0, next_bit: 0 }
+    pub fn spans<'a>(&'a self) -> ExtensibleBitmapSpansIterator<'a> {
+        ExtensibleBitmapSpansIterator::<'a> { bitmap: self, map_item: 0, next_bit: 0 }
     }
 
     /// Returns the next bit after the bits in this [`ExtensibleBitmap`]. That is, the bits in this
     /// [`ExtensibleBitmap`] may be indexed by the range `[0, Self::high_bit())`.
     fn high_bit(&self) -> u32 {
-        PS::deref(&self.metadata).high_bit.get()
+        self.metadata.high_bit.get()
     }
 
     fn item_ordering(&self, map_item: &MapItem, index: u32) -> Ordering {
         let map_item_start_bit = map_item.start_bit.get();
         if map_item_start_bit > index {
             Ordering::Greater
-        } else if map_item_start_bit + PS::deref(&self.metadata).map_item_size_bits.get() <= index {
+        } else if map_item_start_bit + self.metadata.map_item_size_bits.get() <= index {
             Ordering::Less
         } else {
             Ordering::Equal
@@ -77,20 +75,22 @@ pub(super) struct ExtensibleBitmapSpan {
 }
 
 /// Iterator returned by `ExtensibleBitmap::spans()`.
-pub(super) struct ExtensibleBitmapSpansIterator<'a, PS: ParseStrategy> {
-    bitmap: &'a ExtensibleBitmap<PS>,
+pub(super) struct ExtensibleBitmapSpansIterator<'a> {
+    bitmap: &'a ExtensibleBitmap,
     map_item: usize, // Zero-based `Vec<MapItem>` index.
     next_bit: u32,   // Zero-based bit index within the bitmap.
 }
 
-impl<PS: ParseStrategy> ExtensibleBitmapSpansIterator<'_, PS> {
+impl ExtensibleBitmapSpansIterator<'_> {
     /// Returns the zero-based index of the next bit with the specified value, if any.
     fn next_bit_with_value(&mut self, is_set: bool) -> Option<u32> {
-        let map_item_size_bits = PS::deref(&self.bitmap.metadata).map_item_size_bits.get();
+        let map_item_size_bits = self.bitmap.metadata.map_item_size_bits.get();
         let num_elements = self.bitmap.num_elements();
 
         while self.next_bit < num_elements {
-            let (start_bit, map) = PS::deref_slice(&self.bitmap.data)
+            let (start_bit, map) = self
+                .bitmap
+                .data
                 .get(self.map_item)
                 .map_or((num_elements, 0), |item| (item.start_bit.get(), item.map.get()));
 
@@ -122,7 +122,7 @@ impl<PS: ParseStrategy> ExtensibleBitmapSpansIterator<'_, PS> {
     }
 }
 
-impl<PS: ParseStrategy> Iterator for ExtensibleBitmapSpansIterator<'_, PS> {
+impl Iterator for ExtensibleBitmapSpansIterator<'_> {
     type Item = ExtensibleBitmapSpan;
 
     /// Returns the next span of at least one bit set in the bitmap.
@@ -135,8 +135,8 @@ impl<PS: ParseStrategy> Iterator for ExtensibleBitmapSpansIterator<'_, PS> {
     }
 }
 
-impl<PS: ParseStrategy> Validate for Vec<ExtensibleBitmap<PS>> {
-    type Error = <ExtensibleBitmap<PS> as Validate>::Error;
+impl Validate for Vec<ExtensibleBitmap> {
+    type Error = <ExtensibleBitmap as Validate>::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         for extensible_bitmap in self.iter() {
@@ -227,7 +227,7 @@ impl Validate for [MapItem] {
     }
 }
 
-impl<PS: ParseStrategy> ValidateArray<Metadata, MapItem> for ExtensibleBitmap<PS> {
+impl ValidateArray<Metadata, MapItem> for ExtensibleBitmap {
     type Error = anyhow::Error;
 
     /// Validates that `metadata` and `data` are internally consistent. [`MapItem`] objects are
@@ -283,37 +283,30 @@ mod tests {
     use crate::policy::Parse;
 
     use std::borrow::Borrow;
-    use std::marker::PhantomData;
 
     macro_rules! parse_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
             let data = $data;
             fn check_by_value(
                 $result: Result<
-                    ($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>),
-                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Parse<ByValue<Vec<u8>>>>::Error,
+                    ($parse_output, ByValue<Vec<u8>>),
+                    <$parse_output as crate::policy::Parse>::Error,
                 >,
-            ) -> Option<($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)> {
+            ) -> Option<($parse_output, ByValue<Vec<u8>>)> {
                 $check_impl
             }
 
-            let by_value_result = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data));
+            let by_value_result = $parse_output::parse(ByValue::new(data));
             let _ = check_by_value(by_value_result);
         }};
     }
 
-    pub(in super::super) struct ExtensibleBitmapIterator<
-        PS: ParseStrategy,
-        B: Borrow<ExtensibleBitmap<PS>>,
-    > {
+    pub(in super::super) struct ExtensibleBitmapIterator<B: Borrow<ExtensibleBitmap>> {
         extensible_bitmap: B,
         i: u32,
-        _marker: PhantomData<PS>,
     }
 
-    impl<PS: ParseStrategy, B: Borrow<ExtensibleBitmap<PS>>> Iterator
-        for ExtensibleBitmapIterator<PS, B>
-    {
+    impl<B: Borrow<ExtensibleBitmap>> Iterator for ExtensibleBitmapIterator<B> {
         type Item = bool;
 
         fn next(&mut self) -> Option<Self::Item> {
@@ -326,18 +319,18 @@ mod tests {
         }
     }
 
-    impl<PS: ParseStrategy> IntoIterator for ExtensibleBitmap<PS> {
+    impl IntoIterator for ExtensibleBitmap {
         type Item = bool;
-        type IntoIter = ExtensibleBitmapIterator<PS, ExtensibleBitmap<PS>>;
+        type IntoIter = ExtensibleBitmapIterator<ExtensibleBitmap>;
 
         fn into_iter(self) -> Self::IntoIter {
-            ExtensibleBitmapIterator { extensible_bitmap: self, i: 0, _marker: PhantomData }
+            ExtensibleBitmapIterator { extensible_bitmap: self, i: 0 }
         }
     }
 
-    impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
-        fn iter(&self) -> ExtensibleBitmapIterator<PS, &ExtensibleBitmap<PS>> {
-            ExtensibleBitmapIterator { extensible_bitmap: self, i: 0, _marker: PhantomData }
+    impl ExtensibleBitmap {
+        fn iter(&self) -> ExtensibleBitmapIterator<&ExtensibleBitmap> {
+            ExtensibleBitmapIterator { extensible_bitmap: self, i: 0 }
         }
     }
 
@@ -507,7 +500,7 @@ mod tests {
                         );
                     }
                 };
-                None::<(ExtensibleBitmap<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)>
+                None::<(ExtensibleBitmap, ByValue<Vec<u8>>)>
             }
         );
 
@@ -623,7 +616,7 @@ mod tests {
                         );
                     }
                 };
-                None::<(ExtensibleBitmap<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)>
+                None::<(ExtensibleBitmap, ByValue<Vec<u8>>)>
             }
         );
     }

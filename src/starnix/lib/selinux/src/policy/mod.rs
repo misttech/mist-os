@@ -24,9 +24,9 @@ use error::ParseError;
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
-use parser::{ByValue, ParseStrategy};
+use parser::ByValue;
 use std::fmt::{Debug, Display, LowerHex};
-use std::marker::PhantomData;
+
 use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
 use std::str::FromStr;
@@ -250,7 +250,7 @@ impl IoctlAccessDecision {
 /// ```
 pub fn parse_policy_by_value(
     binary_policy: Vec<u8>,
-) -> Result<(Unvalidated<ByValue<Vec<u8>>>, Vec<u8>), anyhow::Error> {
+) -> Result<(Unvalidated, Vec<u8>), anyhow::Error> {
     let (parsed_policy, binary_policy) =
         ParsedPolicy::parse(ByValue::new(binary_policy)).context("parsing policy")?;
     Ok((Unvalidated(parsed_policy), binary_policy))
@@ -265,9 +265,9 @@ pub struct ClassInfo<'a> {
 }
 
 #[derive(Debug)]
-pub struct Policy<PS: ParseStrategy>(PolicyIndex<PS>);
+pub struct Policy(PolicyIndex);
 
-impl<PS: ParseStrategy> Policy<PS> {
+impl Policy {
     /// The policy version stored in the underlying binary policy.
     pub fn policy_version(&self) -> u32 {
         self.0.parsed_policy().policy_version()
@@ -284,7 +284,7 @@ impl<PS: ParseStrategy> Policy<PS> {
             .parsed_policy()
             .conditional_booleans()
             .iter()
-            .map(|boolean| (PS::deref_slice(&boolean.data), PS::deref(&boolean.metadata).active()))
+            .map(|boolean| (boolean.data.as_slice(), boolean.metadata.active()))
             .collect()
     }
 
@@ -496,7 +496,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     }
 }
 
-impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
+impl AccessVectorComputer for Policy {
     fn access_vector_from_permissions<
         P: sc::ClassPermission + Into<sc::KernelPermission> + Clone + 'static,
     >(
@@ -519,7 +519,7 @@ impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Validate for Policy<PS> {
+impl Validate for Policy {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -528,10 +528,10 @@ impl<PS: ParseStrategy> Validate for Policy<PS> {
 }
 
 /// A [`Policy`] that has been successfully parsed, but not validated.
-pub struct Unvalidated<PS: ParseStrategy>(ParsedPolicy<PS>);
+pub struct Unvalidated(ParsedPolicy);
 
-impl<PS: ParseStrategy> Unvalidated<PS> {
-    pub fn validate(self) -> Result<Policy<PS>, anyhow::Error> {
+impl Unvalidated {
+    pub fn validate(self) -> Result<Policy, anyhow::Error> {
         Validate::validate(&self.0).context("validating parsed policy")?;
         let index = PolicyIndex::new(self.0).context("building index")?;
         Ok(Policy(index))
@@ -556,25 +556,28 @@ pub trait AccessVectorComputer {
 }
 
 /// A data structure that can be parsed as a part of a binary policy.
-pub trait Parse<PS: ParseStrategy>: Sized {
+pub trait Parse: Sized {
     /// The type of error that may be returned from `parse()`, usually [`ParseError`] or
     /// [`anyhow::Error`].
     type Error: Into<anyhow::Error>;
 
     /// Parses a `Self` from `bytes`, returning the `Self` and trailing bytes, or an error if
     /// bytes corresponding to a `Self` are malformed.
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error>;
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error>;
 }
 
 /// Parse a data as a slice of inner data structures from a prefix of a [`ByteSlice`].
-pub(super) trait ParseSlice<PS: ParseStrategy>: Sized {
+pub(super) trait ParseSlice: Sized {
     /// The type of error that may be returned from `parse()`, usually [`ParseError`] or
     /// [`anyhow::Error`].
     type Error: Into<anyhow::Error>;
 
     /// Parses a `Self` as `count` of internal itemsfrom `bytes`, returning the `Self` and trailing
     /// bytes, or an error if bytes corresponding to a `Self` are malformed.
-    fn parse_slice(bytes: PS, count: usize) -> Result<(Self, PS), Self::Error>;
+    fn parse_slice(
+        bytes: ByValue<Vec<u8>>,
+        count: usize,
+    ) -> Result<(Self, ByValue<Vec<u8>>), Self::Error>;
 }
 
 /// Validate a parsed data structure.
@@ -660,19 +663,18 @@ impl<B: SplitByteSlice, T: Counted + FromBytes + KnownLayout + Immutable> Counte
 /// A length-encoded array that contains metadata in `M` and a slice of data items internally
 /// managed by `D`.
 #[derive(Clone, Debug, PartialEq)]
-struct Array<PS, M, D> {
+struct Array<M, D> {
     metadata: M,
     data: D,
-    _marker: PhantomData<PS>,
 }
 
-impl<PS: ParseStrategy, M: Counted + Parse<PS>, D: ParseSlice<PS>> Parse<PS> for Array<PS, M, D> {
+impl<M: Counted + Parse, D: ParseSlice> Parse for Array<M, D> {
     /// [`Array`] abstracts over two types (`M` and `D`) that may have different [`Parse::Error`]
     /// types. Unify error return type via [`anyhow::Error`].
     type Error = anyhow::Error;
 
     /// Parses [`Array`] by parsing *and validating* `metadata`, `data`, and `self`.
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) = M::parse(tail).map_err(Into::<anyhow::Error>::into)?;
@@ -680,22 +682,18 @@ impl<PS: ParseStrategy, M: Counted + Parse<PS>, D: ParseSlice<PS>> Parse<PS> for
         let (data, tail) =
             D::parse_slice(tail, metadata.count() as usize).map_err(Into::<anyhow::Error>::into)?;
 
-        let array = Self { metadata, data, _marker: PhantomData };
+        let array = Self { metadata, data };
 
         Ok((array, tail))
     }
 }
 
-impl<
-        T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
-        PS: ParseStrategy<Output<T> = T>,
-    > Parse<PS> for T
-{
+impl<T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> Parse for T {
     type Error = anyhow::Error;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let num_bytes = bytes.len();
-        let (data, tail) = PS::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
+        let (data, tail) = ByValue::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
             type_name: std::any::type_name::<T>(),
             type_size: std::mem::size_of::<T>(),
             num_bytes,
@@ -709,42 +707,39 @@ impl<
 /// macro should be used in contexts where using a general [`Array`] implementation may introduce
 /// conflicting implementations on account of general [`Array`] type parameters.
 macro_rules! array_type {
-    ($type_name:ident, $parse_strategy:ident, $metadata_type:ty, $data_type:ty, $metadata_type_name:expr, $data_type_name:expr) => {
+    ($type_name:ident, $metadata_type:ty, $data_type:ty, $metadata_type_name:expr, $data_type_name:expr) => {
         #[doc = "An [`Array`] with [`"]
         #[doc = $metadata_type_name]
         #[doc = "`] metadata and [`"]
         #[doc = $data_type_name]
         #[doc = "`] data items."]
         #[derive(Debug, PartialEq)]
-        pub(super) struct $type_name<$parse_strategy: crate::policy::parser::ParseStrategy>(
-            crate::policy::Array<PS, $metadata_type, $data_type>,
-        );
+        pub(super) struct $type_name(crate::policy::Array<$metadata_type, $data_type>);
 
-        impl<PS: crate::policy::parser::ParseStrategy> std::ops::Deref for $type_name<PS> {
-            type Target = crate::policy::Array<PS, $metadata_type, $data_type>;
+        impl std::ops::Deref for $type_name {
+            type Target = crate::policy::Array<$metadata_type, $data_type>;
 
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
         }
 
-        impl<PS: crate::policy::parser::ParseStrategy> crate::policy::Parse<PS> for $type_name<PS>
+        impl crate::policy::Parse for $type_name
         where
-            crate::policy::Array<PS, $metadata_type, $data_type>: crate::policy::Parse<PS>,
+            crate::policy::Array<$metadata_type, $data_type>: crate::policy::Parse,
         {
-            type Error = <Array<PS, $metadata_type, $data_type> as crate::policy::Parse<PS>>::Error;
+            type Error = <Array<$metadata_type, $data_type> as crate::policy::Parse>::Error;
 
-            fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
-                let (array, tail) = Array::<PS, $metadata_type, $data_type>::parse(bytes)?;
+            fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+                let (array, tail) = Array::<$metadata_type, $data_type>::parse(bytes)?;
                 Ok((Self(array), tail))
             }
         }
     };
 
-    ($type_name:ident, $parse_strategy:ident, $metadata_type:ty, $data_type:ty) => {
+    ($type_name:ident, $metadata_type:ty, $data_type:ty) => {
         array_type!(
             $type_name,
-            $parse_strategy,
             $metadata_type,
             $data_type,
             stringify!($metadata_type),
@@ -757,14 +752,14 @@ pub(super) use array_type;
 
 macro_rules! array_type_validate_deref_both {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
-                let metadata = PS::deref(&self.metadata);
+                let metadata = &self.metadata;
                 metadata.validate()?;
 
-                let data = PS::deref_slice(&self.data);
+                let data = &self.data;
                 data.validate()?;
 
                 Self::validate_array(metadata, data).map_err(Into::<anyhow::Error>::into)
@@ -777,14 +772,14 @@ pub(super) use array_type_validate_deref_both;
 
 macro_rules! array_type_validate_deref_data {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
                 let metadata = &self.metadata;
                 metadata.validate()?;
 
-                let data = PS::deref_slice(&self.data);
+                let data = &self.data;
                 data.validate()?;
 
                 Self::validate_array(metadata, data)
@@ -797,11 +792,11 @@ pub(super) use array_type_validate_deref_data;
 
 macro_rules! array_type_validate_deref_metadata_data_vec {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
-                let metadata = PS::deref(&self.metadata);
+                let metadata = &self.metadata;
                 metadata.validate()?;
 
                 let data = &self.data;
@@ -817,7 +812,7 @@ pub(super) use array_type_validate_deref_metadata_data_vec;
 
 macro_rules! array_type_validate_deref_none_data_vec {
     ($type_name:ident) => {
-        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl Validate for $type_name {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
@@ -835,13 +830,16 @@ macro_rules! array_type_validate_deref_none_data_vec {
 
 pub(super) use array_type_validate_deref_none_data_vec;
 
-impl<PS: ParseStrategy, T: Parse<PS>> ParseSlice<PS> for Vec<T> {
+impl<T: Parse> ParseSlice for Vec<T> {
     /// `Vec<T>` may return a [`ParseError`] internally, or `<T as Parse>::Error`. Unify error
     /// return type via [`anyhow::Error`].
     type Error = anyhow::Error;
 
     /// Parses `Vec<T>` by parsing individual `T` instances, then validating them.
-    fn parse_slice(bytes: PS, count: usize) -> Result<(Self, PS), Self::Error> {
+    fn parse_slice(
+        bytes: ByValue<Vec<u8>>,
+        count: usize,
+    ) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let mut slice = Vec::with_capacity(count);
         let mut tail = bytes;
 
@@ -892,8 +890,8 @@ pub(super) mod tests {
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
     /// ensures that all such Ids have corresponding definitions.
     /// If either of `target_class` or `permission` cannot be resolved in the policy.
-    fn is_explicitly_allowed<PS: ParseStrategy>(
-        policy: &Policy<PS>,
+    fn is_explicitly_allowed(
+        policy: &Policy,
         source_type: TypeId,
         target_type: TypeId,
         target_class: &str,

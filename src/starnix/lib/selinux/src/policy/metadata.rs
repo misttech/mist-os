@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::error::ValidateError;
-use super::parser::ParseStrategy;
+use super::parser::ByValue;
 use super::{
-    array_type, array_type_validate_deref_both, Array, Counted, Parse, ParseError, Validate,
-    ValidateArray,
+    array_type, array_type_validate_deref_both, Array, Counted, Parse, Validate, ValidateArray,
 };
+use crate::policy::error::{ParseError, ValidateError};
 
 use std::fmt::Debug;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
@@ -43,11 +42,11 @@ impl Validate for Magic {
     }
 }
 
-array_type!(Signature, PS, PS::Output<SignatureMetadata>, PS::Slice<u8>);
+array_type!(Signature, SignatureMetadata, Vec<u8>);
 
 array_type_validate_deref_both!(Signature);
 
-impl<PS: ParseStrategy> ValidateArray<SignatureMetadata, u8> for Signature<PS> {
+impl ValidateArray<SignatureMetadata, u8> for Signature {
     type Error = ValidateError;
 
     fn validate_array<'a>(
@@ -112,31 +111,31 @@ impl Validate for PolicyVersion {
 }
 
 #[derive(Debug)]
-pub(super) struct Config<PS: ParseStrategy> {
+pub(super) struct Config {
     handle_unknown: HandleUnknown,
 
     #[allow(dead_code)]
-    config: PS::Output<le::U32>,
+    config: le::U32,
 }
 
-impl<PS: ParseStrategy> Config<PS> {
+impl Config {
     pub fn handle_unknown(&self) -> HandleUnknown {
         self.handle_unknown
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for Config<PS> {
+impl Parse for Config {
     type Error = ParseError;
 
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
         let num_bytes = bytes.len();
-        let (config, tail) = PS::parse::<le::U32>(bytes).ok_or(ParseError::MissingData {
+        let (config, tail) = ByValue::parse::<le::U32>(bytes).ok_or(ParseError::MissingData {
             type_name: "Config",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
         })?;
 
-        let found_config = PS::deref(&config).get();
+        let found_config = config.get();
         if found_config & CONFIG_MLS_FLAG == 0 {
             return Err(ParseError::ConfigMissingMlsFlag { found_config });
         }
@@ -146,7 +145,7 @@ impl<PS: ParseStrategy> Parse<PS> for Config<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Validate for Config<PS> {
+impl Validate for Config {
     type Error = anyhow::Error;
 
     /// All validation for [`Config`] is necessary to parse it correctly. No additional validation
@@ -201,15 +200,12 @@ mod tests {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
             let data = $data;
             fn check_by_value(
-                $result: Result<
-                    (),
-                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Validate>::Error,
-                >,
+                $result: Result<(), <$parse_output as crate::policy::Validate>::Error>,
             ) {
                 $check_impl
             }
 
-            let (by_value_parsed, _) = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data))
+            let (by_value_parsed, _) = $parse_output::parse(ByValue::new(data))
                 .expect("successful parse for validate test");
             let by_value_result = by_value_parsed.validate();
             check_by_value(by_value_result);
