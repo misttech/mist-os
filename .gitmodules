@@ -388,11 +388,6 @@
 	url = https://fuchsia.googlesource.com/third_party/vboot_reference
 	name = third_party/vboot_reference
 	ignore = all
-[submodule "third_party/wayland"]
-	path = third_party/wayland
-	url = https://fuchsia.googlesource.com/third_party/wayland
-	name = third_party/wayland
-	ignore = all
 [submodule "third_party/yxml"]
 	path = third_party/yxml
 	url = https://fuchsia.googlesource.com/third_party/yxml
