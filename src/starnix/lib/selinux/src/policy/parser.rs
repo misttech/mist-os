@@ -4,8 +4,7 @@
 
 use std::fmt::Debug;
 use std::io::{Cursor, Seek as _, SeekFrom};
-use std::ops::Deref;
-use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned};
+use zerocopy::{FromBytes, Immutable, KnownLayout, Unaligned};
 
 /// Trait for a cursor that can emit a slice of "remaining" data, and advance forward.
 trait ParseCursor: Sized {
@@ -107,85 +106,6 @@ pub trait ParseStrategy: Debug + PartialEq + Sized {
 
     /// Returns the complete parse input being consumed by this strategy.
     fn into_inner(self) -> Self::Input;
-}
-
-/// A [`ParseStrategy`] that produces [`Ref<B, T>`].
-///
-/// This strategy is zero-copy, but one consequence is that the parser input and output cannot be
-/// retained outside the lexical scope from which the parser input was borrowed. For example, the
-/// following will not compile:
-///
-/// ```rust,ignore
-/// fn do_by_ref<'a, T: zerocopy::FromBytes + zerocopy::Unaligned>() -> (
-///     zerocopy::Ref<&'a [u8], T>, ByRef<&'a [u8]>,
-/// ) {
-///     let bytes: Vec<u8> = // ...
-///     let parser = ByRef::new(bytes.as_slice());
-///     parser.parse::<T>().unwrap()
-/// }
-/// ```
-///
-/// The above code induces the following error:
-///
-/// ```rust,ignore
-/// error[E0515]: cannot return value referencing local variable `bytes`
-/// ```
-#[derive(Clone, Debug, PartialEq)]
-pub struct ByRef<B: SplitByteSlice> {
-    input: B,
-    tail: B,
-}
-
-impl<B: SplitByteSlice + Clone> ByRef<B> {
-    /// Returns a new [`ByRef`] that wraps `bytes_slice`.
-    pub fn new(byte_slice: B) -> Self {
-        Self { input: byte_slice.clone(), tail: byte_slice }
-    }
-}
-
-impl<B: Debug + SplitByteSlice + PartialEq> ParseStrategy for ByRef<B> {
-    type Input = B;
-    type Output<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> = Ref<B, T>;
-    type Slice<T: Debug + FromBytes + Immutable + PartialEq + Unaligned> = Ref<B, [T]>;
-
-    /// Returns a [`Ref<B, T>`] as the parsed output of the next bytes in the underlying
-    /// [`ByteSlice`].
-    fn parse<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
-        self,
-    ) -> Option<(Self::Output<T>, Self)> {
-        let (output, tail) = Ref::from_prefix(self.tail).ok()?;
-        Some((output, Self { input: self.input, tail }))
-    }
-
-    /// Returns a `Ref<B, [T]>` as the parsed output of the next bytes in the underlying
-    /// [`ByteSlice`].
-    fn parse_slice<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
-        self,
-        num: usize,
-    ) -> Option<(Self::Slice<T>, Self)> {
-        let (slice, tail) = Ref::from_prefix_with_elems(self.tail, num).ok()?;
-        Some((slice, Self { input: self.input, tail }))
-    }
-
-    fn deref<'a, T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
-        output: &'a Self::Output<T>,
-    ) -> &'a T {
-        output.deref() as &T
-    }
-
-    fn deref_slice<'a, T: Debug + FromBytes + Immutable + PartialEq + Unaligned>(
-        slice: &'a Self::Slice<T>,
-    ) -> &'a [T] {
-        slice.deref() as &[T]
-    }
-
-    fn len(&self) -> usize {
-        self.tail.len()
-    }
-
-    fn into_inner(self) -> Self::Input {
-        self.input
-    }
 }
 
 /// A [`ParseStrategy`] that produces (copied/cloned) `T`.
@@ -305,31 +225,6 @@ mod tests {
     ) -> (Vec<T>, ByValue<D>) {
         let parser = ByValue::new(data);
         parser.parse_slice::<T>(count).expect("some numbers")
-    }
-
-    #[test]
-    fn by_ref_slice_u8_parse() {
-        let bytes: Vec<u8> = (0..8).collect();
-        let parser = ByRef::new(bytes.as_slice());
-        let (some_numbers, parser) = parser.parse::<SomeNumbers>().expect("some numbers");
-        assert_eq!(0, some_numbers.a);
-        assert_eq!(7, some_numbers.d);
-        assert_eq!(0, parser.tail.len());
-    }
-
-    #[test]
-    fn by_ref_slice_u8_parse_slice() {
-        let bytes: Vec<u8> = (0..24).collect();
-        let parser = ByRef::new(bytes.as_slice());
-        let (some_numbers, parser) = parser.parse_slice::<SomeNumbers>(3).expect("some numbers");
-        assert_eq!(3, some_numbers.len());
-        assert_eq!(0, some_numbers[0].a);
-        assert_eq!(7, some_numbers[0].d);
-        assert_eq!(8, some_numbers[1].a);
-        assert_eq!(15, some_numbers[1].d);
-        assert_eq!(16, some_numbers[2].a);
-        assert_eq!(23, some_numbers[2].d);
-        assert_eq!(0, parser.tail.len());
     }
 
     #[test]

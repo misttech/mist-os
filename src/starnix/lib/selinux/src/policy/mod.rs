@@ -24,7 +24,7 @@ use error::ParseError;
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
-use parser::{ByRef, ByValue, ParseStrategy};
+use parser::{ByValue, ParseStrategy};
 use std::fmt::{Debug, Display, LowerHex};
 use std::marker::PhantomData;
 use std::num::{NonZeroU32, NonZeroU64};
@@ -834,52 +834,6 @@ macro_rules! array_type_validate_deref_none_data_vec {
 }
 
 pub(super) use array_type_validate_deref_none_data_vec;
-
-impl<
-        B: Debug + SplitByteSlice + PartialEq,
-        T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
-    > Parse<ByRef<B>> for Ref<B, T>
-{
-    type Error = anyhow::Error;
-
-    fn parse(bytes: ByRef<B>) -> Result<(Self, ByRef<B>), Self::Error> {
-        let num_bytes = bytes.len();
-        let (data, tail) =
-            ByRef::<B>::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
-                type_name: std::any::type_name::<T>(),
-                type_size: std::mem::size_of::<T>(),
-                num_bytes,
-            })?;
-
-        Ok((data, tail))
-    }
-}
-
-impl<
-        B: Debug + SplitByteSlice + PartialEq,
-        T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned,
-    > ParseSlice<ByRef<B>> for Ref<B, [T]>
-{
-    /// [`Ref`] may return a [`ParseError`] internally, or `<T as Parse>::Error`. Unify error return
-    /// type via [`anyhow::Error`].
-    type Error = anyhow::Error;
-
-    /// Parses [`Ref`] by consuming it as an unaligned prefix as a slice, then validating the slice
-    /// via `Ref::deref`.
-    fn parse_slice(bytes: ByRef<B>, count: usize) -> Result<(Self, ByRef<B>), Self::Error> {
-        let num_bytes = bytes.len();
-        let (data, tail) = ByRef::<B>::parse_slice::<T>(bytes, count).ok_or_else(|| {
-            ParseError::MissingSliceData {
-                type_name: std::any::type_name::<T>(),
-                type_size: std::mem::size_of::<T>(),
-                num_items: count,
-                num_bytes,
-            }
-        })?;
-
-        Ok((data, tail))
-    }
-}
 
 impl<PS: ParseStrategy, T: Parse<PS>> ParseSlice<PS> for Vec<T> {
     /// `Vec<T>` may return a [`ParseError`] internally, or `<T as Parse>::Error`. Unify error

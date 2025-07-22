@@ -194,21 +194,12 @@ impl Validate for Counts {
 mod tests {
     use super::*;
 
-    use crate::policy::parser::{ByRef, ByValue};
+    use crate::policy::parser::ByValue;
     use crate::policy::testing::{as_parse_error, as_validate_error};
 
     macro_rules! validate_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
             let data = $data;
-            fn check_by_ref<'a>(
-                $result: Result<
-                    (),
-                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Validate>::Error,
-                >,
-            ) {
-                $check_impl;
-            }
-
             fn check_by_value(
                 $result: Result<
                     (),
@@ -218,11 +209,6 @@ mod tests {
                 $check_impl
             }
 
-            let by_ref = ByRef::new(data.as_slice());
-            let (by_ref_parsed, _) =
-                $parse_output::parse(by_ref).expect("successful parse for validate test");
-            let by_ref_result = by_ref_parsed.validate();
-            check_by_ref(by_ref_result);
             let (by_value_parsed, _) = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data))
                 .expect("successful parse for validate test");
             let by_value_result = by_value_parsed.validate();
@@ -237,7 +223,6 @@ mod tests {
         // One byte short of magic.
         bytes.pop();
         let bytes = bytes;
-        assert_eq!(None, ByRef::parse::<Magic>(ByRef::new(bytes.as_slice())),);
         assert_eq!(None, ByValue::parse::<Magic>(ByValue::new(bytes)),);
     }
 
@@ -249,13 +234,6 @@ mod tests {
         let bytes = bytes;
         let expected_invalid_magic =
             u32::from_le_bytes(bytes.clone().as_slice().try_into().unwrap());
-
-        let (magic, tail) = ByRef::parse::<Magic>(ByRef::new(bytes.as_slice())).expect("magic");
-        assert_eq!(0, tail.len());
-        assert_eq!(
-            Err(ValidateError::InvalidMagic { found_magic: expected_invalid_magic }),
-            magic.validate()
-        );
 
         let (magic, tail) = ByValue::parse::<Magic>(ByValue::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
@@ -287,15 +265,10 @@ mod tests {
     #[test]
     fn missing_signature() {
         let bytes = [(1 as u32).to_le_bytes().as_slice()].concat();
-        match Signature::parse(ByRef::new(bytes.as_slice())).err().map(as_parse_error) {
-            Some(ParseError::MissingSliceData {
-                type_name: "u8",
-                type_size: 1,
-                num_items: 1,
-                num_bytes: 0,
-            }) => {}
+        match Signature::parse(ByValue::new(bytes)).err().map(as_parse_error) {
+            Some(ParseError::MissingData { type_name: "u8", type_size: 1, num_bytes: 0 }) => {}
             parse_err => {
-                assert!(false, "Expected Some(MissingSliceData...), but got {:?}", parse_err);
+                assert!(false, "Expected Some(MissingData...), but got {:?}", parse_err);
             }
         }
     }
@@ -322,16 +295,6 @@ mod tests {
     fn invalid_policy_version() {
         let bytes = [(POLICYDB_VERSION_MIN - 1).to_le_bytes().as_slice()].concat();
         let (policy_version, tail) =
-            ByRef::parse::<PolicyVersion>(ByRef::new(bytes.as_slice())).expect("magic");
-        assert_eq!(0, tail.len());
-        assert_eq!(
-            Err(ValidateError::InvalidPolicyVersion {
-                found_policy_version: POLICYDB_VERSION_MIN - 1
-            }),
-            policy_version.validate()
-        );
-
-        let (policy_version, tail) =
             ByValue::parse::<PolicyVersion>(ByValue::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
@@ -342,16 +305,6 @@ mod tests {
         );
 
         let bytes = [(POLICYDB_VERSION_MAX + 1).to_le_bytes().as_slice()].concat();
-        let (policy_version, tail) =
-            ByRef::parse::<PolicyVersion>(ByRef::new(bytes.as_slice())).expect("magic");
-        assert_eq!(0, tail.len());
-        assert_eq!(
-            Err(ValidateError::InvalidPolicyVersion {
-                found_policy_version: POLICYDB_VERSION_MAX + 1
-            }),
-            policy_version.validate()
-        );
-
         let (policy_version, tail) =
             ByValue::parse::<PolicyVersion>(ByValue::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
@@ -366,7 +319,7 @@ mod tests {
     #[test]
     fn config_missing_mls_flag() {
         let bytes = [(!CONFIG_MLS_FLAG).to_le_bytes().as_slice()].concat();
-        match Config::parse(ByRef::new(bytes.as_slice())).err() {
+        match Config::parse(ByValue::new(bytes)).err() {
             Some(ParseError::ConfigMissingMlsFlag { .. }) => {}
             parse_err => {
                 assert!(false, "Expected Some(ConfigMissingMlsFlag...), but got {:?}", parse_err);
@@ -386,7 +339,7 @@ mod tests {
             Some(ParseError::InvalidHandleUnknownConfigurationBits {
                 masked_bits: CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG | CONFIG_HANDLE_UNKNOWN_REJECT_FLAG
             }),
-            Config::parse(ByRef::new(bytes.as_slice())).err()
+            Config::parse(ByValue::new(bytes)).err()
         );
     }
 }

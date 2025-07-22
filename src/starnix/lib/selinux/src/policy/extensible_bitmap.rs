@@ -278,7 +278,7 @@ impl<PS: ParseStrategy> ValidateArray<Metadata, MapItem> for ExtensibleBitmap<PS
 mod tests {
     use super::*;
     use crate::policy::error::ParseError;
-    use crate::policy::parser::{ByRef, ByValue};
+    use crate::policy::parser::ByValue;
     use crate::policy::testing::{as_parse_error, as_validate_error};
     use crate::policy::Parse;
 
@@ -288,15 +288,6 @@ mod tests {
     macro_rules! parse_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
             let data = $data;
-            fn check_by_ref<'a>(
-                $result: Result<
-                    ($parse_output<ByRef<&'a [u8]>>, ByRef<&'a [u8]>),
-                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Parse<ByRef<&'a [u8]>>>::Error,
-                >,
-            ) {
-                $check_impl;
-            }
-
             fn check_by_value(
                 $result: Result<
                     ($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>),
@@ -306,9 +297,6 @@ mod tests {
                 $check_impl
             }
 
-            let by_ref = ByRef::new(data.as_slice());
-            let by_ref_result = $parse_output::parse(by_ref);
-            check_by_ref(by_ref_result);
             let by_value_result = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data));
             let _ = check_by_value(by_value_result);
         }};
