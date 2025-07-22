@@ -123,9 +123,9 @@ void DisplayManager::OnDisplaysChanged(
       const fuchsia_hardware_display_types::wire::Mode& mode = display.modes[mode_index];
       std::vector<fuchsia_images2::PixelFormat> pixel_formats(display.pixel_format.begin(),
                                                               display.pixel_format.end());
-      default_display_ = std::make_unique<Display>(
-          display.id, mode.active_area.width, mode.active_area.height, display.horizontal_size_mm,
-          display.vertical_size_mm, std::move(pixel_formats), mode.refresh_rate_millihertz);
+      default_display_ =
+          std::make_unique<Display>(display.id, mode, display.horizontal_size_mm,
+                                    display.vertical_size_mm, std::move(pixel_formats));
       OnClientOwnershipChange(owns_display_coordinator_);
 
       if (display_available_cb_) {
