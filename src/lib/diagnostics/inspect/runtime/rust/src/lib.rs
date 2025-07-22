@@ -87,7 +87,8 @@ pub struct PublishOptions {
 
     /// Channel over which the InspectSink protocol will be used.
     pub(crate) inspect_sink_client: Option<ClientEnd<finspect::InspectSinkMarker>>,
-    /// Channel over which the InspectSink protocol will be used.
+
+    /// Scope on which the server will be spawned.
     pub(crate) custom_scope: Option<fasync::ScopeHandle>,
 }
 
