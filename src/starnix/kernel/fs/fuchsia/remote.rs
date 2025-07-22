@@ -44,10 +44,11 @@ use starnix_uapi::{
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 use syncio::zxio::{
-    zxio_get_posix_mode, zxio_node_attr, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
-    ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, ZXIO_OBJECT_TYPE_DIR, ZXIO_OBJECT_TYPE_FILE,
-    ZXIO_OBJECT_TYPE_NONE, ZXIO_OBJECT_TYPE_PACKET_SOCKET, ZXIO_OBJECT_TYPE_RAW_SOCKET,
-    ZXIO_OBJECT_TYPE_STREAM_SOCKET, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
+    zxio_node_attr, ZXIO_NODE_PROTOCOL_DIRECTORY, ZXIO_NODE_PROTOCOL_FILE,
+    ZXIO_NODE_PROTOCOL_SYMLINK, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, ZXIO_OBJECT_TYPE_DIR,
+    ZXIO_OBJECT_TYPE_FILE, ZXIO_OBJECT_TYPE_NONE, ZXIO_OBJECT_TYPE_PACKET_SOCKET,
+    ZXIO_OBJECT_TYPE_RAW_SOCKET, ZXIO_OBJECT_TYPE_STREAM_SOCKET,
+    ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
 };
 use syncio::{
     zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, AllocateMode,
@@ -342,10 +343,10 @@ impl RemoteNode {
 /// The handle must be a channel, socket, vmo or debuglog object.  If the handle is a channel, then
 /// the channel must implement the `fuchsia.unknown/Queryable` protocol.
 ///
-/// The resulting object will be owned by root and will have a permissions derived from the node's
-/// underlying abilities (which is not the same as the the permissions that are set if the object
-/// was created using Starnix).  This is fine, since this should mostly be used when interfacing
-/// with objects created outside of Starnix.
+/// The resulting object will be owned by root, and will have permissions derived from the `flags`
+/// used to open this object. This is not the same as the permissions set if the object was created
+/// using Starnix itself. We use this mainly for interfacing with objects created outside of Starnix
+/// where these flags represent the desired permissions already.
 pub fn new_remote_file<L>(
     locked: &mut Locked<L>,
     current_task: &CurrentTask,
@@ -356,11 +357,14 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     let (attrs, ops) = remote_file_attrs_and_ops(handle)?;
-    let mut mode = get_mode(&attrs);
-    if ops.as_any().is::<SocketFile>() {
-        // Set the file mode to socket.
-        mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
+    let mut rights = fio::Flags::empty();
+    if flags.can_read() {
+        rights |= fio::PERM_READABLE;
     }
+    if flags.can_write() {
+        rights |= fio::PERM_WRITABLE;
+    }
+    let mode = get_mode(&attrs, rights);
     // TODO: https://fxbug.dev/407611229 - Give these nodes valid labels.
     let mut info = FsNodeInfo::new(mode, FsCred::root());
     update_info_from_attrs(&mut info, &attrs);
@@ -392,7 +396,7 @@ fn remote_file_attrs_and_ops(
                 let file_ops = SocketFile::new(socket);
                 let attr = zxio_node_attr {
                     has: zxio_node_attr_has_t { mode: true, ..zxio_node_attr_has_t::default() },
-                    mode: 0o777,
+                    mode: 0o777 | FileMode::IFSOCK.bits(),
                     ..zxio_node_attr::default()
                 };
                 return Ok((attr, file_ops));
@@ -407,7 +411,7 @@ fn remote_file_attrs_and_ops(
 
     // Otherwise, use zxio based objects.
     let zxio = Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?;
-    let attrs = zxio
+    let mut attrs = zxio
         .attr_get(zxio_node_attr_has_t {
             protocols: true,
             abilities: true,
@@ -432,6 +436,8 @@ fn remote_file_attrs_and_ops(
         | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
             let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
             let socket = Socket::new_with_ops(Box::new(socket_ops))?;
+            attrs.has.mode = true;
+            attrs.mode = FileMode::IFSOCK.bits();
             SocketFile::new(socket)
         }
         _ => return error!(ENOTSUP),
@@ -506,7 +512,7 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     }
 }
 
-fn get_mode(attrs: &zxio_node_attributes_t) -> FileMode {
+fn get_mode(attrs: &zxio_node_attributes_t, rights: fio::Flags) -> FileMode {
     if attrs.protocols & ZXIO_NODE_PROTOCOL_SYMLINK != 0 {
         // We don't set the mode for symbolic links , so we synthesize it instead.
         FileMode::IFLNK | FileMode::ALLOW_ALL
@@ -514,13 +520,24 @@ fn get_mode(attrs: &zxio_node_attributes_t) -> FileMode {
         // If the filesystem supports POSIX mode bits, use that directly.
         FileMode::from_bits(attrs.mode)
     } else {
-        // The filesystem doesn't support the `mode` attribute, so synthesize it from the node's
-        // fuchsia.io protocols/abilities.
-        let mode =
-            FileMode::from_bits(unsafe { zxio_get_posix_mode(attrs.protocols, attrs.abilities) });
-        let user_perms = mode.bits() & 0o700;
+        // The filesystem doesn't support the `mode` attribute, so synthesize it from the protocols
+        // this node supports, and the rights used to open it.
+        let is_directory =
+            attrs.protocols & ZXIO_NODE_PROTOCOL_DIRECTORY == ZXIO_NODE_PROTOCOL_DIRECTORY;
+        let mode = if is_directory { FileMode::IFDIR } else { FileMode::IFREG };
+        let mut permissions = FileMode::EMPTY;
+        if rights.contains(fio::PERM_READABLE) {
+            permissions |= FileMode::IRUSR;
+        }
+        if rights.contains(fio::PERM_WRITABLE) {
+            permissions |= FileMode::IWUSR;
+        }
+        if rights.contains(fio::PERM_EXECUTABLE) {
+            permissions |= FileMode::IXUSR;
+        }
         // Make sure the same permissions are granted to user, group, and other.
-        mode | FileMode::from_bits((user_perms >> 3) | (user_perms >> 6))
+        permissions |= FileMode::from_bits((permissions.bits() >> 3) | (permissions.bits() >> 6));
+        mode | permissions
     }
 }
 
@@ -655,11 +672,8 @@ impl FsNodeOps for RemoteNode {
                 name,
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_FILE
-                    | fio::Flags::PERM_READ_BYTES
-                    | fio::Flags::PERM_WRITE_BYTES
-                    | fio::Flags::PERM_GET_ATTRIBUTES
-                    | fio::Flags::PERM_UPDATE_ATTRIBUTES
-                    | fio::Flags::PERM_MODIFY_DIRECTORY,
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
                 ZxioOpenOptions::new(
                     Some(&mut attrs),
                     Some(zxio_node_attributes_t {
@@ -794,7 +808,7 @@ impl FsNodeOps for RemoteNode {
             .open(name, self.rights, options)
             .map_err(|status| from_status_like_fdio!(status, name))?;
         let symlink_zxio = zxio.clone();
-        let mode = get_mode(&attrs);
+        let mode = get_mode(&attrs, self.rights);
         let node_id = if fs_ops.use_remote_ids {
             if attrs.id == fio::INO_UNKNOWN {
                 return error!(ENOTSUP);
