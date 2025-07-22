@@ -794,7 +794,7 @@ def _offset_symbols_and_breakpoints(kernel_relocated_base=None):
 
     # Identify all section addresses
     x = gdb.execute("info target", to_string=True)
-    m = re.findall("\s0x([a-f0-9]+) - 0x[a-f0-9]+ is (.*)", x)
+    m = re.findall("\\s0x([a-f0-9]+) - 0x[a-f0-9]+ is (.*)", x)
 
     offset = base_address - relocated
     sections = dict([(name, int(addr, 16)) for addr, name in m])
