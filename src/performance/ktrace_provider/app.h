@@ -67,7 +67,7 @@ struct DrainContext {
       if (status != ZX_OK) {
         return nullptr;
       }
-      buffer = std::make_unique<uint64_t[]>(buffer_size / sizeof(uint64_t));
+      buffer = std::make_unique_for_overwrite<uint64_t[]>(buffer_size / sizeof(uint64_t));
     }
 
     return std::make_unique<DrainContext>(zx::clock::get_monotonic(), context,
