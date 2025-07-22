@@ -70,7 +70,7 @@
 #include <zircon/syscalls/smc.h>
 #include <zircon/types.h>
 
-#include <platform/ram_mappable_crashlog.h>
+#include <platform/mapped_crashlog.h>
 
 #define LOCAL_TRACE 0
 
@@ -82,9 +82,8 @@ static bool cpu_suspend_supported = false;
 
 namespace {
 
-lazy_init::LazyInit<RamMappableCrashlog, lazy_init::CheckType::None,
-                    lazy_init::Destructor::Disabled>
-    ram_mappable_crashlog;
+lazy_init::LazyInit<MappedCrashlog, lazy_init::CheckType::None, lazy_init::Destructor::Disabled>
+    mapped_crashlog;
 
 }  // namespace
 
@@ -371,8 +370,8 @@ static void allocate_persistent_ram(const MappedMemoryRange& range) {
   // Configure up the crashlog RAM
   if (crashlog_size > 0) {
     dprintf(INFO, "Crashlog configured with %" PRIu64 " bytes\n", crashlog_size);
-    ram_mappable_crashlog.Initialize(ktl::span{range.data(), crashlog_size});
-    PlatformCrashlog::Bind(ram_mappable_crashlog.Get());
+    mapped_crashlog.Initialize(ktl::span{range.data(), crashlog_size});
+    PlatformCrashlog::Bind(mapped_crashlog.Get());
   }
 
   ktl::byte* leftover_base = range.data() + crashlog_size;

@@ -16,12 +16,10 @@
 #include <platform/crashlog.h>
 #include <ram-crashlog/ram-crashlog.h>
 
-// TODO(https://fxbug.dev/42164859): Rename as MappedRamCrashlog, since it is
-// presented as already mapped to this class.
-class RamMappableCrashlog final : public PlatformCrashlog::Interface {
+class MappedCrashlog final : public PlatformCrashlog::Interface {
  public:
-  RamMappableCrashlog() = delete;
-  RamMappableCrashlog(ktl::span<ktl::byte> range);
+  MappedCrashlog() = delete;
+  MappedCrashlog(ktl::span<ktl::byte> range);
 
   ktl::span<char> GetRenderTarget() final { return render_target_; }
 
@@ -44,7 +42,7 @@ class RamMappableCrashlog final : public PlatformCrashlog::Interface {
   recovered_ram_crashlog_t recovered_log_;
   zx_status_t log_recovery_result_ = ZX_ERR_INTERNAL;
 
-  DECLARE_SPINLOCK(RamMappableCrashlog) uptime_updater_lock_;
+  DECLARE_SPINLOCK(MappedCrashlog) uptime_updater_lock_;
   Timer uptime_updater_timer_ TA_GUARDED(uptime_updater_lock_);
   bool uptime_updater_enabled_ TA_GUARDED(uptime_updater_lock_) = false;
 

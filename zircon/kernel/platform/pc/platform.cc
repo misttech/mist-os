@@ -45,11 +45,11 @@
 #include <platform/crashlog.h>
 #include <platform/efi.h>
 #include <platform/efi_crashlog.h>
+#include <platform/mapped_crashlog.h>
 #include <platform/pc.h>
 #include <platform/pc/acpi.h>
 #include <platform/pc/memory.h>
 #include <platform/pc/smbios.h>
-#include <platform/ram_mappable_crashlog.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm_aspace.h>
@@ -61,8 +61,7 @@
 namespace {
 namespace crashlog_impls {
 
-lazy_init::LazyInit<RamMappableCrashlog, lazy_init::CheckType::None,
-                    lazy_init::Destructor::Disabled>
+lazy_init::LazyInit<MappedCrashlog, lazy_init::CheckType::None, lazy_init::Destructor::Disabled>
     ram_mappable;
 EfiCrashlog efi;
 
@@ -77,7 +76,7 @@ static void platform_save_bootloader_data(void) {
 
   // If we have an NVRAM location and we have not already configured a platform
   // crashlog implementation, use the NVRAM location to back a
-  // RamMappableCrashlog implementation and configure the generic platform
+  // MappedCrashlog implementation and configure the generic platform
   // layer to use it.
   if (gPhysHandoff->nvram && !PlatformCrashlog::HasNonTrivialImpl()) {
     crashlog_impls::ram_mappable.Initialize(gPhysHandoff->nvram.value());

@@ -13,7 +13,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/limits.h>
 #include <ktl/span.h>
-#include <platform/ram_mappable_crashlog.h>
+#include <platform/mapped_crashlog.h>
 #include <ram-crashlog/ram-crashlog.h>
 
 #include <ktl/enforce.h>
@@ -26,7 +26,7 @@ FILE NULL_FILE = FILE{[](void*, ktl::string_view str) -> int {
                       nullptr};
 }  // namespace
 
-RamMappableCrashlog::RamMappableCrashlog(ktl::span<ktl::byte> range)
+MappedCrashlog::MappedCrashlog(ktl::span<ktl::byte> range)
     : crashlog_buffer_(range.empty() ? ktl::span<char>{}
                                      : ktl::span<char>{reinterpret_cast<char*>(range.data()),
                                                        range.size_bytes()}),
@@ -44,7 +44,7 @@ RamMappableCrashlog::RamMappableCrashlog(ktl::span<ktl::byte> range)
   }
 }
 
-void RamMappableCrashlog::Finalize(zircon_crash_reason_t reason, size_t amt) {
+void MappedCrashlog::Finalize(zircon_crash_reason_t reason, size_t amt) {
   // Whatever the user tells us, the amt of the crashlog render target which was
   // filled cannot exceed the amount that we originally reported, nor can it be
   // larger than what a u32 can hold.
@@ -57,7 +57,7 @@ void RamMappableCrashlog::Finalize(zircon_crash_reason_t reason, size_t amt) {
                     static_cast<uint32_t>(amt), reason, current_boot_time(), current_mono_time());
 }
 
-size_t RamMappableCrashlog::Recover(FILE* tgt) {
+size_t MappedCrashlog::Recover(FILE* tgt) {
   // If the user didn't supply a target FILE to render to, use the NULL_FILE
   // instead so that we compute a proper length for them as we go.
   if (tgt == nullptr) {
@@ -231,7 +231,7 @@ size_t RamMappableCrashlog::Recover(FILE* tgt) {
   return written + rlog.payload_len;
 }
 
-void RamMappableCrashlog::EnableCrashlogUptimeUpdates(bool enabled) {
+void MappedCrashlog::EnableCrashlogUptimeUpdates(bool enabled) {
   Guard<SpinLock, IrqSave> guard{&uptime_updater_lock_};
 
   if (uptime_updater_enabled_ != enabled) {
@@ -244,7 +244,7 @@ void RamMappableCrashlog::EnableCrashlogUptimeUpdates(bool enabled) {
   }
 }
 
-void RamMappableCrashlog::UpdateUptimeLocked() {
+void MappedCrashlog::UpdateUptimeLocked() {
   if (uptime_updater_enabled_) {
     constexpr zx_duration_t kDefaultUpdateInterval = ZX_SEC(1);
 
@@ -256,7 +256,7 @@ void RamMappableCrashlog::UpdateUptimeLocked() {
     uptime_updater_timer_.Set(
         next_update_time,
         [](Timer*, zx_instant_mono_t now, void* arg) {
-          auto thiz = reinterpret_cast<RamMappableCrashlog*>(arg);
+          auto thiz = reinterpret_cast<MappedCrashlog*>(arg);
           Guard<SpinLock, IrqSave> guard{&thiz->uptime_updater_lock_};
           thiz->UpdateUptimeLocked();
         },
