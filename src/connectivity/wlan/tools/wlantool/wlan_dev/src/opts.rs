@@ -51,6 +51,14 @@ arg_enum! {
     }
 }
 
+arg_enum! {
+    #[derive(PartialEq, Copy, Clone, Debug)]
+    pub enum OnOffArg {
+        On,
+        Off,
+    }
+}
+
 impl ::std::convert::From<RoleArg> for wlan_common::WlanMacRole {
     fn from(arg: RoleArg) -> Self {
         match arg {
@@ -96,6 +104,15 @@ impl ::std::convert::From<PsModeArg> for PowerSaveType {
             PsModeArg::PsModeBalanced => PowerSaveType::PsModeBalanced,
             PsModeArg::PsModeLowPower => PowerSaveType::PsModeLowPower,
             PsModeArg::PsModeUltraLowPower => PowerSaveType::PsModeUltraLowPower,
+        }
+    }
+}
+
+impl ::std::convert::From<OnOffArg> for bool {
+    fn from(arg: OnOffArg) -> Self {
+        match arg {
+            OnOffArg::On => true,
+            OnOffArg::Off => false,
         }
     }
 }
@@ -169,18 +186,6 @@ pub enum PhyCmd {
         /// id of the phy to query
         phy_id: u16,
     },
-    #[structopt(name = "power-down")]
-    PowerDown {
-        #[structopt(required = true)]
-        /// id of the phy to power down
-        phy_id: u16,
-    },
-    #[structopt(name = "power-up")]
-    PowerUp {
-        #[structopt(required = true)]
-        /// id of the phy to power up
-        phy_id: u16,
-    },
     #[structopt(name = "reset")]
     Reset {
         #[structopt(required = true)]
@@ -188,10 +193,38 @@ pub enum PhyCmd {
         phy_id: u16,
     },
     #[structopt(name = "get-power-state")]
+    /// gets the on/off state of the phy
     GetPowerState {
         #[structopt(required = true)]
         /// id of the phy to get its power state
         phy_id: u16,
+    },
+    #[structopt(name = "set-power-state")]
+    /// sets the on/off state of the phy
+    SetPowerState {
+        #[structopt(required = true)]
+        /// id of the phy to get its power state
+        phy_id: u16,
+        #[structopt(required = true, possible_values = &OnOffArg::variants(), case_insensitive = true)]
+        /// desired state of the phy
+        state: OnOffArg,
+    },
+    #[structopt(name = "get-powersave-mode")]
+    /// gets the power save mode of the phy
+    GetPowerSaveMode {
+        #[structopt(required = true)]
+        /// id of the phy to get its power save mode
+        phy_id: u16,
+    },
+    #[structopt(name = "set-powersave-mode")]
+    /// sets the power save mode of the phy
+    SetPowerSaveMode {
+        #[structopt(required = true)]
+        /// id of the phy to set its power save mode
+        phy_id: u16,
+        #[structopt(required = true, possible_values = &PsModeArg::variants(), case_insensitive = true)]
+        /// desired power save mode of the phy
+        mode: PsModeArg,
     },
 }
 
