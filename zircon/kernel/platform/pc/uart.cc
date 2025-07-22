@@ -17,6 +17,17 @@
 #include <platform/uart.h>
 #include <vm/physmap.h>
 
+void PlatformUartPrepareMmio(paddr_t paddr, size_t size) {
+  root_resource_filter_add_deny_region(paddr, size, ZX_RSRC_KIND_MMIO);
+}
+
+PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>::PlatformUartIoProvider(
+    const zbi_dcfg_simple_pio_t& config, uint16_t io_slots)
+    : Base(config, io_slots) {
+  // Reserve pio.
+  root_resource_filter_add_deny_region(config.base, io_slots, ZX_RSRC_KIND_IOPORT);
+}
+
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) {
   if (irq_num == 0) {
     return ktl::nullopt;

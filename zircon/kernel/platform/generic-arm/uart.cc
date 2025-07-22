@@ -8,4 +8,6 @@
 
 #include <platform/uart.h>
 
+void PlatformUartPrepareMmio(paddr_t paddr, size_t size) {}
+
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
