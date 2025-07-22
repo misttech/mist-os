@@ -8,30 +8,39 @@
 
 #include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
 
+void ValidateSigactions(int argc, char** argv) {
+  ASSERT_EQ(argc % 2, 1);
+
+  std::vector<int> signums;
+  std::vector<struct sigaction> sigactions;
+  std::vector<sighandler_t> expectations;
+
+  for (int i = 1; i < (argc - 1); i += 2) {
+    int signum = std::atoi(argv[i]);
+    signums.push_back(signum);
+
+    struct sigaction sa{};
+    ASSERT_THAT(sigaction(signum, NULL, &sa), SyscallSucceeds()) << "signal number: " << signum;
+    sigactions.push_back(sa);
+
+    std::string action = std::string(argv[i + 1]);
+    ASSERT_TRUE(action == "default" || action == "ignore") << "signal number: " << signum;
+    sighandler_t expectation = action == "default" ? SIG_DFL : SIG_IGN;
+    expectations.push_back(expectation);
+  }
+
+  for (int i = 0; i < (argc / 2); i++) {
+    EXPECT_EQ(sigactions[i].sa_handler, expectations[i]) << "signal number: " << signums[i];
+  }
+}
+
 // For a given list of signal numbers, checks whether the signal disposition
 // for each one is SIG_DFL or SIG_IGN.
 //
 // Arguments should be provided in pairs, with each signal number followed by
 // either "default" or "ignore".
 int main(int argc, char** argv) {
-  EXPECT_EQ(argc % 2, 1);
-  if (::testing::Test::HasFailure()) {
-    return 1;
-  }
-
-  for (int i = 1; i < (argc - 1); i += 2) {
-    int signum = std::atoi(argv[i]);
-    auto action = std::string(argv[i + 1]);
-
-    struct sigaction sa{};
-    EXPECT_THAT(sigaction(signum, NULL, &sa), SyscallSucceeds());
-    EXPECT_TRUE(action == "default" || action == "ignore");
-    if (::testing::Test::HasFailure()) {
-      return 1;
-    }
-    auto expected = (action == "default") ? SIG_DFL : SIG_IGN;
-    EXPECT_EQ(sa.sa_handler, expected);
-  }
+  ValidateSigactions(argc, argv);
 
   return ::testing::Test::HasFailure() ? 1 : 0;
 }
