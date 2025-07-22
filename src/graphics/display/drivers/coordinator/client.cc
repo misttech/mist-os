@@ -1391,6 +1391,7 @@ void Client::CaptureCompleted() {
 
 void Client::TearDown(zx_status_t epitaph) {
   TRACE_DURATION("gfx", "Display::Client::TearDown");
+  fdf::info("Tearing down Client 0x{:x} (ID = {})", reinterpret_cast<uintptr_t>(this), id_.value());
 
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
   draft_display_config_was_validated_ = false;

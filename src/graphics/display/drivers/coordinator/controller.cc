@@ -591,7 +591,7 @@ void Controller::HandleClientOwnershipChanges() {
 }
 
 void Controller::OnClientDead(ClientProxy* client) {
-  fdf::debug("Client {} dead", client->client_id().value());
+  fdf::info("Client {} dead", client->client_id().value());
   fbl::AutoLock lock(mtx());
   if (unbinding_) {
     return;
@@ -842,7 +842,7 @@ zx::result<> Controller::Initialize() {
 }
 
 void Controller::PrepareStop() {
-  fdf::info("Controller::PrepareStop");
+  fdf::info("Controller::PrepareStop started");
 
   {
     fbl::AutoLock lock(mtx());
@@ -868,6 +868,8 @@ void Controller::PrepareStop() {
       }
     }
   }
+
+  fdf::info("Controller::PrepareStop finished");
 }
 
 void Controller::Stop() { fdf::info("Controller::Stop"); }
