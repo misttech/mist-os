@@ -51,8 +51,9 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
    HOST_TRIPLE={{ '<var>' }}x86_64-unknown-linux-gnu{{ '</var>' }}
+   CIPD_DIR=$DEV_ROOT/cipd
 
-   cat << "EOF" > ${DEV_ROOT}/cipd.ensure
+   cat << "EOF" > ${CIPD_DIR}/cipd.ensure
    fuchsia/third_party/clang/${platform} latest
    fuchsia/third_party/cmake/${platform} integration
    fuchsia/third_party/ninja/${platform} integration
@@ -78,13 +79,13 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
      curl -s "https://static.rust-lang.org/dist/${STAGE0_DATE}/channel-rust-${STAGE0_VERSION}.toml" \
      | python3 -c 'import tomllib, sys; print(tomllib.load(sys.stdin.buffer)["pkg"]["rust"]["git_commit_hash"])')
 
-   echo "@Subdir stage0" >> cipd.ensure
-   echo "fuchsia/third_party/rust/host/\${platform} rust_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
-   echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} rust_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
+   echo "@Subdir stage0" >> ${CIPD_DIR}/cipd.ensure
+   echo "fuchsia/third_party/rust/host/\${platform} rust_revision:${STAGE0_COMMIT_HASH}" >> ${CIPD_DIR}/cipd.ensure
+   echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} rust_revision:${STAGE0_COMMIT_HASH}" >> ${CIPD_DIR}/cipd.ensure
 
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/cipd ensure \
      --root "${DEV_ROOT}" \
-     --ensure-file "${DEV_ROOT}/cipd.ensure"
+     --ensure-file "${CIPD_DIR}/cipd.ensure"
    ```
 
    Note: these versions are not pinned, so every time you run the `cipd ensure`
@@ -251,9 +252,9 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
            --targets=aarch64-unknown-linux-gnu,x86_64-unknown-linux-gnu,thumbv6m-none-eabi,thumbv7m-none-eabi,riscv32imc-unknown-none-elf,riscv64gc-unknown-linux-gnu \
            --source="${DEV_ROOT}/rust" \
            --stage0="${STAGE0_DIR}" \
-           --clang-prefix="$${CIPD_DIR}" \
+           --clang-prefix="${CIPD_DIR}" \
            --sdk-dir="${CIPD_DIR}/sdk" \
-           --linux-sysroot="$CIPD_DIR}/linux" \
+           --linux-sysroot="${CIPD_DIR}/linux" \
            --linux-riscv64-sysroot="${CIPD_DIR}/ubuntu20.04" \
            --eval \
         | tee "${DEV_ROOT}/fuchsia-env.sh" \
@@ -278,7 +279,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
 
-   rm -rf ${DEV_ROOT}/install/fuchsia-rust"
+   rm -rf "${DEV_ROOT}/install/fuchsia-rust"
    mkdir -p "${DEV_ROOT}/install/fuchsia-rust"
 
    # Copy and paste the following subshell to build and install Rust, as needed.
@@ -289,7 +290,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
      export LDFLAGS="-L${DEV_ROOT}/install/zlib/lib -L${DEV_ROOT}/install/zstd/lib" && \
      export RUSTFLAGS="-Clink-arg=-L${DEV_ROOT}/install/zlib/lib -Clink-arg=-L${DEV_ROOT}/install/zstd/lib" && \
      \
-     source "${DEV_ROOT/fuchsia-env.sh" && \
+     source "${DEV_ROOT}/fuchsia-env.sh" && \
      ./x.py install \
        --config "${DEV_ROOT}/fuchsia-config.toml" \
        --skip-stage0-validation \
