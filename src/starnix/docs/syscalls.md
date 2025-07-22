@@ -66,8 +66,10 @@ to validate values from userspace.
 When working with userspace addresses, do not use raw numerical values or raw
 pointers. Instead, use the `UserAddress` type for addresses. If the address is a
 pointer to a specific struct in userspace, use the `UserRef` type, which has the
-specific struct as a type parameter. The `UserRef` type is also useful for
-processing arrays of objects.
+specific struct as a type parameter. If the address is a pointer to a struct
+that has a different layout on different architectures, use the
+`MultiArchUserRef` type. The `UserRef` and `MultiArchUserRef` types are also
+useful for processing arrays of objects.
 
 Syscalls should not read the same location from userspace memory more than once
 because another thread in userspace could modify userspace memory while the
