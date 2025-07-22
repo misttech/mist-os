@@ -349,9 +349,9 @@ macro_rules! fragmented_buffer_method_impls {
             self.as_ref().len()
         }
 
-        fn with_bytes<R, F>(&self, f: F) -> R
+        fn with_bytes<'macro_a, R, F>(&'macro_a self, f: F) -> R
         where
-            F: for<'macro_a, 'macro_b> FnOnce(FragmentedBytes<'macro_a, 'macro_b>) -> R,
+            F: for<'macro_b> FnOnce(FragmentedBytes<'macro_b, 'macro_a>) -> R,
         {
             let mut bs = [AsRef::<[u8]>::as_ref(self)];
             f(FragmentedBytes::new(&mut bs))
@@ -367,9 +367,9 @@ macro_rules! fragmented_buffer_method_impls {
 /// a contiguous buffer which implements [`AsMut`].
 macro_rules! fragmented_buffer_mut_method_impls {
     () => {
-        fn with_bytes_mut<R, F>(&mut self, f: F) -> R
+        fn with_bytes_mut<'macro_a, R, F>(&'macro_a mut self, f: F) -> R
         where
-            F: for<'macro_a, 'macro_b> FnOnce(FragmentedBytesMut<'macro_a, 'macro_b>) -> R,
+            F: for<'macro_b> FnOnce(FragmentedBytesMut<'macro_b, 'macro_a>) -> R,
         {
             let mut bs = [AsMut::<[u8]>::as_mut(self)];
             f(FragmentedBytesMut::new(&mut bs))
@@ -421,9 +421,9 @@ pub trait FragmentedBuffer {
 
     /// Invokes a callback on a view into this buffer's contents as
     /// [`FragmentedBytes`].
-    fn with_bytes<R, F>(&self, f: F) -> R
+    fn with_bytes<'a, R, F>(&'a self, f: F) -> R
     where
-        F: for<'a, 'b> FnOnce(FragmentedBytes<'a, 'b>) -> R;
+        F: for<'b> FnOnce(FragmentedBytes<'b, 'a>) -> R;
 
     /// Returns a flattened version of this buffer, copying its contents into a
     /// [`Vec`].
@@ -436,9 +436,9 @@ pub trait FragmentedBuffer {
 pub trait FragmentedBufferMut: FragmentedBuffer {
     /// Invokes a callback on a mutable view into this buffer's contents as
     /// [`FragmentedBytesMut`].
-    fn with_bytes_mut<R, F>(&mut self, f: F) -> R
+    fn with_bytes_mut<'a, R, F>(&'a mut self, f: F) -> R
     where
-        F: for<'a, 'b> FnOnce(FragmentedBytesMut<'a, 'b>) -> R;
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> R;
 
     /// Sets all bytes in `range` to zero.
     ///
@@ -723,9 +723,9 @@ pub trait GrowBuffer: FragmentedBuffer {
     ///
     /// Calls `f`, passing the prefix, body, and suffix as arguments (in that
     /// order).
-    fn with_parts<O, F>(&self, f: F) -> O
+    fn with_parts<'a, O, F>(&'a self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O;
+        F: for<'b> FnOnce(&'a [u8], FragmentedBytes<'b, 'a>, &'a [u8]) -> O;
 
     /// The capacity of the buffer.
     ///
@@ -830,9 +830,24 @@ pub trait GrowBufferMut: GrowBuffer + FragmentedBufferMut {
     ///
     /// Calls `f`, passing the prefix, body, and suffix as arguments (in that
     /// order).
-    fn with_parts_mut<O, F>(&mut self, f: F) -> O
+    fn with_parts_mut<'a, O, F>(&'a mut self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O;
+        F: for<'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'b, 'a>, &'a mut [u8]) -> O;
+
+    /// Gets a mutable view into the entirety of this `GrowBufferMut`.
+    ///
+    /// This provides an escape to the requirement that `GrowBufferMut`'s
+    /// [`FragmentedBufferMut`] implementation only provides views into the
+    /// body.
+    ///
+    /// Implementations provide the entirety of the buffer's contents as a
+    /// single [`FragmentedBytesMut`] with the _least_ amount of fragments
+    /// possible. That is, if the prefix or suffix are contiguous slices with
+    /// the head or tail of the body, these slices are merged in the provided
+    /// argument to the callback.
+    fn with_all_contents_mut<'a, O, F>(&'a mut self, f: F) -> O
+    where
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> O;
 
     /// Extends the front of the body towards the beginning of the buffer,
     /// zeroing the new bytes.
@@ -1036,9 +1051,9 @@ impl ParseBufferMut for EmptyBuf {
 }
 impl GrowBuffer for EmptyBuf {
     #[inline]
-    fn with_parts<O, F>(&self, f: F) -> O
+    fn with_parts<'a, O, F>(&'a self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+        F: for<'b> FnOnce(&'a [u8], FragmentedBytes<'b, 'a>, &'a [u8]) -> O,
     {
         f(&[], FragmentedBytes::new_empty(), &[])
     }
@@ -1052,11 +1067,18 @@ impl GrowBuffer for EmptyBuf {
     }
 }
 impl GrowBufferMut for EmptyBuf {
-    fn with_parts_mut<O, F>(&mut self, f: F) -> O
+    fn with_parts_mut<'a, O, F>(&'a mut self, f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
+        F: for<'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'b, 'a>, &'a mut [u8]) -> O,
     {
         f(&mut [], FragmentedBytesMut::new_empty(), &mut [])
+    }
+
+    fn with_all_contents_mut<'a, O, F>(&'a mut self, f: F) -> O
+    where
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> O,
+    {
+        f(FragmentedBytesMut::new_empty())
     }
 }
 impl<'a> BufferView<&'a [u8]> for EmptyBuf {
@@ -1122,17 +1144,17 @@ impl FragmentedBuffer for Never {
         match *self {}
     }
 
-    fn with_bytes<R, F>(&self, _f: F) -> R
+    fn with_bytes<'a, R, F>(&'a self, _f: F) -> R
     where
-        F: for<'a, 'b> FnOnce(FragmentedBytes<'a, 'b>) -> R,
+        F: for<'b> FnOnce(FragmentedBytes<'b, 'a>) -> R,
     {
         match *self {}
     }
 }
 impl FragmentedBufferMut for Never {
-    fn with_bytes_mut<R, F>(&mut self, _f: F) -> R
+    fn with_bytes_mut<'a, R, F>(&'a mut self, _f: F) -> R
     where
-        F: for<'a, 'b> FnOnce(FragmentedBytesMut<'a, 'b>) -> R,
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> R,
     {
         match *self {}
     }
@@ -1142,9 +1164,9 @@ impl ShrinkBuffer for Never {
     fn shrink_back(&mut self, _n: usize) {}
 }
 impl GrowBuffer for Never {
-    fn with_parts<O, F>(&self, _f: F) -> O
+    fn with_parts<'a, O, F>(&'a self, _f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a [u8], FragmentedBytes<'a, 'b>, &'a [u8]) -> O,
+        F: for<'b> FnOnce(&'a [u8], FragmentedBytes<'b, 'a>, &'a [u8]) -> O,
     {
         match *self {}
     }
@@ -1152,9 +1174,16 @@ impl GrowBuffer for Never {
     fn grow_back(&mut self, _n: usize) {}
 }
 impl GrowBufferMut for Never {
-    fn with_parts_mut<O, F>(&mut self, _f: F) -> O
+    fn with_parts_mut<'a, O, F>(&'a mut self, _f: F) -> O
     where
-        F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O,
+        F: for<'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'b, 'a>, &'a mut [u8]) -> O,
+    {
+        match *self {}
+    }
+
+    fn with_all_contents_mut<'a, O, F>(&'a mut self, _f: F) -> O
+    where
+        F: for<'b> FnOnce(FragmentedBytesMut<'b, 'a>) -> O,
     {
         match *self {}
     }
