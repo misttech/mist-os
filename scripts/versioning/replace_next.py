@@ -54,7 +54,9 @@ class Pattern:
         return self.sub_regex.sub(sub_fn, text)
 
 
-CPP_PATH_REGEX: re.Pattern[str] = re.compile(r"\.(h|c|cc)$")
+# `json` is included because magma.json is used to generate a header and thus can
+# contain the macros.
+CPP_PATH_REGEX: re.Pattern[str] = re.compile(r"\.(h|c|cc|json)$")
 
 
 PATTERNS = [
