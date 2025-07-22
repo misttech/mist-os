@@ -123,7 +123,6 @@ lazy_static_visibility = [
   "//src/lib/scoped_task:*",
   "//src/lib/test_util:*",
   "//src/lib/ui/keymaps:*",
-  "//src/lib/usb_bulk/rust:*",
   "//src/lib/webpki-roots-fuchsia:*",
   "//src/media/stream_processors/test:*",
   "//src/performance/memory/heapdump/instrumentation:*",
