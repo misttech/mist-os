@@ -33,7 +33,7 @@ use starnix_uapi::signals::{sigaltstack_contains_pointer, SigSet, Signal};
 use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, tid_t, uapi, ucred,
+    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, tid_t, uapi,
     CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
@@ -912,11 +912,13 @@ impl TaskPersistentInfoState {
         &self.command
     }
 
-    pub fn creds(&self) -> &Credentials {
+    pub fn real_creds(&self) -> &Credentials {
         &self.creds
     }
 
-    pub fn creds_mut(&mut self) -> &mut Credentials {
+    /// SAFETY: Only use from CurrentTask. Changing credentials outside of the CurrentTask may
+    /// introduce TOCTOU issues in access checks.
+    pub(in crate::task) unsafe fn creds_mut(&mut self) -> &mut Credentials {
         &mut self.creds
     }
 }
@@ -1083,7 +1085,7 @@ impl Task {
                     starnix_logging::log_error!("Exiting without an exit code.");
                     ExitStatus::Exit(u8::MAX)
                 });
-                let uid = self.persistent_info.lock().creds().uid;
+                let uid = self.persistent_info.lock().real_creds().uid;
                 let exit_signal = self.thread_group().exit_signal.clone();
                 let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
                 let zombie = ZombieProcess {
@@ -1234,7 +1236,10 @@ impl Task {
         self.files.add_with_flags(locked.cast_locked::<FileOpsCore>(), self, file, flags)
     }
 
-    pub fn creds(&self) -> Credentials {
+    /// Returns the real credentials of the task. These credentials are used to check permissions
+    /// for actions performed on the task. If the task itself is performing an action, use
+    /// `CurrentTask::current_creds` instead.
+    pub fn real_creds(&self) -> Credentials {
         self.persistent_info.lock().creds.clone()
     }
 
@@ -1423,13 +1428,8 @@ impl Task {
             .map_err(|status| from_status_like_fdio!(status))
     }
 
-    pub fn as_ucred(&self) -> ucred {
-        let creds = self.creds();
-        ucred { pid: self.get_pid(), uid: creds.uid, gid: creds.gid }
-    }
-
-    pub fn as_fscred(&self) -> FsCred {
-        self.creds().as_fscred()
+    pub fn real_fscred(&self) -> FsCred {
+        self.real_creds().as_fscred()
     }
 
     /// Interrupts the current task.
@@ -1652,12 +1652,6 @@ impl cmp::PartialEq for Task {
 
 impl cmp::Eq for Task {}
 
-impl From<&Task> for FsCred {
-    fn from(t: &Task) -> FsCred {
-        t.creds().into()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1703,7 +1697,7 @@ mod test {
     async fn test_root_capabilities() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert!(security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));
-        assert_eq!(current_task.creds().cap_inheritable, Capabilities::empty());
+        assert_eq!(current_task.real_creds().cap_inheritable, Capabilities::empty());
 
         current_task.set_creds(Credentials::with_ids(1, 1));
         assert!(!security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));

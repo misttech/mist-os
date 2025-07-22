@@ -150,7 +150,7 @@ impl<'a> MapsContext<'a> for EbpfRunContextImpl<'a> {
 
 impl<'a> CurrentTaskContext for EbpfRunContextImpl<'a> {
     fn get_uid_gid(&self) -> (uid_t, gid_t) {
-        let creds = self.current_task.creds();
+        let creds = self.current_task.current_creds();
         (creds.uid, creds.gid)
     }
 

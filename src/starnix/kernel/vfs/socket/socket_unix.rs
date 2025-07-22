@@ -181,7 +181,7 @@ impl UnixSocket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let credentials = current_task.as_ucred();
+        let credentials = current_task.current_ucred();
         let left = Socket::new(
             locked,
             current_task,
@@ -267,7 +267,7 @@ impl UnixSocket {
         )?;
         security::unix_stream_connect(current_task, socket, peer, &server)?;
         client.state = UnixSocketState::Connected(server.clone());
-        client.credentials = Some(current_task.as_ucred());
+        client.credentials = Some(current_task.current_ucred());
         {
             let mut server = downcast_socket_to_unix(&server).lock();
             server.state = UnixSocketState::Connected(socket.clone());
@@ -611,7 +611,7 @@ impl SocketOps for UnixSocket {
         let unix_socket = downcast_socket_to_unix(&peer);
         let mut peer = unix_socket.lock();
         if peer.passcred {
-            let creds = creds.unwrap_or_else(|| current_task.as_ucred());
+            let creds = creds.unwrap_or_else(|| current_task.current_ucred());
             ancillary_data.push(AncillaryData::Unix(UnixControlData::Credentials(creds)));
         }
         if peer.passsec {

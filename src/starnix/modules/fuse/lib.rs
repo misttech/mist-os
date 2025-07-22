@@ -367,7 +367,7 @@ impl FuseConnections {
     fn new_connection(&self, current_task: &CurrentTask) -> Arc<FuseConnection> {
         let connection = Arc::new(FuseConnection {
             id: self.next_identifier.next(),
-            creds: current_task.as_fscred(),
+            creds: current_task.current_fscred(),
             state: Default::default(),
         });
         self.connections.lock().push(Arc::downgrade(&connection));
@@ -2188,7 +2188,7 @@ impl FuseKernelMessage {
         nodeid: u64,
         operation: FuseOperation,
     ) -> Result<Self, Errno> {
-        let creds = current_task.creds();
+        let creds = current_task.current_creds();
         Ok(Self {
             header: uapi::fuse_in_header {
                 len: u32::try_from(std::mem::size_of::<uapi::fuse_in_header>() + operation.len())

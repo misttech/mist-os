@@ -1036,7 +1036,7 @@ pub fn default_ioctl(
             }
             let key = current_task
                 .read_memory_to_vec(key_ref_addr, fscrypt_add_key_arg.raw_size as usize)?;
-            let user_id = current_task.creds().uid;
+            let user_id = current_task.current_creds().uid;
             let (key_identifier, wrapping_key) = derive_wrapping_key(key.as_bytes());
             current_task.kernel().crypt_service.add_wrapping_key(
                 key_identifier,
@@ -1076,7 +1076,7 @@ pub fn default_ioctl(
                     policy.filenames_encryption_mode
                 );
             }
-            let user_id = current_task.creds().uid;
+            let user_id = current_task.current_creds().uid;
             if user_id != file.node().info().uid {
                 security::check_task_capable(current_task, CAP_FOWNER)
                     .map_err(|_| errno!(EACCES))?;
@@ -1125,7 +1125,7 @@ pub fn default_ioctl(
                 track_stub!(TODO("https://fxbug.dev/375648306"), "fscrypt descriptor type");
                 return error!(ENOTSUP);
             }
-            let user_id = current_task.creds().uid;
+            let user_id = current_task.current_creds().uid;
             let identifier = unsafe { fscrypt_remove_key_arg.key_spec.u.identifier.value };
             current_task.kernel().crypt_service.forget_wrapping_key(identifier, user_id)?;
             Ok(SUCCESS)

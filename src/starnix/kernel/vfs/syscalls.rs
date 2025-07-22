@@ -398,7 +398,7 @@ pub fn sys_fcntl(
             Ok(state.get_seals()?.into())
         }
         F_SETLEASE => {
-            let creds = current_task.creds();
+            let creds = current_task.current_creds();
             if creds.fsuid != file.node().info().uid {
                 security::check_task_capable(current_task, CAP_LEASE)?;
             }
@@ -3188,7 +3188,8 @@ pub fn sys_io_uring_setup(
         0 => (),
         1 => {
             let io_uring_group = limits.io_uring_group.load(atomic::Ordering::Relaxed).try_into();
-            if io_uring_group.is_err() || !current_task.creds().is_in_group(io_uring_group.unwrap())
+            if io_uring_group.is_err()
+                || !current_task.current_creds().is_in_group(io_uring_group.unwrap())
             {
                 security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
             }

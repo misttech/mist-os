@@ -4154,7 +4154,7 @@ impl BinderDriver {
                 let transaction = TransactionData {
                     peer_pid: binder_proc.key.pid(),
                     peer_tid: binder_thread.tid,
-                    peer_euid: current_task.creds().euid,
+                    peer_euid: current_task.current_creds().euid,
                     object: {
                         if handle.is_handle_0() {
                             // This handle (0) always refers to the context manager, which is always
@@ -4333,7 +4333,7 @@ impl BinderDriver {
                 target_thread.lock().enqueue_command(Command::Reply(TransactionData {
                     peer_pid: binder_proc.key.pid(),
                     peer_tid: binder_thread.tid,
-                    peer_euid: current_task.creds().euid,
+                    peer_euid: current_task.current_creds().euid,
 
                     object: FlatBinderObject::Remote { handle: Handle::ContextManager },
                     code: data.transaction_data.code,

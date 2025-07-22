@@ -33,8 +33,8 @@ use starnix_types::ownership::{
     release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
 };
 use starnix_uapi::auth::{
-    Credentials, PtraceAccessMode, UserAndOrGroupId, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE,
-    PTRACE_MODE_FSCREDS, PTRACE_MODE_REALCREDS,
+    Credentials, FsCred, PtraceAccessMode, UserAndOrGroupId, CAP_KILL, CAP_SYS_ADMIN,
+    CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS, PTRACE_MODE_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoCode};
@@ -46,13 +46,14 @@ use starnix_uapi::signals::{
 use starnix_uapi::user_address::{ArchSpecific, UserAddress, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
-    clone_args, errno, error, from_status_like_fdio, pid_t, sock_filter, CLONE_CHILD_CLEARTID,
-    CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP, CLONE_IO, CLONE_NEWUTS,
-    CLONE_PARENT, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
-    CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK, ROBUST_LIST_LIMIT,
-    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
-    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
+    clone_args, errno, error, from_status_like_fdio, pid_t, sock_filter, ucred,
+    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP, CLONE_IO,
+    CLONE_NEWUTS, CLONE_PARENT, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND,
+    CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK,
+    ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::ffi::CString;
 use std::fmt;
@@ -117,6 +118,14 @@ impl std::ops::Deref for TaskBuilder {
     }
 }
 
+/// Task permission are determined from their credentials, and if enabled, from their SEStarnix
+///  security state.
+#[derive(Debug, Clone)]
+pub struct FullCredentials {
+    pub creds: Credentials,
+    pub security_state: security::TaskState,
+}
+
 /// The task object associated with the currently executing thread.
 ///
 /// We often pass the `CurrentTask` as the first argument to functions if those functions need to
@@ -134,6 +143,10 @@ pub struct CurrentTask {
     pub task: OwnedRef<Task>,
 
     pub thread_state: Box<ThreadState>,
+
+    // TODO(https://fxbug.dev/433548348): Avoid interior mutability here by passing a
+    // &mut CurrentTask around instead of &CurrentTask.
+    pub overridden_creds: RefCell<Option<FullCredentials>>,
 
     /// Makes CurrentTask neither Sync not Send.
     _local_marker: PhantomData<*mut u8>,
@@ -250,7 +263,65 @@ impl fmt::Debug for CurrentTask {
 
 impl CurrentTask {
     pub fn new(task: OwnedRef<Task>, thread_state: Box<ThreadState>) -> Self {
-        Self { task, thread_state, _local_marker: Default::default() }
+        Self {
+            task,
+            thread_state,
+            overridden_creds: RefCell::new(None),
+            _local_marker: Default::default(),
+        }
+    }
+
+    /// Returns the current subjective credentials of the task.
+    ///
+    /// The subjective credentials are the credentials that are used to check permissions for
+    /// actions performed by the task.
+    pub fn current_creds(&self) -> Credentials {
+        match self.overridden_creds.borrow().as_ref() {
+            Some(x) => x.creds.clone(),
+            None => self.real_creds(),
+        }
+    }
+
+    pub fn current_fscred(&self) -> FsCred {
+        self.current_creds().as_fscred()
+    }
+
+    pub fn current_ucred(&self) -> ucred {
+        let creds = self.current_creds();
+        ucred { pid: self.get_pid(), uid: creds.uid, gid: creds.gid }
+    }
+
+    /// Save the current creds and security state, alter them by calling `alter_creds`, then call
+    /// `callback`.
+    /// The creds and security state will be restored to their original values at the end of the
+    /// call. Only the "subjective" state of the CurrentTask, accessed with `current_creds()` and
+    ///  used to check permissions for actions performed by the task, is altered. The "objective"
+    ///  state, accessed through `Task::real_creds()` by other tasks and used to check permissions
+    /// for actions performed on the task, is not altered, and changes to the credentials are not
+    /// externally visible.
+    pub fn override_creds<R>(
+        &self,
+        alter_creds: impl FnOnce(&mut FullCredentials),
+        callback: impl FnOnce() -> R,
+    ) -> R {
+        let saved = self.overridden_creds.take();
+        let mut new_creds = saved.clone().unwrap_or_else(|| FullCredentials {
+            creds: self.real_creds(),
+            security_state: self.security_state.clone(),
+        });
+        alter_creds(&mut new_creds);
+
+        self.overridden_creds.replace(Some(new_creds));
+
+        let result = callback();
+
+        self.overridden_creds.replace(saved);
+
+        result
+    }
+
+    pub fn has_overridden_creds(&self) -> bool {
+        self.overridden_creds.borrow().is_some()
     }
 
     pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<L>)
@@ -269,13 +340,20 @@ impl CurrentTask {
         TempRef::from(&self.task)
     }
 
+    /// Change the current and real creds of the task. This is invalid to call while temporary
+    /// credentials are present.
     pub fn set_creds(&self, creds: Credentials) {
-        *self.temp_task().persistent_info.lock().creds_mut() = creds;
+        let overridden_creds = self.overridden_creds.borrow();
+        assert!(overridden_creds.is_none());
+        unsafe {
+            // SAFETY: this is allowed because we are the CurrentTask.
+            *self.persistent_info.lock().creds_mut() = creds;
+        }
         // The /proc/pid directory's ownership is updated when the task's euid
         // or egid changes. See proc(5).
         let maybe_node = self.proc_pid_directory_cache.lock();
         if let Some(node) = &*maybe_node {
-            let creds = self.creds().euid_as_fscred();
+            let creds = self.real_creds().euid_as_fscred();
             // SAFETY: The /proc/pid directory held by `proc_pid_directory_cache` represents the
             // current task. It's owner and group are supposed to track the current task's euid and
             // egid.
@@ -1047,7 +1125,11 @@ impl CurrentTask {
 
             // TODO(tbodt): Check whether capability xattrs are set on the file, and grant/limit
             // capabilities accordingly.
-            persistent_info.creds_mut().exec(maybe_set_id);
+            unsafe {
+                // SAFETY: this is allowed because we are the CurrentTask.
+                persistent_info.creds_mut()
+            }
+            .exec(maybe_set_id);
         }
 
         let security_state = resolved_elf.security_state.clone();
@@ -1493,7 +1575,7 @@ impl CurrentTask {
 
             pid = pids.allocate_pid();
             command = self.command();
-            creds = self.creds();
+            creds = self.current_creds();
             scheduler_state = state.scheduler_state.fork();
             timerslack_ns = state.timerslack_ns;
 
@@ -1868,7 +1950,7 @@ impl CurrentTask {
         //      next step.  (Most APIs that check the caller's UID and GID
         //      use the effective IDs.  For historical reasons, the
         //      PTRACE_MODE_REALCREDS check uses the real IDs instead.)
-        let creds = self.creds();
+        let creds = self.current_creds();
         let (uid, gid) = if mode.contains(PTRACE_MODE_FSCREDS) {
             let fscred = creds.as_fscred();
             (fscred.uid, fscred.gid)
@@ -1887,7 +1969,7 @@ impl CurrentTask {
         //
         //      -  The caller has the CAP_SYS_PTRACE capability in the user
         //         namespace of the target.
-        let target_creds = target.creds();
+        let target_creds = target.real_creds();
         if !(target_creds.uid == uid
             && target_creds.euid == uid
             && target_creds.saved_uid == uid
@@ -1929,9 +2011,9 @@ impl CurrentTask {
             return Ok(());
         }
 
-        let self_creds = self.creds();
+        let self_creds = self.current_creds();
 
-        if self_creds.has_same_uid(&target.creds()) {
+        if self_creds.has_same_uid(&target.real_creds()) {
             return Ok(());
         }
 

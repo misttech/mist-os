@@ -772,7 +772,7 @@ impl ThreadGroup {
             let exit_info =
                 ProcessExitInfo { status: exit_status, exit_signal: self.exit_signal.clone() };
             let zombie =
-                ZombieProcess::new(state.as_ref(), persistent_info.lock().creds(), exit_info);
+                ZombieProcess::new(state.as_ref(), persistent_info.lock().real_creds(), exit_info);
             pids.kill_process(self.leader, OwnedRef::downgrade(&zombie));
 
             state.leave_process_group(locked, pids);
@@ -1456,7 +1456,7 @@ impl ThreadGroup {
                 // The shared information:
                 let mut pid: i32 = 0;
                 let info = process_state.tasks.values().next().unwrap().info().clone();
-                let uid = info.creds().uid;
+                let uid = info.real_creds().uid;
                 let mut exit_status = None;
                 let exit_signal = process_state.base.exit_signal.clone();
                 let time_stats =
@@ -1589,7 +1589,7 @@ impl ThreadGroup {
                 code: SI_USER as i32,
                 detail: SignalDetail::Kill {
                     pid: current_task.thread_group().leader,
-                    uid: current_task.creds().uid,
+                    uid: current_task.current_creds().uid,
                 },
                 ..SignalInfo::default(signal)
             };
@@ -1899,7 +1899,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                     let info = child.tasks.values().next().unwrap().info();
                     WaitResult {
                         pid: child.base.leader,
-                        uid: info.creds().uid,
+                        uid: info.real_creds().uid,
                         exit_info: ProcessExitInfo {
                             status: exit_status,
                             exit_signal: child.base.exit_signal,

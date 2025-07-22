@@ -808,7 +808,7 @@ impl FsNodeOps for BooleansDirectory {
             profile_duration!("selinuxfs.booleans.lookup");
             Ok(node.fs().create_node_and_allocate_node_id(
                 BooleanFile::new_node(self.security_server.clone(), utf8_name),
-                FsNodeInfo::new(mode!(IFREG, 0o644), current_task.as_fscred()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), current_task.current_fscred()),
             ))
         } else {
             error!(ENOENT)
@@ -1027,7 +1027,7 @@ impl FsNodeOps for PermsDirectory {
 
         Ok(node.fs().create_node_and_allocate_node_id(
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
-            FsNodeInfo::new(mode!(IFREG, 0o444), current_task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), current_task.current_fscred()),
         ))
     }
 }

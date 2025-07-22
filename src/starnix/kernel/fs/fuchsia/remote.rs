@@ -2017,7 +2017,7 @@ mod test {
                             fsuid: 1,
                             egid: 2,
                             fsgid: 2,
-                            ..current_task.creds()
+                            ..current_task.current_creds()
                         });
                         let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                         let fs = RemoteFs::new_fs(

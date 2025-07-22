@@ -120,7 +120,7 @@ impl Deref for TaskDirectoryNode {
 
 impl TaskDirectory {
     fn new(fs: &FileSystemHandle, task: &TempRef<'_, Task>, scope: TaskEntryScope) -> FsNodeHandle {
-        let creds = task.creds().euid_as_fscred();
+        let creds = task.real_creds().euid_as_fscred();
         let task_weak = WeakRef::from(task);
         fs.create_node_and_allocate_node_id(
             TaskDirectoryNode(Arc::new(TaskDirectory {
@@ -368,7 +368,7 @@ impl FsNodeOps for FdDirectory {
                 let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
                 Ok(SymlinkTarget::Node(file.name.to_passive()))
             }),
-            FsNodeInfo::new(mode!(IFLNK, 0o777), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFLNK, 0o777), task.real_fscred()),
         ))
     }
 }
@@ -500,7 +500,7 @@ impl FsNodeOps for NsDirectory {
             if !NS_IDENTIFIER_RE.is_match(id) {
                 return error!(ENOENT);
             }
-            let node_info = || FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred());
+            let node_info = || FsNodeInfo::new(mode!(IFREG, 0o444), task.real_fscred());
             let fallback = || {
                 node.fs().create_node_and_allocate_node_id(BytesFile::new_node(vec![]), node_info())
             };
@@ -557,7 +557,7 @@ impl FsNodeOps for NsDirectory {
                 CallbackSymlinkNode::new(move || {
                     Ok(SymlinkTarget::Path(format!("{name}:[{id}]").into()))
                 }),
-                FsNodeInfo::new(mode!(IFLNK, 0o7777), task.as_fscred()),
+                FsNodeInfo::new(mode!(IFLNK, 0o7777), task.real_fscred()),
             ))
         }
     }
@@ -608,7 +608,7 @@ impl FsNodeOps for FdInfoDirectory {
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
         Ok(node.fs().create_node_and_allocate_node_id(
             BytesFile::new_node(data),
-            FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), task.real_fscred()),
         ))
     }
 }
@@ -1188,7 +1188,7 @@ impl DynamicFileSource for StatusFile {
                 let info = task.persistent_info.lock();
                 write!(sink, "Name:\t")?;
                 sink.write(info.command().as_bytes());
-                let creds = info.creds();
+                let creds = info.real_creds();
                 (
                     Some(info.pid()),
                     Some(info.tid()),

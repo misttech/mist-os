@@ -713,7 +713,7 @@ pub fn load_executable(
     )?;
 
     let auxv = {
-        let creds = current_task.creds();
+        let creds = current_task.current_creds();
         let secure = if creds.uid != creds.euid || creds.gid != creds.egid { 1 } else { 0 };
 
         vec![

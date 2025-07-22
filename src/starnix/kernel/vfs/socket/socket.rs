@@ -1175,7 +1175,7 @@ impl Socket {
         let max_connections =
             current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
         let backlog = std::cmp::min(backlog, max_connections);
-        let credentials = current_task.as_ucred();
+        let credentials = current_task.current_ucred();
         self.ops.listen(locked.cast_locked::<FileOpsCore>(), self, backlog, credentials)
     }
 

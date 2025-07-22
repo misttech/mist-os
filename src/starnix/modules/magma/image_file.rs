@@ -54,7 +54,8 @@ impl ImageFile {
     ) -> FileHandle {
         let memory_size = memory.get_size();
 
-        let mut node_info = FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred());
+        let mut node_info =
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.current_fscred());
         node_info.size = memory_size as usize;
         // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
         Anon::new_private_file_extended(
