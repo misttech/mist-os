@@ -48,8 +48,9 @@ pub use matchers::{
     PortMatcher, TransportProtocolMatcher,
 };
 pub use packets::{
-    FilterIpExt, ForwardedPacket, IcmpMessage, IpPacket, MaybeTransportPacket,
-    MaybeTransportPacketMut, RawIpBody, TransportPacketSerializer, TxPacket,
+    DynTransportSerializer, DynamicTransportSerializer, FilterIpExt, ForwardedPacket, IcmpMessage,
+    IpPacket, MaybeTransportPacket, MaybeTransportPacketMut, RawIpBody, TransportPacketSerializer,
+    TxPacket,
 };
 pub use state::validation::{ValidRoutines, ValidationError};
 pub use state::{

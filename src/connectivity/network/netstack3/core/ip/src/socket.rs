@@ -18,9 +18,9 @@ use netstack3_base::{
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
-    self as filter, FilterBindingsContext, FilterHandler as _, FilterIpExt, InterfaceProperties,
-    RawIpBody, SocketEgressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext,
-    TransportPacketSerializer,
+    self as filter, DynTransportSerializer, DynamicTransportSerializer, FilterBindingsContext,
+    FilterHandler as _, FilterIpExt, InterfaceProperties, RawIpBody, SocketEgressFilterResult,
+    SocketOpsFilter, SocketOpsFilterBindingContext, TransportPacketSerializer,
 };
 use netstack3_trace::trace_duration;
 use packet::{BufferMut, PacketConstraints, SerializeError};
@@ -162,6 +162,39 @@ pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })
     }
 
+    /// Like `send_oneshot_ip_packet_with_fallible_serializer`, but a dynamic
+    /// transport serializer is used.
+    ///
+    /// This reduces code generation cost at the expense of some runtime
+    /// overhead.
+    fn send_oneshot_ip_packet_with_dyn_fallible_serializer<S, E, F, O>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        args: IpSocketArgs<'_, Self::DeviceId, I, O>,
+        tx_metadata: BC::TxMetadata,
+        get_body_from_src_ip: F,
+    ) -> Result<(), SendOneShotIpPacketError<E>>
+    where
+        S: DynamicTransportSerializer<I>,
+        F: FnOnce(IpDeviceAddr<I::Addr>) -> Result<S, E>,
+        O: SendOptions<I> + RouteResolutionOptions<I>,
+    {
+        let options = args.options;
+        let tmp = self
+            .new_ip_socket(bindings_ctx, args)
+            .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
+        let mut packet = get_body_from_src_ip(*tmp.local_ip())
+            .map_err(SendOneShotIpPacketError::SerializeError)?;
+        self.send_ip_packet(
+            bindings_ctx,
+            &tmp,
+            DynTransportSerializer::new(&mut packet),
+            options,
+            tx_metadata,
+        )
+        .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })
+    }
+
     /// Sends a one-shot IP packet but with a non-fallible serializer.
     fn send_oneshot_ip_packet<S, F, O>(
         &mut self,
@@ -177,6 +210,34 @@ pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
         O: SendOptions<I> + RouteResolutionOptions<I>,
     {
         self.send_oneshot_ip_packet_with_fallible_serializer(
+            bindings_ctx,
+            args,
+            tx_metadata,
+            |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
+        )
+        .map_err(|err| match err {
+            SendOneShotIpPacketError::CreateAndSendError { err } => err,
+        })
+    }
+
+    /// Like `send_oneshot_ip_packet`, but a dynamic transport serializer is
+    /// used.
+    ///
+    /// This reduces code generation cost at the expense of some runtime
+    /// overhead.
+    fn send_oneshot_ip_packet_with_dyn_serializer<S, F, O>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        args: IpSocketArgs<'_, Self::DeviceId, I, O>,
+        tx_metadata: BC::TxMetadata,
+        get_body_from_src_ip: F,
+    ) -> Result<(), IpSockCreateAndSendError>
+    where
+        S: DynamicTransportSerializer<I>,
+        F: FnOnce(IpDeviceAddr<I::Addr>) -> S,
+        O: SendOptions<I> + RouteResolutionOptions<I>,
+    {
+        self.send_oneshot_ip_packet_with_dyn_fallible_serializer(
             bindings_ctx,
             args,
             tx_metadata,

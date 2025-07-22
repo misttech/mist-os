@@ -21,7 +21,7 @@ use netstack3_base::{
     AnyDevice, Counter, DeviceIdContext, ErrorAndSerializer, HandleableTimer, Inspectable,
     InspectableValue, Inspector, InspectorExt, ResourceCounterContext, WeakDeviceIdentifier,
 };
-use netstack3_filter as filter;
+use netstack3_filter::{self as filter, DynTransportSerializer};
 use packet::serialize::{PacketBuilder, Serializer};
 use packet::InnerPacketBuilder;
 use packet_formats::icmp::mld::{
@@ -482,8 +482,10 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         };
         for report in reports {
             self.increment_both(device, |counters: &MldCounters| &counters.tx_mldv2_report);
+            let mut report = report.into_serializer().wrap_in(icmp.clone());
+            let report = DynTransportSerializer::new(&mut report);
             let destination = IpPacketDestination::Multicast(dst_ip);
-            let ip_frame = report.into_serializer().wrap_in(icmp.clone()).wrap_in(ipv6.clone());
+            let ip_frame = report.wrap_in(ipv6.clone());
             IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
                     self.increment_both(device, |counters: &MldCounters| &counters.tx_err);
@@ -738,12 +740,14 @@ fn send_mld_v1_packet<BC: MldBindingsContext, CC: MldSendContext<BC>>(
         ($type:ty, $struct:expr, $group_addr:expr) => {{
             let (ipv6, icmp) = new_ip_and_icmp_builders(core_ctx, device, dst_ip, $struct);
 
-            let body = Mldv1MessageBuilder::<$type>::new_with_max_resp_delay($group_addr, ())
-                .into_serializer()
-                .wrap_in(icmp)
-                .wrap_in(ipv6);
+            let mut message =
+                Mldv1MessageBuilder::<$type>::new_with_max_resp_delay($group_addr, ())
+                    .into_serializer()
+                    .wrap_in(icmp);
+            let message = DynTransportSerializer::new(&mut message);
+            let ip_frame = message.wrap_in(ipv6);
             let destination = IpPacketDestination::Multicast(dst_ip);
-            IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
+            IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, ip_frame)
                 .map_err(|_| MldError::SendFailure { addr: $group_addr.into() })
         }};
     }

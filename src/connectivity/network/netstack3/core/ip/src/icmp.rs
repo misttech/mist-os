@@ -25,7 +25,7 @@ use netstack3_base::{
     IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext,
     IpDeviceAddr, IpExt, Marks, RngContext, TokenBucket, TxMetadataBindingsTypes,
 };
-use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
+use netstack3_filter::{DynTransportSerializer, DynamicTransportSerializer, FilterIpExt};
 use packet::{
     BufferMut, InnerPacketBuilder as _, PacketBuilder as _, ParsablePacket as _, ParseBuffer,
     PartialSerializer, Serializer, TruncateDirection, TruncatingSerializer,
@@ -1178,7 +1178,14 @@ where
     macro_rules! send {
         ($message:expr, $code:expr) => {{
             // TODO(https://fxbug.dev/42177356): Send through ICMPv6 send path.
-            IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
+            let mut ser = IcmpPacketBuilder::<Ipv6, _>::new(
+                src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get()),
+                dst_ip.get(),
+                $code,
+                $message,
+            )
+            .wrap_body(body);
+            match IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
                 core_ctx,
                 bindings_ctx,
                 SendIpPacketMeta {
@@ -1191,15 +1198,16 @@ where
                     mtu: Mtu::no_limit(),
                     dscp_and_ecn: DscpAndEcn::default(),
                 },
-                IcmpPacketBuilder::<Ipv6, _>::new(
-                    src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get()),
-                    dst_ip.get(),
-                    $code,
-                    $message,
-                )
-                .wrap_body(body),
-            )
-            .map_err(|s| s.into_inner())
+                DynTransportSerializer::new(&mut ser),
+            ) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(e
+                    .map_serializer(|s| {
+                        // Get rid of the borrow to the serializer.
+                        let _: DynTransportSerializer<'_, _> = s;
+                    })
+                    .map_serializer(|()| ser.into_inner())),
+            }
         }};
     }
 
@@ -1950,8 +1958,7 @@ fn send_icmp_reply<I, BC, CC, S, F, O>(
     I: IpExt + FilterIpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
     BC: TxMetadataBindingsTypes,
-    S: TransportPacketSerializer<I>,
-    S::Buffer: BufferMut,
+    S: DynamicTransportSerializer<I>,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
     O: SendOptions<I> + RouteResolutionOptions<I>,
 {
@@ -1967,7 +1974,7 @@ fn send_icmp_reply<I, BC, CC, S, F, O>(
     .then_some(EitherDeviceId::Strong(device));
 
     core_ctx
-        .send_oneshot_ip_packet(
+        .send_oneshot_ip_packet_with_dyn_serializer(
             bindings_ctx,
             IpSocketArgs {
                 device: egress_device,
@@ -2831,7 +2838,7 @@ fn send_icmpv4_error_message<
             let _ = try_send_error!(
                 core_ctx,
                 bindings_ctx,
-                core_ctx.send_oneshot_ip_packet(
+                core_ctx.send_oneshot_ip_packet_with_dyn_serializer(
                     bindings_ctx,
                     IpSocketArgs {
                         device: device.map(EitherDeviceId::Strong),
@@ -2935,7 +2942,7 @@ fn send_icmpv6_error_message<
             let _ = try_send_error!(
                 core_ctx,
                 bindings_ctx,
-                core_ctx.send_oneshot_ip_packet(
+                core_ctx.send_oneshot_ip_packet_with_dyn_serializer(
                     bindings_ctx,
                     IpSocketArgs {
                         device: device.map(EitherDeviceId::Strong),
@@ -3177,6 +3184,7 @@ mod tests {
         FakeTxMetadata, FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
     use netstack3_base::{CtxPair, Uninstantiable};
+    use netstack3_filter::TransportPacketSerializer;
     use packet::{Buf, EmptyBuf};
     use packet_formats::icmp::mld::MldPacket;
     use packet_formats::ip::IpProto;
