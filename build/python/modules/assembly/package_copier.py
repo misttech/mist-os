@@ -234,6 +234,7 @@ def _copy_package(
     # blobs within it.
     new_manifest = PackageManifest(manifest.package, [])
     new_manifest.repository = manifest.repository
+    new_manifest.abi_revision = manifest.abi_revision
     new_manifest.set_paths_relative(True)
 
     # For each blob in the manifest:

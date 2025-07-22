@@ -207,6 +207,7 @@ mod tests {
                         name: "hello".to_string(),
                         manifest: "path".into(),
                         blobs: Default::default(),
+                        abi_revision: Some(version_history::AbiRevision::from_u64(1234)),
                     }],
                 },
                 cache: PackageSetMetadata { metadata: vec![] },

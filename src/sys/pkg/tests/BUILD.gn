@@ -45,7 +45,6 @@ group("all_tests") {
   testonly = true
   public_deps = [
     ":hermetic_tests($target_toolchain)",
-    ":hon-hermetic_tests($target_toolchain)",
-    ":tests",
+    ":non_hermetic_tests($target_toolchain)",
   ]
 }
