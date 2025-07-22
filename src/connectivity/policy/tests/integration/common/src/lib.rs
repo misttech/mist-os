@@ -4,17 +4,22 @@
 
 use std::pin::pin;
 
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext, FidlRouteIpExt};
 use futures::future::{FutureExt as _, LocalBoxFuture};
+use net_types::ip::{self as net_types_ip, Ip};
 use netemul::{TestEndpoint, TestNetwork, TestRealm};
 use netstack_testing_common::realms::{
-    KnownServiceProvider, Manager, ManagerConfig, Netstack, TestSandboxExt,
+    KnownServiceProvider, Manager, ManagerConfig, Netstack, TestRealmExt, TestSandboxExt,
 };
 use netstack_testing_common::{
     interfaces, wait_for_component_stopped, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_netemul_network as fnetemul_network,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_netemul_network as fnetemul_network,
 };
 
 #[derive(Default)]
@@ -80,7 +85,6 @@ pub async fn with_netcfg_owned_device<
             .chain(use_socket_proxy.then_some(KnownServiceProvider::SocketProxy).into_iter()),
         )
         .expect("create netstack realm");
-
     // Add a device to the realm.
     let network = sandbox.create_network(name).await.expect("create network");
     let _endpoint = add_device_to_devfs::<M>(&network, &realm, name.to_string(), None).await;
@@ -148,4 +152,58 @@ pub async fn verify_interface_added<'a, M: Manager>(
     .await
     .expect("wait for non loopback interface");
     (interface_state, if_id, if_name.clone())
+}
+
+/// Add a default route to the provided interface by id. Must not be called
+/// more than once for the same interface.
+///
+/// Returns whether the route was added to the RouteSet.
+pub async fn add_default_route<'a, I>(
+    realm: &'a TestRealm<'a>,
+    if_id: u64,
+    route_set: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
+) -> bool
+where
+    I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+{
+    // Acquire the control for the interface so we can directly add a default route to the
+    // interface without going through DHCP. This meets the condition for the interface to
+    // be added to Fuchsia's NetworkRegistry and set as default if it is Locally provisioned.
+    let client_interface_control =
+        realm.interface_control(if_id).expect("get client interface Control");
+
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+        client_interface_control
+            .get_authorization_for_interface()
+            .await
+            .expect("get authorization");
+
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(
+        route_set,
+        fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+    )
+    .await
+    .expect("authenticate for interface should not see FIDL error")
+    .expect("authenticate for interface should succeed");
+
+    let default_route = fnet_routes_ext::Route {
+        destination: net_types_ip::Subnet::new(I::UNSPECIFIED_ADDRESS, 0).expect("invalid subnet"),
+        action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget::<I> {
+            outbound_interface: interface_id,
+            next_hop: None,
+        }),
+        properties: fnet_routes_ext::RouteProperties {
+            specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            },
+        },
+    };
+
+    fnet_routes_ext::admin::add_route::<I>(
+        route_set,
+        &default_route.try_into().expect("convert into fidl route"),
+    )
+    .await
+    .expect("should not see RouteSet FIDL error")
+    .expect("should not see RouteSet error")
 }

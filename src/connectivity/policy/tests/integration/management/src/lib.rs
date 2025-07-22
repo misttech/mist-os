@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
 
 use fidl_fuchsia_net_ext::IntoExt as _;
+use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
@@ -22,7 +23,8 @@ use {
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
-    fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_masquerade as fnet_masquerade,
+    fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
     fidl_fuchsia_netemul_network as fnetemul_network,
@@ -31,23 +33,23 @@ use {
 use anyhow::Context as _;
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy as _;
-use futures::future::{FutureExt as _, TryFutureExt as _};
+use futures::future::{FusedFuture, Future, FutureExt as _, TryFutureExt as _};
 use futures::stream::{self, StreamExt as _, TryStreamExt as _};
 use futures_util::AsyncWriteExt;
 use net_declare::{
     fidl_ip, fidl_ip_v4, fidl_subnet, net_ip_v6, net_prefix_length_v4, net_subnet_v6, std_ip,
 };
 use net_types::ethernet::Mac;
-use net_types::ip::{self as net_types_ip, IpVersion, Ipv4};
+use net_types::ip::{self as net_types_ip, Ip, IpVersion, Ipv4};
 use netemul::{RealmTcpListener, RealmTcpStream, RealmUdpSocket};
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::nud::apply_nud_flake_workaround;
 use netstack_testing_common::realms::{
-    KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
-    Netstack, Netstack3, NetstackExt, TestRealmExt as _, TestSandboxExt,
+    constants, KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic,
+    NetCfgVersion, Netstack, Netstack3, NetstackExt, TestRealmExt as _, TestSandboxExt,
 };
 use netstack_testing_common::{
-    dhcpv4 as dhcpv4_helper, try_all, try_any, wait_for_component_stopped,
+    dhcpv4 as dhcpv4_helper, try_all, try_any, wait_for_component_stopped, Result,
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -62,7 +64,8 @@ use packet_formats::testutil::parse_ip_packet;
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6 as dhcpv6;
 use policy_testing_common::{
-    add_device_to_devfs, verify_interface_added, with_netcfg_owned_device, NetcfgOwnedDeviceArgs,
+    add_default_route, add_device_to_devfs, verify_interface_added, with_netcfg_owned_device,
+    NetcfgOwnedDeviceArgs,
 };
 use test_case::test_case;
 
@@ -1915,6 +1918,226 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
         },
     )
     .await;
+}
+
+// TODO(https://fxbug.dev/431822969): Replace this with a common definition of
+// which mark domain is used for which purpose.
+fn socket_option_mark() -> fnet::MarkDomain {
+    fnet::MarkDomain::Mark1
+}
+
+/// TODO(https://fxbug.dev/430075407): Replace this with hanging get to
+/// fuchsia.net.policy.properties/WatchProperties to prevent busy-looping.
+///
+/// Keep polling socking creation until the set mark aligns with `expect`.
+async fn wait_for_socket_mark<F>(
+    posix_socket: &fposix_socket::ProviderProxy,
+    expect: &OptionalUint32,
+    mut wait_for_netmgr_fut: &mut F,
+    timeout: zx::MonotonicDuration,
+) where
+    F: Future<Output = Result<component_events::events::Stopped>> + Unpin + FusedFuture,
+{
+    let mut wait_for_mark = pin!(async {
+        let mut attempt = 0;
+        loop {
+            let socket = posix_socket
+                .stream_socket(
+                    fposix_socket::Domain::Ipv4,
+                    fposix_socket::StreamSocketProtocol::Tcp,
+                )
+                .await
+                .expect("stream socket")
+                .expect("create socket")
+                .into_proxy();
+            let mark = socket.get_mark(socket_option_mark()).await.expect("failed to get mark");
+
+            println!("attempt {} got socket mark {:?}", attempt, mark);
+
+            if mark == Ok(*expect) {
+                return Ok::<(), anyhow::Error>(());
+            }
+
+            attempt += 1;
+        }
+    }
+    .map_err(anyhow::Error::from)
+    .on_timeout(timeout.after_now(), || Err(anyhow::anyhow!("timed out")))
+    .map(|r| r.context("failed to stream socket with specified mark"))
+    .fuse());
+    futures::select! {
+        wait_for_mark_res = wait_for_mark => {
+            match wait_for_mark_res {
+                Ok(()) => return,
+                Err(e) => panic!("received an error from socket stream: {e:?}"),
+            }
+        }
+        stopped_event = wait_for_netmgr_fut => {
+            panic!(
+                "the network manager unexpectedly exited with event: {:?}",
+                stopped_event,
+            )
+        }
+    }
+}
+
+#[netstack_test]
+#[variant(M, Manager)]
+#[test_case(ManagerConfig::EnableSocketProxy; "local_provisioning")]
+#[test_case(ManagerConfig::EnableSocketProxyAllDelegated; "delegated_provisioning")]
+async fn fuchsia_networks_default_network<M: Manager>(name: &str, manager_config: ManagerConfig) {
+    const STARNIX_NETWORK_ID: u32 = 1;
+    const STARNIX_NETWORK_MARK: u32 = 123;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<Netstack3, _, _>(
+            format!("{name}-realm"),
+            [
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    config: manager_config.clone(),
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: true,
+                    use_socket_proxy: true,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::SocketProxy,
+                KnownServiceProvider::DhcpClient,
+            ]
+            .into_iter(),
+        )
+        .expect("create netstack realm");
+
+    // Deliberately connect to the version of posix_socket offered from socketproxy,
+    // not from the Netstack.
+    let posix_socket = realm
+        .connect_to_protocol_from_child::<fposix_socket::ProviderMarker>(
+            constants::socket_proxy::COMPONENT_NAME,
+        )
+        .expect("while connecting to provider");
+    let starnix_networks = realm
+        .connect_to_protocol::<fnp_socketproxy::StarnixNetworksMarker>()
+        .expect("while connecting to StarnixNetworks");
+    let root_routes = realm
+        .connect_to_protocol::<fnet_root::RoutesV4Marker>()
+        .expect("connect to fuchsia.net.root.RoutesV4");
+    let (global_route_set, server_end) =
+        fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>();
+    root_routes.global_route_set(server_end).expect("create global RouteSetV4");
+
+    // Add a Starnix network to the Starnix NetworkRegistry and set it as default. Since there is
+    // no default network in the Fuchsia NetworkRegistry, the Starnix default network will dictate
+    // the mark used during socket creation.
+    let starnix_network = fnp_socketproxy::Network {
+        network_id: Some(STARNIX_NETWORK_ID),
+        info: Some(fnp_socketproxy::NetworkInfo::Starnix(fnp_socketproxy::StarnixNetworkInfo {
+            mark: Some(STARNIX_NETWORK_MARK),
+            handle: Some(0), // Arbitrary and irrelevant for this test, but must be provided.
+            ..Default::default()
+        })),
+        dns_servers: Some(fnp_socketproxy::NetworkDnsServers {
+            v4: Some(vec![]),
+            v6: Some(vec![]),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_matches::assert_matches!(starnix_networks.add(&starnix_network).await, Ok(Ok(())));
+    assert_matches::assert_matches!(
+        starnix_networks.set_default(&OptionalUint32::Value(STARNIX_NETWORK_ID)).await,
+        Ok(Ok(()))
+    );
+
+    // Verify that the mark reflects the Starnix NetworkRegistry's default network.
+    {
+        let socket = posix_socket
+            .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
+            .await
+            .expect("stream socket")
+            .expect("create socket")
+            .into_proxy();
+
+        assert_eq!(
+            socket.get_mark(socket_option_mark()).await.expect("get mark"),
+            Ok(OptionalUint32::Value(STARNIX_NETWORK_MARK))
+        );
+    }
+
+    // Add a device to the realm via devfs so it can be discovered by netcfg.
+    let network = sandbox.create_network(name).await.expect("create network");
+    let _ep = add_device_to_devfs::<M>(&network, &realm, name.to_string(), None).await;
+
+    // Make sure the Netstack got the new device added.
+    let (_interface_state, if_id, _if_name) = verify_interface_added::<M>(&realm).await;
+
+    // Acquire the control for the interface so we can directly add a default route to the
+    // interface without going through DHCP. This meets the condition for the interface to
+    // be added to Fuchsia's NetworkRegistry and set as default if it is Locally provisioned.
+    assert!(add_default_route::<Ipv4>(&realm, if_id, &global_route_set).await);
+
+    // Only locally provisioned networks should be added to Fuchsia's NetworkRegistry and become
+    // the default network. If the network is marked as delegated provisioning, the Starnix mark
+    // should continue to take precedent.
+    let expected_mark_after_default_route = match manager_config {
+        // The unset mark reflects the Fuchsia network being set as default.
+        ManagerConfig::EnableSocketProxy => OptionalUint32::Unset(fposix_socket::Empty),
+        ManagerConfig::EnableSocketProxyAllDelegated => OptionalUint32::Value(STARNIX_NETWORK_MARK),
+        config => {
+            panic!(
+                "this test should only be run with socketproxy-enabled variants,\
+                    variant was: {config:?}"
+            )
+        }
+    };
+    let wait_for_netmgr =
+        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+    let mut wait_for_netmgr = pin!(wait_for_netmgr);
+    wait_for_socket_mark(
+        &posix_socket,
+        &expected_mark_after_default_route,
+        &mut wait_for_netmgr,
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    )
+    .await;
+
+    // Remove the default route.
+    let _: bool = fnet_routes_ext::admin::remove_route::<Ipv4>(
+        &global_route_set,
+        &fnet_routes_ext::Route {
+            destination: net_types_ip::Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0)
+                .expect("invalid subnet"),
+            action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget::<Ipv4> {
+                outbound_interface: if_id,
+                next_hop: None,
+            }),
+            properties: fnet_routes_ext::RouteProperties {
+                specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                    metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                        fnet_routes::Empty,
+                    ),
+                },
+            },
+        }
+        .try_into()
+        .expect("convert to FIDL route"),
+    )
+    .await
+    .expect("should not see RouteSet FIDL error")
+    .expect("should not see RouteSet error");
+
+    // Verify that the mark reflects the Starnix NetworkRegistry's default network regardless of
+    // whether or not the Fuchsia network above was impactful in changing the mark.
+    wait_for_socket_mark(
+        &posix_socket,
+        &OptionalUint32::Value(STARNIX_NETWORK_MARK),
+        &mut wait_for_netmgr,
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    )
+    .await;
+
+    realm.shutdown().await.expect("failed to shutdown realm");
 }
 
 #[derive(Clone)]

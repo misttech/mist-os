@@ -9,9 +9,14 @@ rustc_library("policy_testing_common") {
   testonly = true
   deps = [
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
+    "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
+    "//src/connectivity/lib/net-types",
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_rust",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//third_party/rust_crates:futures",
   ]
   sources = [ "src/lib.rs" ]
