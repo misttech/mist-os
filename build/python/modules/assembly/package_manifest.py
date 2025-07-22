@@ -100,7 +100,6 @@ class PackageManifest:
     blob_sources_relative: Optional[str] = None
     subpackages: list[SubpackageEntry] = field(default_factory=list)
     repository: Optional[str] = None
-    abi_revision: Optional[str] = None
 
     def set_paths_relative(self, relative_to_file: bool) -> None:
         self.blob_sources_relative = (
@@ -130,11 +129,6 @@ class PackageManifest:
         if self.repository != other.repository:
             errors.append(
                 f"package publishing repositories differ: {self.repository} vs. {other.repository}"
-            )
-
-        if self.abi_revision != other.abi_revision:
-            errors.append(
-                f"package abi revisions differ: {self.abi_revision} vs. {other.abi_revision}"
             )
 
         self_blobs_by_path = self.blobs_by_path()

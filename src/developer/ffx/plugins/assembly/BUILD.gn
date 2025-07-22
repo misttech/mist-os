@@ -97,7 +97,6 @@ rustc_library("ffx_assembly") {
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/release_info",
     "//src/lib/utf8_path",
-    "//src/lib/versioning/version-history/rust",
     "//src/storage/blobfs/tools:blobfs",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//third_party/rust_crates:camino",

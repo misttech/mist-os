@@ -12,7 +12,6 @@ use std::io::{Seek, SeekFrom};
 use std::path::PathBuf;
 use std::{fs, io};
 use tempfile::NamedTempFile;
-use version_history::AbiRevision;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct BlobEntry {
@@ -34,7 +33,6 @@ pub(crate) fn build(
     published_name: impl AsRef<str>,
     subpackages: Vec<SubpackageEntry>,
     repository: Option<String>,
-    abi_revision: AbiRevision,
 ) -> Result<PackageManifest, BuildError> {
     build_with_file_system(
         creation_manifest,
@@ -42,7 +40,6 @@ pub(crate) fn build(
         published_name,
         subpackages,
         repository,
-        abi_revision,
         &ActualFileSystem {},
     )
 }
@@ -76,7 +73,6 @@ pub(crate) fn build_with_file_system<'a>(
     published_name: impl AsRef<str>,
     subpackages: Vec<SubpackageEntry>,
     repository: Option<String>,
-    abi_revision: AbiRevision,
     file_system: &'a impl FileSystem<'a>,
 ) -> Result<PackageManifest, BuildError> {
     let meta_far_path = meta_far_path.into();
@@ -165,7 +161,7 @@ pub(crate) fn build_with_file_system<'a>(
     );
 
     let package_manifest =
-        PackageManifest::from_parts(meta_package, repository, blobs, subpackages, abi_revision)?;
+        PackageManifest::from_parts(meta_package, repository, blobs, subpackages)?;
     Ok(package_manifest)
 }
 
@@ -208,11 +204,8 @@ mod test_build_with_file_system {
     use std::collections::{HashMap, HashSet};
     use std::fs::File;
     use tempfile::TempDir;
-    use version_history::AbiRevision;
 
     const GENERATED_FAR_CONTENTS: [&str; 2] = ["meta/contents", "meta/package"];
-
-    const FAKE_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0xabcdef);
 
     struct FakeFileSystem {
         content_map: HashMap<String, Vec<u8>>,
@@ -291,7 +284,6 @@ mod test_build_with_file_system {
             "published-name",
             vec![],
             None,
-            FAKE_ABI_REVISION,
             &file_system,
         )
         .unwrap();
@@ -337,7 +329,6 @@ mod test_build_with_file_system {
             "published-name",
             vec![],
             None,
-            FAKE_ABI_REVISION,
             &file_system,
         );
         assert_matches!(
@@ -372,7 +363,6 @@ mod test_build_with_file_system {
                 "published-name",
                 vec![],
                 None,
-                FAKE_ABI_REVISION,
                 &file_system,
             )
                 .unwrap();
@@ -411,7 +401,6 @@ mod test_build_with_file_system {
                 "published-name",
                 vec![],
                 None,
-                FAKE_ABI_REVISION,
                 &file_system,
             )
                 .unwrap();
@@ -443,7 +432,6 @@ mod test_build_with_file_system {
                 "published-name",
                 vec![],
                 None,
-                FAKE_ABI_REVISION,
                 &file_system,
             )
                 .unwrap();
@@ -478,8 +466,6 @@ mod test_build {
     use rand::SeedableRng as _;
     use std::io::Write;
     use tempfile::TempDir;
-
-    const FAKE_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0xabcdef);
 
     // Creates a temporary directory, then for each host path in the `PackageBuildManifest`'s
     // external contents and far contents maps creates a file in the temporary directory with path
@@ -564,7 +550,6 @@ mod test_build {
                 "published-name",
                 vec![],
                 None,
-                FAKE_ABI_REVISION,
             )
                 .unwrap();
             let mut reader =

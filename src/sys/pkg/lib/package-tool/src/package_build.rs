@@ -330,7 +330,6 @@ mod test {
                     "name": "my-package",
                     "version": "0",
                 },
-                "abi_revision": "0xa56735a6690e09d8",
                 "blobs": [
                     {
                         "source_path": meta_far_path,
@@ -417,7 +416,6 @@ mod test {
                     "name": "my-package",
                     "version": "0",
                 },
-                "abi_revision": "0x2db0661e7832b33d",
                 "blobs": [
                     {
                         "source_path": meta_far_path,
@@ -501,7 +499,6 @@ mod test {
                     "name": "my-package",
                     "version": "0",
                 },
-                "abi_revision": "0xa56735a6690e09d8",
                 "repository": "my-repository",
                 "blobs": [
                     {
@@ -570,7 +567,6 @@ mod test {
                         "name": "mock-subpackage",
                         "version": "0"
                     },
-                    "abi_revision": "0xa56735a6690e09d8",
                     "blobs": [
                         {
                             "path": "meta/",
