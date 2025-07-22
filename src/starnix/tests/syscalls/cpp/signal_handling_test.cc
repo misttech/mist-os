@@ -722,19 +722,26 @@ TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureCanUseMainStack) {
 }
 
 // Checks the effect of `exec` on signal handlers. Custom signal dispositions should be reset to the
-// default, while ignored signals should remain ignored.
+// default, while ignored signals should remain ignored. Signal action flags should be cleared.
 TEST(SignalHandling, SigactionResetByExec) {
   test_helper::ForkHelper helper;
 
   struct sigaction custom = {};
   custom.sa_handler = [](int) {};
+  custom.sa_flags = SA_ONSTACK;
 
   struct sigaction ignore = {};
   ignore.sa_handler = SIG_IGN;
+  ignore.sa_flags = SA_ONSTACK;
+
+  struct sigaction dfl = {};
+  dfl.sa_handler = SIG_DFL;
+  dfl.sa_flags = SA_ONSTACK;
 
   helper.RunInForkedProcess([&] {
     ASSERT_THAT(sigaction(SIGUSR1, &custom, NULL), SyscallSucceeds());
     ASSERT_THAT(sigaction(SIGUSR2, &ignore, NULL), SyscallSucceeds());
+    ASSERT_THAT(sigaction(SIGCONT, &dfl, NULL), SyscallSucceeds());
 
     std::string binary_name = "signal_handling_test_exec_child";
     std::string binary_path = GetBinaryPath(binary_name);
@@ -745,8 +752,10 @@ TEST(SignalHandling, SigactionResetByExec) {
     std::string sigusr2 = std::to_string(SIGUSR2);
     std::string sig_ign = "ignore";
 
-    char *const argv[] = {binary_name.data(), sigusr1.data(), sig_dfl.data(),
-                          sigusr2.data(),     sig_ign.data(), nullptr};
+    std::string sigcont = std::to_string(SIGCONT);
+
+    char *const argv[] = {binary_name.data(), sigusr1.data(), sig_dfl.data(), sigusr2.data(),
+                          sig_ign.data(),     sigcont.data(), sig_dfl.data(), nullptr};
 
     SAFE_SYSCALL(execve(binary_path.data(), argv, nullptr));
     _exit(EXIT_FAILURE);

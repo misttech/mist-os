@@ -31,6 +31,7 @@ void ValidateSigactions(int argc, char** argv) {
 
   for (int i = 0; i < (argc / 2); i++) {
     EXPECT_EQ(sigactions[i].sa_handler, expectations[i]) << "signal number: " << signums[i];
+    EXPECT_EQ(sigactions[i].sa_flags, 0) << "signal number: " << signums[i];
   }
 }
 
@@ -38,7 +39,7 @@ void ValidateSigactions(int argc, char** argv) {
 // for each one is SIG_DFL or SIG_IGN.
 //
 // Arguments should be provided in pairs, with each signal number followed by
-// either "default" or "ignore".
+// either "default" or "ignore". Signal action flags should be cleared.
 int main(int argc, char** argv) {
   ValidateSigactions(argc, argv);
 
