@@ -19,9 +19,9 @@ use log::debug;
 use net_types::ip::{GenericOverIp, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use packet::records::{AlignedRecordSequenceBuilder, Records, RecordsRaw};
 use packet::{
-    BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
-    GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
-    ParsablePacket, ParseMetadata, PartialPacketBuilder, ReusableBuffer, SerializeError,
+    BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
+    GrowBufferMut, InnerPacketBuilder, LayoutBufferAlloc, MaybeParsed, PacketBuilder,
+    PacketConstraints, ParsablePacket, ParseMetadata, PartialPacketBuilder, SerializeError,
     SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::{U16, U32};
@@ -627,7 +627,7 @@ impl<B: SplitByteSlice> Ipv6Packet<B> {
                 }
             }
 
-            fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+            fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
                 &self,
                 outer: PacketConstraints,
                 alloc: A,

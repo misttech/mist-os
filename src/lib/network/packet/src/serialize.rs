@@ -1202,6 +1202,40 @@ pub fn new_buf_vec(len: usize) -> Result<Buf<Vec<u8>>, Never> {
     Ok(Buf::new(vec![0; len], ..))
 }
 
+/// A variant of [`BufferAlloc`] that allocates buffers with the necessary
+/// prefix, body, suffix layout.
+pub trait LayoutBufferAlloc<O> {
+    /// The type of errors returned from [`layout_alloc`].
+    ///
+    /// [`layout_alloc`]: LayoutBufferAlloc::layout_alloc
+    type Error;
+
+    /// Like [`BufferAlloc::layout_alloc`], but the returned buffer has reserved
+    /// `prefix` and `suffix` bytes around `body`.
+    fn layout_alloc(self, prefix: usize, body: usize, suffix: usize) -> Result<O, Self::Error>;
+}
+
+impl<O: ShrinkBuffer, E, F: FnOnce(usize) -> Result<O, E>> LayoutBufferAlloc<O> for F {
+    type Error = E;
+
+    #[inline]
+    fn layout_alloc(self, prefix: usize, body: usize, suffix: usize) -> Result<O, E> {
+        let mut b = self(prefix + body + suffix)?;
+        b.shrink_front(prefix);
+        b.shrink_back(suffix);
+        Ok(b)
+    }
+}
+
+impl LayoutBufferAlloc<Never> for () {
+    type Error = ();
+
+    #[inline]
+    fn layout_alloc(self, _prefix: usize, _body: usize, _suffix: usize) -> Result<Never, ()> {
+        Err(())
+    }
+}
+
 /// Attempts to reuse a buffer for the purposes of implementing
 /// [`BufferProvider::reuse_or_realloc`].
 ///
@@ -1408,7 +1442,7 @@ pub trait Serializer: Sized {
     /// that new buffer. Unlike all other serialize methods,
     /// `serialize_new_buf` takes `self` by reference. This allows to use the
     /// same `Serializer` to serialize the data more than once.
-    fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+    fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1623,7 +1657,7 @@ impl<I: InnerPacketBuilder, B: GrowBuffer + ShrinkBuffer> Serializer for InnerSe
     }
 
     #[inline]
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1646,7 +1680,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for B {
             .map_err(|(err, ser)| (err, ser.buffer))
     }
 
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1657,10 +1691,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for B {
 
         let padding = outer.min_body_len().saturating_sub(self.len());
         let tail_size = padding + outer.footer_len();
-        let buffer_size = outer.header_len() + self.len() + tail_size;
-        let mut buffer = alloc.alloc(buffer_size)?;
-        buffer.shrink_front(outer.header_len());
-        buffer.shrink_back(tail_size);
+        let mut buffer = alloc.layout_alloc(outer.header_len(), self.len(), tail_size)?;
         buffer.copy_from(self);
         buffer.grow_back(padding);
         Ok(buffer)
@@ -1693,7 +1724,7 @@ impl<A: Serializer, B: Serializer<Buffer = A::Buffer>> Serializer for EitherSeri
         }
     }
 
-    fn serialize_new_buf<TB: ReusableBuffer, BA: BufferAlloc<TB>>(
+    fn serialize_new_buf<TB: GrowBufferMut, BA: LayoutBufferAlloc<TB>>(
         &self,
         outer: PacketConstraints,
         alloc: BA,
@@ -1809,7 +1840,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
         }
     }
 
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -1818,10 +1849,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
         let discarded_bytes = self.buffer.len() - truncated_size;
         let padding = outer.min_body_len().saturating_sub(truncated_size);
         let tail_size = padding + outer.footer_len();
-        let buffer_size = outer.header_len() + truncated_size + tail_size;
-        let mut buffer = alloc.alloc(buffer_size)?;
-        buffer.shrink_front(outer.header_len());
-        buffer.shrink_back(tail_size);
+        let mut buffer = alloc.layout_alloc(outer.header_len(), truncated_size, tail_size)?;
         buffer.with_bytes_mut(|mut dst| {
             self.buffer.with_bytes(|src| {
                 let src = match (discarded_bytes > 0, self.direction) {
@@ -1864,7 +1892,7 @@ impl<I: Serializer, O: PacketBuilder> Serializer for Nested<I, O> {
     }
 
     #[inline]
-    fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+    fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
         &self,
         outer: PacketConstraints,
         alloc: A,
@@ -2171,7 +2199,7 @@ mod tests {
             result
         }
 
-        fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+        fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
             &self,
             outer: PacketConstraints,
             alloc: A,

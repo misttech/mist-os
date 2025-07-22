@@ -13,9 +13,9 @@ use net_types::ip::{
 use netstack3_base::{Options, PayloadLen, SegmentHeader};
 use packet::records::options::OptionSequenceBuilder;
 use packet::{
-    Buf, Buffer, BufferAlloc, BufferMut, BufferProvider, BufferViewMut, EitherSerializer, EmptyBuf,
-    GrowBufferMut, InnerSerializer, Nested, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseBuffer, ParseMetadata, PartialSerializeResult, PartialSerializer, ReusableBuffer,
+    Buf, Buffer, BufferMut, BufferProvider, BufferViewMut, EitherSerializer, EmptyBuf,
+    GrowBufferMut, InnerSerializer, LayoutBufferAlloc, Nested, PacketBuilder, PacketConstraints,
+    ParsablePacket, ParseBuffer, ParseMetadata, PartialSerializeResult, PartialSerializer,
     SerializeError, Serializer, SliceBufViewMut, TruncatingSerializer,
 };
 use packet_formats::icmp::mld::{
@@ -1092,7 +1092,7 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
         })
     }
 
-    fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: packet::PacketConstraints,
         alloc: A,
@@ -2107,7 +2107,7 @@ impl<I: IpExt, B: BufferMut> Serializer for RawIpBody<I, B> {
         })
     }
 
-    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+    fn serialize_new_buf<BB: GrowBufferMut, A: LayoutBufferAlloc<BB>>(
         &self,
         outer: PacketConstraints,
         alloc: A,

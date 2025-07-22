@@ -44,8 +44,8 @@ use netstack3_filter::{
 };
 use netstack3_hashmap::HashMap;
 use packet::{
-    Buf, BufferAlloc, BufferMut, GrowBuffer, PacketBuilder as _, PacketConstraints, ParseBufferMut,
-    ParseMetadata, SerializeError, Serializer as _,
+    Buf, BufferMut, GrowBuffer, LayoutBufferAlloc, PacketBuilder as _, PacketConstraints,
+    ParseBufferMut, ParseMetadata, SerializeError, Serializer as _,
 };
 use packet_formats::error::IpParseError;
 use packet_formats::ip::{DscpAndEcn, IpPacket as _, IpPacketBuilder as _};
@@ -436,7 +436,10 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
         _original_body: &[u8],
         err: I::ErrorCode,
     ) {
-        trace!("IpTransportContext::receive_icmp_error: Received ICMP error message ({:?}) for unsupported IP protocol", err);
+        trace!(
+            "IpTransportContext::receive_icmp_error: Received ICMP error message ({:?}) for unsupported IP protocol",
+            err
+        );
     }
 
     fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
@@ -2975,9 +2978,14 @@ where
 /// fact serializing the buffer.
 struct AlwaysFailBufferAlloc;
 
-impl BufferAlloc<Never> for AlwaysFailBufferAlloc {
+impl LayoutBufferAlloc<Never> for AlwaysFailBufferAlloc {
     type Error = ();
-    fn alloc(self, _len: usize) -> Result<Never, Self::Error> {
+    fn layout_alloc(
+        self,
+        _prefix: usize,
+        _body: usize,
+        _suffix: usize,
+    ) -> Result<Never, Self::Error> {
         Err(())
     }
 }
@@ -3195,7 +3203,9 @@ pub fn receive_ipv4_packet<
                 Some(ip) => ip,
                 None => {
                     core_ctx.increment_both(device, |c| &c.unspecified_destination);
-                    debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
+                    debug!(
+                        "receive_ipv4_packet: Received packet with unspecified destination IP address; dropping"
+                    );
                     return;
                 }
             };
@@ -3545,7 +3555,9 @@ pub fn receive_ipv6_packet<
                 Some(ip) => ip,
                 None => {
                     core_ctx.increment_both(device, |c| &c.unspecified_destination);
-                    debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
+                    debug!(
+                        "receive_ipv6_packet: Received packet with unspecified destination IP address; dropping"
+                    );
                     return;
                 }
             };

@@ -19,9 +19,9 @@ use net_types::ip::{GenericOverIp, IpAddress, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ip
 use packet::records::options::{OptionSequenceBuilder, OptionsRaw};
 use packet::records::RecordsIter;
 use packet::{
-    BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
-    GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
-    ParsablePacket, ParseMetadata, PartialPacketBuilder, ReusableBuffer, SerializeError,
+    BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
+    GrowBufferMut, InnerPacketBuilder, LayoutBufferAlloc, MaybeParsed, PacketBuilder,
+    PacketConstraints, ParsablePacket, ParseMetadata, PartialPacketBuilder, SerializeError,
     SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::U16;
@@ -452,7 +452,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
                 }
             }
 
-            fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+            fn serialize_new_buf<B: GrowBufferMut, A: LayoutBufferAlloc<B>>(
                 &self,
                 outer: PacketConstraints,
                 alloc: A,
