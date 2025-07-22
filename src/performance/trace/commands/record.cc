@@ -269,13 +269,13 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
       binary_out_->write(reinterpret_cast<const char*>(buffer), n_bytes);
     };
     record_consumer = [](trace::Record record) {};
-    error_handler = [](fbl::String error) {};
+    error_handler = [](std::string_view error) {};
   } else {
     exporter_ = std::make_unique<ChromiumExporter>(std::move(out_stream));
 
     bytes_consumer = [](const unsigned char* buffer, size_t n_bytes) {};
     record_consumer = [this](trace::Record record) { exporter_->ExportRecord(record); };
-    error_handler = [](fbl::String error) { FX_LOGS(ERROR) << error.c_str(); };
+    error_handler = [](std::string_view error) { FX_LOGS(ERROR) << error; };
   }
 
   tracer_ = std::make_unique<Tracer>(take_provisioner());

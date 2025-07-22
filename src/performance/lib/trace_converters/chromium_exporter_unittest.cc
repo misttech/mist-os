@@ -178,7 +178,7 @@ TEST(ChromiumExporterTest, LastBranchRecords) {
   }
   trace::Record record(trace::Record::Blob{
       .type = TRACE_BLOB_TYPE_LAST_BRANCH,
-      .name = fbl::String("cpu1"),
+      .name = "cpu1",
       .blob = blob.data(),
       .blob_size = blob.size(),
   });

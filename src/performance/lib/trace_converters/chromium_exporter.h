@@ -5,9 +5,9 @@
 #ifndef SRC_PERFORMANCE_LIB_TRACE_CONVERTERS_CHROMIUM_EXPORTER_H_
 #define SRC_PERFORMANCE_LIB_TRACE_CONVERTERS_CHROMIUM_EXPORTER_H_
 
+#include <fstream>
 #include <memory>
-#include <ostream>
-#include <tuple>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -51,11 +51,11 @@ class ChromiumExporter {
   // By default ticks are in nanoseconds.
   double tick_scale_ = 0.001;
 
-  std::unordered_map<zx_koid_t, fbl::String> processes_;
+  std::unordered_map<zx_koid_t, std::string> processes_;
   // Virtual threads mean the same thread id can appear in different processes.
   // Organize threads by process to cope with this.
   std::unordered_map<zx_koid_t /* process id */,
-                     std::unordered_map<zx_koid_t /* thread id */, fbl::String /* thread name */>>
+                     std::unordered_map<zx_koid_t /* thread id */, std::string /* thread name */>>
       threads_;
 
   // The chromium/catapult trace file format doesn't support scheduler event

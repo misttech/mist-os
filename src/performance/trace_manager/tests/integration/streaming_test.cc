@@ -31,7 +31,7 @@ void ConsumeEvents(zx::socket in_socket, zx::eventpair e) {
       most_recent_arg = counter;
     }
   };
-  trace::TraceReader reader(std::move(handle_events), [](fbl::String&&) {});
+  trace::TraceReader reader(std::move(handle_events), [](std::string_view) {});
 
   uint8_t buffer[ZX_PAGE_SIZE];
   uint8_t* buffer_base = buffer;

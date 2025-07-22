@@ -5,10 +5,10 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include <iomanip>
+#include <sstream>
 #include <utility>
 
-#include <fbl/string_buffer.h>
-#include <fbl/string_printf.h>
 #include <trace-reader/records.h>
 
 namespace trace {
@@ -101,11 +101,12 @@ const char* ObjectTypeToString(zx_obj_type_t type) {
 }
 
 template <size_t max_preview_start, size_t max_preview_end>
-fbl::String PreviewBlobData(const void* blob, size_t blob_size) {
+std::string PreviewBlobData(const void* blob, size_t blob_size) {
   static_assert((max_preview_start + max_preview_end) > 0);
 
   auto blob_data = (const unsigned char*)blob;
-  fbl::StringBuffer<3 * (max_preview_start + max_preview_end) + 128> result;
+  std::string result;
+  result.reserve((3 * (max_preview_start + max_preview_end)) + 128);
 
   size_t num_leading_bytes;
   size_t num_trailing_bytes;
@@ -117,71 +118,84 @@ fbl::String PreviewBlobData(const void* blob, size_t blob_size) {
     num_trailing_bytes = max_preview_end;
   }
 
-  result.Append('<');
+  char buf[3];  // Shared buffer into which to format hex data byte by byte.
+  result.append("<");
   for (size_t i = 0; i < num_leading_bytes; i++) {
     if (i > 0)
-      result.Append(' ');
-    result.AppendPrintf("%02x", blob_data[i]);
+      result.append(" ");
+    snprintf(buf, sizeof(buf), "%02x", blob_data[i]);
+    result.append(buf);
   }
   if (num_trailing_bytes)
-    result.Append(" ...");
+    result.append(" ...");
   for (size_t i = blob_size - num_trailing_bytes; i < blob_size; i++) {
-    result.Append(' ');
-    result.AppendPrintf("%02x", blob_data[i]);
+    result.append(" ");
+    snprintf(buf, sizeof(buf), "%02x", blob_data[i]);
+    result.append(buf);
   }
-  result.Append('>');
+  result.append(">");
 
-  return result.ToString();
+  result.shrink_to_fit();
+  return result;
 }
 
-fbl::String FormatArgumentList(const std::vector<trace::Argument>& args) {
-  fbl::StringBuffer<1024> result;
+std::string FormatArgumentList(const std::vector<trace::Argument>& args) {
+  std::string result;
+  result.reserve(1024);
 
-  result.Append('{');
+  result.append("{");
   for (size_t i = 0; i < args.size(); i++) {
     if (i != 0)
-      result.Append(", ");
-    result.Append(args[i].ToString());
+      result.append(", ");
+    result.append(args[i].ToString());
   }
-  result.Append('}');
+  result.append("}");
 
-  return result.ToString();
+  result.shrink_to_fit();
+  return result;
 }
 }  // namespace
 
-fbl::String ProcessThread::ToString() const {
-  return fbl::StringPrintf("%" PRIu64 "/%" PRIu64, process_koid_, thread_koid_);
+std::string ProcessThread::ToString() const {
+  return (std::stringstream() << process_koid_ << "/" << thread_koid_).str();
 }
 
-fbl::String ArgumentValue::ToString() const {
+std::string ArgumentValue::ToString() const {
   switch (type()) {
     case ArgumentType::kNull:
       return "null";
-    case ArgumentType::kBool:
-      return fbl::StringPrintf("bool(%s)", std::get<Bool>(value_).value ? "true" : "false");
+    case ArgumentType::kBool: {
+      std::stringstream ss;
+      ss << std::boolalpha << "bool(" << std::get<Bool>(value_).value << ")";
+      return ss.str();
+    }
     case ArgumentType::kInt32:
-      return fbl::StringPrintf("int32(%" PRId32 ")", std::get<int32_t>(value_));
+      return (std::stringstream() << "int32(" << std::get<int32_t>(value_) << ")").str();
     case ArgumentType::kUint32:
-      return fbl::StringPrintf("uint32(%" PRIu32 ")", std::get<uint32_t>(value_));
+      return (std::stringstream() << "uint32(" << std::get<uint32_t>(value_) << ")").str();
     case ArgumentType::kInt64:
-      return fbl::StringPrintf("int64(%" PRId64 ")", std::get<int64_t>(value_));
+      return (std::stringstream() << "int64(" << std::get<int64_t>(value_) << ")").str();
     case ArgumentType::kUint64:
-      return fbl::StringPrintf("uint64(%" PRIu64 ")", std::get<uint64_t>(value_));
-    case ArgumentType::kDouble:
-      return fbl::StringPrintf("double(%f)", std::get<double>(value_));
+      return (std::stringstream() << "uint64(" << std::get<uint64_t>(value_) << ")").str();
+    case ArgumentType::kDouble: {
+      std::stringstream ss;
+      ss << std::fixed << std::setprecision(6) << "double(" << std::get<double>(value_) << ")";
+      return ss.str();
+    }
     case ArgumentType::kString:
-      return fbl::StringPrintf("string(\"%s\")", std::get<fbl::String>(value_).c_str());
-    case ArgumentType::kPointer:
-      return fbl::StringPrintf("pointer(%p)",
-                               reinterpret_cast<void*>(std::get<Pointer>(value_).value));
+      return (std::stringstream() << "string(\"" << std::get<std::string>(value_) << "\")").str();
+    case ArgumentType::kPointer: {
+      auto p = std::get<Pointer>(value_).value;
+      return (std::stringstream() << std::hex << "pointer(" << (p ? "0x" : "") << p << ")").str();
+    }
     case ArgumentType::kKoid:
-      return fbl::StringPrintf("koid(%" PRIu64 ")", std::get<Koid>(value_).value);
+      return (std::stringstream() << "koid(" << std::get<Koid>(value_).value << ")").str();
   }
   ZX_ASSERT(false);
 }
 
-fbl::String Argument::ToString() const {
-  return fbl::StringPrintf("%s: %s", name_.c_str(), value_.ToString().c_str());
+std::string Argument::ToString() const {
+  return (std::stringstream() << name_ << ": " << value_.ToString()).str();
 }
 
 void TraceInfoContent::Destroy() {
@@ -201,11 +215,13 @@ void TraceInfoContent::MoveFrom(TraceInfoContent&& other) {
   }
 }
 
-fbl::String TraceInfoContent::ToString() const {
+std::string TraceInfoContent::ToString() const {
   switch (type_) {
-    case TraceInfoType::kMagicNumber:
-      return fbl::StringPrintf("MagicNumberInfo(magic_value: 0x%" PRIx32 ")",
-                               magic_number_info_.magic_value);
+    case TraceInfoType::kMagicNumber: {
+      std::stringstream ss;
+      ss << "MagicNumberInfo(magic_value: 0x" << std::hex << magic_number_info_.magic_value << ")";
+      return ss.str();
+    }
   }
   ZX_ASSERT(false);
 }
@@ -245,29 +261,34 @@ void MetadataContent::MoveFrom(MetadataContent&& other) {
   }
 }
 
-fbl::String MetadataContent::ToString() const {
+std::string MetadataContent::ToString() const {
+  std::stringstream ss;
   switch (type_) {
     case MetadataType::kProviderInfo:
-      return fbl::StringPrintf("ProviderInfo(id: %" PRId32 ", name: \"%s\")", provider_info_.id,
-                               provider_info_.name.c_str());
+      ss << "ProviderInfo(id: " << provider_info_.id << ", name: \"" << provider_info_.name
+         << "\")";
+      return ss.str();
     case MetadataType::kProviderSection:
-      return fbl::StringPrintf("ProviderSection(id: %" PRId32 ")", provider_section_.id);
+      ss << "ProviderSection(id: " << provider_section_.id << ")";
+      return ss.str();
     case MetadataType::kProviderEvent: {
-      fbl::String name;
+      ss << "ProviderEvent(id: " << provider_event_.id << ", ";
       ProviderEventType type = provider_event_.event;
       switch (type) {
         case ProviderEventType::kBufferOverflow:
-          name = "buffer overflow";
+          ss << "buffer overflow";
           break;
-        default:
-          name = fbl::StringPrintf("unknown(%u)", static_cast<unsigned>(type));
+        default: {
+          ss << "unknown(" << static_cast<unsigned>(type) << ")";
           break;
+        }
       }
-      return fbl::StringPrintf("ProviderEvent(id: %" PRId32 ", %s)", provider_event_.id,
-                               name.c_str());
+      ss << ")";
+      return ss.str();
     }
     case MetadataType::kTraceInfo: {
-      return fbl::StringPrintf("TraceInfo(content: %s)", trace_info_.content.ToString().c_str());
+      ss << "TraceInfo(content: " << trace_info_.content.ToString() << ")";
+      return ss.str();
     }
   }
   ZX_ASSERT(false);
@@ -350,31 +371,36 @@ void EventData::MoveFrom(EventData&& other) {
   }
 }
 
-fbl::String EventData::ToString() const {
+std::string EventData::ToString() const {
   switch (type_) {
-    case EventType::kInstant:
-      return fbl::StringPrintf("Instant(scope: %s)", EventScopeToString(instant_.scope));
+    case EventType::kInstant: {
+      std::stringstream ss;
+      ss << "Instant(scope: " << EventScopeToString(instant_.scope) << ")";
+      return ss.str();
+    }
     case EventType::kCounter:
-      return fbl::StringPrintf("Counter(id: %" PRIu64 ")", counter_.id);
+      return (std::stringstream() << "Counter(id: " << counter_.id << ")").str();
     case EventType::kDurationBegin:
       return "DurationBegin";
     case EventType::kDurationEnd:
       return "DurationEnd";
-    case EventType::kDurationComplete:
-      return fbl::StringPrintf("DurationComplete(end_ts: %" PRIu64 ")",
-                               duration_complete_.end_time);
+    case EventType::kDurationComplete: {
+      std::stringstream ss;
+      ss << "DurationComplete(end_ts: " << duration_complete_.end_time << ")";
+      return ss.str();
+    }
     case EventType::kAsyncBegin:
-      return fbl::StringPrintf("AsyncBegin(id: %" PRIu64 ")", async_begin_.id);
+      return (std::stringstream() << "AsyncBegin(id: " << async_begin_.id << ")").str();
     case EventType::kAsyncInstant:
-      return fbl::StringPrintf("AsyncInstant(id: %" PRIu64 ")", async_instant_.id);
+      return (std::stringstream() << "AsyncInstant(id: " << async_instant_.id << ")").str();
     case EventType::kAsyncEnd:
-      return fbl::StringPrintf("AsyncEnd(id: %" PRIu64 ")", async_end_.id);
+      return (std::stringstream() << "AsyncEnd(id: " << async_end_.id << ")").str();
     case EventType::kFlowBegin:
-      return fbl::StringPrintf("FlowBegin(id: %" PRIu64 ")", flow_begin_.id);
+      return (std::stringstream() << "FlowBegin(id: " << flow_begin_.id << ")").str();
     case EventType::kFlowStep:
-      return fbl::StringPrintf("FlowStep(id: %" PRIu64 ")", flow_step_.id);
+      return (std::stringstream() << "FlowStep(id: " << flow_step_.id << ")").str();
     case EventType::kFlowEnd:
-      return fbl::StringPrintf("FlowEnd(id: %" PRIu64 ")", flow_end_.id);
+      return (std::stringstream() << "FlowEnd(id: " << flow_end_.id << ")").str();
   }
   ZX_ASSERT(false);
 }
@@ -395,26 +421,25 @@ void LargeRecordData::MoveFrom(trace::LargeRecordData&& other) {
   }
 }
 
-fbl::String LargeRecordData::ToString() const {
+std::string LargeRecordData::ToString() const {
+  std::stringstream ss;
   switch (type_) {
     case LargeRecordType::kBlob:
       if (std::holds_alternative<BlobEvent>(blob_)) {
         const auto& data = std::get<BlobEvent>(blob_);
-        return fbl::StringPrintf(
-            "Blob(format: blob_event, category: \"%s\", name: \"%s\", "
-            "ts: %" PRIu64
-            ", pt: %s, %s, "
-            "size: %" PRIu64 ", preview: %s)",
-            data.category.c_str(), data.name.c_str(), data.timestamp,
-            data.process_thread.ToString().c_str(), FormatArgumentList(data.arguments).c_str(),
-            data.blob_size, PreviewBlobData<8, 8>(data.blob, data.blob_size).c_str());
+        ss << "Blob(format: blob_event, category: \"" << data.category << "\""
+           << ", name: \"" << data.name << "\""
+           << ", ts: " << data.timestamp << ", pt: " << data.process_thread.ToString() << ", "
+           << FormatArgumentList(data.arguments) << ", size: " << data.blob_size
+           << ", preview: " << PreviewBlobData<8, 8>(data.blob, data.blob_size) << ")";
+        return ss.str();
       } else if (std::holds_alternative<BlobAttachment>(blob_)) {
         const auto& data = std::get<BlobAttachment>(blob_);
-        return fbl::StringPrintf(
-            "Blob(format: blob_attachment, category: \"%s\", name: \"%s\", "
-            "size: %" PRIu64 ", preview: %s)",
-            data.category.c_str(), data.name.c_str(), data.blob_size,
-            PreviewBlobData<8, 8>(data.blob, data.blob_size).c_str());
+        ss << "Blob(format: blob_attachment, category: \"" << data.category << "\""
+           << ", name: \"" << data.name << "\""
+           << ", size: " << data.blob_size
+           << ", preview: " << PreviewBlobData<8, 8>(data.blob, data.blob_size) << ")";
+        return ss.str();
       }
       break;
   }
@@ -492,77 +517,73 @@ void Record::MoveFrom(Record&& other) {
   }
 }
 
-fbl::String Record::ToString() const {
+std::string Record::ToString() const {
+  std::stringstream ss;
   switch (type_) {
     case RecordType::kMetadata:
-      return fbl::StringPrintf("Metadata(content: %s)", metadata_.content.ToString().c_str());
+      ss << "Metadata(content: " << metadata_.content.ToString() << ")";
+      return ss.str();
     case RecordType::kInitialization:
-      return fbl::StringPrintf("Initialization(ticks_per_second: %" PRIu64 ")",
-                               initialization_.ticks_per_second);
+      ss << "Initialization(ticks_per_second: " << initialization_.ticks_per_second << ")";
+      return ss.str();
     case RecordType::kString:
-      return fbl::StringPrintf("String(index: %" PRIu32 ", \"%s\")", string_.index,
-                               string_.string.c_str());
+      ss << "String(index: " << string_.index << ", \"" << string_.string << "\")";
+      return ss.str();
     case RecordType::kThread:
-      return fbl::StringPrintf("Thread(index: %" PRIu32 ", %s)", thread_.index,
-                               thread_.process_thread.ToString().c_str());
+      ss << "Thread(index: " << thread_.index << ", " << thread_.process_thread.ToString() << ")";
+      return ss.str();
     case RecordType::kEvent:
-      return fbl::StringPrintf(
-          "Event(ts: %" PRIu64 ", pt: %s, category: \"%s\", name: \"%s\", %s, %s)",
-          event_.timestamp, event_.process_thread.ToString().c_str(), event_.category.c_str(),
-          event_.name.c_str(), event_.data.ToString().c_str(),
-          FormatArgumentList(event_.arguments).c_str());
-      break;
+      ss << "Event(ts: " << event_.timestamp << ", pt: " << event_.process_thread.ToString()
+         << ", category: \"" << event_.category << "\", name: \"" << event_.name << "\", "
+         << event_.data.ToString() << ", " << FormatArgumentList(event_.arguments) << ")";
+      return ss.str();
     case RecordType::kBlob:
-      return fbl::StringPrintf("Blob(name: %s, size: %zu, preview: %s)", blob_.name.c_str(),
-                               blob_.blob_size,
-                               PreviewBlobData<8, 8>(blob_.blob, blob_.blob_size).c_str());
+      ss << "Blob(name: " << blob_.name << ", size: " << blob_.blob_size
+         << ", preview: " << PreviewBlobData<8, 8>(blob_.blob, blob_.blob_size) << ")";
+      return ss.str();
     case RecordType::kKernelObject:
-      return fbl::StringPrintf("KernelObject(koid: %" PRIu64 ", type: %s, name: \"%s\", %s)",
-                               kernel_object_.koid, ObjectTypeToString(kernel_object_.object_type),
-                               kernel_object_.name.c_str(),
-                               FormatArgumentList(kernel_object_.arguments).c_str());
-      break;
+      ss << "KernelObject(koid: " << kernel_object_.koid
+         << ", type: " << ObjectTypeToString(kernel_object_.object_type) << ", name: \""
+         << kernel_object_.name << "\", " << FormatArgumentList(kernel_object_.arguments) << ")";
+      return ss.str();
     case RecordType::kScheduler:
       if (scheduler_event_.type() == SchedulerEventType::kLegacyContextSwitch) {
         auto& context_switch = scheduler_event_.legacy_context_switch();
-        return fbl::StringPrintf("ContextSwitch(ts: %" PRIu64 ", cpu: %" PRIu32
-                                 ", os: %s, opt: %s, ipt: %s"
-                                 ", oprio: %" PRIu32 ", iprio: %" PRIu32 ")",
-                                 context_switch.timestamp, context_switch.cpu_number,
-                                 ThreadStateToString(context_switch.outgoing_thread_state),
-                                 context_switch.outgoing_thread.ToString().c_str(),
-                                 context_switch.incoming_thread.ToString().c_str(),
-                                 context_switch.outgoing_thread_priority,
-                                 context_switch.incoming_thread_priority);
-      }
-      if (scheduler_event_.type() == SchedulerEventType::kContextSwitch) {
+        ss << "ContextSwitch(ts: " << context_switch.timestamp
+           << ", cpu: " << context_switch.cpu_number
+           << ", os: " << ThreadStateToString(context_switch.outgoing_thread_state)
+           << ", opt: " << context_switch.outgoing_thread.ToString()
+           << ", ipt: " << context_switch.incoming_thread.ToString()
+           << ", oprio: " << context_switch.outgoing_thread_priority
+           << ", iprio: " << context_switch.incoming_thread_priority << ")";
+      } else if (scheduler_event_.type() == SchedulerEventType::kContextSwitch) {
         auto& context_switch = scheduler_event_.context_switch();
-        return fbl::StringPrintf("ContextSwitch(ts: %" PRIu64 ", cpu: %" PRIu32
-                                 ", os: %s, ot: %" PRIu64 ", it: %" PRIu64 ", %s)",
-                                 context_switch.timestamp, context_switch.cpu_number,
-                                 ThreadStateToString(context_switch.outgoing_thread_state),
-                                 context_switch.outgoing_tid, context_switch.incoming_tid,
-                                 FormatArgumentList(context_switch.arguments).c_str());
-      }
-      if (scheduler_event_.type() == SchedulerEventType::kThreadWakeup) {
+        ss << "ContextSwitch(ts: " << context_switch.timestamp
+           << ", cpu: " << context_switch.cpu_number
+           << ", os: " << ThreadStateToString(context_switch.outgoing_thread_state)
+           << ", ot: " << context_switch.outgoing_tid << ", it: " << context_switch.incoming_tid
+           << ", " << FormatArgumentList(context_switch.arguments) << ")";
+      } else if (scheduler_event_.type() == SchedulerEventType::kThreadWakeup) {
         auto& thread_wakeup = scheduler_event_.thread_wakeup();
-        return fbl::StringPrintf(
-            "ThreadWakeup(ts: %" PRIu64 ", cpu: %" PRIu32 ", it: %" PRIu64 ", %s)",
-            thread_wakeup.timestamp, thread_wakeup.cpu_number, thread_wakeup.incoming_tid,
-            FormatArgumentList(thread_wakeup.arguments).c_str());
+        ss << "ThreadWakeup(ts: " << thread_wakeup.timestamp
+           << ", cpu: " << thread_wakeup.cpu_number << ", it: " << thread_wakeup.incoming_tid
+           << ", " << FormatArgumentList(thread_wakeup.arguments) << ")";
+      } else {
+        ss << "UnknownSchedulerEvent(type: " << static_cast<int>(scheduler_event_.type()) << ")";
       }
-      return fbl::StringPrintf("UnknownSchedulerEvent(type: %d)",
-                               static_cast<int>(scheduler_event_.type()));
+      return ss.str();
     case RecordType::kLog:
-      return fbl::StringPrintf("Log(ts: %" PRIu64 ", pt: %s, \"%s\")", log_.timestamp,
-                               log_.process_thread.ToString().c_str(), log_.message.c_str());
+      ss << "Log(ts: " << log_.timestamp << ", pt: " << log_.process_thread.ToString() << ", \""
+         << log_.message << "\")";
+      return ss.str();
     case RecordType::kLargeRecord:
-      return fbl::StringPrintf("LargeRecord(%s)", large_.ToString().c_str());
+      ss << "LargeRecord(" << large_.ToString() << ")";
+      return ss.str();
   }
   ZX_ASSERT(false);
 }
 
-std::optional<fbl::String> Record::GetName() const {
+std::optional<std::string> Record::GetName() const {
   switch (type_) {
     // Do not have a namefield
     case RecordType::kMetadata:

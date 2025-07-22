@@ -5,10 +5,10 @@
 #include <inttypes.h>
 #include <lib/trace-engine/fields.h>
 
+#include <sstream>
 #include <string_view>
 #include <utility>
 
-#include <fbl/string_printf.h>
 #include <trace-reader/reader.h>
 
 namespace trace {
@@ -119,8 +119,9 @@ bool TraceReader::ReadRecords(Chunk& chunk) {
       }
       default: {
         // Ignore unknown record types for forward compatibility.
-        ReportError(
-            fbl::StringPrintf("Skipping record of unknown type %d", static_cast<uint32_t>(type)));
+        std::stringstream ss;
+        ss << "Skipping record of unknown type " << static_cast<uint32_t>(type);
+        ReportError(ss.str());
         break;
       }
     }
@@ -139,7 +140,7 @@ bool TraceReader::ReadMetadataRecord(Chunk& record, RecordHeader header) {
       if (!name_view.has_value()) {
         return false;
       }
-      fbl::String name(name_view.value());
+      std::string name(name_view.value());
 
       RegisterProvider(id, name);
       record_consumer_(
@@ -164,8 +165,9 @@ bool TraceReader::ReadMetadataRecord(Chunk& record, RecordHeader header) {
           break;
         default:
           // Ignore unknown event types for forward compatibility.
-          ReportError(fbl::StringPrintf("Skipping provider event of unknown type %u",
-                                        static_cast<unsigned>(event)));
+          std::stringstream ss;
+          ss << "Skipping provider event of unknown type " << static_cast<unsigned>(event);
+          ReportError(ss.str());
           break;
       }
       break;
@@ -181,8 +183,9 @@ bool TraceReader::ReadMetadataRecord(Chunk& record, RecordHeader header) {
         }
         default: {
           // Ignore unknown trace info types for forward compatibility.
-          ReportError(fbl::StringPrintf("Skipping trace info record of unknown type %u",
-                                        static_cast<unsigned>(info_type)));
+          std::stringstream ss;
+          ss << "Skipping trace info record of unknown type " << static_cast<unsigned>(info_type);
+          ReportError(ss.str());
           break;
         }
       }
@@ -190,8 +193,9 @@ bool TraceReader::ReadMetadataRecord(Chunk& record, RecordHeader header) {
     }
     default: {
       // Ignore unknown metadata types for forward compatibility.
-      ReportError(
-          fbl::StringPrintf("Skipping metadata of unknown type %d", static_cast<uint32_t>(type)));
+      std::stringstream ss;
+      ss << "Skipping metadata of unknown type " << static_cast<uint32_t>(type);
+      ReportError(ss.str());
       break;
     }
   }
@@ -218,17 +222,18 @@ bool TraceReader::ReadStringRecord(Chunk& record, RecordHeader header) {
   auto length = StringRecordFields::StringLength::Get<size_t>(header);
   std::optional string_view = record.ReadString(length);
   if (!string_view.has_value()) {
-    fbl::String errorMessage = fbl::StringPrintf(
-        "Failed to parse a string of length %lu registered with string index: '%d'", length, index);
-    ReportError(errorMessage);
+    std::stringstream ss;
+    ss << "Failed to parse a string of length " << length << " registered with string index: '"
+       << index << "'";
+    ReportError(ss.str());
     return false;
   }
-  fbl::String string(string_view.value());
+  std::string string(string_view.value());
 
   if (index < TRACE_ENCODED_STRING_REF_MIN_INDEX || index > TRACE_ENCODED_STRING_REF_MAX_INDEX) {
-    fbl::String errorMessage = fbl::StringPrintf(
-        "String: '%s' registered with invalid string index: '%d'", string.c_str(), index);
-    ReportError(errorMessage);
+    std::stringstream ss;
+    ss << "String: '" << string << "' registered with invalid string index: '" << index << "'";
+    ReportError(ss.str());
     return false;
   }
 
@@ -274,23 +279,21 @@ bool TraceReader::ReadEventRecord(Chunk& record, RecordHeader header) {
   }
   const trace_ticks_t timestamp = timestamp_opt.value();
   ProcessThread process_thread;
-  fbl::String category;
-  fbl::String name;
+  std::string category;
+  std::string name;
   std::vector<Argument> arguments;
   if (!DecodeThreadRef(record, thread_ref, &process_thread) ||
       !DecodeStringRef(record, category_ref, &category) ||
       !DecodeStringRef(record, name_ref, &name) ||
       !ReadArguments(record, argument_count, &arguments)) {
-    auto errorMessage = fbl::StringPrintf(
-        "Invalid event: Event {\n"
-        "    Type: %d\n"
-        "    ArgumentCount: %lu\n"
-        "    ThreadRef: %u (%s)\n"
-        "    CategoryRef: %u (%s)\n"
-        "    NameRef: %u (%s)\n}",
-        static_cast<uint32_t>(type), argument_count, thread_ref, process_thread.ToString().c_str(),
-        category_ref, category.c_str(), name_ref, name.c_str());
-    ReportError(errorMessage);
+    std::stringstream ss;
+    ss << "Invalid event: Event {\n"
+       << "    Type: " << static_cast<uint32_t>(type) << "\n"
+       << "    ArgumentCount: " << argument_count << "\n"
+       << "    ThreadRef: " << thread_ref << " (" << process_thread.ToString() << ")\n"
+       << "    CategoryRef: " << category_ref << " (" << category << ")\n"
+       << "    NameRef: " << name_ref << " (" << name << ")\n}";
+    ReportError(ss.str());
     return false;
   }
 
@@ -397,8 +400,9 @@ bool TraceReader::ReadEventRecord(Chunk& record, RecordHeader header) {
     }
     default: {
       // Ignore unknown event types for forward compatibility.
-      ReportError(
-          fbl::StringPrintf("Skipping event of unknown type %d", static_cast<uint32_t>(type)));
+      std::stringstream ss;
+      ss << "Skipping event of unknown type " << static_cast<uint32_t>(type);
+      ReportError(ss.str());
       break;
     }
   }
@@ -409,7 +413,7 @@ bool TraceReader::ReadBlobRecord(Chunk& record, RecordHeader header, void** out_
   auto blob_type = BlobRecordFields::BlobType::Get<trace_blob_type_t>(header);
   auto name_ref = BlobRecordFields::NameStringRef::Get<trace_encoded_string_ref_t>(header);
   auto blob_size = BlobRecordFields::BlobSize::Get<size_t>(header);
-  fbl::String name;
+  std::string name;
   if (!DecodeStringRef(record, name_ref, &name))
     return false;
   auto blob_words = BytesToWords(blob_size);
@@ -432,7 +436,7 @@ bool TraceReader::ReadKernelObjectRecord(Chunk& record, RecordHeader header) {
     return false;
   }
   zx_koid_t koid = koid_opt.value();
-  fbl::String name;
+  std::string name;
   if (!DecodeStringRef(record, name_ref, &name)) {
     return false;
   }
@@ -561,7 +565,7 @@ bool TraceReader::ReadLogRecord(Chunk& record, RecordHeader header) {
     return false;
   }
   record_consumer_(
-      Record(Record::Log{timestamp, process_thread, fbl::String(log_message.value())}));
+      Record(Record::Log{timestamp, process_thread, std::string(log_message.value())}));
   return true;
 }
 
@@ -571,9 +575,11 @@ bool TraceReader::ReadLargeRecord(trace::Chunk& record, trace::RecordHeader head
   switch (large_type) {
     case LargeRecordType::kBlob:
       return ReadLargeBlob(record, header);
-    default:
-      ReportError(
-          fbl::StringPrintf("Skipping unknown large record type %d", ToUnderlyingType(large_type)));
+    default: {
+      std::stringstream ss;
+      ss << "Skipping unknown large record type " << ToUnderlyingType(large_type);
+      ReportError(ss.str());
+    }
   }
   return true;
 }
@@ -595,11 +601,11 @@ bool TraceReader::ReadLargeBlob(trace::Chunk& record, trace::RecordHeader header
       auto argument_count = Format::ArgumentCount::Get<size_t>(format_header);
       auto thread_ref = Format::ThreadRef::Get<trace_encoded_thread_ref_t>(format_header);
 
-      fbl::String category;
+      std::string category;
       if (!DecodeStringRef(record, category_ref, &category)) {
         return false;
       }
-      fbl::String name;
+      std::string name;
       if (!DecodeStringRef(record, name_ref, &name)) {
         return false;
       }
@@ -647,11 +653,11 @@ bool TraceReader::ReadLargeBlob(trace::Chunk& record, trace::RecordHeader header
       auto category_ref = Format::CategoryStringRef::Get<trace_encoded_string_ref_t>(format_header);
       auto name_ref = Format::NameStringRef::Get<trace_encoded_string_ref_t>(format_header);
 
-      fbl::String category;
+      std::string category;
       if (!DecodeStringRef(record, category_ref, &category)) {
         return false;
       }
-      fbl::String name;
+      std::string name;
       if (!DecodeStringRef(record, name_ref, &name)) {
         return false;
       }
@@ -672,9 +678,11 @@ bool TraceReader::ReadLargeBlob(trace::Chunk& record, trace::RecordHeader header
       }))));
       break;
     }
-    default:
-      ReportError(fbl::StringPrintf("Skipping unknown large blob record format %d",
-                                    ToUnderlyingType(format_type)));
+    default: {
+      std::stringstream ss;
+      ss << "Skipping unknown large blob record format " << ToUnderlyingType(format_type);
+      ReportError(ss.str());
+    }
   }
   return true;
 }
@@ -702,7 +710,7 @@ bool TraceReader::ReadArguments(Chunk& record, size_t count, std::vector<Argumen
     Chunk& arg = arg_opt.value();
 
     auto name_ref = ArgumentFields::NameRef::Get<trace_encoded_string_ref_t>(header);
-    fbl::String name;
+    std::string name;
     if (!DecodeStringRef(arg, name_ref, &name)) {
       ReportError("Failed to read argument name");
       return false;
@@ -761,7 +769,7 @@ bool TraceReader::ReadArguments(Chunk& record, size_t count, std::vector<Argumen
       }
       case ArgumentType::kString: {
         auto string_ref = StringArgumentFields::Index::Get<trace_encoded_string_ref_t>(header);
-        fbl::String value;
+        std::string value;
         if (!DecodeStringRef(arg, string_ref, &value)) {
           ReportError("Failed to read string argument value");
           return false;
@@ -791,8 +799,10 @@ bool TraceReader::ReadArguments(Chunk& record, size_t count, std::vector<Argumen
       }
       default: {
         // Ignore unknown argument types for forward compatibility.
-        ReportError(fbl::StringPrintf("Skipping argument of unknown type %d, argument name %s",
-                                      static_cast<uint32_t>(type), name.c_str()));
+        std::stringstream ss;
+        ss << "Skipping argument of unknown type " << static_cast<uint32_t>(type)
+           << ", argument name " << name;
+        ReportError(ss.str());
         break;
       }
     }
@@ -800,11 +810,11 @@ bool TraceReader::ReadArguments(Chunk& record, size_t count, std::vector<Argumen
   return true;
 }
 
-fbl::String TraceReader::GetProviderName(ProviderId id) const {
+std::string TraceReader::GetProviderName(ProviderId id) const {
   auto it = providers_.find(id);
   if (it != providers_.end())
     return it->name;
-  return fbl::String();
+  return std::string();
 }
 
 void TraceReader::SetCurrentProvider(ProviderId id) {
@@ -813,11 +823,13 @@ void TraceReader::SetCurrentProvider(ProviderId id) {
     current_provider_ = &*it;
     return;
   }
-  ReportError(fbl::StringPrintf("Registering non-existent provider %u\n", id));
+  std::stringstream ss;
+  ss << "Registering non-existent provider " << id;
+  ReportError(ss.str());
   RegisterProvider(id, "");
 }
 
-void TraceReader::RegisterProvider(ProviderId id, fbl::String name) {
+void TraceReader::RegisterProvider(ProviderId id, std::string name) {
   auto provider = std::make_unique<ProviderInfo>();
   provider->id = id;
   provider->name = std::move(name);
@@ -826,7 +838,7 @@ void TraceReader::RegisterProvider(ProviderId id, fbl::String name) {
   providers_.insert_or_replace(std::move(provider));
 }
 
-void TraceReader::RegisterString(trace_string_index_t index, const fbl::String& string) {
+void TraceReader::RegisterString(trace_string_index_t index, const std::string& string) {
   ZX_DEBUG_ASSERT(index >= TRACE_ENCODED_STRING_REF_MIN_INDEX &&
                   index <= TRACE_ENCODED_STRING_REF_MAX_INDEX);
 
@@ -843,7 +855,7 @@ void TraceReader::RegisterThread(trace_thread_index_t index, const ProcessThread
 }
 
 bool TraceReader::DecodeStringRef(Chunk& chunk, trace_encoded_string_ref_t string_ref,
-                                  fbl::String* out_string) const {
+                                  std::string* out_string) const {
   if (string_ref == TRACE_ENCODED_STRING_REF_EMPTY) {
     out_string->clear();
     return true;
@@ -867,8 +879,9 @@ bool TraceReader::DecodeStringRef(Chunk& chunk, trace_encoded_string_ref_t strin
 
   auto it = current_provider_->string_table.find(string_ref);
   if (it == current_provider_->string_table.end()) {
-    fbl::String errorMessage = fbl::StringPrintf("String ref: '%d' not in table", string_ref);
-    ReportError(errorMessage);
+    std::stringstream ss;
+    ss << "String ref: '" << string_ref << "' not in table";
+    ReportError(ss.str());
     return false;
   }
   *out_string = it->second.string;
@@ -894,16 +907,18 @@ bool TraceReader::DecodeThreadRef(Chunk& chunk, trace_encoded_thread_ref_t threa
 
   auto it = current_provider_->thread_table.find(thread_ref);
   if (it == current_provider_->thread_table.end()) {
-    ReportError(fbl::StringPrintf("Thread ref 0x%x not in table", thread_ref));
+    std::stringstream ss;
+    ss << "Thread ref 0x" << std::hex << thread_ref << " not in table";
+    ReportError(ss.str());
     return false;
   }
   *out_process_thread = it->second.process_thread;
   return true;
 }
 
-void TraceReader::ReportError(fbl::String error) const {
+void TraceReader::ReportError(std::string_view error) const {
   if (error_handler_)
-    error_handler_(std::move(error));
+    error_handler_(error);
 }
 
 Chunk::Chunk(const uint64_t* begin, size_t num_words)

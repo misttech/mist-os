@@ -9,7 +9,7 @@
 
 #include <iterator>
 #include <memory>
-#include <utility>
+#include <string_view>
 #include <vector>
 
 #include <trace-reader/file_reader.h>
@@ -43,7 +43,7 @@ TEST(TraceFileReader, Records) {
 
   std::unique_ptr<trace::FileReader> reader;
   std::vector<trace::Record> records;
-  fbl::String error;
+  std::string_view error;
   ASSERT_TRUE(trace::FileReader::Create(kTestInputFile, test::MakeRecordConsumer(&records),
                                         test::MakeErrorHandler(&error), &reader));
 

@@ -9,6 +9,7 @@
 #include <lib/trace-engine/types.h>
 
 #include <fstream>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -61,7 +62,7 @@ const trace::ArgumentValue* GetArgumentValue(const std::vector<trace::Argument>&
 // replaces any invalid unicode sequences with the replacement character, so
 // that the output will be valid UTF-8, even if a trace provider gives us
 // invalid UTF-8 in a string.
-std::string CleanString(fbl::String str) {
+std::string CleanString(std::string_view str) {
   std::string result;
   const char* data = str.data();
   const size_t len = str.length();
@@ -116,7 +117,7 @@ void ChromiumExporter::Stop() {
 
   for (const auto& pair : processes_) {
     const zx_koid_t process_koid = pair.first;
-    const fbl::String& name = pair.second;
+    const std::string& name = pair.second;
 
     writer_.StartObject();
     writer_.Key("ph");
@@ -137,7 +138,7 @@ void ChromiumExporter::Stop() {
     const zx_koid_t process_koid = process_threads.first;
     for (const auto& thread : process_threads.second) {
       const zx_koid_t thread_koid = thread.first;
-      const fbl::String& name = thread.second;
+      const std::string& name = thread.second;
       writer_.StartObject();
       writer_.Key("ph");
       writer_.String("t");

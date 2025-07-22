@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -27,8 +27,8 @@ static inline trace::TraceReader::RecordConsumer MakeRecordConsumer(
   return [out_records](trace::Record record) { out_records->push_back(std::move(record)); };
 }
 
-static inline trace::TraceReader::ErrorHandler MakeErrorHandler(fbl::String* out_error) {
-  return [out_error](fbl::String error) { *out_error = std::move(error); };
+static inline trace::TraceReader::ErrorHandler MakeErrorHandler(std::string_view* out_error) {
+  return [out_error](std::string_view error) { *out_error = error; };
 }
 
 }  // namespace test

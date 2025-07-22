@@ -125,7 +125,7 @@ bool Tracing::WriteHumanReadable(std::ostream& filepath) {
     filepath << rec.ToString() << "\n";
     record_count++;
   };
-  trace::TraceReader::ErrorHandler accumulate_errors = [&error_count](const fbl::String& error) {
+  trace::TraceReader::ErrorHandler accumulate_errors = [&error_count](std::string_view error) {
     FX_LOGS(ERROR) << error << "\n";
     error_count++;
   };
@@ -202,7 +202,7 @@ bool Tracing::PopulateDurationStats(std::string string_ref,
       }
     }
   };
-  trace::TraceReader::ErrorHandler accumulate_errors = [&error_count](const fbl::String& error) {
+  trace::TraceReader::ErrorHandler accumulate_errors = [&error_count](std::string_view error) {
     FX_LOGS(ERROR) << error << "\n";
     error_count++;
   };

@@ -13,7 +13,7 @@ namespace tracing {
 FuchsiaTraceParser::FuchsiaTraceParser(std::ofstream* out)
     : exporter_(*out),
       reader_([this](trace::Record record) { exporter_.ExportRecord(record); },
-              [](fbl::String error) { FX_LOGS(ERROR) << error.c_str(); }) {}
+              [](std::string_view error) { FX_LOGS(ERROR) << error; }) {}
 
 FuchsiaTraceParser::~FuchsiaTraceParser() = default;
 

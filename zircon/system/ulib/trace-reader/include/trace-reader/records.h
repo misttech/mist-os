@@ -14,12 +14,11 @@
 
 #include <new>
 #include <optional>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <fbl/string.h>
 
 namespace trace {
 
@@ -57,7 +56,7 @@ class ProcessThread final {
     return *this;
   }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
  private:
   zx_koid_t process_koid_;
@@ -74,7 +73,7 @@ class ArgumentValue final {
   static ArgumentValue MakeInt64(int64_t value) { return ArgumentValue(value); }
   static ArgumentValue MakeUint64(uint64_t value) { return ArgumentValue(value); }
   static ArgumentValue MakeDouble(double value) { return ArgumentValue(value); }
-  static ArgumentValue MakeString(fbl::String value) { return ArgumentValue(std::move(value)); }
+  static ArgumentValue MakeString(std::string value) { return ArgumentValue(std::move(value)); }
   static ArgumentValue MakePointer(uint64_t value) { return ArgumentValue(Pointer{value}); }
   static ArgumentValue MakeKoid(zx_koid_t value) { return ArgumentValue(Koid{value}); }
 
@@ -118,9 +117,9 @@ class ArgumentValue final {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kDouble);
     return std::get<double>(value_);
   }
-  const fbl::String& GetString() const {
+  const std::string& GetString() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kString);
-    return std::get<fbl::String>(value_);
+    return std::get<std::string>(value_);
   }
   uint64_t GetPointer() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kPointer);
@@ -131,7 +130,7 @@ class ArgumentValue final {
     return std::get<Koid>(value_).value;
   }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
  private:
   // Strong wrapper types for argument types that have no value or have ambiguous implicit
@@ -154,11 +153,11 @@ class ArgumentValue final {
   explicit ArgumentValue(int64_t int64) : value_(int64) {}
   explicit ArgumentValue(uint64_t uint64) : value_(uint64) {}
   explicit ArgumentValue(double d) : value_(d) {}
-  explicit ArgumentValue(fbl::String string) : value_(std::move(string)) {}
+  explicit ArgumentValue(std::string string) : value_(std::move(string)) {}
   explicit ArgumentValue(Pointer pointer) : value_(pointer) {}
   explicit ArgumentValue(Koid koid) : value_(koid) {}
 
-  using Variant = std::variant<Null, int32_t, uint32_t, int64_t, uint64_t, double, fbl::String,
+  using Variant = std::variant<Null, int32_t, uint32_t, int64_t, uint64_t, double, std::string,
                                Pointer, Koid, Bool>;
   Variant value_;
 
@@ -171,7 +170,7 @@ class ArgumentValue final {
   static_assert(TypeIndexCheck<int64_t, TRACE_ARG_INT64>);
   static_assert(TypeIndexCheck<uint64_t, TRACE_ARG_UINT64>);
   static_assert(TypeIndexCheck<double, TRACE_ARG_DOUBLE>);
-  static_assert(TypeIndexCheck<fbl::String, TRACE_ARG_STRING>);
+  static_assert(TypeIndexCheck<std::string, TRACE_ARG_STRING>);
   static_assert(TypeIndexCheck<Pointer, TRACE_ARG_POINTER>);
   static_assert(TypeIndexCheck<Koid, TRACE_ARG_KOID>);
   static_assert(TypeIndexCheck<Bool, TRACE_ARG_BOOL>);
@@ -180,7 +179,7 @@ class ArgumentValue final {
 // Named argument and value.
 class Argument final {
  public:
-  explicit Argument(fbl::String name, ArgumentValue value)
+  explicit Argument(std::string name, ArgumentValue value)
       : name_(std::move(name)), value_(std::move(value)) {}
 
   Argument(const Argument&) = default;
@@ -189,13 +188,13 @@ class Argument final {
   Argument(Argument&&) = default;
   Argument& operator=(Argument&&) = default;
 
-  const fbl::String& name() const { return name_; }
+  const std::string& name() const { return name_; }
   const ArgumentValue& value() const { return value_; }
   ArgumentType type() const { return value_.type(); }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
-  static const Argument* Find(const fbl::String& name, const std::vector<Argument>& arguments) {
+  static const Argument* Find(const std::string& name, const std::vector<Argument>& arguments) {
     for (const Argument& argument : arguments) {
       if (argument.name() == name) {
         return &argument;
@@ -205,7 +204,7 @@ class Argument final {
   }
 
  private:
-  fbl::String name_;
+  std::string name_;
   ArgumentValue value_;
 };
 
@@ -237,7 +236,7 @@ class TraceInfoContent final {
 
   TraceInfoType type() const { return type_; }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
  private:
   void Destroy();
@@ -258,7 +257,7 @@ class MetadataContent final {
   // Provider info event data.
   struct ProviderInfo {
     ProviderId id;
-    fbl::String name;
+    std::string name;
   };
 
   // Provider section event data.
@@ -317,7 +316,7 @@ class MetadataContent final {
 
   MetadataType type() const { return type_; }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
  private:
   void Destroy();
@@ -487,7 +486,7 @@ class EventData final {
 
   EventType type() const { return type_; }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
  private:
   void Destroy();
@@ -516,8 +515,8 @@ class EventData final {
 class LargeRecordData final {
  public:
   struct BlobEvent {
-    fbl::String category;
-    fbl::String name;
+    std::string category;
+    std::string name;
     trace_ticks_t timestamp;
     ProcessThread process_thread;
     std::vector<Argument> arguments;
@@ -527,8 +526,8 @@ class LargeRecordData final {
   };
 
   struct BlobAttachment {
-    fbl::String category;
-    fbl::String name;
+    std::string category;
+    std::string name;
 
     const void* blob;
     uint64_t blob_size;
@@ -561,7 +560,7 @@ class LargeRecordData final {
 
   LargeRecordType type() const { return type_; }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
  private:
   void Destroy();
@@ -593,7 +592,7 @@ class Record final {
   // String record data.
   struct String {
     trace_string_index_t index;
-    fbl::String string;
+    std::string string;
   };
 
   // Thread record data.
@@ -607,8 +606,8 @@ class Record final {
     EventType type() const { return data.type(); }
     trace_ticks_t timestamp;
     ProcessThread process_thread;
-    fbl::String category;
-    fbl::String name;
+    std::string category;
+    std::string name;
     std::vector<Argument> arguments;
     EventData data;
   };
@@ -619,7 +618,7 @@ class Record final {
   // before the next record is read.
   struct Blob {
     trace_blob_type_t type;
-    fbl::String name;
+    std::string name;
     const void* blob;
     size_t blob_size;
   };
@@ -628,7 +627,7 @@ class Record final {
   struct KernelObject {
     zx_koid_t koid;
     zx_obj_type_t object_type;
-    fbl::String name;
+    std::string name;
     std::vector<Argument> arguments;
   };
 
@@ -651,7 +650,7 @@ class Record final {
       zx_koid_t incoming_tid;
       std::vector<Argument> arguments;
 
-      const Argument* FindArgument(const fbl::String& name) const {
+      const Argument* FindArgument(const std::string& name) const {
         return Argument::Find(name, arguments);
       }
     };
@@ -661,7 +660,7 @@ class Record final {
       zx_koid_t incoming_tid;
       std::vector<Argument> arguments;
 
-      const Argument* FindArgument(const fbl::String& name) const {
+      const Argument* FindArgument(const std::string& name) const {
         return Argument::Find(name, arguments);
       }
     };
@@ -701,7 +700,7 @@ class Record final {
   struct Log {
     trace_ticks_t timestamp;
     ProcessThread process_thread;
-    fbl::String message;
+    std::string message;
   };
 
   // Large record data.
@@ -802,9 +801,9 @@ class Record final {
 
   RecordType type() const { return type_; }
 
-  fbl::String ToString() const;
+  std::string ToString() const;
 
-  std::optional<fbl::String> GetName() const;
+  std::optional<std::string> GetName() const;
 
  private:
   void Destroy();

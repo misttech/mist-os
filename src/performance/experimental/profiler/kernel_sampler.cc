@@ -246,8 +246,8 @@ zx::result<> profiler::KernelSampler::Stop() {
     inspecting_durations_.emplace_back(0);
   };
   zx_status_t encountered_error = ZX_OK;
-  trace::TraceReader::ErrorHandler handle_error = [&encountered_error](fbl::String err) {
-    FX_LOGS(ERROR) << "Encountered malformed data: " << err.c_str();
+  trace::TraceReader::ErrorHandler handle_error = [&encountered_error](std::string_view err) {
+    FX_LOGS(ERROR) << "Encountered malformed data: " << err;
     encountered_error = ZX_ERR_BAD_STATE;
   };
   trace::TraceReader reader{std::move(consume_record), std::move(handle_error)};

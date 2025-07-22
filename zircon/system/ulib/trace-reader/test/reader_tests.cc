@@ -133,7 +133,7 @@ TEST(TraceReader, NonEmptyChunk) {
 
 TEST(TraceReader, InitialState) {
   std::vector<trace::Record> records;
-  fbl::String error;
+  std::string_view error;
   trace::TraceReader reader(test::MakeRecordConsumer(&records), test::MakeErrorHandler(&error));
 
   EXPECT_EQ(0, reader.current_provider_id());
