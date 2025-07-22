@@ -5,6 +5,7 @@
 group("util") {
   testonly = true
   public_deps = [
+    ":buffers_helper",
     ":portable_ui_test",
     ":screenshot_helper",
     ":test_view",
@@ -108,4 +109,16 @@ source_set("zxtest_helpers") {
 source_set("fidl_cpp_helpers") {
   testonly = true
   sources = [ "fidl_cpp_helpers.h" ]
+}
+
+source_set("buffers_helper") {
+  testonly = true
+  sources = [
+    "buffers_helper.cc",
+    "buffers_helper.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//zircon/system/ulib/zx",
+  ]
 }

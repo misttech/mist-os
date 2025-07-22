@@ -101,8 +101,8 @@ source_set("screen-capture-utils") {
       [ "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp" ]
   deps = [
     ":common-deps-zxtest",
-    "//src/ui/scenic/lib/flatland/buffers",
     "//src/ui/scenic/lib/utils:utils",
+    "//src/ui/testing/util:buffers_helper",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -273,8 +273,8 @@ ctf_components_packages("cpu-renderer-integration-test") {
     ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/flatland/buffers",
     "//src/ui/scenic/lib/utils:utils",
+    "//src/ui/testing/util:buffers_helper",
   ]
   test_specs = {
     log_settings = {

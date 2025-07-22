@@ -5,6 +5,9 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_BUFFERS_UTIL_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_BUFFERS_UTIL_H_
 
+#include <fuchsia/sysmem2/cpp/fidl.h>
+#include <lib/syslog/cpp/macros.h>
+
 #include "src/ui/scenic/lib/flatland/buffers/buffer_collection.h"
 
 namespace flatland {
