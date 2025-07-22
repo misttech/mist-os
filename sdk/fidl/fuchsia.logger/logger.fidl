@@ -132,6 +132,14 @@ type InterestChangeError = strict enum : uint32 {
 /// Drains a program's logs.
 @discoverable(server="platform")
 closed(removed=26) open(added=26) protocol LogSink {
+    /// This event is sent whenever Archivist accepts a new connection. Clients may use
+    /// the returned IOBuffer to write logs.
+    @available(added=NEXT)
+    flexible -> OnInit(resource table {
+        1: buffer zx.Handle:IOB;
+        2: interest fuchsia.diagnostics.types.Interest;
+    });
+
     /// Send this socket to be drained.
     ///
     /// See [wire_format.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/syslog/include/lib/syslog/wire_format.h)

@@ -257,6 +257,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.logger/LogSink.OnInit",
+        "strictness": "flexible",
+        "ordinal": "7052827292487084730",
+        "direction": "event",
+        "request": "fuchsia.logger/LogSinkOnInitRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.logger/LogSink.WaitForInterestChange",
         "strictness": "strict",
         "ordinal": "2138400952013124162",
@@ -279,6 +287,23 @@
     {
         "kind": "struct",
         "name": "fuchsia.logger/LogSinkConnectStructuredRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.logger/LogSinkOnInitRequest.buffer",
+        "ordinal": "1",
+        "type": "zx/Handle:IOB"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.logger/LogSinkOnInitRequest.interest",
+        "ordinal": "2",
+        "type": "fuchsia.diagnostics.types/Interest"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.logger/LogSinkOnInitRequest",
         "resourceness": "resource"
     },
     {
