@@ -17,7 +17,7 @@ pub trait RuntimeStatsSource {
     /// The returned future will resolve when the task is terminated.
     fn handle_ref(&self) -> zx::HandleRef<'_>;
     /// Provides the runtime info containing the stats.
-    async fn get_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, zx::Status>;
+    fn get_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, zx::Status>;
 }
 
 /// Trait for the container returned by a `DiagnosticsReceiverProvider`.
@@ -40,7 +40,7 @@ where
 {
     /// Fetches a oneshot receiver that will eventually resolve to the diagnostics of a component
     /// if the runner provides them.
-    async fn get_receiver(&self) -> Option<oneshot::Receiver<T>>;
+    fn get_receiver(&self) -> Option<oneshot::Receiver<T>>;
 
     /// Returns the reported start time.
     fn start_time(&self) -> zx::BootInstant;
@@ -71,7 +71,7 @@ impl RuntimeStatsSource for DiagnosticsTask {
         }
     }
 
-    async fn get_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, zx::Status> {
+    fn get_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, zx::Status> {
         match &self {
             DiagnosticsTask::Job(job) => job.get_runtime_info(),
             DiagnosticsTask::Process(process) => process.get_runtime_info(),
@@ -96,8 +96,8 @@ impl RuntimeStatsContainer<DiagnosticsTask> for ComponentDiagnostics {
 
 #[async_trait]
 impl ComponentStartedInfo<ComponentDiagnostics, DiagnosticsTask> for RuntimeInfo {
-    async fn get_receiver(&self) -> Option<oneshot::Receiver<ComponentDiagnostics>> {
-        let mut receiver_guard = self.diagnostics_receiver.lock().await;
+    fn get_receiver(&self) -> Option<oneshot::Receiver<ComponentDiagnostics>> {
+        let mut receiver_guard = self.diagnostics_receiver.lock();
         receiver_guard.take()
     }
 

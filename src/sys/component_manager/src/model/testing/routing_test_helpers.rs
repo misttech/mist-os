@@ -383,7 +383,7 @@ impl RoutingTest {
             state.component_input.insert_capability(&name, launch.into_router().into()).unwrap();
         }
 
-        model.root().hooks.install(builder.additional_hooks.clone()).await;
+        model.root().hooks.install(builder.additional_hooks.clone());
 
         Self {
             components: builder.components,

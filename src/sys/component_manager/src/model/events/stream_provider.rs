@@ -9,7 +9,7 @@ use ::routing::WeakInstanceTokenExt;
 use async_trait::async_trait;
 use cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl};
 use errors::{EventsError, ModelError};
-use futures::lock::Mutex;
+use fuchsia_sync::Mutex;
 use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::{ExtendedMoniker, Moniker};
 use std::collections::HashMap;
@@ -80,7 +80,7 @@ impl EventStreamProvider {
         target_moniker: ExtendedMoniker,
         path: String,
     ) -> Option<Vec<UseEventStreamDecl>> {
-        let state = self.state.lock().await;
+        let state = self.state.lock();
         state
             .subscription_component_lookup
             .get(&target_moniker)
@@ -101,12 +101,12 @@ impl EventStreamProvider {
         let event_stream = registry.subscribe(subscriber, vec![subscription.clone()]).await?;
         let subscriber_moniker = subscriber.extended_moniker();
         let absolute_path = AbsolutePath { target_moniker: subscriber_moniker.clone(), path };
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock();
         let subscriptions =
             state.subscription_component_lookup.entry(subscriber_moniker.clone()).or_default();
         let path_list = subscriptions.entry(absolute_path).or_default();
         path_list.push(subscription.event_name.clone());
-        let event_streams = state.streams.entry(subscriber_moniker.clone()).or_default();
+        let event_streams = state.streams.entry(subscriber_moniker).or_default();
         event_streams.push(EventStreamAttachment {
             name: subscription.event_name,
             server_end: Some(event_stream),
@@ -122,7 +122,7 @@ impl EventStreamProvider {
         target_moniker: &ExtendedMoniker,
         stream_name: &EventSubscription,
     ) -> Option<EventStream> {
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock();
         state
             .streams
             .get_mut(&target_moniker)
@@ -135,7 +135,7 @@ impl EventStreamProvider {
     }
 
     async fn on_component_destroyed(self: &Arc<Self>, target_moniker: &Moniker) {
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock();
         // Remove all event streams associated with the `target_moniker` component.
         state.streams.remove(&ExtendedMoniker::ComponentInstance(target_moniker.clone()));
         state

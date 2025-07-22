@@ -7,14 +7,14 @@ use async_trait::async_trait;
 use cm_rust::ComponentDecl;
 use cm_types::{Name, Url};
 use errors::ModelError;
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
-use futures::lock::Mutex;
 use log::warn;
 use moniker::{ExtendedMoniker, Moniker};
 use sandbox::{Connector, Receiver, WeakInstanceToken};
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::{Arc, Mutex as StdMutex, Weak};
+use std::sync::{Arc, Weak};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
@@ -184,7 +184,7 @@ impl HooksRegistration {
 /// opportunity to monitor requests for the corresponding capability.
 #[derive(Clone)]
 pub struct CapabilityReceiver {
-    inner: Arc<StdMutex<Option<Receiver>>>,
+    inner: Arc<Mutex<Option<Receiver>>>,
 }
 
 impl CapabilityReceiver {
@@ -192,18 +192,18 @@ impl CapabilityReceiver {
     /// [`Sender`] capability.
     pub fn new() -> (Self, Connector) {
         let (receiver, sender) = Connector::new();
-        let inner = Arc::new(StdMutex::new(Some(receiver)));
+        let inner = Arc::new(Mutex::new(Some(receiver)));
         (Self { inner }, sender)
     }
 
     /// Take the opportunity to monitor requests.
     pub fn take(&self) -> Option<Receiver> {
-        self.inner.lock().unwrap().take()
+        self.inner.lock().take()
     }
 
     /// Did someone call `take` on this capability receiver.
     pub fn is_taken(&self) -> bool {
-        self.inner.lock().unwrap().is_none()
+        self.inner.lock().is_none()
     }
 }
 
@@ -211,7 +211,7 @@ impl CapabilityReceiver {
 impl TransferEvent for CapabilityReceiver {
     async fn transfer(&self) -> Self {
         let receiver = self.take();
-        let inner = Arc::new(StdMutex::new(receiver));
+        let inner = Arc::new(Mutex::new(receiver));
         Self { inner }
     }
 }
@@ -386,8 +386,8 @@ impl Hooks {
 
     /// For every hook in `hooks`, add it to the list of hooks that are executed when `dispatch`
     /// is called for `hook.event`.
-    pub async fn install(&self, hooks: Vec<HooksRegistration>) {
-        let mut hooks_map = self.hooks_map.lock().await;
+    pub fn install(&self, hooks: Vec<HooksRegistration>) {
+        let mut hooks_map = self.hooks_map.lock();
         for hook in hooks {
             for event in hook.events {
                 let existing_hooks = hooks_map.entry(event).or_insert(vec![]);
@@ -400,8 +400,8 @@ impl Hooks {
     ///
     /// This is test-only because in general it shouldn't matter what order hooks are executed
     /// in. This is useful for tests that need guarantees about hook execution order.
-    pub async fn install_front_for_test(&self, hooks: Vec<HooksRegistration>) {
-        let mut hooks_map = self.hooks_map.lock().await;
+    pub fn install_front_for_test(&self, hooks: Vec<HooksRegistration>) {
+        let mut hooks_map = self.hooks_map.lock();
         for hook in hooks {
             for event in hook.events {
                 let existing_hooks = hooks_map.entry(event).or_insert(vec![]);
@@ -412,7 +412,7 @@ impl Hooks {
 
     pub async fn dispatch(&self, event: &Event) {
         let strong_hooks = {
-            let mut hooks_map = self.hooks_map.lock().await;
+            let mut hooks_map = self.hooks_map.lock();
             if let Some(hooks) = hooks_map.get_mut(&event.event_type()) {
                 // We must upgrade our weak references to hooks to strong ones before we can
                 // call out to them.

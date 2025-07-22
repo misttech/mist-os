@@ -638,14 +638,11 @@ mod tests {
         let (done, mut hook_done_receiver) = mpsc::channel(1);
         let start_hook =
             Arc::new(ShutdownOnStartHook { component: child.clone(), done: Mutex::new(done) });
-        child
-            .hooks
-            .install(vec![HooksRegistration::new(
-                "my_start_hook",
-                vec![EventType::Started],
-                Arc::downgrade(&start_hook) as Weak<dyn Hook>,
-            )])
-            .await;
+        child.hooks.install(vec![HooksRegistration::new(
+            "my_start_hook",
+            vec![EventType::Started],
+            Arc::downgrade(&start_hook) as Weak<dyn Hook>,
+        )]);
 
         ActionsManager::register(
             child.clone(),
@@ -702,14 +699,11 @@ mod tests {
         let (done, mut hook_done_receiver) = mpsc::channel(1);
         let start_hook =
             Arc::new(StopOnStartHook { component: child.clone(), done: Mutex::new(done) });
-        child
-            .hooks
-            .install(vec![HooksRegistration::new(
-                "my_start_hook",
-                vec![EventType::Started],
-                Arc::downgrade(&start_hook) as Weak<dyn Hook>,
-            )])
-            .await;
+        child.hooks.install(vec![HooksRegistration::new(
+            "my_start_hook",
+            vec![EventType::Started],
+            Arc::downgrade(&start_hook) as Weak<dyn Hook>,
+        )]);
 
         ActionsManager::register(
             child.clone(),

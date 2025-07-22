@@ -12,7 +12,8 @@ use cm_types::{Availability, Name};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::readdir;
-use futures::lock::Mutex;
+use fuchsia_sync::Mutex;
+use futures::lock::Mutex as AsyncMutex;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use router_error::RouterError;
@@ -60,7 +61,7 @@ pub struct AggregateRouter {
     capability_source: AnonymizedOrFiltered,
     sources: Vec<AggregateSource>,
     // This is set to `Some` when the aggregate router has been started.
-    aggregate_directory: Mutex<Option<DirEntry>>,
+    aggregate_directory: AsyncMutex<Option<DirEntry>>,
     // This is set to `Some` when the aggregate router has been started, if this is an anonymizing
     // aggregate.
     anonymized_aggregate_service_dir: Mutex<Option<Arc<AnonymizedAggregateServiceDir>>>,
@@ -125,7 +126,7 @@ impl AggregateRouter {
             component: component.as_weak(),
             capability_source,
             sources,
-            aggregate_directory: Mutex::new(None),
+            aggregate_directory: AsyncMutex::new(None),
             anonymized_aggregate_service_dir: Mutex::new(None),
             scope: component.execution_scope.clone(),
             porcelain_type,
@@ -144,9 +145,9 @@ impl AggregateRouter {
         };
 
         let mut instances = vec![];
-        let service_dir_guard = self.anonymized_aggregate_service_dir.lock().await;
+        let service_dir_guard = self.anonymized_aggregate_service_dir.lock();
         if let Some(anonymized_aggregate_service_dir) = &*service_dir_guard {
-            let mut dir_entries = anonymized_aggregate_service_dir.entries().await;
+            let mut dir_entries = anonymized_aggregate_service_dir.entries();
             // Sort the entries (they can show up in any order)
             dir_entries.sort_by(|a, b| match a.source_id.cmp(&b.source_id) {
                 Ordering::Equal => a.service_instance.cmp(&b.service_instance),
@@ -209,15 +210,10 @@ impl AggregateRouter {
         // Errors returned by this function are already logged, so there's not much for us to do if
         // it returns an error. Some children may have been added successfully, so we might as well
         // continue.
-        self.component
-            .upgrade()
-            .map_err(RoutingError::from)?
-            .hooks
-            .install(service_dir.hooks())
-            .await;
+        self.component.upgrade().map_err(RoutingError::from)?.hooks.install(service_dir.hooks());
         let _ = service_dir.add_entries_from_children().await;
-        *self.anonymized_aggregate_service_dir.lock().await = Some(service_dir.clone());
-        Ok(DirEntry::new(service_dir.dir_entry().await))
+        *self.anonymized_aggregate_service_dir.lock() = Some(service_dir.clone());
+        Ok(DirEntry::new(service_dir.dir_entry()))
     }
 
     async fn create_filtered_aggregate(&self, request: Request) -> Result<DirEntry, RouterError> {

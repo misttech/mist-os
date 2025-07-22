@@ -1527,8 +1527,8 @@ impl BuiltinEnvironment {
         let root_component_input = root_input_builder.build();
         let model = Model::new(params, root_component_input).await?;
 
-        model.root().hooks.install(event_registry.hooks()).await;
-        model.root().hooks.install(event_stream_provider.hooks()).await;
+        model.root().hooks.install(event_registry.hooks());
+        model.root().hooks.install(event_stream_provider.hooks());
 
         let capability_store = CapabilityStore::new();
         let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
@@ -1550,7 +1550,7 @@ impl BuiltinEnvironment {
 
         let event_logger = if runtime_config.log_all_events {
             let event_logger = Arc::new(EventLogger::new());
-            model.root().hooks.install(event_logger.hooks()).await;
+            model.root().hooks.install(event_logger.hooks());
             Some(event_logger)
         } else {
             None
@@ -1558,7 +1558,7 @@ impl BuiltinEnvironment {
 
         // Set up the root realm stop notifier.
         let stop_notifier = Arc::new(RootStopNotifier::new());
-        model.root().hooks.install(stop_notifier.hooks()).await;
+        model.root().hooks.install(stop_notifier.hooks());
 
         let realm_query = if runtime_config.enable_introspection {
             let cap = RealmQuery::new(Arc::downgrade(&model));
@@ -1596,20 +1596,19 @@ impl BuiltinEnvironment {
 
         // Set up the Component Tree Diagnostics runtime statistics.
         let inspector = inspect_sink_provider.inspector();
-        let component_tree_stats =
-            ComponentTreeStats::new(inspector.root().create_child("stats")).await;
-        component_tree_stats.track_component_manager_stats().await;
-        component_tree_stats.start_measuring().await;
-        model.root().hooks.install(component_tree_stats.hooks()).await;
+        let component_tree_stats = ComponentTreeStats::new(inspector.root().create_child("stats"));
+        component_tree_stats.track_component_manager_stats();
+        component_tree_stats.start_measuring();
+        model.root().hooks.install(component_tree_stats.hooks());
 
         let component_lifecycle_time_stats =
             Arc::new(ComponentLifecycleTimeStats::new(inspector.root().create_child("lifecycle")));
-        model.root().hooks.install(component_lifecycle_time_stats.hooks()).await;
+        model.root().hooks.install(component_lifecycle_time_stats.hooks());
 
         let component_escrow_duration_status = Arc::new(::diagnostics::escrow::DurationStats::new(
             inspector.root().create_child("escrow"),
         ));
-        model.root().hooks.install(component_escrow_duration_status.hooks()).await;
+        model.root().hooks.install(component_escrow_duration_status.hooks());
 
         let component_id_index_node = inspector.root().create_child("component_id_index");
         for (moniker, instance_id) in model.component_id_index().iter() {

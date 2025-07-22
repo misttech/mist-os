@@ -4,8 +4,8 @@
 
 use async_trait::async_trait;
 use errors::ModelError;
+use fuchsia_sync::Mutex;
 use futures::channel::*;
-use futures::lock::Mutex;
 use hooks::{Event, EventType, Hook, HooksRegistration};
 use std::sync::{Arc, Weak};
 
@@ -31,7 +31,7 @@ impl RootStopNotifier {
     }
 
     pub async fn wait_for_root_stop(&self) {
-        let rx = self.rx.lock().await.take();
+        let rx = self.rx.lock().take();
         if let Some(rx) = rx {
             rx.await.expect("Failed to wait for root instance to be stopped");
         }
@@ -45,7 +45,7 @@ impl Hook for RootStopNotifier {
             .target_moniker
             .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
         if target_moniker.is_root() {
-            let tx = self.tx.lock().await.take();
+            let tx = self.tx.lock().take();
             if let Some(tx) = tx {
                 tx.send(()).expect("Could not notify on Stopped of root realm");
             }

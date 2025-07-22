@@ -14,8 +14,8 @@ use errors::ModelError;
 use fidl_fuchsia_component_runner::Task as DiagnosticsTask;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, ArrayProperty, HistogramProperty};
+use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
-use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 use injectable_time::{BootInstant, TimeSource};
@@ -79,11 +79,11 @@ pub struct ComponentTreeStats<T: RuntimeStatsSource + Debug> {
 }
 
 impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T> {
-    pub async fn new(node: inspect::Node) -> Arc<Self> {
-        Self::new_with_timesource(node, Arc::new(BootInstant::new())).await
+    pub fn new(node: inspect::Node) -> Arc<Self> {
+        Self::new_with_timesource(node, Arc::new(BootInstant::new()))
     }
 
-    async fn new_with_timesource(
+    fn new_with_timesource(
         node: inspect::Node,
         time_source: Arc<dyn TimeSource + Send + Sync>,
     ) -> Arc<Self> {
@@ -127,7 +127,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             let weak_self_clone = weak_self_for_fut.clone();
             async move {
                 if let Some(this) = weak_self_clone.upgrade() {
-                    Ok(this.write_measurements_to_inspect().await)
+                    Ok(this.write_measurements_to_inspect())
                 } else {
                     Ok(inspect::Inspector::default())
                 }
@@ -140,7 +140,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             let weak_self_clone = weak_self_clone_for_fut.clone();
             async move {
                 if let Some(this) = weak_self_clone.upgrade() {
-                    Ok(this.write_recent_usage_to_inspect().await)
+                    Ok(this.write_recent_usage_to_inspect())
                 } else {
                     Ok(inspect::Inspector::default())
                 }
@@ -152,7 +152,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             let weak_self_clone = weak_self_for_fut.clone();
             async move {
                 if let Some(this) = weak_self_clone.upgrade() {
-                    Ok(this.write_totals_to_inspect().await)
+                    Ok(this.write_totals_to_inspect())
                 } else {
                     Ok(inspect::Inspector::default())
                 }
@@ -165,16 +165,16 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
 
     /// Perform an initial measurement followed by spawning a task that will perform a measurement
     /// every `CPU_SAMPLE_PERIOD` seconds.
-    pub async fn start_measuring(self: &Arc<Self>) {
+    pub fn start_measuring(self: &Arc<Self>) {
         let weak_self = Arc::downgrade(self);
-        self.measure().await;
-        *(self.sampler_task.lock().await) = Some(fasync::Task::spawn(async move {
+        self.measure();
+        *(self.sampler_task.lock()) = Some(fasync::Task::spawn(async move {
             loop {
                 fasync::Timer::new(CPU_SAMPLE_PERIOD).await;
                 match weak_self.upgrade() {
                     None => break,
                     Some(this) => {
-                        this.measure().await;
+                        this.measure();
                     }
                 }
             }
@@ -182,25 +182,25 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     }
 
     /// Initializes a new component stats with the given task.
-    async fn track_ready(&self, moniker: ExtendedMoniker, task: T) {
+    fn track_ready(&self, moniker: ExtendedMoniker, task: T) {
         let histogram = create_cpu_histogram(&self.histograms_node, &moniker);
         if let Ok(task_info) = TaskInfo::try_from(task, Some(histogram), self.time_source.clone()) {
             let koid = task_info.koid();
             let arc_task_info = Arc::new(Mutex::new(task_info));
             let mut stats = ComponentStats::new();
-            stats.add_task(arc_task_info.clone()).await;
+            stats.add_task(arc_task_info.clone());
             let stats = Arc::new(Mutex::new(stats));
-            self.tree.lock().await.insert(moniker.clone(), stats);
-            self.tasks.lock().await.insert(koid, Arc::downgrade(&arc_task_info));
+            self.tree.lock().insert(moniker, stats);
+            self.tasks.lock().insert(koid, Arc::downgrade(&arc_task_info));
         }
     }
 
-    async fn write_measurements_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
+    fn write_measurements_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
         let inspector =
             inspect::Inspector::new(inspect::InspectorConfig::default().size(MAX_INSPECT_SIZE));
         let components = inspector.root().create_child("components");
-        let (component_count, task_count) = self.write_measurements(&components).await;
-        self.write_aggregate_measurements(&components).await;
+        let (component_count, task_count) = self.write_measurements(&components);
+        self.write_aggregate_measurements(&components);
         inspector.root().record_uint("component_count", component_count);
         inspector.root().record_uint("task_count", task_count);
         inspector.root().record(components);
@@ -211,20 +211,20 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         inspector
     }
 
-    async fn write_recent_usage_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
+    fn write_recent_usage_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
         let inspector = inspect::Inspector::default();
-        self.totals.lock().await.write_recents_to(inspector.root());
+        self.totals.lock().write_recents_to(inspector.root());
         inspector
     }
 
-    async fn write_totals_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
+    fn write_totals_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
         let inspector = inspect::Inspector::default();
-        self.totals.lock().await.write_totals_to(inspector.root());
+        self.totals.lock().write_totals_to(inspector.root());
         inspector
     }
 
-    async fn write_aggregate_measurements(&self, components_node: &inspect::Node) {
-        let locked_aggregate = self.aggregated_dead_task_data.lock().await;
+    fn write_aggregate_measurements(&self, components_node: &inspect::Node) {
+        let locked_aggregate = self.aggregated_dead_task_data.lock();
         if locked_aggregate.no_true_measurements() {
             return;
         }
@@ -234,11 +234,11 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         components_node.record(aggregate);
     }
 
-    async fn write_measurements(&self, node: &inspect::Node) -> (u64, u64) {
+    fn write_measurements(&self, node: &inspect::Node) -> (u64, u64) {
         let mut task_count = 0;
-        let tree = self.tree.lock().await;
+        let tree = self.tree.lock();
         for (moniker, stats) in tree.iter() {
-            let stats_guard = stats.lock().await;
+            let stats_guard = stats.lock();
             let key = match moniker {
                 ExtendedMoniker::ComponentManager => moniker.to_string(),
                 ExtendedMoniker::ComponentInstance(m) => {
@@ -250,7 +250,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
                 }
             };
             let child = node.create_child(key);
-            task_count += stats_guard.record_to_node(&child).await;
+            task_count += stats_guard.record_to_node(&child);
             node.record(child);
         }
         (tree.len() as u64, task_count)
@@ -259,62 +259,61 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     /// Takes a measurement of all tracked tasks and updated the totals. If any task is not alive
     /// anymore it deletes it. If any component is not alive any more and no more historical
     /// measurements are available for it, deletes it too.
-    pub async fn measure(self: &Arc<Self>) {
+    pub fn measure(self: &Arc<Self>) {
         let start = zx::BootInstant::get();
 
         // Copy the stats and release the lock.
         let stats = self
             .tree
             .lock()
-            .await
             .iter()
             .map(|(k, v)| (k.clone(), Arc::downgrade(&v)))
             .collect::<Vec<_>>();
-        let mut locked_exited_measurements = self.exited_measurements.lock().await;
+        let mut locked_exited_measurements = self.exited_measurements.lock();
         let mut aggregated = Measurement::clone_with_time(&*locked_exited_measurements, start);
         let mut stats_to_remove = vec![];
         let mut koids_to_remove = vec![];
         for (moniker, weak_stats) in stats.into_iter() {
             if let Some(stats) = weak_stats.upgrade() {
-                let mut stat_guard = stats.lock().await;
+                let mut stat_guard = stats.lock();
                 // Order is important: measure, then measure_tracked_dead_tasks, then clean_stale
-                aggregated += &stat_guard.measure().await;
-                aggregated += &stat_guard.measure_tracked_dead_tasks().await;
-                let (mut stale_koids, exited_cpu_of_deleted) = stat_guard.clean_stale().await;
+                aggregated += &stat_guard.measure();
+                aggregated += &stat_guard.measure_tracked_dead_tasks();
+                let (mut stale_koids, exited_cpu_of_deleted) = stat_guard.clean_stale();
                 aggregated += &exited_cpu_of_deleted;
                 *locked_exited_measurements += &exited_cpu_of_deleted;
                 koids_to_remove.append(&mut stale_koids);
-                if !stat_guard.is_alive().await {
+                if !stat_guard.is_alive() {
                     stats_to_remove.push(moniker);
                 }
             }
         }
 
         // Lock the tree so that we ensure no modifications are made while we are deleting
-        let mut stats = self.tree.lock().await;
+        let mut stats = self.tree.lock();
         for moniker in stats_to_remove {
             // Ensure that they are still not alive (if a component restarted it might be alive
             // again).
             if let Some(stat) = stats.get(&moniker) {
-                if !stat.lock().await.is_alive().await {
+                if !stat.lock().is_alive() {
                     stats.remove(&moniker);
                 }
             }
         }
 
-        let mut tasks = self.tasks.lock().await;
+        let mut tasks = self.tasks.lock();
         for koid in koids_to_remove {
             tasks.remove(&koid);
         }
 
-        self.totals.lock().await.insert(aggregated);
+        self.totals.lock().insert(aggregated);
         self.processing_times.insert((zx::BootInstant::get() - start).into_nanos());
     }
 
-    async fn prune_dead_tasks(self: &Arc<Self>, max_dead_tasks: usize) {
+    fn prune_dead_tasks(self: &Arc<Self>, max_dead_tasks: usize) {
         let mut all_dead_tasks = BTreeMap::new();
-        for (moniker, component) in self.tree.lock().await.iter() {
-            let dead_tasks = component.lock().await.gather_dead_tasks().await;
+        for (moniker, component) in self.tree.lock().iter() {
+            let dead_tasks = component.lock().gather_dead_tasks();
             for (timestamp, task) in dead_tasks {
                 all_dead_tasks.insert(timestamp, (task, moniker.clone()));
             }
@@ -328,47 +327,47 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         let to_remove = all_dead_tasks.iter().take(total - (max_dead_tasks / 2));
 
         let mut koids_to_remove = vec![];
-        let mut aggregate_data = self.aggregated_dead_task_data.lock().await;
+        let mut aggregate_data = self.aggregated_dead_task_data.lock();
         for (_, (unlocked_task, _)) in to_remove {
-            let mut task = unlocked_task.lock().await;
-            if let Ok(measurements) = task.take_measurements_queue().await {
+            let mut task = unlocked_task.lock();
+            if let Ok(measurements) = task.take_measurements_queue() {
                 koids_to_remove.push(task.koid());
                 *aggregate_data += measurements;
             }
         }
 
         let mut stats_to_remove = vec![];
-        for (moniker, stats) in self.tree.lock().await.iter() {
-            let mut stat_guard = stats.lock().await;
-            stat_guard.remove_by_koids(&koids_to_remove).await;
-            if !stat_guard.is_alive().await {
+        for (moniker, stats) in self.tree.lock().iter() {
+            let mut stat_guard = stats.lock();
+            stat_guard.remove_by_koids(&koids_to_remove);
+            if !stat_guard.is_alive() {
                 stats_to_remove.push(moniker.clone());
             }
         }
 
-        let mut stats = self.tree.lock().await;
+        let mut stats = self.tree.lock();
         for moniker in stats_to_remove {
             // Ensure that they are still not alive (if a component restarted it might be alive
             // again).
             if let Some(stat) = stats.get(&moniker) {
-                if !stat.lock().await.is_alive().await {
+                if !stat.lock().is_alive() {
                     stats.remove(&moniker);
                 }
             }
         }
 
-        let mut tasks = self.tasks.lock().await;
+        let mut tasks = self.tasks.lock();
         for koid in koids_to_remove {
             tasks.remove(&koid);
         }
     }
 
-    async fn on_component_started<P, C>(self: &Arc<Self>, moniker: &Moniker, runtime: &P)
+    fn on_component_started<P, C>(self: &Arc<Self>, moniker: &Moniker, runtime: &P)
     where
         P: ComponentStartedInfo<C, T>,
         C: RuntimeStatsContainer<T> + Send + Sync + 'static,
     {
-        if let Some(receiver) = runtime.get_receiver().await {
+        if let Some(receiver) = runtime.get_receiver() {
             let task = fasync::Task::spawn(Self::diagnostics_waiter_task(
                 Arc::downgrade(&self),
                 moniker.clone().into(),
@@ -389,7 +388,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     {
         let mut source = maybe_return!(receiver.await.ok());
         let this = maybe_return!(weak_self.upgrade());
-        let mut tree_lock = this.tree.lock().await;
+        let mut tree_lock = this.tree.lock();
         let stats = tree_lock
             .entry(moniker.clone())
             .or_insert_with(|| Arc::new(Mutex::new(ComponentStats::new())));
@@ -414,9 +413,9 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         //     with a cpu_time and queue_time of 0.
         //  2) a "real" measurement that captures the first changed CPU data
         task_info.record_measurement_with_start_time(start_time);
-        task_info.measure_if_no_parent().await;
+        task_info.measure_if_no_parent();
 
-        let mut task_guard = this.tasks.lock().await;
+        let mut task_guard = this.tasks.lock();
 
         let task_info = match parent_koid {
             None => {
@@ -428,17 +427,17 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
                 task_info.has_parent_task = true;
                 let task_info = Arc::new(Mutex::new(task_info));
                 if let Some(parent) = task_guard.get(&parent_koid).and_then(|p| p.upgrade()) {
-                    let mut parent_guard = parent.lock().await;
+                    let mut parent_guard = parent.lock();
                     parent_guard.add_child(Arc::downgrade(&task_info));
                 }
                 task_info
             }
         };
         task_guard.insert(koid, Arc::downgrade(&task_info));
-        stats.lock().await.add_task(task_info).await;
+        stats.lock().add_task(task_info);
         drop(task_guard);
         drop(tree_lock);
-        this.prune_dead_tasks(MAX_DEAD_TASKS).await;
+        this.prune_dead_tasks(MAX_DEAD_TASKS);
     }
 }
 
@@ -452,11 +451,10 @@ impl ComponentTreeStats<DiagnosticsTask> {
     }
 
     /// Starts tracking component manager own stats.
-    pub async fn track_component_manager_stats(&self) {
+    pub fn track_component_manager_stats(&self) {
         match fuchsia_runtime::job_default().duplicate_handle(zx::Rights::SAME_RIGHTS) {
             Ok(job) => {
-                self.track_ready(ExtendedMoniker::ComponentManager, DiagnosticsTask::Job(job))
-                    .await;
+                self.track_ready(ExtendedMoniker::ComponentManager, DiagnosticsTask::Job(job));
             }
             Err(err) => warn!(
                 "Failed to duplicate component manager job. Not tracking its own stats: {:?}",
@@ -475,7 +473,7 @@ impl Hook for ComponentTreeStats<DiagnosticsTask> {
         match event.event_type() {
             EventType::Started => {
                 if let EventPayload::Started { runtime, .. } = &event.payload {
-                    self.on_component_started(target_moniker, runtime).await;
+                    self.on_component_started(target_moniker, runtime);
                 }
             }
             _ => {}
@@ -550,8 +548,7 @@ mod tests {
         let stats = ComponentTreeStats::new_with_timesource(
             inspector.root().create_child("stats"),
             clock.clone(),
-        )
-        .await;
+        );
 
         let mut previous_task_count = 0;
         for i in 0..10 {
@@ -564,10 +561,10 @@ mod tests {
             let moniker = Moniker::try_from([format!("moniker-{}", i).as_ref()]).unwrap();
             let fake_runtime =
                 FakeRuntime::new(FakeDiagnosticsContainer::new(component_task, None));
-            stats.on_component_started(&moniker, &fake_runtime).await;
+            stats.on_component_started(&moniker, &fake_runtime);
 
             loop {
-                let current = stats.tree.lock().await.len();
+                let current = stats.tree.lock().len();
                 if current != previous_task_count {
                     previous_task_count = current;
                     break;
@@ -579,18 +576,18 @@ mod tests {
             }
         }
 
-        assert_eq!(stats.tasks.lock().await.len(), 10);
-        assert_eq!(stats.tree.lock().await.len(), 10);
+        assert_eq!(stats.tasks.lock().len(), 10);
+        assert_eq!(stats.tree.lock().len(), 10);
 
         for _ in 0..=COMPONENT_CPU_MAX_SAMPLES - 2 {
-            stats.measure().await;
+            stats.measure();
             clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
         }
 
         // Data is produced by `measure`
         // Both recent and previous exist
         {
-            let totals = stats.totals.lock().await;
+            let totals = stats.totals.lock();
             let recent_measurement = totals
                 .measurements
                 .get(totals.measurements.len() - 1)
@@ -609,18 +606,10 @@ mod tests {
         // Terminate all tasks
         for i in 0..10 {
             let moniker = Moniker::try_from([format!("moniker-{}", i).as_ref()]).unwrap();
-            for task in stats
-                .tree
-                .lock()
-                .await
-                .get(&moniker.into())
-                .unwrap()
-                .lock()
-                .await
-                .tasks_mut()
-                .iter_mut()
+            for task in
+                stats.tree.lock().get(&moniker.into()).unwrap().lock().tasks_mut().iter_mut()
             {
-                task.lock().await.force_terminate().await;
+                task.lock().force_terminate().await;
                 // the timestamp for termination is used as a key when pruning,
                 // so all of the tasks cannot be removed at exactly the same time
                 clock.add_ticks(1);
@@ -629,7 +618,7 @@ mod tests {
 
         // Data is produced by measure_dead_tasks
         {
-            let totals = stats.totals.lock().await;
+            let totals = stats.totals.lock();
             let recent_measurement = totals
                 .measurements
                 .get(totals.measurements.len() - 1)
@@ -646,11 +635,11 @@ mod tests {
         }
 
         // Data is produced by measure_dead_tasks
-        stats.measure().await;
+        stats.measure();
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
 
         {
-            let totals = stats.totals.lock().await;
+            let totals = stats.totals.lock();
             let recent_measurement = totals
                 .measurements
                 .get(totals.measurements.len() - 1)
@@ -666,11 +655,11 @@ mod tests {
             assert_eq!(previous_measurement.queue_time().into_nanos(), 2360);
         }
 
-        stats.measure().await;
+        stats.measure();
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
 
         {
-            let totals = stats.totals.lock().await;
+            let totals = stats.totals.lock();
             let recent_measurement = totals
                 .measurements
                 .get(totals.measurements.len() - 1)
@@ -688,17 +677,17 @@ mod tests {
 
         // Push all the measurements in the queues out. @totals should still be accurate
         for _ in 0..COMPONENT_CPU_MAX_SAMPLES {
-            stats.measure().await;
+            stats.measure();
             clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
         }
 
         // Data is produced by clean_stale
-        assert_eq!(stats.tasks.lock().await.len(), 0);
-        assert_eq!(stats.tree.lock().await.len(), 0);
+        assert_eq!(stats.tasks.lock().len(), 0);
+        assert_eq!(stats.tree.lock().len(), 0);
 
         // Expect that cumulative totals are still around, plus a post-termination measurement
         {
-            let totals = stats.totals.lock().await;
+            let totals = stats.totals.lock();
             let recent_measurement = totals
                 .measurements
                 .get(totals.measurements.len() - 1)
@@ -722,53 +711,41 @@ mod tests {
         let stats = ComponentTreeStats::new_with_timesource(
             inspector.root().create_child("stats"),
             clock.clone(),
-        )
-        .await;
+        );
         let moniker: Moniker = ["a"].try_into().unwrap();
         let moniker: ExtendedMoniker = moniker.into();
-        stats.track_ready(moniker.clone(), FakeTask::default()).await;
+        stats.track_ready(moniker.clone(), FakeTask::default());
         for _ in 0..=COMPONENT_CPU_MAX_SAMPLES {
-            stats.measure().await;
+            stats.measure();
             clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
         }
-        assert_eq!(stats.tree.lock().await.len(), 1);
-        assert_eq!(stats.tasks.lock().await.len(), 1);
+        assert_eq!(stats.tree.lock().len(), 1);
+        assert_eq!(stats.tasks.lock().len(), 1);
         assert_eq!(
-            stats.tree.lock().await.get(&moniker).unwrap().lock().await.total_measurements().await,
+            stats.tree.lock().get(&moniker).unwrap().lock().total_measurements(),
             COMPONENT_CPU_MAX_SAMPLES
         );
 
         // Invalidate the handle, to simulate that the component stopped.
-        for task in
-            stats.tree.lock().await.get(&moniker).unwrap().lock().await.tasks_mut().iter_mut()
-        {
-            task.lock().await.force_terminate().await;
+        for task in stats.tree.lock().get(&moniker).unwrap().lock().tasks_mut().iter_mut() {
+            task.lock().force_terminate().await;
             clock.add_ticks(1);
         }
 
         // All post-invalidation measurements; this will push out true measurements
         for i in 0..COMPONENT_CPU_MAX_SAMPLES {
-            stats.measure().await;
+            stats.measure();
             clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
             assert_eq!(
-                stats
-                    .tree
-                    .lock()
-                    .await
-                    .get(&moniker)
-                    .unwrap()
-                    .lock()
-                    .await
-                    .total_measurements()
-                    .await,
+                stats.tree.lock().get(&moniker).unwrap().lock().total_measurements(),
                 COMPONENT_CPU_MAX_SAMPLES - i,
             );
         }
-        stats.measure().await;
+        stats.measure();
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
-        assert!(stats.tree.lock().await.get(&moniker).is_none());
-        assert_eq!(stats.tree.lock().await.len(), 0);
-        assert_eq!(stats.tasks.lock().await.len(), 0);
+        assert!(stats.tree.lock().get(&moniker).is_none());
+        assert_eq!(stats.tree.lock().len(), 0);
+        assert_eq!(stats.tasks.lock().len(), 0);
     }
 
     fn create_measurements_vec_for_fake_task(
@@ -792,13 +769,10 @@ mod tests {
     async fn dead_tasks_are_pruned() {
         let clock = Arc::new(FakeTime::new());
         let inspector = inspect::Inspector::default();
-        let stats = Arc::new(
-            ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("stats"),
-                clock.clone(),
-            )
-            .await,
-        );
+        let stats = Arc::new(ComponentTreeStats::new_with_timesource(
+            inspector.root().create_child("stats"),
+            clock.clone(),
+        ));
 
         let mut previous_task_count = 0;
         for i in 0..(MAX_DEAD_TASKS * 2) {
@@ -809,10 +783,10 @@ mod tests {
             let moniker = Moniker::try_from([format!("moniker-{}", i).as_ref()]).unwrap();
             let fake_runtime =
                 FakeRuntime::new(FakeDiagnosticsContainer::new(component_task, None));
-            stats.on_component_started(&moniker, &fake_runtime).await;
+            stats.on_component_started(&moniker, &fake_runtime);
 
             loop {
-                let current = stats.tree.lock().await.len();
+                let current = stats.tree.lock().len();
                 if current != previous_task_count {
                     previous_task_count = current;
                     break;
@@ -823,24 +797,16 @@ mod tests {
                 .await;
             }
 
-            for task in stats
-                .tree
-                .lock()
-                .await
-                .get(&moniker.into())
-                .unwrap()
-                .lock()
-                .await
-                .tasks_mut()
-                .iter_mut()
+            for task in
+                stats.tree.lock().get(&moniker.into()).unwrap().lock().tasks_mut().iter_mut()
             {
-                task.lock().await.force_terminate().await;
+                task.lock().force_terminate().await;
                 clock.add_ticks(1);
             }
         }
 
-        let task_count = stats.tasks.lock().await.len();
-        let moniker_count = stats.tree.lock().await.len();
+        let task_count = stats.tasks.lock().len();
+        let moniker_count = stats.tree.lock().len();
         assert_eq!(task_count, 88);
         assert_eq!(moniker_count, 88);
     }
@@ -850,13 +816,10 @@ mod tests {
         let max_dead_tasks = 4;
         let clock = Arc::new(FakeTime::new());
         let inspector = inspect::Inspector::default();
-        let stats = Arc::new(
-            ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("stats"),
-                clock.clone(),
-            )
-            .await,
-        );
+        let stats = Arc::new(ComponentTreeStats::new_with_timesource(
+            inspector.root().create_child("stats"),
+            clock.clone(),
+        ));
 
         let mut moniker_list = vec![];
         for i in 0..(max_dead_tasks * 2) {
@@ -865,15 +828,15 @@ mod tests {
             moniker_list.push(moniker.clone());
             let component_task =
                 FakeTask::new(i as u64, create_measurements_vec_for_fake_task(5, 1, 1));
-            stats.track_ready(moniker.into(), component_task).await;
+            stats.track_ready(moniker.into(), component_task);
         }
 
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
-        stats.measure().await;
+        stats.measure();
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
-        stats.measure().await;
+        stats.measure();
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
-        stats.measure().await;
+        stats.measure();
 
         assert_data_tree!(inspector, root: {
             stats: contains {
@@ -896,22 +859,20 @@ mod tests {
             for task in stats
                 .tree
                 .lock()
-                .await
                 .get(&moniker.clone().into())
                 .unwrap()
                 .lock()
-                .await
                 .tasks_mut()
                 .iter_mut()
             {
-                task.lock().await.force_terminate().await;
+                task.lock().force_terminate().await;
                 // the timestamp for termination is used as a key when pruning,
                 // so all of the tasks cannot be removed at exactly the same time
                 clock.add_ticks(1);
             }
         }
 
-        stats.prune_dead_tasks(max_dead_tasks).await;
+        stats.prune_dead_tasks(max_dead_tasks);
 
         let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(inspector, root: {
@@ -938,57 +899,53 @@ mod tests {
     #[fuchsia::test]
     async fn total_holds_sum_of_stats() {
         let inspector = inspect::Inspector::default();
-        let stats = ComponentTreeStats::new(inspector.root().create_child("stats")).await;
-        stats.measure().await;
-        stats
-            .track_ready(
-                ExtendedMoniker::ComponentInstance(["a"].try_into().unwrap()),
-                FakeTask::new(
-                    1,
-                    vec![
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 2,
-                            queue_time: 4,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 6,
-                            queue_time: 8,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                    ],
-                ),
-            )
-            .await;
-        stats
-            .track_ready(
-                ExtendedMoniker::ComponentInstance(["b"].try_into().unwrap()),
-                FakeTask::new(
-                    2,
-                    vec![
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 1,
-                            queue_time: 3,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 5,
-                            queue_time: 7,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                    ],
-                ),
-            )
-            .await;
+        let stats = ComponentTreeStats::new(inspector.root().create_child("stats"));
+        stats.measure();
+        stats.track_ready(
+            ExtendedMoniker::ComponentInstance(["a"].try_into().unwrap()),
+            FakeTask::new(
+                1,
+                vec![
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 2,
+                        queue_time: 4,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 6,
+                        queue_time: 8,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                ],
+            ),
+        );
+        stats.track_ready(
+            ExtendedMoniker::ComponentInstance(["b"].try_into().unwrap()),
+            FakeTask::new(
+                2,
+                vec![
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 1,
+                        queue_time: 3,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 5,
+                        queue_time: 7,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                ],
+            ),
+        );
 
-        stats.measure().await;
+        stats.measure();
         let hierarchy = inspect::reader::read(&inspector).await.expect("read inspect hierarchy");
         let (timestamps, cpu_times, queue_times) = get_data_at(&hierarchy, &["stats", "@total"]);
         assert_eq!(timestamps.len(), 2);
         assert_eq!(cpu_times, vec![0, 2 + 1]);
         assert_eq!(queue_times, vec![0, 4 + 3]);
 
-        stats.measure().await;
+        stats.measure();
         let hierarchy = inspect::reader::read(&inspector).await.expect("read inspect hierarchy");
         let (timestamps, cpu_times, queue_times) = get_data_at(&hierarchy, &["stats", "@total"]);
         assert_eq!(timestamps.len(), 3);
@@ -1000,51 +957,47 @@ mod tests {
     async fn recent_usage() {
         // Set up the test
         let inspector = inspect::Inspector::default();
-        let stats = ComponentTreeStats::new(inspector.root().create_child("stats")).await;
-        stats.measure().await;
+        let stats = ComponentTreeStats::new(inspector.root().create_child("stats"));
+        stats.measure();
 
-        stats
-            .track_ready(
-                ExtendedMoniker::ComponentInstance(["a"].try_into().unwrap()),
-                FakeTask::new(
-                    1,
-                    vec![
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 2,
-                            queue_time: 4,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 6,
-                            queue_time: 8,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                    ],
-                ),
-            )
-            .await;
-        stats
-            .track_ready(
-                ExtendedMoniker::ComponentInstance(["b"].try_into().unwrap()),
-                FakeTask::new(
-                    2,
-                    vec![
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 1,
-                            queue_time: 3,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 5,
-                            queue_time: 7,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                    ],
-                ),
-            )
-            .await;
+        stats.track_ready(
+            ExtendedMoniker::ComponentInstance(["a"].try_into().unwrap()),
+            FakeTask::new(
+                1,
+                vec![
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 2,
+                        queue_time: 4,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 6,
+                        queue_time: 8,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                ],
+            ),
+        );
+        stats.track_ready(
+            ExtendedMoniker::ComponentInstance(["b"].try_into().unwrap()),
+            FakeTask::new(
+                2,
+                vec![
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 1,
+                        queue_time: 3,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 5,
+                        queue_time: 7,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                ],
+            ),
+        );
 
-        stats.measure().await;
+        stats.measure();
         let hierarchy = inspect::reader::read(&inspector).await.expect("read inspect hierarchy");
 
         // Verify initially there's no second most recent measurement since we only
@@ -1071,7 +1024,7 @@ mod tests {
         assert_eq!(queue_times, vec![0, 4 + 3]);
 
         // Add one measurement
-        stats.measure().await;
+        stats.measure();
         let hierarchy = inspect::reader::read(&inspector).await.expect("read inspect hierarchy");
 
         // Verify that previous is now there and holds the previously recent values.
@@ -1096,29 +1049,27 @@ mod tests {
     #[fuchsia::test]
     async fn component_stats_are_available_in_inspect() {
         let inspector = inspect::Inspector::default();
-        let stats = ComponentTreeStats::new(inspector.root().create_child("stats")).await;
-        stats
-            .track_ready(
-                ExtendedMoniker::ComponentInstance(["a"].try_into().unwrap()),
-                FakeTask::new(
-                    1,
-                    vec![
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 2,
-                            queue_time: 4,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                        zx::TaskRuntimeInfo {
-                            cpu_time: 6,
-                            queue_time: 8,
-                            ..zx::TaskRuntimeInfo::default()
-                        },
-                    ],
-                ),
-            )
-            .await;
+        let stats = ComponentTreeStats::new(inspector.root().create_child("stats"));
+        stats.track_ready(
+            ExtendedMoniker::ComponentInstance(["a"].try_into().unwrap()),
+            FakeTask::new(
+                1,
+                vec![
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 2,
+                        queue_time: 4,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                    zx::TaskRuntimeInfo {
+                        cpu_time: 6,
+                        queue_time: 8,
+                        ..zx::TaskRuntimeInfo::default()
+                    },
+                ],
+            ),
+        );
 
-        stats.measure().await;
+        stats.measure();
 
         let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: {
@@ -1140,7 +1091,7 @@ mod tests {
         assert_eq!(timestamps.len(), 1);
 
         // Add another measurement
-        stats.measure().await;
+        stats.measure();
 
         let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: {
@@ -1170,13 +1121,10 @@ mod tests {
         // set ticks to 20 to avoid interfering with the start times reported
         // by FakeRuntime
         clock.add_ticks(20);
-        let stats = Arc::new(
-            ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("stats"),
-                clock.clone(),
-            )
-            .await,
-        );
+        let stats = Arc::new(ComponentTreeStats::new_with_timesource(
+            inspector.root().create_child("stats"),
+            clock.clone(),
+        ));
         let parent_task = FakeTask::new(
             1,
             vec![
@@ -1212,18 +1160,18 @@ mod tests {
             FakeDiagnosticsContainer::new(parent_task.clone(), None),
             IncrementingFakeTime::new(3, std::time::Duration::from_nanos(5)),
         );
-        stats.on_component_started(&Moniker::try_from(["parent"]).unwrap(), &fake_runtime).await;
+        stats.on_component_started(&Moniker::try_from(["parent"]).unwrap(), &fake_runtime);
 
         let fake_runtime = FakeRuntime::new_with_start_times(
             FakeDiagnosticsContainer::new(component_task, Some(parent_task)),
             IncrementingFakeTime::new(8, std::time::Duration::from_nanos(5)),
         );
-        stats.on_component_started(&Moniker::try_from(["child"]).unwrap(), &fake_runtime).await;
+        stats.on_component_started(&Moniker::try_from(["child"]).unwrap(), &fake_runtime);
 
         // Wait for diagnostics data to be received since it's done in a non-blocking way on
         // started.
         loop {
-            if stats.tree.lock().await.len() == 2 {
+            if stats.tree.lock().len() == 2 {
                 break;
             }
             fasync::Timer::new(fasync::MonotonicInstant::after(
@@ -1260,13 +1208,10 @@ mod tests {
     async fn child_tasks_garbage_collection() {
         let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
-        let stats = Arc::new(
-            ComponentTreeStats::new_with_timesource(
-                inspector.root().create_child("stats"),
-                clock.clone(),
-            )
-            .await,
-        );
+        let stats = Arc::new(ComponentTreeStats::new_with_timesource(
+            inspector.root().create_child("stats"),
+            clock.clone(),
+        ));
         let parent_task = FakeTask::new(
             1,
             vec![
@@ -1292,19 +1237,17 @@ mod tests {
         );
         let fake_parent_runtime =
             FakeRuntime::new(FakeDiagnosticsContainer::new(parent_task.clone(), None));
-        stats
-            .on_component_started(&Moniker::try_from(["parent"]).unwrap(), &fake_parent_runtime)
-            .await;
+        stats.on_component_started(&Moniker::try_from(["parent"]).unwrap(), &fake_parent_runtime);
 
         let child_moniker = Moniker::try_from(["child"]).unwrap();
         let fake_runtime =
             FakeRuntime::new(FakeDiagnosticsContainer::new(component_task, Some(parent_task)));
-        stats.on_component_started(&child_moniker, &fake_runtime).await;
+        stats.on_component_started(&child_moniker, &fake_runtime);
 
         // Wait for diagnostics data to be received since it's done in a non-blocking way on
         // started.
         loop {
-            if stats.tree.lock().await.len() == 2 {
+            if stats.tree.lock().len() == 2 {
                 break;
             }
             fasync::Timer::new(fasync::MonotonicInstant::after(
@@ -1313,34 +1256,33 @@ mod tests {
             .await;
         }
 
-        assert_eq!(stats.tree.lock().await.len(), 2);
-        assert_eq!(stats.tasks.lock().await.len(), 2);
+        assert_eq!(stats.tree.lock().len(), 2);
+        assert_eq!(stats.tasks.lock().len(), 2);
 
         let extended_moniker = child_moniker.into();
         // Mark as terminated, to simulate that the component completely stopped.
-        for task in stats.tree.lock().await.get(&extended_moniker).unwrap().lock().await.tasks_mut()
-        {
-            task.lock().await.force_terminate().await;
+        for task in stats.tree.lock().get(&extended_moniker).unwrap().lock().tasks_mut() {
+            task.lock().force_terminate().await;
             clock.add_ticks(1);
         }
 
         // This will perform the (last) post-termination sample.
-        stats.measure().await;
+        stats.measure();
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
 
         // These will start incrementing the counter of post-termination samples, but won't sample.
         for _ in 0..COMPONENT_CPU_MAX_SAMPLES {
-            stats.measure().await;
+            stats.measure();
             clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
         }
 
         // Causes the task to be gone since it has been terminated for long enough.
-        stats.measure().await;
+        stats.measure();
 
         // Child is gone and only the parent exists now.
-        assert!(stats.tree.lock().await.get(&extended_moniker).is_none());
-        assert_eq!(stats.tree.lock().await.len(), 1);
-        assert_eq!(stats.tasks.lock().await.len(), 1);
+        assert!(stats.tree.lock().get(&extended_moniker).is_none());
+        assert_eq!(stats.tree.lock().len(), 1);
+        assert_eq!(stats.tasks.lock().len(), 1);
     }
 
     fn get_recent_property(hierarchy: &DiagnosticsHierarchy, name: &str) -> i64 {

@@ -9,9 +9,9 @@ use async_trait::async_trait;
 use cm_types::Name;
 use cm_util::WeakTaskGroup;
 use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy, ServerEnd};
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
-use futures::lock::Mutex;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use moniker::Moniker;
@@ -191,7 +191,7 @@ impl CapabilityFactory {
     ) -> Option<WeakInstanceToken> {
         let fruntime::WeakInstanceToken { token } = token;
         let koid = token.basic_info().ok()?.koid;
-        match self.remote_capabilities.lock().await.remove(&koid) {
+        match self.remote_capabilities.lock().remove(&koid) {
             Some(CapabilityOrWaiter::Capability(Capability::Instance(token))) => Some(token),
             _ => None,
         }
@@ -199,7 +199,7 @@ impl CapabilityFactory {
 
     async fn store_remote(&self, handle: impl AsHandleRef, capability: impl Into<Capability>) {
         let koid = handle.basic_info().expect("failed to get basic info on handle").koid;
-        match self.remote_capabilities.lock().await.entry(koid) {
+        match self.remote_capabilities.lock().entry(koid) {
             Entry::Occupied(occupied_entry) => match occupied_entry.remove() {
                 CapabilityOrWaiter::Capability(prior_capability) => panic!(
                     "duplicate koids found, first one was assigned to capability \
@@ -216,7 +216,7 @@ impl CapabilityFactory {
     }
 
     async fn remove_remote(&self, koid: zx::Koid) {
-        let _ = self.remote_capabilities.lock().await.remove(&koid);
+        let _ = self.remote_capabilities.lock().remove(&koid);
     }
 
     async fn retrieve_remote(&self, capability: fruntime::Capability) -> Option<Capability> {
@@ -258,7 +258,7 @@ impl CapabilityFactory {
             },
             _ => return None,
         };
-        let receiver = match self.remote_capabilities.lock().await.entry(koid) {
+        let receiver = match self.remote_capabilities.lock().entry(koid) {
             Entry::Occupied(occupied_entry) => match occupied_entry.remove() {
                 CapabilityOrWaiter::Capability(capability) => return Some(capability),
                 CapabilityOrWaiter::Waiter(_sender) => {
@@ -1078,7 +1078,7 @@ mod tests {
         // Cleanup happens asynchronously and there's no way for us to block on it from here, so we
         // have to rely on a timer to wait for cleanup to happen.
         fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
-        assert_eq!(0, capabilities.lock().await.len());
+        assert_eq!(0, capabilities.lock().len());
     }
 
     #[fuchsia::test]
@@ -1089,7 +1089,7 @@ mod tests {
         test_connector_is_connected(&connector_proxy, &mut receiver_stream).await;
         let store_koid = connector_proxy.as_channel().basic_info().unwrap().related_koid;
         assert_matches!(
-            remote_capabilities.lock().await.get(&store_koid),
+            remote_capabilities.lock().get(&store_koid),
             Some(CapabilityOrWaiter::Capability(Capability::Connector(_)))
         );
         drop(connector_proxy);
@@ -1104,7 +1104,7 @@ mod tests {
         test_dir_connector_is_connected(&dir_connector_proxy, &mut dir_receiver_stream).await;
         let store_koid = dir_connector_proxy.as_channel().basic_info().unwrap().related_koid;
         assert_matches!(
-            remote_capabilities.lock().await.get(&store_koid),
+            remote_capabilities.lock().get(&store_koid),
             Some(CapabilityOrWaiter::Capability(Capability::DirConnector(_)))
         );
         drop(dir_connector_proxy);
@@ -1124,7 +1124,7 @@ mod tests {
 
         let store_koid = dictionary_proxy.as_channel().basic_info().unwrap().related_koid;
         assert_matches!(
-            remote_capabilities.lock().await.get(&store_koid),
+            remote_capabilities.lock().get(&store_koid),
             Some(CapabilityOrWaiter::Capability(Capability::Dictionary(_)))
         );
         drop(dictionary_proxy);
@@ -1219,7 +1219,7 @@ mod tests {
 
         let store_koid = router_proxy.as_channel().basic_info().unwrap().related_koid;
         assert_matches!(
-            remote_capabilities.lock().await.get(&store_koid),
+            remote_capabilities.lock().get(&store_koid),
             Some(CapabilityOrWaiter::Capability(Capability::ConnectorRouter(_)))
         );
         drop(router_proxy);
@@ -1259,7 +1259,7 @@ mod tests {
 
         let store_koid = router_proxy.as_channel().basic_info().unwrap().related_koid;
         assert_matches!(
-            remote_capabilities.lock().await.get(&store_koid),
+            remote_capabilities.lock().get(&store_koid),
             Some(CapabilityOrWaiter::Capability(Capability::DirConnectorRouter(_)))
         );
         drop(router_proxy);
@@ -1298,7 +1298,7 @@ mod tests {
 
         let store_koid = router_proxy.as_channel().basic_info().unwrap().related_koid;
         assert_matches!(
-            remote_capabilities.lock().await.get(&store_koid),
+            remote_capabilities.lock().get(&store_koid),
             Some(CapabilityOrWaiter::Capability(Capability::DictionaryRouter(_)))
         );
         drop(router_proxy);
@@ -1331,7 +1331,7 @@ mod tests {
 
         let store_koid = router_proxy.as_channel().basic_info().unwrap().related_koid;
         assert_matches!(
-            remote_capabilities.lock().await.get(&store_koid),
+            remote_capabilities.lock().get(&store_koid),
             Some(CapabilityOrWaiter::Capability(Capability::DataRouter(_)))
         );
         drop(router_proxy);

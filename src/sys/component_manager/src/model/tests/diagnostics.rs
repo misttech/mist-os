@@ -107,7 +107,7 @@ mod tests {
 
         let inspector = inspect::Inspector::default();
         let stats = Arc::new(DurationStats::new(inspector.root().create_child("escrow")));
-        root.hooks.install(stats.hooks()).await;
+        root.hooks.install(stats.hooks());
         root.ensure_started(&StartReason::Debug).await.unwrap();
         root.stop().await.unwrap();
 
@@ -147,7 +147,7 @@ mod tests {
         let root = test.model.root();
         let inspector = inspect::Inspector::default();
         let stats = Arc::new(DurationStats::new(inspector.root().create_child("escrow")));
-        root.hooks.install(stats.hooks()).await;
+        root.hooks.install(stats.hooks());
 
         let event_stream =
             test.new_event_stream(vec![EventType::Started, EventType::Stopped]).await;
@@ -267,7 +267,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let stats =
             Arc::new(ComponentLifecycleTimeStats::new(inspector.root().create_child("lifecycle")));
-        root.hooks.install(stats.hooks()).await;
+        root.hooks.install(stats.hooks());
 
         let root_timestamp = start_and_get_timestamp(root, &Moniker::root()).await.into_nanos();
         let a_timestamp = start_and_get_timestamp(root, &"a".parse().unwrap()).await.into_nanos();
