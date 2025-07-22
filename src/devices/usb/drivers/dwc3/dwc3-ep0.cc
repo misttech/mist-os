@@ -21,18 +21,12 @@ zx_status_t Dwc3::Ep0Init() {
 
   const std::array eps{&ep0_.out, &ep0_.in};
   for (Endpoint* ep : eps) {
-    ep->enabled = false;
     ep->max_packet_size = kEp0MaxPacketSize;
     ep->type = USB_ENDPOINT_CONTROL;
     ep->interval = 0;
   }
 
   return ZX_OK;
-}
-
-void Dwc3::Ep0Reset() {
-  ep0_.shared_fifo.Clear();
-  ep0_.state = Ep0::State::None;
 }
 
 void Dwc3::Ep0Start() {
@@ -63,13 +57,6 @@ void Dwc3::Ep0StartEndpoints() {
   // 1-102), it will be ignored by the Start New Configuration command we are
   // sending.
   CmdStartNewConfig(ep0_.out, 2);
-
-  for (UserEndpoint& uep : user_endpoints_) {
-    if (uep.ep.enabled) {
-      EpSetConfig(uep.ep, true);
-      UserEpQueueNext(uep);
-    }
-  }
 }
 
 void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
@@ -78,9 +65,13 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
   // Only DataOut state needs TRB read.
   dwc3_trb_t trb = ep0_.state == Ep0::State::DataOut ? ep0_.shared_fifo.Read() : dwc3_trb_t{};
   ep0_.shared_fifo.AdvanceRead();
+  ep0_.transfer_in_progress_ = false;
 
   switch (ep0_.state) {
     case Ep0::State::Setup: {
+      // Control Endpoint stall is cleared upon receiving SETUP.
+      ep0_.out.stalled = false;
+
       memcpy(&ep0_.cur_setup, ep0_.buffer->virt(), sizeof(ep0_.cur_setup));
 
       FDF_LOG(DEBUG, "got setup: type: 0x%02X req: %d value: %d index: %d length: %d",
@@ -93,6 +84,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
         CacheFlushInvalidate(ep0_.buffer.get(), 0, ep0_.buffer->size());
         EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, ep0_.buffer->phys(),
                         ep0_.buffer->size());
+        ep0_.transfer_in_progress_ = true;
         ep0_.state = Ep0::State::DataOut;
         break;
       }
@@ -129,7 +121,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
           (stage == DEPEVT_XFER_NOT_READY_STAGE_STATUS)) {
         // Stall if we receive xfer not ready data/status while waiting for setup to complete
         ep0_.shared_fifo.Clear();
-        CmdEpSetStall(ep0_.out);
+        EpSetStall(ep0_.out, true);
         Ep0QueueSetup();
       }
       break;
@@ -138,7 +130,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
         // end transfer and stall if we receive xfer not ready in the opposite direction
         ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.out);
-        CmdEpSetStall(ep0_.out);
+        EpSetStall(ep0_.out, true);
         Ep0QueueSetup();
       }
       break;
@@ -147,7 +139,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
         // end transfer and stall if we receive xfer not ready in the opposite direction
         ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.in);
-        CmdEpSetStall(ep0_.out);
+        EpSetStall(ep0_.out, true);
         Ep0QueueSetup();
       }
       break;
@@ -155,6 +147,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       if (ep_num == kEp0Out) {
         EpStartTransfer(ep0_.out, ep0_.shared_fifo,
                         ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0);
+        ep0_.transfer_in_progress_ = true;
         ep0_.state = Ep0::State::Status;
       }
       break;
@@ -162,6 +155,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       if (ep_num == kEp0In) {
         EpStartTransfer(ep0_.in, ep0_.shared_fifo,
                         ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0);
+        ep0_.transfer_in_progress_ = true;
         ep0_.state = Ep0::State::Status;
       }
       break;
@@ -173,13 +167,6 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
 }
 
 void Dwc3::HandleEp0Setup(size_t length) {
-  auto fail = [this]() {
-    ep0_.shared_fifo.Clear();
-    CmdEpSetStall(ep0_.out);
-    Ep0QueueSetup();
-  };
-  std::optional<std::function<void()>> success = std::nullopt;
-
   if (ep0_.cur_setup.bm_request_type == (USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE)) {
     // handle some special setup requests in this driver
     switch (ep0_.cur_setup.b_request) {
@@ -188,14 +175,7 @@ void Dwc3::HandleEp0Setup(size_t length) {
         return;
       case USB_REQ_SET_CONFIGURATION:
         ResetConfiguration();
-        configured_ = false;
-
-        success.emplace([this, w_value = ep0_.cur_setup.w_value]() {
-          if (w_value) {
-            configured_ = true;
-            Ep0StartEndpoints();
-          }
-        });
+        Ep0StartEndpoints();
         break;
       default:
         // fall through to the common DoControlCall
@@ -203,6 +183,11 @@ void Dwc3::HandleEp0Setup(size_t length) {
     }
   }
 
+  auto fail = [this]() {
+    ep0_.shared_fifo.Clear();
+    EpSetStall(ep0_.out, true);
+    Ep0QueueSetup();
+  };
   if (!dci_intf_.is_valid()) {
     fail();
     return;
@@ -216,7 +201,7 @@ void Dwc3::HandleEp0Setup(size_t length) {
                                           reinterpret_cast<uint8_t*>(ep0_.buffer->virt()), length)
                                     : fidl::VectorView<uint8_t>::FromExternal(nullptr, 0))
       .Then(
-          [this, is_out, fail, success, length](
+          [this, is_out, fail, length](
               fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::Control>& result) {
             if (!result.ok()) {
               FDF_LOG(ERROR, "(framework) Control(): %s", result.status_string());
@@ -226,11 +211,6 @@ void Dwc3::HandleEp0Setup(size_t length) {
             if (result->is_error()) {
               FDF_LOG(ERROR, "Control(): %s", zx_status_get_string(result->error_value()));
               fail();
-              return;
-            }
-
-            if (success) {
-              (*success)();
               return;
             }
 
@@ -252,6 +232,7 @@ void Dwc3::HandleEp0Setup(size_t length) {
               CacheFlush(ep0_.buffer.get(), 0, read_data.size_bytes());
               EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA,
                               ep0_.buffer->phys(), read_data.size_bytes());
+              ep0_.transfer_in_progress_ = true;
             }
           });
 }

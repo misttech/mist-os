@@ -9,7 +9,7 @@
 
 namespace dwc3 {
 
-void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
+void Dwc3::EpEnable(Endpoint& ep, bool enable) {
   auto* mmio = get_mmio();
 
   if (enable) {
@@ -17,6 +17,8 @@ void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
   } else {
     DALEPENA::Get().ReadFrom(mmio).DisableEp(ep.ep_num).WriteTo(mmio);
   }
+
+  ep.enabled = enable;
 }
 
 void Dwc3::EpSetConfig(Endpoint& ep, bool enable) {
@@ -43,7 +45,6 @@ zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
   }
 
   ep.stalled = stall;
-
   return ZX_OK;
 }
 
@@ -71,6 +72,7 @@ void Dwc3::EpServer::CancelAll(zx_status_t reason) {
   for (; !queued_reqs.empty(); queued_reqs.pop()) {
     RequestComplete(reason, 0, std::move(queued_reqs.front()));
   }
+  uep_->fifo.Clear();
 }
 
 void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
@@ -82,11 +84,8 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
   uep.server->current_req.emplace(std::move(uep.server->queued_reqs.front()));
   uep.server->queued_reqs.pop();
 
-  zx::result result{uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size())};
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "[BUG] server->phys_iter(): %s", result.status_string());
-  }
-  ZX_ASSERT(result.is_ok());
+  zx::result result = uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size());
+  ZX_ASSERT_MSG(result.is_ok(), "[BUG] server->phys_iter(): %s", result.status_string());
 
   // TODO(voydanoff) scatter/gather support
   zx_paddr_t phys;
