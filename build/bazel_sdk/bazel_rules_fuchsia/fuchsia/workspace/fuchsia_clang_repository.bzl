@@ -4,7 +4,14 @@
 
 """Defines a WORKSPACE rule for loading a version of clang."""
 
-load("//common:toolchains/clang/repository_utils.bzl", "prepare_clang_repository")
+load(
+    "//common:repository_utils.bzl",
+    "bazel_major_version_is_at_least",
+)
+load(
+    "//common:toolchains/clang/repository_utils.bzl",
+    "prepare_clang_repository",
+)
 load(
     "//fuchsia/workspace:utils.bzl",
     "abspath_from_full_label_or_repo_relpath",
@@ -48,9 +55,10 @@ def _instantiate_from_local_dir(ctx, local_clang):
     # If a version file is provided, that is relative to the workspace,
     # record its path to ensure this repository rule is re-run when its
     # content changes.
+    version_file_path = None
     version_file = ctx.attr.local_version_file
     if version_file:
-        ctx.path(version_file)
+        version_file_path = ctx.path(version_file)
     else:
         version_file = ctx.os.environ.get(_LOCAL_FUCHSIA_CLANG_VERSION_FILE)
         if version_file:
@@ -58,7 +66,22 @@ def _instantiate_from_local_dir(ctx, local_clang):
                 # buildifier: disable=print
                 print("### Ignoring %s value, path should be relative to workspace root: %s" % (_LOCAL_FUCHSIA_CLANG_VERSION_FILE, version_file))
             else:
-                ctx.path("%s/%s" % (ctx.workspace_root, version_file))
+                version_file_path = ctx.path("%s/%s" % (ctx.workspace_root, version_file))
+        else:
+            # Fallback to a CIPD version file if it exists.
+            cipd_version_path = ctx.path("%s/.versions/clang.cipd_version" % local_clang)
+            if cipd_version_path.exists:
+                version_file_path = cipd_version_path
+
+    if version_file_path:
+        if not version_file_path.exists:
+            fail("Missing Clang version file: %s" % version_file_path)
+
+        # repository_ctx.watch() doesn't exist on Bazel 6, which is still being used
+        # by the HSP build. Remove this once it has been upgraded to 7.5 or above.'
+        # NOTE: An empty native.bazel_version string denotes a development version.
+        if bazel_major_version_is_at_least(ctx, 7):
+            ctx.watch(version_file_path)
 
 def _instantiate_from_local_fuchsia_tree(ctx):
     # Copies clang prebuilt from a local Fuchsia platform tree.

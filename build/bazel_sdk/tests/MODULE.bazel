@@ -98,7 +98,6 @@ fuchsia_clang_ext = use_extension(
 )
 fuchsia_clang_ext.local(
     local_path = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/clang",
-    local_version_file = "//:fuchsia_build_generated/fuchsia_clang.hash",
 )
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
 
@@ -111,9 +110,6 @@ compact_python_runtime_repository = use_repo_rule(
 
 compact_python_runtime_repository(
     name = "prebuilt_python",
-    # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
 register_toolchains("@prebuilt_python//:all")

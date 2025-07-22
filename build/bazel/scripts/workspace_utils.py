@@ -686,11 +686,8 @@ def record_fuchsia_workspace(
 
     # LINT.IfChange
     generated.record_symlink(
-        "workspace/fuchsia_build_generated/prebuilt_python.hash",
-        gn_output_dir
-        / "regenerator_outputs"
-        / "bazel_content_hashes"
-        / "prebuilt_python.hash",
+        "workspace/fuchsia_build_generated/content_hashes",
+        gn_output_dir / "regenerator_outputs" / "bazel_content_hashes",
     )
     # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
 
