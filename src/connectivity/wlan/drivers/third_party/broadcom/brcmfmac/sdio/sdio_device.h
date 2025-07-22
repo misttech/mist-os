@@ -17,6 +17,7 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
@@ -67,6 +68,7 @@ class SdioDevice final : public Device, public fdf::DriverBase {
   fidl::WireClient<fdf::Node> parent_node_;
   std::unique_ptr<DeviceInspect> inspect_;
   std::unique_ptr<brcmf_bus> brcmf_bus_;
+  fdf::PDev pdev_;
 };
 
 }  // namespace wlan::brcmfmac

@@ -166,7 +166,7 @@ zx::result<> AddWifiNode(fdf::WireSyncClient<fpbus::PlatformBus>& pbus) {
 
   std::vector<fpbus::Metadata> metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_WIFI_CONFIG),
+          .id = fuchsia_wlan_broadcom::WifiConfig::kSerializableName,
           .data = std::move(persisted_wifi_config.value()),
       }},
   };

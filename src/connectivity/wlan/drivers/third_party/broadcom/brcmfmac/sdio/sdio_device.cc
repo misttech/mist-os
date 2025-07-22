@@ -56,6 +56,14 @@ SdioDevice::~SdioDevice() = default;
 void SdioDevice::Start(fdf::StartCompleter completer) {
   wlan::drivers::log::Instance::Init(Debug::kBrcmfMsgFilter);
 
+  zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
+  if (pdev.is_error()) {
+    BRCMF_ERR("Failed to connect to platform device: %s", pdev.status_string());
+    completer(pdev.take_error());
+    return;
+  }
+  pdev_ = fdf::PDev{std::move(pdev.value())};
+
   zx::result<> result = [&]() -> zx::result<> {
     fidl::Arena arena;
     zx_status_t status = InitDevice(*outgoing());
@@ -230,8 +238,7 @@ zx::result<std::vector<uint8_t>> SdioDevice::DeviceGetPersistedMetadata(
 }
 
 zx::result<fuchsia_wlan_broadcom::WifiConfig> SdioDevice::GetWifiConfig() {
-  zx::result metadata = compat::GetMetadata<fuchsia_wlan_broadcom::WifiConfig>(
-      incoming(), DEVICE_METADATA_WIFI_CONFIG, "pdev");
+  zx::result metadata = pdev_.GetFidlMetadata<fuchsia_wlan_broadcom::WifiConfig>();
   if (metadata.is_error()) {
     BRCMF_ERR("Failed to get metadata: %s", metadata.status_string());
     return metadata.take_error();

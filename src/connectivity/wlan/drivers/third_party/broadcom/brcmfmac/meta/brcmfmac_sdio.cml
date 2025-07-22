@@ -27,9 +27,14 @@
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
-        { service: "fuchsia.hardware.pci.Service" },
-        { service: "fuchsia.hardware.gpio.Service" },
-        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
+        {
+            service: [
+                "fuchsia.boot.metadata.MacAddressMetadata",
+                "fuchsia.hardware.gpio.Service",
+                "fuchsia.hardware.pci.Service",
+                "fuchsia.hardware.platform.device.Service",
+            ],
+        },
     ],
     expose: [
         {
