@@ -160,7 +160,6 @@ template("bazel_product_bundle") {
 
     if (defined(invoker.bazel_product_image_target)) {
       bazel_product_assembly = "${target_name}_product_assembly"
-      bazel_create_system = "${target_name}_create_system"
     }
 
     if (defined(invoker.bazel_license_review_target)) {
@@ -183,7 +182,6 @@ template("bazel_product_bundle") {
 
     if (defined(invoker.bazel_product_image_target)) {
       product_assembly_out_dir = targets.bazel_product_assembly
-      create_system_out_dir = targets.bazel_create_system
     }
   }
 
@@ -263,40 +261,12 @@ template("bazel_product_bundle") {
           bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/image_assembly.json"
           ninja = "${_product_assembly_target}/image_assembly.json"
         },
-      ]
-      deps = _common_deps
-    },
-  ]
-
-  _create_system_target = "${target_name}_create_system"
-  _subtargets += [
-    {
-      bazel_target = invoker.bazel_product_image_target
-      gn_target_name = _create_system_target
-      directory_outputs = [
         {
-          bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
-          ninja_dir = _create_system_target
-          tracked_files = [ "assembled_system.json" ]
-          copy_debug_symbols = true
+          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/assembly_builder_forensics.json"
+          ninja = "${_product_assembly_target}/assembly_builder_forensics.json"
         },
       ]
       deps = _common_deps
-
-      if (_generate_image_metadata) {
-        _full_label = get_label_info(":${target_name}", "label_with_toolchain")
-        metadata = {
-          assembly_manifests = [
-            {
-              image_name = "fuchsia"
-              label = _full_label
-              assembly_manifest_path = rebase_path(
-                      "${target_out_dir}/${_create_system_target}/assembled_system.json",
-                      root_build_dir)
-            },
-          ]
-        }
-      }
     },
   ]
 
@@ -540,6 +510,16 @@ template("bazel_product_bundle") {
       _system_a_root = rebase_path(target_out_dir, root_out_dir) +
                        "/${files.product_bundle_out_dir}/system_a"
 
+      _metadata.assembly_manifests = [
+        {
+          image_name = "fuchsia"
+          label = _full_label
+          assembly_manifest_path = rebase_path(
+                  "${target_out_dir}/${target_name}_create_system_out/assembled_system.json",
+                  root_build_dir)
+        },
+      ]
+
       _image_has_fxfs_blob = true
       if (defined(invoker.image_has_fxfs_blob)) {
         _image_has_fxfs_blob = invoker.image_has_fxfs_blob
@@ -761,7 +741,12 @@ template("bazel_product_bundle") {
           copy_debug_symbols = true
         },
       ]
-
+      copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_PATH}}_create_system_out/assembled_system.json"
+          ninja = "${target_name}_create_system_out/assembled_system.json"
+        },
+      ]
       deps = _common_deps
 
       metadata = _metadata

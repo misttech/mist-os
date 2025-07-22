@@ -124,32 +124,11 @@ def _fuchsia_product_assembly_impl(ctx):
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
-    cache_package_list = ctx.actions.declare_file(ctx.label.name + "/bazel_cache_package_manifests.list")
-    base_package_list = ctx.actions.declare_file(ctx.label.name + "/bazel_base_package_manifests.list")
-    ctx.actions.run(
-        outputs = [cache_package_list, base_package_list],
-        inputs = [out_dir],
-        executable = ctx.executable._create_package_manifest_list,
-        arguments = [
-            "--images-config",
-            out_dir.path + "/image_assembly.json",
-            "--cache-package-manifest-list",
-            cache_package_list.path,
-            "--base-package-manifest-list",
-            base_package_list.path,
-        ],
-        mnemonic = "Assembly",
-        progress_message = "Creating package manifests list for %s" % ctx.label,
-        **LOCAL_ONLY_ACTION_KWARGS
-    )
-
-    outputs = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list, platform_aibs_file]
-
     return [
-        DefaultInfo(files = depset(outputs + inputs_also_needed_by_create_system)),
+        DefaultInfo(files = depset([out_dir])),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
-            all_files = depset(outputs + inputs_also_needed_by_create_system),
+            all_files = depset([out_dir]),
         ),
         FuchsiaProductAssemblyInfo(
             product_assembly_out = out_dir,
@@ -263,6 +242,7 @@ def _fuchsia_product_create_system_impl(ctx):
         # Also provide the product assembly info, so that the intermediate rule for the
         # product assembly step doesn't need to be exposed.
         ctx.attr.product_assembly[FuchsiaProductAssemblyInfo],
+        ctx.attr.platform_artifacts[FuchsiaPlatformArtifactsInfo],
     ]
 
 def generate_create_system_call_info(

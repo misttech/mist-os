@@ -287,10 +287,6 @@ group("default-images") {
   if (use_bazel_images_only) {
     if (bazel_product_bundle_target != "") {
       deps += [
-        # Needed so that 'assembly_manifest' metadata can be properly collected from the
-        # default-images target.
-        "${bazel_product_bundle_target}_create_system",
-
         # Needed so that 'gerrit_size_reports' and 'detailed_size_checker_data' metadata
         # can be properly collected form the default-images target.
         "${bazel_product_bundle_target}_size_targets",
