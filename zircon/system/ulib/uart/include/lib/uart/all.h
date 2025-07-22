@@ -336,16 +336,8 @@ class KernelDriver {
 
   // Returns true if the active `uart::KernelDriver<...>` is backed by `TargetUartDriver`.
   template <typename TargetUartDriver>
-  constexpr bool holds_alternative() const {
+  bool holds_alternative() const {
     return std::holds_alternative<OneDriver<TargetUartDriver>>(variant_);
-  }
-
-  // Returns true if a valid non-null driver variant is active.
-  explicit constexpr operator bool() const {
-    return !(holds_alternative<uart::null::Driver>() ||
-             // For completeness.
-             holds_alternative<internal::DummyDriver>() ||
-             std::holds_alternative<std::monostate>(variant_));
   }
 
  private:

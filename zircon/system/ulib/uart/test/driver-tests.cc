@@ -257,7 +257,6 @@ TEST(UartTests, Config) {
 TEST(UartTests, AllConfig) {
   // Assignment
   uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy> all_driver;
-  EXPECT_FALSE(all_driver);
   zbi_dcfg_simple_pio_t pio_cfg{
       .base = 0x3f8,
       .irq = 3,
@@ -265,8 +264,6 @@ TEST(UartTests, AllConfig) {
   uart::KernelDriver<uart::ns8250::PioDriver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>
       driver(pio_cfg);
   all_driver = std::move(driver).TakeUart();
-  EXPECT_TRUE(all_driver);
-
   uart::all::Config all_config = all_driver.config();
   all_config.Visit([&pio_cfg](auto& config) {
     if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_pio_t>) {
@@ -308,7 +305,7 @@ TEST(UartTests, All) {
 
   // Default constructed `configuration` should default to being the `null::Driver`.
   AllDriver driver(AllConfig{});
-  EXPECT_FALSE(driver);
+
   // Make sure Unparse is instantiated.
   driver.Unparse();
 
@@ -320,9 +317,6 @@ TEST(UartTests, All) {
 
   // Transfer state to a new instantiation and pick up using it.
   AllDriver newdriver{std::move(driver).TakeUart()};
-
-  EXPECT_FALSE(driver);
-  EXPECT_FALSE(newdriver);
   newdriver.Visit([](auto&& driver) {
     EXPECT_EQ(driver.template Write("hello world\n"), 12);
     EXPECT_FALSE(driver.template Read());
