@@ -179,17 +179,22 @@ impl ZxioBackedSocket {
             None => vec![],
         };
 
+        let map_errors = |res: Result<Result<usize, ZxioErrorCode>, zx::Status>| {
+            res.map_err(|status| match status {
+                zx::Status::OUT_OF_RANGE => errno!(EMSGSIZE),
+                other => from_status_like_fdio!(other),
+            })?
+            .map_err(|out_code| errno_from_zxio_code!(out_code))
+        };
+
         let flags = flags.bits() & !MSG_DONTWAIT;
         let sent_bytes = if UNIFIED_ASPACES_ENABLED {
             match data.peek_all_segments_as_iovecs() {
-                Ok(mut iovecs) => Some(self.zxio.sendmsg(&mut addr, &mut iovecs, &cmsgs, flags)),
-                Err(e) => {
-                    if e.code == ENOTSUP {
-                        None
-                    } else {
-                        return Err(e);
-                    }
+                Ok(mut iovecs) => {
+                    Some(map_errors(self.zxio.sendmsg(&mut addr, &mut iovecs, &cmsgs, flags))?)
                 }
+                Err(e) if e.code == ENOTSUP => None,
+                Err(e) => return Err(e),
             }
         } else {
             None
@@ -197,25 +202,21 @@ impl ZxioBackedSocket {
 
         // If we can't pass the iovecs directly so fallback to reading
         // all the bytes from the input buffer first.
-        let sent_bytes = if let Some(sent_bytes) = sent_bytes {
-            sent_bytes
-        } else {
-            let mut bytes = data.peek_all()?;
-            self.zxio.sendmsg(
-                &mut addr,
-                &mut [syncio::zxio::iovec {
-                    iov_base: bytes.as_mut_ptr() as *mut starnix_uapi::c_void,
-                    iov_len: bytes.len(),
-                }],
-                &cmsgs,
-                flags,
-            )
-        }
-        .map_err(|status| match status {
-            zx::Status::OUT_OF_RANGE => errno!(EMSGSIZE),
-            other => from_status_like_fdio!(other),
-        })?
-        .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+        let sent_bytes = match sent_bytes {
+            Some(sent_bytes) => sent_bytes,
+            None => {
+                let mut bytes = data.peek_all()?;
+                map_errors(self.zxio.sendmsg(
+                    &mut addr,
+                    &mut [syncio::zxio::iovec {
+                        iov_base: bytes.as_mut_ptr() as *mut starnix_uapi::c_void,
+                        iov_len: bytes.len(),
+                    }],
+                    &cmsgs,
+                    flags,
+                ))?
+            }
+        };
         data.advance(sent_bytes)?;
         Ok(sent_bytes)
     }
@@ -227,34 +228,22 @@ impl ZxioBackedSocket {
     ) -> Result<RecvMessageInfo, Errno> {
         let flags = flags.bits() & !MSG_DONTWAIT & !MSG_WAITALL;
 
-        fn with_res<F: FnOnce(&RecvMessageInfo) -> Result<(), Errno>>(
-            res: Result<Result<RecvMessageInfo, ZxioErrorCode>, zx::Status>,
-            f: F,
-        ) -> Result<RecvMessageInfo, Errno> {
-            let info = res
-                .map_err(|status| from_status_like_fdio!(status))?
-                .map_err(|out_code| errno_from_zxio_code!(out_code))?;
-            f(&info)?;
-            Ok(info)
-        }
+        let map_errors = |res: Result<Result<RecvMessageInfo, ZxioErrorCode>, zx::Status>| {
+            res.map_err(|status| from_status_like_fdio!(status))?
+                .map_err(|out_code| errno_from_zxio_code!(out_code))
+        };
 
-        let res = if UNIFIED_ASPACES_ENABLED {
+        let info = if UNIFIED_ASPACES_ENABLED {
             match data.peek_all_segments_as_iovecs() {
                 Ok(mut iovecs) => {
-                    let res = self.zxio.recvmsg(&mut iovecs, flags);
-                    Some(with_res(res, |info| {
-                        // SAFETY: we successfully read `info.bytes_read` bytes
-                        // directly to the user's buffer segments.
-                        unsafe { data.advance(info.bytes_read) }
-                    }))
+                    let info = map_errors(self.zxio.recvmsg(&mut iovecs, flags))?;
+                    // SAFETY: we successfully read `info.bytes_read` bytes
+                    // directly to the user's buffer segments.
+                    (unsafe { data.advance(info.bytes_read) })?;
+                    Some(info)
                 }
-                Err(e) => {
-                    if e.code == ENOTSUP {
-                        None
-                    } else {
-                        return Err(e);
-                    }
-                }
+                Err(e) if e.code == ENOTSUP => None,
+                Err(e) => return Err(e),
             }
         } else {
             None
@@ -263,22 +252,23 @@ impl ZxioBackedSocket {
         // If we can't pass the segments directly, fallback to receiving
         // all the bytes in an intermediate buffer and writing that
         // to our output buffer.
-        res.unwrap_or_else(|| {
-            // TODO: use MaybeUninit
-            let mut buf = vec![0; data.available()];
-            let res = self.zxio.recvmsg(
-                &mut [syncio::zxio::iovec {
+        let info = match info {
+            Some(info) => info,
+            None => {
+                // TODO: use MaybeUninit
+                let mut buf = vec![0; data.available()];
+                let iovec = &mut [syncio::zxio::iovec {
                     iov_base: buf.as_mut_ptr() as *mut starnix_uapi::c_void,
                     iov_len: buf.len(),
-                }],
-                flags,
-            );
-            with_res(res, |info| {
+                }];
+                let info = map_errors(self.zxio.recvmsg(iovec, flags))?;
                 let written = data.write_all(&buf[..info.bytes_read])?;
                 debug_assert_eq!(written, info.bytes_read);
-                Ok(())
-            })
-        })
+                info
+            }
+        };
+
+        Ok(info)
     }
 
     fn attach_cbpf_filter(&self, _task: &Task, code: Vec<sock_filter>) -> Result<(), Errno> {
