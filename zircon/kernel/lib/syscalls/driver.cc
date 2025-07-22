@@ -563,8 +563,9 @@ zx_status_t sys_interrupt_create(zx_handle_t src_obj, uint32_t src_num, uint32_t
                                  zx_handle_t* out_handle) {
   LTRACEF("options 0x%x\n", options);
 
-  // resource not required for virtual interrupts
-  if (!(options & ZX_INTERRUPT_VIRTUAL)) {
+  // The IRQ resource is required for all non-virtual interrupts, and virtual
+  // interrupts which are configured as wake vectors.
+  if (!(options & ZX_INTERRUPT_VIRTUAL) || (options & ZX_INTERRUPT_WAKE_VECTOR)) {
     zx_status_t status;
     if ((status = validate_resource_irq(src_obj, src_num)) != ZX_OK) {
       return status;

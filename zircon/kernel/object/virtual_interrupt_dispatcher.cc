@@ -23,13 +23,20 @@ zx_status_t VirtualInterruptDispatcher::Create(KernelHandle<InterruptDispatcher>
   if (!(options & ZX_INTERRUPT_VIRTUAL)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (options & ~(ZX_INTERRUPT_VIRTUAL | ZX_INTERRUPT_TIMESTAMP_MONO)) {
+
+  constexpr uint32_t permitted_options =
+      ZX_INTERRUPT_VIRTUAL | ZX_INTERRUPT_TIMESTAMP_MONO | ZX_INTERRUPT_WAKE_VECTOR;
+  if (options & ~permitted_options) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   Flags flags = INTERRUPT_VIRTUAL;
   if (options & ZX_INTERRUPT_TIMESTAMP_MONO) {
     flags = Flags(flags | INTERRUPT_TIMESTAMP_MONO);
+  }
+
+  if (options & ZX_INTERRUPT_WAKE_VECTOR) {
+    flags = Flags(flags | INTERRUPT_WAKE_VECTOR);
   }
 
   // Attempt to construct the dispatcher.
@@ -51,10 +58,22 @@ VirtualInterruptDispatcher::VirtualInterruptDispatcher(Flags flags, uint32_t opt
   // untriggered state.  Make sure that our initial signal state reflects this.
   UpdateState(0, ZX_VIRTUAL_INTERRUPT_UNTRIGGERED);
   kcounter_add(dispatcher_virtual_interrupt_create_count, 1);
+  if (is_wake_vector()) {
+    InitializeWakeEvent();
+  }
 }
 
 VirtualInterruptDispatcher::~VirtualInterruptDispatcher() {
+  if (is_wake_vector()) {
+    DestroyWakeEvent();
+  }
   kcounter_add(dispatcher_virtual_interrupt_destroy_count, 1);
+}
+
+void VirtualInterruptDispatcher::GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const {
+  diagnostics_out.enabled = is_wake_vector();
+  diagnostics_out.koid = get_koid();
+  diagnostics_out.PrintExtra("VirtIRQ %" PRIu64, get_koid());
 }
 
 void VirtualInterruptDispatcher::MaskInterrupt() {}

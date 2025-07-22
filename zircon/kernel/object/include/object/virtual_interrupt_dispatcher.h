@@ -24,6 +24,8 @@ class VirtualInterruptDispatcher final : public InterruptDispatcher {
   VirtualInterruptDispatcher(const InterruptDispatcher&) = delete;
   VirtualInterruptDispatcher& operator=(const InterruptDispatcher&) = delete;
 
+  void GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const override;
+
   zx_status_t WaitForInterrupt(zx_time_t* out_timestamp) final;
   zx_status_t Trigger(zx_time_t timestamp) final;
   zx_status_t Ack() final;
