@@ -90,7 +90,7 @@ void NodeConnection::Sync(SyncCompleter::Sync& completer) {
   completer.Reply(zx::make_result(ZX_ERR_BAD_HANDLE));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
 void NodeConnection::DeprecatedGetAttr(DeprecatedGetAttrCompleter::Sync& completer) {
 #else
 void NodeConnection::GetAttr(GetAttrCompleter::Sync& completer) {
@@ -103,7 +103,7 @@ void NodeConnection::GetAttr(GetAttrCompleter::Sync& completer) {
   }
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
 void NodeConnection::DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
                                        DeprecatedSetAttrCompleter::Sync& completer) {
 #else

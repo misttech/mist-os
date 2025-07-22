@@ -9,10 +9,10 @@ using fuchsia.driver.framework;
 using fuchsia.url;
 using zx;
 
-@available(removed=NEXT)
+@available(removed=28)
 const BINDING_RESULT_MAX uint8 = 10;
 
-@available(added=NEXT)
+@available(added=28)
 const BINDING_RESULT_MAX_2 uint32 = 256;
 
 const HASH_LENGTH uint8 = 64;
@@ -110,7 +110,7 @@ open protocol Manager {
 
     /// Attempts to bind all unbound nodes in the topology.
     /// Returns new successful binds.
-    @available(removed=NEXT)
+    @available(removed=28)
     flexible BindAllUnboundNodes() -> (struct {
         /// List of new bindings that happened as a result of this.
         binding_result vector<NodeBindingInfo>:BINDING_RESULT_MAX;
@@ -118,7 +118,7 @@ open protocol Manager {
 
     /// Attempts to bind all unbound nodes in the topology.
     /// Returns new successful binds.
-    @available(added=NEXT)
+    @available(added=28)
     flexible BindAllUnboundNodes2() -> (struct {
         /// List of new bindings that happened as a result of this.
         binding_result vector<NodeBindingInfo>:BINDING_RESULT_MAX_2;

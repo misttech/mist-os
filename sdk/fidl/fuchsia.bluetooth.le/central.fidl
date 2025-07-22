@@ -163,7 +163,7 @@ closed protocol Central {
 
     /// Synchronize to a periodic advertising train. Reports will be delivered via the
     /// `PeriodicAdvertisingSync` protocol.
-    @available(added=NEXT)
+    @available(added=28)
     strict SyncToPeriodicAdvertising(resource table {
         /// Identifier of the peer transmitting the periodic advertisement, as indicated via
         /// `Peer.periodic_advertising_interval`.

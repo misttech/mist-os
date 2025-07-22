@@ -53,8 +53,8 @@ uint64_t trace_generate_nonce(void);
 // 2. input events tracing cross components has uid for flow id.
 //
 // This function is thread-safe and lock-free.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
-uint64_t trace_time_based_id(zx_koid_t thread_id) ZX_AVAILABLE_SINCE(NEXT);
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
+uint64_t trace_time_based_id(zx_koid_t thread_id) ZX_AVAILABLE_SINCE(28);
 #endif
 
 // Describes the state of the trace engine.

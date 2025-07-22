@@ -156,7 +156,7 @@ zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver)
 //
 // This should not be called from a thread managed by the driver runtime,
 // such as from tasks or ChannelRead callbacks.
-void fdf_env_scan_threads_for_stalls(void) ZX_AVAILABLE_SINCE(NEXT);
+void fdf_env_scan_threads_for_stalls(void) ZX_AVAILABLE_SINCE(28);
 
 __END_CDECLS
 

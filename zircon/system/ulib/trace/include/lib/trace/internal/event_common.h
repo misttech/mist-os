@@ -65,7 +65,7 @@
 //     // a little while later...
 //     TRACE_ASYNC_END("category", "name", async_id);
 //
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
 #define TRACE_RANDOM_ID() (trace_internal_time_based_id())
 #endif
 

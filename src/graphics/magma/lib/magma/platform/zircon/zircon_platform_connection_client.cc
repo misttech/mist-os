@@ -250,7 +250,7 @@ magma_status_t PrimaryWrapper::CreateContext(uint32_t context_id) {
 magma_status_t PrimaryWrapper::CreateContext2(uint32_t context_id, uint64_t priority) {
   std::lock_guard<std::mutex> lock(flow_control_mutex_);
   FlowControl();
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
   zx_status_t status =
       client_->CreateContext2(context_id, fuchsia_gpu_magma::wire::Priority(priority)).status();
 #else

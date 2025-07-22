@@ -15,5 +15,5 @@
 /// * [WakeAlarms]: Provides scheduling platform-wide wake alarms.  These alarms
 ///   can wake a suspended system if needed.  The ability to wake the system
 ///   must be supported by the platform to obtain the wake behavior.
-@available(added=NEXT)
+@available(added=28)
 library fuchsia.time.alarms;

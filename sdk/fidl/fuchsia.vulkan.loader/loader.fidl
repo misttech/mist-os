@@ -77,7 +77,7 @@ closed protocol Loader {
 };
 
 /// Provides expanded device node access to trusted clients.
-@available(added=NEXT)
+@available(added=28)
 service TrustedService {
     loader client_end:Loader;
 };

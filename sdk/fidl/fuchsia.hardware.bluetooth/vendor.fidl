@@ -19,7 +19,7 @@ type AndroidVendorSupport = table {
 
 /// Various settings for audio offload data paths, which vary by controller
 /// manufacturer and firmware version.
-@available(added=NEXT)
+@available(added=28)
 type AudioOffloadSettings = table {
     /// The index to use when SCO OFFLOAD DataPath is requested.
     1: sco_offload_index uint8;
@@ -35,7 +35,7 @@ type VendorFeatures = table {
     2: android_vendor_extensions AndroidVendorSupport;
     /// Specify some alternative settings for audio offload paths.
     /// If missing, use the reasonable defaults or configured settings.
-    @available(added=NEXT)
+    @available(added=28)
     3: audio_offload_settings AudioOffloadSettings;
 };
 

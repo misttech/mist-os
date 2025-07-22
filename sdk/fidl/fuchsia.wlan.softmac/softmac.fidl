@@ -194,9 +194,9 @@ type WlanRxInfo = struct {
     /// The data rate of the device, measured in units of 0.5 Mb/s.
     data_rate uint32;
     /// The channel of the device at the time of the operation. This field must be included.
-    @available(replaced=NEXT)
+    @available(replaced=28)
     channel fuchsia.wlan.common.WlanChannel;
-    @available(added=NEXT)
+    @available(added=28)
     channel ieee80211.WlanChannel;
     /// The modulation and coding scheme index of the device at the time of the operation. Depends
     /// on the PHY format and channel width.
@@ -245,9 +245,9 @@ type WlanTxInfo = struct {
     // The PHY format to be used to transmit this packet.
     phy fuchsia.wlan.common.WlanPhyType;
     // The channel width to be used to transmit this packet.
-    @available(replaced=NEXT)
+    @available(replaced=28)
     channel_bandwidth fuchsia.wlan.common.ChannelBandwidth;
-    @available(added=NEXT)
+    @available(added=28)
     channel_bandwidth ieee80211.ChannelBandwidth;
     /// The modulation and coding scheme index for this packet. Depends on the PHY format and
     /// channel width.
@@ -573,9 +573,9 @@ type WlanAssociationConfig = table {
     2: aid uint16;
     3: listen_interval uint16;
     /// The channel on which we have associated with this peer.
-    @available(replaced=NEXT)
+    @available(replaced=28)
     4: channel fuchsia.wlan.common.WlanChannel;
-    @available(added=NEXT)
+    @available(added=28)
     4: channel ieee80211.WlanChannel;
 
     /// QoS capable and parameters
@@ -1047,9 +1047,9 @@ closed protocol WlanSoftmac {
     ///   ZX_ERR_NOT_SUPPORTED: The device cannot switch to the requested channel.
     @available(added=15, replaced=HEAD)
     strict SetChannel(table {
-        @available(replaced=NEXT)
+        @available(replaced=28)
         1: channel fuchsia.wlan.common.WlanChannel;
-        @available(added=NEXT)
+        @available(added=28)
         1: channel ieee80211.WlanChannel;
     }) -> () error zx.Status;
 

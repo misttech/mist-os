@@ -134,7 +134,7 @@ type InterestChangeError = strict enum : uint32 {
 closed(removed=26) open(added=26) protocol LogSink {
     /// This event is sent whenever Archivist accepts a new connection. Clients may use
     /// the returned IOBuffer to write logs.
-    @available(added=NEXT)
+    @available(added=28)
     flexible -> OnInit(resource table {
         1: buffer zx.Handle:IOB;
         2: interest fuchsia.diagnostics.types.Interest;

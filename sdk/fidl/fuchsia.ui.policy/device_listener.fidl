@@ -27,7 +27,7 @@ closed protocol DeviceListenerRegistry {
     /// Registers a listener to receive touch button related events.
     /// On registration, the `listener` receives the last touch button event that
     /// occurred, if one exists, and all touch button events going forward.
-    @available(added=NEXT)
+    @available(added=28)
     strict RegisterTouchButtonsListener(resource struct {
         listener client_end:TouchButtonsListener;
     }) -> ();
@@ -53,7 +53,7 @@ closed protocol MediaButtonsListener {
 /// [`fuchsia.ui.policy/DeviceListenerRegistry.RegisterTouchButtonsListener`]
 /// will consume this listener interface and call `OnEvent` when the
 /// registered touch buttons event occurs.
-@available(added=NEXT)
+@available(added=28)
 closed protocol TouchButtonsListener {
     strict OnEvent(struct {
         event fuchsia.ui.input.TouchButtonsEvent;

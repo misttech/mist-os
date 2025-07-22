@@ -107,7 +107,7 @@ type CrashReport = resource table {
     ///
     /// A weight of 1 is used if the field is not set. An explicitly set value of 0 is invalid and
     /// will be rejected.
-    @available(added=NEXT)
+    @available(added=28)
     9: weight uint32;
 };
 

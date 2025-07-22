@@ -51,7 +51,7 @@ type RebootReason2 = flexible enum {
 
     /// The device rebooted because a developer initiated the reboot, typically via a shell command
     /// or similar interface, including within an automated test.
-    @available(added=NEXT)
+    @available(added=28)
     DEVELOPER_REQUEST = 13;
 
     /// A new system update has been downloaded.
@@ -84,6 +84,6 @@ type RebootReason2 = flexible enum {
     NETSTACK_MIGRATION = 11;
 
     /// An Android-initiated reboot reason that Starnix doesn't recognize
-    @available(added=NEXT)
+    @available(added=28)
     ANDROID_UNEXPECTED_REASON = 12;
 };

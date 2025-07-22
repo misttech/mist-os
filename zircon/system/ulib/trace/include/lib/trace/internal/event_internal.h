@@ -419,8 +419,8 @@ void trace_internal_write_blob_record_and_release_context(trace_context_t* conte
 void trace_internal_send_alert_and_release_context(trace_context_t* context,
                                                    const char* alert_name);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
-uint64_t trace_internal_time_based_id(void) ZX_AVAILABLE_SINCE(NEXT);
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
+uint64_t trace_internal_time_based_id(void) ZX_AVAILABLE_SINCE(28);
 #endif
 
 #ifndef NTRACE

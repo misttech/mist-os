@@ -99,7 +99,7 @@ type RebootReason = strict(removed=9) flexible(added=9) enum : uint16 {
 
     /// The device rebooted because a developer initiated the reboot, typically via a shell command
     /// or similar interface, including within an automated test.
-    @available(added=NEXT)
+    @available(added=28)
     DEVELOPER_REQUEST = 22;
 
     /// The device rebooted because applying the OTA failed and we want to retry.
@@ -127,7 +127,7 @@ type RebootReason = strict(removed=9) flexible(added=9) enum : uint16 {
     ZBI_SWAP = 18;
 
     /// An Android-initiated reboot reason that Starnix doesn't recognize.
-    @available(added=NEXT)
+    @available(added=28)
     ANDROID_UNEXPECTED_REASON = 21;
 
     // ///////////////////////////////////////////////////////////////////////////////////////////

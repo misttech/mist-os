@@ -17,7 +17,7 @@ __EXPORT uint64_t trace_generate_nonce() {
   return g_nonce.fetch_add(1u, std::memory_order_relaxed);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
 __EXPORT uint64_t trace_time_based_id(zx_koid_t thread_id) {
   uint64_t time = zx::clock::get_boot().get();
   uint64_t ts = time << 16;

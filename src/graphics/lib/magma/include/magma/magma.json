@@ -38,7 +38,7 @@
                 "name": "magma_enumerate_devices",
                 "type": "magma_status_t",
                 "description": "Returns information describing the magma devices that are available.  Returns: MAGMA_STATUS_MEMORY_ERROR if |device_count_inout| is insufficient; MAGMA_STATUS_INVALID_ARGS if |device_path_size| is insufficient.",
-                "attributes": "MAGMA_AVAILABLE_SINCE(NEXT)",
+                "attributes": "MAGMA_AVAILABLE_SINCE(28)",
                 "arguments": [
                     {
                         "name": "device_namespace",

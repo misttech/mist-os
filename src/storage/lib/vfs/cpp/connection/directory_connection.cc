@@ -161,7 +161,7 @@ void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {
   });
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
 void DirectoryConnection::DeprecatedGetAttr(DeprecatedGetAttrCompleter::Sync& completer) {
 #else
 void DirectoryConnection::GetAttr(GetAttrCompleter::Sync& completer) {
@@ -174,7 +174,7 @@ void DirectoryConnection::GetAttr(GetAttrCompleter::Sync& completer) {
   }
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(28)
 void DirectoryConnection::DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
                                             DeprecatedSetAttrCompleter::Sync& completer) {
 #else

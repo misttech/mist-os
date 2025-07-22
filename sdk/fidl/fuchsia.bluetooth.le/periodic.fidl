@@ -6,16 +6,16 @@ library fuchsia.bluetooth.le;
 using fuchsia.bluetooth as bt;
 using zx;
 
-@available(added=NEXT)
+@available(added=28)
 const MAX_SUBEVENTS uint8 = 128;
 
 /// 64-bit unique value used by the system to identify a PeriodicAdvertisingSync.
-@available(added=NEXT)
+@available(added=28)
 type PeriodicAdvertisingSyncId = struct {
     value uint64;
 };
 
-@available(added=NEXT)
+@available(added=28)
 type PeriodicAdvertisingReport = table {
     /// The signal strength of the advertising report.
     1: rssi int8;
@@ -31,14 +31,14 @@ type PeriodicAdvertisingReport = table {
 };
 
 /// A BIGInfo report that was received with a periodic advertisement.
-@available(added=NEXT)
+@available(added=28)
 type BroadcastIsochronousGroupInfoReport = table {
     1: info BroadcastIsochronousGroupInfo;
     /// The timestamp when the report was received by the host.
     2: timestamp zx.Time;
 };
 
-@available(added=NEXT)
+@available(added=28)
 type PeriodicAdvertisingSyncConfiguration = table {
     /// Filter out duplicate advertising reports.
     /// Optional.
@@ -46,13 +46,13 @@ type PeriodicAdvertisingSyncConfiguration = table {
     1: filter_duplicates bool;
 };
 
-@available(added=NEXT)
+@available(added=28)
 type SyncReport = flexible union {
     1: periodic_advertising_report PeriodicAdvertisingReport;
     2: broadcast_isochronous_group_info_report BroadcastIsochronousGroupInfoReport;
 };
 
-@available(added=NEXT)
+@available(added=28)
 type PeriodicAdvertisingSyncError = flexible enum : uint32 {
     INITIAL_SYNCHRONIZATION_FAILED = 0;
     SYNCHRONIZATION_LOST = 1;
@@ -61,7 +61,7 @@ type PeriodicAdvertisingSyncError = flexible enum : uint32 {
 };
 
 /// Closed by the server when the sync fails to be established or is lost.
-@available(added=NEXT)
+@available(added=28)
 open protocol PeriodicAdvertisingSync {
     /// Sent once when the sync is established.
     flexible -> OnEstablished(table {

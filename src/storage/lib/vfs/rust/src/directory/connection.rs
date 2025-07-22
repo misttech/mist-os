@@ -105,7 +105,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::DirectoryRequest::DeprecatedGetAttr { responder } => {
                 async move {
                     let (status, attrs) = crate::common::io2_to_io1_attrs(
@@ -118,7 +118,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 .trace(trace::trace_future_args!(c"storage", c"Directory::GetAttr"))
                 .await?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::DirectoryRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) = crate::common::io2_to_io1_attrs(
@@ -276,11 +276,11 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::Rename { src: _, dst_parent_token: _, dst: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::DirectoryRequest::DeprecatedSetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::DirectoryRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }

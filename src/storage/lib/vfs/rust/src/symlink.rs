@@ -127,7 +127,7 @@ impl<T: Symlink> Connection<T> {
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(Ok(()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::SymlinkRequest::DeprecatedGetAttr { responder } => {
                 // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
                 let (status, attrs) = crate::common::io2_to_io1_attrs(
@@ -137,7 +137,7 @@ impl<T: Symlink> Connection<T> {
                 .await;
                 responder.send(status.into_raw(), &attrs)?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::SymlinkRequest::GetAttr { responder } => {
                 // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
                 let (status, attrs) = crate::common::io2_to_io1_attrs(
@@ -147,11 +147,11 @@ impl<T: Symlink> Connection<T> {
                 .await;
                 responder.send(status.into_raw(), &attrs)?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::SymlinkRequest::DeprecatedSetAttr { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::SymlinkRequest::SetAttr { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }

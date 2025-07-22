@@ -4,7 +4,7 @@
 library fuchsia.bluetooth.le;
 
 /// The physical layer configuration for LE radio transmissions.
-@available(added=NEXT)
+@available(added=28)
 type PhysicalLayer = flexible enum : uint8 {
     /// The 1 Megabit PHY is the original and default PHY with balanced throughput and range.
     LE_1M = 1;

@@ -603,7 +603,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::Sync"))
                 .await?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::FileRequest::DeprecatedGetAttr { responder } => {
                 async move {
                     let (status, attrs) =
@@ -614,7 +614,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::GetAttr"))
                 .await?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::FileRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) =
@@ -625,7 +625,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::GetAttr"))
                 .await?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "28")]
             fio::FileRequest::DeprecatedSetAttr { flags, attributes, responder } => {
                 async move {
                     let result =
@@ -635,7 +635,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::SetAttr"))
                 .await?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "28"))]
             fio::FileRequest::SetAttr { flags, attributes, responder } => {
                 async move {
                     let result =
