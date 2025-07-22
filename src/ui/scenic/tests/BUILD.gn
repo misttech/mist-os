@@ -97,10 +97,8 @@ source_set("screen-capture-utils") {
     "utils/screen_capture_utils.cc",
     "utils/screen_capture_utils.h",
   ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/allocation:allocation",
-  ]
+  public_deps =
+      [ "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp" ]
   deps = [
     ":common-deps-zxtest",
     "//src/ui/scenic/lib/flatland/buffers",
@@ -190,7 +188,6 @@ ctf_components_packages("flatland-allocation-test") {
   deps = [
     ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils:utils",
     "//zircon/system/ulib/fbl",
   ]
@@ -276,7 +273,6 @@ ctf_components_packages("cpu-renderer-integration-test") {
     ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/flatland/buffers",
     "//src/ui/scenic/lib/utils:utils",
   ]
@@ -293,7 +289,6 @@ ctf_components_packages("null-renderer-integration-test") {
     ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils:utils",
   ]
   test_specs = {
@@ -346,7 +341,6 @@ ctf_components_packages("flatland-protected-memory-integration-test") {
   deps = [
     ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils:utils",
     "//zircon/system/ulib/fbl",
   ]
@@ -368,7 +362,6 @@ ctf_components_packages("screen-capture-integration-test") {
     ":common-deps-zxtest",
     ":screen-capture-utils",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils:utils",
     "//src/ui/testing/util:zxtest_helpers",
     "//zircon/system/ulib/fbl",
@@ -390,7 +383,6 @@ ctf_components_packages("screen-capture2-integration-test") {
     "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//src/ui/lib/escher",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils:utils",
     "//zircon/system/ulib/fbl",
   ]
@@ -461,7 +453,6 @@ ctf_components_packages("flatland-pixeltest-general") {
     "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/utils:utils",
     "//src/ui/testing/util:screenshot_helper",
@@ -506,7 +497,6 @@ ctf_components_packages("flatland-pixeltest-flip-and-orientation") {
     "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/utils:utils",
     "//src/ui/testing/util:screenshot_helper",
@@ -528,7 +518,6 @@ ctf_components_packages("flatland-pixeltest-yuv") {
     "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/utils:utils",
     "//src/ui/testing/util:screenshot_helper",

@@ -19,6 +19,7 @@ cc_test_executable("unittests") {
 
   deps = [
     "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl:fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",

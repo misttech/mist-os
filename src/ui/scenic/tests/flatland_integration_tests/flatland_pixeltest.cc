@@ -5,6 +5,7 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
@@ -13,7 +14,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"

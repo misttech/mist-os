@@ -12,6 +12,7 @@
 #include <lib/sync/cpp/completion.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
@@ -28,7 +29,6 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/escher/util/epsilon_compare.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/allocation/mock_buffer_collection_importer.h"

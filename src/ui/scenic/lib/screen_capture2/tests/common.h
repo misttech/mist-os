@@ -7,10 +7,10 @@
 
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/zx/event.h>
 
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture_buffer_collection_importer.h"
 
 namespace screen_capture2 {
@@ -22,7 +22,7 @@ std::shared_ptr<allocation::Allocator> CreateAllocator(
 
 void CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
-    allocation::BufferCollectionExportToken export_token,
+    fuchsia::ui::composition::BufferCollectionExportToken export_token,
     std::shared_ptr<allocation::Allocator> flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator);
 

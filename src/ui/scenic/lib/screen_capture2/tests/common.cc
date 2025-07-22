@@ -6,12 +6,12 @@
 
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture_buffer_collection_importer.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
@@ -37,7 +37,7 @@ std::shared_ptr<Allocator> CreateAllocator(
 
 void CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
-    allocation::BufferCollectionExportToken export_token,
+    fuchsia::ui::composition::BufferCollectionExportToken export_token,
     std::shared_ptr<Allocator> flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator) {
   zx_status_t status;

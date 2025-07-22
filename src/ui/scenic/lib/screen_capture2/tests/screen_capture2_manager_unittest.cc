@@ -6,6 +6,7 @@
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 
 #include <memory>
 #include <utility>
@@ -16,7 +17,6 @@
 #include "fuchsia/ui/composition/internal/cpp/fidl.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
 #include "src/ui/scenic/lib/flatland/tests/mock_flatland_presenter.h"

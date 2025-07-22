@@ -22,12 +22,11 @@ void AppendPixel(std::vector<uint8_t>* values, const uint8_t* pixel) {
   values->insert(values->end(), pixel, pixel + kBytesPerPixel);
 }
 
-void GenerateImageForFlatlandInstance(uint32_t buffer_collection_index,
-                                      fuchsia::ui::composition::FlatlandPtr& flatland,
-                                      TransformId parent_transform,
-                                      allocation::BufferCollectionImportToken import_token,
-                                      SizeU size, Vec translation, uint32_t image_id,
-                                      uint32_t transform_id) {
+void GenerateImageForFlatlandInstance(
+    uint32_t buffer_collection_index, fuchsia::ui::composition::FlatlandPtr& flatland,
+    TransformId parent_transform,
+    fuchsia::ui::composition::BufferCollectionImportToken import_token, SizeU size, Vec translation,
+    uint32_t image_id, uint32_t transform_id) {
   // Create the image in the Flatland instance.
   fuchsia::ui::composition::ImageProperties image_properties = {};
   image_properties.set_size(size);
@@ -92,7 +91,7 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
 
 fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
-    allocation::BufferCollectionExportToken export_token,
+    fuchsia::ui::composition::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage) {
   RegisterBufferCollectionArgs rbc_args = {};

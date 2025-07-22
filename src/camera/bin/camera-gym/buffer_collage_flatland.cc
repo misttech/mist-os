@@ -17,6 +17,7 @@
 #include <lib/fpromise/promise.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
@@ -31,7 +32,6 @@
 #include <optional>
 
 #include "src/camera/bin/camera-gym/screen_util.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 
 namespace camera_flatland {
 

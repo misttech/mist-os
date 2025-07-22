@@ -6,8 +6,6 @@ source_set("allocation") {
   sources = [
     "allocator.cc",
     "allocator.h",
-    "buffer_collection_import_export_tokens.cc",
-    "buffer_collection_import_export_tokens.h",
     "buffer_collection_importer.h",
     "id.cc",
     "id.h",

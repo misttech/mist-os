@@ -8,6 +8,7 @@
 #include <fuchsia/images2/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/buffer_collection_import_export_tokens.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -15,7 +16,6 @@
 #include <string>
 
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/image-compression/image_compression.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
