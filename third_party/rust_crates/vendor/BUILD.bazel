@@ -3091,14 +3091,14 @@ alias(
 )
 
 alias(
-    name = "unicode-normalization-0.1.19",
-    actual = "//third_party/rust_crates/vendor/unicode-normalization-0.1.19:unicode_normalization",
+    name = "unicode-normalization-0.1.24",
+    actual = "//third_party/rust_crates/vendor/unicode-normalization-0.1.24:unicode_normalization",
     tags = ["manual"],
 )
 
 alias(
     name = "unicode-normalization",
-    actual = "//third_party/rust_crates/vendor/unicode-normalization-0.1.19:unicode_normalization",
+    actual = "//third_party/rust_crates/vendor/unicode-normalization-0.1.24:unicode_normalization",
     tags = ["manual"],
 )
 

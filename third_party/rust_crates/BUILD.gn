@@ -1184,7 +1184,7 @@ group("unicase") {
 
 if (current_os == "fuchsia") {
   group("unicode-normalization") {
-    public_deps = [ ":unicode-normalization-v0_1_19" ]
+    public_deps = [ ":unicode-normalization-v0_1_24" ]
   }
 }
 
@@ -8443,7 +8443,7 @@ rustc_library("idna-v0_1_5") {
   deps = []
   deps += [ ":matches-v0_1_9" ]
   deps += [ ":unicode-bidi-v0_3_18" ]
-  deps += [ ":unicode-normalization-v0_1_19" ]
+  deps += [ ":unicode-normalization-v0_1_24" ]
 
   rustenv = []
 
@@ -8478,7 +8478,7 @@ rustc_library("idna-v0_2_3") {
   deps = []
   deps += [ ":matches-v0_1_9" ]
   deps += [ ":unicode-bidi-v0_3_18" ]
-  deps += [ ":unicode-normalization-v0_1_19" ]
+  deps += [ ":unicode-normalization-v0_1_24" ]
 
   rustenv = []
 
@@ -8512,7 +8512,7 @@ rustc_library("idna-v0_3_0") {
 
   deps = []
   deps += [ ":unicode-bidi-v0_3_18" ]
-  deps += [ ":unicode-normalization-v0_1_19" ]
+  deps += [ ":unicode-normalization-v0_1_24" ]
 
   rustenv = []
 
@@ -19416,16 +19416,16 @@ rustc_library("unicode-ident-v1_0_1") {
   applicable_licenses = [ ":unicode-ident-v1_0_1.license" ]
 }
 
-license("unicode-normalization-v0_1_19.license") {
+license("unicode-normalization-v0_1_24.license") {
   public_package_name = "unicode_normalization"
-  license_files = [ "//third_party/rust_crates/vendor/unicode-normalization-0.1.19/LICENSE-APACHE" ]
+  license_files = [ "//third_party/rust_crates/vendor/unicode-normalization-0.1.24/LICENSE-APACHE" ]
 }
 
-rustc_library("unicode-normalization-v0_1_19") {
+rustc_library("unicode-normalization-v0_1_24") {
   crate_name = "unicode_normalization"
   source_root =
-      "//third_party/rust_crates/vendor/unicode-normalization-0.1.19/src/lib.rs"
-  output_name = "unicode_normalization-f0419f1689e12c5b"
+      "//third_party/rust_crates/vendor/unicode-normalization-0.1.24/src/lib.rs"
+  output_name = "unicode_normalization-d1728aecffd438d7"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -19438,15 +19438,15 @@ rustc_library("unicode-normalization-v0_1_19") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=f0419f1689e12c5b",
-    "-Cextra-filename=-f0419f1689e12c5b",
+    "-Cmetadata=d1728aecffd438d7",
+    "-Cextra-filename=-d1728aecffd438d7",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":unicode-normalization-v0_1_19.license" ]
+  applicable_licenses = [ ":unicode-normalization-v0_1_24.license" ]
 }
 
 license("unicode-segmentation-v1_12_0.license") {

@@ -13,7 +13,7 @@ use super::UnicodeNormalization;
 use core::char;
 
 #[cfg(not(feature = "std"))]
-use crate::no_std_prelude::*;
+use alloc::string::{String, ToString};
 
 #[test]
 fn test_nfd() {
@@ -103,6 +103,11 @@ fn test_nfkc() {
         "a\u{300}\u{305}\u{315}\u{5ae}b",
         "\u{e0}\u{5ae}\u{305}\u{315}b"
     );
+}
+
+#[test]
+fn test_normalize_char() {
+    assert_eq!('\u{2126}'.nfd().to_string(), "\u{3a9}")
 }
 
 #[test]

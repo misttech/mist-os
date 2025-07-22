@@ -559,7 +559,7 @@ _NORMAL_DEPENDENCIES = {
             "trust-dns-proto": Label("//third_party/rust_crates/vendor/trust-dns-proto-0.22.0:trust_dns_proto"),
             "trust-dns-resolver": Label("//third_party/rust_crates/vendor/trust-dns-resolver-0.22.0:trust_dns_resolver"),
             "ttf-parser": Label("//third_party/rust_crates/vendor/ttf-parser-0.10.1:ttf_parser"),
-            "unicode-normalization": Label("//third_party/rust_crates/vendor/unicode-normalization-0.1.19:unicode_normalization"),
+            "unicode-normalization": Label("//third_party/rust_crates/vendor/unicode-normalization-0.1.24:unicode_normalization"),
             "vk-sys": Label("//third_party/rust_crates/vendor/vk-sys-0.7.0:vk_sys"),
             "x509-cert": Label("//third_party/rust_crates/vendor/x509-cert-0.2.5:x509_cert"),
             "zeroize": Label("//third_party/rust_crates/vendor/zeroize-1.8.1:zeroize"),
