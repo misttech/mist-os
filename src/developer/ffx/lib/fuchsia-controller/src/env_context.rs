@@ -121,7 +121,19 @@ impl EnvContext {
             return Err(unspecified_target());
         }
         let mut device_connection = self.device_connection.lock().await;
-        if device_connection.is_none() {
+        // This is a race condition here. It is possible that the connection
+        // will have been terminated between here and when this function completes even if
+        // `is_terminated` returns `false`, meaning we would end up hitting the timeout in
+        // functions like `connect_remote_control_proxy`.
+        let device_connection_is_terminated =
+            device_connection.as_ref().map(|c| c.is_terminated()).unwrap_or(false);
+        if device_connection_is_terminated {
+            log::warn!(
+                "connection has been interrupted. Attempting to reconnect. Any closed FIDL proxies seen will have been related to this EnvContext's connection having been lost. This is for EnvContext: {}",
+                logging::log_id(&self.context)
+            );
+        }
+        if device_connection.is_none() || device_connection_is_terminated {
             *device_connection =
                 Some(new_device_connection(&self.context, &self.target_spec).await?);
         }
@@ -132,11 +144,27 @@ impl EnvContext {
     async fn connect_remote_control_helper(
         &self,
     ) -> Result<fidl_fuchsia_developer_remotecontrol::RemoteControlProxy> {
-        self.invariant_check().await?;
-        let t = Duration::from_secs_f64(self.context.get(ffx_config::keys::PROXY_TIMEOUT)?);
-        Ok(timeout::timeout(t, self.device_connection.lock().await.as_ref().unwrap().rcs_proxy()).await.map_err(|_| {
-            anyhow::anyhow!("Timed out attempting to get remote control proxy. This happened after verifying that we can connect to the device, so the device has likely disconnected.")
-                })??)
+        const MAX_RECONNECT_ATTEMPTS: u32 = 1;
+        for attempt in 0..=MAX_RECONNECT_ATTEMPTS {
+            self.invariant_check().await?;
+            let t = Duration::from_secs_f64(self.context.get(ffx_config::keys::PROXY_TIMEOUT)?);
+            match timeout::timeout(t, self.device_connection.lock().await.as_ref().unwrap().rcs_proxy()).await.map_err(|_| {
+            anyhow::anyhow!("Timed out attempting to get remote control proxy. This happened after verifying that we can connect to the device, so the device has likely disconnected in the interim.")
+                }) {
+                // No timeout here (there are two layers of errors)
+                Ok(res) => return Ok(res?),
+                Err(e) => {
+                    if attempt < MAX_RECONNECT_ATTEMPTS {
+                        log::warn!("{e} Attempting to connect once more");
+                    } else {
+                        log::warn!("{e} Max attempts reached. Giving up and returning error.");
+                        return Err(e);
+                    }
+                }
+            }
+        }
+        // The above will always return eventually.
+        unreachable!();
     }
 
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {

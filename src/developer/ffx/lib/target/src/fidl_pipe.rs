@@ -14,6 +14,7 @@ use futures::FutureExt;
 use futures_lite::stream::StreamExt;
 use std::io;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -25,6 +26,9 @@ use std::time::Duration;
 pub struct FidlPipe {
     task: Option<Task<()>>,
     error_queue: Receiver<anyhow::Error>,
+    // Using atomic bool because turning `Task<()>` into a fused future didn't appear to behave as
+    // intended, e.g. `terminated()` did not return `true` even if the task had run to completion.
+    is_terminated: Arc<AtomicBool>,
     compat: Option<CompatibilityInfo>,
     device_address: Option<SocketAddr>,
     host_ssh_address: Option<HostAddr>,
@@ -153,26 +157,38 @@ impl FidlPipe {
             (None, None)
         };
 
+        let is_terminated = Arc::new(AtomicBool::new(false));
+        let is_terminated_clone = Arc::clone(&is_terminated);
         let main_task = match (overnet_task, fdomain_task) {
             (None, None) => unreachable!(),
             (Some(o), None) => Task::local(async move {
                 o.await;
+                is_terminated_clone.store(true, Ordering::Release);
                 // Explicit drop to force the struct into the closure.
                 drop(connector);
             }),
             (None, Some(f)) => Task::local(async move {
                 f.await;
+                is_terminated_clone.store(true, Ordering::Release);
                 // Explicit drop to force the struct into the closure.
                 drop(connector);
             }),
             (Some(o), Some(f)) => Task::local(async move {
                 futures::future::join(o, f).await;
+                is_terminated_clone.store(true, Ordering::Release);
                 // Explicit drop to force the struct into the closure.
                 drop(connector);
             }),
         };
         Ok((
-            Self { task: Some(main_task), error_queue, compat, device_address, host_ssh_address },
+            Self {
+                task: Some(main_task),
+                error_queue,
+                compat,
+                device_address,
+                host_ssh_address,
+                is_terminated,
+            },
             node,
             client,
         ))
@@ -203,7 +219,18 @@ impl FidlPipe {
 
     pub fn fake(device_address: Option<SocketAddr>) -> Self {
         let (_error_sender, error_queue) = async_channel::unbounded();
-        Self { task: None, error_queue, compat: None, device_address, host_ssh_address: None }
+        Self {
+            task: None,
+            error_queue,
+            compat: None,
+            device_address,
+            host_ssh_address: None,
+            is_terminated: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.is_terminated.load(Ordering::Acquire)
     }
 }
 

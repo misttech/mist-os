@@ -198,6 +198,10 @@ impl Connection {
             rcs_info: Mutex::new(None),
         }
     }
+
+    pub fn is_terminated(&self) -> bool {
+        self.fidl_pipe.is_terminated()
+    }
 }
 
 #[derive(Debug)]
