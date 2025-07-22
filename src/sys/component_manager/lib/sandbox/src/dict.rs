@@ -176,6 +176,26 @@ impl Dict {
         self.lock().entries.get(key)
     }
 
+    /// Returns a clone of the capability associated with `key`, or populates it with `default` if
+    /// it is not present.
+    ///
+    /// If the value could not be cloned, returns an error.
+    pub fn get_or_insert(
+        &self,
+        key: &Key,
+        default: impl FnOnce() -> Capability,
+    ) -> Result<Capability, ()> {
+        let DictInner { entries, update_notifiers, .. } = &mut *self.lock();
+        match entries.get(key)? {
+            Some(v) => Ok(v),
+            None => {
+                let v = (default)();
+                entries.insert(key.clone(), v.try_clone()?, update_notifiers).unwrap();
+                Ok(v)
+            }
+        }
+    }
+
     /// Removes `key` from the entries, returning the capability at `key` if the key was already in
     /// the entries.
     pub fn remove(&self, key: &BorrowedKey) -> Option<Capability> {

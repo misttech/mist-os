@@ -132,8 +132,9 @@ impl StructuredDict for ComponentInput {
 impl ComponentInput {
     pub fn new(environment: ComponentEnvironment) -> Self {
         let dict = Dict::new();
-        dict.insert(PARENT.clone(), Dict::new().into()).ok();
-        dict.insert(ENVIRONMENT.clone(), Dict::from(environment).into()).ok();
+        if let Some(_) = environment.0.keys().next() {
+            dict.insert(ENVIRONMENT.clone(), Dict::from(environment).into()).unwrap();
+        }
         Self(dict)
     }
 
@@ -145,29 +146,20 @@ impl ComponentInput {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
-        let dict = Dict::new();
-        dict.insert(PARENT.clone(), self.capabilities().shallow_copy()?.into()).ok();
-        dict.insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy()?.into())
-            .ok();
-        Ok(Self(dict))
+        let dest = Dict::new();
+        shallow_copy(&self.0, &dest, &*PARENT)?;
+        shallow_copy(&self.0, &dest, &*ENVIRONMENT)?;
+        Ok(Self(dest))
     }
 
     /// Returns the sub-dictionary containing capabilities routed by the component's parent.
     pub fn capabilities(&self) -> Dict {
-        let cap = self.0.get(&*PARENT).expect("capabilities must be cloneable").unwrap();
-        let Capability::Dictionary(dict) = cap else {
-            unreachable!("parent entry must be a dict: {cap:?}");
-        };
-        dict
+        get_or_insert(&self.0, &*PARENT)
     }
 
     /// Returns the sub-dictionary containing capabilities routed by the component's environment.
     pub fn environment(&self) -> ComponentEnvironment {
-        let cap = self.0.get(&*ENVIRONMENT).expect("environment must be cloneable").unwrap();
-        let Capability::Dictionary(dict) = cap else {
-            unreachable!("environment entry must be a dict: {cap:?}");
-        };
-        ComponentEnvironment(dict)
+        ComponentEnvironment(get_or_insert(&self.0, &*ENVIRONMENT))
     }
 
     pub fn insert_capability(
@@ -192,11 +184,7 @@ pub struct ComponentEnvironment(Dict);
 
 impl Default for ComponentEnvironment {
     fn default() -> Self {
-        let dict = Dict::new();
-        dict.insert(DEBUG.clone(), Dict::new().into()).ok();
-        dict.insert(RUNNERS.clone(), Dict::new().into()).ok();
-        dict.insert(RESOLVERS.clone(), Dict::new().into()).ok();
-        Self(dict)
+        Self(Dict::new())
     }
 }
 
@@ -213,40 +201,28 @@ impl ComponentEnvironment {
 
     /// Capabilities listed in the `debug_capabilities` portion of its environment.
     pub fn debug(&self) -> Dict {
-        let cap = self.0.get(&*DEBUG).expect("debug must be cloneable").unwrap();
-        let Capability::Dictionary(dict) = cap else {
-            unreachable!("debug entry must be a dict: {cap:?}");
-        };
-        dict
+        get_or_insert(&self.0, &*DEBUG)
     }
 
     /// Capabilities listed in the `runners` portion of its environment.
     pub fn runners(&self) -> Dict {
-        let cap = self.0.get(&*RUNNERS).expect("runners must be cloneable").unwrap();
-        let Capability::Dictionary(dict) = cap else {
-            unreachable!("runners entry must be a dict: {cap:?}");
-        };
-        dict
+        get_or_insert(&self.0, &*RUNNERS)
     }
 
     /// Capabilities listed in the `resolvers` portion of its environment.
     pub fn resolvers(&self) -> Dict {
-        let cap = self.0.get(&*RESOLVERS).expect("resolvers must be cloneable").unwrap();
-        let Capability::Dictionary(dict) = cap else {
-            unreachable!("resolvers entry must be a dict: {cap:?}");
-        };
-        dict
+        get_or_insert(&self.0, &*RESOLVERS)
     }
 
     pub fn shallow_copy(&self) -> Result<Self, ()> {
         // Note: We call [Dict::shallow_copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::shallow_copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
-        let dict = Dict::new();
-        dict.insert(DEBUG.clone(), self.debug().shallow_copy()?.into()).ok();
-        dict.insert(RUNNERS.clone(), self.runners().shallow_copy()?.into()).ok();
-        dict.insert(RESOLVERS.clone(), self.resolvers().shallow_copy()?.into()).ok();
-        Ok(Self(dict))
+        let dest = Dict::new();
+        shallow_copy(&self.0, &dest, &*DEBUG)?;
+        shallow_copy(&self.0, &dest, &*RUNNERS)?;
+        shallow_copy(&self.0, &dest, &*RESOLVERS)?;
+        Ok(Self(dest))
     }
 }
 
@@ -276,10 +252,7 @@ impl StructuredDict for ComponentOutput {
 
 impl ComponentOutput {
     pub fn new() -> Self {
-        let dict = Dict::new();
-        dict.insert(PARENT.clone(), Dict::new().into()).ok();
-        dict.insert(FRAMEWORK.clone(), Dict::new().into()).ok();
-        Self(dict)
+        Self(Dict::new())
     }
 
     /// Creates a new ComponentOutput with entries cloned from this ComponentOutput.
@@ -290,29 +263,22 @@ impl ComponentOutput {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
-        let dict = Dict::new();
-        dict.insert(PARENT.clone(), self.capabilities().shallow_copy()?.into()).ok();
-        dict.insert(FRAMEWORK.clone(), self.framework().shallow_copy()?.into()).ok();
-        Ok(Self(dict))
+        let dest = Dict::new();
+        shallow_copy(&self.0, &dest, &*PARENT)?;
+        shallow_copy(&self.0, &dest, &*FRAMEWORK)?;
+        Ok(Self(dest))
     }
 
     /// Returns the sub-dictionary containing capabilities routed by the component's parent.
+    /// framework. Lazily adds the dictionary if it does not exist yet.
     pub fn capabilities(&self) -> Dict {
-        let cap = self.0.get(&*PARENT).expect("capabilities must be cloneable").unwrap();
-        let Capability::Dictionary(dict) = cap else {
-            unreachable!("parent entry must be a dict: {cap:?}");
-        };
-        dict
+        get_or_insert(&self.0, &*PARENT)
     }
 
     /// Returns the sub-dictionary containing capabilities exposed by the component to the
-    /// framework.
+    /// framework. Lazily adds the dictionary if it does not exist yet.
     pub fn framework(&self) -> Dict {
-        let cap = self.0.get(&*FRAMEWORK).expect("capabilities must be cloneable").unwrap();
-        let Capability::Dictionary(dict) = cap else {
-            unreachable!("framework entry must be a dict: {cap:?}");
-        };
-        dict
+        get_or_insert(&self.0, &*FRAMEWORK)
     }
 }
 
@@ -320,6 +286,26 @@ impl From<ComponentOutput> for Dict {
     fn from(e: ComponentOutput) -> Self {
         e.0
     }
+}
+
+fn shallow_copy(src: &Dict, dest: &Dict, key: &Name) -> Result<(), ()> {
+    if let Some(d) = src.get(key).expect("must be cloneable") {
+        let Capability::Dictionary(d) = d else {
+            unreachable!("{key} entry must be a dict: {d:?}");
+        };
+        dest.insert(key.clone(), d.shallow_copy()?.into()).ok();
+    }
+    Ok(())
+}
+
+fn get_or_insert(this: &Dict, key: &Name) -> Dict {
+    let cap = this
+        .get_or_insert(&key, || Capability::Dictionary(Dict::new()))
+        .expect("capabilities must be cloneable");
+    let Capability::Dictionary(dict) = cap else {
+        unreachable!("{key} entry must be a dict: {cap:?}");
+    };
+    dict
 }
 
 #[cfg(test)]
