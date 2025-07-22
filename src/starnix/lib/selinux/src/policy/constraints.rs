@@ -367,7 +367,7 @@ impl ContextExpression {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy::{find_class_by_name, parse_policy_by_reference};
+    use crate::policy::{find_class_by_name, parse_policy_by_value};
 
     fn normalize_context_expr(expr: ContextExpression) -> ContextExpression {
         let (left, right) = match expr.operator {
@@ -407,8 +407,9 @@ mod tests {
     #[test]
     fn decode_constraint_expr() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let parsed_policy = policy.0.parsed_policy();
@@ -475,8 +476,9 @@ mod tests {
     #[test]
     fn evaluate_constraint_expr() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let parsed_policy = policy.0.parsed_policy();
@@ -555,8 +557,9 @@ mod tests {
     #[test]
     fn evaluate_mls_constraint_expr() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        let policy = parse_policy_by_value(policy_bytes.to_vec())
             .expect("parse policy")
+            .0
             .validate()
             .expect("validate policy");
         let parsed_policy = policy.0.parsed_policy();

@@ -1767,7 +1767,7 @@ impl Validate for CategoryMetadata {
 #[cfg(test)]
 mod tests {
     use super::super::security_context::Level;
-    use super::super::{parse_policy_by_reference, CategoryId, SensitivityId, UserId};
+    use super::super::{parse_policy_by_value, CategoryId, SensitivityId, UserId};
     use super::*;
 
     use std::num::NonZeroU32;
@@ -1775,7 +1775,7 @@ mod tests {
     #[test]
     fn mls_levels_for_user_context() {
         const TEST_POLICY: &[u8] = include_bytes! {"../../testdata/micro_policies/multiple_levels_and_categories_policy.pp"};
-        let policy = parse_policy_by_reference(TEST_POLICY).unwrap().validate().unwrap();
+        let policy = parse_policy_by_value(TEST_POLICY.to_vec()).unwrap().0.validate().unwrap();
         let parsed_policy = policy.0.parsed_policy();
 
         let user = parsed_policy.user(UserId(NonZeroU32::new(1).expect("user with id 1")));
@@ -1805,7 +1805,7 @@ mod tests {
     #[test]
     fn parse_mls_constrain_statement() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1868,7 +1868,7 @@ mod tests {
     #[test]
     fn parse_constrain_statement() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 

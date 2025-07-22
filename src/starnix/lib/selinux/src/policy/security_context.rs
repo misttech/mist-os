@@ -588,16 +588,16 @@ pub enum SecurityContextError {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{parse_policy_by_reference, ByRef, Policy};
+    use super::super::{parse_policy_by_value, ByValue, Policy};
     use super::*;
 
     use std::num::NonZeroU32;
 
-    type TestPolicy = Policy<ByRef<&'static [u8]>>;
+    type TestPolicy = Policy<ByValue<Vec<u8>>>;
     fn test_policy() -> TestPolicy {
         const TEST_POLICY: &[u8] =
             include_bytes!("../../testdata/micro_policies/security_context_tests_policy.pp");
-        parse_policy_by_reference(TEST_POLICY).unwrap().validate().unwrap()
+        parse_policy_by_value(TEST_POLICY.to_vec()).unwrap().0.validate().unwrap()
     }
 
     // Represents a `CategorySpan`.

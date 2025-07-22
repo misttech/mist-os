@@ -1560,13 +1560,13 @@ pub(super) struct RangeTransitionMetadata {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{find_class_by_name, parse_policy_by_reference};
+    use super::super::{find_class_by_name, parse_policy_by_value};
     use super::*;
 
     #[test]
     fn parse_allowxperm_one_ioctl() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1595,7 +1595,7 @@ mod tests {
     #[test]
     fn parse_allowxperm_two_ioctls_same_range() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1625,7 +1625,7 @@ mod tests {
     #[test]
     fn parse_allowxperm_two_ioctls_different_range() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1659,7 +1659,7 @@ mod tests {
     #[test]
     fn parse_allowxperm_one_driver_range() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1687,7 +1687,7 @@ mod tests {
     #[test]
     fn parse_allowxperm_all_ioctls() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1716,7 +1716,7 @@ mod tests {
     #[test]
     fn parse_allowxperm_overlapping_ranges() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1755,7 +1755,7 @@ mod tests {
     #[test]
     fn parse_auditallowxperm() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
@@ -1789,7 +1789,7 @@ mod tests {
     #[test]
     fn parse_dontauditxperm() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
 
