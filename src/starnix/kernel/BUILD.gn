@@ -375,6 +375,7 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/split_enum_storage",
     "//src/starnix/lib/starnix_ext",
     "//src/starnix/lib/starnix_lifecycle",
+    "//src/starnix/lib/starnix_stack",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_types",

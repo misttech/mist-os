@@ -9,6 +9,7 @@ group("lib") {
     "magma",
     "starnix_ext",
     "starnix_lifecycle",
+    "starnix_stack",
     "starnix_types",
     "starnix_uapi",
     "syncio",
