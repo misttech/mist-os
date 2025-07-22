@@ -88,61 +88,76 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
 
   // Setup Fshost.
   if (args->enable_storage_host) {
-    if (args->ramdisk_image) {
-      realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host-ramdisk-image.cm");
-      realm_builder.AddChild("fshost_config",
-                             "#meta/test-fshost-storage-host-ramdisk-image_config.cm");
-    } else {
-      realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host.cm");
-      realm_builder.AddChild("fshost_config", "#meta/test-fshost-storage-host_config.cm");
-    }
-  } else if (args->disable_block_watcher) {
-    realm_builder.AddChild("fshost", "#meta/test-fshost-no-watcher.cm");
-    realm_builder.AddChild("fshost_config", "#meta/test-fshost-no-watcher_config.cm");
+    realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host.cm");
+    realm_builder.AddChild("fshost_config", "#meta/test-fshost-storage-host_config.cm");
   } else {
     realm_builder.AddChild("fshost", "#meta/test-fshost.cm");
     realm_builder.AddChild("fshost_config", "#meta/test-fshost_config.cm");
+    if (args->disable_block_watcher) {
+      args->fshost_config.emplace_back(ConfigCapability{
+          .name = "fuchsia.fshost.DisableBlockWatcher", .value = ConfigValue::Bool(true)});
+    }
   }
+
+  std::vector<Capability> config_routes = {
+      Config{.name = "fuchsia.fshost.Blobfs"},
+      Config{.name = "fuchsia.fshost.BlobfsInitialInodes"},
+      Config{.name = "fuchsia.fshost.BlobfsMaxBytes"},
+      Config{.name = "fuchsia.fshost.BlobfsUseDeprecatedPaddedFormat"},
+      Config{.name = "fuchsia.fshost.BootPart"},
+      Config{.name = "fuchsia.fshost.CheckFilesystems"},
+      Config{.name = "fuchsia.fshost.Data"},
+      Config{.name = "fuchsia.fshost.DataFilesystemFormat"},
+      Config{.name = "fuchsia.fshost.DataMaxBytes"},
+      Config{.name = "fuchsia.fshost.DisableBlockWatcher"},
+      Config{.name = "fuchsia.fshost.Factory"},
+      Config{.name = "fuchsia.fshost.FormatDataOnCorruption"},
+      Config{.name = "fuchsia.fshost.Fvm"},
+      Config{.name = "fuchsia.fshost.FvmSliceSize"},
+      Config{.name = "fuchsia.fshost.FxfsBlob"},
+      Config{.name = "fuchsia.fshost.Gpt"},
+      Config{.name = "fuchsia.fshost.GptAll"},
+      Config{.name = "fuchsia.fshost.Mbr"},
+      Config{.name = "fuchsia.fshost.Nand"},
+      Config{.name = "fuchsia.fshost.NoZxcrypt"},
+      Config{.name = "fuchsia.fshost.RamdiskImage"},
+      Config{.name = "fuchsia.fshost.StorageHost"},
+      Config{.name = "fuchsia.fshost.StorageHostUrl"},
+      Config{.name = "fuchsia.fshost.UseDiskMigration"},
+      Config{.name = "fuchsia.fshost.FxfsCryptUrl"},
+      Config{.name = "fuchsia.fshost.StarnixVolumeName"},
+      Config{.name = "fuchsia.fshost.InlineCrypto"},
+  };
+
+  if (!args->fshost_config.empty()) {
+    std::vector<Capability> config_self_routes;
+    for (const auto& config : args->fshost_config) {
+      std::erase_if(config_routes, [&config](const auto& route) {
+        const auto* config_route = std::get_if<Config>(&route);
+        return config_route && config_route->name == config.name;
+      });
+      config_self_routes.emplace_back(Config{.name = config.name});
+    }
+    realm_builder.AddRoute(Route{
+        .capabilities = config_self_routes,
+        .source = {SelfRef{}},
+        .targets = {ChildRef{"fshost"}},
+    });
+    realm_builder.AddConfiguration(std::move(args->fshost_config));
+  }
+
   realm_builder.AddRoute(Route{
-      .capabilities =
-          {
-              Config{"fuchsia.fshost.Blobfs"},
-              Config{"fuchsia.fshost.BlobfsInitialInodes"},
-              Config{"fuchsia.fshost.BlobfsMaxBytes"},
-              Config{"fuchsia.fshost.BlobfsUseDeprecatedPaddedFormat"},
-              Config{"fuchsia.fshost.BootPart"},
-              Config{"fuchsia.fshost.CheckFilesystems"},
-              Config{"fuchsia.fshost.Data"},
-              Config{"fuchsia.fshost.DataFilesystemFormat"},
-              Config{"fuchsia.fshost.DataMaxBytes"},
-              Config{"fuchsia.fshost.DisableBlockWatcher"},
-              Config{"fuchsia.fshost.Factory"},
-              Config{"fuchsia.fshost.FormatDataOnCorruption"},
-              Config{"fuchsia.fshost.Fvm"},
-              Config{"fuchsia.fshost.FvmSliceSize"},
-              Config{"fuchsia.fshost.FxfsBlob"},
-              Config{"fuchsia.fshost.Gpt"},
-              Config{"fuchsia.fshost.GptAll"},
-              Config{"fuchsia.fshost.Mbr"},
-              Config{"fuchsia.fshost.Nand"},
-              Config{"fuchsia.fshost.NoZxcrypt"},
-              Config{"fuchsia.fshost.RamdiskImage"},
-              Config{"fuchsia.fshost.StorageHost"},
-              Config{"fuchsia.fshost.StorageHostUrl"},
-              Config{"fuchsia.fshost.UseDiskMigration"},
-              Config{"fuchsia.fshost.FxfsCryptUrl"},
-              Config{"fuchsia.fshost.StarnixVolumeName"},
-              Config{"fuchsia.fshost.InlineCrypto"},
-          },
+      .capabilities = config_routes,
       .source = {ChildRef{"fshost_config"}},
       .targets = {ChildRef{"fshost"}},
   });
+
   realm_builder.AddRoute(Route{
       .capabilities =
           {
-              Config{"fuchsia.fshost.DisableAutomount"},
-              Config{"fuchsia.blobfs.WriteCompressionAlgorithm"},
-              Config{"fuchsia.blobfs.CacheEvictionPolicy"},
+              Config{.name = "fuchsia.fshost.DisableAutomount"},
+              Config{.name = "fuchsia.blobfs.WriteCompressionAlgorithm"},
+              Config{.name = "fuchsia.blobfs.CacheEvictionPolicy"},
           },
       .source = {VoidRef()},
       .targets = {ChildRef{"fshost"}},

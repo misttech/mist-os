@@ -676,8 +676,10 @@ class EfiDevicePartitionerWithStorageHostTests : public EfiDevicePartitionerTest
   IsolatedDevmgr::Args BaseDevmgrArgs() override {
     IsolatedDevmgr::Args args;
     args.enable_storage_host = true;
-    args.ramdisk_image = true;
     args.disable_block_watcher = true;
+    args.fshost_config.emplace_back(
+        component_testing::ConfigCapability{.name = "fuchsia.fshost.RamdiskImage",
+                                            .value = component_testing::ConfigValue::Bool(true)});
     return args;
   }
 
