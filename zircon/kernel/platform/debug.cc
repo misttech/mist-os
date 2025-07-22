@@ -7,6 +7,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/cbuf.h>
 #include <lib/debuglog.h>
+#include <lib/root_resource_filter.h>
 #include <lib/uart/all.h>
 #include <lib/uart/null.h>
 #include <lib/uart/qemu.h>
@@ -163,8 +164,8 @@ bool platform_serial_enabled(void) { return is_serial_enabled; }
 
 void UartDriverHandoffEarly(const uart::all::Driver& serial) {
   ktl::visit(
-      [&](auto& driver) {
-        is_serial_enabled = !(ktl::is_same_v<ktl::decay_t<decltype(driver)>, uart::null::Driver>);
+      [&]<typename T>(T& driver) {
+        is_serial_enabled = !(ktl::is_same_v<ktl::decay_t<T>, uart::null::Driver>);
       },
       serial);
 
@@ -190,15 +191,22 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
     return;
   }
 
-  // Check for interrupt support or explicitly polling uart.
+  // Check for interrupt support or explicitly polling uart and reserve the IO regions, preventing
+  // userspace from claiming htem.
   ktl::optional<uint32_t> uart_irq;
   bool polling_mode = false;
   gUart.Visit([&]<typename DriverType>(DriverType& driver) {
     using uart_type = typename DriverType::uart_type;
     using cfg_type = typename uart_type::config_type;
-    if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_pio_t> ||
-                  ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
+    if constexpr (uart::MmioDriver<uart_type>) {
       uart_irq = PlatformUartGetIrqNumber(driver.config().irq);
+      uart::MmioRange aligned_mmio_range = driver.mmio_range().AlignedTo(ZX_PAGE_SIZE);
+      root_resource_filter_add_deny_region(aligned_mmio_range.address, aligned_mmio_range.size,
+                                           ZX_RSRC_KIND_MMIO);
+    } else if constexpr (uart::PioDriver<uart_type>) {
+      uart_irq = PlatformUartGetIrqNumber(driver.config().irq);
+      uart::IoPortRange ioports = driver.ioports();
+      root_resource_filter_add_deny_region(ioports.base, ioports.count, ZX_RSRC_KIND_IOPORT);
     } else {  // Only |uart::null::Driver| is expected to have a different configuration type.
       constexpr auto kIsNullDriver = ktl::is_same_v<uart_type, uart::null::Driver>;
       ZX_ASSERT_MSG(kIsNullDriver, "Unexpected UART Configuration.");

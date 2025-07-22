@@ -14,9 +14,6 @@
 #include <ktl/optional.h>
 #include <phys/handoff.h>
 
-// Platform specific preparation or set-up relating to the UART MMIO range.
-void PlatformUartPrepareMmio(paddr_t paddr, size_t size);
-
 // Returns the |irq| number to be used for registering an IRQ Handler if such |irq_num| can be
 // translated.
 // Returns |nullopt| if there is no irq wired to the provided |irq_num|, if the provided
@@ -49,7 +46,6 @@ class PlatformUartIoProvider<zbi_dcfg_simple_t, IoType>
   PlatformUartIoProvider(const zbi_dcfg_simple_t& config, size_t io_slots)
       : Base(config, io_slots, gPhysHandoff->uart_mmio.data()) {
     ZX_DEBUG_ASSERT(config.mmio_phys == gPhysHandoff->uart_mmio.paddr);
-    PlatformUartPrepareMmio(config.mmio_phys, gPhysHandoff->uart_mmio.size_bytes());
   }
 };
 
@@ -61,7 +57,8 @@ class PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>
  public:
   using Base = uart::BasicIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>;
   using Base::Base;
-  PlatformUartIoProvider(const zbi_dcfg_simple_pio_t& config, uint16_t io_slots);
+  PlatformUartIoProvider(const zbi_dcfg_simple_pio_t& config, uint16_t io_slots)
+      : Base(config, io_slots) {}
 };
 #endif
 
