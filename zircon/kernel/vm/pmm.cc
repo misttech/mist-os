@@ -172,10 +172,6 @@ bool pmm_set_free_memory_signal(uint64_t free_lower_bound, uint64_t free_upper_b
                                          delay_allocations_pages, event);
 }
 
-zx_status_t pmm_wait_till_should_retry_single_alloc(const Deadline& deadline) {
-  return Pmm::Node().WaitTillShouldRetrySingleAlloc(deadline);
-}
-
 void pmm_stop_returning_should_wait() { Pmm::Node().StopReturningShouldWait(); }
 
 void pmm_checker_check_all_free_pages() { Pmm::Node().CheckAllFreePages(); }
