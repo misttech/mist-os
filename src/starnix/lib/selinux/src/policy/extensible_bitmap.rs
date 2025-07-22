@@ -467,16 +467,6 @@ mod tests {
             result,
             {
                 match result.err().map(Into::<anyhow::Error>::into).map(as_parse_error) {
-                    // `ByRef` attempts to read large slice.
-                    Some(ParseError::MissingSliceData {
-                        type_name,
-                        type_size,
-                        num_items: 11,
-                        num_bytes: 24,
-                    }) => {
-                        assert_eq!(std::any::type_name::<MapItem>(), type_name);
-                        assert_eq!(std::mem::size_of::<MapItem>(), type_size);
-                    }
                     // `ByValue` attempts to read `Vec` one item at a time.
                     Some(ParseError::MissingData { type_name, type_size, num_bytes: 0 }) => {
                         assert_eq!(std::any::type_name::<MapItem>(), type_name);
@@ -484,13 +474,7 @@ mod tests {
                     }
                     v => {
                         panic!(
-                            "Expected Some({:?}) or Some({:?}), but got {:?}",
-                            ParseError::MissingSliceData {
-                                type_name: std::any::type_name::<MapItem>(),
-                                type_size: std::mem::size_of::<MapItem>(),
-                                num_items: 11,
-                                num_bytes: 24,
-                            },
+                            "Expected Some({:?}), but got {:?}",
                             ParseError::MissingData {
                                 type_name: std::any::type_name::<MapItem>(),
                                 type_size: std::mem::size_of::<MapItem>(),
@@ -581,17 +565,6 @@ mod tests {
             result,
             {
                 match result.err().map(Into::<anyhow::Error>::into).map(as_parse_error) {
-                    // `ByRef` attempts to read large slice.
-                    Some(ParseError::MissingSliceData {
-                        type_name,
-                        type_size,
-                        num_items: 3,
-                        num_bytes,
-                    }) => {
-                        assert_eq!(std::any::type_name::<MapItem>(), type_name);
-                        assert_eq!(std::mem::size_of::<MapItem>(), type_size);
-                        assert_eq!(2 * std::mem::size_of::<MapItem>(), num_bytes);
-                    }
                     // `ByValue` attempts to read `Vec` one item at a time.
                     Some(ParseError::MissingData { type_name, type_size, num_bytes: 0 }) => {
                         assert_eq!(std::any::type_name::<MapItem>(), type_name);
@@ -600,13 +573,7 @@ mod tests {
                     parse_err => {
                         assert!(
                             false,
-                            "Expected Some({:?}) or Some({:?}), but got {:?}",
-                            ParseError::MissingSliceData {
-                                type_name: std::any::type_name::<MapItem>(),
-                                type_size: std::mem::size_of::<MapItem>(),
-                                num_items: 3,
-                                num_bytes: 2 * std::mem::size_of::<MapItem>(),
-                            },
+                            "Expected Some({:?}), but got {:?}",
                             ParseError::MissingData {
                                 type_name: std::any::type_name::<MapItem>(),
                                 type_size: std::mem::size_of::<MapItem>(),

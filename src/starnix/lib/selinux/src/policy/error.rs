@@ -24,13 +24,6 @@ pub enum ParseError {
     TrailingBytes { num_bytes: usize },
     #[error("expected data item of type {type_name} ({type_size} bytes), but found {num_bytes}")]
     MissingData { type_name: &'static str, type_size: usize, num_bytes: usize },
-    #[error("expected {num_items} data item(s) of type {type_name} ({type_size} bytes), but found {num_bytes}")]
-    MissingSliceData {
-        type_name: &'static str,
-        type_size: usize,
-        num_items: usize,
-        num_bytes: usize,
-    },
     #[error("required parsing routine not implemented")]
     NotImplemented,
 }
