@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/event.h>
 #include <lib/zx/resource.h>
@@ -481,6 +482,7 @@ zx::result<fs::VnodeAttributes> Blob::GetAttributes() const {
         .id = map_index_,
         .content_size = content_size,
         .storage_size = block_count_ * GetBlockSize(),
+        .mode = V_TYPE_FILE | V_IRUSR | V_IXUSR,
     });
   });
 }

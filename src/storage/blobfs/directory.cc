@@ -88,6 +88,12 @@ zx_status_t Directory::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out
   });
 }
 
+zx::result<fs::VnodeAttributes> Directory::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .mode = V_TYPE_DIR | V_IRUSR,
+  });
+}
+
 zx::result<fbl::RefPtr<fs::Vnode>> Directory::Create(std::string_view name, fs::CreationType type) {
   TRACE_DURATION("blobfs", "Directory::Create", "name", name);
   ZX_DEBUG_ASSERT(name.find('/') == std::string_view::npos);
