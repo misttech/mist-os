@@ -442,6 +442,7 @@
                 "/bootstrap/sysmem",
                 "/core/audio_core",
                 "/core/network/netstack",
+                "/core/network/socket-proxy",
                 "/core/setui_service",
                 "/core/system-update/omaha-client-service",
                 "/core/system-update/system-update-checker",
