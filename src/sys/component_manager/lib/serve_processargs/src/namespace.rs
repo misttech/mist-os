@@ -6,7 +6,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use namespace::{Entry as NamespaceEntry, EntryError, Namespace, NamespaceError, Tree};
-use sandbox::{Capability, Dict, Directory, RemotableCapability};
+use sandbox::{Capability, Dict, Directory};
 use thiserror::Error;
 use vfs::directory::entry::serve_directory;
 use vfs::execution_scope::ExecutionScope;
@@ -113,11 +113,13 @@ impl NamespaceBuilder {
                     let _ = c.send(server);
                     Directory::new(directory)
                 }
-                cap @ Capability::Dictionary(_) => {
-                    let entry =
-                        cap.try_into_directory_entry(self.namespace_scope.clone()).map_err(
-                            |err| BuildNamespaceError::Conversion { path: path.clone(), err },
-                        )?;
+                Capability::Dictionary(dict) => {
+                    let entry = dict
+                        .try_into_directory_entry_oneshot(self.namespace_scope.clone())
+                        .map_err(|err| BuildNamespaceError::Conversion {
+                            path: path.clone(),
+                            err,
+                        })?;
                     if entry.entry_info().type_() != fio::DirentType::Directory {
                         return Err(BuildNamespaceError::Conversion {
                             path: path.clone(),

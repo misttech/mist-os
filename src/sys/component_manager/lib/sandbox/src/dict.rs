@@ -33,7 +33,7 @@ pub(crate) struct DictInner {
     #[derivative(Debug = "ignore")]
     // Currently this is only used on target, but it's compatible with host.
     #[allow(dead_code)]
-    not_found: Option<Box<dyn Fn(&str) -> () + 'static + Send + Sync>>,
+    pub(crate) not_found: Option<Box<dyn Fn(&str) -> () + 'static + Send + Sync>>,
 
     /// Tasks that serve the Dictionary protocol. This is an `Option` because dictionaries are not
     /// necessarily used in async contexts but a TaskGroup will fail construction if there is no
