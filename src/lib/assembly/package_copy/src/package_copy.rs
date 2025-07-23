@@ -221,10 +221,11 @@ impl PackageCopier {
             manifest.name().clone(),
         ));
 
-        // Pass the repository through if it was set.
+        // Pass the repository and ABI stamp through if set.
         if let Some(repository) = manifest.repository() {
             builder = builder.repository(repository);
         }
+        builder = builder.abi_revision(manifest.abi_revision());
 
         let (blobs, subpackages) = manifest.into_blobs_and_subpackages();
 

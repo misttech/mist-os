@@ -94,6 +94,9 @@ pub enum PackageManifestError {
         cause: delivery_blob::DecompressError,
         path: PathBuf,
     },
+
+    #[error("invalid abi-revision file")]
+    AbiRevision(#[from] AbiRevisionError),
 }
 
 #[derive(Debug, Error)]
@@ -137,6 +140,14 @@ pub enum MetaPackageError {
 
     #[error("meta/package file not found")]
     MetaPackageMissing,
+}
+
+#[derive(Debug, Error)]
+pub enum AbiRevisionError {
+    #[error("abi-revision file must be 8 bytes")]
+    Invalid(#[from] std::array::TryFromSliceError),
+    #[error("abi-revision file is missing")]
+    Missing,
 }
 
 #[derive(Debug, Error)]

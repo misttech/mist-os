@@ -349,11 +349,17 @@ impl BlobfsContents {
         let manifest = path.as_ref().to_owned();
         let package_manifest = PackageManifest::try_load_from(&manifest)?;
         let name = package_manifest.name().to_string();
+        let abi_revision = package_manifest.abi_revision();
         let mut package_blobs: Vec<PackageBlob> = vec![];
         Self::add_package_blobs(None, package_manifest, &mut package_blobs, merkle_size_map)
             .with_context(|| format!("adding package: {manifest}"))?;
         package_blobs.sort();
-        package_set.metadata.push(PackageMetadata { name, manifest, blobs: package_blobs });
+        package_set.metadata.push(PackageMetadata {
+            name,
+            manifest,
+            abi_revision,
+            blobs: package_blobs,
+        });
         Ok(())
     }
 
@@ -391,12 +397,14 @@ pub struct PackageSetMetadata {
 }
 
 /// Metadata on a single package included in a given image.
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct PackageMetadata {
     /// The package's name.
     pub name: String,
     /// Path to the package's manifest.
     pub manifest: Utf8PathBuf,
+    /// ABI revision stamped into the package.
+    pub abi_revision: Option<version_history::AbiRevision>,
     /// List of blobs in this package.
     pub blobs: Vec<PackageBlob>,
 }

@@ -428,6 +428,7 @@ mod tests {
                 "name": "some_pkg_name",
                 "version": "0"
             },
+            "abi_revision": "0x406c7ca7ef077db4",
             "blobs": [
                 {
                     "merkle": META_FAR_HASH,
