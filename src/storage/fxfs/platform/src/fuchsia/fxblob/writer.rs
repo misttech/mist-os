@@ -399,6 +399,8 @@ impl DeliveryBlobWriter {
             _ => return Err(FxfsError::Inconsistent.into()),
         };
 
+        let mut deferred_work = None;
+
         transaction
             .commit_with_callback(|_| {
                 let handle = self.stage.complete();
@@ -407,16 +409,19 @@ impl DeliveryBlobWriter {
                     // If the blob is in the cache, then we need to swap it.
                     if let Some(old_blob) = handle.owner().cache().get(old_id) {
                         let old_blob = old_blob.into_any().downcast::<FxBlob>().unwrap();
-                        let new_blob =
-                            old_blob.overwrite_me(handle, compression_info) as Arc<dyn FxNode>;
+                        let (new_blob, deferred) = old_blob.overwrite_me(handle, compression_info);
+                        deferred_work = deferred;
                         old_blob.mark_to_be_purged();
-                        reservation.commit(&new_blob);
+                        reservation.commit(&(new_blob as Arc<dyn FxNode>));
                     }
                 }
                 self.parent.did_add(&name, None);
             })
             .await
             .context("Failed to commit transaction!")?;
+        if let Some(deferred) = deferred_work {
+            deferred.await;
+        }
         Ok(())
     }
 
@@ -1255,6 +1260,7 @@ mod tests {
             connect_to_protocol_at_dir_svc::<BlobCreatorMarker>(fixture.volume_out_dir())
                 .expect("failed to connect to the BlobCreator service");
         let hash_cpy = hash;
+        let graveyard = fixture.fs().graveyard().clone();
         // Repeatedly overwrite the blob.
         let overwrite_loop = fasync::Task::spawn(async move {
             let hash = hash_cpy;
@@ -1277,6 +1283,8 @@ mod tests {
                     .await
                     .expect("transport error on bytes_ready")
                     .expect("failed to write data to vmo");
+                // Await graveyard so that we don't fill up the disk.
+                graveyard.flush().await;
             }
         });
 

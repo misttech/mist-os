@@ -26,8 +26,10 @@ use fxfs::object_store::{DataObjectHandle, ObjectDescriptor};
 use fxfs::round::{round_down, round_up};
 use fxfs::serialized_types::BlobMetadata;
 use fxfs_macros::ToWeakNode;
+use std::future::Future;
 use std::num::NonZero;
 use std::ops::Range;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use storage_device::buffer;
@@ -99,11 +101,13 @@ impl FxBlob {
         })
     }
 
+    /// Returns the new blob and some deferred work in an async future that must complete before
+    /// returning to the external caller.
     pub fn overwrite_me(
         self: &Arc<Self>,
         handle: DataObjectHandle<FxVolume>,
         compression_info: Option<CompressionInfo>,
-    ) -> Arc<Self> {
+    ) -> (Arc<Self>, Option<Pin<Box<impl Future<Output = ()>>>>) {
         let vmo = self.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
         let new_blob = Arc::new(Self {
@@ -127,19 +131,21 @@ impl FxBlob {
         // zero children signals.
         let receiver_lock =
             self.pager_packet_receiver_registration.receiver().set_receiver(&new_blob);
-        if receiver_lock.is_strong() {
+        let deferred_work = if receiver_lock.is_strong() {
             // If there was a strong moved between them, then the counts exchange as well. It is
             // only important that the increment happen under the lock as it may handle the next
             // zero children signal, no new requests can now go to the old blob, but to safely
             // ensure that all existing requests finish, we will defer to an async context.
             new_blob.open_count_add_one();
             let old_blob = self.clone();
-            self.handle.owner().spawn(async move {
+            Some(Box::pin(async move {
                 old_blob.pager().page_in_barrier().await;
                 old_blob.open_count_sub_one();
-            });
-        }
-        new_blob
+            }))
+        } else {
+            None
+        };
+        (new_blob, deferred_work)
     }
 
     pub fn root(&self) -> Hash {
