@@ -18,7 +18,9 @@ ffx_plugin("ffx_target_remove") {
 
   sources = [ "src/lib.rs" ]
   deps = [
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/manual_targets:lib",
     "//src/developer/ffx/lib/target/holders:lib",
