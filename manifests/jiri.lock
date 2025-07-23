@@ -216,63 +216,63 @@
     },
     {
         "package": "fuchsia/prebuilt/bt-hci-virtual/arm64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "d2vB_SxE6kTymMk14aGyA-PyiJ_e3lqBtNY3TuUAXrYC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "Wli4uuywPluZZlhWwOyOXlnTz69rNW5QAKHLQ2kLEj4C"
     },
     {
         "package": "fuchsia/prebuilt/bt-hci-virtual/debug-symbols-arm64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "MljCmxF9YFtmae3kIvCUdEAL1l97FyZmyksyZgMxmyEC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "h-3O9dWKAMnPATYymVsGH1rVE7soDchQ62das1P-C2YC"
     },
     {
         "package": "fuchsia/prebuilt/bt-hci-virtual/debug-symbols-riscv64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "WgJQkBGdM6Y9rOGXAIjP3vS_4TeSZtvWwp1g_FvkqZoC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "WoHr4pe8ZHUkp_QF-LY3GjRDDPGY8sN9p1Ub6Zjb0swC"
     },
     {
         "package": "fuchsia/prebuilt/bt-hci-virtual/debug-symbols-x86_64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "yLq4v7HNLtYFHZ8lck33opbEThoBLv5cKIU1WJKeJP0C"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "_G8zGqPPTbxMRjmwlwH9CZI1R4FjqWQJISR1QgX-ZiMC"
     },
     {
         "package": "fuchsia/prebuilt/bt-hci-virtual/riscv64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "icxmcl7v9QNGN21Kk2D1ES9v9u4OOhlpBfBtYmEMhs4C"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "gcWe6FMTTzPG4jw6jc8_QyMN4HVRr7XHP75IbkAzD84C"
     },
     {
         "package": "fuchsia/prebuilt/bt-hci-virtual/x86_64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "JHjHbcKNd1Gw9juR6wbN6jpIdLSJi_vrgpbdqlob2VQC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "Lo61robETqy9Sk_feexNJPzqFo8yjmKjdK90PRA5rr4C"
     },
     {
         "package": "fuchsia/prebuilt/bt-host/arm64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "xA7OtiUIGqaKFgbNcOa_Hvs9ZgcKo9A46YcUz_IdRTYC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "SkfYSRR-arU4t3AvV_02bIXM5LKr5oHSCl2lPERtvBgC"
     },
     {
         "package": "fuchsia/prebuilt/bt-host/debug-symbols-arm64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "2sNTUXR30P394JRaS78ltgNYGR0Q9GQdc1atHvhMZmQC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "emBitfdLZOnFOdRAUM5XqnWqIIedXpgGJtkJZmlB0joC"
     },
     {
         "package": "fuchsia/prebuilt/bt-host/debug-symbols-riscv64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "XaC984t0jq1sVg1QHRvD5NfKvIcTlSTBgmNA7xt7WpwC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "WEkvDrv0FzqKrOIn7kcRbI7N646N5aqU-qTSe0uEczwC"
     },
     {
         "package": "fuchsia/prebuilt/bt-host/debug-symbols-x86_64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "_qKM-bfQVQDAuxuHjba9ZLgY6ty-o2ACqw2NI38felUC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "eh1pVPtim2KlQYsg1RtIM4KBa97Ugkm7R48Z302DQ9YC"
     },
     {
         "package": "fuchsia/prebuilt/bt-host/riscv64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "q5MTRtBi7ekstjBcKMDwApuZPOTHxDJd-WLTYRUfYmUC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "Np1YiLewo9vcP85sfXRpJAg4raRZxtBIf-d8YaquxwEC"
     },
     {
         "package": "fuchsia/prebuilt/bt-host/x86_64",
-        "version": "git_revision:a362fc2292aba8e788fd0fa2eb9cfcd94ee9c651",
-        "instance_id": "yWkAXvG3SQMkhQ29REKCQOh1Snv-GhMKEdk2Wu_6pqIC"
+        "version": "git_revision:2a3969beb3d4bccf6c737ef03ff4085583429d90",
+        "instance_id": "lhNGZ86Ncaq4cYfW9u5nLghJVEaTFo3KhdD9SP_gqbgC"
     },
     {
         "package": "fuchsia/prebuilt/third_party/firmware/vim3",
