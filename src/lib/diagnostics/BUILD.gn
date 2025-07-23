@@ -22,6 +22,7 @@ group("tests") {
     "accessor2logger/integration",
     "accessor2logger/tests",
     "data:tests",
+    "fake-log-sink:tests",
     "hierarchy:tests",
     "inspect:tests",
     "log:tests",
