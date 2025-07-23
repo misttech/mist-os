@@ -274,12 +274,9 @@ sync_completion_t* ClientProxy::FidlUnboundCompletionForTesting() {
 
 void ClientProxy::CloseForTesting() { handler_.TearDownForTesting(); }
 
-void ClientProxy::TearDownOnDriverDispatcher() {
-  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *controller_.driver_dispatcher()->async_dispatcher(),
-      [this]() { handler_.TearDown(ZX_ERR_CONNECTION_ABORTED); });
-  ZX_DEBUG_ASSERT_MSG(post_task_result.is_ok(), "Failed to post TearDown task: %s",
-                      post_task_result.status_string());
+void ClientProxy::TearDown() {
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
+  handler_.TearDown(ZX_ERR_CONNECTION_ABORTED);
 }
 
 zx_status_t ClientProxy::Init(

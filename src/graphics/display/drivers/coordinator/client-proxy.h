@@ -56,11 +56,10 @@ class ClientProxy {
                               fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
                                   coordinator_listener_client_end);
 
-  // Schedule a task to tear down the `Client` instance on the driver
-  // dispatcher.
+  // Tears down the `Client` instance.
   //
-  // Caller must guarantee the dispatcher is running.
-  void TearDownOnDriverDispatcher();
+  // Must be called on the driver dispatcher.
+  void TearDown();
 
   // Requires holding `controller_.mtx()` lock.
   zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,

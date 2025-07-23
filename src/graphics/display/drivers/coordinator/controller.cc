@@ -850,7 +850,7 @@ void Controller::PrepareStop() {
     // Tell each client to start releasing. We know `clients_` will not be
     // modified here because we are holding the lock.
     for (auto& client : clients_) {
-      client->TearDownOnDriverDispatcher();
+      client->TearDown();
     }
 
     vsync_monitor_.Deinitialize();
