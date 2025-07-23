@@ -92,7 +92,6 @@
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.composition.Screenshot",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.wlan.device.service.DeviceMonitor",
                 "fuchsia.wlan.policy.AccessPointListener",
                 "fuchsia.wlan.policy.AccessPointProvider",

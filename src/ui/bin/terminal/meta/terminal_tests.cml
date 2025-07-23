@@ -35,7 +35,6 @@
                 "fuchsia.process.Launcher",
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
             ],
         },
     ],

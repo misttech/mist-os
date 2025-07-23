@@ -398,7 +398,6 @@
                 "fuchsia.ui.pointerinjector.Registry",
                 "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.policy.DisplayBacklight",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
             from: "parent",

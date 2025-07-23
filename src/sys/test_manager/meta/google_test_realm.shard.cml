@@ -58,12 +58,6 @@
             to: "#google-tests",
         },
         {
-            protocol: [ "fuchsia.ui.scenic.Scenic" ],
-            from: "parent",
-            to: "#google-tests",
-            availability: "same_as_target",
-        },
-        {
             storage: "data",
             from: "self",
             to: [ "#google-tests" ],

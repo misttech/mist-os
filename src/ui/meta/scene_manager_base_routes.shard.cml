@@ -49,7 +49,6 @@
                 "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.focus.FocusChainListenerRegistry",
                 "fuchsia.ui.pointerinjector.Registry",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
             from: "#scenic",
