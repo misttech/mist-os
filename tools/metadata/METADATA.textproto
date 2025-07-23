@@ -17,7 +17,3 @@ trackers: {
     component_id: 1478090
   }
 }
-
-presubmits: {
-  auto_reviewers: "fuchsia-infra-reviews@google.com"
-}
