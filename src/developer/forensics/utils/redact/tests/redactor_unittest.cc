@@ -37,85 +37,196 @@ class RedactorTest : public ::testing::Test {
   Redactor redactor_{0u, inspect::UintProperty(), inspect::BoolProperty()};
 };
 
-TEST_F(RedactorTest, Check) {
+TEST_F(RedactorTest, RedactsEmail) {
   EXPECT_EQ(Redact("Email: alice@website.tld"), "Email: <REDACTED-EMAIL>");
+}
+
+TEST_F(RedactorTest, RedactsIpv4) {
   EXPECT_EQ(Redact("IPv4: 8.8.8.8"), "IPv4: <REDACTED-IPV4: 1>");
-  EXPECT_EQ(Redact("IPv46: ::ffff:12.34.56.78"), "IPv46: ::ffff:<REDACTED-IPV4: 2>");
-  EXPECT_EQ(Redact("IPv46h: ::ffff:ab12:34cd"), "IPv46h: ::ffff:<REDACTED-IPV4: 3>");
-  EXPECT_EQ(Redact("not_IPv46h: ::ffff:ab12:34cd:5"), "not_IPv46h: <REDACTED-IPV6: 4>");
-  EXPECT_EQ(Redact("IPv6: 2001:503:eEa3:0:0:0:0:30"), "IPv6: <REDACTED-IPV6: 5>");
+}
+
+TEST_F(RedactorTest, RedactsIpv4InIpv6) {
+  EXPECT_EQ(Redact("IPv46: ::ffff:12.34.56.78"), "IPv46: ::ffff:<REDACTED-IPV4: 1>");
+}
+
+TEST_F(RedactorTest, RedactsIpv4InIpv6Hex) {
+  EXPECT_EQ(Redact("IPv46h: ::ffff:ab12:34cd"), "IPv46h: ::ffff:<REDACTED-IPV4: 1>");
+}
+
+TEST_F(RedactorTest, RedactsIpv6) {
+  EXPECT_EQ(Redact("not_IPv46h: ::ffff:ab12:34cd:5"), "not_IPv46h: <REDACTED-IPV6: 1>");
+  EXPECT_EQ(Redact("IPv6: 2001:503:eEa3:0:0:0:0:30"), "IPv6: <REDACTED-IPV6: 2>");
+}
+
+TEST_F(RedactorTest, RedactsIpv6Complex) {
   EXPECT_EQ(Redact("IPv6C: [::/0 via 2082::7d84:c1dc:ab34:656a nic 4]"),
-            "IPv6C: [::/0 via <REDACTED-IPV6: 6> nic 4]");
-  EXPECT_EQ(Redact("IPv6LL: fe80::7d84:c1dc:ab34:656a"), "IPv6LL: fe80:<REDACTED-IPV6-LL: 7>");
+            "IPv6C: [::/0 via <REDACTED-IPV6: 1> nic 4]");
+}
+
+TEST_F(RedactorTest, RedactsIpv6LinkLocal) {
+  EXPECT_EQ(Redact("IPv6LL: fe80::7d84:c1dc:ab34:656a"), "IPv6LL: fe80:<REDACTED-IPV6-LL: 1>");
+}
+
+TEST_F(RedactorTest, RedactsUuid) {
   EXPECT_EQ(Redact("UUID: ddd0fA34-1016-11eb-adc1-0242ac120002"), "UUID: <REDACTED-UUID>");
+}
+
+TEST_F(RedactorTest, RedactsMacAddress) {
   EXPECT_EQ(Redact("MAC address: 00:0a:95:9F:68:16 12-34-95-9F-68-16"),
-            "MAC address: 00:0a:95:<REDACTED-MAC: 8> 12-34-95-<REDACTED-MAC: 9>");
+            "MAC address: 00:0a:95:<REDACTED-MAC: 1> 12-34-95-<REDACTED-MAC: 2>");
+}
+
+TEST_F(RedactorTest, RedactsSsid) {
   EXPECT_EQ(Redact("SSID: <ssid-666F6F> <ssid-77696669>"),
-            "SSID: <REDACTED-SSID: 10> <REDACTED-SSID: 11>");
+            "SSID: <REDACTED-SSID: 1> <REDACTED-SSID: 2>");
+}
+
+TEST_F(RedactorTest, RedactsHttpUrl) {
   EXPECT_EQ(Redact("HTTP: http://fuchsia.dev/"), "HTTP: <REDACTED-URL>");
+}
+
+TEST_F(RedactorTest, RedactsHttpsUrl) {
   EXPECT_EQ(Redact("HTTPS: https://fuchsia.dev/"), "HTTPS: <REDACTED-URL>");
+}
+
+TEST_F(RedactorTest, RedactsUrlWithSemicolon) {
   EXPECT_EQ(Redact("URL with semicolon: https://fuchsia.dev?query=a;b"),
             "URL with semicolon: <REDACTED-URL>");
+}
+
+TEST_F(RedactorTest, RedactsUrlWithUuid) {
   EXPECT_EQ(
       Redact("URL with UUID: https://fuchsia.dev/ddd0fA34-1016-11eb-adc1-0242ac120002?query=a;b"),
       "URL with UUID: <REDACTED-URL>");
+}
+
+TEST_F(RedactorTest, RedactsCombined) {
   EXPECT_EQ(Redact("Combined: Email alice@website.tld, IPv4 8.8.8.8"),
             "Combined: Email <REDACTED-EMAIL>, IPv4 <REDACTED-IPV4: 1>");
+}
+
+TEST_F(RedactorTest, DoesNotRedactFidlService) {
   EXPECT_EQ(Redact("service::fidl service:fidl"), "service::fidl service:fidl");
+}
+
+TEST_F(RedactorTest, RedactsHexAndIpv4) {
   EXPECT_EQ(Redact("456 1234567890abcdefABCDEF0123456789 1.2.3.4"),
-            "456 <REDACTED-HEX: 13> <REDACTED-IPV4: 12>");
+            "456 <REDACTED-HEX: 2> <REDACTED-IPV4: 1>");
+}
+
+TEST_F(RedactorTest, DoesNotRedactPartialIpv4) {
   EXPECT_EQ(Redact("current: 0.8.8.8"), "current: 0.8.8.8");
+}
+
+TEST_F(RedactorTest, DoesNotRedactLoopbackIpv4) {
   EXPECT_EQ(Redact("loopback: 127.8.8.8"), "loopback: 127.8.8.8");
+}
+
+TEST_F(RedactorTest, DoesNotRedactLinkLocalIpv4) {
   EXPECT_EQ(Redact("link_local: 169.254.8.8"), "link_local: 169.254.8.8");
+}
+
+TEST_F(RedactorTest, DoesNotRedactLinkLocalMulticastIpv4) {
   EXPECT_EQ(Redact("link_local_multicast: 224.0.0.8"), "link_local_multicast: 224.0.0.8");
+}
+
+TEST_F(RedactorTest, DoesNotRedactBroadcastIpv4) {
   EXPECT_EQ(Redact("broadcast: 255.255.255.255"), "broadcast: 255.255.255.255");
-  EXPECT_EQ(Redact("not_broadcast: 255.255.255.254"), "not_broadcast: <REDACTED-IPV4: 14>");
+}
+
+TEST_F(RedactorTest, RedactsNonBroadcastIpv4) {
+  EXPECT_EQ(Redact("not_broadcast: 255.255.255.254"), "not_broadcast: <REDACTED-IPV4: 1>");
+}
+
+TEST_F(RedactorTest, RedactsNonLinkLocalMulticastIpv4) {
   EXPECT_EQ(Redact("not_link_local_multicast: 224.0.1.8"),
-            "not_link_local_multicast: <REDACTED-IPV4: 15>");
+            "not_link_local_multicast: <REDACTED-IPV4: 1>");
+}
+
+TEST_F(RedactorTest, DoesNotRedactLocalMulticastIpv6) {
   EXPECT_EQ(Redact("local_multicast_1: fF41::1234:5678:9aBc"),
             "local_multicast_1: fF41::1234:5678:9aBc");
   EXPECT_EQ(Redact("local_multicast_2: Ffe2:1:2:33:abcd:ef0:6789:456"),
             "local_multicast_2: Ffe2:1:2:33:abcd:ef0:6789:456");
+}
+
+TEST_F(RedactorTest, RedactsMulticastIpv6) {
   EXPECT_EQ(Redact("multicast: fF43:abcd::ef0:6789:456"),
-            "multicast: fF43:<REDACTED-IPV6-MULTI: 16>");
+            "multicast: fF43:<REDACTED-IPV6-MULTI: 1>");
+}
+
+TEST_F(RedactorTest, RedactsLinkLocalIpv6) {
   EXPECT_EQ(Redact("link_local_8: fe89:123::4567:8:90"),
-            "link_local_8: fe89:<REDACTED-IPV6-LL: 17>");
+            "link_local_8: fe89:<REDACTED-IPV6-LL: 1>");
   EXPECT_EQ(Redact("link_local_b: FEB2:123::4567:8:90"),
-            "link_local_b: FEB2:<REDACTED-IPV6-LL: 18>");
-  EXPECT_EQ(Redact("not_link_local: fec1:123::4567:8:90"), "not_link_local: <REDACTED-IPV6: 19>");
+            "link_local_b: FEB2:<REDACTED-IPV6-LL: 2>");
+}
+
+TEST_F(RedactorTest, RedactsNonLinkLocalIpv6) {
+  EXPECT_EQ(Redact("not_link_local: fec1:123::4567:8:90"), "not_link_local: <REDACTED-IPV6: 1>");
   EXPECT_EQ(Redact("not_link_local_2: fe71:123::4567:8:90"),
-            "not_link_local_2: <REDACTED-IPV6: 20>");
+            "not_link_local_2: <REDACTED-IPV6: 2>");
+}
+
+TEST_F(RedactorTest, DoesNotRedactInvalidIpv6) {
   EXPECT_EQ(Redact("not_address_1: 12:34::"), "not_address_1: 12:34::");
   EXPECT_EQ(Redact("not_address_2: ::12:34"), "not_address_2: ::12:34");
-  EXPECT_EQ(Redact("v6_colons_3_fields: ::12:34:5"), "v6_colons_3_fields: <REDACTED-IPV6: 21>");
-  EXPECT_EQ(Redact("v6_3_fields_colons: 12:34:5::"), "v6_3_fields_colons: <REDACTED-IPV6: 22>");
+}
+
+TEST_F(RedactorTest, RedactsValidIpv6WithEdgeCaseColons) {
+  EXPECT_EQ(Redact("v6_colons_3_fields: ::12:34:5"), "v6_colons_3_fields: <REDACTED-IPV6: 1>");
+  EXPECT_EQ(Redact("v6_3_fields_colons: 12:34:5::"), "v6_3_fields_colons: <REDACTED-IPV6: 2>");
   EXPECT_EQ(Redact("v6_colons_7_fields: ::12:234:35:46:5:6:7"),
-            "v6_colons_7_fields: <REDACTED-IPV6: 23>");
+            "v6_colons_7_fields: <REDACTED-IPV6: 3>");
   EXPECT_EQ(Redact("v6_7_fields_colons: 12:234:35:46:5:6:7::"),
-            "v6_7_fields_colons: <REDACTED-IPV6: 24>");
+            "v6_7_fields_colons: <REDACTED-IPV6: 4>");
   EXPECT_EQ(Redact("v6_colons_8_fields: ::12:234:35:46:5:6:7:8"),
-            "v6_colons_8_fields: <REDACTED-IPV6: 23>:8");
+            "v6_colons_8_fields: <REDACTED-IPV6: 3>:8");
   EXPECT_EQ(Redact("v6_8_fields_colons: 12:234:35:46:5:6:7:8::"),
-            "v6_8_fields_colons: <REDACTED-IPV6: 25>::");
+            "v6_8_fields_colons: <REDACTED-IPV6: 5>::");
+}
+
+TEST_F(RedactorTest, RedactsObfuscatedGaiaId) {
   EXPECT_EQ(Redact("obfuscated_gaia_id: 106986199446298680449"),
-            "obfuscated_gaia_id: <REDACTED-OBFUSCATED-GAIA-ID: 26>");
+            "obfuscated_gaia_id: <REDACTED-OBFUSCATED-GAIA-ID: 1>");
+}
+
+TEST_F(RedactorTest, Redacts32ByteHex) {
   EXPECT_EQ(
       Redact("32_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 33_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
-      "32_hex: <REDACTED-HEX: 27> 33_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-  EXPECT_EQ(Redact("456 1234567890abcdef 789"), "456 <REDACTED-HEX: 28> 789");
+      "32_hex: <REDACTED-HEX: 1> 33_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+
+TEST_F(RedactorTest, Redacts16ByteHex) {
+  EXPECT_EQ(Redact("456 1234567890abcdef 789"), "456 <REDACTED-HEX: 1> 789");
+}
+
+TEST_F(RedactorTest, DoesNotRedactHexWithElfPrefix) {
   EXPECT_EQ(Redact("456 elf:1234567890abcdef 789"), "456 elf:1234567890abcdef 789");
   EXPECT_EQ(Redact("456 elf:1234567890abcdefABCDEF0123456789 789"),
             "456 elf:1234567890abcdefABCDEF0123456789 789");
+}
+
+TEST_F(RedactorTest, DoesNotRedactBuildId) {
   EXPECT_EQ(Redact("456 build_id: '5f2c0ede0fa479b9b997c4fce6d4cf24' 789"),
             "456 build_id: '5f2c0ede0fa479b9b997c4fce6d4cf24' 789");
+}
+
+TEST_F(RedactorTest, RedactsIpv4InFidl) {
   EXPECT_EQ(Redact("ipv4 fidl debug: Ipv4Address { addr: [1, 255, FF, FF] }"),
-            "ipv4 fidl debug: Ipv4Address { <REDACTED-IPV4: 29> }");
+            "ipv4 fidl debug: Ipv4Address { <REDACTED-IPV4: 1> }");
+}
+
+TEST_F(RedactorTest, RedactsIpv6InFidl) {
   EXPECT_EQ(
       Redact(
           "ipv6 fidl debug: Ipv6Address { addr: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 255, FF, FF] }"),
-      "ipv6 fidl debug: Ipv6Address { <REDACTED-IPV6: 30> }");
+      "ipv6 fidl debug: Ipv6Address { <REDACTED-IPV6: 1> }");
+}
+
+TEST_F(RedactorTest, RedactsMacInFidl) {
   EXPECT_EQ(Redact("mac fidl debug: MacAddress { octets: [1, 2, 3, 255, FF, FF] }"),
-            "mac fidl debug: MacAddress { <REDACTED-MAC: 31> }");
+            "mac fidl debug: MacAddress { <REDACTED-MAC: 1> }");
 }
 
 TEST_F(RedactorTest, Canary) {
