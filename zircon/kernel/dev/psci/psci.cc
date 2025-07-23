@@ -203,14 +203,17 @@ zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context) {
   return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, context));
 }
 
-uint32_t psci_get_cpu_suspend_power_state() {
+uint32_t psci_get_cpu_suspend_power_state(PsciCpuSuspendMaxScope max_scope) {
+  LTRACEF("psci_get_cpu_suspend_power_state max_scope=%d\n", static_cast<int>(max_scope));
+
   DEBUG_ASSERT(arch_ints_disabled());
 
   // By convention, when suspending the entire system, higher layers (like IdlePowerThread) will
   // make sure that the boot CPU is the last one to enter CPU_SUSPEND.  So if the calling CPU is the
   // boot CPU, and we have a power_state that targets the power domain, use that.  Otherwise, use a
   // power_state that targets this CPU.
-  if (cpu_suspend_power_state_target_power_domain.has_value() &&
+  if (max_scope == PsciCpuSuspendMaxScope::CpuAndMore &&
+      cpu_suspend_power_state_target_power_domain.has_value() &&
       arch_curr_cpu_num() == BOOT_CPU_ID) {
     return cpu_suspend_power_state_target_power_domain.value();
   }

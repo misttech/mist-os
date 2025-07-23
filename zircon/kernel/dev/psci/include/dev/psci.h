@@ -75,11 +75,19 @@ uint32_t psci_get_feature(uint32_t psci_call);
 zx_status_t psci_cpu_off();
 zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context);
 
+// Specifies whether a requested power state can target more than the calling
+// CPU.
+enum class PsciCpuSuspendMaxScope : bool { CpuOnly, CpuAndMore };
+
 // Returns the PSCI CPU_SUSPEND power_state value for the calling CPU.  This is
 // the value that should be passed to |psci_cpu_suspend|.
 //
+// |max_scope| specifies whether the requested power state must be limited to
+// targeting just the calling CPU or if it can target a larger scope (e.g. the
+// containing cluster).
+//
 // Interrupts must be disabled.
-uint32_t psci_get_cpu_suspend_power_state();
+uint32_t psci_get_cpu_suspend_power_state(PsciCpuSuspendMaxScope max_scope);
 
 // Returns true iff |power_state| is a "powerdown" power_state (as opposed to a
 // standby or retention state).

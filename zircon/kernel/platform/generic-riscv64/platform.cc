@@ -140,7 +140,9 @@ void platform_halt_cpu() {
 
 bool platform_supports_suspend_cpu() { return false; }
 
-zx_status_t platform_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t platform_suspend_cpu(PlatformAllowDomainPowerDown allow_domain) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
 zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
   DEBUG_ASSERT(cpu_id < SMP_MAX_CPUS);

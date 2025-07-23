@@ -142,15 +142,9 @@ bool platform_supports_suspend_cpu() { return cpu_suspend_supported; }
 
 // TODO(https://fxbug.dev/417558115): Expand to include a deadline parameter
 // that's used to wake the CPU based on the boot time clock.
-//
-// TODO(https://fxbug.dev/417553411): Consider adding a parameter that indicates
-// how deep of a suspend state we want to enter.  Then, on platforms and CPUs
-// that support multiple PSCI power states, we can choose the state that matches
-// the request.  That way this same function can be used to implement both "deep
-// suspend" and "deep idle".
-zx_status_t platform_suspend_cpu() {
-  LTRACEF("platform_suspend_cpu cpu-%u current_boot_time=%ld\n", arch_curr_cpu_num(),
-          current_boot_time());
+zx_status_t platform_suspend_cpu(PlatformAllowDomainPowerDown allow_domain) {
+  LTRACEF("platform_suspend_cpu cpu-%u current_boot_time=%ld allow_domain=%d\n",
+          arch_curr_cpu_num(), current_boot_time(), static_cast<int>(allow_domain));
 
   DEBUG_ASSERT(!Thread::Current::Get()->preemption_state().PreemptIsEnabled());
   DEBUG_ASSERT(arch_ints_disabled());
@@ -164,7 +158,10 @@ zx_status_t platform_suspend_cpu() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  const uint32_t power_state = psci_get_cpu_suspend_power_state();
+  const PsciCpuSuspendMaxScope max_scope = static_cast<bool>(allow_domain)
+                                               ? PsciCpuSuspendMaxScope::CpuAndMore
+                                               : PsciCpuSuspendMaxScope::CpuOnly;
+  const uint32_t power_state = psci_get_cpu_suspend_power_state(max_scope);
   const bool is_power_down = psci_is_powerdown_power_state(power_state);
 
   if (is_power_down) {
