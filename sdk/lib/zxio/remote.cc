@@ -11,7 +11,6 @@
 #include <lib/zx/channel.h>
 #include <lib/zxio/null.h>
 #include <lib/zxio/ops.h>
-#include <lib/zxio/posix_mode.h>
 #include <lib/zxio/types.h>
 #include <sys/stat.h>
 #include <zircon/availability.h>
@@ -1542,56 +1541,6 @@ zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fio::Syml
   return ZX_OK;
 }
 #endif
-
-uint32_t zxio_node_protocols_to_posix_type(zxio_node_protocols_t protocols) {
-  // The "file type" portion of mode only allow one bit, so we find
-  // the best approximation given some set of |protocols|, tie-breaking
-  // in the following precedence.
-  if (protocols & ZXIO_NODE_PROTOCOL_DIRECTORY) {
-    return S_IFDIR;
-  }
-  if (protocols & ZXIO_NODE_PROTOCOL_FILE) {
-    return S_IFREG;
-  }
-  if (protocols & ZXIO_NODE_PROTOCOL_CONNECTOR) {
-    // There is no good analogue for FIDL services in POSIX land...
-    // Returning "regular file" as a fallback.
-    return S_IFREG;
-  }
-  if (protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
-    return S_IFLNK;
-  }
-  return 0;
-}
-
-__EXPORT
-uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t abilities) {
-  uint32_t mode = zxio_node_protocols_to_posix_type(protocols);
-  // Permissions are not applicable on Fuchsia so approximate them using the node's |abilities|.
-  // This mapping depends on if the node is a directory or file.
-  if (mode & S_IFDIR) {
-    if (abilities & ZXIO_OPERATION_ENUMERATE) {
-      mode |= S_IRUSR;
-    }
-    if (abilities & ZXIO_OPERATION_MODIFY_DIRECTORY) {
-      mode |= S_IWUSR;
-    }
-    if (abilities & ZXIO_OPERATION_TRAVERSE) {
-      mode |= S_IXUSR;
-    }
-  } else {
-    if (abilities & ZXIO_OPERATION_READ_BYTES) {
-      mode |= S_IRUSR;
-    }
-    if (abilities & ZXIO_OPERATION_WRITE_BYTES) {
-      mode |= S_IWUSR;
-    }
-    if (abilities & ZXIO_OPERATION_EXECUTE) {
-      mode |= S_IXUSR;
-    }
-  }
-  return mode;
-}
 
 zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_attributes_t* out) {
   out->has = {};

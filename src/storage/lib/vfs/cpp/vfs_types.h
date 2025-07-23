@@ -260,7 +260,7 @@ zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::Flags flags,
                                             fuchsia_io::NodeProtocolKinds supported);
 
 // Synthesizes a set of POSIX mode bits using a node's supported protocols and abilities.
-// This implementation mirrors that of |zxio_get_posix_mode|.
+// This implementation mirrors that of |get_posix_mode| in fdio.
 //
 // Unlike the ZXIO implementation, this function is *only* used for synthesizing the mode bits
 // reported by the io1 GetAttrs method. Callers should use the io2 GetAttributes method to get
