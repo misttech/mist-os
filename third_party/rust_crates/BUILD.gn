@@ -8758,19 +8758,19 @@ rustc_library("iota-v0_2_3") {
   applicable_licenses = [ ":iota-v0_2_3.license" ]
 }
 
-license("ipnet-v2_3_1.license") {
+license("ipnet-v2_11_0.license") {
   public_package_name = "ipnet"
   license_files = [
-    "//third_party/rust_crates/vendor/ipnet-2.3.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/ipnet-2.3.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/ipnet-2.11.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/ipnet-2.11.0/LICENSE-MIT",
   ]
 }
 
-rustc_library("ipnet-v2_3_1") {
+rustc_library("ipnet-v2_11_0") {
   crate_name = "ipnet"
-  source_root = "//third_party/rust_crates/vendor/ipnet-2.3.1/src/lib.rs"
-  output_name = "ipnet-f8a52ce484aace28"
-  edition = "2015"
+  source_root = "//third_party/rust_crates/vendor/ipnet-2.11.0/src/lib.rs"
+  output_name = "ipnet-20bd7b4ffb3107d0"
+  edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -8781,13 +8781,15 @@ rustc_library("ipnet-v2_3_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=f8a52ce484aace28",
-    "-Cextra-filename=-f8a52ce484aace28",
+    "-Cmetadata=20bd7b4ffb3107d0",
+    "-Cextra-filename=-20bd7b4ffb3107d0",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":ipnet-v2_3_1.license" ]
+  applicable_licenses = [ ":ipnet-v2_11_0.license" ]
 }
 
 license("itertools-v0_10_1.license") {
@@ -18793,7 +18795,7 @@ rustc_library("trust-dns-proto-v0_22_0") {
   deps += [ ":futures-io-v0_3_30" ]
   deps += [ ":futures-util-v0_3_30" ]
   deps += [ ":idna-v0_2_3" ]
-  deps += [ ":ipnet-v2_3_1" ]
+  deps += [ ":ipnet-v2_11_0" ]
   deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":smallvec-v1_15_1" ]

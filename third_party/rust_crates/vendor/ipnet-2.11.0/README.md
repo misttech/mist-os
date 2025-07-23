@@ -2,7 +2,7 @@
 
 This module provides types and useful methods for working with IPv4 and IPv6 network addresses, commonly called IP prefixes. The new `IpNet`, `Ipv4Net`, and `Ipv6Net` types build on the existing `IpAddr`, `Ipv4Addr`, and `Ipv6Addr` types already provided in Rust's standard library and align to their design to stay consistent.
 
-The module also provides the `IpSubnets`, `Ipv4Subnets`, and `Ipv6Subnets` types for interating over the subnets contained in an IP address range. The `IpAddrRange`, `Ipv4AddrRange`, and `Ipv6AddrRange` types for iterating over IP addresses in a range. And traits that extend `Ipv4Addr` and `Ipv6Addr` with methods for addition, subtraction, bitwise-and, and bitwise-or operations that are missing in Rust's standard library.
+The module also provides the `IpSubnets`, `Ipv4Subnets`, and `Ipv6Subnets` types for iterating over the subnets contained in an IP address range. The `IpAddrRange`, `Ipv4AddrRange`, and `Ipv6AddrRange` types for iterating over IP addresses in a range. And traits that extend `Ipv4Addr` and `Ipv6Addr` with methods for addition, subtraction, bitwise-and, and bitwise-or operations that are missing in Rust's standard library.
 
 The module only uses stable features so it is guaranteed to compile using the stable toolchain. Tests aim for thorough coverage and can be found in both the test modules and doctests. Please file an [issue on GitHub] if you have any problems, requests, or suggested improvements.
 
@@ -31,6 +31,16 @@ fn main() {
 
     let net4 = Ipv4Net::new(Ipv4Addr::new(10, 1, 1, 0), 24).unwrap();
     let net6 = Ipv6Net::new(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 24).unwrap();
+
+    // They can also be created by a constructor that panics when the prefix length is invalid,
+
+    let net4 = Ipv4Net::new_assert(Ipv4Addr::new(10, 1, 1, 0), 24);
+    let net6 = Ipv6Net::new_assert(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 24);
+
+    // or does not compile when called from a const context.
+
+    const NET4: Ipv4Net = Ipv4Net::new_assert(Ipv4Addr::new(10, 1, 1, 0), 24);
+    const NET6: Ipv6Net = Ipv6Net::new_assert(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 24);
 
     // They can also be created from string representations.
 
@@ -143,7 +153,7 @@ fn main() {
 extern crate ipnet;
 use ipnet::IpNet;
 
-fn main() {}
+fn main() {
     // Example input list of overlapping and adjacent prefixes.
 
     let strings = vec![

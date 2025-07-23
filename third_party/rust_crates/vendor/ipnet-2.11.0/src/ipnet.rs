@@ -1,13 +1,21 @@
-use std::cmp::{min, max};
-use std::cmp::Ordering::{Less, Equal};
-use std::convert::From;
+use alloc::vec::Vec;
+use core::cmp::{min, max};
+use core::cmp::Ordering::{Less, Equal};
+use core::convert::From;
+use core::fmt;
+use core::iter::FusedIterator;
+use core::option::Option::{Some, None};
+#[cfg(not(feature = "std"))]
+use core::error::Error;
+#[cfg(feature = "std")]
 use std::error::Error;
-use std::fmt;
-use std::iter::FusedIterator;
+#[cfg(not(feature = "std"))]
+use core::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+#[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::option::Option::{Some, None};
 
-use ipext::{IpAdd, IpSub, IpStep, IpAddrRange, Ipv4AddrRange, Ipv6AddrRange};
+use crate::ipext::{IpAdd, IpSub, IpStep, IpAddrRange, Ipv4AddrRange, Ipv6AddrRange};
+use crate::mask::{ip_mask_to_prefix, ipv4_mask_to_prefix, ipv6_mask_to_prefix};
 
 /// An IP network address, either IPv4 or IPv6.
 ///
@@ -56,14 +64,17 @@ pub enum IpNet {
 /// addresses represented in CIDR notation. See [IETF RFC 4632] for the
 /// CIDR notation.
 ///
-/// [`IpNet`]: enum.IpAddr.html
+/// [`IpNet`]: enum.IpNet.html
 /// [`FromStr`]: https://doc.rust-lang.org/std/str/trait.FromStr.html
 /// [IETF RFC 4632]: https://tools.ietf.org/html/rfc4632
 ///
 /// # Examples
 ///
 /// ```
-/// use std::net::Ipv4Addr;
+/// # #[cfg(feature = "std")]
+/// # use std::net::Ipv6Addr;
+/// # #[cfg(not(feature = "std"))]
+/// # use core::net::Ipv6Addr;
 /// use ipnet::Ipv4Net;
 ///
 /// let net: Ipv4Net = "10.1.1.0/24".parse().unwrap();
@@ -86,7 +97,7 @@ pub struct Ipv4Net {
 /// addresses represented in CIDR notation. See [IETF RFC 4632] for the
 /// CIDR notation.
 ///
-/// [`IpNet`]: enum.IpAddr.html
+/// [`IpNet`]: enum.IpNet.html
 /// [`FromStr`]: https://doc.rust-lang.org/std/str/trait.FromStr.html
 /// [IETF RFC 4632]: https://tools.ietf.org/html/rfc4632
 ///
@@ -120,6 +131,79 @@ impl fmt::Display for PrefixLenError {
 impl Error for PrefixLenError {}
 
 impl IpNet {
+    /// Creates a new IP network address from an `IpAddr` and prefix
+    /// length.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::net::Ipv6Addr;
+    /// use ipnet::{IpNet, PrefixLenError};
+    ///
+    /// let net = IpNet::new(Ipv6Addr::LOCALHOST.into(), 48);
+    /// assert!(net.is_ok());
+    /// 
+    /// let bad_prefix_len = IpNet::new(Ipv6Addr::LOCALHOST.into(), 129);
+    /// assert_eq!(bad_prefix_len, Err(PrefixLenError));
+    /// ```
+    pub fn new(ip: IpAddr, prefix_len: u8) -> Result<IpNet, PrefixLenError> {
+        Ok(match ip {
+            IpAddr::V4(a) => Ipv4Net::new(a, prefix_len)?.into(),
+            IpAddr::V6(a) => Ipv6Net::new(a, prefix_len)?.into(),
+        })
+    }
+
+    /// Creates a new IP network address from an `IpAddr` and prefix
+    /// length. If called from a const context it will verify prefix length
+    /// at compile time. Otherwise it will panic at runtime if prefix length
+    /// is incorrect for a given IpAddr type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    /// use ipnet::{IpNet};
+    ///
+    /// // This code is verified at compile time:
+    /// const NET: IpNet = IpNet::new_assert(IpAddr::V4(Ipv4Addr::new(10, 1, 1, 0)), 24);
+    /// assert_eq!(NET.prefix_len(), 24);
+    ///
+    /// // This code is verified at runtime:
+    /// let net = IpNet::new_assert(Ipv6Addr::LOCALHOST.into(), 24);
+    /// assert_eq!(net.prefix_len(), 24);
+    ///
+    /// // This code does not compile:
+    /// // const BAD_PREFIX_LEN: IpNet = IpNet::new_assert(IpAddr::V4(Ipv4Addr::new(10, 1, 1, 0)), 33);
+    ///
+    /// // This code panics at runtime:
+    /// // let bad_prefix_len = IpNet::new_assert(Ipv6Addr::LOCALHOST.into(), 129);
+    /// ```
+    pub const fn new_assert(ip: IpAddr, prefix_len: u8) -> IpNet {
+        match ip {
+            IpAddr::V4(a) => IpNet::V4(Ipv4Net::new_assert(a, prefix_len)),
+            IpAddr::V6(a) => IpNet::V6(Ipv6Net::new_assert(a, prefix_len)),
+        }
+    }
+
+    /// Creates a new IP network address from an `IpAddr` and netmask.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::net::Ipv6Addr;
+    /// use ipnet::{IpNet, PrefixLenError};
+    ///
+    /// let net = IpNet::with_netmask(Ipv6Addr::LOCALHOST.into(), Ipv6Addr::from(0xffff_ffff_ffff_0000_0000_0000_0000_0000).into());
+    /// assert!(net.is_ok());
+    ///
+    /// let bad_prefix_len = IpNet::with_netmask(Ipv6Addr::LOCALHOST.into(), Ipv6Addr::from(0xffff_ffff_ffff_0000_0001_0000_0000_0000).into());
+    /// assert_eq!(bad_prefix_len, Err(PrefixLenError));
+    /// ```
+    pub fn with_netmask(ip: IpAddr, netmask: IpAddr) -> Result<IpNet, PrefixLenError> {
+        let prefix = ip_mask_to_prefix(netmask)?;
+        Self::new(ip, prefix)
+    }
+
     /// Returns a copy of the network with the address truncated to the
     /// prefix length.
     ///
@@ -536,11 +620,62 @@ impl Ipv4Net {
     /// let bad_prefix_len = Ipv4Net::new(Ipv4Addr::new(10, 1, 1, 0), 33);
     /// assert_eq!(bad_prefix_len, Err(PrefixLenError));
     /// ```
-    pub fn new(ip: Ipv4Addr, prefix_len: u8) -> Result<Ipv4Net, PrefixLenError> {
+    #[inline]
+    pub const fn new(ip: Ipv4Addr, prefix_len: u8) -> Result<Ipv4Net, PrefixLenError> {
         if prefix_len > 32 {
             return Err(PrefixLenError);
         }
         Ok(Ipv4Net { addr: ip, prefix_len: prefix_len })
+    }
+
+    /// Creates a new IPv4 network address from an `Ipv4Addr` and prefix
+    /// length. If called from a const context it will verify prefix length
+    /// at compile time. Otherwise it will panic at runtime if prefix length
+    /// is not less then or equal to 32.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::net::Ipv4Addr;
+    /// use ipnet::{Ipv4Net};
+    ///
+    /// // This code is verified at compile time:
+    /// const NET: Ipv4Net = Ipv4Net::new_assert(Ipv4Addr::new(10, 1, 1, 0), 24);
+    /// assert_eq!(NET.prefix_len(), 24);
+    ///
+    /// // This code is verified at runtime:
+    /// let net = Ipv4Net::new_assert(Ipv4Addr::new(10, 1, 1, 0), 24);
+    /// assert_eq!(NET.prefix_len(), 24);
+    ///
+    /// // This code does not compile:
+    /// // const BAD_PREFIX_LEN: Ipv4Net = Ipv4Net::new_assert(Ipv4Addr::new(10, 1, 1, 0), 33);
+    ///
+    /// // This code panics at runtime:
+    /// // let bad_prefix_len = Ipv4Net::new_assert(Ipv4Addr::new(10, 1, 1, 0), 33);
+    /// ```
+    #[inline]
+    pub const fn new_assert(ip: Ipv4Addr, prefix_len: u8) -> Ipv4Net {
+        assert!(prefix_len <= 32, "PREFIX_LEN must be less then or equal to 32 for Ipv4Net");
+        Ipv4Net { addr: ip, prefix_len: prefix_len }
+    }
+
+    /// Creates a new IPv4 network address from an `Ipv4Addr` and netmask.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::net::Ipv4Addr;
+    /// use ipnet::{Ipv4Net, PrefixLenError};
+    ///
+    /// let net = Ipv4Net::with_netmask(Ipv4Addr::new(10, 1, 1, 0), Ipv4Addr::new(255, 255, 255, 0));
+    /// assert!(net.is_ok());
+    ///
+    /// let bad_prefix_len = Ipv4Net::with_netmask(Ipv4Addr::new(10, 1, 1, 0), Ipv4Addr::new(255, 255, 0, 1));
+    /// assert_eq!(bad_prefix_len, Err(PrefixLenError));
+    /// ```
+    pub fn with_netmask(ip: Ipv4Addr, netmask: Ipv4Addr) -> Result<Ipv4Net, PrefixLenError> {
+        let prefix = ipv4_mask_to_prefix(netmask)?;
+        Self::new(ip, prefix)
     }
 
     /// Returns a copy of the network with the address truncated to the
@@ -561,17 +696,20 @@ impl Ipv4Net {
     }
 
     /// Returns the address.
-    pub fn addr(&self) -> Ipv4Addr {
+    #[inline]
+    pub const fn addr(&self) -> Ipv4Addr {
         self.addr
     }
 
     /// Returns the prefix length.
-    pub fn prefix_len(&self) -> u8 {
+    #[inline]
+    pub const fn prefix_len(&self) -> u8 {
         self.prefix_len
     }
 
     /// Returns the maximum valid prefix length.
-    pub fn max_prefix_len(&self) -> u8 {
+    #[inline]
+    pub const fn max_prefix_len(&self) -> u8 {
         32
     }
     
@@ -816,8 +954,11 @@ impl Ipv4Net {
         intervals = merge_intervals(intervals);
         let mut res: Vec<Ipv4Net> = Vec::new();
         
-        for (start, end) in intervals {
-            let iter = Ipv4Subnets::new(start.into(), end.saturating_sub(1).into(), 0);
+        for (start, mut end) in intervals {
+            if end != core::u32::MAX {
+                end = end.saturating_sub(1)
+            }
+            let iter = Ipv4Subnets::new(start.into(), end.into(), 0);
             res.extend(iter);
         }
         res
@@ -867,11 +1008,62 @@ impl Ipv6Net {
     /// let bad_prefix_len = Ipv6Net::new(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 129);
     /// assert_eq!(bad_prefix_len, Err(PrefixLenError));
     /// ```
-    pub fn new(ip: Ipv6Addr, prefix_len: u8) -> Result<Ipv6Net, PrefixLenError> {
+    #[inline]
+    pub const fn new(ip: Ipv6Addr, prefix_len: u8) -> Result<Ipv6Net, PrefixLenError> {
         if prefix_len > 128 {
             return Err(PrefixLenError);
         }
         Ok(Ipv6Net { addr: ip, prefix_len: prefix_len })
+    }
+
+    /// Creates a new IPv6 network address from an `Ipv6Addr` and prefix
+    /// length. If called from a const context it will verify prefix length
+    /// at compile time. Otherwise it will panic at runtime if prefix length
+    /// is not less then or equal to 128.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::net::Ipv6Addr;
+    /// use ipnet::{Ipv6Net};
+    ///
+    /// // This code is verified at compile time:
+    /// const NET: Ipv6Net = Ipv6Net::new_assert(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 24);
+    /// assert_eq!(NET.prefix_len(), 24);
+    ///
+    /// // This code is verified at runtime:
+    /// let net = Ipv6Net::new_assert(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 24);
+    /// assert_eq!(net.prefix_len(), 24);
+    ///
+    /// // This code does not compile:
+    /// // const BAD_PREFIX_LEN: Ipv6Net = Ipv6Net::new_assert(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 129);
+    ///
+    /// // This code panics at runtime:
+    /// // let bad_prefix_len = Ipv6Addr::new_assert(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), 129);
+    /// ```
+    #[inline]
+    pub const fn new_assert(ip: Ipv6Addr, prefix_len: u8) -> Ipv6Net {
+        assert!(prefix_len <= 128, "PREFIX_LEN must be less then or equal to 128 for Ipv6Net");
+        Ipv6Net { addr: ip, prefix_len: prefix_len }
+    }
+
+    /// Creates a new IPv6 network address from an `Ipv6Addr` and netmask.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::net::Ipv6Addr;
+    /// use ipnet::{Ipv6Net, PrefixLenError};
+    ///
+    /// let net = Ipv6Net::with_netmask(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), Ipv6Addr::from(0xffff_ff00_0000_0000_0000_0000_0000_0000));
+    /// assert!(net.is_ok());
+    ///
+    /// let bad_prefix_len = Ipv6Net::with_netmask(Ipv6Addr::new(0xfd, 0, 0, 0, 0, 0, 0, 0), Ipv6Addr::from(0xffff_ff00_0000_0000_0001_0000_0000_0000));
+    /// assert_eq!(bad_prefix_len, Err(PrefixLenError));
+    /// ```
+    pub fn with_netmask(ip: Ipv6Addr, netmask: Ipv6Addr) -> Result<Ipv6Net, PrefixLenError> {
+        let prefix = ipv6_mask_to_prefix(netmask)?;
+        Self::new(ip, prefix)
     }
 
     /// Returns a copy of the network with the address truncated to the
@@ -892,17 +1084,20 @@ impl Ipv6Net {
     }
     
     /// Returns the address.
-    pub fn addr(&self) -> Ipv6Addr {
+    #[inline]
+    pub const fn addr(&self) -> Ipv6Addr {
         self.addr
     }
 
     /// Returns the prefix length.
-    pub fn prefix_len(&self) -> u8 {
+    #[inline]
+    pub const fn prefix_len(&self) -> u8 {
         self.prefix_len
     }
     
     /// Returns the maximum valid prefix length.
-    pub fn max_prefix_len(&self) -> u8 {
+    #[inline]
+    pub const fn max_prefix_len(&self) -> u8 {
         128
     }
 
@@ -1135,8 +1330,11 @@ impl Ipv6Net {
         intervals = merge_intervals(intervals);
         let mut res: Vec<Ipv6Net> = Vec::new();
 
-        for (start, end) in intervals {
-            let iter = Ipv6Subnets::new(start.into(), end.saturating_sub(1).into(), 0);
+        for (start, mut end) in intervals {
+            if end != core::u128::MAX {
+                end = end.saturating_sub(1)
+            }
+            let iter = Ipv6Subnets::new(start.into(), end.into(), 0);
             res.extend(iter);
         }
         res
@@ -1258,7 +1456,7 @@ impl<'a> Contains<&'a Ipv6Addr> for Ipv6Net {
 /// Generates the subnets between the provided `start` and `end` IP
 /// addresses inclusive of `end`. Each iteration generates the next
 /// network address of the largest valid size it can, while using a
-/// prefix lenth not less than `min_prefix_len`.
+/// prefix length not less than `min_prefix_len`.
 ///
 /// # Examples
 ///
@@ -1305,7 +1503,7 @@ pub enum IpSubnets {
 /// Generates the subnets between the provided `start` and `end` IP
 /// addresses inclusive of `end`. Each iteration generates the next
 /// network address of the largest valid size it can, while using a
-/// prefix lenth not less than `min_prefix_len`.
+/// prefix length not less than `min_prefix_len`.
 ///
 /// # Examples
 ///
@@ -1339,7 +1537,7 @@ pub struct Ipv4Subnets {
 /// Generates the subnets between the provided `start` and `end` IP
 /// addresses inclusive of `end`. Each iteration generates the next
 /// network address of the largest valid size it can, while using a
-/// prefix lenth not less than `min_prefix_len`.
+/// prefix length not less than `min_prefix_len`.
 ///
 /// # Examples
 ///
@@ -1413,20 +1611,31 @@ impl Iterator for IpSubnets {
 
 fn next_ipv4_subnet(start: Ipv4Addr, end: Ipv4Addr, min_prefix_len: u8) -> Ipv4Net {
     let range = end.saturating_sub(start).saturating_add(1);
-    let range_bits = 32u32.saturating_sub(range.leading_zeros()).saturating_sub(1);
-    let start_tz = u32::from(start).trailing_zeros();
-    let new_prefix_len = 32 - min(range_bits, start_tz);
-    let next_prefix_len = max(new_prefix_len as u8, min_prefix_len);
-    Ipv4Net::new(start, next_prefix_len).unwrap()
+    if range == core::u32::MAX && min_prefix_len == 0 {
+        Ipv4Net::new(start, min_prefix_len).unwrap()
+    }
+    else {
+        let range_bits = 32u32.saturating_sub(range.leading_zeros()).saturating_sub(1);
+        let start_tz = u32::from(start).trailing_zeros();
+        let new_prefix_len = 32 - min(range_bits, start_tz);
+        let next_prefix_len = max(new_prefix_len as u8, min_prefix_len);
+        Ipv4Net::new(start, next_prefix_len).unwrap()
+    }
 }
 
 fn next_ipv6_subnet(start: Ipv6Addr, end: Ipv6Addr, min_prefix_len: u8) -> Ipv6Net {
     let range = end.saturating_sub(start).saturating_add(1);
-    let range_bits = 128u32.saturating_sub(range.leading_zeros()).saturating_sub(1);
-    let start_tz = u128::from(start).trailing_zeros();
-    let new_prefix_len = 128 - min(range_bits, start_tz);
-    let next_prefix_len = max(new_prefix_len as u8, min_prefix_len);
-    Ipv6Net::new(start, next_prefix_len).unwrap()
+    if range == core::u128::MAX && min_prefix_len == 0 {
+        Ipv6Net::new(start, min_prefix_len).unwrap()
+    }
+    else {
+        let range = end.saturating_sub(start).saturating_add(1);
+        let range_bits = 128u32.saturating_sub(range.leading_zeros()).saturating_sub(1);
+        let start_tz = u128::from(start).trailing_zeros();
+        let new_prefix_len = 128 - min(range_bits, start_tz);
+        let next_prefix_len = max(new_prefix_len as u8, min_prefix_len);
+        Ipv6Net::new(start, next_prefix_len).unwrap()
+    }
 }
 
 impl Iterator for Ipv4Subnets {
@@ -1619,6 +1828,12 @@ mod tests {
     );
 
     make_ipv4_subnets_test!(
+        test_ipv4_subnets_zero_max,
+        "0.0.0.0", "255.255.255.255", 0,
+        "0.0.0.0/0",
+    );
+
+    make_ipv4_subnets_test!(
         test_ipv4_subnets_max_max,
         "255.255.255.255", "255.255.255.255", 0,
         "255.255.255.255/32",
@@ -1655,6 +1870,12 @@ mod tests {
         test_ipv6_subnets_zero_zero,
         "::", "::", 0,
         "::/128",
+    );
+
+    make_ipv6_subnets_test!(
+        test_ipv6_subnets_zero_max,
+        "::", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", 0,
+        "::/0",
     );
 
     make_ipv6_subnets_test!(
@@ -1719,6 +1940,21 @@ mod tests {
         assert_eq!(Ipv4Net::aggregate(&ipv4_nets), ipv4_aggs);
         assert_eq!(Ipv6Net::aggregate(&ipv6_nets), ipv6_aggs);
     }
+    
+    #[test]
+    fn test_aggregate_issue44() {
+        let nets: Vec<Ipv4Net> = vec!["128.0.0.0/1".parse().unwrap()];
+        assert_eq!(Ipv4Net::aggregate(&nets), nets);
+
+        let nets: Vec<Ipv4Net> = vec!["0.0.0.0/1".parse().unwrap(), "128.0.0.0/1".parse().unwrap()];
+        assert_eq!(Ipv4Net::aggregate(&nets), vec!["0.0.0.0/0".parse().unwrap()]);
+
+        let nets: Vec<Ipv6Net> = vec!["8000::/1".parse().unwrap()];
+        assert_eq!(Ipv6Net::aggregate(&nets), nets);
+
+        let nets: Vec<Ipv6Net> = vec!["::/1".parse().unwrap(), "8000::/1".parse().unwrap()];
+        assert_eq!(Ipv6Net::aggregate(&nets), vec!["::/0".parse().unwrap()]);
+    }
 
     #[test]
     fn ipnet_default() {
@@ -1736,5 +1972,30 @@ mod tests {
     fn ipv6net_default() {
         let ipnet: Ipv6Net = "::/0".parse().unwrap();
         assert_eq!(ipnet, Ipv6Net::default());
+    }
+
+    #[test]
+    fn new_assert() {
+        const _: Ipv4Net = Ipv4Net::new_assert(Ipv4Addr::new(0, 0, 0, 0), 0);
+        const _: Ipv4Net = Ipv4Net::new_assert(Ipv4Addr::new(0, 0, 0, 0), 32);
+        const _: Ipv6Net = Ipv6Net::new_assert(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), 0);
+        const _: Ipv6Net = Ipv6Net::new_assert(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), 128);
+
+        let _ = Ipv4Net::new_assert(Ipv4Addr::new(0, 0, 0, 0), 0);
+        let _ = Ipv4Net::new_assert(Ipv4Addr::new(0, 0, 0, 0), 32);
+        let _ = Ipv6Net::new_assert(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), 0);
+        let _ = Ipv6Net::new_assert(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), 128);
+    }
+
+    #[test]
+    #[should_panic]
+    fn ipv4net_new_assert_panics() {
+        let _ = Ipv4Net::new_assert(Ipv4Addr::new(0, 0, 0, 0), 33);
+    }
+
+    #[test]
+    #[should_panic]
+    fn ipv6net_new_assert_panics() {
+        let _ = Ipv6Net::new_assert(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), 129);
     }
 }
