@@ -15,8 +15,7 @@ use crate::{input, IntPoint, IntSize, Size, ViewKey};
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use display_utils::{
-    BufferCollectionId, BufferId, EventId, ImageId as DisplayImageId, LayerId, PixelFormat,
-    INVALID_LAYER_ID,
+    BufferCollectionId, EventId, ImageId as DisplayImageId, LayerId, PixelFormat, INVALID_LAYER_ID,
 };
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{
@@ -403,7 +402,8 @@ impl DisplayDirectViewStrategy {
                 .coordinator
                 .import_image(
                     &image_metadata,
-                    &BufferId::new(collection_id, uindex).into(),
+                    &collection_id.into(),
+                    uindex,
                     &display_image_id.into(),
                 )
                 .await

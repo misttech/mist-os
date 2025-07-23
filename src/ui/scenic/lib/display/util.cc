@@ -127,12 +127,7 @@ zx_status_t ImportImageForCapture(
       scenic_impl::ToDisplayFidlImageId(image_id);
 
   auto import_image_result = display_coordinator.sync()->ImportImage(
-      image_metadata,
-      {
-          .buffer_collection_id = display_buffer_collection_id,
-          .buffer_index = vmo_idx,
-      },
-      fidl_image_id);
+      image_metadata, display_buffer_collection_id, vmo_idx, fidl_image_id);
   if (!import_image_result.ok()) {
     FX_LOGS(ERROR) << "ImportImage transport error: " << import_image_result.status_string();
     return import_image_result->error_value();

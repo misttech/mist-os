@@ -53,7 +53,6 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types/cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
@@ -122,10 +121,12 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     return;
   }
   const display::ImageMetadata image_metadata(request->image_metadata);
+  const display::BufferCollectionId buffer_collection_id(request->buffer_collection_id);
+  const uint32_t buffer_index = request->buffer_index;
 
   if (image_metadata.tiling_type() == display::ImageTilingType::kCapture) {
     zx_status_t import_status =
-        ImportImageForCapture(image_metadata, display::ToBufferId(request->buffer_id), image_id);
+        ImportImageForCapture(image_metadata, buffer_collection_id, buffer_index, image_id);
     if (import_status == ZX_OK) {
       completer.ReplySuccess();
     } else {
@@ -135,7 +136,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   }
 
   zx_status_t import_status =
-      ImportImageForDisplay(image_metadata, display::ToBufferId(request->buffer_id), image_id);
+      ImportImageForDisplay(image_metadata, buffer_collection_id, buffer_index, image_id);
   if (import_status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -144,19 +145,20 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
 }
 
 zx_status_t Client::ImportImageForDisplay(const display::ImageMetadata& image_metadata,
-                                          display::BufferId buffer_id, display::ImageId image_id) {
+                                          display::BufferCollectionId buffer_collection_id,
+                                          uint32_t buffer_index, display::ImageId image_id) {
   ZX_DEBUG_ASSERT(image_metadata.tiling_type() != display::ImageTilingType::kCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
-  auto collection_map_it = collection_map_.find(buffer_id.buffer_collection_id);
+  auto collection_map_it = collection_map_.find(buffer_collection_id);
   if (collection_map_it == collection_map_.end()) {
     return ZX_ERR_INVALID_ARGS;
   }
   const Collections& collections = collection_map_it->second;
 
   zx::result<display::DriverImageId> result = controller_.engine_driver_client()->ImportImage(
-      image_metadata, collections.driver_buffer_collection_id, buffer_id.buffer_index);
+      image_metadata, collections.driver_buffer_collection_id, buffer_index);
   if (result.is_error()) {
     return result.error_value();
   }
@@ -828,7 +830,8 @@ void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
 }
 
 zx_status_t Client::ImportImageForCapture(const display::ImageMetadata& image_metadata,
-                                          display::BufferId buffer_id, display::ImageId image_id) {
+                                          display::BufferCollectionId buffer_collection_id,
+                                          uint32_t buffer_index, display::ImageId image_id) {
   ZX_DEBUG_ASSERT(image_metadata.tiling_type() == display::ImageTilingType::kCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
@@ -839,14 +842,14 @@ zx_status_t Client::ImportImageForCapture(const display::ImageMetadata& image_me
   }
 
   // Ensure a previously imported collection id is being used for import.
-  auto it = collection_map_.find(buffer_id.buffer_collection_id);
+  auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     return ZX_ERR_INVALID_ARGS;
   }
   const Client::Collections& collections = it->second;
   zx::result<display::DriverCaptureImageId> import_result =
       controller_.engine_driver_client()->ImportImageForCapture(
-          collections.driver_buffer_collection_id, buffer_id.buffer_index);
+          collections.driver_buffer_collection_id, buffer_index);
   if (import_result.is_error()) {
     return import_result.error_value();
   }

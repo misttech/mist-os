@@ -31,7 +31,6 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types/cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -192,7 +191,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for display.
   zx_status_t ImportImageForDisplay(const display::ImageMetadata& image_metadata,
-                                    display::BufferId buffer_id, display::ImageId image_id);
+                                    display::BufferCollectionId buffer_collection_id,
+                                    uint32_t buffer_index, display::ImageId image_id);
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for capture
   // images.
@@ -200,7 +200,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for capture.
   zx_status_t ImportImageForCapture(const display::ImageMetadata& image_metadata,
-                                    display::BufferId buffer_id, display::ImageId image_id);
+                                    display::BufferCollectionId buffer_collection_id,
+                                    uint32_t buffer_index, display::ImageId image_id);
 
   // Discards all the draft configs on all displays and layers.
   void DiscardConfig();

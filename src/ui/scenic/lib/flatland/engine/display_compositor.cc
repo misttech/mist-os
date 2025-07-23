@@ -468,13 +468,8 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
       CreateImageMetadata(metadata);
   const fuchsia_hardware_display::wire::ImageId fidl_image_id =
       scenic_impl::ToDisplayFidlImageId(metadata.identifier);
-  const auto import_image_result =
-      display_coordinator_.sync()->ImportImage(image_metadata,
-                                               {
-                                                   .buffer_collection_id = display_collection_id,
-                                                   .buffer_index = metadata.vmo_index,
-                                               },
-                                               fidl_image_id);
+  const auto import_image_result = display_coordinator_.sync()->ImportImage(
+      image_metadata, display_collection_id, metadata.vmo_index, fidl_image_id);
   if (!import_image_result.ok()) {
     FX_LOGS(ERROR) << "ImportImage transport error: " << import_image_result.status_string();
     return false;

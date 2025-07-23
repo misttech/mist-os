@@ -266,7 +266,8 @@ class TestFidlClient {
       display::BufferCollectionId buffer_collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_token);
   zx::result<> ImportImage(const display::ImageMetadata& image_metadata,
-                           display::BufferId image_buffer_id, display::ImageId image_id);
+                           display::BufferCollectionId buffer_collection_id, uint32_t buffer_index,
+                           display::ImageId image_id);
   zx::result<> ImportEvent(zx::event event, display::EventId event_id);
   zx::result<> SetBufferCollectionConstraints(display::BufferCollectionId buffer_collection_id,
                                               display::ImageBufferUsage image_buffer_usage);
@@ -474,17 +475,17 @@ zx::result<display::LayerId> TestFidlClient::CreateLayer() {
 }
 
 zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_metadata,
-                                         display::BufferId image_buffer_id,
-                                         display::ImageId image_id) {
+                                         display::BufferCollectionId buffer_collection_id,
+                                         uint32_t buffer_index, display::ImageId image_id) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display::wire::BufferId fidl_image_buffer_id =
-      display::ToFidlBufferId(image_buffer_id);
+  const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
+      buffer_collection_id.ToFidl();
   const fuchsia_hardware_display::wire::ImageId fidl_image_id = image_id.ToFidl();
 
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> fidl_status =
-      coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_image_buffer_id,
-                                            fidl_image_id);
+      coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_buffer_collection_id,
+                                            buffer_index, fidl_image_id);
   if (!fidl_status.ok()) {
     fdf::error("ImportImage() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
@@ -1065,11 +1066,8 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   const display::ImageId image_id = next_imported_image_id_;
   ++next_imported_image_id_;
 
-  const display::BufferId image_buffer_id{
-      .buffer_collection_id = buffer_collection_id,
-      .buffer_index = 0,
-  };
-  zx::result<> import_image_result = ImportImage(image_metadata, image_buffer_id, image_id);
+  zx::result<> import_image_result =
+      ImportImage(image_metadata, buffer_collection_id, /*buffer_index=*/0, image_id);
   if (import_image_result.is_error()) {
     // ImportImage() has already logged the error.
     return import_image_result.take_error();
@@ -1999,16 +1997,16 @@ TEST_F(IntegrationTest, CreateColorLayer) {
   EXPECT_OK(client->CreateFullscreenColorLayer(kFuchsiaBgra));
 }
 
-TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
+TEST_F(IntegrationTest, ImportImageWithInvalidImageIdFails) {
   std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
 
   constexpr display::ImageId image_id = display::kInvalidImageId;
   constexpr display::BufferCollectionId buffer_collection_id(0xffeeeedd);
 
-  zx::result<> import_image_result = client->ImportImage(
-      client->state().FullscreenImageMetadata(),
-      display::BufferId{.buffer_collection_id = buffer_collection_id, .buffer_index = 0}, image_id);
+  zx::result<> import_image_result =
+      client->ImportImage(client->state().FullscreenImageMetadata(), buffer_collection_id,
+                          /*buffer_index=*/0, image_id);
   EXPECT_NE(ZX_OK, import_image_result.status_value()) << import_image_result.status_string();
 }
 
@@ -2018,10 +2016,9 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
 
   constexpr display::BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
   constexpr display::ImageId image_id(1);
-  zx::result<> import_image_result = client->ImportImage(
-      client->state().FullscreenImageMetadata(),
-      display::BufferId{.buffer_collection_id = kNonExistentCollectionId, .buffer_index = 0},
-      image_id);
+  zx::result<> import_image_result =
+      client->ImportImage(client->state().FullscreenImageMetadata(), kNonExistentCollectionId,
+                          /*buffer_index=*/0, image_id);
   EXPECT_NE(ZX_OK, import_image_result.status_value()) << import_image_result.status_string();
 }
 

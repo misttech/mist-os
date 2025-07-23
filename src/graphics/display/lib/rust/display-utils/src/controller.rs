@@ -23,9 +23,7 @@ use zx::{self as zx, HandleBased};
 
 use crate::config::{DisplayConfig, LayerConfig};
 use crate::error::{ConfigError, Error, Result};
-use crate::types::{
-    BufferCollectionId, BufferId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId,
-};
+use crate::types::{BufferCollectionId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId};
 use crate::INVALID_EVENT_ID;
 
 const DEV_DIR_PATH: &str = "/dev/class/display-coordinator";
@@ -327,7 +325,8 @@ impl Coordinator {
         self.proxy()
             .import_image(
                 &image_metadata,
-                &BufferId::new(collection_id, 0).into(),
+                &collection_id.into(),
+                0, // buffer_index
                 &image_id.into(),
             )
             .await?

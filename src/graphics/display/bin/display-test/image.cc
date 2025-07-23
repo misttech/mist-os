@@ -479,12 +479,7 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
 
   fhdt::wire::ImageMetadata image_metadata = GetMetadata();
   const fidl::WireResult import_result =
-      dc->ImportImage(image_metadata,
-                      fhd::wire::BufferId{
-                          .buffer_collection_id = buffer_collection_id_.ToFidl(),
-                          .buffer_index = 0,
-                      },
-                      image_id.ToFidl());
+      dc->ImportImage(image_metadata, buffer_collection_id_.ToFidl(), 0, image_id.ToFidl());
   if (!import_result.ok()) {
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;

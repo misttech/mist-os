@@ -21,14 +21,3 @@ alias BufferCollectionIdValue = uint64;
 type BufferCollectionId = struct {
     value BufferCollectionIdValue;
 };
-
-/// Identifies a single buffer within a sysmem BufferCollection owned by a
-/// Display Coordinator client.
-///
-/// A [`fuchsia.sysmem/BufferCollection`] may allocate multiple buffers at a
-/// time. This identifies the specific buffer at `buffer_index` within the
-/// shared BufferCollection identified by `buffer_collection_id`.
-type BufferId = struct {
-    buffer_collection_id BufferCollectionId;
-    buffer_index uint32;
-};

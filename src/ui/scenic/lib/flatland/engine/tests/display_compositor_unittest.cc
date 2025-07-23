@@ -56,10 +56,6 @@ bool operator==(const BufferCollectionId& a, const BufferCollectionId& b) {
   return a.value == b.value;
 }
 
-bool operator==(const BufferId& a, const BufferId& b) {
-  return a.buffer_collection_id == b.buffer_collection_id && a.buffer_index == b.buffer_index;
-}
-
 bool operator==(const ImageId& a, const ImageId& b) { return a.value == b.value; }
 
 bool operator==(const LayerId& a, const LayerId& b) { return a.value == b.value; }
@@ -386,11 +382,9 @@ TEST_F(DisplayCompositorTest,
           }));
 
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = 0,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(0))),
                           _))
       .Times(1)
       .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
@@ -723,11 +717,9 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
       .blend_mode = BlendMode::kSrc,
   };
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = 0,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(0))),
                           _))
       .Times(1)
       .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
@@ -820,11 +812,9 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Make sure that the engine returns true if the display coordinator returns true.
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = kVmoIdx,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(kVmoIdx))),
                           _))
       .Times(1)
       .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
@@ -849,11 +839,9 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Make sure that the engine returns false if the display coordinator returns an error
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = kVmoIdx,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(kVmoIdx))),
                           _))
       .Times(1)
       .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
@@ -869,11 +857,9 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Collection ID can't be invalid. This shouldn't reach the display coordinator.
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = kVmoIdx,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(kVmoIdx))),
                           _))
       .Times(0);
   auto copy_metadata = metadata;
@@ -884,11 +870,9 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Image Id can't be 0. This shouldn't reach the display coordinator.
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = kVmoIdx,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(kVmoIdx))),
                           _))
       .Times(0);
   copy_metadata = metadata;
@@ -899,11 +883,9 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Width can't be 0. This shouldn't reach the display coordinator.
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = kVmoIdx,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(kVmoIdx))),
                           _))
       .Times(0);
   copy_metadata = metadata;
@@ -914,11 +896,9 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Height can't be 0. This shouldn't reach the display coordinator.
   EXPECT_CALL(*mock_display_coordinator_,
-              ImportImage(MatchRequestField(ImportImage, buffer_id,
-                                            Eq(fuchsia_hardware_display::wire::BufferId{
-                                                .buffer_collection_id = kDisplayBufferCollectionId,
-                                                .buffer_index = kVmoIdx,
-                                            })),
+              ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                           Eq(kDisplayBufferCollectionId)),
+                                         MatchRequestField(ImportImage, buffer_index, Eq(kVmoIdx))),
                           _))
       .Times(0);
   copy_metadata = metadata;
@@ -1096,16 +1076,13 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
   const fuchsia_hardware_display::wire::ImageId fidl_parent_image_id =
       scenic_impl::ToDisplayFidlImageId(parent_image_metadata.identifier);
-  EXPECT_CALL(
-      *mock_display_coordinator_,
-      ImportImage(
-          testing::AllOf(MatchRequestField(ImportImage, buffer_id,
-                                           Eq(fuchsia_hardware_display::wire::BufferId{
-                                               .buffer_collection_id = kDisplayBufferCollectionId,
-                                               .buffer_index = 0,
-                                           })),
-                         MatchRequestField(ImportImage, image_id, Eq(fidl_parent_image_id))),
-          _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(testing::AllOf(
+                              MatchRequestField(ImportImage, buffer_collection_id,
+                                                Eq(kDisplayBufferCollectionId)),
+                              MatchRequestField(ImportImage, buffer_index, Eq(0)),
+                              MatchRequestField(ImportImage, image_id, Eq(fidl_parent_image_id))),
+                          _))
       .Times(1)
       .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
                                    MockDisplayCoordinator::ImportImageCompleter::Sync& completer) {
@@ -1121,14 +1098,11 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
   EXPECT_CALL(
       *mock_display_coordinator_,
-      ImportImage(
-          testing::AllOf(MatchRequestField(ImportImage, buffer_id,
-                                           Eq(fuchsia_hardware_display::wire::BufferId{
-                                               .buffer_collection_id = kDisplayBufferCollectionId,
-                                               .buffer_index = 1,
-                                           })),
-                         MatchRequestField(ImportImage, image_id, Eq(fidl_child_image_id))),
-          _))
+      ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
+                                                   Eq(kDisplayBufferCollectionId)),
+                                 MatchRequestField(ImportImage, buffer_index, Eq(1)),
+                                 MatchRequestField(ImportImage, image_id, Eq(fidl_child_image_id))),
+                  _))
       .Times(1)
       .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
                                    MockDisplayCoordinator::ImportImageCompleter::Sync& completer) {
@@ -1325,16 +1299,13 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
 
   const fuchsia_hardware_display::wire::ImageId fidl_parent_image_id =
       scenic_impl::ToDisplayFidlImageId(parent_image_metadata.identifier);
-  EXPECT_CALL(
-      *mock_display_coordinator_,
-      ImportImage(
-          testing::AllOf(MatchRequestField(ImportImage, buffer_id,
-                                           Eq(fuchsia_hardware_display::wire::BufferId{
-                                               .buffer_collection_id = kDisplayBufferCollectionId,
-                                               .buffer_index = 0,
-                                           })),
-                         MatchRequestField(ImportImage, image_id, Eq(fidl_parent_image_id))),
-          _))
+  EXPECT_CALL(*mock_display_coordinator_,
+              ImportImage(testing::AllOf(
+                              MatchRequestField(ImportImage, buffer_collection_id,
+                                                Eq(kDisplayBufferCollectionId)),
+                              MatchRequestField(ImportImage, buffer_index, Eq(0)),
+                              MatchRequestField(ImportImage, image_id, Eq(fidl_parent_image_id))),
+                          _))
       .Times(1)
       .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
                                    MockDisplayCoordinator::ImportImageCompleter::Sync& completer) {

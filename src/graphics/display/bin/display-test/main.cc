@@ -496,12 +496,7 @@ zx_status_t capture_setup(Display& display) {
       .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
   };
   fidl::WireResult import_capture_result =
-      dc->ImportImage(capture_metadata,
-                      fuchsia_hardware_display::wire::BufferId{
-                          .buffer_collection_id = kBufferCollectionId.ToFidl(),
-                          .buffer_index = 0,
-                      },
-                      kCaptureImageId.ToFidl());
+      dc->ImportImage(capture_metadata, kBufferCollectionId.ToFidl(), 0, kCaptureImageId.ToFidl());
   if (import_capture_result.status() != ZX_OK) {
     printf("Failed to start capture: %s\n", import_capture_result.FormatDescription().c_str());
     return import_capture_result.status();
