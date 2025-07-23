@@ -26,7 +26,7 @@ static const std::vector<fuchsia_hardware_platform_bus::Mmio> saradc_mmios{
     }},
     {{
         .base = S905D3_AOBUS_BASE,
-        .length = S905D3_AOBUS_LENGTH,
+        .length = 0x1000,
     }},
 };
 
