@@ -50,11 +50,11 @@ fuchsia_test_package("bt-a2dp-source-integration-tests") {
   }
 
   deps = [
-    # The v2 A2DP component with only Source mode enabled.
+    # The A2DP component with only source enabled.
     "//src/connectivity/bluetooth/profiles/bt-a2dp:component",
     "//src/connectivity/bluetooth/profiles/bt-a2dp:source_only_config",
 
-    # Mock Piconet Server
+    # Mock Piconet Server for the `bredr.Profile` service.
     "//src/connectivity/bluetooth/testing/mock-piconet-server:component",
 
     # Fake cobalt component that provides Cobalt services to A2DP.
@@ -67,8 +67,7 @@ group("tests") {
   deps = [
     ":bt-a2dp-source-integration-tests",
 
-    # Codec Factory package with the CFv2 component providing the `fuchsia.mediacodec.CodecFactory`
-    # capability.
+    # Codec Factory component which provides the `fuchsia.mediacodec.CodecFactory` capability.
     "//src/media/codec:codec_factory",
   ]
 }
