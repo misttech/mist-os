@@ -241,10 +241,7 @@ zx::result<display::DriverCaptureImageId> EngineDriverClient::ImportImageForCapt
   if (use_engine_) {
     fdf::Arena arena(kArenaTag);
     fdf::WireUnownedResult result =
-        fidl_engine_.buffer(arena)->ImportImageForCapture(display::ToFidlDriverBufferId({
-            .buffer_collection_id = collection_id,
-            .buffer_index = index,
-        }));
+        fidl_engine_.buffer(arena)->ImportImageForCapture(collection_id.ToFidl(), index);
     if (!result.ok()) {
       return zx::error(result.status());
     }

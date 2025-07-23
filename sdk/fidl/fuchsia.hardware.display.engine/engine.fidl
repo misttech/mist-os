@@ -160,7 +160,7 @@ type DisplayConfig = struct {
     cc_postoffsets array<float32, 3>;
 
     /// Valid display configurations have at least one layer.
-    layer vector<Layer>:MAX;
+    layers vector<Layer>:MAX;
 };
 
 // An E-EDID can contain up to 256 data blocks, each of which contains 128
@@ -347,7 +347,7 @@ open protocol Engine {
     ///
     /// Fails with ZX_ERR_INTERNAL if any error occurs during the setup process,
     /// which mainly consists of communicating with the Sysmem service.
-    flexible ImportBufferCollection2(resource struct {
+    flexible ImportBufferCollection(resource struct {
         /// Identifies the imported BufferCollection.
         ///
         /// The ID must not be invalid, and must not be already assigned.
@@ -374,7 +374,7 @@ open protocol Engine {
         /// When the call completes, the ID is no longer assigned to the
         /// BufferCollection, and can be used in a future call to
         /// [`Engine.ImportBufferCollection2`].
-        collection_id uint64;
+        buffer_collection_id BufferCollectionId;
     }) -> () error zx.Status;
 
     /// Sets up the hardware to use a buffer as a display image data source.
@@ -393,7 +393,10 @@ open protocol Engine {
         ///
         /// The ID must be assigned to an imported BufferCollection, via a
         /// successful [`DisplayEnigne.ImportBufferCollection`] call.
-        buffer_id BufferId;
+        buffer_collection_id BufferCollectionId;
+
+        /// Must be a valid index in the imported BufferCollection.
+        buffer_collection_index uint32;
     }) -> (struct {
         /// Assigned to the imported image buffer.
         ///
@@ -418,7 +421,10 @@ open protocol Engine {
         ///
         /// The ID must be assigned to an imported BufferCollection, via a
         /// successful [`DisplayEnigne.ImportBufferCollection`] call.
-        buffer_id BufferId;
+        buffer_collection_id BufferCollectionId;
+
+        /// Must be a valid index in the imported BufferCollection.
+        buffer_collection_index uint32;
     }) -> (struct {
         /// Assigned to the imported capture image buffer.
         ///
