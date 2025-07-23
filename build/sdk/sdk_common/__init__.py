@@ -22,26 +22,52 @@ class File:
 
 
 @functools.total_ordering
-class Atom(object):
-    """Wrapper class for atom data, adding convenience methods."""
+class MinimalAtom(object):
+    """Wrapper class for minimal atom data, adding convenience methods."""
 
     def __init__(self, json: dict[str, Any]) -> None:
-        self.json = json
         self.id: str = json["id"]
-        self.metadata: str = json["meta"]
         self.label: str = json["gn-label"]
         self.category: str = json["category"]
-        self.area: str | None = json["area"]
-        self.deps: Sequence[str] = json["deps"]
-        self.files: Sequence[File] = [File(f) for f in json["files"]]
+        self.area: str | None = json.get("area")
         self.type: str = json["type"]
-        self.stable = json["stable"]
 
     def __str__(self) -> str:
         return str(self.id)
 
     def __hash__(self) -> int:
         return hash(self.label)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, MinimalAtom):
+            return False
+        return self.label == other.label
+
+    def __ne__(self, other: Any) -> bool:
+        if not isinstance(other, MinimalAtom):
+            return True
+        return not self.__eq__(other)
+
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, MinimalAtom):
+            return False
+        return self.id < other.id
+
+
+@functools.total_ordering
+class Atom(MinimalAtom):
+    """Wrapper class for atom data, adding convenience methods."""
+
+    def __init__(self, json: dict[str, Any]) -> None:
+        super().__init__(json)
+        self.json = json
+        self.metadata: str = json["meta"]
+        self.deps: Sequence[str] = json["deps"]
+        self.files: Sequence[File] = [File(f) for f in json["files"]]
+        self.stable: bool = json["stable"]
+
+    def __hash__(self) -> int:
+        return super().__hash__()
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Atom):
@@ -79,7 +105,7 @@ def gather_dependencies(
     return (direct_deps, atoms)
 
 
-def detect_collisions(atoms: Sequence[Atom]) -> Iterator[str]:
+def detect_collisions(atoms: Sequence[MinimalAtom]) -> Iterator[str]:
     """Detects name collisions in a given atom list. Yields a series of error
     messages as strings."""
     mappings = collections.defaultdict(lambda: [])
@@ -111,7 +137,7 @@ def _index_for_category(category: str) -> int:
 
 
 def detect_category_violations(
-    category: str, atoms: Sequence[Atom]
+    category: str, atoms: Sequence[MinimalAtom]
 ) -> Iterator[str]:
     """Yields strings describing mismatches in publication categories."""
     category_index = _index_for_category(category)
@@ -175,7 +201,7 @@ class Validator:
             return Validator(area_names_from_file(parsed_areas))
 
     def detect_violations(
-        self, category: str | None, atoms: Sequence[Atom]
+        self, category: str | None, atoms: Sequence[MinimalAtom]
     ) -> Iterator[str]:
         """Yield strings describing all violations found in `atoms`."""
         yield from detect_collisions(atoms)
@@ -184,7 +210,9 @@ class Validator:
         yield from self.detect_invalid_types(atoms)
         yield from self.detect_area_violations(atoms)
 
-    def detect_invalid_types(self, atoms: Sequence[Atom]) -> Iterator[str]:
+    def detect_invalid_types(
+        self, atoms: Sequence[MinimalAtom]
+    ) -> Iterator[str]:
         """Yields strings describing any invalid types in `atoms`."""
         for atom in atoms:
             if atom.type not in _VALID_ATOM_TYPES:
@@ -197,7 +225,9 @@ class Validator:
                     )
                 )
 
-    def detect_area_violations(self, atoms: Sequence[Atom]) -> Iterator[str]:
+    def detect_area_violations(
+        self, atoms: Sequence[MinimalAtom]
+    ) -> Iterator[str]:
         """Yields strings describing any invalid API areas in `atoms`."""
         for atom in atoms:
             if atom.area is None and atom.type not in _AREA_OPTIONAL_TYPES:
