@@ -81,7 +81,7 @@ class PowerCycleTest(fuchsia_base_test.FuchsiaBaseTest):
                 self._power_switch_impl["module"],
                 self._power_switch_impl["class"],
             )
-            power_switch_class: power_switch.PowerSwitch = getattr(
+            power_switch_class: type[power_switch.PowerSwitch] = getattr(
                 importlib.import_module(self._power_switch_impl["module"]),
                 self._power_switch_impl["class"],
             )
@@ -91,20 +91,20 @@ class PowerCycleTest(fuchsia_base_test.FuchsiaBaseTest):
                 self._power_switch_impl["module"],
                 self._power_switch_impl["class"],
             )
-            self._power_switch = power_switch_class(**self._power_switch_hw)  # type: ignore[operator]
+            self._power_switch = power_switch_class(**self._power_switch_hw)
 
             self._port = int(self._power_switch_hw["port"])
         else:
             _LOGGER.info("Test execution is in infra mode...")
 
             _LOGGER.debug("Importing %s.%s module", _DMC_MODULE, _DMC_CLASS)
-            power_switch_class: power_switch.PowerSwitch = getattr(  # type: ignore[no-redef]
+            power_switch_class: type[power_switch.PowerSwitch] = getattr(  # type: ignore[no-redef]
                 importlib.import_module(_DMC_MODULE), _DMC_CLASS
             )
 
             _LOGGER.debug("Instantiating %s.%s module", _DMC_MODULE, _DMC_CLASS)
-            self._power_switch = power_switch_class(  # type: ignore[operator]
-                device_name=self.dut.device_name
+            self._power_switch = power_switch_class(
+                device_name=self.dut.device_name  # type: ignore
             )
 
     def _test_logic(self, iteration: int) -> None:
