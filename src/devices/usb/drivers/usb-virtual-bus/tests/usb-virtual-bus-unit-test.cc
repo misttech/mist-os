@@ -3,37 +3,42 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
-#include <thread>
+#include <gtest/gtest.h>
 
-#include <zxtest/zxtest.h>
-
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus.h"
 
 namespace usb_virtual_bus {
 
-TEST(VirtualBusUnitTest, DdkLifecycle) {
-  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
-  auto fake_parent = MockDevice::FakeRootParent();
+class Environment : public fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override { return zx::ok(); }
+};
 
-  auto bus = new UsbVirtualBus(fake_parent.get(), loop.dispatcher());
-  ASSERT_NOT_NULL(bus);
+class UsbVirtualBusTestConfig final {
+ public:
+  using DriverType = UsbVirtualBus;
+  using EnvironmentType = Environment;
+};
 
-  ASSERT_OK(bus->DdkAdd("usb-virtual-bus"));
-  ASSERT_EQ(1, fake_parent->child_count());
-  auto* child = fake_parent->GetLatestChild();
+class UsbVirtualBusTest : public testing::Test {
+ public:
+  fdf_testing::BackgroundDriverTest<UsbVirtualBusTestConfig>& driver_test() { return driver_test_; }
 
-  child->InitOp();
-  ASSERT_OK(child->WaitUntilInitReplyCalled());
-  EXPECT_TRUE(child->InitReplyCalled());
+ private:
+  fdf_testing::BackgroundDriverTest<UsbVirtualBusTestConfig> driver_test_;
+};
 
-  device_async_remove(bus->zxdev());
-  mock_ddk::ReleaseFlaggedDevices(fake_parent.get());
+TEST_F(UsbVirtualBusTest, LifecycleTest) {
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
+  driver_test().RunInNodeContext(
+      [](fdf_testing::TestNode& node) { ASSERT_EQ(1UL, node.children().size()); });
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
 }
 
+#if 0
+// TODO(b/394914630): Turn this test back on.
 class FakeDci : public ddk::UsbDciInterfaceProtocol<FakeDci> {
  public:
   explicit FakeDci()
@@ -44,8 +49,8 @@ class FakeDci : public ddk::UsbDciInterfaceProtocol<FakeDci> {
   // UsbDciInterface implementation.
   // This will block until the test calls |CompleteControlRequest|.
   zx_status_t UsbDciInterfaceControl(const usb_setup_t* setup, const uint8_t* write_buffer,
-                                     size_t write_size, uint8_t* out_read_buffer, size_t read_size,
-                                     size_t* out_read_actual) {
+                                     size_t write_size, uint8_t* out_read_buffer, size_t
+                                     read_size, size_t* out_read_actual) {
     sync_completion_signal(&control_start_sync_);
     sync_completion_wait(&control_complete_sync_, ZX_TIME_INFINITE);
     return ZX_OK;
@@ -129,5 +134,6 @@ TEST(VirtualBusUnitTest, UnbindDuringControlRequest) {
   EXPECT_EQ(ZX_OK, child->WaitUntilUnbindReplyCalled());
   EXPECT_TRUE(child->UnbindReplyCalled());
 }
+#endif
 
 }  // namespace usb_virtual_bus

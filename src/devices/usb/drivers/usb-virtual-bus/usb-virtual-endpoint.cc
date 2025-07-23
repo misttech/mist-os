@@ -4,33 +4,101 @@
 
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-endpoint.h"
 
-#include <fbl/auto_lock.h>
-
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus.h"
 
 namespace usb_virtual_bus {
 
 namespace {
 
-inline usb_setup_t ToBanjo(fuchsia_hardware_usb_descriptor::UsbSetup setup) {
-  return usb_setup_t{
-      .bm_request_type = setup.bm_request_type(),
-      .b_request = setup.b_request(),
-      .w_value = setup.w_value(),
-      .w_index = setup.w_index(),
-      .w_length = setup.w_length(),
-  };
+zx::result<void*> GetBuffer(
+    RequestVariant& req,
+    std::optional<usb::FidlRequest::get_mapped_func_t> mapping_fn = std::nullopt) {
+  if (std::holds_alternative<Request>(req)) {
+    void* buffer;
+    auto status = std::get<Request>(req).Mmap(&buffer);
+    if (status != ZX_OK) {
+      FDF_LOG(ERROR, "usb_request_mmap failed: %d", status);
+      return zx::error(status);
+    }
+    return zx::ok(buffer);
+  }
+
+  auto& request_buffer = (*std::get<usb::FidlRequest>(req)->data())[0].buffer();
+  const auto& buffer_type = request_buffer->Which();
+  switch (buffer_type) {
+    case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId:
+      ZX_DEBUG_ASSERT(mapping_fn);
+      {
+        zx::result result = (*mapping_fn)(*request_buffer);
+        if (result.is_error()) {
+          FDF_LOG(ERROR, "Failed to map %s", result.status_string());
+          return result.take_error();
+        }
+        return zx::ok(reinterpret_cast<void*>(result->addr));
+      }
+    case fuchsia_hardware_usb_request::Buffer::Tag::kData:
+      return zx::ok(request_buffer->data()->data());
+    default:
+      FDF_LOG(ERROR, "%s: Unknown buffer type %u", __func__, static_cast<uint32_t>(buffer_type));
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+size_t GetLength(RequestVariant& req) {
+  return std::holds_alternative<usb::FidlRequest>(req)
+             ? std::get<usb::FidlRequest>(req).length()
+             : std::get<Request>(req).request()->header.length;
+}
+
+fuchsia_hardware_usb_descriptor::UsbSetup GetSetup(RequestVariant& req) {
+  if (std::holds_alternative<usb::FidlRequest>(req)) {
+    return *std::get<usb::FidlRequest>(req)->information()->control()->setup();
+  }
+
+  usb_setup_t setup = std::get<Request>(req).request()->setup;
+  return fuchsia_hardware_usb_descriptor::UsbSetup(setup.bm_request_type, setup.b_request,
+                                                   setup.w_value, setup.w_index, setup.w_length);
 }
 
 }  // namespace
 
-void UsbEpServer::OnFidlClosed(fidl::UnbindInfo) {
-  for (const auto& [_, registered_vmo] : registered_vmos_) {
-    auto status = zx::vmar::root_self()->unmap(registered_vmo.addr, registered_vmo.size);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to unmap VMO %d", status);
-      continue;
-    }
+void UsbEpServer::Connect(fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {
+  if (binding_) {
+    FDF_LOG(ERROR, "Endpoint already bound");
+    return;
+  }
+  binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server_end), this,
+                   [this](fidl::UnbindInfo) {
+                     for (const auto& [_, registered_vmo] : registered_vmos_) {
+                       auto status =
+                           zx::vmar::root_self()->unmap(registered_vmo.addr, registered_vmo.size);
+                       if (status != ZX_OK) {
+                         FDF_LOG(ERROR, "Failed to unmap VMO %d", status);
+                         continue;
+                       }
+                     }
+                   });
+}
+
+void UsbEpServer::QueueRequest(RequestVariant req) {
+  if (ep_->stalled_) {
+    // Do not process any requests if stalled.
+    RequestComplete(ZX_ERR_IO_REFUSED, 0, req);
+    return;
+  }
+
+  if (!ep_->is_control()) {
+    pending_reqs_.push(std::move(req));
+    ep_->process_requests_.Post(ep_->bus_->async_dispatcher());
+  } else {
+    ep_->HandleControl(std::move(req));
+  }
+}
+
+void UsbEpServer::CommonCancelAll() {
+  while (!pending_reqs_.empty()) {
+    RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, pending_reqs_.front());
+    pending_reqs_.pop();
   }
 }
 
@@ -44,14 +112,14 @@ void UsbEpServer::RegisterVmos(RegisterVmosRequest& request,
     auto size = *info.size();
 
     if (registered_vmos_.find(id) != registered_vmos_.end()) {
-      zxlogf(ERROR, "VMO ID %lu already registered", id);
+      FDF_LOG(ERROR, "VMO ID %lu already registered", id);
       continue;
     }
 
     zx::vmo vmo;
     auto status = zx::vmo::create(size, 0, &vmo);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to pin registered VMO %d", status);
+      FDF_LOG(ERROR, "Failed to pin registered VMO %d", status);
       continue;
     }
 
@@ -60,7 +128,7 @@ void UsbEpServer::RegisterVmos(RegisterVmosRequest& request,
     status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size,
                                         &mapped_addr);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to map the vmo: %d", status);
+      FDF_LOG(ERROR, "Failed to map the vmo: %d", status);
       // Try for the next one.
       continue;
     }
@@ -89,7 +157,7 @@ void UsbEpServer::UnregisterVmos(UnregisterVmosRequest& request,
     auto status =
         zx::vmar::root_self()->unmap(registered_vmo.mapped().addr, registered_vmo.mapped().size);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to unmap VMO %d", status);
+      FDF_LOG(ERROR, "Failed to unmap VMO %d", status);
       failed_vmo_ids.emplace_back(id);
       errors.emplace_back(status);
       continue;
@@ -101,18 +169,25 @@ void UsbEpServer::UnregisterVmos(UnregisterVmosRequest& request,
 void UsbEpServer::QueueRequests(QueueRequestsRequest& request,
                                 QueueRequestsCompleter::Sync& completer) {
   for (auto& req : request.req()) {
-    ep_->QueueRequest(usb::FidlRequest{std::move(req)});
+    QueueRequest(usb::FidlRequest{std::move(req)});
   }
 }
 
 void UsbEpServer::CancelAll(CancelAllCompleter::Sync& completer) {
-  completer.Reply(ep_->CancelAll());
+  CommonCancelAll();
+  completer.Reply(zx::ok());
 }
 
-void UsbEpServer::RequestComplete(zx_status_t status, size_t actual, usb::FidlRequest request) {
-  auto defer_completion = *request->defer_completion();
+void UsbEpServer::RequestComplete(zx_status_t status, size_t actual, RequestVariant& request) {
+  if (std::holds_alternative<usb::BorrowedRequest<void>>(request)) {
+    std::get<usb::BorrowedRequest<void>>(request).Complete(status, actual);
+    return;
+  }
+
+  auto& freq = std::get<usb::FidlRequest>(request);
+  auto defer_completion = *freq->defer_completion();
   completions_.emplace_back(std::move(fuchsia_hardware_usb_endpoint::Completion()
-                                          .request(request.take_request())
+                                          .request(freq.take_request())
                                           .status(status)
                                           .transfer_size(actual)));
   if (defer_completion && status == ZX_OK) {
@@ -121,274 +196,160 @@ void UsbEpServer::RequestComplete(zx_status_t status, size_t actual, usb::FidlRe
   std::vector<fuchsia_hardware_usb_endpoint::Completion> completions;
   completions.swap(completions_);
 
-  auto result = fidl::SendEvent(binding_)->OnCompletion(std::move(completions));
+  auto result = fidl::SendEvent(*binding_)->OnCompletion(std::move(completions));
   if (result.is_error()) {
-    zxlogf(ERROR, "Error sending event: %s", result.error_value().status_string());
+    FDF_LOG(ERROR, "Error sending event: %s", result.error_value().status_string());
   }
 }
 
-void UsbVirtualEp::QueueRequest(RequestVariant request) {
-  bool connected;
-  {
-    fbl::AutoLock _(&bus_->connection_lock_);
-    connected = bus_->connected_;
-  }
-  if (!connected) {
-    RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
+void UsbVirtualEp::ProcessRequests() {
+  ZX_DEBUG_ASSERT(!is_control());
+
+  if (!bus_->connected_) {
+    // Do not process any requests if not connected.
     return;
   }
 
-  fbl::AutoLock device_lock(&bus_->device_lock_);
-  if (bus_->unbinding_) {
-    device_lock.release();
-    RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
-    return;
-  }
-
-  if (stalled) {
-    device_lock.release();
-    RequestComplete(ZX_ERR_IO_REFUSED, 0, std::move(request));
-    return;
-  }
-  if (!is_control()) {
-    host_reqs.push(std::move(request));
-    bus_->process_requests_.Post(bus_->device_dispatcher_.async_dispatcher());
-  } else {
-    bus_->num_pending_control_reqs_++;
-    // Control messages are a VERY special case.
-    // They are synchronous; so we shouldn't dispatch them
-    // to an I/O thread.
-    // We can't hold a lock when responding to a control request
-    device_lock.release();
-    bus_->HandleControl(std::move(request));
-  }
-}
-
-zx::result<> UsbVirtualEp::CancelAll() {
-  std::queue<RequestVariant> q;
-  {
-    fbl::AutoLock lock(&bus_->device_lock_);
-    q = std::move(host_reqs);
-  }
-  while (!q.empty()) {
-    RequestComplete(ZX_ERR_IO, 0, std::move(q.front()));
-    q.pop();
-  }
-  return zx::ok();
-}
-
-void UsbVirtualEp::RequestComplete(zx_status_t status, size_t actual, RequestVariant request) {
-  if (std::holds_alternative<usb::BorrowedRequest<void>>(request)) {
-    std::get<usb::BorrowedRequest<void>>(request).Complete(status, actual);
-    return;
-  }
-
-  if (bus_->device_dispatcher() != fdf::Dispatcher::GetCurrent()->async_dispatcher()) {
-    libsync::Completion wait;
-    async::PostTask(bus_->device_dispatcher(), [this, status, actual, &request, &wait]() {
-      bus_->host_->ep(index_)->RequestComplete(status, actual,
-                                               std::move(std::get<usb::FidlRequest>(request)));
-      wait.Signal();
-    });
-    wait.Wait();
-  } else {
-    bus_->host_->ep(index_)->RequestComplete(status, actual,
-                                             std::move(std::get<usb::FidlRequest>(request)));
-  }
-}
-
-void UsbVirtualBus::ProcessRequests() {
   struct complete_request_t {
-    complete_request_t(UsbVirtualEp& ep, RequestVariant request, zx_status_t status, size_t actual)
-        : ep(ep), request(std::move(request)), status(status), actual(actual) {}
+    complete_request_t(RequestVariant request, zx_status_t status, size_t actual)
+        : request(std::move(request)), status(status), actual(actual) {}
 
-    UsbVirtualEp& ep;
     RequestVariant request;
     zx_status_t status;
     size_t actual;
   };
-  std::queue<complete_request_t> complete_reqs_pending;
+  std::queue<complete_request_t> host_complete_reqs_pending;
+  std::queue<complete_request_t> device_complete_reqs_pending;
 
-  auto add_complete_reqs = [&complete_reqs_pending](UsbVirtualEp& ep, RequestVariant request,
-                                                    zx_status_t status, size_t actual) {
-    complete_reqs_pending.emplace(ep, std::move(request), status, actual);
-  };
-  auto process_complete_reqs = [&complete_reqs_pending]() {
-    while (!complete_reqs_pending.empty()) {
-      auto& complete = complete_reqs_pending.front();
-      complete.ep.RequestComplete(complete.status, complete.actual, std::move(complete.request));
-      complete_reqs_pending.pop();
+  // Data transfer between device/host
+  while (!host_.pending_reqs_.empty() && !device_.pending_reqs_.empty()) {
+    auto device_req = std::move(device_.pending_reqs_.front());
+    device_.pending_reqs_.pop();
+    auto host_req = std::move(host_.pending_reqs_.front());
+    host_.pending_reqs_.pop();
+
+    size_t length = std::min(GetLength(host_req), GetLength(device_req));
+    zx::result host_buffer = GetBuffer(host_req, fit::bind_member(&host_, &UsbEpServer::GetMapped));
+    if (host_buffer.is_error()) {
+      FDF_LOG(ERROR, "Failed to get host buffer %s", host_buffer.status_string());
+      host_complete_reqs_pending.emplace(std::move(host_req), host_buffer.error_value(), 0);
+      device_complete_reqs_pending.emplace(std::move(device_req), host_buffer.error_value(), 0);
+      return;
     }
-  };
-
-  {
-    fbl::AutoLock al(&device_lock_);
-    bool has_work = true;
-    while (has_work) {
-      has_work = false;
-      if (unbinding_) {
-        for (auto& ep : eps_) {
-          for (auto req = ep.device_reqs.pop(); req; req = ep.device_reqs.pop()) {
-            add_complete_reqs(ep, std::move(req.value()), ZX_ERR_IO_NOT_PRESENT, 0);
-          }
-        }
-        // We need to wait for all control requests to complete before completing the unbind.
-        if (num_pending_control_reqs_ > 0) {
-          complete_unbind_signal_.Wait(&device_lock_);
-        }
-
-        al.release();
-        process_complete_reqs();
-
-        // At this point, all pending control requests have been completed,
-        // and any queued requests wil be immediately completed with an error.
-        ZX_DEBUG_ASSERT(unbind_txn_.has_value());
-        unbind_txn_->Reply();
-        return;
-      }
-      // Data transfer between device/host (everything except ep 0)
-      for (uint8_t i = 0; i < USB_MAX_EPS; i++) {
-        auto& ep = eps_[i];
-        while (!ep.host_reqs.empty() && !ep.device_reqs.is_empty()) {
-          has_work = true;
-          auto device_req = std::move(ep.device_reqs.pop().value());
-          auto req = std::move(ep.host_reqs.front());
-          ep.host_reqs.pop();
-          size_t length = std::min(std::holds_alternative<usb::FidlRequest>(req)
-                                       ? std::get<usb::FidlRequest>(req).length()
-                                       : std::get<Request>(req).request()->header.length,
-                                   device_req.request()->header.length);
-          void* device_buffer;
-          auto status = device_req.Mmap(&device_buffer);
-          if (status != ZX_OK) {
-            zxlogf(ERROR, "%s: usb_request_mmap failed: %d", __func__, status);
-            add_complete_reqs(ep, std::move(req), status, 0);
-            add_complete_reqs(ep, std::move(device_req), status, 0);
-            continue;
-          }
-
-          if (i < IN_EP_START) {
-            if (std::holds_alternative<usb::FidlRequest>(req)) {
-              std::vector<size_t> result = std::get<usb::FidlRequest>(req).CopyFrom(
-                  0, device_buffer, length,
-                  fit::bind_member(host_->ep(i), &UsbEpServer::GetMapped));
-              ZX_ASSERT(result.size() == 1);
-              ZX_ASSERT(result[0] == length);
-            } else {
-              size_t result = std::get<Request>(req).CopyFrom(device_buffer, length, 0);
-              ZX_ASSERT(result == length);
-            }
-          } else {
-            if (std::holds_alternative<usb::FidlRequest>(req)) {
-              std::vector<size_t> result = std::get<usb::FidlRequest>(req).CopyTo(
-                  0, device_buffer, length,
-                  fit::bind_member(host_->ep(i), &UsbEpServer::GetMapped));
-              ZX_ASSERT(result.size() == 1);
-              ZX_ASSERT(result[0] == length);
-            } else {
-              size_t result = std::get<Request>(req).CopyTo(device_buffer, length, 0);
-              ZX_ASSERT(result == length);
-            }
-          }
-          add_complete_reqs(ep, std::move(req), ZX_OK, length);
-          add_complete_reqs(ep, std::move(device_req), ZX_OK, length);
-        }
-      }
+    zx::result device_buffer =
+        GetBuffer(device_req, fit::bind_member(&device_, &UsbEpServer::GetMapped));
+    if (device_buffer.is_error()) {
+      FDF_LOG(ERROR, "Failed to get device buffer %s", device_buffer.status_string());
+      host_complete_reqs_pending.emplace(std::move(host_req), device_buffer.error_value(), 0);
+      device_complete_reqs_pending.emplace(std::move(device_req), device_buffer.error_value(), 0);
+      return;
     }
+
+    if (is_out()) {
+      std::memcpy(*device_buffer, *host_buffer, length);
+    } else {
+      std::memcpy(*host_buffer, *device_buffer, length);
+    }
+    host_complete_reqs_pending.emplace(std::move(host_req), ZX_OK, length);
+    device_complete_reqs_pending.emplace(std::move(device_req), ZX_OK, length);
   }
-  process_complete_reqs();
+
+  while (!host_complete_reqs_pending.empty()) {
+    auto& complete = host_complete_reqs_pending.front();
+    host_.RequestComplete(complete.status, complete.actual, complete.request);
+    host_complete_reqs_pending.pop();
+  }
+
+  while (!device_complete_reqs_pending.empty()) {
+    auto& complete = device_complete_reqs_pending.front();
+    device_.RequestComplete(complete.status, complete.actual, complete.request);
+    device_complete_reqs_pending.pop();
+  }
 }
 
-void UsbVirtualBus::HandleControl(RequestVariant req) {
-  const usb_setup_t& setup =
-      std::holds_alternative<usb::FidlRequest>(req)
-          ? ToBanjo(*std::get<usb::FidlRequest>(req)->information()->control()->setup())
-          : std::get<Request>(req).request()->setup;
-  zx_status_t status;
-  size_t length = le16toh(setup.w_length);
-  size_t actual = 0;
+void UsbVirtualEp::HandleControl(RequestVariant req) {
+  ZX_DEBUG_ASSERT(is_control());
 
-  zxlogf(DEBUG, "%s type: 0x%02X req: %d value: %d index: %d length: %zu", __func__,
-         setup.bm_request_type, setup.b_request, le16toh(setup.w_value), le16toh(setup.w_index),
-         length);
+  if (!bus_->connected_) {
+    // Do not process any requests if not connected.
+    host_.RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, req);
+    return;
+  }
 
-  if (dci_intf_.is_valid()) {
-    void* buffer = nullptr;
+  fuchsia_hardware_usb_descriptor::UsbSetup setup = GetSetup(req);
 
-    if (length > 0) {
-      if (std::holds_alternative<usb::FidlRequest>(req)) {
-        auto& request_buffer = (*std::get<usb::FidlRequest>(req)->data())[0].buffer();
-        const auto& buffer_type = request_buffer->Which();
-        switch (buffer_type) {
-          case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId:
-            buffer = reinterpret_cast<void*>(
-                host_->ep(0)->registered_vmo(request_buffer->vmo_id().value()).addr);
-            break;
-          case fuchsia_hardware_usb_request::Buffer::Tag::kData:
-            buffer = request_buffer->data()->data();
-            break;
-          default:
-            zxlogf(ERROR, "%s: Unknown buffer type %u", __func__,
-                   static_cast<uint32_t>(buffer_type));
-            return;
-        }
-      } else {
-        auto status = std::get<Request>(req).Mmap(&buffer);
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "%s: usb_request_mmap failed: %d", __func__, status);
-          eps_[0].RequestComplete(status, 0, std::move(req));
+  FDF_LOG(DEBUG, "%s type: 0x%02X req: %d value: %d index: %d length: %hu", __func__,
+          setup.bm_request_type(), setup.b_request(), setup.w_value(), setup.w_index(),
+          setup.w_length());
+
+  if (!bus_->dci_intf_.is_valid()) {
+    FDF_LOG(ERROR, "Dci Interface not ready");
+    host_.RequestComplete(ZX_ERR_UNAVAILABLE, 0, req);
+    return;
+  }
+
+  const bool is_in = ((setup.bm_request_type() & USB_ENDPOINT_DIR_MASK) == USB_ENDPOINT_IN);
+  std::vector<uint8_t> write(0);
+  if (!is_in && setup.w_length() > 0) {
+    zx::result result = GetBuffer(req, fit::bind_member(&host_, &UsbEpServer::GetMapped));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to get buffer pointer %s", result.status_string());
+      host_.RequestComplete(result.error_value(), 0, req);
+      return;
+    }
+    write = std::vector<uint8_t>(reinterpret_cast<uint8_t*>(*result),
+                                 reinterpret_cast<uint8_t*>(*result) + setup.w_length());
+  }
+
+  bus_->dci_intf_->Control({setup, std::move(write)})
+      .Then([this, req = std::move(req), length = setup.w_length()](
+                fidl::Result<fuchsia_hardware_usb_dci::UsbDciInterface::Control>& result) mutable {
+        if (result.is_error()) {
+          host_.RequestComplete(result.error_value().is_framework_error()
+                                    ? ZX_ERR_IO_NOT_PRESENT
+                                    : result.error_value().domain_error(),
+                                0, req);
           return;
         }
-      }
-    }
+        if (result->read().size() > length) {
+          FDF_LOG(ERROR, "Buffer overflow!");
+          host_.RequestComplete(ZX_ERR_NO_MEMORY, 0, req);
+          return;
+        }
 
-    if ((setup.bm_request_type & USB_ENDPOINT_DIR_MASK) == USB_ENDPOINT_IN) {
-      status = dci_intf_.Control(&setup, nullptr, 0, reinterpret_cast<uint8_t*>(buffer), length,
-                                 &actual);
-    } else {
-      status = dci_intf_.Control(&setup, reinterpret_cast<uint8_t*>(buffer), length, nullptr, 0,
-                                 nullptr);
-    }
-  } else {
-    status = ZX_ERR_UNAVAILABLE;
-  }
+        if (std::holds_alternative<usb::FidlRequest>(req) &&
+            !std::get<usb::FidlRequest>(req)->data()) {
+          // Means we should create a buffer for it to return.
+          std::get<usb::FidlRequest>(req)->data().emplace();
+          std::get<usb::FidlRequest>(req)
+              ->data()
+              ->emplace_back()
+              .buffer(fuchsia_hardware_usb_request::Buffer::WithData(
+                  std::vector<uint8_t>(result->read().size())))
+              .offset(0)
+              .size(result->read().size());
+        }
 
-  {
-    fbl::AutoLock device_lock(&device_lock_);
-    num_pending_control_reqs_--;
-    if (unbinding_ && num_pending_control_reqs_ == 0) {
-      // The worker thread is waiting for the control request to complete.
-      complete_unbind_signal_.Signal();
-    }
-  }
-
-  eps_[0].RequestComplete(status, actual, std::move(req));
+        zx::result buffer = GetBuffer(req, fit::bind_member(&host_, &UsbEpServer::GetMapped));
+        if (buffer.is_error()) {
+          FDF_LOG(ERROR, "Failed to get buffer pointer %s", buffer.status_string());
+          host_.RequestComplete(buffer.error_value(), 0, req);
+          return;
+        }
+        std::memcpy(*buffer, result->read().data(), result->read().size());
+        host_.RequestComplete(ZX_OK, result->read().size(), req);
+      });
 }
 
-zx_status_t UsbVirtualBus::SetStall(uint8_t ep_address, bool stall) {
-  uint8_t index = EpAddressToIndex(ep_address);
-  if (index >= USB_MAX_EPS) {
-    return ZX_ERR_INVALID_ARGS;
+zx::result<> UsbVirtualEp::SetStall(bool stall) {
+  stalled_ = stall;
+
+  if (stall) {
+    host_.RequestComplete(ZX_ERR_IO_REFUSED, 0, host_.pending_reqs_.front());
+    host_.pending_reqs_.pop();
   }
 
-  UsbVirtualEp& ep = eps_[index];
-  std::optional<RequestVariant> req = std::nullopt;
-  {
-    fbl::AutoLock lock(&lock_);
-
-    ep.stalled = stall;
-
-    if (stall) {
-      req.emplace(std::move(ep.host_reqs.front()));
-      ep.host_reqs.pop();
-    }
-  }
-
-  if (req) {
-    ep.RequestComplete(ZX_ERR_IO_REFUSED, 0, std::move(*req));
-  }
-
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace usb_virtual_bus

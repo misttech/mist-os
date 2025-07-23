@@ -201,7 +201,7 @@ class UsbPeripheral : public fdf::DriverBase,
   int ListenerCleanupThread();
   void RequestComplete(usb_request_t* req);
 
-  bool AllFunctionsRegistered() const;
+  bool AllFunctionsRegistered() const __TA_REQUIRES(lock_);
   UsbFunction& GetFunction(size_t index);
   const UsbFunction& GetFunction(size_t index) const;
 

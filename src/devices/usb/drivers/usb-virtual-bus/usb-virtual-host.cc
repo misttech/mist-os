@@ -5,9 +5,6 @@
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-host.h"
 
 #include <assert.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,15 +18,25 @@
 
 namespace usb_virtual_bus {
 
-void UsbVirtualHost::DdkRelease() { delete this; }
-
 void UsbVirtualHost::UsbHciRequestQueue(usb_request_t* req,
                                         const usb_request_complete_callback_t* complete_cb) {
-  return bus_->UsbHciRequestQueue(req, complete_cb);
+  Request request(req, *complete_cb, sizeof(usb_request_t));
+
+  uint8_t index = EpAddressToIndex(request.request()->header.ep_address);
+  if (index >= USB_MAX_EPS) {
+    FDF_LOG(ERROR, "usb_virtual_bus_host_queue bad endpoint %u\n",
+            request.request()->header.ep_address);
+    request.Complete(ZX_ERR_INVALID_ARGS, 0);
+    return;
+  }
+
+  async::PostTask(bus_->async_dispatcher(), [this, index, request = std::move(request)]() mutable {
+    bus_->ep(index).host_.QueueRequest(std::move(request));
+  });
 }
 
 void UsbVirtualHost::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bus_intf) {
-  bus_->UsbHciSetBusInterface(bus_intf);
+  bus_->SetBusInterface(bus_intf);
 }
 
 size_t UsbVirtualHost::UsbHciGetMaxDeviceCount() { return 1; }
@@ -74,7 +81,13 @@ size_t UsbVirtualHost::UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_a
 }
 
 zx_status_t UsbVirtualHost::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
-  return bus_->UsbHciCancelAll(device_id, ep_address);
+  uint8_t index = EpAddressToIndex(ep_address);
+  if (index >= USB_MAX_EPS) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  bus_->ep(index).host_.CommonCancelAll();
+  return ZX_OK;
 }
 
 size_t UsbVirtualHost::UsbHciGetRequestSize() {
@@ -85,31 +98,12 @@ void UsbVirtualHost::ConnectToEndpoint(ConnectToEndpointRequest& request,
                                        ConnectToEndpointCompleter::Sync& completer) {
   uint8_t index = EpAddressToIndex(request.ep_addr());
   if (index >= USB_MAX_EPS) {
-    printf("usb_virtual_bus_host_queue bad endpoint %u\n", request.ep_addr());
-    return completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
   }
 
-  if (eps_[index].has_value()) {
-    return completer.Reply(zx::error(ZX_ERR_ALREADY_BOUND));
-  }
-
-  async::PostTask(bus_->device_dispatcher(), [this, index, req = std::move(request),
-                                              cmp = completer.ToAsync()]() mutable {
-    eps_[index].emplace(bus_->ep(index), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                        std::move(req.ep()));
-    cmp.Reply(zx::ok());
-  });
-}
-
-UsbVirtualHost::~UsbVirtualHost() {
-  libsync::Completion wait;
-  async::PostTask(bus_->device_dispatcher(), [this, &wait]() mutable {
-    for (auto& ep : eps_) {
-      ep.reset();
-    }
-    wait.Signal();
-  });
-  wait.Wait();
+  bus_->ep(index).host_.Connect(std::move(request.ep()));
+  completer.Reply(zx::ok());
 }
 
 }  // namespace usb_virtual_bus

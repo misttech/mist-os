@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_USB_VIRTUAL_ENDPOINT_H_
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
+#include <lib/async/cpp/task.h>
 
 #include <usb/request-cpp.h>
 #include <usb/request-fidl.h>
@@ -20,19 +21,32 @@ static inline uint8_t EpAddressToIndex(uint8_t addr) {
 }
 
 using Request = usb::BorrowedRequest<void>;
-using RequestQueue = usb::BorrowedRequestQueue<void>;
 using RequestVariant = std::variant<Request, usb::FidlRequest>;
 
 class UsbVirtualEp;
 class UsbEpServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint> {
  public:
-  UsbEpServer(UsbVirtualEp* ep, async_dispatcher_t* dispatcher,
-              fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server)
-      : ep_(ep),
-        binding_(dispatcher, std::move(server), this,
-                 fit::bind_member(this, &UsbEpServer::OnFidlClosed)) {}
-  void OnFidlClosed(fidl::UnbindInfo);
+  explicit UsbEpServer(UsbVirtualEp* ep) : ep_(ep) {}
+  ~UsbEpServer() { ZX_ASSERT(pending_reqs_.empty()); }
 
+  void Connect(fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end);
+
+  void QueueRequest(RequestVariant req);
+  void CommonCancelAll();
+
+  void RequestComplete(zx_status_t status, size_t actual, RequestVariant& request);
+  zx::result<std::optional<usb::MappedVmo>> GetMapped(
+      const fuchsia_hardware_usb_request::Buffer& buffer) {
+    if (buffer.Which() == fuchsia_hardware_usb_request::Buffer::Tag::kData) {
+      return zx::ok(std::nullopt);
+    }
+    return zx::ok(registered_vmos_.at(buffer.vmo_id().value()));
+  }
+
+  // pending_reqs_: Requests not processed yet.
+  std::queue<RequestVariant> pending_reqs_;
+
+ private:
   // fuchsia_hardware_usb_new.Endpoint protocol implementation.
   void GetInfo(GetInfoCompleter::Sync& completer) override {
     completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
@@ -44,23 +58,8 @@ class UsbEpServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint>
                      QueueRequestsCompleter::Sync& completer) override;
   void CancelAll(CancelAllCompleter::Sync& completer) override;
 
-  void RequestComplete(zx_status_t status, size_t actual, usb::FidlRequest request);
-  zx::result<std::optional<usb::MappedVmo>> GetMapped(
-      const fuchsia_hardware_usb_request::Buffer& buffer) {
-    if (buffer.Which() == fuchsia_hardware_usb_request::Buffer::Tag::kData) {
-      return zx::ok(std::nullopt);
-    }
-    return zx::ok(registered_vmos_.at(buffer.vmo_id().value()));
-  }
-  usb::MappedVmo& registered_vmo(uint64_t i) { return registered_vmos_[i]; }
-
- private:
   UsbVirtualEp* ep_;
-  // binding_ must be created, used, and destroyed on bus_->device_dispatcher_. There is no check
-  // for this, but `RequestComplete` in this class will only be called when it supports FIDL and
-  // that will happen on device_dispatcher_. When we've moved away from Banjo, it maybe worth
-  // putting this in async_patterns::DispatcherBound.
-  fidl::ServerBinding<fuchsia_hardware_usb_endpoint::Endpoint> binding_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_usb_endpoint::Endpoint>> binding_;
 
   // completions_: Holds on to request completions that are completed, but have not been replied
   // to due to  defer_completion == true.
@@ -72,33 +71,32 @@ class UsbEpServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint>
 };
 
 class UsbVirtualBus;
-// This struct represents an endpoint on the virtual device.
+// This class represents an endpoint on the virtual device.
 class UsbVirtualEp {
  public:
-  ~UsbVirtualEp() {
-    ZX_ASSERT(host_reqs.empty());
-    ZX_ASSERT(device_reqs.is_empty());
-  }
-
   void Init(UsbVirtualBus* bus, uint8_t index) {
     bus_ = bus;
     index_ = index;
   }
 
-  void QueueRequest(RequestVariant request);
-  zx::result<> CancelAll();
-  void RequestComplete(zx_status_t status, size_t actual, RequestVariant request);
+  void ProcessRequests();
+  void HandleControl(RequestVariant req);
+  zx::result<> SetStall(bool stall);
 
   bool is_control() const { return index_ == 0; }
+  bool is_out() const { return index_ > 0 && index_ < IN_EP_START; }
+  bool is_in() const { return !is_control() && !is_out(); }
 
-  std::queue<RequestVariant> host_reqs;
-  RequestQueue device_reqs;
-  uint16_t max_packet_size = 0;
-  bool stalled = false;
-
- private:
   UsbVirtualBus* bus_;
   uint8_t index_;
+
+  uint16_t max_packet_size_ = 0;
+  bool stalled_ = false;
+
+  UsbEpServer host_{this};
+  UsbEpServer device_{this};
+
+  async::TaskClosureMethod<UsbVirtualEp, &UsbVirtualEp::ProcessRequests> process_requests_{this};
 };
 
 }  // namespace usb_virtual_bus
