@@ -54,19 +54,14 @@ impl<T: AsRef<[u8]>> ParseCursor for Cursor<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ByValue<T: AsRef<[u8]>>(Cursor<T>);
+pub struct PolicyCursor(Cursor<Vec<u8>>);
 
-impl<T: AsRef<[u8]>> ByValue<T> {
-    /// Returns a new [`ByValue`] that wraps `data` in a [`Cursor`] for parsing.
-    pub fn new(data: T) -> Self {
+impl PolicyCursor {
+    /// Returns a new [`PolicyCursor`] that wraps `data` in a [`Cursor`] for parsing.
+    pub fn new(data: Vec<u8>) -> Self {
         Self(Cursor::new(data))
     }
-}
 
-impl<T: AsRef<[u8]> + Debug + PartialEq> ByValue<T>
-where
-    Cursor<T>: Debug + ParseCursor + PartialEq,
-{
     /// Returns an `P` as the parsed output of the next bytes in the underlying [`Cursor`] data.
     pub fn parse<P: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         mut self,
@@ -99,7 +94,7 @@ where
         self.0.len()
     }
 
-    pub fn into_inner(self) -> T {
+    pub fn into_inner(self) -> Vec<u8> {
         self.0.into_inner()
     }
 }
@@ -118,31 +113,27 @@ mod tests {
         d: u8,
     }
 
-    // Ensure that "return parser + parsed output" pattern works on `ByValue`.
+    // Ensure that "return parser + parsed output" pattern works on `PolicyCursor`.
     fn do_by_value<
-        D: AsRef<[u8]> + Debug + PartialEq,
         T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
     >(
-        data: D,
-    ) -> (T, ByValue<D>) {
-        let parser = ByValue::new(data);
+        data: Vec<u8>,
+    ) -> (T, PolicyCursor) {
+        let parser = PolicyCursor::new(data);
         parser.parse::<T>().expect("some numbers")
     }
-    fn do_slice_by_value<
-        D: AsRef<[u8]> + Debug + PartialEq,
-        T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned,
-    >(
-        data: D,
+    fn do_slice_by_value<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
+        data: Vec<u8>,
         count: usize,
-    ) -> (Vec<T>, ByValue<D>) {
-        let parser = ByValue::new(data);
+    ) -> (Vec<T>, PolicyCursor) {
+        let parser = PolicyCursor::new(data);
         parser.parse_slice::<T>(count).expect("some numbers")
     }
 
     #[test]
     fn by_value_cursor_vec_u8() {
         let bytes: Vec<u8> = (0..8).collect();
-        let (some_numbers, parser) = do_by_value::<_, SomeNumbers>(bytes);
+        let (some_numbers, parser) = do_by_value::<SomeNumbers>(bytes);
         assert_eq!(0, some_numbers.a);
         assert_eq!(7, some_numbers.d);
         assert_eq!(8, parser.0.position());
@@ -152,7 +143,7 @@ mod tests {
     #[test]
     fn by_value_slice_u8_parse_slice() {
         let bytes: Vec<u8> = (0..24).collect();
-        let (some_numbers, parser) = do_slice_by_value::<_, SomeNumbers>(bytes.as_slice(), 3);
+        let (some_numbers, parser) = do_slice_by_value::<SomeNumbers>(bytes, 3);
         assert_eq!(3, some_numbers.len());
         assert_eq!(0, some_numbers[0].a);
         assert_eq!(7, some_numbers[0].d);

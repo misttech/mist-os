@@ -24,7 +24,7 @@ use error::ParseError;
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
-use parser::ByValue;
+use parser::PolicyCursor;
 use std::fmt::{Debug, Display, LowerHex};
 
 use std::num::{NonZeroU32, NonZeroU64};
@@ -252,7 +252,7 @@ pub fn parse_policy_by_value(
     binary_policy: Vec<u8>,
 ) -> Result<(Unvalidated, Vec<u8>), anyhow::Error> {
     let (parsed_policy, binary_policy) =
-        ParsedPolicy::parse(ByValue::new(binary_policy)).context("parsing policy")?;
+        ParsedPolicy::parse(PolicyCursor::new(binary_policy)).context("parsing policy")?;
     Ok((Unvalidated(parsed_policy), binary_policy))
 }
 
@@ -563,7 +563,7 @@ pub trait Parse: Sized {
 
     /// Parses a `Self` from `bytes`, returning the `Self` and trailing bytes, or an error if
     /// bytes corresponding to a `Self` are malformed.
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error>;
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error>;
 }
 
 /// Parse a data as a slice of inner data structures from a prefix of a [`ByteSlice`].
@@ -574,10 +574,7 @@ pub(super) trait ParseSlice: Sized {
 
     /// Parses a `Self` as `count` of internal itemsfrom `bytes`, returning the `Self` and trailing
     /// bytes, or an error if bytes corresponding to a `Self` are malformed.
-    fn parse_slice(
-        bytes: ByValue<Vec<u8>>,
-        count: usize,
-    ) -> Result<(Self, ByValue<Vec<u8>>), Self::Error>;
+    fn parse_slice(bytes: PolicyCursor, count: usize) -> Result<(Self, PolicyCursor), Self::Error>;
 }
 
 /// Validate a parsed data structure.
@@ -674,7 +671,7 @@ impl<M: Counted + Parse, D: ParseSlice> Parse for Array<M, D> {
     type Error = anyhow::Error;
 
     /// Parses [`Array`] by parsing *and validating* `metadata`, `data`, and `self`.
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) = M::parse(tail).map_err(Into::<anyhow::Error>::into)?;
@@ -691,13 +688,14 @@ impl<M: Counted + Parse, D: ParseSlice> Parse for Array<M, D> {
 impl<T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> Parse for T {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let num_bytes = bytes.len();
-        let (data, tail) = ByValue::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
-            type_name: std::any::type_name::<T>(),
-            type_size: std::mem::size_of::<T>(),
-            num_bytes,
-        })?;
+        let (data, tail) =
+            PolicyCursor::parse::<T>(bytes).ok_or_else(|| ParseError::MissingData {
+                type_name: std::any::type_name::<T>(),
+                type_size: std::mem::size_of::<T>(),
+                num_bytes,
+            })?;
 
         Ok((data, tail))
     }
@@ -730,7 +728,7 @@ macro_rules! array_type {
         {
             type Error = <Array<$metadata_type, $data_type> as crate::policy::Parse>::Error;
 
-            fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+            fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
                 let (array, tail) = Array::<$metadata_type, $data_type>::parse(bytes)?;
                 Ok((Self(array), tail))
             }
@@ -836,10 +834,7 @@ impl<T: Parse> ParseSlice for Vec<T> {
     type Error = anyhow::Error;
 
     /// Parses `Vec<T>` by parsing individual `T` instances, then validating them.
-    fn parse_slice(
-        bytes: ByValue<Vec<u8>>,
-        count: usize,
-    ) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse_slice(bytes: PolicyCursor, count: usize) -> Result<(Self, PolicyCursor), Self::Error> {
         let mut slice = Vec::with_capacity(count);
         let mut tail = bytes;
 

@@ -7,7 +7,7 @@ use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::{
     ExtensibleBitmap, ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator,
 };
-use super::parser::ByValue;
+use super::parser::PolicyCursor;
 use super::security_context::{CategoryIterator, Level, SecurityContext};
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
@@ -167,7 +167,7 @@ impl<T> Deref for SymbolList<T> {
 impl<T: Parse> Parse for SymbolList<T> {
     type Error = <Array<Metadata, Vec<T>> as Parse>::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let (array, tail) = Array::<Metadata, Vec<T>>::parse(bytes)?;
         Ok((Self(array), tail))
     }
@@ -429,11 +429,11 @@ impl Constraint {
 impl Parse for Constraint {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (access_vector, tail) = ByValue::parse::<le::U32>(tail).ok_or_else(|| {
+        let (access_vector, tail) = PolicyCursor::parse::<le::U32>(tail).ok_or_else(|| {
             Into::<anyhow::Error>::into(ParseError::MissingData {
                 type_name: "AccessVector",
                 type_size: std::mem::size_of::<le::U32>(),
@@ -524,10 +524,10 @@ pub(super) type ConstraintTerms = Vec<ConstraintTerm>;
 impl Parse for ConstraintTerm {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
-        let (metadata, tail) = ByValue::parse::<ConstraintTermMetadata>(tail)
+        let (metadata, tail) = PolicyCursor::parse::<ConstraintTermMetadata>(tail)
             .context("parsing constraint term metadata")?;
 
         let (names, names_type_set, tail) = match metadata.constraint_term_type.get() {
@@ -625,7 +625,7 @@ pub(super) struct TypeSet {
 impl Parse for TypeSet {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let (types, tail) = ExtensibleBitmap::parse(tail)
@@ -637,7 +637,7 @@ impl Parse for TypeSet {
             .context("parsing type set negative set")?;
 
         let num_bytes = tail.len();
-        let (flags, tail) = ByValue::parse::<le::U32>(tail).ok_or_else(|| {
+        let (flags, tail) = PolicyCursor::parse::<le::U32>(tail).ok_or_else(|| {
             Into::<anyhow::Error>::into(ParseError::MissingData {
                 type_name: "TypeSetFlags",
                 type_size: std::mem::size_of::<le::U32>(),
@@ -760,7 +760,7 @@ impl Class {
 impl Parse for Class {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let (constraints, tail) = ClassConstraints::parse(tail)
@@ -772,7 +772,7 @@ impl Parse for Class {
             .context("parsing class validate transitions")?;
 
         let (defaults, tail) =
-            ByValue::parse::<ClassDefaults>(tail).context("parsing class defaults")?;
+            PolicyCursor::parse::<ClassDefaults>(tail).context("parsing class defaults")?;
 
         Ok((Self { constraints, validate_transitions, defaults }, tail))
     }
@@ -1098,7 +1098,7 @@ impl Role {
 impl Parse for Role {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) = RoleMetadata::parse(tail)
@@ -1285,7 +1285,7 @@ impl User {
 impl Parse for User {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let (user_data, tail) = UserData::parse(tail)
@@ -1358,12 +1358,12 @@ impl MlsLevel {
 impl Parse for MlsLevel {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
         let (sensitivity, tail) =
-            ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            PolicyCursor::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                 type_name: "MlsLevelSensitivity",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
@@ -1409,22 +1409,23 @@ impl MlsRange {
 impl Parse for MlsRange {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (count, tail) = ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-            type_name: "MlsLevelCount",
-            type_size: std::mem::size_of::<le::U32>(),
-            num_bytes,
-        })?;
+        let (count, tail) =
+            PolicyCursor::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                type_name: "MlsLevelCount",
+                type_size: std::mem::size_of::<le::U32>(),
+                num_bytes,
+            })?;
 
         // `MlsRange::parse()` cannot be implemented in terms of `MlsLevel::parse()` for the
         // low and optional high level, because of the order in which the sensitivity and
         // category bitmap fields appear.
         let num_bytes = tail.len();
         let (sensitivity_low, tail) =
-            ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            PolicyCursor::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                 type_name: "MlsLevelSensitivityLow",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
@@ -1433,7 +1434,7 @@ impl Parse for MlsRange {
         let (low_categories, high_level, tail) = if count.get() > 1 {
             let num_bytes = tail.len();
             let (sensitivity_high, tail) =
-                ByValue::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                PolicyCursor::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
                     type_name: "MlsLevelSensitivityHigh",
                     type_size: std::mem::size_of::<le::U32>(),
                     num_bytes,
@@ -1555,7 +1556,7 @@ impl Sensitivity {
 impl Parse for Sensitivity {
     type Error = anyhow::Error;
 
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
         let (metadata, tail) = SensitivityMetadata::parse(tail)

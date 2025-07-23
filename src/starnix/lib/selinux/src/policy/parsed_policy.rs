@@ -15,7 +15,7 @@ use super::arrays::{
 use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
 use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
-use super::parser::ByValue;
+use super::parser::PolicyCursor;
 use super::security_context::{Level, SecurityContext};
 use super::symbols::{
     Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, MlsLevel, Role,
@@ -490,7 +490,7 @@ where
 {
     /// Parses the binary policy stored in `bytes`. It is an error for `bytes` to have trailing
     /// bytes after policy parsing completes.
-    pub(super) fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, Vec<u8>), anyhow::Error> {
+    pub(super) fn parse(bytes: PolicyCursor) -> Result<(Self, Vec<u8>), anyhow::Error> {
         let (policy, tail) =
             <ParsedPolicy as Parse>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
         let num_bytes = tail.len();
@@ -535,25 +535,25 @@ where
     type Error = anyhow::Error;
 
     /// Parses an entire binary policy.
-    fn parse(bytes: ByValue<Vec<u8>>) -> Result<(Self, ByValue<Vec<u8>>), Self::Error> {
+    fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyCursor), Self::Error> {
         let tail = bytes;
 
-        let (magic, tail) = ByValue::parse::<Magic>(tail).context("parsing magic")?;
+        let (magic, tail) = PolicyCursor::parse::<Magic>(tail).context("parsing magic")?;
 
         let (signature, tail) = Signature::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing signature")?;
 
         let (policy_version, tail) =
-            ByValue::parse::<PolicyVersion>(tail).context("parsing policy version")?;
+            PolicyCursor::parse::<PolicyVersion>(tail).context("parsing policy version")?;
         let policy_version_value = policy_version.policy_version();
 
         let (config, tail) = Config::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing policy config")?;
 
-        let (counts, tail) =
-            ByValue::parse::<Counts>(tail).context("parsing high-level policy object counts")?;
+        let (counts, tail) = PolicyCursor::parse::<Counts>(tail)
+            .context("parsing high-level policy object counts")?;
 
         let (policy_capabilities, tail) = ExtensibleBitmap::parse(tail)
             .map_err(Into::<anyhow::Error>::into)

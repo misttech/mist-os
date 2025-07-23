@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::parser::ByValue;
+use super::parser::PolicyCursor;
 use super::{array_type, array_type_validate_deref_both, Counted, Validate, ValidateArray};
 use crate::policy::error::ValidateError;
 use crate::policy::Array;
@@ -278,7 +278,7 @@ impl ValidateArray<Metadata, MapItem> for ExtensibleBitmap {
 mod tests {
     use super::*;
     use crate::policy::error::ParseError;
-    use crate::policy::parser::ByValue;
+    use crate::policy::parser::PolicyCursor;
     use crate::policy::testing::{as_parse_error, as_validate_error};
     use crate::policy::Parse;
 
@@ -289,14 +289,14 @@ mod tests {
             let data = $data;
             fn check_by_value(
                 $result: Result<
-                    ($parse_output, ByValue<Vec<u8>>),
+                    ($parse_output, PolicyCursor),
                     <$parse_output as crate::policy::Parse>::Error,
                 >,
-            ) -> Option<($parse_output, ByValue<Vec<u8>>)> {
+            ) -> Option<($parse_output, PolicyCursor)> {
                 $check_impl
             }
 
-            let by_value_result = $parse_output::parse(ByValue::new(data));
+            let by_value_result = $parse_output::parse(PolicyCursor::new(data));
             let _ = check_by_value(by_value_result);
         }};
     }
@@ -467,7 +467,7 @@ mod tests {
             result,
             {
                 match result.err().map(Into::<anyhow::Error>::into).map(as_parse_error) {
-                    // `ByValue` attempts to read `Vec` one item at a time.
+                    // `PolicyCursor` attempts to read `Vec` one item at a time.
                     Some(ParseError::MissingData { type_name, type_size, num_bytes: 0 }) => {
                         assert_eq!(std::any::type_name::<MapItem>(), type_name);
                         assert_eq!(std::mem::size_of::<MapItem>(), type_size);
@@ -484,7 +484,7 @@ mod tests {
                         );
                     }
                 };
-                None::<(ExtensibleBitmap, ByValue<Vec<u8>>)>
+                None::<(ExtensibleBitmap, PolicyCursor)>
             }
         );
 
@@ -565,7 +565,7 @@ mod tests {
             result,
             {
                 match result.err().map(Into::<anyhow::Error>::into).map(as_parse_error) {
-                    // `ByValue` attempts to read `Vec` one item at a time.
+                    // `PolicyCursor` attempts to read `Vec` one item at a time.
                     Some(ParseError::MissingData { type_name, type_size, num_bytes: 0 }) => {
                         assert_eq!(std::any::type_name::<MapItem>(), type_name);
                         assert_eq!(std::mem::size_of::<MapItem>(), type_size);
@@ -583,7 +583,7 @@ mod tests {
                         );
                     }
                 };
-                None::<(ExtensibleBitmap, ByValue<Vec<u8>>)>
+                None::<(ExtensibleBitmap, PolicyCursor)>
             }
         );
     }
