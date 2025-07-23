@@ -7,6 +7,7 @@ mod tests {
     use ebpf_loader::{MapDefinition, ProgramDefinition};
     use libc;
     use linux_uapi::bpf_attr;
+    use serial_test::serial;
     use std::fs::File;
     use std::net::UdpSocket;
     use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
@@ -703,7 +704,11 @@ mod tests {
         assert_eq!(test_result.sockaddr_ip, [0, 0, 0xffff0000, 0x0100007F]);
     }
 
+    // The following tests both attach eBPF programs to
+    // `BPF_CGROUP_UDP4_SENDMSG`, so they have to be marked as `serial` to
+    // avoid conflicts.
     #[test]
+    #[serial]
     fn ebpf_udp_send() {
         root_required!();
 
@@ -715,7 +720,7 @@ mod tests {
 
         let _attached = program.attach();
 
-        let send_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UPD socket");
+        let send_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UDP socket");
 
         let dst_port = 65535;
 
@@ -738,5 +743,32 @@ mod tests {
         assert_eq!(test_result.sockaddr_port, dst_port.to_be() as u32);
         assert_eq!(test_result.sockaddr_family, linux_uapi::AF_INET);
         assert_eq!(test_result.sockaddr_ip[0], 0x0100007F);
+    }
+
+    #[test]
+    #[serial]
+    fn ebpf_udp_send_connected() {
+        root_required!();
+
+        let program = LoadedProgram::new(
+            "udpsend4_prog",
+            linux_uapi::bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+            linux_uapi::bpf_attach_type_BPF_CGROUP_UDP4_SENDMSG,
+        );
+
+        let _attached = program.attach();
+
+        let recv_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UDP socket");
+        let dst_port = recv_socket.local_addr().expect("Failed to get local ip").port();
+
+        let send_socket = UdpSocket::bind("127.0.0.1:0").expect("Failed to create UDP socket");
+        send_socket.connect(("127.0.0.1", dst_port)).expect("Failed to connect");
+
+        let cookie = get_socket_cookie(send_socket.as_fd()).expect("Failed to get SO_COOKIE");
+        program.maps.set_target_cookie(cookie);
+
+        // `send()` should still succeed - the program is invoked only for
+        // `sendmsg()` and `sendto()`.
+        send_socket.send(&[1, 2, 3]).expect("Failed to send UDP packet");
     }
 }

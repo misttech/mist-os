@@ -182,11 +182,14 @@ impl ZxioBackedSocket {
             None => vec![],
         };
 
-        // Run eBPF programs for UDP sockets.
+        // Run `CGROUP_UDP[46]_SENDMSG` eBPF programs for `sendto()` and
+        // `sendmsg()` on UDP sockets. Not necessary for `send()` (i.e. when
+        // `addr` is empty).
         if matches!(
             (socket.domain, socket.socket_type),
             (SocketDomain::Inet | SocketDomain::Inet6, SocketType::Datagram)
-        ) {
+        ) && addr.len() > 0
+        {
             self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::UdpSendMsg, &addr)?;
         }
 
