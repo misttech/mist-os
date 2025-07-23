@@ -942,12 +942,18 @@ class X86PageTableImpl : public X86PageTableBase {
             pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
             DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
 
-            ConsistencyManager cm_referenced(referenced_pt_);
-            referenced_pt_->UpdateEntry(&cm_referenced, level, cursor.vaddr(), referenced_entry,
-                                        table_paddr, interm_flags,
+            // The cm can be used here, despite technically being for a different pt, since the
+            // unified PT has the same virtual addresses, and has its tlb invalidated whenever this
+            // has it's tlb invalidated. The only requirement here is that we must ensure this
+            // happens *before* the lock of the referenced_pt_ is dropped, meaning we do an extra
+            // ForceFlush.
+            // In practice we are transitioning an entry from !present->present, which does not
+            // require a TLB invalidation, so the ForceFlush will be a no-op anyway.
+            referenced_pt_->UpdateEntry(cm, level, cursor.vaddr(), referenced_entry, table_paddr,
+                                        interm_flags,
                                         /*was_terminal=*/false);
             referenced_pt_->page_->mmu.num_mappings++;
-            cm_referenced.Finish();
+            cm->ForceFlush();
           }
 
           UpdateEntry(cm, level, cursor.vaddr(), e, table_paddr, interm_flags,
@@ -1145,20 +1151,28 @@ class X86PageTableImpl : public X86PageTableBase {
       // referencing its entries.
       if (unmap_lower && !(IsShared() && level == PageTableLevel::PML4_L)) {
         DEBUG_ASSERT(lower_page);
-        if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
-          Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
-          pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
-          DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
 
-          vm_page_t* referenced_table_page = referenced_pt_->page_;
-          ConsistencyManager cm_referenced(referenced_pt_);
-          referenced_pt_->UnmapEntry(&cm_referenced, level, unmap_vaddr, referenced_entry, false);
-          referenced_table_page->mmu.num_mappings--;
-          cm_referenced.Finish();
-        }
         UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
         unmapped++;
 
+        if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
+          Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
+          pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
+          DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, pt_val));
+
+          vm_page_t* referenced_table_page = referenced_pt_->page_;
+          // The cm can be used here, despite technically being for a different pt, since the
+          // unified PT has the same virtual addresses, and has its tlb invalidated whenever this
+          // has it's tlb invalidated. The only requirement here is that we must ensure this
+          // happens *before* the lock of the referenced_pt_ is dropped, meaning we do an extra
+          // ForceFlush.
+          // The UnmapEntry of |this| was ordered prior so that our ForceFlush here also performs
+          // the invalidate of that update, potentially resulting in no further invalidations being
+          // needed on |this| either, making this ordering a potential performance optimization.
+          referenced_pt_->UnmapEntry(cm, level, unmap_vaddr, referenced_entry, false);
+          referenced_table_page->mmu.num_mappings--;
+          cm->ForceFlush();
+        }
         DEBUG_ASSERT_MSG(lower_page->state() == vm_page_state::MMU,
                          "page %p state %u, paddr %#" PRIxPTR "\n", lower_page,
                          static_cast<uint32_t>(lower_page->state()), X86_VIRT_TO_PHYS(next_table));
@@ -1386,19 +1400,28 @@ class X86PageTableImpl : public X86PageTableBase {
       if (unmap_page_table) {
         vm_page_t* page = paddr_to_vm_page(ptable_phys);
         DEBUG_ASSERT(page);
+
+        UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
+        table_page->mmu.num_mappings--;
+
         if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
           Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
           pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
-          DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
+          DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, pt_val));
 
           vm_page_t* referenced_table_page = referenced_pt_->page_;
-          ConsistencyManager cm_referenced(referenced_pt_);
-          referenced_pt_->UnmapEntry(&cm_referenced, level, unmap_vaddr, referenced_entry, false);
+          // The cm can be used here, despite technically being for a different pt, since the
+          // unified PT has the same virtual addresses, and has its tlb invalidated whenever this
+          // has it's tlb invalidated. The only requirement here is that we must ensure this
+          // happens *before* the lock of the referenced_pt_ is dropped, meaning we do an extra
+          // ForceFlush.
+          // The UnmapEntry of |this| was ordered prior so that our ForceFlush here also performs
+          // the invalidate of that update, potentially resulting in no further invalidations being
+          // needed on |this| either.
+          referenced_pt_->UnmapEntry(cm, level, unmap_vaddr, referenced_entry, false);
           referenced_table_page->mmu.num_mappings--;
-          cm_referenced.Finish();
+          cm->ForceFlush();
         }
-        UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
-        table_page->mmu.num_mappings--;
 
         DEBUG_ASSERT(page);
         DEBUG_ASSERT_MSG(page->state() == vm_page_state::MMU,
