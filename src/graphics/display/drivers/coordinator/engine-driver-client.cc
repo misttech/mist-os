@@ -18,18 +18,16 @@
 
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types/cpp/driver-buffer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
-#include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace display_coordinator {
 
 namespace {
 
-static constexpr fdf_arena_tag_t kArenaTag = 'DISP';
+constexpr fdf_arena_tag_t kArenaTag = 'DISP';
 
 zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
     fdf::Namespace& incoming) {
