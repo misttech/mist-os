@@ -382,13 +382,15 @@ class PrebuildMap(object):
             name = dep_atom["prebuild_info"]["library_name"]
             dep_label = dep_label.removesuffix("_sdk")
             if "_cpp" in dep_label:
-                layer = "cpp" + dep_label.split("_cpp", maxsplit=1)[1]
-                fidl_layers[layer].append(name)
-            else:
-                # There was no suffix, so this is either non-cpp binding dep or it's an hlcpp dep.
-                # this covers both of those bases.
+                fidl_layers["cpp"].append(name)
+            elif "_hlcpp" in dep_label:
                 fidl_layers["hlcpp"].append(name)
+
+                # TODO(https://fxbug.dev/427748486): Determine whether this
+                # should always occur or the key should be removed.
                 fidl_deps.append(name)
+            else:
+                assert f"Unexpected dependency label: {dep_label}"
 
         return self.GetMetaResult(
             {
