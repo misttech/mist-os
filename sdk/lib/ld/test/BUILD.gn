@@ -222,7 +222,10 @@ user_basic_redirect("load-tests.load-sets.basic") {
 
 if (is_fuchsia) {
   resource("remote-tests.test-data") {
-    visibility = [ ":*" ]
+    visibility = [
+      ":*",
+      "//src/lib/zxdump/*",
+    ]
     testonly = true
 
     sources = [
@@ -242,6 +245,16 @@ if (is_fuchsia) {
     # LdRemoteTests.ForeignMachine expects that to be ET_ARM in particular,
     # and also uses the matching stub dynamic linker.
     data_deps += [ "..:ld-stub.user($elf32_tc)" ]
+
+    # This also rolls up via load-tests.load-sets, but this gets it here for
+    # the //src/lib/zxdump reuse of this test data.
+    data_deps += [ ":remote-tests.test-data.basic" ]
+  }
+
+  user_basic_redirect("remote-tests.test-data.basic") {
+    visibility = [ ":*" ]
+    testonly = true
+    public_deps = [ "modules:symbol-filter.test-data" ]
   }
 }
 

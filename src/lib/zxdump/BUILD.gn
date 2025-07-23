@@ -243,9 +243,13 @@ test("zxdump-unittests") {
     deps += [
       ":test-child-elf-search",
       "//sdk/lib/fdio",
+      "//sdk/lib/ld:remote",
+      "//sdk/lib/ld/testing",
       "//zircon/system/ulib/zx",
       "//zircon/system/ulib/zx",
     ]
+
+    data_deps += [ "//sdk/lib/ld/test:remote-tests.test-data" ]
   }
 }
 
@@ -323,6 +327,7 @@ fuchsia_unittest_package("zxdump-tests") {
   deps = [ ":zxdump-unittests" ]
   manifest = "meta/zxdump-tests.cml"
   test_type = "system"
+  disable_elf_binaries_checks = true
 
   if (current_cpu == "riscv64") {
     # TODO(https://fxbug.dev/42081271): Remove this once ZxdumpTests pass on RISC-V.
