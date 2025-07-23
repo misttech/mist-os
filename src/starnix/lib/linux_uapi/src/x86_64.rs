@@ -7843,7 +7843,7 @@ pub const audit_nlgrps_AUDIT_NLGRP_READLOG: audit_nlgrps = 1;
 pub const audit_nlgrps___AUDIT_NLGRP_MAX: audit_nlgrps = 2;
 pub type audit_nlgrps = crate::types::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct audit_status {
     pub mask: __u32,
     pub enabled: __u32,
@@ -7858,7 +7858,7 @@ pub struct audit_status {
     pub backlog_wait_time_actual: __u32,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub union audit_status__bindgen_ty_1 {
     pub version: __u32,
     pub feature_bitmap: __u32,
