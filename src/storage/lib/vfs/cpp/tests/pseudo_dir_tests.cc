@@ -49,8 +49,7 @@ TEST(PseudoDir, ApiTest) {
   // verify node attributes
   zx::result attr = dir->GetAttributes();
   ASSERT_TRUE(attr.is_ok());
-  constexpr fs::VnodeAttributes kExpectedAttrs{.content_size = 0, .storage_size = 0};
-  EXPECT_EQ(kExpectedAttrs, *attr);
+  EXPECT_EQ(*attr, fs::VnodeAttributes{});
 
   // lookup entries
   fbl::RefPtr<fs::Vnode> node;

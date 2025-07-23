@@ -515,7 +515,6 @@ TEST_P(BlobTest, GetAttributes) {
   uint64_t block_count;
 
   auto check_attributes = [&](const fs::VnodeAttributes& attributes) {
-    EXPECT_EQ(attributes.mode, unsigned{V_TYPE_FILE | V_IRUSR | V_IXUSR});
     EXPECT_EQ(attributes.id, inode);
     EXPECT_EQ(attributes.content_size, 64u);
     EXPECT_EQ(attributes.storage_size, block_count * kBlobfsBlockSize);

@@ -48,7 +48,6 @@ class Service : public Vnode {
  public:
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
-  zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx_status_t ConnectService(zx::channel channel) final;
 
  protected:
