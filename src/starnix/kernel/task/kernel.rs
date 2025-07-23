@@ -115,10 +115,6 @@ pub struct KernelFeatures {
 
     /// Allows the netstack to mark packets/sockets.
     pub netstack_mark: bool,
-
-    /// Allows the rtnetlink worker to rely on an `ifb0` interface being present instead of faking
-    /// the existence of one itself.
-    pub rtnetlink_assume_ifb0_existence: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -668,12 +664,8 @@ impl Kernel {
     /// call will instantiate the Netlink implementation.
     pub fn network_netlink(&self) -> &Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
-            let (network_netlink, network_netlink_async_worker) = Netlink::new(
-                InterfacesHandlerImpl(self.weak_self.clone()),
-                netlink::FeatureFlags {
-                    assume_ifb0_existence: self.features.rtnetlink_assume_ifb0_existence,
-                },
-            );
+            let (network_netlink, network_netlink_async_worker) =
+                Netlink::new(InterfacesHandlerImpl(self.weak_self.clone()));
             self.kthreads.spawn_async(async move |_: LockedAndTask<'_>| {
                 network_netlink_async_worker.await;
                 log_error!(tag = NETLINK_LOG_TAG; "Netlink async worker unexpectedly exited");

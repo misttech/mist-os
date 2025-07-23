@@ -22,7 +22,6 @@ use net_declare::{fidl_mac, net_ip_v6};
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netemul::{RealmUdpSocket as _, TestRealm};
 use netlink::multicast_groups::ModernGroup;
-use netlink::FeatureFlags;
 use netlink_packet_core::{
     ErrorMessage, NetlinkMessage, NetlinkPayload, NetlinkSerializable, NLM_F_ACK,
 };
@@ -395,7 +394,6 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
             NoopInterfacesHandler,
             protocols,
             on_initialized,
-            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -623,7 +621,6 @@ async fn successfully_installs_rule_referencing_main_table<
             NoopInterfacesHandler,
             protocols,
             on_initialized,
-            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -745,7 +742,6 @@ async fn route_table_kept_alive_by_rules<I: Ip + FidlRuleIpExt + FidlRouteIpExt>
             NoopInterfacesHandler,
             protocols,
             on_initialized,
-            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -967,7 +963,6 @@ async fn route_table_is_cleaned_up_after_rules_and_routes_deleted<
             NoopInterfacesHandler,
             protocols,
             on_initialized,
-            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -1354,7 +1349,6 @@ async fn join_leave_nduseropt_multicast_group() {
             NoopInterfacesHandler,
             protocols,
             on_initialized,
-            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -1439,7 +1433,6 @@ async fn backup_route_does_not_override_interface_metric<I: Ip + FidlRouteIpExt>
             NoopInterfacesHandler,
             protocols,
             on_initialized,
-            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");

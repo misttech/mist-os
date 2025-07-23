@@ -29,7 +29,7 @@ use crate::netlink_packet::errno::Errno;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
 use crate::{
-    interfaces, route_tables, routes, rules, FeatureFlags, NetlinkRouteNotifiedGroup, SysctlError,
+    interfaces, route_tables, routes, rules, NetlinkRouteNotifiedGroup, SysctlError,
     SysctlInterfaceSelector,
 };
 
@@ -102,7 +102,6 @@ pub(crate) struct EventLoop<
     pub(crate) async_work_receiver:
         futures::channel::mpsc::UnboundedReceiver<AsyncWorkItem<NetlinkRouteNotifiedGroup>>,
     pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
-    pub(crate) feature_flags: FeatureFlags,
 }
 
 /// The types that implement this trait ([`Optional`] and [`Required`]) are used to signify whether
@@ -257,8 +256,6 @@ pub(crate) struct EventLoopInputs<
         futures::channel::mpsc::UnboundedReceiver<AsyncWorkItem<NetlinkRouteNotifiedGroup>>,
 
     pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
-
-    pub(crate) feature_flags: FeatureFlags,
 }
 
 impl<
@@ -290,7 +287,6 @@ impl<
             route_clients,
             async_work_receiver,
             unified_request_stream,
-            feature_flags,
         } = self;
         let (routes_v4, routes_v6, interfaces) = futures::join!(
             async {
@@ -345,7 +341,6 @@ impl<
                             route_clients.get_ref().clone(),
                             interfaces_proxy.get_ref().clone(),
                             interfaces_state_proxy.get(),
-                            &feature_flags,
                         )
                         .await;
                         (EventLoopComponent::Present(worker), stream.left_stream())
@@ -440,7 +435,6 @@ impl<
             v6_route_table_map,
             async_work_receiver,
             unified_request_stream,
-            feature_flags,
         }
     }
 }
@@ -472,8 +466,6 @@ pub(crate) struct EventLoopState<
     unified_pending_request: Option<UnifiedPendingRequest<S>>,
     unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
     unified_event_stream: futures::stream::Fuse<BoxStream<'static, UnifiedEvent>>,
-
-    feature_flags: FeatureFlags,
 }
 
 impl<
@@ -527,7 +519,6 @@ impl<
             async_work_receiver,
             v4_route_table_map,
             v6_route_table_map,
-            feature_flags,
         } = self;
 
         let mut unified_request_stream = unified_request_stream.chain(futures::stream::pending());
@@ -684,10 +675,7 @@ impl<
                         )
                     },
                     UnifiedEvent::InterfacesEvent(event) => {
-                        interfaces_worker.get_mut().handle_interface_watcher_event(
-                            event,
-                            feature_flags
-                        ).await;
+                        interfaces_worker.get_mut().handle_interface_watcher_event(event).await;
                         Cleanup::None
                     },
                 }
@@ -702,7 +690,7 @@ impl<
                 match request.expect("request stream cannot end") {
                     UnifiedRequest::InterfacesRequest(request) => {
                         let request = interfaces_worker.get_mut()
-                            .handle_request(request, &feature_flags).await;
+                            .handle_request(request).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::Interfaces);
                         Cleanup::None
                     }
@@ -930,7 +918,6 @@ impl<
             route_clients,
             async_work_receiver,
             unified_request_stream,
-            feature_flags,
         } = self;
 
         let state = EventLoopInputs::<_, _, AllWorkers> {
@@ -949,7 +936,6 @@ impl<
             route_clients: EventLoopComponent::Present(route_clients),
             async_work_receiver,
             unified_request_stream,
-            feature_flags,
         }
         .initialize(IncludedWorkers {
             routes_v4: EventLoopComponent::Present(()),

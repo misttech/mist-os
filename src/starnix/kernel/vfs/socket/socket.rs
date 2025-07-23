@@ -1012,11 +1012,7 @@ impl Socket {
                 // Remove the first IPv4 address on the requested interface.
                 let Some(addr) = address_msgs.into_iter().next() else {
                     // There's nothing to do if there are no addresses on the interface.
-                    // TODO(https://fxbug.dev/387998791): We should actually return an error here,
-                    // but a workaround for us not supporting blackhole devices means that we need
-                    // to allow this to succeed as a no-op instead. Once the workaround is removed
-                    // this should be an EADDRNOTAVAIL.
-                    return Ok(SUCCESS);
+                    return error!(EADDRNOTAVAIL, "no addresses to remove");
                 };
 
                 let resp = send_netlink_msg_and_wait_response(

@@ -175,8 +175,7 @@ fn map_route_set_error<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
             // not authenticate.
             panic!(
                 "authenticated for interface {:?}, but received unauthentication error from route set for route ({:?})",
-                interface_id,
-                route,
+                interface_id, route,
             );
         }
         RouteSetError::InvalidDestinationSubnet => {
@@ -1009,9 +1008,9 @@ fn handle_route_watcher_event<
                         // This is a FIDL table ID that the netlink worker didn't know about, and is
                         // not the main table ID.
                         crate::logging::log_debug!(
-                        "Observed an added route via the routes watcher that is installed in a \
+                            "Observed an added route via the routes watcher that is installed in a \
                         non-main FIDL table not managed by netlink: {removed_installed_route:?}"
-                    );
+                        );
                         // Because we'll never be able to map this FIDL table ID to a netlink table
                         // index, we have no choice but to avoid notifying netlink clients about this.
                         (None, None)
@@ -1132,7 +1131,7 @@ impl NetlinkRouteMessage {
     ) -> Result<Self, NetlinkRouteMessageConversionError> {
         let fnet_routes_ext::RouteTarget { outbound_interface, next_hop } = match action {
             fnet_routes_ext::RouteAction::Unknown => {
-                return Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding)
+                return Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding);
             }
             fnet_routes_ext::RouteAction::Forward(target) => target,
         };
@@ -1201,7 +1200,7 @@ impl NetlinkRouteMessage {
             Err(std::num::TryFromIntError { .. }) => {
                 return Err(NetlinkRouteMessageConversionError::InvalidInterfaceId(
                     outbound_interface,
-                ))
+                ));
             }
             Ok(id) => id,
         };
@@ -1498,7 +1497,6 @@ mod tests {
     use crate::messaging::testutil::{FakeSender, SentMessage};
     use crate::protocol_family::route::NetlinkRouteNotifiedGroup;
     use crate::route_tables::ManagedNetlinkRouteTableIndex;
-    use crate::FeatureFlags;
 
     const V4_SUB1: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/32");
     const V4_SUB2: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.1/32");
@@ -2334,7 +2332,6 @@ mod tests {
             ndp_option_watcher_provider: EventLoopComponent::Absent(Optional),
 
             unified_request_stream: request_stream,
-            feature_flags: FeatureFlags::test(),
         };
 
         let (IpInvariant(inputs), server_ends) = I::map_ip_out(
