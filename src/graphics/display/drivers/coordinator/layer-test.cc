@@ -66,8 +66,10 @@ class LayerTest : public TestBase {
     applied_display_config_layer_list.push_front(&layer.applied_display_config_list_node_);
   }
 
-  // Helper method that returns a unique_ptr with a custom deleter which destroys the layer on the
-  // driver dispatcher, as required by the Layer destructor.
+  // Returns a unique_ptr to `Layer` created on the driver dispatcher.
+  //
+  // The returned `Layer` is created with a custom deleter which destroys the
+  // layer on the driver dispatcher, as required by the Layer destructor.
   //
   // Must not be called on the driver dispatcher, otherwise deadlock is guaranteed.
   std::unique_ptr<Layer, std::function<void(Layer*)>> CreateLayerForTest(
@@ -81,8 +83,12 @@ class LayerTest : public TestBase {
                       });
       completion.Wait();
     };
-    return std::unique_ptr<Layer, decltype(deleter)>(new Layer(CoordinatorController(), layer_id),
-                                                     std::move(deleter));
+
+    return RunOnDriverDispatcher<std::unique_ptr<Layer, std::function<void(Layer*)>>>(
+        [this, layer_id, deleter = std::move(deleter)]() {
+          return std::unique_ptr<Layer, decltype(deleter)>(
+              new Layer(CoordinatorController(), layer_id), std::move(deleter));
+        });
   }
 
   // Helper struct for `RunOnDriverDispatcher()`.  `std::optional<void>` is illegal, so we need our
@@ -130,34 +136,40 @@ class LayerTest : public TestBase {
 TEST_F(LayerTest, PrimaryBasic) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
-  auto image = CreateReadyImage();
-  layer->SetImage(image, display::kInvalidEventId);
-  layer->ApplyChanges();
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+    auto image = CreateReadyImage();
+    layer->SetImage(image, display::kInvalidEventId);
+    layer->ApplyChanges();
+  });
 }
 
 TEST_F(LayerTest, CleanUpImage) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   auto displayed_image = CreateReadyImage();
-  layer->SetImage(displayed_image, display::kInvalidEventId);
-  layer->ApplyChanges();
+  RunOnDriverDispatcher<void>([&] {
+    layer->SetImage(displayed_image, display::kInvalidEventId);
+    layer->ApplyChanges();
+  });
 
   ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
@@ -224,20 +236,24 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   // Clean up images, which doesn't change the applied config.
   {
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
     ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
     ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
@@ -258,8 +274,10 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     MakeLayerApplied(*layer, applied_layers);
 
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
     ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
     ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
@@ -282,18 +300,22 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 TEST_F(LayerTest, CleanUpAllImages) {
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_metadata = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_metadata);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_metadata = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_metadata);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   auto displayed_image = CreateReadyImage();
-  layer->SetImage(displayed_image, display::kInvalidEventId);
-  layer->ApplyChanges();
+  RunOnDriverDispatcher<void>([&] {
+    layer->SetImage(displayed_image, display::kInvalidEventId);
+    layer->ApplyChanges();
+  });
   ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
 
@@ -306,12 +328,12 @@ TEST_F(LayerTest, CleanUpAllImages) {
   });
 
   auto waiting_image = CreateReadyImage();
-  layer->SetImage(waiting_image, kWaitFenceId);
+  RunOnDriverDispatcher<void>([&] { layer->SetImage(waiting_image, kWaitFenceId); });
   ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto draft_image = CreateReadyImage();
-  layer->SetImage(draft_image, display::kInvalidEventId);
+  RunOnDriverDispatcher<void>([&] { layer->SetImage(draft_image, display::kInvalidEventId); });
 
   ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
@@ -330,20 +352,24 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
 
   std::unique_ptr layer = CreateLayerForTest(display::LayerId(1));
 
-  fhdt::wire::ImageMetadata image_config = {
-      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer->SetPrimaryConfig(image_config);
-  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                            display_area);
-  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  RunOnDriverDispatcher<void>([&] {
+    fhdt::wire::ImageMetadata image_config = {
+        .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
+        .tiling_type = fhdt::wire::kImageTilingTypeLinear};
+    fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
+    layer->SetPrimaryConfig(image_config);
+    layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                              display_area);
+    layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  });
 
   // Clean up all images, which doesn't change the applied config.
   {
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
     ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
     ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
@@ -364,8 +390,10 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     MakeLayerApplied(*layer, applied_layers);
 
     auto image = CreateReadyImage();
-    layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges();
+    RunOnDriverDispatcher<void>([&] {
+      layer->SetImage(image, display::kInvalidEventId);
+      layer->ApplyChanges();
+    });
     ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
     ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
