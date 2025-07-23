@@ -64,7 +64,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   // `display::EngineInfo::kMaxAllowedMaxLayerCount`.
   int engine_max_layer_count() const { return engine_max_layer_count_; }
 
-  int applied_layer_count() const { return static_cast<int>(applied_.layer_count); }
+  int applied_layer_count() const { return static_cast<int>(applied_.layers_count); }
   const display_config_t* applied_config() const { return &applied_; }
   const fbl::DoublyLinkedList<LayerNode*>& get_applied_layers() const { return applied_layers_; }
 

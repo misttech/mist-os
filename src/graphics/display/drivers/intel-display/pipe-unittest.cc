@@ -114,8 +114,8 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .display_id = 1u,
       .mode = {},
       .cc_flags = 0u,
-      .layer_list = test_layers_1,
-      .layer_count = 1,
+      .layers_list = test_layers_1,
+      .layers_count = 1,
   };
   display::DriverConfigStamp stamp_1{1};
   pipe.ApplyConfiguration(&config, stamp_1, GetGttImageHandle, GetPixelFormat);
@@ -139,8 +139,8 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .display_id = 1u,
       .mode = {},
       .cc_flags = 0u,
-      .layer_list = test_layers_2,
-      .layer_count = 1,
+      .layers_list = test_layers_2,
+      .layers_count = 1,
   };
   display::DriverConfigStamp stamp_2{2};
   pipe.ApplyConfiguration(&config_2, stamp_2, GetGttImageHandle, GetPixelFormat);

@@ -445,11 +445,11 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
   bottom_color.set_csc_enable(!!banjo_display_config->cc_flags);
   bool has_color_layer =
-      banjo_display_config->layer_count &&
-      (banjo_display_config->layer_list[0].image_metadata.dimensions.width == 0 ||
-       banjo_display_config->layer_list[0].image_metadata.dimensions.height == 0);
+      banjo_display_config->layers_count &&
+      (banjo_display_config->layers_list[0].image_metadata.dimensions.width == 0 ||
+       banjo_display_config->layers_list[0].image_metadata.dimensions.height == 0);
   if (has_color_layer) {
-    const layer_t* layer = &banjo_display_config->layer_list[0];
+    const layer_t* layer = &banjo_display_config->layers_list[0];
     const auto format =
         static_cast<fuchsia_images2::wire::PixelFormat>(layer->fallback_color.format);
 
@@ -475,8 +475,9 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   bool scaler_1_claimed = false;
   for (unsigned plane = 0; plane < 3; plane++) {
     const layer_t* primary = nullptr;
-    for (unsigned layer_index = 0; layer_index < banjo_display_config->layer_count; ++layer_index) {
-      const layer_t& layer = banjo_display_config->layer_list[layer_index];
+    for (unsigned layer_index = 0; layer_index < banjo_display_config->layers_count;
+         ++layer_index) {
+      const layer_t& layer = banjo_display_config->layers_list[layer_index];
       if (layer.image_handle != INVALID_DISPLAY_ID && layer_index == plane + has_color_layer) {
         primary = &layer;
         break;

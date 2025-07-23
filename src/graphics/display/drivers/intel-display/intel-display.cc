@@ -1102,11 +1102,11 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
     if (display_id != pipe_attached_display_id) {
       continue;
     }
-    bool has_color_layer = (banjo_display_config.layer_count > 0) &&
-                           (banjo_display_config.layer_list[0].image_source.width == 0 ||
-                            banjo_display_config.layer_list[0].image_source.height == 0);
-    for (unsigned layer_index = 0; layer_index < banjo_display_config.layer_count; ++layer_index) {
-      const layer_t& layer = banjo_display_config.layer_list[layer_index];
+    bool has_color_layer = (banjo_display_config.layers_count > 0) &&
+                           (banjo_display_config.layers_list[0].image_source.width == 0 ||
+                            banjo_display_config.layers_list[0].image_source.height == 0);
+    for (unsigned layer_index = 0; layer_index < banjo_display_config.layers_count; ++layer_index) {
+      const layer_t& layer = banjo_display_config.layers_list[layer_index];
       if (layer.image_source.width != 0 && layer.image_source.height != 0) {
         if (plane + (has_color_layer ? 1 : 0) != layer_index) {
           continue;
@@ -1115,7 +1115,7 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
         // Solid color fill layers don't use planes.
         continue;
       }
-      *layer_out = &banjo_display_config.layer_list[layer_index];
+      *layer_out = &banjo_display_config.layers_list[layer_index];
       return true;
     }
   }
@@ -1515,13 +1515,13 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t> banjo_di
     // Compute the maximum pipe pixel rate with the desired scaling. If the max rate
     // is too low, then make the client do any downscaling itself.
     double min_plane_ratio = 1.0;
-    for (unsigned i = 0; i < banjo_display_config.layer_count; i++) {
-      const layer_t& layer = banjo_display_config.layer_list[i];
+    for (unsigned i = 0; i < banjo_display_config.layers_count; i++) {
+      const layer_t& layer = banjo_display_config.layers_list[i];
       if (layer.image_source.width == 0 || layer.image_source.height == 0) {
         continue;
       }
       uint32_t src_width, src_height;
-      GetPostTransformWidth(banjo_display_config.layer_list[i], &src_width, &src_height);
+      GetPostTransformWidth(banjo_display_config.layers_list[i], &src_width, &src_height);
 
       double downscale = std::max(1.0, 1.0 * src_height / layer.display_destination.height) *
                          std::max(1.0, 1.0 * src_width / layer.display_destination.width);
@@ -1532,13 +1532,13 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t> banjo_di
     max_pipe_pixel_rate_hz =
         static_cast<int64_t>(min_plane_ratio * static_cast<double>(max_pipe_pixel_rate_hz));
     if (max_pipe_pixel_rate_hz < pixel_clock_hz) {
-      for (unsigned j = 0; j < banjo_display_config.layer_count; j++) {
-        const layer_t& layer = banjo_display_config.layer_list[j];
+      for (unsigned j = 0; j < banjo_display_config.layers_count; j++) {
+        const layer_t& layer = banjo_display_config.layers_list[j];
         if (layer.image_source.width == 0 || layer.image_source.height == 0) {
           continue;
         }
         uint32_t src_width, src_height;
-        GetPostTransformWidth(banjo_display_config.layer_list[j], &src_width, &src_height);
+        GetPostTransformWidth(banjo_display_config.layers_list[j], &src_width, &src_height);
       }
     }
 
@@ -1579,11 +1579,11 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
 
   config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   bool merge_all = false;
-  if (banjo_display_config->layer_count > 3) {
+  if (banjo_display_config->layers_count > 3) {
     bool layer0_is_solid_color_fill =
-        (banjo_display_config->layer_list[0].image_metadata.dimensions.width == 0 ||
-         banjo_display_config->layer_list[0].image_metadata.dimensions.height == 0);
-    merge_all = banjo_display_config->layer_count > 4 || layer0_is_solid_color_fill;
+        (banjo_display_config->layers_list[0].image_metadata.dimensions.width == 0 ||
+         banjo_display_config->layers_list[0].image_metadata.dimensions.height == 0);
+    merge_all = banjo_display_config->layers_count > 4 || layer0_is_solid_color_fill;
   }
   if (!merge_all && banjo_display_config->cc_flags) {
     if (banjo_display_config->cc_flags & COLOR_CONVERSION_PREOFFSET) {
@@ -1601,8 +1601,8 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
   }
 
   uint32_t total_scalers_needed = 0;
-  for (size_t j = 0; j < banjo_display_config->layer_count; ++j) {
-    const layer_t& layer = banjo_display_config->layer_list[j];
+  for (size_t j = 0; j < banjo_display_config->layers_count; ++j) {
+    const layer_t& layer = banjo_display_config->layers_list[j];
 
     if (layer.image_metadata.dimensions.width != 0 && layer.image_metadata.dimensions.height != 0) {
       if (layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
@@ -1619,7 +1619,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
       }
 
       uint32_t src_width, src_height;
-      GetPostTransformWidth(banjo_display_config->layer_list[j], &src_width, &src_height);
+      GetPostTransformWidth(banjo_display_config->layers_list[j], &src_width, &src_height);
 
       // If the plane is too wide, force the client to do all composition
       // and just give us a simple configuration.
@@ -1802,14 +1802,14 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
 
     // TODO(https://fxbug.dev/42079186): Remove this condition once we enforce
     // config layer count to be non-zero.
-    if (banjo_display_config->layer_count == 0) {
+    if (banjo_display_config->layers_count == 0) {
       needs_fake_vsync = true;
     }
 
     // No display plane is enabled on the pipe if there's only a color layer
     // in a display config, thus we need to issue a fake Vsync event.
-    if (banjo_display_config->layer_count == 1) {
-      const auto& layer = banjo_display_config->layer_list[0];
+    if (banjo_display_config->layers_count == 1) {
+      const auto& layer = banjo_display_config->layers_list[0];
       if (layer.image_source.width == 0 && layer.image_source.height == 0) {
         needs_fake_vsync = true;
       }

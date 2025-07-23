@@ -246,8 +246,8 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSingleLayerSuccess) {
   static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .layer_list = kBanjoLayers.data(),
-      .layer_count = kBanjoLayers.size(),
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
   };
 
   mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
@@ -272,8 +272,8 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerSuccess) {
       kLayers[0].ToBanjo(), kLayers[1].ToBanjo(), kLayers[2].ToBanjo(), kLayers[3].ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .layer_list = banjo_layers.data(),
-      .layer_count = banjo_layers.size(),
+      .layers_list = banjo_layers.data(),
+      .layers_count = banjo_layers.size(),
   };
 
   mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
@@ -300,8 +300,8 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationAdapterErrorLayerCountPa
 
   const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .layer_list = banjo_layers.data(),
-      .layer_count = banjo_layers.size(),
+      .layers_list = banjo_layers.data(),
+      .layers_count = banjo_layers.size(),
   };
 
   // The adapter is expected to reject the CheckConfiguration() call without
@@ -318,8 +318,8 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationEngineError) {
   static constexpr std::array<layer_t, 1> kBanjoLayers = {CreateValidLayerWithSeed(0).ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .layer_list = kBanjoLayers.data(),
-      .layer_count = kBanjoLayers.size(),
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
   };
 
   mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
@@ -339,8 +339,8 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationSingleLayer) {
   static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .layer_list = kBanjoLayers.data(),
-      .layer_count = kBanjoLayers.size(),
+      .layers_list = kBanjoLayers.data(),
+      .layers_count = kBanjoLayers.size(),
   };
   static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 
@@ -366,8 +366,8 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationMultiLayer) {
       kLayers[0].ToBanjo(), kLayers[1].ToBanjo(), kLayers[2].ToBanjo(), kLayers[3].ToBanjo()};
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .layer_list = banjo_layers.data(),
-      .layer_count = banjo_layers.size(),
+      .layers_list = banjo_layers.data(),
+      .layers_count = banjo_layers.size(),
   };
   static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
 

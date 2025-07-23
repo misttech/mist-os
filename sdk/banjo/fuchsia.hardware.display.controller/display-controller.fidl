@@ -262,7 +262,7 @@ type DisplayConfig = struct {
     cc_postoffsets array<float32, 3>;
 
     /// Valid display configurations have at least one layer.
-    layer vector<Layer>:MAX;
+    layers vector<Layer>:MAX;
 };
 
 /// Equivalent to the [`fuchsia.hardware.display.types/ConfigResult`] FIDL type.

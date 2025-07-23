@@ -458,10 +458,10 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   }
 
   config_check_result_t check_result = [&] {
-    if (display_config.layer_count > 1) {
+    if (display_config.layers_count > 1) {
       // We only support 1 layer
       fdf::warn("CheckConfig failure: {} layers requested, we only support 1",
-                display_config.layer_count);
+                display_config.layers_count);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
 
@@ -491,7 +491,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const uint32_t display_height = display_timing.vertical_active_lines;
 
     // Make sure the layer configuration is supported.
-    const layer_t& layer = display_config.layer_list[0];
+    const layer_t& layer = display_config.layers_list[0];
     // TODO(https://fxbug.dev/42080883) Instead of using memcmp() to compare the frame
     // with expected frames, we should use the common type in "api-types-cpp"
     // which supports comparison operators.
@@ -551,7 +551,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
 
   fbl::AutoLock lock(&display_mutex_);
 
-  if (display_config.layer_count) {
+  if (display_config.layers_count) {
     if (!IgnoreDisplayMode()) {
       // Perform Vout modeset iff there's a new display mode.
       //

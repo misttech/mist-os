@@ -370,7 +370,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   const display_config_t& display_config = *display_config_ptr;
 
   const display::DisplayId display_id = display::DisplayId(display_config.display_id);
-  if (display_config.layer_count == 0) {
+  if (display_config.layers_count == 0) {
     return CONFIG_CHECK_RESULT_OK;
   }
 
@@ -385,7 +385,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     fdf::warn("Color Correction not supported.");
   }
 
-  const layer_t& layer0 = display_config.layer_list[0];
+  const layer_t& layer0 = display_config.layers_list[0];
   if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
     // Solid color fill layers are not yet supported.
     // TODO(https://fxbug.dev/406525464): add support.
@@ -425,7 +425,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     }
   }
   // If there is more than one layer, the rest need to be merged into the base layer.
-  if (display_config.layer_count > 1) {
+  if (display_config.layers_count > 1) {
     check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
@@ -535,8 +535,8 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
 
   if (display::DisplayId(display_config.display_id) == kPrimaryDisplayId) {
-    if (display_config.layer_count) {
-      driver_image_id = display::DriverImageId(display_config.layer_list[0].image_handle);
+    if (display_config.layers_count) {
+      driver_image_id = display::DriverImageId(display_config.layers_list[0].image_handle);
     }
   }
 

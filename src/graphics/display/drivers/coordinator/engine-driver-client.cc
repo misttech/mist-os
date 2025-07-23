@@ -160,8 +160,8 @@ zx::result<> EngineDriverClient::ReleaseCapture(
 display::ConfigCheckResult EngineDriverClient::CheckConfiguration(
     const display_config_t* display_config) {
   ZX_DEBUG_ASSERT(display_config != nullptr);
-  ZX_DEBUG_ASSERT(display_config->layer_count != 0);
-  ZX_DEBUG_ASSERT(display_config->layer_list != nullptr);
+  ZX_DEBUG_ASSERT(display_config->layers_count != 0);
+  ZX_DEBUG_ASSERT(display_config->layers_list != nullptr);
 
   if (use_engine_) {
     return display::ConfigCheckResult::kUnsupportedDisplayModes;
@@ -182,8 +182,8 @@ display::ConfigCheckResult EngineDriverClient::CheckConfiguration(
 void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config,
                                             display::DriverConfigStamp config_stamp) {
   ZX_DEBUG_ASSERT(display_config != nullptr);
-  ZX_DEBUG_ASSERT(display_config->layer_count != 0);
-  ZX_DEBUG_ASSERT(display_config->layer_list != nullptr);
+  ZX_DEBUG_ASSERT(display_config->layers_count != 0);
+  ZX_DEBUG_ASSERT(display_config->layers_list != nullptr);
 
   if (use_engine_) {
     return;

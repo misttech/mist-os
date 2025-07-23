@@ -118,8 +118,8 @@ void DisplayEngineBanjoAdapter::DisplayEngineReleaseImage(uint64_t banjo_image_h
 
 config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration(
     const display_config_t* banjo_display_config) {
-  cpp20::span<const layer_t> banjo_layers(banjo_display_config->layer_list,
-                                          banjo_display_config->layer_count);
+  cpp20::span<const layer_t> banjo_layers(banjo_display_config->layers_list,
+                                          banjo_display_config->layers_count);
 
   ZX_DEBUG_ASSERT_MSG(!banjo_layers.empty(),
                       "Display Coordinator checked empty config (zero layers)");
@@ -147,8 +147,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
 
 void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
     const display_config_t* banjo_display_config, const config_stamp_t* banjo_config_stamp) {
-  cpp20::span<const layer_t> banjo_layers(banjo_display_config->layer_list,
-                                          banjo_display_config->layer_count);
+  cpp20::span<const layer_t> banjo_layers(banjo_display_config->layers_list,
+                                          banjo_display_config->layers_count);
 
   // The display coordinator currently uses zero-display configs to blank a
   // display. We'll remove this eventually.

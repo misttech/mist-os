@@ -89,8 +89,8 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
   };
   display_config_t test_config = {
       .display_id = display_info.id().ToBanjo(),
-      .layer_list = test_layers,
-      .layer_count = 1,
+      .layers_list = test_layers,
+      .layers_count = 1,
   };
 
   for (auto edid_timing_it = edid::timing_iterator(&edid_info); edid_timing_it.is_valid();
@@ -114,7 +114,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
 
     layer_t& test_layer = test_layers[0];
     ZX_DEBUG_ASSERT_MSG(
-        static_cast<const layer_t*>(&test_layer) == &test_config.layer_list[0],
+        static_cast<const layer_t*>(&test_layer) == &test_config.layers_list[0],
         "test_layer should be a non-const alias for the first layer in test_configs");
     test_layer.image_metadata.dimensions.width = width;
     test_layer.image_metadata.dimensions.height = height;

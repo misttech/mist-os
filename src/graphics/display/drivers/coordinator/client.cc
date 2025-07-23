@@ -501,7 +501,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
       return;
     }
   }
-  display_config.draft_.layer_count = static_cast<int32_t>(request->layer_ids.size());
+  display_config.draft_.layers_count = static_cast<int32_t>(request->layer_ids.size());
   draft_display_config_was_validated_ = false;
 
   // One-way call. No reply required.
@@ -1040,14 +1040,14 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
     }
   }
 
-  ZX_DEBUG_ASSERT_MSG(display_config.draft_.layer_count == banjo_layers_index,
+  ZX_DEBUG_ASSERT_MSG(display_config.draft_.layers_count == banjo_layers_index,
                       "Draft configuration layer count %zu does not agree with list size %zu",
-                      display_config.draft_.layer_count, banjo_layers_index);
+                      display_config.draft_.layers_count, banjo_layers_index);
 
   // The layer count will be replaced if the client has a valid configuration
   // for a display.
   display_config_t banjo_display_config = display_config.draft_;
-  banjo_display_config.layer_list = banjo_layers;
+  banjo_display_config.layers_list = banjo_layers;
 
   {
     TRACE_DURATION("gfx", "Display::Client::CheckConfig engine_driver_client");
@@ -1091,8 +1091,8 @@ void Client::ApplyConfigImpl() {
   display::ConfigStamp applied_config_stamp = latest_config_stamp_;
 
   for (DisplayConfig& display_config : display_configs_) {
-    display_config.applied_.layer_count = 0;
-    display_config.applied_.layer_list = layers + layers_index;
+    display_config.applied_.layers_count = 0;
+    display_config.applied_.layers_list = layers + layers_index;
 
     // Displays with no current layers are filtered out in `Controller::ApplyConfig`,
     // after it updates its own image tracking logic.
@@ -1117,7 +1117,7 @@ void Client::ApplyConfigImpl() {
         applied_config_stamp = std::min(applied_config_stamp, *applied_layer_client_config_stamp);
       }
 
-      display_config.applied_.layer_count++;
+      display_config.applied_.layers_count++;
       layers[layers_index] = applied_layer->applied_layer_config_;
       ++layers_index;
 
@@ -1237,8 +1237,8 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     }
 
     display_config->applied_.display_id = display_config->id().ToBanjo();
-    display_config->applied_.layer_list = nullptr;
-    display_config->applied_.layer_count = 0;
+    display_config->applied_.layers_list = nullptr;
+    display_config->applied_.layers_count = 0;
 
     std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
