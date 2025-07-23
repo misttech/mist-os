@@ -38,7 +38,10 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
   Layer* layer;
 };
 
-// Almost-POD used by Client to manage layer state. Public state is used by Controller.
+// Manages Client-created Layer configurations.
+//
+// This class is not thread safe. Its methods and destructor must be invoked
+// on the Controller's driver dispatcher.
 class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
  public:
   // `controller` must be non-null.
@@ -99,11 +102,11 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
 
   // Removes references to all Images associated with this Layer.
   // Returns true if the applied config has been affected.
-  bool CleanUpAllImages() __TA_REQUIRES(mtx());
+  bool CleanUpAllImages();
 
   // Removes references to the provided Image. `image` must be valid.
   // Returns true if the applied config has been affected.
-  bool CleanUpImage(const Image& image) __TA_REQUIRES(mtx());
+  bool CleanUpImage(const Image& image);
 
   // If a new image is available, retire applied_image() and other pending images. Returns false if
   // no images were ready.
@@ -140,9 +143,6 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
   // "waiting" (in the context of a specific layer) when that layer appears in an applied config.
   bool HasWaitingImages() const;
 
-  // Aliases controller_.mtx() for the purpose of thread-safety analysis.
-  fbl::Mutex* mtx() const;
-
  private:
   // Retires the `draft_image_`.
   void RetireDraftImage();
@@ -154,7 +154,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
   // Retires the image most recently sent to the display engine driver.
   //
   // Returns true if this changes the applied display configuration.
-  bool RetireAppliedImage() __TA_REQUIRES(mtx());
+  bool RetireAppliedImage();
 
   Controller& controller_;
 

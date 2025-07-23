@@ -1453,11 +1453,8 @@ void Client::TearDownForTesting() { valid_ = false; }
 
 bool Client::CleanUpAllImages() {
   // Clean up any layer state associated with the images.
-  fbl::AutoLock lock(controller_.mtx());
-  bool current_config_changed = std::any_of(layers_.begin(), layers_.end(), [this](Layer& layer) {
-    controller_.AssertMtxAliasHeld(*layer.mtx());
-    return layer.CleanUpAllImages();
-  });
+  bool current_config_changed =
+      std::ranges::any_of(layers_, [](Layer& layer) { return layer.CleanUpAllImages(); });
 
   images_.clear();
   return current_config_changed;
@@ -1467,14 +1464,8 @@ bool Client::CleanUpImage(Image& image) {
   // Clean up any layer state associated with the images.
   bool current_config_changed = false;
 
-  {
-    fbl::AutoLock lock(controller_.mtx());
-    current_config_changed = std::any_of(layers_.begin(), layers_.end(),
-                                         [this, &image = std::as_const(image)](Layer& layer) {
-                                           controller_.AssertMtxAliasHeld(*layer.mtx());
-                                           return layer.CleanUpImage(image);
-                                         });
-  }
+  current_config_changed = std::ranges::any_of(
+      layers_, [&image = std::as_const(image)](Layer& layer) { return layer.CleanUpImage(image); });
 
   images_.erase(image);
   return current_config_changed;

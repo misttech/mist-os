@@ -58,8 +58,6 @@ Layer::~Layer() {
   waiting_images_.RemoveAllImages();
 }
 
-fbl::Mutex* Layer::mtx() const { return controller_.mtx(); }
-
 bool Layer::ResolveDraftLayerProperties() {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
 

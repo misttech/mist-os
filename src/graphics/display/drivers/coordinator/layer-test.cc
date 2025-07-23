@@ -196,38 +196,24 @@ TEST_F(LayerTest, CleanUpImage) {
 
   // Nothing should happen if image doesn't match.
   auto not_matching_image = CreateReadyImage();
-  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*not_matching_image);
-  }));
+  EXPECT_FALSE(
+      RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*not_matching_image); }));
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up a waiting image.
-  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*waiting_image);
-  }));
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*waiting_image); }));
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up a draft image.
-  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*draft_image);
-  }));
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*draft_image); }));
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up the associated image.
   //
   // The layer is not in a display's applied configuration list. So, cleaning up
   // the layer's image doesn't change the applied config.
-  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*displayed_image);
-  }));
+  EXPECT_FALSE(
+      RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*displayed_image); }));
   EXPECT_FALSE(layer->applied_image());
 }
 
@@ -261,11 +247,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     EXPECT_TRUE(layer->applied_image());
     // The layer is not in a display's applied configuration list. So, cleaning
     // up the layer's image doesn't change the applied config.
-    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpImage(*image);
-    }));
+    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*image); }));
     EXPECT_FALSE(layer->applied_image());
   }
 
@@ -286,11 +268,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 
     // The layer is in a display's applied configuration list. So, cleaning up
     // the layer's image changes the applied config.
-    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpImage(*image);
-    }));
+    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpImage(*image); }));
     EXPECT_FALSE(layer->applied_image());
 
     applied_layers.clear();
@@ -339,11 +317,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
 
   // The layer is not in a display's applied configuration list. So, cleaning
   // up the layer's image doesn't change the applied config.
-  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
-    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpAllImages();
-  }));
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpAllImages(); }));
   EXPECT_FALSE(layer->applied_image());
 }
 
@@ -377,11 +351,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     EXPECT_TRUE(layer->applied_image());
     // The layer is not in a display's applied configuration list. So, cleaning
     // up the layer's image doesn't change the applied config.
-    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpAllImages();
-    }));
+    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpAllImages(); }));
     EXPECT_FALSE(layer->applied_image());
   }
 
@@ -401,11 +371,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     EXPECT_TRUE(layer->applied_image());
     // The layer is in a display's applied configuration list. So, cleaning up
     // the layer's image changes the applied config.
-    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-      return layer->CleanUpAllImages();
-    }));
+    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->CleanUpAllImages(); }));
     EXPECT_FALSE(layer->applied_image());
 
     applied_layers.clear();
