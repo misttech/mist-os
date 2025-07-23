@@ -35,6 +35,7 @@ group("tests") {
     "split_enum_storage:tests",
     "starnix_ext:tests",
     "starnix_lifecycle:tests",
+    "starnix_stack:tests",
     "starnix_sync:tests",
     "starnix_types:tests",
     "starnix_uapi:tests",

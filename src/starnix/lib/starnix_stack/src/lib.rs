@@ -62,3 +62,32 @@ pub fn clean_stack() {
             fuchsia_runtime::vmar_root_self().op_range(zx::VmarOp::ZERO, start_addr, CLEAN_SIZE);
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[inline(never)]
+    fn clean_stack_at_level(level: usize) -> usize {
+        if level == 0 {
+            clean_stack();
+            0
+        } else {
+            1 + clean_stack_at_level(level - 1)
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_clean_stack() {
+        let mut array = [0u8; 256];
+        for i in 0..256 {
+            array[i] = 255 - (i as u8);
+        }
+        for i in 0..4096 {
+            assert_eq!(clean_stack_at_level(i), i);
+        }
+        for i in 0..256 {
+            assert_eq!(array[i], 255 - (i as u8));
+        }
+    }
+}
