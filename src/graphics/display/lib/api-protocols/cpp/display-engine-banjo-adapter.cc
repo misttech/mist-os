@@ -179,11 +179,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   cpp20::span<const layer_t> banjo_layers(banjo_display_config->layer_list,
                                           banjo_display_config->layer_count);
 
-  // The display coordinator currently uses zero-display configs to blank a
-  // display. We'll remove this eventually.
-  if (banjo_layers.size() == 0) {
-    return display::ConfigCheckResult::kOk.ToBanjo();
-  }
+  ZX_DEBUG_ASSERT_MSG(!banjo_layers.empty(),
+                      "Display Coordinator checked empty config (zero layers)");
 
   if (banjo_layers.size() > display::EngineInfo::kMaxAllowedMaxLayerCount) {
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
@@ -196,9 +193,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
 
   for (const auto& banjo_layer : banjo_layers) {
     if (!display::DriverLayer::IsValid(banjo_layer)) {
-      // TODO(costan): Add an error code that indicates invalid input.
       ZX_DEBUG_ASSERT_MSG(false, "Display coordinator checked invalid layer config");
-      return display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo();
+      return display::ConfigCheckResult::kInvalidConfig.ToBanjo();
     }
   }
 
