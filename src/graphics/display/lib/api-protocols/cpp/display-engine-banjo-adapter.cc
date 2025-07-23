@@ -7,22 +7,19 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/compat/cpp/device_server.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <array>
-#include <cassert>
-#include <concepts>
-#include <cstddef>
 #include <cstdint>
-#include <span>
 #include <utility>
 
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
+#include "src/graphics/display/lib/api-protocols/cpp/inplace-vector.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
@@ -31,61 +28,6 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-
-namespace {
-
-// Array whose size is determined at construction time.
-//
-// BoundedArray uses a placement new to initialize its elements one at a time
-// without using heap allocation.  The BoundedArray's capacity (maximum size) is set at compilation
-// time, but the number of elements is decided when the array is constructed.  This provides a
-// variable length array behavior without dynamic allocations.
-template <typename T, size_t Capacity>
-class BoundedArray {
- public:
-  template <typename U>
-    requires std::constructible_from<T, const U>
-  BoundedArray(const U* elements, size_t count) : elements_buffer_{}, count_{count} {
-    ZX_DEBUG_ASSERT(count <= Capacity);
-    for (size_t i = 0; i < count; i++) {
-      new (&elements_buffer_[i].value) T(elements[i]);
-    }
-  }
-
-  template <typename U>
-    requires std::constructible_from<T, const U>
-  explicit BoundedArray(const cpp20::span<U> elements)
-      : BoundedArray(elements.data(), elements.size()) {}
-
-  ~BoundedArray() {
-    for (size_t i = 0; i < count_; i++) {
-      elements_buffer_[i].value.~T();
-    }
-  }
-
-  BoundedArray(const BoundedArray&) = delete;
-  BoundedArray& operator=(const BoundedArray&) = delete;
-  BoundedArray(BoundedArray&&) = delete;
-  BoundedArray& operator=(BoundedArray&&) = delete;
-
-  cpp20::span<T> elements() { return {&elements_buffer_[0].value, count_}; }
-
- private:
-  struct Empty {};
-
-  union Element {
-    constexpr ~Element() {}  // Suppress automatic destruction that could cause UB.
-
-    Empty empty{};
-    T value;
-  };
-
-  std::array<Element, Capacity> elements_buffer_;
-  // The first `count_` elements store instances of T.
-  const size_t count_;
-};
-
-}  // anonymous namespace
 
 namespace display {
 
@@ -191,19 +133,15 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
+  internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
+      layers;
   for (const auto& banjo_layer : banjo_layers) {
-    if (!display::DriverLayer::IsValid(banjo_layer)) {
-      ZX_DEBUG_ASSERT_MSG(false, "Display coordinator checked invalid layer config");
-      return display::ConfigCheckResult::kInvalidConfig.ToBanjo();
-    }
+    ZX_DEBUG_ASSERT(display::DriverLayer::IsValid(banjo_layer));
+    layers.emplace_back(banjo_layer);
   }
 
-  BoundedArray<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount> layers(
-      banjo_layers);
-
   display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
-      display::DisplayId(banjo_display_config->display_id), display::ModeId(1), layers.elements());
-
+      display::DisplayId(banjo_display_config->display_id), display::ModeId(1), layers);
   return config_check_result.ToBanjo();
 }
 
@@ -225,18 +163,15 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
   ZX_DEBUG_ASSERT_MSG(banjo_display_config->cc_flags == 0,
                       "Display coordinator applied rejected color-correction config");
 
+  internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
+      layers;
   for (const auto& banjo_layer : banjo_layers) {
-    if (!display::DriverLayer::IsValid(banjo_layer)) {
-      ZX_DEBUG_ASSERT_MSG(false, "Display coordinator applied rejected invalid layer config");
-      return;
-    }
+    ZX_DEBUG_ASSERT(display::DriverLayer::IsValid(banjo_layer));
+    layers.emplace_back(banjo_layer);
   }
 
-  BoundedArray<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount> layers(
-      banjo_layers);
-
   engine_.ApplyConfiguration(display::DisplayId(banjo_display_config->display_id),
-                             display::ModeId(1), layers.elements(),
+                             display::ModeId(1), layers,
                              display::DriverConfigStamp(*banjo_config_stamp));
 }
 

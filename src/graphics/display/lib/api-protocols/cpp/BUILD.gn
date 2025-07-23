@@ -20,6 +20,8 @@ source_set("cpp") {
     "display-engine-events-interface.h",
     "display-engine-interface.cc",
     "display-engine-interface.h",
+    "inplace-vector.cc",
+    "inplace-vector.h",
   ]
   deps = [
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
@@ -47,6 +49,7 @@ test_sources = [
   "display-engine-events-fidl-test.cc",
   "display-engine-events-interface-test.cc",
   "display-engine-interface-test.cc",
+  "inplace-vector-test.cc",
   "mock-backlight.cc",
   "mock-backlight.h",
   "mock-banjo-display-engine-listener.cc",
