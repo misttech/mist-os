@@ -1537,7 +1537,6 @@ build_api_module("tool_paths") {
     "//zircon/tools/lz4($host_toolchain)",
     "//zircon/tools/merkleroot($host_toolchain)",
     "//src/storage/minfs/tools:minfs($host_toolchain)",
-    "//zircon/tools/xdc-server($host_toolchain)",
     "//zircon/tools/zbi($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
   ]
