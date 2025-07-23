@@ -5408,8 +5408,9 @@ zx_status_t VmCowPages::LookupReadableLocked(VmCowRange range, LookupReadableFun
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSpliceList* pages,
-                                                  uint64_t* taken_len, DeferredOps& deferred,
+zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, uint64_t splice_offset,
+                                                  VmPageSpliceList* pages, uint64_t* taken_len,
+                                                  DeferredOps& deferred,
                                                   MultiPageRequest* page_request) {
   DEBUG_ASSERT(parent_);
 
@@ -5501,7 +5502,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
     }
 
     // Add the content to the splice list.
-    status = pages->Append(ktl::move(content));
+    status = pages->Insert(splice_offset + position - range.offset, ktl::move(content));
     if (status == ZX_ERR_NO_MEMORY) {
       break;
     }
@@ -5526,8 +5527,8 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
   return status;
 }
 
-zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
-                                  MultiPageRequest* page_request) {
+zx_status_t VmCowPages::TakePages(VmCowRange range, uint64_t splice_offset, VmPageSpliceList* pages,
+                                  uint64_t* taken_len, MultiPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(range.is_page_aligned());
@@ -5552,7 +5553,8 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
 
   // If this is a child of any other kind, we need to handle it specially.
   if (parent_) {
-    return TakePagesWithParentLocked(range, pages, taken_len, deferred, page_request);
+    return TakePagesWithParentLocked(range, splice_offset, pages, taken_len, deferred,
+                                     page_request);
   }
 
   // On the assumption of success, unamp the entire range we are going to process. This ensures that
@@ -5598,19 +5600,21 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
   // because a non-empty splice list can only ever be encountered when we are taking pages from a
   // VMO whose parent is concurrently closed. In this case, we have to append to the splice list
   // one VmPageOrMarker at a time.
-  if (likely(pages->IsEmpty())) {
+  if (likely(pages->IsEmpty() && splice_offset == 0)) {
     zx_status_t status = page_list_.TakePages(range.offset, pages);
     if (status != ZX_OK) {
       DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
       return status;
     }
   } else {
-    for (uint64_t position = range.offset; position < range.end(); position += PAGE_SIZE) {
-      VmPageOrMarker content = page_list_.RemoveContent(position);
-      zx_status_t status = pages->Append(ktl::move(content));
-      if (status != ZX_OK) {
-        DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
-        return status;
+    for (uint64_t offset = 0; offset < range.len; offset += PAGE_SIZE) {
+      VmPageOrMarker content = page_list_.RemoveContent(offset + range.offset);
+      if (!content.IsEmpty()) {
+        zx_status_t status = pages->Insert(splice_offset + offset, ktl::move(content));
+        if (status != ZX_OK) {
+          DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+          return status;
+        }
       }
     }
     pages->Finalize();

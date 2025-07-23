@@ -1840,10 +1840,10 @@ class VmPageSpliceList final {
   // if and only if it is a reference. It is invalid to peek at a non-finalized splice list.
   VmPageOrMarkerRef PeekReference();
 
-  // Appends `content` to the end of the splice list.
+  // Inserts the |content| into the splice list at the specified |offset|.
   // The splice list takes ownership of `content` after this call.
   // It is invalid to append to a finalized splice list.
-  zx_status_t Append(VmPageOrMarker content);
+  zx_status_t Insert(uint64_t offset, VmPageOrMarker content);
 
   // Returns true after the whole collection has been processed by Pop.
   bool IsProcessed() const { return state_ == State::Processed; }
@@ -1859,7 +1859,6 @@ class VmPageSpliceList final {
   // to call it. Note that it is invalid to call `Finalize` twice on the same list.
   void Finalize() {
     DEBUG_ASSERT(IsInitialized());
-    pos_ = 0;
     state_ = State::Finalized;
   }
 

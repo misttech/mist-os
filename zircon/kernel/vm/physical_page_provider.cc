@@ -390,10 +390,11 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
       auto loan_pages = fit::defer([&] {
         while (!splice_list.IsProcessed()) {
           VmPageOrMarker page_or_marker = splice_list.Pop();
-          DEBUG_ASSERT(page_or_marker.IsPage());
-          vm_page_t* p = page_or_marker.ReleasePage();
-          DEBUG_ASSERT(!list_in_list(&p->queue_node));
-          list_add_tail(&contiguous_pages, &p->queue_node);
+          if (page_or_marker.IsPage()) {
+            vm_page_t* p = page_or_marker.ReleasePage();
+            DEBUG_ASSERT(!list_in_list(&p->queue_node));
+            list_add_tail(&contiguous_pages, &p->queue_node);
+          }
         }
         if (!list_is_empty(&contiguous_pages)) {
           Guard<Mutex> guard{&loaned_state_lock_};

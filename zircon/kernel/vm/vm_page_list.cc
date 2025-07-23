@@ -1202,11 +1202,13 @@ zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t length, list_node* pag
   DEBUG_ASSERT(pages);
   DEBUG_ASSERT(list_length(pages) == length / PAGE_SIZE);
   splice->Initialize(length);
+  uint64_t offset = 0;
   while (vm_page_t* page = list_remove_head_type(pages, vm_page_t, queue_node)) {
-    zx_status_t status = splice->Append(VmPageOrMarker::Page(page));
+    zx_status_t status = splice->Insert(offset, VmPageOrMarker::Page(page));
     if (status != ZX_OK) {
       return status;
     }
+    offset += PAGE_SIZE;
   }
   splice->Finalize();
   return ZX_OK;
@@ -1226,13 +1228,13 @@ void VmPageSpliceList::FreeAllPages() {
   state_ = State::Processed;
 }
 
-zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
-  ASSERT(pos_ < length_);
+zx_status_t VmPageSpliceList::Insert(uint64_t offset, VmPageOrMarker content) {
+  ASSERT(offset < length_);
   ASSERT(IsInitialized());
   ASSERT(!content.IsInterval());
 
   auto [slot, interval] =
-      page_list_.LookupOrAllocate(pos_, VmPageList::IntervalHandling::NoIntervals);
+      page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
   if (!slot) {
     // If the allocation failed, we need to free content.
     if (content.IsPage()) {
@@ -1247,7 +1249,6 @@ zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
     return ZX_ERR_NO_MEMORY;
   }
   *slot = ktl::move(content);
-  pos_ += PAGE_SIZE;
   return ZX_OK;
 }
 

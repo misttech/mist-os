@@ -483,7 +483,7 @@ static bool vmpl_append_to_splice_list_test() {
   for (uint8_t i = 0; i < kNumPages; i++) {
     paddr_t pa;
     ASSERT_OK(pmm_alloc_page(0, &pages[i], &pa));
-    EXPECT_OK(splice.Append(VmPageOrMarker::Page(pages[i])));
+    EXPECT_OK(splice.Insert(i * PAGE_SIZE, VmPageOrMarker::Page(pages[i])));
   }
 
   // Finalize the splice list and verify that it worked.

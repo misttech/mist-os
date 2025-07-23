@@ -1715,11 +1715,13 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
 
   // Initialize the splice list to the right size.
   pages->Initialize(range.len);
+  uint64_t splice_offset = 0;
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
     uint64_t taken_len = 0;
-    zx_status_t status = cow_pages_->TakePages(range, pages, &taken_len, &page_request);
+    zx_status_t status =
+        cow_pages_->TakePages(range, splice_offset, pages, &taken_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
@@ -1730,6 +1732,8 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
     DEBUG_ASSERT(status != ZX_OK || taken_len == range.len);
     // We should not have taken any more than the requested range.
     DEBUG_ASSERT(taken_len <= range.len);
+
+    splice_offset += taken_len;
 
     // Record the completed portion.
     range = range.TrimedFromStart(taken_len);
