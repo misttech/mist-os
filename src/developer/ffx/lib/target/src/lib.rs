@@ -332,8 +332,9 @@ async fn wait_for_device_inner(
     .await
 }
 
+/// Represents the ability to knock RCS on a specified Target.
 #[cfg_attr(test, mockall::automock)]
-trait RcsKnocker {
+pub trait RcsKnocker {
     fn knock_rcs(
         &self,
         target_spec: Option<String>,
@@ -341,7 +342,8 @@ trait RcsKnocker {
     ) -> impl Future<Output = Result<(), KnockError>>;
 }
 
-struct LocalRcsKnockerImpl;
+///  Knocks RCS without calling the ffx daemon.
+pub struct LocalRcsKnockerImpl;
 
 impl<T: RcsKnocker + ?Sized> RcsKnocker for Box<T> {
     fn knock_rcs(
