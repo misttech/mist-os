@@ -7,8 +7,8 @@
 
 use super::bpf::{check_bpf_map_access, check_bpf_prog_access};
 use super::{
-    fs_node_effective_sid_and_class, has_file_ioctl_permission, has_file_permissions,
-    permissions_from_flags, task_effective_sid, todo_has_fs_node_permissions, FileObjectState,
+    current_task_state, fs_node_effective_sid_and_class, has_file_ioctl_permission,
+    has_file_permissions, permissions_from_flags, todo_has_fs_node_permissions, FileObjectState,
     FsNodeSidAndClass, PermissionFlags, NO_PERMISSIONS,
 };
 use crate::bpf::fs::BpfHandle;
@@ -31,7 +31,7 @@ use std::ops::Range;
 
 /// Returns the security state for a new file object created by `current_task`.
 pub(in crate::security) fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
-    FileObjectState { sid: task_effective_sid(current_task) }
+    FileObjectState { sid: current_task_state(current_task).lock().current_sid }
 }
 
 /// Checks whether the `current_task`` has the permissions specified by `mask` to the `file`.
@@ -41,7 +41,7 @@ pub(in crate::security) fn file_permission(
     file: &FileObject,
     mut permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
-    let current_sid = task_effective_sid(current_task);
+    let current_sid = current_task_state(current_task).lock().current_sid;
     let FsNodeSidAndClass { class: file_class, .. } =
         fs_node_effective_sid_and_class(&file.name.entry.node);
 
@@ -76,7 +76,7 @@ pub(in crate::security) fn file_receive(
     file: &FileObject,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let subject_sid = task_effective_sid(current_task);
+    let subject_sid = current_task_state(current_task).lock().current_sid;
     let fs_node_class = file.node().security_state.lock().class;
     let permission_flags = file.flags().into();
 
@@ -123,7 +123,7 @@ pub(in crate::security) fn check_file_ioctl_access(
     request: u32,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let subject_sid = task_effective_sid(current_task);
+    let subject_sid = current_task_state(current_task).lock().current_sid;
     match canonicalize_ioctl_request(current_task, request) {
         FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => has_file_permissions(
             &permission_check,
@@ -171,7 +171,7 @@ pub(in crate::security) fn check_file_lock_access(
     file: &FileObject,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let subject_sid = task_effective_sid(current_task);
+    let subject_sid = current_task_state(current_task).lock().current_sid;
     has_file_permissions(
         &permission_check,
         current_task.kernel(),
@@ -192,7 +192,7 @@ pub(in crate::security) fn check_file_fcntl_access(
     fcntl_arg: u64,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let subject_sid = task_effective_sid(current_task);
+    let subject_sid = current_task_state(current_task).lock().current_sid;
     let fs_node_class = file.node().security_state.lock().class;
 
     match fcntl_cmd {
@@ -297,7 +297,7 @@ pub fn file_mprotect(
             }
         };
         if let Some(permission) = permission {
-            let subject_sid = task_effective_sid(current_task);
+            let subject_sid = current_task_state(current_task).lock().current_sid;
             check_self_permission(
                 &security_server.as_permission_check(),
                 current_task.kernel(),
@@ -327,7 +327,7 @@ pub fn mmap_file(
     mapping_options: MappingOptions,
 ) -> Result<(), Errno> {
     if let Some(file) = file {
-        let current_sid = task_effective_sid(current_task);
+        let current_sid = current_task_state(current_task).lock().current_sid;
         todo_has_file_permissions(
             TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
             &security_server.as_permission_check(),
@@ -362,7 +362,7 @@ fn file_map_prot_check(
         let private_writable_mapping = !mapping_options.contains(MappingOptions::SHARED)
             && prot.contains(ProtectionFlags::WRITE);
         if anonymous_mapping || private_writable_mapping {
-            let current_sid = task_effective_sid(current_task);
+            let current_sid = current_task_state(current_task).lock().current_sid;
             todo_check_permission(
                 TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
                 &security_server.as_permission_check(),
@@ -391,7 +391,7 @@ fn file_map_prot_check(
             flags
         };
         let permissions = permissions_from_flags(flags, node_class);
-        let current_sid = task_effective_sid(current_task);
+        let current_sid = current_task_state(current_task).lock().current_sid;
         todo_has_fs_node_permissions(
             TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
             &security_server.as_permission_check(),

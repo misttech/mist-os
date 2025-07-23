@@ -4,7 +4,7 @@
 
 use super::fs_node::fs_node_init_with_dentry;
 use super::{
-    check_permission, fs_node_effective_sid_and_class, task_effective_sid, FileSystemLabel,
+    check_permission, current_task_state, fs_node_effective_sid_and_class, FileSystemLabel,
     FileSystemState, FsNodeSidAndClass,
 };
 
@@ -151,7 +151,7 @@ pub(in crate::security) fn sb_kern_mount(
     fs: &FileSystem,
 ) -> Result<(), Errno> {
     let audit_context = [current_task.into(), fs.into()];
-    let source_sid = task_effective_sid(current_task);
+    let source_sid = current_task_state(current_task).lock().current_sid;
     let target_sid = fs_sid(fs)?;
     check_permission(
         permission_check,
@@ -170,7 +170,7 @@ pub(in crate::security) fn sb_mount(
     path: &NamespaceNode,
     flags: MountFlags,
 ) -> Result<(), Errno> {
-    let source_sid = task_effective_sid(current_task);
+    let source_sid = current_task_state(current_task).lock().current_sid;
     if flags.contains(MountFlags::REMOUNT) {
         let mount = path.mount_if_root()?;
         let fs = mount.root().entry.node.fs();
@@ -231,7 +231,7 @@ pub(in crate::security) fn sb_statfs(
     fs: &FileSystem,
 ) -> Result<(), Errno> {
     let audit_context = [current_task.into(), fs.into()];
-    let source_sid = task_effective_sid(current_task);
+    let source_sid = current_task_state(current_task).lock().current_sid;
     let target_sid = fs_sid(fs)?;
     check_permission(
         permission_check,
@@ -251,7 +251,7 @@ pub(in crate::security) fn sb_umount(
     node: &NamespaceNode,
     _flags: UnmountFlags,
 ) -> Result<(), Errno> {
-    let source_sid = task_effective_sid(current_task);
+    let source_sid = current_task_state(current_task).lock().current_sid;
     let mount = node.mount_if_root()?;
     let fs = mount.root().entry.node.fs();
     let target_sid = fs_sid(&fs)?;

@@ -832,10 +832,10 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
     ))
 }
 
-/// Saves the effective SID of `current_task` for later use.
+/// Saves the current SID of `current_task` for later use.
 pub fn task_save_effective_state(current_task: &CurrentTask) -> SavedEffectiveState {
     track_hook_duration!(c"security.hooks.task_save_effective_state");
-    SavedEffectiveState(current_task.security_state.lock().effective_sid)
+    SavedEffectiveState(selinux_hooks::current_task_state(current_task).lock().current_sid)
 }
 
 /// Temporarily switches to the saved `effective_state`, calls `f`, then restores the previous state.
@@ -844,13 +844,15 @@ pub fn run_with_effective_state<R>(
     effective_state: &SavedEffectiveState,
     f: impl FnOnce() -> R,
 ) -> R {
-    if_selinux_else_with_context(
-        f,
-        current_task,
-        |f, _security_server| {
-            selinux_hooks::task::run_with_effective_sid(current_task, effective_state.0, f)
+    // Unconditionally override the security state: in some cases, the state we try to apply may
+    // contain some initial security ids. It's safer to stash them and use them once a policy is
+    // loaded, rather than ignoring them and risking having a task that misses the appropriate
+    // security state.
+    current_task.override_creds(
+        |creds| {
+            creds.security_state.lock().current_sid = effective_state.0.clone();
         },
-        |f| f(),
+        f,
     )
 }
 
@@ -2016,11 +2018,17 @@ mod tests {
             let target_sid = InitialSid::Unlabeled.into();
             let elf_state = ResolvedElfState { sid: Some(target_sid) };
 
-            assert!(selinux_hooks::task_effective_sid(current_task) != target_sid);
+            assert!(
+                selinux_hooks::current_task_state(current_task).lock().current_sid != target_sid
+            );
 
-            let before_hook_sid = selinux_hooks::task_effective_sid(current_task);
+            let before_hook_sid =
+                selinux_hooks::current_task_state(current_task).lock().current_sid;
             exec_binprm(locked, current_task, &elf_state);
-            assert_eq!(selinux_hooks::task_effective_sid(current_task), before_hook_sid);
+            assert_eq!(
+                selinux_hooks::current_task_state(current_task).lock().current_sid,
+                before_hook_sid
+            );
             assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid)
         })
     }
@@ -2033,7 +2041,7 @@ mod tests {
             let initial_state = current_task.security_state.lock().clone();
             let elf_sid = InitialSid::Unlabeled.into();
             let elf_state = ResolvedElfState { sid: Some(elf_sid) };
-            assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
+            assert_ne!(elf_sid, selinux_hooks::current_task_state(current_task).lock().current_sid);
             exec_binprm(locked, current_task, &elf_state);
             assert_eq!(*current_task.security_state.lock(), initial_state);
         })
@@ -2050,9 +2058,15 @@ mod tests {
                     .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
                     .expect("invalid security context");
                 let elf_state = ResolvedElfState { sid: Some(elf_sid) };
-                assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
+                assert_ne!(
+                    elf_sid,
+                    selinux_hooks::current_task_state(current_task).lock().current_sid
+                );
                 exec_binprm(locked, current_task, &elf_state);
-                assert_eq!(selinux_hooks::task_effective_sid(current_task), elf_sid);
+                assert_eq!(
+                    selinux_hooks::current_task_state(current_task).lock().current_sid,
+                    elf_sid
+                );
                 assert_eq!(current_task.security_state.lock().current_sid, elf_sid);
             },
         )
@@ -2755,35 +2769,5 @@ mod tests {
                 assert_eq!(get_cached_sid(&dir_entry.node), Some(sid));
             },
         );
-    }
-
-    #[fuchsia::test]
-    async fn save_and_reuse_effective_sid() {
-        spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |_locked, current_task, security_server| {
-                let sid =
-                    security_server.security_context_to_sid(VALID_SECURITY_CONTEXT.into()).unwrap();
-
-                let saved_state =
-                    selinux_hooks::task::run_with_effective_sid(current_task, sid, || {
-                        task_save_effective_state(current_task)
-                    });
-
-                let current_sid = current_task.security_state.lock().current_sid;
-                assert_ne!(sid, current_sid);
-                // Set an fscreate SID and check that it is overridden.
-                current_task.security_state.lock().fscreate_sid = Some(sid);
-                run_with_effective_state(current_task, &saved_state, || {
-                    assert_eq!(current_task.security_state.lock().current_sid, current_sid);
-                    assert_eq!(current_task.security_state.lock().effective_sid, sid);
-                    assert_eq!(current_task.security_state.lock().fscreate_sid, None);
-                });
-
-                // The modified state is restored.
-                assert_eq!(current_task.security_state.lock().current_sid, current_sid);
-                assert_eq!(current_task.security_state.lock().effective_sid, current_sid);
-                assert_eq!(current_task.security_state.lock().fscreate_sid, Some(sid));
-            },
-        )
     }
 }

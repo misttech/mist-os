@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{check_permission, set_cached_sid, superblock, task_effective_sid};
+use super::{check_permission, current_task_state, set_cached_sid, superblock};
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
@@ -65,7 +65,7 @@ pub(in crate::security) fn selinuxfs_check_access(
     current_task: &CurrentTask,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
-    let source_sid = task_effective_sid(current_task);
+    let source_sid = current_task_state(current_task).lock().current_sid;
     let target_sid = InitialSid::Security.into();
     let permission_check = security_server.as_permission_check();
     check_permission(
