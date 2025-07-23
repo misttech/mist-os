@@ -15,7 +15,6 @@
 
 #include <dev/interrupt.h>
 #include <fbl/alloc_checker.h>
-#include <kernel/auto_lock.h>
 #include <kernel/mutex.h>
 
 KCOUNTER(dispatcher_interrupt_event_create_count, "dispatcher.interrupt_event.create")

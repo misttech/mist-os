@@ -23,7 +23,6 @@
 
 #include <arch/ops.h>
 #include <fbl/intrusive_double_list.h>
-#include <kernel/auto_lock.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <vm/physmap.h>

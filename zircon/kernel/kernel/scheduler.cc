@@ -30,7 +30,6 @@
 #include <arch/ops.h>
 #include <arch/thread.h>
 #include <ffl/string.h>
-#include <kernel/auto_lock.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/cpu.h>
 #include <kernel/lockdep.h>

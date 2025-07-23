@@ -86,7 +86,7 @@ class Cbuf {
   uint32_t len_pow2_ TA_GUARDED(lock_) = 0;
   char* buf_ TA_GUARDED(lock_) = nullptr;
   Event event_;
-  SpinLock lock_;
+  DECLARE_SPINLOCK(Cbuf) lock_;
 };
 
 #endif  // ZIRCON_KERNEL_LIB_CBUF_INCLUDE_LIB_CBUF_H_

@@ -15,7 +15,6 @@
 #include <bitmap/storage.h>
 #include <hypervisor/ktrace.h>
 #include <hypervisor/state_invalidator.h>
-#include <kernel/auto_lock.h>
 #include <kernel/event.h>
 
 namespace hypervisor {

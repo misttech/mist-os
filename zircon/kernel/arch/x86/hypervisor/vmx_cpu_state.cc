@@ -10,7 +10,6 @@
 
 #include <arch/x86/hypervisor/invalidate.h>
 #include <hypervisor/cpu.h>
-#include <kernel/auto_lock.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
 

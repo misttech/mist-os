@@ -23,7 +23,6 @@
 #include <explicit-memory/bytes.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/auto_lock.h>
 #include <kernel/thread.h>
 #include <ktl/algorithm.h>
 #include <ktl/atomic.h>

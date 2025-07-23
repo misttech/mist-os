@@ -12,7 +12,6 @@
 #include <string.h>
 #include <trace.h>
 
-#include <kernel/auto_lock.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/event.h>
 #include <kernel/spinlock.h>
@@ -45,7 +44,7 @@ bool Cbuf::Full() const TA_NO_THREAD_SAFETY_ANALYSIS {
 
 size_t Cbuf::WriteChar(char c) {
   {
-    AutoSpinLock guard(&lock_);
+    Guard<SpinLock, IrqSave> guard(&lock_);
 
     if (Full()) {
       return 0;
@@ -68,7 +67,7 @@ size_t Cbuf::WriteChar(char c) {
 zx::result<Cbuf::ReadContext> Cbuf::ReadCharWithContext(bool block) {
   while (true) {
     {
-      AutoSpinLock guard(&lock_);
+      Guard<SpinLock, IrqSave> guard(&lock_);
       if (!Empty()) {
         ReadContext res = {
             .c = buf_[tail_],

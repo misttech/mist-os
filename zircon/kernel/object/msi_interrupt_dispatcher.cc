@@ -21,7 +21,6 @@
 
 #include <dev/interrupt.h>
 #include <fbl/alloc_checker.h>
-#include <kernel/auto_lock.h>
 #include <object/dispatcher.h>
 #include <object/interrupt_dispatcher.h>
 #include <object/msi_interrupt_dispatcher.h>

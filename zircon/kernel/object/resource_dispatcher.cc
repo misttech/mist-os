@@ -15,7 +15,6 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <kernel/auto_lock.h>
 #include <kernel/range_check.h>
 #include <pretty/cpp/sizes.h>
 #include <vm/vm.h>

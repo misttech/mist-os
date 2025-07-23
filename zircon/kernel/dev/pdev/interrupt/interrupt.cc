@@ -8,7 +8,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <kernel/auto_lock.h>
 #include <kernel/spinlock.h>
 #include <lk/init.h>
 #include <pdev/interrupt.h>

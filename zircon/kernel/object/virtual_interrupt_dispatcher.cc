@@ -12,7 +12,6 @@
 
 #include <dev/interrupt.h>
 #include <fbl/alloc_checker.h>
-#include <kernel/auto_lock.h>
 #include <kernel/mutex.h>
 
 KCOUNTER(dispatcher_virtual_interrupt_create_count, "dispatcher.virtual_interrupt.create")

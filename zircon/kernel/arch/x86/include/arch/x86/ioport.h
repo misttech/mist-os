@@ -31,7 +31,7 @@ class IoBitmap {
   friend void x86_clear_tss_io_bitmap(IoBitmap& bitmap);
 
   ktl::unique_ptr<bitmap::RleBitmap> bitmap_;
-  SpinLock lock_;
+  DECLARE_SPINLOCK(IoBitmap) lock_;
 };
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_X86_IOPORT_H_

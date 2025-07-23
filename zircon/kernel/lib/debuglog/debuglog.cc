@@ -20,7 +20,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <kernel/auto_lock.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <kernel/spinlock.h>

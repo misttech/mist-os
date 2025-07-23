@@ -18,7 +18,6 @@
 
 #include <arch/interrupt.h>
 #include <fbl/algorithm.h>
-#include <kernel/auto_lock.h>
 #include <kernel/cpu.h>
 #include <kernel/event.h>
 #include <kernel/mp.h>

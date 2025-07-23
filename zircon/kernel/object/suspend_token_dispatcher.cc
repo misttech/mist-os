@@ -12,7 +12,6 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <kernel/auto_lock.h>
 #include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
 
