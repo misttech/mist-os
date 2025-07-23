@@ -43,7 +43,6 @@ uapi::check_arch_independent_layout! {
         __bindgen_anon_1,
         sample_type,
         read_format,
-        _bitfield_align_1,
         _bitfield_1,
         __bindgen_anon_2,
         bp_type,
