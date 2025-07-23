@@ -11,8 +11,6 @@
 
 #include <ostream>
 #include <span>
-#include <utility>
-#include <variant>
 
 #include "buffer.h"
 #include "dump.h"
@@ -23,25 +21,6 @@ namespace zxdump {
 
 // Zircon core dumps are always in the 64-bit little-endian ELF format.
 using Elf = elfldltl::Elf64<elfldltl::ElfData::k2Lsb>;
-
-// However, ELF images in memory can be either 64-bit or 32-bit.
-template <class... Elf>
-using AllElfPhdrs = std::variant<std::span<const typename Elf::Phdr>...>;
-using AnyElfPhdrs = elfldltl::AllNativeFormats<AllElfPhdrs>;
-
-// AnyElfPhdrsBuffer is just a variant of zxdump::Buffer<Elf...::Phdr> types,
-// but it also has the empty() method to avoid needing to use std::visit or
-// other methods to access the buffer when which variant it is doesn't matter.
-template <class... Elf>
-using AllElfPhdrsBuffer = std::variant<Buffer<typename Elf::Phdr>...>;
-class AnyElfPhdrsBuffer : public elfldltl::AllNativeFormats<AllElfPhdrsBuffer> {
- public:
-  using elfldltl::AllNativeFormats<AllElfPhdrsBuffer>::variant;
-
-  bool empty() const {
-    return std::visit([](const auto& buffer) { return buffer->empty(); }, *this);
-  }
-};
 
 // This can be used from a zxdump::SegmentCallback function to guess if it's
 // likely worthwhile to probe this mapping for containing the beginning of an
@@ -84,7 +63,7 @@ std::ostream& operator<<(std::ostream& os, const ElfSearchError& error);
 // process.read_memory gets an error, either because the segment memory can't
 // be read or because the ELF header pointed to a Phdr range (not necessarily
 // all in that segment) that can't be read.
-fit::result<ElfSearchError, AnyElfPhdrsBuffer> DetectElf(  //
+fit::result<ElfSearchError, Buffer<Elf::Phdr>> DetectElf(  //
     Process& process, const zx_info_maps_t& segment);
 
 // This is the return value of zxdump::DetectElfIdentity, below.  It contains
@@ -111,15 +90,7 @@ struct ElfIdentity {
 // doesn't have to be one returned by DetectElf (i.e. by process.read_memory)
 // but it can be.
 fit::result<ElfSearchError, ElfIdentity> DetectElfIdentity(  //
-    Process& process, const zx_info_maps_t& segment, const AnyElfPhdrs& phdrs);
-
-// This overload converts the variant buffer to the variant span.
-inline fit::result<ElfSearchError, ElfIdentity> DetectElfIdentity(  //
-    Process& process, const zx_info_maps_t& segment, const AnyElfPhdrsBuffer& phdrs_buffer) {
-  return std::visit(
-      [&](const auto& buffer) { return DetectElfIdentity(process, segment, *buffer); },
-      phdrs_buffer);
-}
+    Process& process, const zx_info_maps_t& segment, std::span<const Elf::Phdr> phdrs);
 
 // This represents the data from ZX_INFO_PROCESS_MAPS or ZX_INFO_VMAR_MAPS.
 using MapsInfoSpan = std::span<const zx_info_maps_t>;

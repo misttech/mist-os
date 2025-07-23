@@ -523,7 +523,7 @@ class Process : public Task {
       return result.take_error();
     }
 
-    return fit::ok(std::move(buffer).Reinterpret<T, View>());
+    return fit::ok(static_cast<Buffer<T, View>>(std::move(buffer)));
   }
 
   // This just reads a single datum of type T from dumped process memory at
