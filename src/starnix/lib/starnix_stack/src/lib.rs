@@ -54,8 +54,8 @@ pub fn clean_stack() {
         // Compute the pointers to the stack as a function call from this function to ensure the
         // pointed memory is unused.
         let v = factory();
-        // ptr point to the last used byte on the stack, so move it to the first unused byte.
-        let v = v - 1;
+        // Afford some space on the stack for the op_range call.
+        let v = v - 64;
         let max_addr = v - (v % page_size);
         let start_addr = max_addr - CLEAN_SIZE;
         let _ =
