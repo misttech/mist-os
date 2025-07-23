@@ -539,7 +539,7 @@ void PaperRenderer::GenerateCommandsForNoShadows(uint32_t camera_index) {
     render_queue_.GenerateCommands(cmd_buf, &context, PaperRenderQueueFlagBits::kOpaque);
 
     // Render translucent.
-    cmd_buf->SetToDefaultState(CommandBuffer::DefaultState::kTranslucent);
+    cmd_buf->SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
     if (kDisableBackfaceCulling) {
       cmd_buf->SetCullMode(vk::CullModeFlagBits::eNone);
     }
@@ -695,7 +695,7 @@ void PaperRenderer::GenerateCommandsForShadowVolumes(uint32_t camera_index) {
 
   // Draw translucent geometry without lighting.
   context.set_shader_selector(PaperShaderListSelector::kAmbientLighting);
-  cmd_buf->SetToDefaultState(CommandBuffer::DefaultState::kTranslucent);
+  cmd_buf->SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
   if (kDisableBackfaceCulling) {
     cmd_buf->SetCullMode(vk::CullModeFlagBits::eNone);
   }
@@ -887,7 +887,7 @@ void PaperRenderer::WarmPipelineAndRenderPassCaches(
       WarmProgramHelper(escher->pipeline_layout_cache(),
                         escher->GetProgram(kAmbientLightProgramData), &cbps, immutable_samplers);
 
-      cbps.SetToDefaultState(CommandBuffer::DefaultState::kTranslucent);
+      cbps.SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
       if (kDisableBackfaceCulling) {
         cbps.SetCullMode(vk::CullModeFlagBits::eNone);
       }
@@ -968,7 +968,7 @@ void PaperRenderer::WarmPipelineAndRenderPassCaches(
 
       // Translucent.
       {
-        cbps.SetToDefaultState(CommandBuffer::DefaultState::kTranslucent);
+        cbps.SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
         if (kDisableBackfaceCulling) {
           cbps.SetCullMode(vk::CullModeFlagBits::eNone);
         }
