@@ -128,6 +128,29 @@ zx_instant_mono_t current_mono_time();
 // Current boot time in nanoseconds.
 zx_instant_boot_t current_boot_time();
 
+// Monotonic and boot time representing the same instant in both timelines.
+struct InstantMonoAndBootTime {
+  zx_instant_mono_t mono_time;
+  zx_instant_boot_t boot_time;
+};
+
+// Current monotonic and boot time in nanoseconds, derived from a coherent
+// observation of the offsets and raw ticks.
+InstantMonoAndBootTime current_mono_and_boot_time();
+
+// Monotonic time and boot ticks representing same instant in both timelines.
+// This is primarily useful for lining up samples of monotonic time with
+// corresponding trace events, which use boot ticks, so that computed and
+// visualized intervals are accurate.
+struct InstantMonoTimeAndBootTicks {
+  zx_instant_mono_t mono_time;
+  zx_instant_boot_ticks_t boot_ticks;
+};
+
+// Current monotonic time in nanoseconds and boot ticks, derived from a coherent
+// observation of the offsets and raw ticks.
+InstantMonoTimeAndBootTicks current_mono_time_and_boot_ticks();
+
 // High-precision timer ticks per second.
 zx_ticks_t ticks_per_second();
 
