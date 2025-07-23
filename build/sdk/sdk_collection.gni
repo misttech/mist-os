@@ -193,7 +193,12 @@ template("sdk_collection") {
 
     binary_label = "//build/sdk/generate_prebuild_idk"
 
-    inputs = [ files.prebuild_manifest ]
+    inputs = [
+      files.prebuild_manifest,
+
+      # Used in validation.
+      "//docs/contribute/governance/areas/_areas.yaml",
+    ]
 
     _stamp_file = "${target_gen_dir}/${target_name}.exported"
 

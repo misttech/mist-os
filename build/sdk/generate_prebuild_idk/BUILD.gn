@@ -40,6 +40,7 @@ if (is_host) {
 
     deps = [
       "//build/sdk/generate_version_history",
+      "//build/sdk/sdk_common",
       "//third_party/pyyaml:yaml",
     ]
   }
@@ -55,6 +56,7 @@ if (is_host) {
 
       # Accessed by idk_generator.py.
       "//build/sdk/generate_version_history/__init__.py",
+      "//docs/contribute/governance/areas/_areas.yaml",
       "//third_party/pyyaml/src/lib/yaml/__init__.py",
       "//third_party/pyyaml/src/lib/yaml/composer.py",
       "//third_party/pyyaml/src/lib/yaml/constructor.py",
@@ -83,8 +85,22 @@ if (is_host) {
     hermetic_inputs_file = "$target_out_dir/$target_name.hermetic_inputs"
   }
 
+  host_test_data("areas_file_test_data") {
+    visibility = [ ":*" ]
+    sources = [ "//docs/contribute/governance/areas/_areas.yaml" ]
+  }
+
   python_host_test("idk_generator_unittest") {
     main_source = "idk_generator_unittest.py"
     libraries = [ ":idk_generator_lib" ]
+
+    # LINT.IfChange(gn_test_main)
+    main_callable = "gn_test_main"
+    source_root_relative_to_target_gen_dir = rebase_path("//", target_gen_dir)
+    extra_args = [ source_root_relative_to_target_gen_dir ]
+
+    # LINT.ThenChange(idk_generator_unittest.py:gn_test_main)
+
+    test_data_deps = [ ":areas_file_test_data" ]
   }
 }

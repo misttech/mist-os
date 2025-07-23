@@ -29,8 +29,27 @@ class MinimalAtom(object):
         self.id: str = json["id"]
         self.label: str = json["gn-label"]
         self.category: str = json["category"]
-        self.area: str | None = json.get("area")
         self.type: str = json["type"]
+        self.area: str | None = json.get("area")
+
+    @classmethod
+    def from_values(
+        cls,
+        id: str,
+        label: str,
+        category: str,
+        type: str,
+        area: str | None = None,
+    ) -> "MinimalAtom":
+        json_data = {
+            "id": id,
+            "gn-label": label,
+            "category": category,
+            "type": type,
+        }
+        if area:
+            json_data["area"] = area
+        return cls(json_data)
 
     def __str__(self) -> str:
         return str(self.id)
@@ -174,10 +193,15 @@ _VALID_ATOM_TYPES = [
     "version_history",
     # LINT.ThenChange(//build/sdk/generate_prebuild_idk/idk_generator.py, //build/sdk/manifest_schema.json, //build/sdk/meta/BUILD.bazel:schema_in_idk, //build/sdk/meta/BUILD.gn:schema_in_idk)
 ]
+# IdkGenerator may pass "none" as well, but it should not be included in the
+# list of valid types above.
+_VALID_ATOM_TYPES_PLUS_NONE = _VALID_ATOM_TYPES + [
+    "none",
+]
 
 # Remove the types requiring area from the list of all types to get the types
 # for which area is optional.
-_AREA_OPTIONAL_TYPES = _VALID_ATOM_TYPES[:]
+_AREA_OPTIONAL_TYPES = _VALID_ATOM_TYPES_PLUS_NONE[:]
 _AREA_OPTIONAL_TYPES.remove("bind_library")
 _AREA_OPTIONAL_TYPES.remove("fidl_library")
 
@@ -215,7 +239,7 @@ class Validator:
     ) -> Iterator[str]:
         """Yields strings describing any invalid types in `atoms`."""
         for atom in atoms:
-            if atom.type not in _VALID_ATOM_TYPES:
+            if atom.type not in _VALID_ATOM_TYPES_PLUS_NONE:
                 yield (
                     "Atom type `%s` for `%s` is unsupported. Valid types are: %s"
                     % (

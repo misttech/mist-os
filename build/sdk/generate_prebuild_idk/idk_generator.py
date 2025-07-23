@@ -34,6 +34,7 @@ sys.path.insert(0, str(_FUCHSIA_ROOT_DIR / "third_party/pyyaml/src/lib"))
 
 import generate_version_history
 import yaml
+from sdk_common import MinimalAtom, Validator
 
 # Information about an atom in the prebuild manifest.
 AtomInfo: T.TypeAlias = dict[str, T.Any]
@@ -75,6 +76,54 @@ def collect_directory_files(src_root: str | Path) -> T.List[str]:
             src_path = os.path.join(rootpath, file)
             result.append(os.path.relpath(src_path, src_root))
     return result
+
+
+def _make_minimal_atom(atom: AtomInfo) -> MinimalAtom:
+    area = None
+    if "api_area" in atom:
+        area = atom["api_area"]
+
+    return MinimalAtom.from_values(
+        id=atom["atom_id"],
+        label=atom["atom_label"],
+        category=atom["category"],
+        type=atom["atom_type"],
+        area=area,
+    )
+
+
+def _get_validator(fuchsia_source_dir: Path) -> Validator:
+    return Validator.from_areas_file_path(
+        areas_file=fuchsia_source_dir
+        / "docs/contribute/governance/areas/_areas.yaml"
+    )
+
+
+# TODO(https://fxbug.dev/419105478): Check for "root" and "meta" destination
+# collisions in `atoms_in_collection`.
+def _verify_collection(
+    collection_info: AtomInfo,
+    atoms_in_collection: list[AtomInfo],
+    fuchsia_source_dir: Path,
+) -> None:
+    minimal_atoms_in_collection = []
+    for info in atoms_in_collection:
+        # Not all collections have "atom_id", so skip the collection.
+        # TODO(https://fxbug.dev/407083737): Remove "atom_id" once the build
+        # manifests no longer exist. They use "id" like this file uses label.
+        # Then consider removing this exception.
+        if info != collection_info:
+            minimal_atoms_in_collection.append(_make_minimal_atom(info))
+
+    violations = [
+        *_get_validator(fuchsia_source_dir).detect_violations(
+            collection_info["category"], minimal_atoms_in_collection
+        )
+    ]
+    assert not violations, (
+        f"Violations detected in collection `{collection_info['atom_label']}`:\n"
+        + "\n".join(violations)
+    )
 
 
 class DebugManifest(object):
@@ -238,19 +287,18 @@ class PrebuildMap(object):
 
         return dep_atom_type in allowed_deps_types
 
-    def verify_dependency_relationships(self) -> int:
+    def verify_dependency_relationships(self) -> None:
         """Verifies relationships between IDK atoms.
 
         Verifies atom dependencies are of allowed types.
         TODO(https://fxbug.dev/419105478): Add category validation.
 
-        Returns:
-            0 on success, a positive integer on failure.
         """
         for atom_info in self._labels_map.values():
             if atom_info["atom_type"] == "none":
                 # A noop atom, such as "zircon_sdk" or a package that is not
                 # supported in the current API level.
+                assert "prebuild_info" not in atom_info
                 continue
             if "prebuild_info" not in atom_info:
                 # Atoms without prebuild info do not have deps.
@@ -276,8 +324,6 @@ class PrebuildMap(object):
                         dep_atom["atom_type"],
                     )
                 )
-
-        return 0
 
     class GetMetaResult(T.NamedTuple):
         """The result of a call to `get_meta()`.
@@ -892,7 +938,7 @@ class IdkGenerator(object):
         Must be called before other methods and may only be called one time.
 
         Args:
-            include_internal_atoms: Whether to includ atoms with category
+            include_internal_atoms: Whether to include atoms with category
               'internal'.
               TODO(https://fxbug.dev/333907192): Remove along with internal only IDK.
 
@@ -906,28 +952,35 @@ class IdkGenerator(object):
             and not self._package_atom_files
         )
 
-        result = self._prebuild_map.verify_dependency_relationships()
-        if result != 0:
-            return result, set()
+        # Relationships are verified for all atoms, not just those that are
+        # included in the collection.
+        # TODO(https://fxbug.dev/419105478): Rationalize this with the fact that
+        # other atom properties are only validated for atoms in the collection
+        # (in `_verify_collection()`).
+        self._prebuild_map.verify_dependency_relationships()
+
+        # Note: Due to the way the prebuild manifest is currently generated,
+        # any atom in the "partner" category that is a dependency of the IDK
+        # collection will be included in the IDK, even if it is an indirect
+        # dependency, such as within a prebuilt library.
+        # The IDK manifest golden build tests ensure any new IDK atoms that
+        # may result from this are caught.
+        allowed_categories = ["partner"]
+        if include_internal_atoms:
+            allowed_categories.append("internal")
+
+        atoms_in_collection = []
+        for info in self._prebuild_map.values():
+            if info["category"] not in allowed_categories:
+                continue
+            atoms_in_collection.append(info)
 
         unhandled_labels = set()
+        collection_info = None
         collection_parts: list[dict[str, T.Any]] = []
         all_additional_files_read: set[str] = set()
 
-        for info in self._prebuild_map.values():
-            # Note: Due to the way the prebuild manifest is currently generated,
-            # any atom in the "partner" category that is a dependency of the IDK
-            # collection will be included in the IDK, even if it is an indirect
-            # dependency, such as within a prebuilt library.
-            # The IDK manifest golden build tests ensure any new IDK atoms that
-            # may result from this are caught.
-            allowed_categories = ["partner"]
-            if include_internal_atoms:
-                allowed_categories.append("internal")
-
-            if info["category"] not in allowed_categories:
-                continue
-
+        for info in atoms_in_collection:
             (
                 meta_json,
                 additional_atom_files,
@@ -948,6 +1001,7 @@ class IdkGenerator(object):
                         not self.collection_meta_path
                     ), "More than one collection info provided."
                     self.collection_meta_path = meta_path
+                    collection_info = info
                 else:
                     collection_parts.append(
                         {
@@ -997,10 +1051,20 @@ class IdkGenerator(object):
             sorted(unhandled_labels)
         )
 
+        assert (
+            self.collection_meta_path and collection_info
+        ), "Collection info must be provided."
+        assert self._prebuild_map._fuchsia_source_dir
+
+        _verify_collection(
+            collection_info,
+            atoms_in_collection,
+            self._prebuild_map._fuchsia_source_dir,
+        )
+
         collection_parts.sort(key=lambda a: (a["meta"], a["type"]))
 
         # Populate the IDK manifest.
-        assert self.collection_meta_path, "Collection info must be provided."
         self._meta_files[self.collection_meta_path]["parts"] = collection_parts
         return 0, all_additional_files_read
 
