@@ -10,6 +10,10 @@ group("tests") {
   deps = [ ":starnix-nanohub-tests" ]
 }
 
+fuchsia_package_with_single_component("google_display") {
+  manifest = "meta/display.cml"
+}
+
 fuchsia_package_with_single_component("sockettunnel") {
   manifest = "meta/sockettunnel.cml"
 }

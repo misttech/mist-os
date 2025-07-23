@@ -147,6 +147,7 @@
                 "fuchsia.gpu.magma.TestService",
                 "fuchsia.gpu.magma.TrustedService",
                 "fuchsia.hardware.gnss.Service",
+                "fuchsia.hardware.google.nanohub.DisplayService",
                 "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.nfc.Service",

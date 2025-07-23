@@ -185,6 +185,13 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
+            from: "#fastrpc",
+            to: "#starnix_runner",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.hardware.google.nanohub.Device",
             from: "#nanohub",
             to: "#starnix_runner",
@@ -192,8 +199,8 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
-            from: "#fastrpc",
+            protocol: "fuchsia.hardware.google.nanohub.DisplayDevice",
+            from: "#display",
             to: "#starnix_runner",
             availability: "optional",
             source_availability: "unknown",

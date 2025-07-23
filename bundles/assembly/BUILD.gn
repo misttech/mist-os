@@ -2636,8 +2636,9 @@ assembly_input_bundle("fastbootd_usb_support") {
 #
 assembly_input_bundle("nanohub_support") {
   base_packages = [
-    "//src/starnix/modules/nanohub:sockettunnel",
+    "//src/starnix/modules/nanohub:google_display",
     "//src/starnix/modules/nanohub:google_nanohub",
+    "//src/starnix/modules/nanohub:sockettunnel",
   ]
   compiled_packages = [
     {
@@ -2646,8 +2647,9 @@ assembly_input_bundle("nanohub_support") {
         {
           component_name = "core"
           shards = [
-            "//src/starnix/modules/nanohub/meta/sockettunnel.core_shard.cml",
+            "//src/starnix/modules/nanohub/meta/display.core_shard.cml",
             "//src/starnix/modules/nanohub/meta/nanohub.core_shard.cml",
+            "//src/starnix/modules/nanohub/meta/sockettunnel.core_shard.cml",
           ]
         },
       ]

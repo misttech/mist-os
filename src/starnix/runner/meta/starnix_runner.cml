@@ -116,6 +116,7 @@
             protocol: [
                 "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.hardware.google.nanohub.Device",
+                "fuchsia.hardware.google.nanohub.DisplayDevice",
                 "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.policy.socketproxy.StarnixNetworks",
