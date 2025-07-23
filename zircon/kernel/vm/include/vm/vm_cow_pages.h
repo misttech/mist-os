@@ -262,25 +262,12 @@ class VmCowPages final : public VmHierarchyBase,
 
     bool source_is_suitable = page_source_->properties().is_preserving_page_content;
 
-    // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
-    // return false.  We could delete this bool without damaging correctness, but we want to
-    // mitigate a call site that maybe fails to check its call-site-specific settings such as
-    // is_borrowing_in_supplypages_enabled().
-    //
-    // We also don't technically need to check is_any_borrowing_enabled() here since pmm will check
-    // also, but by checking here, we minimize the amount of code that will run when
-    // !is_any_borrowing_enabled() (in case we have it disabled due to late discovery of a problem
-    // with borrowing).
-    bool borrowing_is_generally_acceptable =
-        PhysicalPageBorrowingConfig::Get().is_any_borrowing_enabled();
-
     // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
     // these from being compatible AFAICT - we're just avoiding overlap of these two things until
     // later.
     bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
 
-    return source_is_suitable && borrowing_is_generally_acceptable &&
-           !overlapping_with_other_features;
+    return source_is_suitable && !overlapping_with_other_features;
   }
 
   // In addition to whether a VmCowPages is allowed, for correctness reasons, to borrow pages there

@@ -21,15 +21,10 @@ class PhysicalPageBorrowingConfig {
 
   static PhysicalPageBorrowingConfig& Get() { return instance_; }
 
-  bool is_any_borrowing_enabled() {
-    return is_any_borrowing_enabled_.load(ktl::memory_order_relaxed);
-  }
-
   // true - allow page borrowing for newly-allocated pages of pager-backed VMOs
   // false - disallow any page borrowing for newly-allocated pages
   void set_borrowing_in_supplypages_enabled(bool enabled) {
     borrowing_in_supplypages_enabled_.store(enabled, ktl::memory_order_relaxed);
-    OnBorrowingSettingsChanged();
   }
   bool is_borrowing_in_supplypages_enabled() {
     return borrowing_in_supplypages_enabled_.load(ktl::memory_order_relaxed);
@@ -39,7 +34,6 @@ class PhysicalPageBorrowingConfig {
   // false - disallow page borrowing when a page is logically moved to MRU queue
   void set_borrowing_on_mru_enabled(bool enabled) {
     borrowing_on_mru_enabled_.store(enabled, ktl::memory_order_relaxed);
-    OnBorrowingSettingsChanged();
   }
   bool is_borrowing_on_mru_enabled() {
     return borrowing_on_mru_enabled_.load(ktl::memory_order_relaxed);
@@ -60,16 +54,8 @@ class PhysicalPageBorrowingConfig {
   bool is_replace_on_unloan_enabled() { return replace_on_unloan_.load(ktl::memory_order_relaxed); }
 
  private:
-  void OnBorrowingSettingsChanged() {
-    bool enabled = is_borrowing_in_supplypages_enabled() || is_borrowing_on_mru_enabled();
-    is_any_borrowing_enabled_.store(enabled, ktl::memory_order_relaxed);
-  }
-
   // Singleton.
   static PhysicalPageBorrowingConfig instance_;
-
-  // True iff any borrowing is enabled.
-  ktl::atomic<bool> is_any_borrowing_enabled_ = false;
 
   // Enable page borrowing by SupplyPages().  If this is false, no page borrowing will occur in
   // SupplyPages().  If this is true, SupplyPages() will copy supplied pages into borrowed pages.
