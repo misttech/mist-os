@@ -90,12 +90,6 @@ class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
         """Puts the device into fastboot mode before each test."""
         super().setup_test()
         self.device.fastboot.boot_to_fastboot_mode()
-        # `fastboot devices` sometimes lists a device before it's fully
-        # connected, so rarely our first command we send might report
-        # `< waiting for [serial]>` while fastboot finishes connecting. Issue
-        # an initial command here to ensure the device is ready so we don't have
-        # to worry about this case when parsing output (b/419262916).
-        self.device.fastboot.run(["getvar", "serialno"])
 
     def teardown_test(self) -> None:
         """Puts the device back into Fuchsia mode after each test."""
@@ -109,14 +103,22 @@ class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
         # value is what we expect.
         logging.info("Checking `getvar` variables")
         for expected_name, expected_values in _REQUIRED_VARS.items():
-            output = self.device.fastboot.run(["getvar", expected_name])
-            asserts.assert_equal(
-                len(output),
-                1,
-                "getvar output should only be a single line",
-                extras={"output": output},
-            )
-            name, value = parse_getvar(output[0])
+            lines = self.device.fastboot.run(["getvar", expected_name])
+
+            if len(lines) == 1:
+                output = lines[0]
+            elif len(lines) == 2 and "waiting for" in lines[0]:
+                # The infra devices seem to occasionally drop off fastboot for short
+                # periods of time, and if we query them during this time we get an
+                # initial "<waiting for _serial_>" line (b/419262916). This is
+                # harmless, so just skip this line if we see it.
+                output = lines[1]
+            else:
+                asserts.fail(
+                    "Unexpected getvar output",
+                    extras={"lines": lines},
+                )
+            name, value = parse_getvar(output)
 
             asserts.assert_equal(
                 name, expected_name, "getvar name doesn't match expected"
