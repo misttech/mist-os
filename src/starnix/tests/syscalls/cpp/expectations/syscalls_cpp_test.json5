@@ -34,10 +34,6 @@
                 // TODO(https://fxbug.dev/351037863)
                 "AshmemTest.SetNameOverflow",
 
-                // TODO(https://fxbug.dev/433713111)
-                "CapDacTest.NonOwnerCanReadAndTraverseDirectoryWithDacOverrideOrReadSearch",
-                "CapDacTest.NonOwnerCanReadFileWithDacOverrideOrReadSearch",
-
                 // TODO(https://fxbug.dev/297438799)
                 "MmapTest.CanMprotectNonExecMmapToExecutable",
 

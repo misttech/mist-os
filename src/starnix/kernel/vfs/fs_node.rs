@@ -34,8 +34,8 @@ use starnix_types::ownership::{Releasable, ReleaseGuard};
 use starnix_types::time::{timespec_from_time, NANOS_PER_SECOND};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
-    FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
-    CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
+    FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH, CAP_FOWNER,
+    CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES, ENOTSUP};
@@ -2694,27 +2694,52 @@ fn check_access(
     node_gid: gid_t,
     mode: FileMode,
 ) -> Result<(), Errno> {
-    let mode_bits = mode.bits();
-    let mode_rwx_bits = if current_task.current_creds().fsuid == node_uid {
-        (mode_bits & 0o700) >> 6
+    // Determine which of the access bits apply to the `current_task`.
+    let granted = if current_task.current_creds().fsuid == node_uid {
+        mode.user_access()
     } else if current_task.current_creds().is_in_group(node_gid) {
-        (mode_bits & 0o070) >> 3
+        mode.group_access()
     } else {
-        mode_bits & 0o007
+        mode.other_access()
     };
-    if (access.rwx_bits() as u32 & mode_rwx_bits) == access.rwx_bits() as u32 {
+    if granted.contains(access) {
         return Ok(());
     }
-    let capability_check_mode_rwx_bits = if mode.is_dir() {
-        0o7
-    } else {
-        // At least one of the EXEC bits must be set to execute files.
-        0o6 | (mode_bits & 0o100) >> 6 | (mode_bits & 0o010) >> 3 | mode_bits & 0o001
-    };
-    if (capability_check_mode_rwx_bits & access.rwx_bits() as u32) != access.rwx_bits() as u32 {
-        return error!(EACCES);
+
+    // Callers with CAP_DAC_READ_SOURCE override can read files & directories, and traverse directories to which they lack permission.
+    let mut requested = access & !granted;
+
+    // CAP_DAC_READ_SEARCH allows bypass of read checks, and directory traverse (eXecute) checks.
+    let dac_read_search_access =
+        if mode.is_dir() { Access::READ | Access::EXEC } else { Access::READ };
+    if dac_read_search_access.intersects(requested)
+        && security::check_task_capable(current_task, CAP_DAC_READ_SEARCH).is_ok()
+    {
+        requested.remove(dac_read_search_access);
     }
-    security::check_task_capable(current_task, CAP_DAC_OVERRIDE).map_err(|_| errno!(EACCES))
+    if requested.is_empty() {
+        return Ok(());
+    }
+
+    // CAP_DAC_OVERRIDE allows bypass of all checks (though see the comment for file-execute).
+    let dac_override_access = Access::READ
+        | Access::WRITE
+        | if mode.is_dir() {
+            Access::EXEC
+        } else {
+            // File execute access checks may not be bypassed unless at least one executable bit is set.
+            (mode.user_access() | mode.group_access() | mode.other_access()) & Access::EXEC
+        };
+    if dac_override_access.intersects(requested)
+        && security::check_task_capable(current_task, CAP_DAC_OVERRIDE).is_ok()
+    {
+        requested.remove(dac_override_access);
+    }
+    if requested.is_empty() {
+        return Ok(());
+    }
+
+    return error!(EACCES);
 }
 
 #[cfg(test)]

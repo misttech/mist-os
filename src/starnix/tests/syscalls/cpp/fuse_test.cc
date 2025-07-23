@@ -1232,12 +1232,13 @@ TEST_F(FuseServerTest, RevalidateEnoent) {
   }
 }
 
-// Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
-// capability which bypasses file permission checks. See capabilities(7).
+// Run the checks in a separate thread where we drop the capabilities which bypasses discretionary
+// file permission checks. See capabilities(7).
 template <typename F>
 void InThreadWithoutCapDacOverride(F f) {
   std::thread thrd([&]() {
     test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_DAC_READ_SEARCH);
 
     f();
   });
