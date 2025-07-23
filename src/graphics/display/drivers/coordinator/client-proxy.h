@@ -56,9 +56,11 @@ class ClientProxy {
                               fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
                                   coordinator_listener_client_end);
 
-  // Schedule a task on the controller loop to close this ClientProxy and
-  // have it be freed.
-  void CloseOnControllerLoop();
+  // Schedule a task to tear down the `Client` instance on the driver
+  // dispatcher.
+  //
+  // Caller must guarantee the dispatcher is running.
+  void TearDownOnDriverDispatcher();
 
   // Requires holding `controller_.mtx()` lock.
   zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,

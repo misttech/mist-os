@@ -141,7 +141,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
 }
 
 void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info) {
-  ZX_DEBUG_ASSERT(IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(IsRunningOnDriverDispatcher());
 
   zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
@@ -192,7 +192,7 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
 }
 
 void Controller::RemoveDisplay(display::DisplayId removed_display_id) {
-  ZX_DEBUG_ASSERT(IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(IsRunningOnDriverDispatcher());
 
   fbl::AutoLock lock(mtx());
   std::unique_ptr<DisplayInfo> removed_display = displays_.erase(removed_display_id);
@@ -231,7 +231,7 @@ void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* b
       std::move(added_display_info_result).value();
 
   zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *client_dispatcher()->async_dispatcher(),
+      *driver_dispatcher()->async_dispatcher(),
       [this, added_display_info = std::move(added_display_info)]() mutable {
         AddDisplay(std::move(added_display_info));
       });
@@ -244,7 +244,7 @@ void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id
   display::DisplayId removed_display_id = display::DisplayId(banjo_display_id);
 
   zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *client_dispatcher()->async_dispatcher(),
+      *driver_dispatcher()->async_dispatcher(),
       [this, removed_display_id]() { RemoveDisplay(removed_display_id); });
   if (post_task_result.is_error()) {
     fdf::error("Failed to dispatch RemoveDisplay task: {}", post_task_result);
@@ -261,7 +261,7 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
   }
 
   zx::result<> post_task_result =
-      display::PostTask<kDisplayTaskTargetSize>(*client_dispatcher()->async_dispatcher(), [this]() {
+      display::PostTask<kDisplayTaskTargetSize>(*driver_dispatcher()->async_dispatcher(), [this]() {
         // Free an image that was previously used by the hardware.
         if (pending_release_capture_image_id_ != display::kInvalidDriverCaptureImageId) {
           ReleaseCaptureImage(pending_release_capture_image_id_);
@@ -311,7 +311,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   if (!displays_it.IsValid()) {
     // TODO(https://fxbug.dev/399886375): This logging is racy. It is possible
     // that DisplayEngineListenerOnDisplayAdded() was called, but the event
-    // wasn't processed on the Coordinator's client dispatcher yet. This means we can
+    // wasn't processed on the Coordinator's driver dispatcher yet. This means we can
     // discard the VSync, as it can't possibly report a configuration applied by
     // Coordinator clients.
     fdf::error("Received VSync for unknown display ID: {}", display_id.value());
@@ -723,7 +723,7 @@ zx_status_t Controller::CreateClient(
   HandleClientOwnershipChanges();
 
   zx::result<> post_task_result = display::PostTask(
-      std::move(post_task_state), *client_dispatcher()->async_dispatcher(), [this, client_id]() {
+      std::move(post_task_state), *driver_dispatcher()->async_dispatcher(), [this, client_id]() {
         fbl::AutoLock lock(mtx());
         if (unbinding_) {
           return;
@@ -850,7 +850,7 @@ void Controller::PrepareStop() {
     // Tell each client to start releasing. We know `clients_` will not be
     // modified here because we are holding the lock.
     for (auto& client : clients_) {
-      client->CloseOnControllerLoop();
+      client->TearDownOnDriverDispatcher();
     }
 
     vsync_monitor_.Deinitialize();
@@ -881,12 +881,12 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
 }
 
 Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                       fdf::UnownedSynchronizedDispatcher client_dispatcher,
+                       fdf::UnownedSynchronizedDispatcher driver_dispatcher,
                        inspect::Inspector inspector)
     : inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
-      client_dispatcher_(std::move(client_dispatcher)),
-      vsync_monitor_(root_.CreateChild("vsync_monitor"), client_dispatcher_->async_dispatcher()),
+      driver_dispatcher_(std::move(driver_dispatcher)),
+      vsync_monitor_(root_.CreateChild("vsync_monitor"), driver_dispatcher_->async_dispatcher()),
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
 

@@ -64,8 +64,8 @@ class FakeDisplayStack {
   std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_;
   std::unique_ptr<SysmemServiceProvider> sysmem_service_provider_;
 
-  fdf::SynchronizedDispatcher coordinator_client_dispatcher_;
-  libsync::Completion coordinator_client_dispatcher_is_shut_down_;
+  fdf::SynchronizedDispatcher coordinator_driver_dispatcher_;
+  libsync::Completion coordinator_driver_dispatcher_is_shut_down_;
 
   display::DisplayEngineEventsBanjo engine_events_;
   std::unique_ptr<FakeDisplay> display_engine_;

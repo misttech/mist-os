@@ -39,12 +39,12 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
                                           "display-client-loop",
                                           [this](fdf_dispatcher_t* dispatcher) {
-                                            coordinator_client_dispatcher_is_shut_down_.Signal();
+                                            coordinator_driver_dispatcher_is_shut_down_.Signal();
                                           });
   if (create_dispatcher_result.is_error()) {
     ZX_PANIC("Failed to create dispatcher: %s", create_dispatcher_result.status_string());
   }
-  coordinator_client_dispatcher_ = std::move(create_dispatcher_result).value();
+  coordinator_driver_dispatcher_ = std::move(create_dispatcher_result).value();
 
   const display_engine_protocol_t display_engine_protocol = banjo_adapter_->GetProtocol();
   ddk::DisplayEngineProtocolClient display_engine_client(&display_engine_protocol);
@@ -52,7 +52,7 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
       std::make_unique<display_coordinator::EngineDriverClient>(display_engine_client);
   zx::result<std::unique_ptr<display_coordinator::Controller>> create_controller_result =
       display_coordinator::Controller::Create(std::move(engine_driver_client),
-                                              coordinator_client_dispatcher_.borrow());
+                                              coordinator_driver_dispatcher_.borrow());
   if (create_controller_result.is_error()) {
     ZX_PANIC("Failed to create display coordinator Controller device: %s",
              create_controller_result.status_string());
@@ -60,9 +60,8 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   coordinator_controller_ = std::move(create_controller_result).value();
 
   auto display_endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
-  fidl::BindServer(display_loop_.dispatcher(), std::move(display_endpoints->server),
-                   coordinator_controller_.get());
-  display_loop_.StartThread("display-server-thread");
+  fidl::BindServer(coordinator_driver_dispatcher_.async_dispatcher(),
+                   std::move(display_endpoints->server), coordinator_controller_.get());
   display_provider_client_ = fidl::WireSyncClient<fuchsia_hardware_display::Provider>(
       std::move(display_endpoints->client));
 }
@@ -109,14 +108,16 @@ void FakeDisplayStack::SyncShutdown() {
   }
   shutdown_ = true;
 
-  // Stop serving display loop so that the device can be safely torn down.
-  display_loop_.Shutdown();
-  display_loop_.JoinThreads();
+  libsync::Completion prepare_stop_completed;
+  zx_status_t post_status = async::PostTask(coordinator_driver_dispatcher_.async_dispatcher(), [&] {
+    coordinator_controller_->PrepareStop();
+    prepare_stop_completed.Signal();
+  });
+  ZX_ASSERT(post_status == ZX_OK);
+  prepare_stop_completed.Wait();
 
-  coordinator_controller_->PrepareStop();
-
-  coordinator_client_dispatcher_.ShutdownAsync();
-  coordinator_client_dispatcher_is_shut_down_.Wait();
+  coordinator_driver_dispatcher_.ShutdownAsync();
+  coordinator_driver_dispatcher_is_shut_down_.Wait();
 
   coordinator_controller_->Stop();
   coordinator_controller_.reset();

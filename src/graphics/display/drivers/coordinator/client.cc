@@ -1062,7 +1062,7 @@ void Client::ReapplyConfig() {
 }
 
 void Client::ApplyConfigImpl() {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig internal");
 
   ZX_DEBUG_ASSERT_MSG(!layers_.is_empty(), "Empty layers during ApplyConfigImpl");
@@ -1146,7 +1146,7 @@ void Client::ApplyConfigImpl() {
 }
 
 void Client::SetOwnership(bool is_owner) {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   is_owner_ = is_owner;
 
   fidl::Status result = NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
@@ -1207,7 +1207,7 @@ fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time_monoton
 
 void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                                std::span<const display::DisplayId> removed_display_ids) {
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
 
   controller_.AssertMtxAliasHeld(*controller_.mtx());
   for (display::DisplayId added_display_id : added_display_ids) {
@@ -1393,7 +1393,7 @@ void Client::TearDown(zx_status_t epitaph) {
   TRACE_DURATION("gfx", "Display::Client::TearDown");
   fdf::info("Tearing down Client 0x{:x} (ID = {})", reinterpret_cast<uintptr_t>(this), id_.value());
 
-  ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
+  ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   draft_display_config_was_validated_ = false;
 
   // See `fuchsia.hardware.display/Coordinator` protocol documentation in `coordinator.fidl`,
@@ -1546,11 +1546,11 @@ void Client::Bind(
   valid_ = true;
 
   // Keep a copy of FIDL binding so we can safely unbind from it during shutdown.
-  binding_ = fidl::BindServer(controller_.client_dispatcher()->async_dispatcher(),
+  binding_ = fidl::BindServer(controller_.driver_dispatcher()->async_dispatcher(),
                               std::move(coordinator_server_end), this, std::move(unbound_callback));
 
   coordinator_listener_.Bind(std::move(coordinator_listener_client_end),
-                             controller_.client_dispatcher()->async_dispatcher());
+                             controller_.driver_dispatcher()->async_dispatcher());
 }
 
 Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
@@ -1559,7 +1559,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       proxy_(proxy),
       priority_(priority),
       id_(client_id),
-      fences_(controller->client_dispatcher()->async_dispatcher(),
+      fences_(controller->driver_dispatcher()->async_dispatcher(),
               fit::bind_member<&Client::OnFenceFired>(this)) {
   ZX_DEBUG_ASSERT(controller);
   ZX_DEBUG_ASSERT(proxy);

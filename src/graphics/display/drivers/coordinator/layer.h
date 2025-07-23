@@ -173,8 +173,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::LayerId> {
   // Manages images which are waiting to be displayed. Each one has an optional wait fence which
   // may not have been signaled yet.
   //
-  // Must be accessed on `controller_`'s client dispatcher loop. Call-sites must guarantee this via
-  // `ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher())`.
+  // Must be accessed on `controller_`'s driver dispatcher loop. Call-sites must guarantee this via
+  // `ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher())`.
   WaitingImageList waiting_images_;
 
   fbl::RefPtr<Image> applied_image_;

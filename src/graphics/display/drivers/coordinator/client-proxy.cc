@@ -69,7 +69,7 @@ void ClientProxy::SetOwnership(bool is_owner) {
     client_scheduled_tasks_.erase(it);
   });
   fbl::AutoLock task_lock(&task_mtx_);
-  if (task->Post(controller_.client_dispatcher()->async_dispatcher()) == ZX_OK) {
+  if (task->Post(controller_.driver_dispatcher()->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
 }
@@ -110,7 +110,7 @@ void ClientProxy::ReapplyConfig() {
     client_scheduled_tasks_.erase(it);
   });
   fbl::AutoLock task_lock(&task_mtx_);
-  if (task->Post(controller_.client_dispatcher()->async_dispatcher()) == ZX_OK) {
+  if (task->Post(controller_.driver_dispatcher()->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
 }
@@ -274,15 +274,12 @@ sync_completion_t* ClientProxy::FidlUnboundCompletionForTesting() {
 
 void ClientProxy::CloseForTesting() { handler_.TearDownForTesting(); }
 
-void ClientProxy::CloseOnControllerLoop() {
-  // Tasks only fail to post if the looper is dead. That can happen if the
-  // controller is unbinding and shutting down active clients, but if it does
-  // then it's safe to call Reset on this thread anyway.
-  [[maybe_unused]] zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *controller_.client_dispatcher()->async_dispatcher(),
-      // `Client::TearDown()` must be called even if the task fails to post.
-      [_ = display::CallFromDestructor(
-           [this]() { handler_.TearDown(ZX_ERR_CONNECTION_ABORTED); })]() {});
+void ClientProxy::TearDownOnDriverDispatcher() {
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *controller_.driver_dispatcher()->async_dispatcher(),
+      [this]() { handler_.TearDown(ZX_ERR_CONNECTION_ABORTED); });
+  ZX_DEBUG_ASSERT_MSG(post_task_result.is_ok(), "Failed to post TearDown task: %s",
+                      post_task_result.status_string());
 }
 
 zx_status_t ClientProxy::Init(
@@ -301,11 +298,16 @@ zx_status_t ClientProxy::Init(
   fidl::OnUnboundFn<Client> unbound_callback =
       [this](Client* client, fidl::UnbindInfo info,
              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
+        ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
+
         sync_completion_signal(&fidl_unbound_completion_);
-        // Make sure we `TearDown()` so that no further tasks are scheduled on the controller loop.
+
+        // Make sure we `TearDown()` so that no further tasks are scheduled on
+        // the driver dispatcher.
         client->TearDown(ZX_OK);
 
-        // The client has died. Notify the proxy, which will free the classes.
+        // The client has died. Notify the proxy, which will free the Client
+        // instance.
         OnClientDead();
       };
 

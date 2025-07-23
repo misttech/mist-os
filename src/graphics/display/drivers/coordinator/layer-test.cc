@@ -67,14 +67,14 @@ class LayerTest : public TestBase {
   }
 
   // Helper method that returns a unique_ptr with a custom deleter which destroys the layer on the
-  // controller loop, as required by the Layer destructor.
+  // driver dispatcher, as required by the Layer destructor.
   //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
+  // Must not be called on the driver dispatcher, otherwise deadlock is guaranteed.
   std::unique_ptr<Layer, std::function<void(Layer*)>> CreateLayerForTest(
       display::LayerId layer_id) {
     auto deleter = [this](Layer* layer) {
       libsync::Completion completion;
-      async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(),
+      async::PostTask(CoordinatorController()->driver_dispatcher()->async_dispatcher(),
                       [&completion, layer]() {
                         delete layer;
                         completion.Signal();
@@ -85,25 +85,25 @@ class LayerTest : public TestBase {
                                                      std::move(deleter));
   }
 
-  // Helper struct for `RunOnControllerLoop()`.  `std::optional<void>` is illegal, so we need our
+  // Helper struct for `RunOnDriverDispatcher()`.  `std::optional<void>` is illegal, so we need our
   // own structs, one for each of the void and non-void cases.
   //
   // Note: T must be default-constructable.  This is for simplicity, and meets current use cases.
   template <typename T>
-  struct RunOnControllerLoopResultHolder {
+  struct RunOnDriverDispatcherResultHolder {
     T value;
   };
 
   // Specialization for void return type.
   template <>
-  struct RunOnControllerLoopResultHolder<void> {};
+  struct RunOnDriverDispatcherResultHolder<void> {};
 
   template <typename ReturnType>
-  ReturnType RunOnControllerLoop(std::function<ReturnType()> func) {
-    RunOnControllerLoopResultHolder<ReturnType> result;
+  ReturnType RunOnDriverDispatcher(std::function<ReturnType()> func) {
+    RunOnDriverDispatcherResultHolder<ReturnType> result;
     libsync::Completion completion;
 
-    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
+    async::PostTask(CoordinatorController()->driver_dispatcher()->async_dispatcher(), [&]() {
       if constexpr (std::is_same_v<ReturnType, void>) {
         func();
       } else {
@@ -159,32 +159,32 @@ TEST_F(LayerTest, CleanUpImage) {
   layer->SetImage(displayed_image, display::kInvalidEventId);
   layer->ApplyChanges();
 
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  RunOnDriverDispatcher<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
   auto fence_release = fit::defer([this, kWaitFenceId] {
-    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+    RunOnDriverDispatcher<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
   });
 
   auto waiting_image = CreateReadyImage();
   layer->SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto draft_image = CreateReadyImage();
   layer->SetImage(draft_image, display::kInvalidEventId);
 
-  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
   EXPECT_TRUE(layer->applied_image());
 
   // Nothing should happen if image doesn't match.
   auto not_matching_image = CreateReadyImage();
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
     fbl::AutoLock lock(CoordinatorController()->mtx());
     CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
     return layer->CleanUpImage(*not_matching_image);
@@ -192,7 +192,7 @@ TEST_F(LayerTest, CleanUpImage) {
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up a waiting image.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
     fbl::AutoLock lock(CoordinatorController()->mtx());
     CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
     return layer->CleanUpImage(*waiting_image);
@@ -200,7 +200,7 @@ TEST_F(LayerTest, CleanUpImage) {
   EXPECT_TRUE(layer->applied_image());
 
   // Test cleaning up a draft image.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
     fbl::AutoLock lock(CoordinatorController()->mtx());
     CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
     return layer->CleanUpImage(*draft_image);
@@ -211,7 +211,7 @@ TEST_F(LayerTest, CleanUpImage) {
   //
   // The layer is not in a display's applied configuration list. So, cleaning up
   // the layer's image doesn't change the applied config.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
     fbl::AutoLock lock(CoordinatorController()->mtx());
     CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
     return layer->CleanUpImage(*displayed_image);
@@ -238,14 +238,14 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
     // The layer is not in a display's applied configuration list. So, cleaning
     // up the layer's image doesn't change the applied config.
-    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
       fbl::AutoLock lock(CoordinatorController()->mtx());
       CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
       return layer->CleanUpImage(*image);
@@ -260,15 +260,15 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
 
     // The layer is in a display's applied configuration list. So, cleaning up
     // the layer's image changes the applied config.
-    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
+    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() {
       fbl::AutoLock lock(CoordinatorController()->mtx());
       CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
       return layer->CleanUpImage(*image);
@@ -294,30 +294,30 @@ TEST_F(LayerTest, CleanUpAllImages) {
   auto displayed_image = CreateReadyImage();
   layer->SetImage(displayed_image, display::kInvalidEventId);
   layer->ApplyChanges();
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  RunOnDriverDispatcher<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
   auto fence_release = fit::defer([this, kWaitFenceId] {
-    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+    RunOnDriverDispatcher<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
   });
 
   auto waiting_image = CreateReadyImage();
   layer->SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(RunOnControllerLoop<bool>(
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>(
       [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto draft_image = CreateReadyImage();
   layer->SetImage(draft_image, display::kInvalidEventId);
 
-  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+  ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
   // The layer is not in a display's applied configuration list. So, cleaning
   // up the layer's image doesn't change the applied config.
-  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+  EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
     fbl::AutoLock lock(CoordinatorController()->mtx());
     CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
     return layer->CleanUpAllImages();
@@ -344,14 +344,14 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
     // The layer is not in a display's applied configuration list. So, cleaning
     // up the layer's image doesn't change the applied config.
-    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    EXPECT_FALSE(RunOnDriverDispatcher<bool>([&]() {
       fbl::AutoLock lock(CoordinatorController()->mtx());
       CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
       return layer->CleanUpAllImages();
@@ -366,14 +366,14 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
-    ASSERT_TRUE(RunOnControllerLoop<bool>(
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>(
         [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
-    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
+    ASSERT_TRUE(RunOnDriverDispatcher<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
     // The layer is in a display's applied configuration list. So, cleaning up
     // the layer's image changes the applied config.
-    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
+    EXPECT_TRUE(RunOnDriverDispatcher<bool>([&]() {
       fbl::AutoLock lock(CoordinatorController()->mtx());
       CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
       return layer->CleanUpAllImages();

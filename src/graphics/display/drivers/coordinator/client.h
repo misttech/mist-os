@@ -47,8 +47,8 @@ class ClientProxy;
 
 // Manages the state associated with a display coordinator client connection.
 //
-// This class is not thread-safe. After initialization, all methods must be
-// executed on the same thread.
+// This class is not thread-safe. The constructor, destructor and all methods
+// must run on the coordinator driver dispatcher.
 class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
  public:
   // `controller` must outlive both this client and `proxy`.
