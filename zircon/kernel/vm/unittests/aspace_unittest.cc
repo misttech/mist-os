@@ -757,29 +757,23 @@ static bool vmaspace_merge_mapping_test() {
           // Validate sizes to ensure any expected merging happened.
           for (int j = 0; j < 3; j++) {
             if (test.mappings[j].vmo) {
-              EXPECT_EQ(mappings[j]->size_locking(), expected_size[j]);
-              if (expected_size[j] == 0) {
-                EXPECT_EQ(nullptr, mappings[j]->vmo().get());
-              } else {
-                EXPECT_EQ(mappings[j]->vmo().get(), test.mappings[j].vmo.get());
+              Guard<CriticalMutex> guard{vmar->lock()};
+              VmMapping* map = vmar->FindMappingLocked(test.mappings[j].vmar_offset + vmar->base());
+              ASSERT_NONNULL(map);
+              AssertHeld(map->lock_ref());
+              if (expected_size[j] != 0) {
+                EXPECT_EQ(map->size_locked(), expected_size[j]);
+                EXPECT_EQ(map->base_locked(), vmar->base_locked() + test.mappings[j].vmar_offset);
               }
-              EXPECT_EQ(mappings[j]->base_locking(),
-                        vmar->base_locking() + test.mappings[j].vmar_offset);
             }
           }
         }
 
         // Destroy any mappings and VMARs.
         for (int i = 0; i < 3; i++) {
-          if (mappings[i]) {
-            if (merge_result[i] == MERGES_LEFT) {
-              EXPECT_EQ(mappings[i]->Destroy(), ZX_ERR_BAD_STATE);
-            } else {
-              EXPECT_EQ(mappings[i]->Destroy(), ZX_OK);
-            }
-          }
-          if (vmars[i]) {
-            EXPECT_OK(vmars[i]->Destroy());
+          if (test.mappings[i].vmo) {
+            EXPECT_OK(vmar->Unmap(vmar->base() + test.mappings[i].vmar_offset, PAGE_SIZE,
+                                  VmAddressRegionOpChildren::Yes));
           }
         }
       }

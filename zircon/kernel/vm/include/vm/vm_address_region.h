@@ -1121,7 +1121,7 @@ class VmMapping final : public VmAddressRegionOrMapping {
   // the region via the parent vmar in the future, and so the region merely needs to remain valid
   // through some VmMapping.
   // For this the function requires you to hand in your last remaining refptr to the mapping.
-  static void MarkMergeable(fbl::RefPtr<VmMapping>&& mapping);
+  static void MarkMergeable(fbl::RefPtr<VmMapping> mapping);
 
   // Used to cache the memory attribution counts for this vmo range. Also tracks the vmo hierarchy
   // generation count and the mapping generation count at the time of caching the attribution

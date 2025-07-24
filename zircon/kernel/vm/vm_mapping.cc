@@ -1387,7 +1387,7 @@ void VmMapping::TryMergeNeighborsLocked() {
   }
 }
 
-void VmMapping::MarkMergeable(fbl::RefPtr<VmMapping>&& mapping) {
+void VmMapping::MarkMergeable(fbl::RefPtr<VmMapping> mapping) {
   Guard<CriticalMutex> guard{mapping->lock()};
   // Now that we have the lock check this mapping is still alive and we haven't raced with some
   // kind of destruction.
