@@ -8,7 +8,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/scenic_unittests",
+        binary: "bin/scenic_shutdown_unittests",
     },
     children: [
         {

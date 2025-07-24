@@ -2,13 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Included as part of //src/ui/scenic/lib/scenic/tests:unittests, rather than packaging as a
-# separate executable.
-source_set("unittests") {
+import("//build/testing/cc_test_executable.gni")
+
+cc_test_executable("unittests") {
+  output_name = "scenic_shutdown_unittests"
   testonly = true
   sources = [ "shutdown_unittest.cc" ]
   deps = [
-    "//src/lib/testing/loop_fixture",
+    "//sdk/lib/sys/cpp/testing:cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture:gtest",
     "//src/ui/scenic/lib/shutdown",
   ]
 }

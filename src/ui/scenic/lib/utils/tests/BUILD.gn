@@ -25,7 +25,7 @@ source_set("testing_deps") {
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fxl",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/scenic/lib/scenic",
+    "//src/ui/scenic/lib/scenic:event_reporter",
     "//src/ui/scenic/lib/scenic/util",
     "//src/ui/scenic/lib/utils",
     "//third_party/googletest:gtest",
