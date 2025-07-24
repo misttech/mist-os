@@ -56,7 +56,7 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
   for (unsigned i = 0; i < region_configs.size(); i++) {
     zx_iob_region_t region_config = region_configs[i];
     fbl::RefPtr<VmObjectPaged> vmo;
-    zx_koid_t koid = KernelObjectId::Generate();
+    zx_koid_t vmo_user_id;
     fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region;
 
     switch (region_config.type) {
@@ -79,7 +79,8 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
         // the maximum possible VMO size if ZX_VMO_UNBOUNDED is used. We need to know the actual
         // size of the vmo to later return if asked.
         region_config.size = stats.size;
-        vmo->set_user_id(koid);
+        vmo_user_id = KernelObjectId::Generate();
+        vmo->set_user_id(vmo_user_id);
         break;
       }
 
@@ -103,6 +104,9 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
           return zx::error(ZX_ERR_INVALID_ARGS);
         }
 
+        // For memory attribution to work correctly, we need to use the same koid for all IOBuffers
+        // that use this shared region.
+        vmo_user_id = shared_region->get_koid();
         break;
       }
 
@@ -147,8 +151,8 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
       return zx::error(status);
     }
 
-    ep0_reference->set_user_id(koid);
-    ep1_reference->set_user_id(koid);
+    ep0_reference->set_user_id(vmo_user_id);
+    ep1_reference->set_user_id(vmo_user_id);
 
     // Now each endpoint can observe the mappings created by the other
     ep0_reference->SetChildObserver(ep1);
@@ -156,7 +160,7 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
 
     if (zx::result result =
             CreateIobRegionVariant(ktl::move(ep0_reference), ktl::move(ep1_reference),
-                                   ktl::move(vmo), region_config, koid, shared_region);
+                                   ktl::move(vmo), region_config, vmo_user_id, shared_region);
         result.is_error()) {
       return result.take_error();
     } else {
@@ -407,7 +411,7 @@ zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRe
     fbl::RefPtr<VmObject> ep1_vmo,     //
     fbl::RefPtr<VmObject> kernel_vmo,  //
     const zx_iob_region_t& region,     //
-    zx_koid_t koid,                    //
+    zx_koid_t vmo_user_id,             //
     fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region) {
   constexpr zx_iob_access_t kEp0MedR = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ;
   constexpr zx_iob_access_t kEp0MedW = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE;
@@ -437,7 +441,8 @@ zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRe
         // NONE type discipline does not support mediated access.
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
-      variant = IobRegionNone{ktl::move(ep0_vmo), ktl::move(ep1_vmo), nullptr, 0, region, koid};
+      variant =
+          IobRegionNone{ktl::move(ep0_vmo), ktl::move(ep1_vmo), nullptr, 0, region, vmo_user_id};
       break;
     case ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR: {
       // For now, disallow shared regions. This can be relaxed as and when need arises.
@@ -466,7 +471,8 @@ zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRe
       }
 
       IobRegionIdAllocator allocator(ktl::move(ep0_vmo), ktl::move(ep1_vmo),
-                                     ktl::move(mapping->mapping), mapping->base, region, koid);
+                                     ktl::move(mapping->mapping), mapping->base, region,
+                                     vmo_user_id);
       if (zx::result result = allocator.Init(); result.is_error()) {
         return result.take_error();
       }
@@ -479,7 +485,7 @@ zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRe
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
       variant = IobRegionMediatedWriteRingBuffer(
-          ktl::move(ep0_vmo), ktl::move(ep1_vmo), region, koid, shared_region,
+          ktl::move(ep0_vmo), ktl::move(ep1_vmo), region, vmo_user_id, shared_region,
           // TODO(https://fxbug.dev/319500512): Remove the cast when we move it out of vdso next.
           reinterpret_cast<const zx_iob_discipline_mediated_write_ring_buffer_t*>(
               region.discipline.reserved)

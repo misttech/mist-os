@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <cstring>
 #include <thread>
+#include <unordered_set>
 
 #include <zxtest/zxtest.h>
 
@@ -1677,6 +1678,106 @@ TEST(Iob, IobWriteMultiThreaded) {
   thread2.join();
 
   EXPECT_EQ(phead, ptail);
+}
+
+TEST(Iob, VmoKoid) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE | kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+
+  // Capture the process VMOs before creating the IOBuffer.
+  std::vector<zx_info_vmo> vmos(16);
+
+  auto read_process_vmos = [&] {
+    for (;;) {
+      size_t actual, avail;
+      ASSERT_OK(zx::process::self()->get_info(ZX_INFO_PROCESS_VMOS, vmos.data(),
+                                              vmos.size() * sizeof(zx_info_vmo), &actual, &avail));
+      if (actual == avail) {
+        break;
+      }
+      vmos.resize(avail + 16);
+    }
+  };
+
+  read_process_vmos();
+
+  // Record all the unique koids we find.
+  std::unordered_set<zx_koid_t> koids;
+  for (const auto& vmo : vmos) {
+    koids.insert(vmo.koid);
+  }
+
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  zx_iob_region_info_t region_info;
+  size_t actual, avail;
+  ASSERT_OK(ep0.get_info(ZX_INFO_IOB_REGIONS, &region_info, sizeof(region_info), &actual, &avail));
+  ASSERT_EQ(actual, 1);
+
+  // It should be a new koid.
+  EXPECT_FALSE(koids.contains(region_info.koid));
+  koids.insert(region_info.koid);
+
+  const zx_koid_t shared_region_koid = region_info.koid;
+
+  // Makes sure it's reported in the process list.
+  read_process_vmos();
+  bool found = false;
+  for (const auto& vmo : vmos) {
+    if (vmo.koid == region_info.koid) {
+      found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found);
+
+  // Create many more IOBuffers, and check that they all use the same koid.
+  std::vector<std::pair<zx::iob, zx::iob>> iobs;
+  for (int i = 0; i < 500; ++i) {
+    zx::iob ep0, ep1;
+    ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+    zx_iob_region_info_t region_info;
+    size_t actual, avail;
+    ASSERT_OK(
+        ep0.get_info(ZX_INFO_IOB_REGIONS, &region_info, sizeof(region_info), &actual, &avail));
+    ASSERT_EQ(actual, 1);
+    EXPECT_EQ(region_info.koid, shared_region_koid);
+
+    ASSERT_OK(
+        ep1.get_info(ZX_INFO_IOB_REGIONS, &region_info, sizeof(region_info), &actual, &avail));
+    ASSERT_EQ(actual, 1);
+    EXPECT_EQ(region_info.koid, shared_region_koid);
+
+    iobs.push_back(std::make_pair(std::move(ep0), std::move(ep1)));
+  }
+
+  // Check that the number of new process VMOs has not grown unexpectedly.
+  read_process_vmos();
+  int new_vmos = 0;
+  for (const auto& vmo : vmos) {
+    if (!koids.contains(vmo.koid)) {
+      ++new_vmos;
+      koids.insert(vmo.koid);
+    }
+  }
+
+  // Allow for some extra VMOs due to allocations.
+  EXPECT_LT(new_vmos, 20);
 }
 
 }  // namespace

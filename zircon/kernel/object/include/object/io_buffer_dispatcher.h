@@ -90,12 +90,12 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
               fbl::RefPtr<VmMapping> mapping,                //
               zx_vaddr_t base,                               //
               const zx_iob_region_t& region,                 //
-              zx_koid_t koid)                                //
+              zx_koid_t vmo_user_id)                         //
         : ep_vmos_{ktl::move(ep0_vmo), ktl::move(ep1_vmo)},  //
           mapping_(ktl::move(mapping)),                      //
           base_(base),                                       //
           region_(region),                                   //
-          koid_(koid) {
+          vmo_user_id_(vmo_user_id) {
       ZX_DEBUG_ASSERT(ep_vmos_[0]);
       ZX_DEBUG_ASSERT(ep_vmos_[1]);
     }
@@ -140,7 +140,7 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
     }
 
     zx_iob_region_info_t GetRegionInfo(bool swap_endpoints) const {
-      zx_iob_region_info_t info{region_, koid_};
+      zx_iob_region_info_t info{region_, vmo_user_id_};
       if (swap_endpoints) {
         uint32_t ep0_access =
             info.region.access &
@@ -202,7 +202,7 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
     zx_vaddr_t base_ = 0;
 
     zx_iob_region_t region_ = {};
-    zx_koid_t koid_ = ZX_KOID_INVALID;
+    zx_koid_t vmo_user_id_ = ZX_KOID_INVALID;
   };
 
   // Represents ZX_IOB_DISCIPLINE_TYPE_NONE.
@@ -240,10 +240,10 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
   class IobRegionMediatedWriteRingBuffer : public IobRegion {
    public:
     IobRegionMediatedWriteRingBuffer(fbl::RefPtr<VmObject> ep0_vmo, fbl::RefPtr<VmObject> ep1_vmo,
-                                     const zx_iob_region_t& region, zx_koid_t koid,
+                                     const zx_iob_region_t& region, zx_koid_t vmo_user_id,
                                      fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region,
                                      uint64_t tag)
-        : IobRegion(ep0_vmo, ep1_vmo, nullptr, 0, region, koid),
+        : IobRegion(ep0_vmo, ep1_vmo, nullptr, 0, region, vmo_user_id),
           shared_region_(std::move(shared_region)),
           tag_(tag) {}
 
@@ -263,7 +263,7 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
       fbl::RefPtr<VmObject> ep1_vmo,     //
       fbl::RefPtr<VmObject> kernel_vmo,  //
       const zx_iob_region_t& region,     //
-      zx_koid_t koid,                    //
+      zx_koid_t vmo_user_id,             //
       fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region);
 
   // Wrapper struct to allow both peers to hold a reference to the regions.
