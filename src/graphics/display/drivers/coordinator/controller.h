@@ -99,11 +99,19 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void Stop();
 
   // fuchsia.hardware.display.controller/DisplayEngineListener:
+  // Runs on dispatchers owned by the display engine driver.
   void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
-  void DisplayEngineListenerOnDisplayRemoved(uint64_t display_id);
+  void DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id);
   void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_instant_mono_t timestamp,
                                            const config_stamp_t* config_stamp);
   void DisplayEngineListenerOnCaptureComplete();
+
+  // Must run on `engine_listener_dispatcher_`.
+  void OnDisplayAdded(std::unique_ptr<AddedDisplayInfo> added_display_info);
+  void OnDisplayRemoved(display::DisplayId removed_display_id);
+  void OnCaptureComplete();
+  void OnDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                      display::DriverConfigStamp driver_config_stamp);
 
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);

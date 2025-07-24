@@ -231,6 +231,58 @@ void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* b
       std::move(added_display_info_result).value();
 
   zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *engine_listener_dispatcher_->async_dispatcher(),
+      [this, added_display_info = std::move(added_display_info)]() mutable {
+        OnDisplayAdded(std::move(added_display_info));
+      });
+  if (post_task_result.is_error()) {
+    fdf::error("Failed to dispatch OnDisplayAdded task: {}", post_task_result);
+  }
+}
+
+void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
+  display::DisplayId display_id(banjo_display_id);
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *engine_listener_dispatcher_->async_dispatcher(),
+      [this, display_id]() { OnDisplayRemoved(display_id); });
+  if (post_task_result.is_error()) {
+    fdf::error("Failed to dispatch OnDisplayVsync task: {}", post_task_result);
+  }
+}
+
+void Controller::DisplayEngineListenerOnCaptureComplete() {
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *engine_listener_dispatcher_->async_dispatcher(), [this]() { OnCaptureComplete(); });
+  if (post_task_result.is_error()) {
+    fdf::error("Failed to dispatch OnDisplayVsync task: {}", post_task_result);
+  }
+}
+
+void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
+                                                     zx_instant_mono_t banjo_timestamp,
+                                                     const config_stamp_t* banjo_config_stamp_ptr) {
+  ZX_DEBUG_ASSERT(banjo_display_id != INVALID_DISPLAY_ID);
+  ZX_DEBUG_ASSERT(banjo_config_stamp_ptr != nullptr);
+
+  display::DisplayId display_id = display::DisplayId(banjo_display_id);
+  zx::time_monotonic timestamp = zx::time_monotonic(banjo_timestamp);
+  display::DriverConfigStamp driver_config_stamp =
+      display::DriverConfigStamp(*banjo_config_stamp_ptr);
+
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *engine_listener_dispatcher_->async_dispatcher(),
+      [this, display_id, timestamp, driver_config_stamp]() {
+        OnDisplayVsync(display_id, timestamp, driver_config_stamp);
+      });
+  if (post_task_result.is_error()) {
+    fdf::error("Failed to dispatch OnDisplayVsync task: {}", post_task_result);
+  }
+}
+
+void Controller::OnDisplayAdded(std::unique_ptr<AddedDisplayInfo> added_display_info) {
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->get() == engine_listener_dispatcher_->get());
+
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
       *driver_dispatcher()->async_dispatcher(),
       [this, added_display_info = std::move(added_display_info)]() mutable {
         AddDisplay(std::move(added_display_info));
@@ -240,8 +292,8 @@ void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* b
   }
 }
 
-void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
-  display::DisplayId removed_display_id = display::DisplayId(banjo_display_id);
+void Controller::OnDisplayRemoved(display::DisplayId removed_display_id) {
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->get() == engine_listener_dispatcher_->get());
 
   zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
       *driver_dispatcher()->async_dispatcher(),
@@ -251,7 +303,9 @@ void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id
   }
 }
 
-void Controller::DisplayEngineListenerOnCaptureComplete() {
+void Controller::OnCaptureComplete() {
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->get() == engine_listener_dispatcher_->get());
+
   ZX_DEBUG_ASSERT_MSG(engine_info_.has_value(),
                       "OnCaptureComplete() called before engine connection completed");
 
@@ -283,36 +337,29 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
   }
 }
 
-void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
-                                                     zx_instant_mono_t banjo_timestamp,
-                                                     const config_stamp_t* banjo_config_stamp_ptr) {
-  ZX_DEBUG_ASSERT(banjo_display_id != INVALID_DISPLAY_ID);
-  ZX_DEBUG_ASSERT(banjo_config_stamp_ptr != nullptr);
+void Controller::OnDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                                display::DriverConfigStamp driver_config_stamp) {
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->get() == engine_listener_dispatcher_->get());
 
   // TODO(https://fxbug.dev/402445178): This trace event is load bearing for fps trace processor.
   // Remove it after changing the dependency.
-  TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
+  TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", display_id.value());
   // Emit a counter called "VSYNC" for visualization in the Trace Viewer. `vsync_edge_flag`
   // switching between 0 and 1 counts represents one vsync period.
   static bool vsync_edge_flag = false;
-  TRACE_COUNTER("gfx", "VSYNC", banjo_display_id, "",
+  TRACE_COUNTER("gfx", "VSYNC", display_id.value(), "",
                 TA_UINT32(vsync_edge_flag = !vsync_edge_flag));
-  TRACE_DURATION("gfx", "Display::Controller::OnDisplayVsync", "display_id", banjo_display_id);
+  TRACE_DURATION("gfx", "Display::Controller::OnDisplayVsync", "display_id", display_id.value());
 
-  const display::DisplayId display_id(banjo_display_id);
-
-  const zx::time_monotonic vsync_timestamp(banjo_timestamp);
-  const display::DriverConfigStamp vsync_config_stamp =
-      display::DriverConfigStamp(*banjo_config_stamp_ptr);
-  vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
+  vsync_monitor_.OnVsync(timestamp, driver_config_stamp);
 
   fbl::AutoLock lock(mtx());
   auto displays_it = displays_.find(display_id);
   if (!displays_it.IsValid()) {
     // TODO(https://fxbug.dev/399886375): This logging is racy. It is possible
-    // that DisplayEngineListenerOnDisplayAdded() was called, but the event
-    // wasn't processed on the Coordinator's driver dispatcher yet. This means we can
-    // discard the VSync, as it can't possibly report a configuration applied by
+    // that OnDisplayAdded() was called, but the event wasn't processed on the
+    // Coordinator's driver dispatcher yet. This means we can discard the
+    // VSync, as it can't possibly report a configuration applied by
     // Coordinator clients.
     fdf::error("Received VSync for unknown display ID: {}", display_id.value());
     return;
@@ -324,7 +371,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   // If there's a pending layer change, don't process any present/retire actions
   // until the change is complete.
   if (display_info.pending_layer_change) {
-    bool done = vsync_config_stamp >= display_info.pending_layer_change_driver_config_stamp;
+    bool done = driver_config_stamp >= display_info.pending_layer_change_driver_config_stamp;
     if (done) {
       display_info.pending_layer_change = false;
       display_info.pending_layer_change_driver_config_stamp = display::kInvalidDriverConfigStamp;
@@ -346,9 +393,9 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
         client_proxy->pending_applied_config_stamps();
     auto it = std::ranges::find_if(pending_stamps,
                                    [&](const ClientProxy::ConfigStampPair& pending_stamp) {
-                                     return pending_stamp.driver_stamp >= vsync_config_stamp;
+                                     return pending_stamp.driver_stamp >= driver_config_stamp;
                                    });
-    if (it != pending_stamps.end() && it->driver_stamp == vsync_config_stamp) {
+    if (it != pending_stamps.end() && it->driver_stamp == driver_config_stamp) {
       config_stamp_source = std::make_optional(client_proxy->client_priority());
       // Obsolete stamps will be removed in `Client::OnDisplayVsync()`.
       break;
@@ -367,7 +414,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     //   `latest_controller_config_stamp` is greater than the incoming
     //   `controller_config_stamp`) and yet to be presented.
     for (auto it = display_info.images.begin(); it != display_info.images.end();) {
-      bool should_retire = it->latest_driver_config_stamp() < vsync_config_stamp;
+      bool should_retire = it->latest_driver_config_stamp() < driver_config_stamp;
 
       // Retire any images which are older than whatever is currently in their
       // layer.
@@ -385,12 +432,12 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     }
   }
 
-  if (vsync_config_stamp != display::kInvalidDriverConfigStamp) {
+  if (driver_config_stamp != display::kInvalidDriverConfigStamp) {
     auto& config_image_queue = display_info.config_image_queue;
 
     // Evict retired configurations from the queue.
     while (!config_image_queue.empty() &&
-           config_image_queue.front().config_stamp < vsync_config_stamp) {
+           config_image_queue.front().config_stamp < driver_config_stamp) {
       config_image_queue.pop();
     }
 
@@ -402,7 +449,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     // Otherwise, we'll get the list of images used at ApplyConfig() with
     // the given |config_stamp|.
     if (!config_image_queue.empty() &&
-        config_image_queue.front().config_stamp == vsync_config_stamp) {
+        config_image_queue.front().config_stamp == driver_config_stamp) {
       for (const auto& image : config_image_queue.front().images) {
         // End of the flow for the image going to be presented.
         //
@@ -421,10 +468,10 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 
   switch (config_stamp_source.value()) {
     case ClientPriority::kPrimary:
-      primary_client_->OnDisplayVsync(display_id, banjo_timestamp, vsync_config_stamp);
+      primary_client_->OnDisplayVsync(display_id, timestamp.get(), driver_config_stamp);
       break;
     case ClientPriority::kVirtcon:
-      virtcon_client_->OnDisplayVsync(display_id, banjo_timestamp, vsync_config_stamp);
+      virtcon_client_->OnDisplayVsync(display_id, timestamp.get(), driver_config_stamp);
       break;
   }
 }
