@@ -405,8 +405,10 @@ void DisplayEngine::virtio_gpu_flusher() {
 
     {
       fbl::AutoLock al(&flush_lock_);
-      engine_events_.OnDisplayVsync(kDisplayId, zx::time_monotonic(next_deadline),
-                                    displayed_config_stamp_);
+      if (displayed_config_stamp_ != display::kInvalidDriverConfigStamp) {
+        engine_events_.OnDisplayVsync(kDisplayId, zx::time_monotonic(next_deadline),
+                                      displayed_config_stamp_);
+      }
     }
     next_deadline = zx_time_add_duration(next_deadline, period);
   }
