@@ -29,15 +29,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 #include <memory>
-#include <optional>
-#include <ranges>
-#include <span>
-#include <string>
 #include <utility>
-#include <vector>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -1456,8 +1450,15 @@ void Client::TearDownForTesting() { valid_ = false; }
 
 bool Client::CleanUpAllImages() {
   // Clean up any layer state associated with the images.
-  bool current_config_changed =
-      std::ranges::any_of(layers_, [](Layer& layer) { return layer.CleanUpAllImages(); });
+  bool current_config_changed = [&] {
+    // We need to clean up images for all layers and thus should not
+    // short-circuit here.
+    bool any_layer_changed = false;
+    for (Layer& layer : layers_) {
+      any_layer_changed |= layer.CleanUpAllImages();
+    }
+    return any_layer_changed;
+  }();
 
   images_.clear();
   return current_config_changed;
@@ -1465,10 +1466,15 @@ bool Client::CleanUpAllImages() {
 
 bool Client::CleanUpImage(Image& image) {
   // Clean up any layer state associated with the images.
-  bool current_config_changed = false;
-
-  current_config_changed = std::ranges::any_of(
-      layers_, [&image = std::as_const(image)](Layer& layer) { return layer.CleanUpImage(image); });
+  bool current_config_changed = [&] {
+    // We need to clean up images for all layers and thus should not
+    // short-circuit here.
+    bool any_layer_changed = false;
+    for (Layer& layer : layers_) {
+      any_layer_changed |= layer.CleanUpImage(image);
+    }
+    return any_layer_changed;
+  }();
 
   images_.erase(image);
   return current_config_changed;
