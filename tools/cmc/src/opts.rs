@@ -19,30 +19,6 @@ pub struct Opt {
 
 #[derive(StructOpt, Debug)]
 pub enum Commands {
-    #[structopt(name = "validate")]
-    /// validate that one or more cml files are valid
-    Validate {
-        #[structopt(name = "FILE", parse(from_os_str))]
-        /// files to process
-        files: Vec<PathBuf>,
-
-        #[structopt(long = "must-offer-protocol")]
-        /// verifies that all children and collections are offered the given protocols
-        ///
-        /// If specified, for each protocol named, cmc will require that all children
-        /// or collections in `files` have been offered the given protocol. This can be
-        /// used to help find missing offers of capabilities like `fuchsia.logger.LogSink`
-        must_offer_protocol: Vec<String>,
-
-        #[structopt(long = "must-use-protocol")]
-        /// verifies that components use the given protocols
-        ///
-        /// If specified, for each protocol named, cmc will require that each component in
-        /// `files` uses the given protocol. This can be used to help find missing usages
-        /// of capabilities like `fuchsia.logger.LogSink`
-        must_use_protocol: Vec<String>,
-    },
-
     #[structopt(name = "validate-references")]
     /// validate a component manifest against package manifest.
     ValidateReferences {
