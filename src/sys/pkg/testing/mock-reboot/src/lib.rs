@@ -108,7 +108,7 @@ mod tests {
         let reboot_service = Arc::new(MockRebootService::new(Box::new(|options| {
             if let Some(reasons) = options.reasons {
                 match &reasons[..] {
-                    [RebootReason2::UserRequest] => Ok(()),
+                    [RebootReason2::DeveloperRequest] => Ok(()),
                     _ => Err(zx::Status::NOT_SUPPORTED.into_raw()),
                 }
             } else {
@@ -122,7 +122,7 @@ mod tests {
         // Succeed when given expected reboot reason.
         let () = proxy
             .perform_reboot(&RebootOptions {
-                reasons: Some(vec![RebootReason2::UserRequest]),
+                reasons: Some(vec![RebootReason2::DeveloperRequest]),
                 ..Default::default()
             })
             .await

@@ -297,7 +297,7 @@ impl RebootController {
                         TargetRebootState::Product => {
                             match admin_proxy
                                 .perform_reboot(&RebootOptions {
-                                    reasons: Some(vec![RebootReason2::UserRequest]),
+                                    reasons: Some(vec![RebootReason2::DeveloperRequest]),
                                     ..Default::default()
                                 })
                                 .await
@@ -417,7 +417,7 @@ mod tests {
                         options: RebootOptions { reasons: Some(reasons), .. },
                         responder,
                     } => {
-                        assert_matches!(&reasons[..], [RebootReason2::UserRequest]);
+                        assert_matches!(&reasons[..], [RebootReason2::DeveloperRequest]);
                         responder.send(Ok(())).unwrap();
                     }
                     AdminRequest::RebootToBootloader { responder } => {

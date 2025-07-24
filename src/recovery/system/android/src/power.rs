@@ -10,7 +10,7 @@ pub async fn reboot() -> Result<(), Error> {
     let proxy = connect_to_protocol::<fpower_statecontrol::AdminMarker>()?;
     proxy
         .perform_reboot(&fpower_statecontrol::RebootOptions {
-            reasons: Some(vec![fpower_statecontrol::RebootReason2::UserRequest]),
+            reasons: Some(vec![fpower_statecontrol::RebootReason2::DeveloperRequest]),
             ..Default::default()
         })
         .await?

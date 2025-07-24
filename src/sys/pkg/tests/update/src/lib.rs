@@ -822,7 +822,7 @@ async fn revert_success() {
             }),
             Interaction::Paver(PaverEvent::BootManagerFlush),
             Interaction::Reboot(RebootOptions {
-                reasons: Some(vec![RebootReason2::UserRequest]),
+                reasons: Some(vec![RebootReason2::DeveloperRequest]),
                 ..Default::default()
             }),
         ]

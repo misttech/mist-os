@@ -47,7 +47,7 @@ async fn handle_revert_impl(
 
     admin
         .perform_reboot(&RebootOptions {
-            reasons: Some(vec![RebootReason2::UserRequest]),
+            reasons: Some(vec![RebootReason2::DeveloperRequest]),
             ..Default::default()
         })
         .await

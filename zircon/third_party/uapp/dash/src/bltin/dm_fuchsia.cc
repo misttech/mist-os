@@ -84,7 +84,7 @@ int zxc_dm(int argc, char** argv) {
           fidl::Arena arena;
           auto builder = fuchsia_hardware_power_statecontrol::wire::RebootOptions::Builder(arena);
           std::vector<fuchsia_hardware_power_statecontrol::RebootReason2> reasons = {
-              fuchsia_hardware_power_statecontrol::RebootReason2::kUserRequest};
+              fuchsia_hardware_power_statecontrol::RebootReason2::kDeveloperRequest};
           auto vector_view =
               fidl::VectorView<fuchsia_hardware_power_statecontrol::RebootReason2>::FromExternal(
                   reasons);

@@ -278,7 +278,7 @@ zx_status_t reboot() {
   fidl::Arena arena;
   auto builder = fuchsia_hardware_power_statecontrol::wire::RebootOptions::Builder(arena);
   fuchsia_hardware_power_statecontrol::RebootReason2 reasons[1] = {
-      fuchsia_hardware_power_statecontrol::RebootReason2::kUserRequest};
+      fuchsia_hardware_power_statecontrol::RebootReason2::kDeveloperRequest};
   auto vector_view =
       fidl::VectorView<fuchsia_hardware_power_statecontrol::RebootReason2>::FromExternal(reasons);
   builder.reasons(vector_view);
