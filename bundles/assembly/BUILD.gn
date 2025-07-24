@@ -5000,7 +5000,8 @@ assembly_resources_directory("resources") {
 
     # Core shard templates.
     "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
-    "//src/developer/forensics/flash_ts_feedback_id/meta/flash_ts_feedback_id.core_shard.cml.template",
+    "//src/developer/forensics/feedback_id/flash_ts/meta/flash_ts_feedback_id.core_shard.cml.template",
+    "//src/developer/forensics/feedback_id/sysinfo/meta/sysinfo_feedback_id.core_shard.cml.template",
     "//src/lib/assembly/platform_configuration/src/subsystems/meta/tee-clients.core_shard.cml",
     "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
