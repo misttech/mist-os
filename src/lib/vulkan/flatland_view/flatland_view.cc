@@ -10,7 +10,6 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/syslog/global.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
@@ -164,7 +163,7 @@ void FlatlandView::OnGetLayout(fuchsia_ui_composition::LayoutInfo info) {
 }
 
 void FlatlandView::OnError(fidl::Event<fuchsia_ui_composition::Flatland::OnError>& event) {
-  FX_LOGF(ERROR, kTag, "OnFlatlandError: %" PRIu32, static_cast<uint32_t>(event.error()));
+  FX_LOGST(ERROR, kTag) << "OnFlatlandError: " << static_cast<uint32_t>(event.error());
 }
 
 void FlatlandView::Present() {

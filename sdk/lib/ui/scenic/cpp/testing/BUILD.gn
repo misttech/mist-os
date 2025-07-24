@@ -32,7 +32,7 @@ sdk_source_set("testing") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/async",
     "//sdk/lib/fidl/hlcpp",
-    "//zircon/system/ulib/syslog",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
   ]
 }
