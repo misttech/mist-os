@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use zx::Status;
 
-use fidl_fuchsia_hardware_interconnect as icc;
+use {fidl_fuchsia_hardware_interconnect as icc, fuchsia_trace as ftrace};
 
 mod graph;
 
@@ -44,6 +44,11 @@ impl Child {
     ) -> Result<(), Status> {
         let average_bandwidth_bps = average_bandwidth_bps.ok_or(Status::INVALID_ARGS)?;
         let peak_bandwidth_bps = peak_bandwidth_bps.ok_or(Status::INVALID_ARGS)?;
+
+        ftrace::duration!(c"interconnect", c"set_bandwidth",
+            "path" => self.path.name(),
+            "average_bandwidth_bps" => average_bandwidth_bps,
+            "peak_bandwidth_bps" => peak_bandwidth_bps);
 
         self.inspect.record_uint("average_bandwidth_bps", average_bandwidth_bps);
         self.inspect.record_uint("peak_bandwidth_bps", peak_bandwidth_bps);
