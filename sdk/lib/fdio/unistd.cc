@@ -522,6 +522,7 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
                                      .link_count = true,
                                      .modification_time = true,
                                      .change_time = true,
+                                     .mode = true,
                                  }};
   const zx_status_t status = io->get_attr(&attr);
   if (status != ZX_OK) {
@@ -529,10 +530,9 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
   }
 
   memset(s, 0, sizeof(struct stat));
-  // TODO(https://fxbug.dev/324111518): We should query the `mode` property above, and use that when
-  // available. Falling back to an approximated POSIX mode should only be done where the underlying
-  // filesystem doesn't support POSIX attributes.
-  s->st_mode = approximate_posix_mode(attr.protocols, attr.abilities);
+  // If the filesystem doesn't support POSIX attributes, we report an approximated set of type and
+  // permission bits for the mode field.
+  s->st_mode = attr.has.mode ? attr.mode : approximate_posix_mode(attr.protocols, attr.abilities);
   s->st_ino = attr.has.id ? attr.id : fio::wire::kInoUnknown;
   s->st_size = static_cast<off_t>(attr.content_size);
   s->st_blksize = VNATTR_BLKSIZE;
