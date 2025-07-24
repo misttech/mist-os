@@ -1014,7 +1014,8 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       // pinned) pages from being evicted while we wait with the lock dropped.
       if (pin && committed_len > 0) {
         uint64_t non_loaned_len = 0;
-        if (cow_pages_locked()->can_borrow_locked()) {
+        if (cow_pages_locked()->can_borrow_locked() &&
+            PhysicalPageBorrowingConfig::Get().is_loaning_enabled()) {
           // We need to replace any loaned pages in the committed range with non-loaned pages first,
           // since pinning expects all pages to be non-loaned. Replacing loaned pages requires a
           // page request too. At any time we'll only be able to wait on a single page request, and
@@ -1029,7 +1030,8 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
               &non_loaned_len);
           DEBUG_ASSERT(non_loaned_len <= committed_len);
         } else {
-          // Borrowing not available so we know there are no loaned pages.
+          // Either the VMO does not support borrowing, or loaning is not enabled so we know there
+          // are no loaned pages.
           non_loaned_len = committed_len;
         }
 
