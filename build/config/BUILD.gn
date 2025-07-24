@@ -98,10 +98,13 @@ config("crash_diagnostics") {
 }
 
 config("stack-size-section") {
-  if (!is_gcc && stack_size_section) {
-    cflags = [ "-fstack-size-section" ]
-    asmflags = cflags
-    ldflags = cflags
+  if (stack_size_section) {
+    if (!is_gcc) {
+      cflags = [ "-fstack-size-section" ]
+      asmflags = cflags
+      ldflags = cflags
+    }
+    rustflags = [ "-Zemit-stack-sizes" ]
   }
 }
 
