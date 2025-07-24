@@ -904,14 +904,18 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
     }
 }
 
+/// Collection of values related to a UsbVsockHost that has been set up for testing.
+pub struct TestHost<S: AsyncRead + AsyncWrite + Send + 'static> {
+    pub host: Arc<UsbVsockHost<S>>,
+    pub event_receiver: mpsc::Receiver<UsbVsockHostEvent>,
+}
+
 /// Collection of values related to a test connection.
 pub struct TestConnection<S: AsyncRead + AsyncWrite + Send + 'static> {
     pub cid: u32,
-    pub host: Arc<UsbVsockHost<S>>,
     pub connection: Arc<usb_vsock::Connection<Vec<u8>, S>>,
     pub incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     pub abort_transfer: (AbortHandle, AbortHandle),
-    pub event_receiver: mpsc::Receiver<UsbVsockHostEvent>,
     pub scope: fasync::Scope,
 }
 
@@ -919,7 +923,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> TestConnection<S> {
     /// Creates a new host with one connected CID inside of it, and also a raw
     /// usb_vsock connection which is the other end of that connection
     /// (representing the target perspective).
-    pub fn new() -> TestConnection<S> {
+    pub fn new() -> (TestHost<S>, TestConnection<S>) {
         let (a_incoming_requests_tx, a_incoming_requests) = mpsc::channel(1);
         let a = Arc::new(usb_vsock::Connection::new(
             ProtocolVersion::LATEST,
@@ -964,15 +968,16 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> TestConnection<S> {
         let host = UsbVsockHost::new_for_test(event_sender);
         let cid = host.add_connection_for_test(a, a_incoming_requests);
 
-        TestConnection {
-            cid,
-            host,
-            connection: b,
-            incoming_requests: b_incoming_requests,
-            abort_transfer: (abort_a, abort_b),
-            event_receiver,
-            scope,
-        }
+        (
+            TestHost { host, event_receiver },
+            TestConnection {
+                cid,
+                connection: b,
+                incoming_requests: b_incoming_requests,
+                abort_transfer: (abort_a, abort_b),
+                scope,
+            },
+        )
     }
 }
 
@@ -985,15 +990,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                mut incoming_requests,
+                abort_transfer: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1039,15 +1045,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                incoming_requests: _,
+                abort_transfer: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1091,15 +1098,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen_one_cid() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1158,15 +1166,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_bad_port() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _c,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection: _c,
+                incoming_requests: _,
+                abort_transfer: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
         let Err(ConnectError::PortOutOfRange) =
@@ -1178,15 +1187,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_rejection() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                mut incoming_requests,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
         let connect_task =
@@ -1204,15 +1214,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_refuse_connection() {
-        let TestConnection {
-            cid,
-            host: _host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host: _host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
         let Err(_) = connection
@@ -1233,15 +1244,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_reject_weird_cid() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1264,15 +1276,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_reject_from_weird_cid() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1295,15 +1308,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_double_listen() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, None).unwrap();
         let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
@@ -1314,15 +1328,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_then_listen() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                mut incoming_requests,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1348,15 +1363,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_double_listen_second_narrower() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, None).unwrap();
         let Err(ListenError::PortInUse(port)) = host.listen(1234, Some(cid.try_into().unwrap()))
@@ -1368,15 +1384,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_double_listen_second_broader() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, Some(cid.try_into().unwrap())).unwrap();
         let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
@@ -1387,15 +1404,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen_bad_cid() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let Err(ListenError::NotFound(cid)) = host.listen(1234, Some(60.try_into().unwrap()))
         else {
@@ -1406,15 +1424,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen_dropped_conn() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let mut listener = host.listen(1234, Some(cid.try_into().unwrap())).unwrap();
 
@@ -1432,15 +1451,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_connect_then_drop_cid() {
-        let TestConnection {
-            cid,
-            host,
-            connection,
-            mut incoming_requests,
-            abort_transfer: (abort_a, abort_b),
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid,
+                connection,
+                abort_transfer: (abort_a, abort_b),
+                mut incoming_requests,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1505,15 +1525,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_listen_drop_listen() {
-        let TestConnection {
-            cid: _,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            event_receiver: _,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, event_receiver: _ },
+            TestConnection {
+                cid: _,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let listener = host.listen(1234, None).unwrap();
         std::mem::drop(listener);
@@ -1522,15 +1543,16 @@ mod test {
 
     #[fuchsia::test]
     async fn test_events() {
-        let TestConnection {
-            cid,
-            host,
-            connection: _connection,
-            incoming_requests: _,
-            abort_transfer: _,
-            mut event_receiver,
-            scope: _scope,
-        } = TestConnection::<fasync::Socket>::new();
+        let (
+            TestHost { host, mut event_receiver },
+            TestConnection {
+                cid,
+                connection: _connection,
+                abort_transfer: _,
+                incoming_requests: _,
+                scope: _scope,
+            },
+        ) = TestConnection::<fasync::Socket>::new();
 
         let Some(UsbVsockHostEvent::AddedCid(got_cid)) = event_receiver.next().await else {
             panic!();
