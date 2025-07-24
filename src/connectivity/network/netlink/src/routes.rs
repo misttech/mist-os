@@ -46,15 +46,14 @@ use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
 use crate::route_tables::{
-    FidlRouteMap, MainRouteTable, NetlinkRouteTableIndex, NonZeroNetlinkRouteTableIndex,
-    RouteRemoveResult, RouteTable, RouteTableKey, RouteTableLookup, RouteTableMap,
-    TableNeedsCleanup,
+    FidlRouteMap, MainRouteTable, ManagedRouteTable, NetlinkRouteTableIndex,
+    NonZeroNetlinkRouteTableIndex, RouteRemoveResult, RouteTable, RouteTableMap, TableNeedsCleanup,
 };
 use crate::util::respond_to_completer;
 
-const UNMANAGED_ROUTE_TABLE: u32 = rt_class_t_RT_TABLE_MAIN;
-pub(crate) const UNMANAGED_ROUTE_TABLE_INDEX: NetlinkRouteTableIndex =
-    NetlinkRouteTableIndex::new(UNMANAGED_ROUTE_TABLE);
+const MAIN_ROUTE_TABLE: u32 = rt_class_t_RT_TABLE_MAIN;
+pub(crate) const MAIN_ROUTE_TABLE_INDEX: NetlinkRouteTableIndex =
+    NetlinkRouteTableIndex::new(MAIN_ROUTE_TABLE);
 
 /// Arguments for an RTM_GETROUTE [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -242,11 +241,10 @@ pub(crate) struct RoutesWorker<
     fidl_route_map: FidlRouteMap<I>,
 }
 
-fn get_table_u8_and_nla_from_key(table: RouteTableKey) -> (u8, Option<RouteAttribute>) {
-    let table_id: u32 = match table {
-        RouteTableKey::Unmanaged => UNMANAGED_ROUTE_TABLE,
-        RouteTableKey::NetlinkManaged { table_id } => table_id.get().get(),
-    };
+fn get_table_u8_and_nla_from_key(
+    netlink_id: NetlinkRouteTableIndex,
+) -> (u8, Option<RouteAttribute>) {
+    let table_id = netlink_id.get();
     // When the table's value is >255, the value should be specified
     // by an NLA and the header value should be RT_TABLE_COMPAT.
     match u8::try_from(table_id) {
@@ -430,9 +428,9 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         // Ideally we'd combine the two following operations with some form of
         // Entry API in order to avoid the panic, but this is difficult to pull
         // off with async.
-        route_tables.create_route_table_if_managed_and_not_present(table).await;
+        route_tables.create_managed_route_table_if_not_present(table).await;
 
-        let table_id = route_tables.get_fidl_table_id(&table).expect("should be populated");
+        let table_id = route_tables.get(&table).expect("should be populated").fidl_table_id();
 
         // Check if the new route conflicts with an existing route.
         //
@@ -443,7 +441,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         // more flexible Netstack routing APIs.
         let new_route_conflicts_with_existing = self
             .fidl_route_map
-            .iter_table(route_tables.get_fidl_table_id(&table).expect("should be populated"))
+            .iter_table(route_tables.get(&table).expect("should be populated").fidl_table_id())
             .any(|(stored_route, stored_props)| {
                 routes_conflict::<I>(
                     fnet_routes_ext::InstalledRoute {
@@ -462,12 +460,12 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
 
         let (real_route_set, backup_route_set) =
             match route_tables.get(&table).expect("should have just been populated") {
-                RouteTableLookup::Managed(RouteTable {
+                RouteTable::Managed(ManagedRouteTable {
                     route_set_proxy,
                     route_set_from_main_table_proxy,
                     ..
                 }) => (route_set_proxy, Some(route_set_from_main_table_proxy)),
-                RouteTableLookup::Unmanaged(MainRouteTable { route_set_proxy, .. }) => {
+                RouteTable::Unmanaged(MainRouteTable { route_set_proxy, .. }) => {
                     (route_set_proxy, None)
                 }
             };
@@ -541,12 +539,12 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         let (real_route_set, backup_route_set) = match route_tables.get(&table.into()) {
             None => return Err(RequestError::NotFound),
             Some(lookup) => match lookup {
-                RouteTableLookup::Managed(RouteTable {
+                RouteTable::Managed(ManagedRouteTable {
                     route_set_proxy,
                     route_set_from_main_table_proxy,
                     ..
                 }) => (route_set_proxy, Some(route_set_from_main_table_proxy)),
-                RouteTableLookup::Unmanaged(MainRouteTable { route_set_proxy, .. }) => {
+                RouteTable::Unmanaged(MainRouteTable { route_set_proxy, .. }) => {
                     (route_set_proxy, None)
                 }
             },
@@ -686,7 +684,6 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             RequestArgs::Route(args) => match args {
                 RouteRequestArgs::Get(args) => match args {
                     GetRouteArgs::Dump => {
-                        let main_route_table_id = route_tables.main_route_table.fidl_table_id;
                         self.fidl_route_map
                             .iter()
                             .flat_map(|(route, tables)| {
@@ -697,11 +694,13 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                                 // TODO(https://fxbug.dev/418849362): Remove this hack once netlink
                                 // supports PBR rules.
                                 let suppress_main_table = tables.len() >= 2;
+                                let route_tables = &*route_tables;
                                 tables
                                     .iter()
                                     .filter(move |(fidl_table_id, _)| {
                                         if suppress_main_table {
-                                            **fidl_table_id != main_route_table_id
+                                            route_tables.get_netlink_id(*fidl_table_id)
+                                                != Some(MAIN_ROUTE_TABLE_INDEX)
                                         } else {
                                             true
                                         }
@@ -715,20 +714,8 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                                     })
                             })
                             .filter_map(|installed_route| {
-                                let table_index = match route_tables
-                                    .lookup_route_table_key_from_fidl_table_id(
-                                        installed_route.table_id,
-                                    ) {
-                                    None => {
-                                        // This FIDL table ID is not managed by netlink, so ignore
-                                        // it in the dump.
-                                        return None;
-                                    }
-                                    Some(RouteTableKey::Unmanaged) => UNMANAGED_ROUTE_TABLE_INDEX,
-                                    Some(RouteTableKey::NetlinkManaged { table_id }) => {
-                                        table_id.get()
-                                    }
-                                };
+                                let table_index =
+                                    route_tables.get_netlink_id(&installed_route.table_id)?;
                                 NetlinkRouteMessage::optionally_from(installed_route, table_index)
                             })
                             .for_each(|message| {
@@ -803,8 +790,9 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                 };
 
                 let own_fidl_table_id = route_tables
-                    .get_fidl_table_id(netlink_table_id)
-                    .expect("should recognize table referenced in pending new route request");
+                    .get(netlink_table_id)
+                    .expect("should recognize table referenced in pending new route request")
+                    .fidl_table_id();
 
                 self.fidl_route_map
                     .route_is_installed_in_tables(&(*args).into(), [&own_fidl_table_id])
@@ -816,7 +804,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                 // It's okay for this to be `None`, as we may have garbage collected the
                 // corresponding entry in `route_tables` if this was the last route in that table.
                 let own_fidl_table_id: Option<fnet_routes_ext::TableId> =
-                    route_tables.get_fidl_table_id(&netlink_table_id);
+                    route_tables.get(&netlink_table_id).map(|table| table.fidl_table_id());
 
                 if let Some(own_fidl_table_id) = own_fidl_table_id {
                     self.fidl_route_map.route_is_uninstalled_in_tables(
@@ -955,7 +943,7 @@ fn handle_route_watcher_event<
                 }
             }
 
-            match route_table_map.lookup_route_table_key_from_fidl_table_id(table_id) {
+            match route_table_map.get_netlink_id(&table_id) {
                 None => {
                     // This is a FIDL table ID that the netlink worker didn't know about, and is
                     // not the main table ID.
@@ -967,22 +955,14 @@ fn handle_route_watcher_event<
                     // index, we have no choice but to avoid notifying netlink clients about this.
                     (None, None)
                 }
-                Some(table) => {
-                    let table = match table {
-                        RouteTableKey::Unmanaged => UNMANAGED_ROUTE_TABLE_INDEX,
-                        RouteTableKey::NetlinkManaged { table_id } => table_id.get(),
-                    };
-
-                    (
-                        NetlinkRouteMessage::optionally_from(added_installed_route, table).map(
-                            |route_message| {
-                                route_message
-                                    .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)
-                            },
-                        ),
-                        None,
-                    )
-                }
+                Some(table) => (
+                    NetlinkRouteMessage::optionally_from(added_installed_route, table).map(
+                        |route_message| {
+                            route_message.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)
+                        },
+                    ),
+                    None,
+                ),
             }
         }
         fnet_routes_ext::Event::Removed(mut removed_installed_route) => {
@@ -1002,32 +982,24 @@ fn handle_route_watcher_event<
                 RouteRemoveResult::RemovedAndTableNewlyEmpty(_properties) => true,
             };
 
-            let (notify_message, table_index) =
-                match route_table_map.lookup_route_table_key_from_fidl_table_id(table_id) {
-                    None => {
-                        // This is a FIDL table ID that the netlink worker didn't know about, and is
-                        // not the main table ID.
-                        crate::logging::log_debug!(
-                            "Observed an added route via the routes watcher that is installed in a \
+            let (notify_message, table_index) = match route_table_map.get_netlink_id(&table_id) {
+                None => {
+                    // This is a FIDL table ID that the netlink worker didn't know about, and is
+                    // not the main table ID.
+                    crate::logging::log_debug!(
+                        "Observed an added route via the routes watcher that is installed in a \
                         non-main FIDL table not managed by netlink: {removed_installed_route:?}"
-                        );
-                        // Because we'll never be able to map this FIDL table ID to a netlink table
-                        // index, we have no choice but to avoid notifying netlink clients about this.
-                        (None, None)
-                    }
-                    Some(table) => {
-                        let table = match table {
-                            RouteTableKey::Unmanaged => UNMANAGED_ROUTE_TABLE_INDEX,
-                            RouteTableKey::NetlinkManaged { table_id } => table_id.get(),
-                        };
-
-                        (
-                            NetlinkRouteMessage::optionally_from(removed_installed_route, table)
-                                .map(|route_message| route_message.into_rtnl_del_route()),
-                            Some(table),
-                        )
-                    }
-                };
+                    );
+                    // Because we'll never be able to map this FIDL table ID to a netlink table
+                    // index, we have no choice but to avoid notifying netlink clients about this.
+                    (None, None)
+                }
+                Some(table) => (
+                    NetlinkRouteMessage::optionally_from(removed_installed_route, table)
+                        .map(|route_message| route_message.into_rtnl_del_route()),
+                    Some(table),
+                ),
+            };
 
             (
                 notify_message,
@@ -1147,7 +1119,7 @@ impl NetlinkRouteMessage {
         .expect("should fit into u8");
         route_header.destination_prefix_length = destination.prefix();
 
-        let (table_u8, table_nla) = get_table_u8_and_nla_from_key(RouteTableKey::from(table));
+        let (table_u8, table_nla) = get_table_u8_and_nla_from_key(table);
         route_header.table = table_u8;
 
         // The following fields are used in the header, but they do not have any
@@ -1496,7 +1468,6 @@ mod tests {
     use crate::interfaces::testutil::FakeInterfacesHandler;
     use crate::messaging::testutil::{FakeSender, SentMessage};
     use crate::protocol_family::route::NetlinkRouteNotifiedGroup;
-    use crate::route_tables::ManagedNetlinkRouteTableIndex;
 
     const V4_SUB1: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/32");
     const V4_SUB2: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.1/32");
@@ -1522,7 +1493,6 @@ mod tests {
     const MANAGED_ROUTE_TABLE_ID: u32 = 5678;
     const MANAGED_ROUTE_TABLE_INDEX: NetlinkRouteTableIndex =
         NetlinkRouteTableIndex::new(MANAGED_ROUTE_TABLE_ID);
-    const MANAGED_ROUTE_TABLE: RouteTableKey = RouteTableKey::from(MANAGED_ROUTE_TABLE_INDEX);
     const MAIN_FIDL_TABLE_ID: fnet_routes_ext::TableId = fnet_routes_ext::TableId::new(0);
     const OTHER_FIDL_TABLE_ID: fnet_routes_ext::TableId = fnet_routes_ext::TableId::new(1);
 
@@ -1553,7 +1523,7 @@ mod tests {
 
     fn create_netlink_route_message<I: Ip>(
         destination_prefix_length: u8,
-        table: RouteTableKey,
+        table: NetlinkRouteTableIndex,
         nlas: Vec<RouteAttribute>,
     ) -> NetlinkRouteMessage {
         let mut route_header = RouteHeader::default();
@@ -1619,39 +1589,31 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(RouteTableKey::Unmanaged)]
-    #[test_case(MANAGED_ROUTE_TABLE)]
+    #[test_case(MAIN_ROUTE_TABLE_INDEX, MAIN_FIDL_TABLE_ID)]
+    #[test_case(MANAGED_ROUTE_TABLE_INDEX, OTHER_FIDL_TABLE_ID)]
     #[fuchsia::test]
     async fn handles_route_watcher_event<
         I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     >(
-        table: RouteTableKey,
+        netlink_id: NetlinkRouteTableIndex,
+        fidl_id: fnet_routes_ext::TableId,
     ) {
         let scope = fasync::Scope::new();
         let (subnet, next_hop) =
             I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
-        let table_id = match table {
-            RouteTableKey::Unmanaged => MAIN_FIDL_TABLE_ID,
-            RouteTableKey::NetlinkManaged { table_id: _ } => OTHER_FIDL_TABLE_ID,
-        };
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1, table_id);
+            create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1, fidl_id);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, Some(next_hop), DEV2.into(), METRIC2, table_id);
+            create_installed_route(subnet, Some(next_hop), DEV2.into(), METRIC2, fidl_id);
 
         let add_event1 = fnet_routes_ext::Event::Added(installed_route1);
         let add_event2 = fnet_routes_ext::Event::Added(installed_route2);
         let remove_event = fnet_routes_ext::Event::Removed(installed_route1);
 
-        let table_index = match table {
-            RouteTableKey::Unmanaged => UNMANAGED_ROUTE_TABLE_INDEX,
-            RouteTableKey::NetlinkManaged { table_id } => table_id.get(),
-        };
-
         let expected_route_message1: NetlinkRouteMessage =
-            NetlinkRouteMessage::try_from_installed_route(installed_route1, table_index).unwrap();
+            NetlinkRouteMessage::try_from_installed_route(installed_route1, netlink_id).unwrap();
         let expected_route_message2: NetlinkRouteMessage =
-            NetlinkRouteMessage::try_from_installed_route(installed_route2, table_index).unwrap();
+            NetlinkRouteMessage::try_from_installed_route(installed_route2, netlink_id).unwrap();
 
         // Set up two fake clients: one is a member of the route multicast group.
         let (right_group, wrong_group) = match I::VERSION {
@@ -1700,23 +1662,24 @@ mod tests {
         );
         let mut fidl_route_map = FidlRouteMap::<I>::default();
 
-        match table {
-            RouteTableKey::Unmanaged => {}
-            RouteTableKey::NetlinkManaged { table_id } => {
+        match netlink_id {
+            MAIN_ROUTE_TABLE_INDEX => {}
+            MANAGED_ROUTE_TABLE_INDEX => {
                 route_table.insert(
-                    table_id,
-                    RouteTable {
+                    netlink_id,
+                    RouteTable::Managed(ManagedRouteTable {
                         route_table_proxy,
                         route_set_proxy,
                         route_set_from_main_table_proxy,
                         fidl_table_id: OTHER_FIDL_TABLE_ID,
                         rule_set_authenticated: false,
-                    },
+                    }),
                 );
             }
+            _ => panic!("unexpected netlink id: {netlink_id:?}"),
         }
 
-        assert_eq!(fidl_route_map.iter_messages(&route_table, table_index).count(), 0);
+        assert_eq!(fidl_route_map.iter_messages(&route_table, netlink_id).count(), 0);
         assert_eq!(&right_sink.take_messages()[..], &[]);
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -1730,7 +1693,7 @@ mod tests {
             None
         );
         assert_eq!(
-            fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
+            fidl_route_map.iter_messages(&route_table, netlink_id).collect::<HashSet<_>>(),
             HashSet::from_iter([expected_route_message1.clone()])
         );
         assert_eq!(
@@ -1745,7 +1708,7 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         assert_eq!(
-            fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
+            fidl_route_map.iter_messages(&route_table, netlink_id).collect::<HashSet<_>>(),
             HashSet::from_iter([expected_route_message1.clone()])
         );
         assert_eq!(&right_sink.take_messages()[..], &[]);
@@ -1762,7 +1725,7 @@ mod tests {
             None
         );
         assert_eq!(
-            fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
+            fidl_route_map.iter_messages(&route_table, netlink_id).collect::<HashSet<_>>(),
             HashSet::from_iter([expected_route_message1.clone(), expected_route_message2.clone()])
         );
         assert_eq!(
@@ -1786,7 +1749,7 @@ mod tests {
             None
         );
         assert_eq!(
-            fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
+            fidl_route_map.iter_messages(&route_table, netlink_id).collect::<HashSet<_>>(),
             HashSet::from_iter([expected_route_message2.clone()])
         );
         assert_eq!(
@@ -1799,7 +1762,7 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         assert_eq!(
-            fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
+            fidl_route_map.iter_messages(&route_table, netlink_id).collect::<HashSet<_>>(),
             HashSet::from_iter([expected_route_message2.clone()])
         );
         assert_eq!(&right_sink.take_messages()[..], &[]);
@@ -1951,22 +1914,17 @@ mod tests {
 
         // Due to the double-writing of routes into managed tables and into the main tables, we need
         // to account for notifications for both routes being added.
-        let expected_route_message1_unmanaged = NetlinkRouteMessage::try_from_installed_route(
-            installed_route1,
-            UNMANAGED_ROUTE_TABLE_INDEX,
-        )
-        .unwrap();
+        let expected_route_message1_unmanaged =
+            NetlinkRouteMessage::try_from_installed_route(installed_route1, MAIN_ROUTE_TABLE_INDEX)
+                .unwrap();
         let expected_route_message1_managed = NetlinkRouteMessage::try_from_installed_route(
             installed_route1,
             MANAGED_ROUTE_TABLE_INDEX,
         )
         .unwrap();
         let expected_route_message2: NetlinkRouteMessage =
-            NetlinkRouteMessage::try_from_installed_route(
-                installed_route2,
-                UNMANAGED_ROUTE_TABLE_INDEX,
-            )
-            .unwrap();
+            NetlinkRouteMessage::try_from_installed_route(installed_route2, MAIN_ROUTE_TABLE_INDEX)
+                .unwrap();
 
         // Set up two fake clients: one is a member of the route multicast group.
         let (right_group, wrong_group) = match I::VERSION {
@@ -2014,14 +1972,14 @@ mod tests {
             route_table_provider,
         );
         route_table.insert(
-            ManagedNetlinkRouteTableIndex::new(MANAGED_ROUTE_TABLE_INDEX).unwrap(),
-            RouteTable {
+            MANAGED_ROUTE_TABLE_INDEX,
+            RouteTable::Managed(ManagedRouteTable {
                 route_set_from_main_table_proxy,
                 route_set_proxy,
                 route_table_proxy,
                 fidl_table_id: OTHER_FIDL_TABLE_ID,
                 rule_set_authenticated: false,
-            },
+            }),
         );
 
         let mut fidl_route_map = FidlRouteMap::<I>::default();
@@ -2062,7 +2020,7 @@ mod tests {
         assert_eq!(
             &fidl_route_map
                 .iter_messages(&route_table, MANAGED_ROUTE_TABLE_INDEX)
-                .chain(fidl_route_map.iter_messages(&route_table, UNMANAGED_ROUTE_TABLE_INDEX))
+                .chain(fidl_route_map.iter_messages(&route_table, MAIN_ROUTE_TABLE_INDEX))
                 .collect::<HashSet<_>>(),
             &HashSet::from_iter([
                 expected_route_message1_unmanaged.clone(),
@@ -2095,7 +2053,7 @@ mod tests {
         assert_eq!(
             &fidl_route_map
                 .iter_messages(&route_table, MANAGED_ROUTE_TABLE_INDEX)
-                .chain(fidl_route_map.iter_messages(&route_table, UNMANAGED_ROUTE_TABLE_INDEX))
+                .chain(fidl_route_map.iter_messages(&route_table, MAIN_ROUTE_TABLE_INDEX))
                 .collect::<HashSet<_>>(),
             &HashSet::from_iter([
                 expected_route_message1_unmanaged.clone(),
@@ -2128,7 +2086,7 @@ mod tests {
         );
         assert_eq!(
             &fidl_route_map
-                .iter_messages(&route_table, UNMANAGED_ROUTE_TABLE_INDEX)
+                .iter_messages(&route_table, MAIN_ROUTE_TABLE_INDEX)
                 .collect::<HashSet<_>>(),
             &HashSet::from_iter([
                 expected_route_message1_unmanaged.clone(),
@@ -2175,14 +2133,12 @@ mod tests {
         let prefix_length = subnet.prefix();
         let subnet = if prefix_length > 0 { Some(subnet) } else { None };
         let nlas = create_nlas::<I>(subnet, Some(next_hop), DEV1, METRIC1, None);
-        let table = RouteTableKey::Unmanaged;
-        let expected = create_netlink_route_message::<I>(prefix_length, table, nlas);
+        let expected =
+            create_netlink_route_message::<I>(prefix_length, MAIN_ROUTE_TABLE_INDEX, nlas);
 
-        let actual = NetlinkRouteMessage::try_from_installed_route(
-            installed_route,
-            UNMANAGED_ROUTE_TABLE_INDEX,
-        )
-        .unwrap();
+        let actual =
+            NetlinkRouteMessage::try_from_installed_route(installed_route, MAIN_ROUTE_TABLE_INDEX)
+                .unwrap();
         assert_eq!(actual, expected);
     }
 
@@ -2205,10 +2161,7 @@ mod tests {
         };
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
-            NetlinkRouteMessage::try_from_installed_route(
-                installed_route,
-                UNMANAGED_ROUTE_TABLE_INDEX,
-            );
+            NetlinkRouteMessage::try_from_installed_route(installed_route, MAIN_ROUTE_TABLE_INDEX);
         assert_eq!(actual, Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding));
     }
 
@@ -2224,10 +2177,7 @@ mod tests {
         );
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
-            NetlinkRouteMessage::try_from_installed_route(
-                installed_route,
-                UNMANAGED_ROUTE_TABLE_INDEX,
-            );
+            NetlinkRouteMessage::try_from_installed_route(installed_route, MAIN_ROUTE_TABLE_INDEX);
         assert_eq!(
             actual,
             Err(NetlinkRouteMessageConversionError::InvalidInterfaceId(invalid_interface_id))
@@ -2236,7 +2186,7 @@ mod tests {
 
     #[test]
     fn test_into_rtnl_new_route_is_serializable() {
-        let route = create_netlink_route_message::<Ipv4>(0, RouteTableKey::Unmanaged, vec![]);
+        let route = create_netlink_route_message::<Ipv4>(0, MAIN_ROUTE_TABLE_INDEX, vec![]);
         let new_route_message = route.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let mut buf = vec![0; new_route_message.buffer_len()];
         // Serialize will panic if `new_route_message` is malformed.
@@ -2245,7 +2195,7 @@ mod tests {
 
     #[test]
     fn test_into_rtnl_del_route_is_serializable() {
-        let route = create_netlink_route_message::<Ipv6>(0, RouteTableKey::Unmanaged, vec![]);
+        let route = create_netlink_route_message::<Ipv6>(0, MAIN_ROUTE_TABLE_INDEX, vec![]);
         let del_route_message = route.into_rtnl_del_route();
         let mut buf = vec![0; del_route_message.buffer_len()];
         // Serialize will panic if `del_route_message` is malformed.
@@ -2822,7 +2772,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -2836,7 +2786,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop2),
@@ -3636,7 +3586,6 @@ mod tests {
         let messages = match waiter_result {
             Ok(()) => {
                 let build_message = |table| {
-                    let table = RouteTableKey::from(NetlinkRouteTableIndex::new(table));
                     let route_message = create_netlink_route_message::<A::Version>(
                         subnet.prefix(),
                         table,
@@ -3652,12 +3601,7 @@ mod tests {
                                 // the lowest metric.
                                 RouteRequestKind::Del => METRIC1,
                             },
-                            match table {
-                                RouteTableKey::Unmanaged => None,
-                                RouteTableKey::NetlinkManaged { table_id } => {
-                                    Some(table_id.get().get())
-                                }
-                            },
+                            (table != MAIN_ROUTE_TABLE_INDEX).then_some(table.get()),
                         ),
                     );
                     let netlink_message = match kind {
@@ -3669,12 +3613,11 @@ mod tests {
                     SentMessage::multicast(netlink_message, route_group)
                 };
 
-                let route_message_in_managed_table = build_message(MANAGED_ROUTE_TABLE_ID);
+                let route_message_in_managed_table = build_message(MANAGED_ROUTE_TABLE_INDEX);
 
                 // TODO(https://fxbug.dev/418849362): Remove this "double-written" route once rules
                 // are properly supported.
-                let route_message_in_unmanaged_table =
-                    build_message(UNMANAGED_ROUTE_TABLE_INDEX.get());
+                let route_message_in_unmanaged_table = build_message(MAIN_ROUTE_TABLE_INDEX);
                 vec![route_message_in_unmanaged_table, route_message_in_managed_table]
             }
             Err(_) => Vec::new(),
@@ -3860,7 +3803,7 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    RouteTableKey::Unmanaged,
+                    MAIN_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3, None),
                 )
                 .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
@@ -3869,7 +3812,7 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    RouteTableKey::from(table),
+                    table,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -3884,7 +3827,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -3898,7 +3841,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop2),
@@ -3912,7 +3855,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    RouteTableKey::from(table),
+                    table,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -4004,7 +3947,7 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    RouteTableKey::from(ALTERNATIVE_ROUTE_TABLE),
+                    ALTERNATIVE_ROUTE_TABLE,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -4019,7 +3962,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -4033,7 +3976,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    RouteTableKey::from(ALTERNATIVE_ROUTE_TABLE),
+                    ALTERNATIVE_ROUTE_TABLE,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -4047,7 +3990,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop2),
@@ -4131,7 +4074,7 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    RouteTableKey::Unmanaged,
+                    MAIN_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3, None),
                 )
                 .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
@@ -4140,7 +4083,7 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -4155,7 +4098,7 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    RouteTableKey::Unmanaged,
+                    MAIN_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3, None),
                 )
                 .into_rtnl_del_route(),
@@ -4164,7 +4107,7 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -4179,7 +4122,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop1),
@@ -4193,7 +4136,7 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop2),
@@ -4479,14 +4422,14 @@ mod tests {
         );
 
         route_table_map.insert(
-            ManagedNetlinkRouteTableIndex::new(MANAGED_ROUTE_TABLE_INDEX).unwrap(),
-            RouteTable {
+            MANAGED_ROUTE_TABLE_INDEX,
+            RouteTable::Managed(ManagedRouteTable {
                 route_table_proxy: own_route_table_proxy,
                 route_set_proxy,
                 route_set_from_main_table_proxy,
                 fidl_table_id: OTHER_FIDL_TABLE_ID,
                 rule_set_authenticated: false,
-            },
+            }),
         );
 
         for Route { subnet, device, nexthop, metric } in existing_routes {
@@ -4508,7 +4451,7 @@ mod tests {
                 let destination = (subnet.prefix() != 0).then_some(*subnet);
                 create_netlink_route_message::<I>(
                     subnet.prefix(),
-                    MANAGED_ROUTE_TABLE,
+                    MANAGED_ROUTE_TABLE_INDEX,
                     create_nlas::<I>(
                         destination,
                         nexthop.to_owned(),
@@ -4958,7 +4901,7 @@ mod tests {
                 let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
                 // The new route table should be present in the map.
                 let table = match route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX) {
-                    Some(RouteTableLookup::Managed(table)) => table,
+                    Some(RouteTable::Managed(table)) => table,
                     _ => panic!("table should be present"),
                 };
                 assert_eq!(table.fidl_table_id, OTHER_FIDL_TABLE_ID);
@@ -5094,7 +5037,7 @@ mod tests {
                 let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
                 // The route table should still be present in the map.
                 let table = match route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX) {
-                    Some(RouteTableLookup::Managed(table)) => table,
+                    Some(RouteTable::Managed(table)) => table,
                     _ => panic!("table should be present"),
                 };
                 assert_eq!(table.fidl_table_id, OTHER_FIDL_TABLE_ID);
