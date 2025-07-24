@@ -19,8 +19,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use thiserror::Error;
 use usb_vsock::{
-    Address, Header, Packet, PacketType, ProtocolVersion, UsbPacketBuilder, VsockPacketIterator,
-    CID_ANY, CID_HOST, CID_LOOPBACK,
+    Address, Header, Packet, PacketType, ProtocolVersion, ReadyConnect, UsbPacketBuilder,
+    VsockPacketIterator, CID_ANY, CID_HOST, CID_LOOPBACK,
 };
 
 /// How long to wait for the USB protocol to synchronize.
@@ -514,15 +514,26 @@ pub enum UsbVsockHostEvent {
 
 /// Represents an incoming connection on a port we are listening on.
 pub struct IncomingConnection<S> {
-    acceptor: oneshot::Sender<(S, oneshot::Sender<std::io::Result<usb_vsock::ConnectionState>>)>,
+    address: Address,
+    acceptor: oneshot::Sender<oneshot::Sender<std::io::Result<ReadyConnect<Vec<u8>, S>>>>,
 }
 
 impl<S: AsyncRead + AsyncWrite + Send + 'static> IncomingConnection<S> {
+    /// Address the connector is using.
+    pub fn address(&self) -> &Address {
+        &self.address
+    }
+
     /// Accept the connection. Data will be sent over the provided socket.
     pub async fn accept(self, socket: S) -> Result<usb_vsock::ConnectionState, UsbVsockError> {
+        Ok(self.accept_late().await?.finish_connect(socket).await)
+    }
+
+    /// Accept the connection. The returned `ReadyConnect` can be used to provide a socket for data.
+    pub async fn accept_late(self) -> Result<usb_vsock::ReadyConnect<Vec<u8>, S>, UsbVsockError> {
         let (sender, receiver) = futures::channel::oneshot::channel();
         self.acceptor
-            .send((socket, sender))
+            .send(sender)
             .map_err(|_| UsbVsockError::AcceptFailed(std::io::Error::other("Driver gone")))?;
         receiver
             .await
@@ -643,6 +654,41 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
             },
             socket,
         )
+        .await
+        .map_err(ConnectError::Failed)
+    }
+
+    /// Connect a new socket to a target with the given CID and port, but don't
+    /// give the data socket. Instead return a [`ReadyConnect`] which can be
+    /// used to provide the socket later.
+    pub async fn connect_late(
+        &self,
+        cid: NonZero<u32>,
+        port: u32,
+    ) -> Result<usb_vsock::ReadyConnect<Vec<u8>, S>, ConnectError> {
+        if port == u32::MAX {
+            return Err(ConnectError::PortOutOfRange);
+        }
+
+        let cid = cid.get();
+        let cid = if cid == CID_LOOPBACK { CID_HOST } else { cid };
+
+        // TODO(407622394): Handle loopback cases.
+        let Some(conn) =
+            self.inner.lock().unwrap().conns.get_mut(&cid).map(|x| Arc::clone(&x.connection))
+        else {
+            return Err(ConnectError::NotFound(cid));
+        };
+
+        // TODO(407622199): Arrange for this port to be released when the connection dies.
+        let host_port = self.alloc_port();
+
+        conn.connect_late(usb_vsock::Address {
+            device_cid: cid,
+            host_cid: CID_HOST,
+            device_port: port,
+            host_port,
+        })
         .await
         .map_err(ConnectError::Failed)
     }
@@ -801,15 +847,15 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
 
                 if let Some(mut accept_channel) = accept_channel {
                     let (sender, receiver) = futures::channel::oneshot::channel();
-                    if let Err(_) = accept_channel.send(IncomingConnection {acceptor: sender}).await {
+                    if let Err(_) = accept_channel.send(IncomingConnection {acceptor: sender, address: *incoming.address() }).await {
                         log::warn!(cid; "Listener disappeared while accepting connection");
-                    } else if let Ok((sock, responder)) = receiver.await {
-                        if let Err(_) = responder.send(connection.accept(incoming, sock).await) {
+                    } else if let Ok(responder) = receiver.await {
+                        if let Err(_) = responder.send(connection.accept_late(incoming).await) {
                             log::warn!(cid; "Accepting connection request failed");
                         }
                         return;
                     } else {
-                        log::warn!(cid; "Listener did not respond to incoming connection");
+                        log::debug!(cid; "Listener rejected incoming connection");
                     }
                 }
 
