@@ -17,6 +17,8 @@
 #include <lib/zircon-internal/macros.h>
 #include <trace.h>
 
+#include <new>
+
 #include <fbl/algorithm.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mp.h>
@@ -198,7 +200,7 @@ void PmmNode::AddFreePages(list_node* list) TA_NO_THREAD_SAFETY_ANALYSIS {
   }
   free_count_.fetch_add(free_count);
   ASSERT(free_count_);
-  may_allocate_evt_.Signal();
+  free_pages_evt_.Signal();
 
   LTRACEF("free count now %" PRIu64 "\n", free_count_.load(ktl::memory_order_relaxed));
 }
@@ -1038,7 +1040,7 @@ void PmmNode::Dump(bool is_panic) const {
 void PmmNode::TripFreePagesLevelLocked() {
   if (should_wait_ == ShouldWaitState::OnceLevelTripped) {
     should_wait_ = ShouldWaitState::UntilReset;
-    may_allocate_evt_.Unsignal();
+    free_pages_evt_.Unsignal();
   }
 }
 
@@ -1055,7 +1057,7 @@ bool PmmNode::SetFreeMemorySignal(uint64_t free_lower_bound, uint64_t free_upper
   if (delay_allocations_pages == UINT64_MAX) {
     TripFreePagesLevelLocked();
   } else if (should_wait_ == ShouldWaitState::UntilReset) {
-    may_allocate_evt_.Signal();
+    free_pages_evt_.Signal();
     should_wait_ = ShouldWaitState::OnceLevelTripped;
   }
   should_wait_free_pages_level_ = delay_allocations_pages;
@@ -1074,7 +1076,7 @@ void PmmNode::SignalFreeMemoryChangeLocked() {
 void PmmNode::StopReturningShouldWait() {
   Guard<Mutex> guard{&lock_};
   should_wait_ = ShouldWaitState::Never;
-  may_allocate_evt_.Signal();
+  free_pages_evt_.Signal();
 }
 
 int64_t PmmNode::get_alloc_failed_count() { return pmm_alloc_failed.SumAcrossAllCpus(); }
@@ -1234,46 +1236,4 @@ const char* PmmNode::AllocFailure::TypeToString(Type type) {
       return "Other";
   }
   return "UNKNOWN";
-}
-
-zx::result<vm_page_t*> PmmNode::WaitForSinglePageAllocation(Deadline deadline) {
-  zx_status_t wait_result = may_allocate_evt_.Wait(deadline);
-
-  if (wait_result != ZX_OK) {
-    ZX_DEBUG_ASSERT(wait_result == ZX_ERR_TIMED_OUT);
-    return zx::error(wait_result);
-  }
-
-  // Try to allocate the page now, it may fail sporadically, since there is no guarantee that
-  // by the time we attempt to allocate the pages are still available.
-  zx::result<vm_page_t*> res = AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
-
-  // Normally we would only signal in the `ZX_OK` case, but in order to address
-  // `pmm_alloc_random_should_wait` we signal unconditionally, to simplify the logic. This leads to
-  // one extra spurious wake-up.
-  //
-  // This is because, when this random wait mode is active, we may block in a non low memory state,
-  // which will lead to threads getting blocked, and no one kicking them out. The unblocking chain
-  // is triggered by the system moving OUT of a low memory state, which would signal the event.
-  bool may_signal = res.is_ok() || res.status_value() == ZX_ERR_SHOULD_WAIT;
-  bool should_signal = false;
-  if (may_signal) {
-    Guard<Mutex> g(&lock_);
-    // We may only signal the event, when we are in an allocation-able state, otherwise
-    // we would wake up another thread just for it to receive `ZX_ERR_SHOULD_WAIT` and go back
-    // to waiting on the event, which we would have signalled below before returning.
-    //
-    // We still allow `ZX_ERR_SHOULD_WAIT` to signal threads, to accommodate random waits.
-    should_signal = may_signal && (should_wait_ != ShouldWaitState::UntilReset);
-  }
-
-  if (should_signal) {
-    may_allocate_evt_.Signal();
-  }
-
-  if (res.is_error()) {
-    ZX_DEBUG_ASSERT(res.error_value() == ZX_ERR_SHOULD_WAIT);
-    return res.take_error();
-  }
-  return res;
 }

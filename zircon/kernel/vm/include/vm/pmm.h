@@ -144,6 +144,13 @@ vm_page_t* paddr_to_vm_page(paddr_t addr);
 bool pmm_set_free_memory_signal(uint64_t free_lower_bound, uint64_t free_upper_bound,
                                 uint64_t delay_allocations_level, Event* event);
 
+// This is intended to be used if an allocation function returns ZX_ERR_SHOULD_WAIT and blocks
+// until such a time as it is appropriate to retry a single allocation for a single page. Due to
+// current implementation limitations, this only waits until single page allocations should be
+// retried, and cannot be used to wait for multi page allocations.
+// Returns the same set of values as Event::Wait.
+zx_status_t pmm_wait_till_should_retry_single_alloc(const Deadline& deadline);
+
 // Tells the PMM that it should never return ZX_ERR_SHOULD_WAIT (even in the presence of
 // PMM_ALLOC_FLAG_CAN_WAIT) and from now on must either succeed an allocation, or fail with
 // ZX_ERR_NO_MEMORY.

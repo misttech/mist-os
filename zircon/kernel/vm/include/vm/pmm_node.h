@@ -155,20 +155,9 @@ class PmmNode {
   bool SetFreeMemorySignal(uint64_t free_lower_bound, uint64_t free_upper_bound,
                            uint64_t delay_allocations_pages, Event* event);
 
-  // Waits the system to exit low memory state and then attempts to allocate.
-  //
-  // To prevent herding problem, and because allocation compete for the `PmmNode::lock_` anyway,
-  // only one thread is woken up a time, only if the previous thread successfully allocated.
-  //
-  // In normal conditions,  when the system is in low memory state, this method will return
-  // `ZX_ERR_TIMED_OUT` if the system didn't transition fast enough. If we run into a TOC to TOU,
-  // for the system race `ZX_ERR_SHOULD_WAIT` will be returned, that is the system transitioned
-  // out and back into low memory state before we managed to perform the allocation.
-  //
-  // If `gBootOptions->pmm_alloc_random_wait` is true, then the system may return spurious
-  // `ZX_ERR_SHOULD_WAIT`, in such cases, if the system is not in a low memory state, a thread is
-  // woken up anyway, so forward progress can be made.
-  zx::result<vm_page_t*> WaitForSinglePageAllocation(Deadline deadline);
+  zx_status_t WaitTillShouldRetrySingleAlloc(const Deadline& deadline) {
+    return free_pages_evt_.Wait(deadline);
+  }
 
   void StopReturningShouldWait();
 
@@ -418,9 +407,9 @@ class PmmNode {
   // Below this number of free pages the PMM will transition into delaying allocations.
   uint64_t should_wait_free_pages_level_ TA_GUARDED(lock_) = 0;
 
-  // The event acts a gate keeper for waking up threads waiting for allocations one at time.
-  // The event gets signalled when there MAY be pages available.
-  AutounsignalEvent may_allocate_evt_{true};
+  // Event is signaled whenever allocations are allowed to happen based on the |should_wait_| state.
+  // Whenever in the |UntilReset| state, this event will be Unsignaled causing waiters to block.
+  Event free_pages_evt_;
 
   // A record of the first time an allocation failure is reported to aid in diagnostics.
   AllocFailure first_alloc_failure_ TA_GUARDED(lock_);

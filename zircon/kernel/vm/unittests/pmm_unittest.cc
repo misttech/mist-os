@@ -439,9 +439,8 @@ static bool pmm_node_low_mem_alloc_failure_test() {
 
   // Waiting for an allocation should block, although to only try with a very small timeout to not
   // make this test take too long.
-  EXPECT_EQ(
-      ZX_ERR_TIMED_OUT,
-      node.node().WaitForSinglePageAllocation(Deadline::after_mono(ZX_MSEC(10))).status_value());
+  EXPECT_EQ(ZX_ERR_TIMED_OUT,
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(ZX_MSEC(10))));
 
   // Free the list.
   node.node().FreeList(&list);
@@ -455,13 +454,7 @@ static bool pmm_node_low_mem_alloc_failure_test() {
   // Allocations should work again, but the PMM is still allowed to randomly fail requests, so we
   // cannot guarantee that any small finite number of allocation attempts will work.
   // We can check that waiting to retry an allocation completes with no timeout though.
-  {
-    auto alloc_page = node.node().WaitForSinglePageAllocation(Deadline::infinite_past());
-    ASSERT_NE(alloc_page.status_value(), ZX_ERR_TIMED_OUT);
-    if (alloc_page.is_ok()) {
-      node.node().FreePage(alloc_page.value());
-    }
-  }
+  EXPECT_EQ(ZX_OK, node.node().WaitTillShouldRetrySingleAlloc(Deadline::infinite_past()));
 
   // Reset the signal.
   node.UnsignalEvent();
@@ -471,21 +464,14 @@ static bool pmm_node_low_mem_alloc_failure_test() {
 
   // Signal should not yet be set, and allocations should not be delayed.
   EXPECT_FALSE(node.IsEventSignaled());
-  {
-    auto alloc_page = node.node().WaitForSinglePageAllocation(Deadline::infinite_past());
-    ASSERT_NE(alloc_page.status_value(), ZX_ERR_TIMED_OUT);
-    if (alloc_page.is_ok()) {
-      node.node().FreePage(alloc_page.value());
-    }
-  }
+  EXPECT_EQ(ZX_OK, node.node().WaitTillShouldRetrySingleAlloc(Deadline::infinite_past()));
 
   // Allocate a single page and validate that allocations are now delayed.
   ASSERT_OK(node.node().AllocPages(1, 0, &list));
   result = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
   EXPECT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
-  EXPECT_EQ(
-      ZX_ERR_TIMED_OUT,
-      node.node().WaitForSinglePageAllocation(Deadline::after_mono(ZX_MSEC(10))).status_value());
+  EXPECT_EQ(ZX_ERR_TIMED_OUT,
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(ZX_MSEC(10))));
 
   node.node().FreeList(&list);
 
@@ -504,9 +490,10 @@ static bool pmm_node_explicit_should_wait_test() {
   // Allocations that can wait should be blocked.
   zx::result<vm_page_t*> result = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
   EXPECT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
-  EXPECT_EQ(
-      ZX_ERR_TIMED_OUT,
-      node.node().WaitForSinglePageAllocation(Deadline::after_mono(ZX_MSEC(10))).status_value());
+  // Waiting for an allocation should block, although to only try with a very small timeout to not
+  // make this test take too long.
+  EXPECT_EQ(ZX_ERR_TIMED_OUT,
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(ZX_MSEC(10))));
 
   // A regular allocation should work.
   result = node.node().AllocPage(0);
@@ -516,13 +503,7 @@ static bool pmm_node_explicit_should_wait_test() {
   // Changing the delayed threshold should re-enable allocations.
   EXPECT_TRUE(node.ResetDefaultMemEvent());
 
-  {
-    auto alloc_page = node.node().WaitForSinglePageAllocation(Deadline::infinite_past());
-    ASSERT_NE(alloc_page.status_value(), ZX_ERR_TIMED_OUT);
-    if (alloc_page.is_ok()) {
-      node.node().FreePage(alloc_page.value());
-    }
-  }
+  EXPECT_EQ(ZX_OK, node.node().WaitTillShouldRetrySingleAlloc(Deadline::infinite_past()));
 
   END_TEST;
 }
