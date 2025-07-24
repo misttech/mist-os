@@ -871,16 +871,8 @@ void Controller::PrepareStop() {
 void Controller::Stop() { fdf::info("Controller::Stop"); }
 
 Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                       fdf::UnownedSynchronizedDispatcher dispatcher)
-    : Controller(std::move(engine_driver_client), std::move(dispatcher), inspect::Inspector{}) {
-  ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
-}
-
-Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                       fdf::UnownedSynchronizedDispatcher driver_dispatcher,
-                       inspect::Inspector inspector)
-    : inspector_(std::move(inspector)),
-      root_(inspector_.GetRoot().CreateChild("display")),
+                       fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : root_(inspector_.GetRoot().CreateChild("display")),
       driver_dispatcher_(std::move(driver_dispatcher)),
       vsync_monitor_(root_.CreateChild("vsync_monitor"), driver_dispatcher_->async_dispatcher()),
       engine_driver_client_(std::move(engine_driver_client)) {

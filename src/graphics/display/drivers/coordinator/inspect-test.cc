@@ -36,21 +36,19 @@ EngineDriverClientAndServer EngineDriverClientAndServer::Create() {
   };
 }
 
+inspect::Hierarchy GetInspectHierarchy(const inspect::Inspector& inspector) {
+  fpromise::result<inspect::Hierarchy> hierarchy_maybe =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(inspector));
+  EXPECT_TRUE(hierarchy_maybe.is_ok());
+  return hierarchy_maybe.take_value();
+}
+
 class InspectTest : public ::testing::Test {
  public:
   InspectTest()
       : engine_driver_client_and_server_(EngineDriverClientAndServer::Create()),
-        inspector_(),
         controller_(std::move(engine_driver_client_and_server_.engine_driver_client),
-                    /*dispatcher=*/driver_runtime_.StartBackgroundDispatcher(), inspector_) {}
-
-  void SetUp() override {
-    fpromise::result<inspect::Hierarchy> hierarchy_maybe =
-        fpromise::run_single_threaded(inspect::ReadFromInspector(inspector_));
-    ASSERT_TRUE(hierarchy_maybe.is_ok());
-
-    hierarchy_ = std::move(hierarchy_maybe.value());
-  }
+                    /*dispatcher=*/driver_runtime_.StartBackgroundDispatcher()) {}
 
  protected:
   // `logger_` must outlive `driver_runtime_` to allow for any
@@ -59,13 +57,12 @@ class InspectTest : public ::testing::Test {
   fdf_testing::DriverRuntime driver_runtime_;
 
   EngineDriverClientAndServer engine_driver_client_and_server_;
-  inspect::Inspector inspector_;
   Controller controller_;
-  inspect::Hierarchy hierarchy_;
 };
 
 TEST_F(InspectTest, ApplyConfigHierarchy) {
-  const inspect::Hierarchy* display = hierarchy_.GetByPath({"display"});
+  inspect::Hierarchy hierarchy = GetInspectHierarchy(controller_.inspector());
+  const inspect::Hierarchy* display = hierarchy.GetByPath({"display"});
   ASSERT_NE(display, nullptr);
   const inspect::NodeValue& display_node = display->node();
 
@@ -81,7 +78,8 @@ TEST_F(InspectTest, ApplyConfigHierarchy) {
 }
 
 TEST_F(InspectTest, VsyncMonitorHierarchy) {
-  const inspect::Hierarchy* vsync_monitor = hierarchy_.GetByPath({"display", "vsync_monitor"});
+  inspect::Hierarchy hierarchy = GetInspectHierarchy(controller_.inspector());
+  const inspect::Hierarchy* vsync_monitor = hierarchy.GetByPath({"display", "vsync_monitor"});
   ASSERT_NE(vsync_monitor, nullptr);
   const inspect::NodeValue& vsync_monitor_node = vsync_monitor->node();
 

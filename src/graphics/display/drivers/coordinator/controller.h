@@ -81,13 +81,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
                       fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  // Creates a new coordinator Controller instance with an injected `inspector`.
-  // The `inspector` and inspect data may be duplicated and shared.
-  //
-  // `engine_driver_client` must not be null.
-  Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-             fdf::UnownedSynchronizedDispatcher dispatcher, inspect::Inspector inspector);
-
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
 
