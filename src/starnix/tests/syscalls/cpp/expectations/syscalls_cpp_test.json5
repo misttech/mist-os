@@ -69,9 +69,6 @@
                 "SocketFault/SocketFault.ReadV/2",
                 "SocketFault/SocketFault.WriteV/2",
 
-                // TODO(https://fxbug.dev/433402022) - Clear signal action flags during exec.
-                "SignalHandling.SigactionResetByExec",
-
                 // TODO(https://fxbug.dev/307595538)
                 "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/*",
 

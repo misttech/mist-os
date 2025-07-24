@@ -12,8 +12,8 @@ use starnix_uapi::union::struct_with_union_into_bytes;
 use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef, UserAddress};
 use starnix_uapi::{
     c_int, c_uint, errno, error, pid_t, sigaction_t, sigaltstack, sigevent, sigval_t, tid_t, uaddr,
-    uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN,
-    SI_KERNEL, SI_MAX_SIZE,
+    uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_IGN, SI_KERNEL,
+    SI_MAX_SIZE,
 };
 use static_assertions::const_assert;
 use std::cmp::Ordering;
@@ -81,8 +81,10 @@ impl SignalActions {
 
     pub fn reset_for_exec(&self) {
         for action in self.actions.write().iter_mut() {
-            if action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN {
-                action.sa_handler = SIG_DFL;
+            let handler = action.sa_handler;
+            *action = sigaction_t::default();
+            if handler == SIG_IGN {
+                action.sa_handler = SIG_IGN;
             }
         }
     }
