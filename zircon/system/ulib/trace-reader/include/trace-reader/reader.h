@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -165,6 +166,8 @@ class Chunk final {
   std::optional<std::string_view> ReadString(size_t length);
   std::optional<Chunk> ReadChunk(size_t num_words);
   std::optional<void const*> ReadInPlace(size_t num_words);
+
+  std::span<const uint64_t> Words() const { return {begin_, end_}; }
 
  private:
   const uint64_t* begin_;

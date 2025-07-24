@@ -76,6 +76,10 @@ impl<'a> RawArg<'a> {
             }
             PTR_ARG_TYPE => map(le_u64, |p| RawArgValue::Pointer(p)).parse(payload),
             KOBJ_ARG_TYPE => map(le_u64, |k| RawArgValue::KernelObj(k)).parse(payload),
+            BLOB_ARG_TYPE => {
+                let header = BlobHeader::new(base_header.0).map_err(nom::Err::Failure)?;
+                Ok((&[][..], RawArgValue::Blob(&payload[..header.blob_size() as usize])))
+            }
             unknown => Ok((&[][..], RawArgValue::Unknown { raw_type: unknown, bytes: payload })),
         }?;
 
@@ -197,6 +201,17 @@ impl<'a> RawArg<'a> {
                 }
                 Ok(builder.atom(val.to_le_bytes()).build())
             }
+            RawArgValue::Blob(val) => {
+                let mut header = BlobHeader::empty();
+                header.set_name_ref(arg_name_ref);
+                header.set_blob_size(val.len() as u32);
+                let mut builder = FxtBuilder::new(header);
+                if let StringRef::Inline(name_str) = self.name {
+                    builder = builder.atom(name_str);
+                }
+                builder = builder.atom(val);
+                Ok(builder.build())
+            }
             RawArgValue::Unknown { raw_type, bytes } => {
                 let mut header = BaseArgHeader::empty();
                 header.set_raw_type(*raw_type);
@@ -222,6 +237,7 @@ pub enum ArgValue {
     String(FlyStr),
     Pointer(u64),
     KernelObj(u64),
+    Blob(Vec<u8>),
 }
 
 impl ArgValue {
@@ -292,6 +308,13 @@ impl ArgValue {
         }
     }
 
+    pub fn blob(&self) -> Option<&[u8]> {
+        match self {
+            Self::Blob(b) => Some(b),
+            _ => None,
+        }
+    }
+
     fn resolve(ctx: &mut ResolveCtx, raw: RawArgValue<'_>) -> Option<Self> {
         Some(match raw {
             RawArgValue::Null => ArgValue::Null,
@@ -304,6 +327,7 @@ impl ArgValue {
             RawArgValue::String(s) => ArgValue::String(ctx.resolve_str(s)),
             RawArgValue::Pointer(p) => ArgValue::Pointer(p),
             RawArgValue::KernelObj(k) => ArgValue::KernelObj(k),
+            RawArgValue::Blob(b) => ArgValue::Blob(b.to_vec()),
             RawArgValue::Unknown { .. } => {
                 return None;
             }
@@ -324,6 +348,7 @@ impl std::fmt::Display for ArgValue {
             ArgValue::String(v) => write!(f, "{v}"),
             ArgValue::Pointer(v) => write!(f, "{v:#016x}"),
             ArgValue::KernelObj(v) => write!(f, "{v}"),
+            ArgValue::Blob(v) => write!(f, "{v:02X?}"),
         }
     }
 }
@@ -340,6 +365,7 @@ pub enum RawArgValue<'a> {
     String(StringRef<'a>),
     Pointer(u64),
     KernelObj(u64),
+    Blob(&'a [u8]),
     Unknown { raw_type: u8, bytes: &'a [u8] },
 }
 
@@ -364,6 +390,7 @@ pub(crate) const STR_ARG_TYPE: u8 = 6;
 pub(crate) const PTR_ARG_TYPE: u8 = 7;
 pub(crate) const KOBJ_ARG_TYPE: u8 = 8;
 pub(crate) const BOOL_ARG_TYPE: u8 = 9;
+pub(crate) const BLOB_ARG_TYPE: u8 = 10;
 
 // Used to probe the arg type.
 arg_header! {
@@ -415,6 +442,12 @@ arg_header! {
 arg_header! {
     BoolHeader (BOOL_ARG_TYPE) {
         u8, value: 32, 32;
+    }
+}
+
+arg_header! {
+    BlobHeader (BLOB_ARG_TYPE) {
+        u32, blob_size: 32, 63;
     }
 }
 
@@ -765,6 +798,39 @@ mod tests {
         let arg_record_bytes = FxtBuilder::new(header).atom(name).build();
         let raw_arg_record =
             RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Boolean(true) };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
+    }
+
+    #[test]
+    fn blob_arg_name_index() {
+        let blob = b"the rain in spain falls mainly on the plain";
+        let mut header = BlobHeader::empty();
+        header.set_name_ref(10);
+        header.set_blob_size(blob.len() as u32);
+
+        let arg_record_bytes = FxtBuilder::new(header).atom(blob).build();
+        let raw_arg_record = RawArg {
+            name: StringRef::Index(NonZeroU16::new(10).unwrap()),
+            value: RawArgValue::Blob(blob),
+        };
+
+        assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
+        assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);
+    }
+
+    #[test]
+    fn blob_arg_name_inline() {
+        let name: &str = "hello";
+        let blob = b"the rain in spain falls mainly on the plain";
+        let mut header = BlobHeader::empty();
+        header.set_name_ref(name.len() as u16 | STRING_REF_INLINE_BIT);
+        header.set_blob_size(blob.len() as u32);
+
+        let arg_record_bytes = FxtBuilder::new(header).atom(name).atom(blob).build();
+        let raw_arg_record =
+            RawArg { name: StringRef::Inline("hello"), value: RawArgValue::Blob(blob) };
 
         assert_parses_to_arg!(arg_record_bytes, raw_arg_record);
         assert_eq!(raw_arg_record.serialize().unwrap(), arg_record_bytes);

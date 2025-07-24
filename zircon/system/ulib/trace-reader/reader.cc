@@ -797,6 +797,14 @@ bool TraceReader::ReadArguments(Chunk& record, size_t count, std::vector<Argumen
         out_arguments->push_back(Argument{std::move(name), ArgumentValue::MakeKoid(value.value())});
         break;
       }
+      case ArgumentType::kBlob: {
+        std::span<const uint64_t> value = arg.Words();
+        const uint8_t* start = reinterpret_cast<const uint8_t*>(value.data());
+        const uint8_t* end = start + (value.size() * sizeof(uint64_t));
+        out_arguments->push_back(
+            Argument{std::move(name), ArgumentValue::MakeBlob(std::vector<uint8_t>(start, end))});
+        break;
+      }
       default: {
         // Ignore unknown argument types for forward compatibility.
         std::stringstream ss;

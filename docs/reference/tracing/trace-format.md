@@ -1217,6 +1217,7 @@ There are the following argument types:
 - [Pointer argument](#pointer-argument)
 - [Kernel object id argument](#kernel-object-id-argument)
 - [Boolean argument](#boolean-argument)
+- [Blob argument](#blob-argument)
 
 ### Argument header {#argument-header}
 
@@ -1458,6 +1459,33 @@ _argument header word_
 _argument name stream_ (omitted unless string ref denotes inline string)
 
 - UTF-8 string, padded with zeros to 8 byte alignment
+
+### Blob argument (argument type = 10) {#blob-argument}
+
+Represents opaque binary data. The maximum size is slightly smaller than 32k.
+
+##### Format
+
+![drawing](images/trace-format/argument10.png)
+
+_argument header word_
+
+- `[0 .. 3]`: argument type (10)
+- `[4 .. 15]`: argument size (inclusive of this word) as a multiple of 8 bytes
+- `[16 .. 31]`: argument name (string ref)
+- `[32 .. 63]`: 32-bit unsigned blob size
+
+_argument name stream_ (omitted unless string ref denotes inline string)
+
+- UTF-8 string, padded with zeros to 8 byte alignment
+
+_payload stream_
+
+- binary data, padded with zeros to 8 byte alignment
+- the maximum size will be 32k minus 8 bytes for the header and as many 8-byte
+  words are used for an inline argument name, if used.
+- since the payload stream may be padded a reader should discard bytes beyond
+  the length specified in the _blob size_ header field.
 
 <!-- xrefs -->
 

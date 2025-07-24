@@ -686,6 +686,14 @@ void ChromiumExporter::WriteArgs(const std::vector<trace::Argument>& arguments) 
         writer_.Key(CleanString(arg.name()));
         writer_.String(fxl::StringPrintf("#%" PRIu64, arg.value().GetKoid()).c_str());
         break;
+      case trace::ArgumentType::kBlob:
+        writer_.Key(CleanString(arg.name()));
+        {
+          std::string blob_str(reinterpret_cast<const char*>(arg.value().GetBlob().data()),
+                               arg.value().GetBlob().size());
+          writer_.String(modp_b64_encode(blob_str));
+        }
+        break;
       default:
         break;
     }

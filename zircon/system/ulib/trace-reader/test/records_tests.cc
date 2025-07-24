@@ -289,6 +289,19 @@ TEST(TraceRecords, ArgumentValue) {
   }
 
   EXPECT_EQ("koid(18446744073709551615)", av.ToString());
+
+  // blob
+  uint8_t blob_value[] = {1, 2, 3, 4, 5};
+  av = trace::ArgumentValue::MakeBlob(std::span<uint8_t>(blob_value, sizeof(blob_value)));
+  EXPECT_EQ(trace::ArgumentType::kBlob, av.type());
+  EXPECT_EQ(5, av.GetBlob().size());
+  EXPECT_EQ(1, av.GetBlob()[0]);
+  EXPECT_EQ(2, av.GetBlob()[1]);
+  EXPECT_EQ(3, av.GetBlob()[2]);
+  EXPECT_EQ(4, av.GetBlob()[3]);
+  EXPECT_EQ(5, av.GetBlob()[4]);
+
+  EXPECT_STREQ("blob(length=5)", av.ToString().c_str());
 }
 
 TEST(TraceRecords, Argument) {

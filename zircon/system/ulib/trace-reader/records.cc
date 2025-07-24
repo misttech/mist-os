@@ -190,6 +190,10 @@ std::string ArgumentValue::ToString() const {
     }
     case ArgumentType::kKoid:
       return (std::stringstream() << "koid(" << std::get<Koid>(value_).value << ")").str();
+    case ArgumentType::kBlob:
+      return (std::stringstream() << "blob(length=" << std::get<std::vector<uint8_t>>(value_).size()
+                                  << ")")
+          .str();
   }
   ZX_ASSERT(false);
 }

@@ -354,6 +354,9 @@ TEST(Serializer, Arguments) {
   fxt::StringRef arg_name(0x7FFF);
   fxt::StringRef inline_string("inline");
 
+  uint8_t blob[5] = {1, 2, 3, 4, 5};
+  std::span<const uint8_t> blob_span{blob};
+
   FakeWriter writer;
   EXPECT_EQ(ZX_OK,
             fxt::WriteInstantEventRecord(
@@ -366,11 +369,11 @@ TEST(Serializer, Arguments) {
                 fxt::Argument(arg_name, fxt::Pointer{0xDEADBEEF}),
                 fxt::Argument(arg_name, fxt::Koid{0x12345678}),
                 fxt::Argument(arg_name, fxt::StringRef(11)), fxt::Argument(arg_name, inline_string),
-                fxt::Argument(inline_string, inline_string)));
-  uint64_t* bytes = reinterpret_cast<uint64_t*>(writer.bytes.data());
-  // We should have 12 arguments
-  uint64_t header = bytes[0];
-  EXPECT_EQ(header & 0x0000'0000'00F0'0000, uint64_t{0x0000'0000'00C0'0000});
+                fxt::Argument(inline_string, inline_string), fxt::Argument(arg_name, blob_span)));
+  uint64_t* words = reinterpret_cast<uint64_t*>(writer.bytes.data());
+  // We should have 13 arguments
+  uint64_t header = words[0];
+  EXPECT_EQ(header & 0x0000'0000'00F0'0000, uint64_t{0x0000'0000'00D0'0000});
 
   const size_t num_words =
       1    // header
@@ -378,52 +381,64 @@ TEST(Serializer, Arguments) {
       + 5  // 1 word for args that fit in the header (null, bool, int32, uint32, string arg (ref)
       + 2 * 6  // 2 words for args that don't fit (int64, uint64, double, pointer, koid, inline
                // string value)
-      + 3;     // 3 words for the string arg with inline name and value.
+      + 3      // 3 words for the string arg with inline name and value.
+      + 2;     // 2 words for the blob arg with interned name
   EXPECT_EQ(writer.bytes.size(), fxt::WordSize(num_words).SizeInBytes());
-  uint64_t null_arg_header = bytes[2];
+  uint64_t null_arg_header = words[2];
   EXPECT_EQ(null_arg_header, uint64_t{0x0000'0000'7FFF'0010});
 
-  uint64_t bool_arg_header = bytes[3];
+  uint64_t bool_arg_header = words[3];
   EXPECT_EQ(bool_arg_header, uint64_t{0x0000'0001'7FFF'0019});
 
-  uint64_t int32_arg_header = bytes[4];
+  uint64_t int32_arg_header = words[4];
   EXPECT_EQ(int32_arg_header, uint64_t{0x1234'5678'7FFF'0011});
 
-  uint64_t uint32_arg_header = bytes[5];
+  uint64_t uint32_arg_header = words[5];
   EXPECT_EQ(uint32_arg_header, uint64_t{0x5678'90AB'7FFF'0012});
 
-  uint64_t int64_arg_header = bytes[6];
+  uint64_t int64_arg_header = words[6];
   EXPECT_EQ(int64_arg_header, uint64_t{0x0000'0000'7FFF'0023});
-  EXPECT_EQ(bytes[7], uint64_t{0x1234'5678'90AB'CDEF});
+  EXPECT_EQ(words[7], uint64_t{0x1234'5678'90AB'CDEF});
 
-  uint64_t uint64_arg_header = bytes[8];
+  uint64_t uint64_arg_header = words[8];
   EXPECT_EQ(uint64_arg_header, uint64_t{0x0000'0000'7FFF'0024});
-  EXPECT_EQ(bytes[9], uint64_t{0xFEDC'BA09'8765'4321});
+  EXPECT_EQ(words[9], uint64_t{0xFEDC'BA09'8765'4321});
 
-  uint64_t double_arg_header = bytes[10];
+  uint64_t double_arg_header = words[10];
   EXPECT_EQ(double_arg_header, uint64_t{0x0000'0000'7FFF'0025});
   double exp_double_val = 1234.5678;
-  EXPECT_EQ(bytes[11], *reinterpret_cast<uint64_t*>(&exp_double_val));
+  EXPECT_EQ(words[11], *reinterpret_cast<uint64_t*>(&exp_double_val));
 
-  uint64_t pointer_arg_header = bytes[12];
+  uint64_t pointer_arg_header = words[12];
   EXPECT_EQ(pointer_arg_header, uint64_t{0x0000'0000'7FFF'0027});
-  EXPECT_EQ(bytes[13], uint64_t{0xDEADBEEF});
+  EXPECT_EQ(words[13], uint64_t{0xDEADBEEF});
 
-  uint64_t koid_arg_header = bytes[14];
+  uint64_t koid_arg_header = words[14];
   EXPECT_EQ(koid_arg_header, uint64_t{0x0000'0000'7FFF'0028});
-  EXPECT_EQ(bytes[15], uint64_t{0x12345678});
+  EXPECT_EQ(words[15], uint64_t{0x12345678});
 
-  uint64_t string_arg_header = bytes[16];
+  uint64_t string_arg_header = words[16];
   EXPECT_EQ(string_arg_header, uint64_t{0x0000'000B'7FFF'0016});
 
-  uint64_t inline_string_arg_header = bytes[17];
+  uint64_t inline_string_arg_header = words[17];
   EXPECT_EQ(inline_string_arg_header, uint64_t{0x0000'8006'7FFF'0026});
-  EXPECT_EQ(bytes[18], uint64_t{0x0000'656E'696C'6E69});
+  EXPECT_EQ(words[18], uint64_t{0x0000'656E'696C'6E69});
 
-  uint64_t double_inline_string_arg_header = bytes[19];
+  uint64_t double_inline_string_arg_header = words[19];
   EXPECT_EQ(double_inline_string_arg_header, uint64_t{0x0000'8006'8006'0036});
-  EXPECT_EQ(bytes[20], uint64_t{0x0000'656E'696C'6E69});
-  EXPECT_EQ(bytes[21], uint64_t{0x0000'656E'696C'6E69});
+  EXPECT_EQ(words[20], uint64_t{0x0000'656E'696C'6E69});
+  EXPECT_EQ(words[21], uint64_t{0x0000'656E'696C'6E69});
+
+  uint64_t blob_arg_header = words[22];
+  EXPECT_EQ(blob_arg_header, uint64_t{0x0000'0005'7FFF'002A});
+  const uint8_t* blob_bytes = reinterpret_cast<const uint8_t*>(&words[23]);
+  EXPECT_EQ(blob_bytes[0], 1);
+  EXPECT_EQ(blob_bytes[1], 2);
+  EXPECT_EQ(blob_bytes[2], 3);
+  EXPECT_EQ(blob_bytes[3], 4);
+  EXPECT_EQ(blob_bytes[4], 5);
+  EXPECT_EQ(blob_bytes[6], 0);
+  EXPECT_EQ(blob_bytes[7], 0);
 }
 
 TEST(Serializer, InstantEventRecord) {

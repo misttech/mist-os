@@ -14,6 +14,7 @@
 
 #include <new>
 #include <optional>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -76,6 +77,9 @@ class ArgumentValue final {
   static ArgumentValue MakeString(std::string value) { return ArgumentValue(std::move(value)); }
   static ArgumentValue MakePointer(uint64_t value) { return ArgumentValue(Pointer{value}); }
   static ArgumentValue MakeKoid(zx_koid_t value) { return ArgumentValue(Koid{value}); }
+  static ArgumentValue MakeBlob(std::span<const uint8_t> value) {
+    return ArgumentValue(std::vector<uint8_t>(value.begin(), value.end()));
+  }
 
   ~ArgumentValue() = default;
 
@@ -132,6 +136,11 @@ class ArgumentValue final {
 
   std::string ToString() const;
 
+  const std::vector<uint8_t>& GetBlob() const {
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kBlob);
+    return std::get<std::vector<uint8_t>>(value_);
+  }
+
  private:
   // Strong wrapper types for argument types that have no value or have ambiguous implicit
   // conversions.
@@ -156,9 +165,10 @@ class ArgumentValue final {
   explicit ArgumentValue(std::string string) : value_(std::move(string)) {}
   explicit ArgumentValue(Pointer pointer) : value_(pointer) {}
   explicit ArgumentValue(Koid koid) : value_(koid) {}
+  explicit ArgumentValue(std::vector<uint8_t> blob) : value_(blob) {}
 
   using Variant = std::variant<Null, int32_t, uint32_t, int64_t, uint64_t, double, std::string,
-                               Pointer, Koid, Bool>;
+                               Pointer, Koid, Bool, std::vector<uint8_t>>;
   Variant value_;
 
   // Ensure the variant size and type order matches the type enum values.
@@ -174,6 +184,7 @@ class ArgumentValue final {
   static_assert(TypeIndexCheck<Pointer, TRACE_ARG_POINTER>);
   static_assert(TypeIndexCheck<Koid, TRACE_ARG_KOID>);
   static_assert(TypeIndexCheck<Bool, TRACE_ARG_BOOL>);
+  static_assert(TypeIndexCheck<std::vector<uint8_t>, TRACE_ARG_BLOB>);
 };
 
 // Named argument and value.

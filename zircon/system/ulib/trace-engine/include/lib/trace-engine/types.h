@@ -220,6 +220,7 @@ typedef enum {
   TRACE_ARG_POINTER = 7,
   TRACE_ARG_KOID = 8,
   TRACE_ARG_BOOL = 9,
+  TRACE_ARG_BLOB = 10,
 } trace_arg_type_t;
 
 // A typed argument value.
@@ -398,6 +399,7 @@ enum class ArgumentType {
   kPointer = TRACE_ARG_POINTER,
   kKoid = TRACE_ARG_KOID,
   kBool = TRACE_ARG_BOOL,
+  kBlob = TRACE_ARG_BLOB,
 };
 
 // EventType enumerates all known trace event types.
