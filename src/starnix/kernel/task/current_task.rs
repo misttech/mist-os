@@ -347,7 +347,7 @@ impl CurrentTask {
         assert!(overridden_creds.is_none());
         unsafe {
             // SAFETY: this is allowed because we are the CurrentTask.
-            *self.persistent_info.lock().creds_mut() = creds;
+            *self.persistent_info.creds_mut() = creds;
         }
         // The /proc/pid directory's ownership is updated when the task's euid
         // or egid changes. See proc(5).
@@ -1110,7 +1110,10 @@ impl CurrentTask {
                 if maybe_set_id.is_none() { DumpPolicy::User } else { DumpPolicy::Disable };
             *mm.dumpable.lock(locked) = dumpable;
 
-            let mut persistent_info = self.persistent_info.lock();
+            let mut creds = unsafe {
+                // SAFETY: this is allowed because we are the CurrentTask.
+                self.persistent_info.creds_mut()
+            };
             state.set_sigaltstack(None);
             state.robust_list_head = RobustListHeadPtr::null(self);
 
@@ -1125,11 +1128,7 @@ impl CurrentTask {
 
             // TODO(tbodt): Check whether capability xattrs are set on the file, and grant/limit
             // capabilities accordingly.
-            unsafe {
-                // SAFETY: this is allowed because we are the CurrentTask.
-                persistent_info.creds_mut()
-            }
-            .exec(maybe_set_id);
+            creds.exec(maybe_set_id);
         }
 
         let security_state = resolved_elf.security_state.clone();

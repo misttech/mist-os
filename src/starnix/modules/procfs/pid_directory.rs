@@ -837,7 +837,7 @@ impl FileOps for CommFile {
 pub struct CommFileSource(TaskPersistentInfo);
 impl DynamicFileSource for CommFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        sink.write(self.0.lock().command().as_bytes());
+        sink.write(self.0.command().as_bytes());
         sink.write(b"\n");
         Ok(())
     }
@@ -1185,13 +1185,12 @@ impl DynamicFileSource for StatusFile {
                 // Collect everything stored in info in this block.  There is a lock ordering
                 // issue with the task lock acquired below, and cloning info is
                 // expensive.
-                let info = task.persistent_info.lock();
                 write!(sink, "Name:\t")?;
-                sink.write(info.command().as_bytes());
-                let creds = info.real_creds();
+                sink.write(task.persistent_info.command().as_bytes());
+                let creds = task.persistent_info.real_creds();
                 (
-                    Some(info.pid()),
-                    Some(info.tid()),
+                    Some(task.persistent_info.pid()),
+                    Some(task.persistent_info.tid()),
                     Some(format!(
                         "Uid:\t{}\t{}\t{}\t{}\nGid:\t{}\t{}\t{}\t{}\nGroups:\t{}",
                         creds.uid,

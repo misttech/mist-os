@@ -15,16 +15,15 @@ use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     ptrace_detach, AtomicStopState, ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable,
     ProcessGroup, PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session,
-    StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState,
-    TimerTable, TypedWaitQueue, ZombiePtraces,
+    StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TimerTable, TypedWaitQueue,
+    ZombiePtraces,
 };
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::{
-    LockBefore, Locked, Mutex, MutexGuard, OrderedMutex, ProcessGroupState, RwLock,
-    ThreadGroupLimits, Unlocked,
+    LockBefore, Locked, Mutex, OrderedMutex, ProcessGroupState, RwLock, ThreadGroupLimits, Unlocked,
 };
 use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef, WeakRefKey};
 use starnix_types::stats::TaskTimeStats;
@@ -772,7 +771,7 @@ impl ThreadGroup {
             let exit_info =
                 ProcessExitInfo { status: exit_status, exit_signal: self.exit_signal.clone() };
             let zombie =
-                ZombieProcess::new(state.as_ref(), persistent_info.lock().real_creds(), exit_info);
+                ZombieProcess::new(state.as_ref(), &persistent_info.real_creds(), exit_info);
             pids.kill_process(self.leader, OwnedRef::downgrade(&zombie));
 
             state.leave_process_group(locked, pids);
@@ -1897,9 +1896,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         exit_status(siginfo)
                     };
                     let info = child.tasks.values().next().unwrap().info();
+                    let uid = info.real_creds().uid;
                     WaitResult {
                         pid: child.base.leader,
-                        uid: info.real_creds().uid,
+                        uid,
                         exit_info: ProcessExitInfo {
                             status: exit_status,
                             exit_signal: child.base.exit_signal,
@@ -2100,8 +2100,8 @@ impl TaskContainer {
         self.0.clone()
     }
 
-    fn info(&self) -> MutexGuard<'_, TaskPersistentInfoState> {
-        self.1.lock()
+    fn info(&self) -> &TaskPersistentInfo {
+        &self.1
     }
 }
 
