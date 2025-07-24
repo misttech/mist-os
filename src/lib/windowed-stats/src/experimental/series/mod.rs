@@ -51,6 +51,13 @@ pub enum FoldError {
     Monotonicity(#[from] MonotonicityError),
     #[error(transparent)]
     Overflow(#[from] OverflowError),
+    // TODO(https://fxbug.dev/432323121): Provide the data that could not be sent into the channel
+    //                                    here. This requires an input type parameter on
+    //                                    `FoldError`, a `dyn Any` trait object, etc.
+    #[error("timed sample dropped: channel is closed or buffer is exhausted")]
+    Buffer,
+    #[error("failed to fold one or more buffered samples")]
+    Flush(Vec1<FoldError>),
 }
 
 impl From<Infallible> for FoldError {

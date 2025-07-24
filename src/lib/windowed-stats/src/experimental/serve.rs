@@ -2,20 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use derivative::Derivative;
-use fuchsia_async as fasync;
 use fuchsia_inspect::{Inspector, Node as InspectNode};
-use fuchsia_sync::Mutex;
+use fuchsia_sync::Mutex as SyncMutex;
 use futures::channel::mpsc;
-use futures::{select, Future, FutureExt, StreamExt};
+use futures::lock::Mutex as AsyncMutex;
+use futures::{select, Future, FutureExt as _, StreamExt as _};
 use log::{error, info, warn};
 use std::sync::Arc;
+use {async_channel as mpmc, fuchsia_async as fasync};
 
 use crate::experimental::clock::{Timed, Timestamp};
 use crate::experimental::series::buffer::BufferStrategy;
 use crate::experimental::series::interpolation::Interpolation;
 use crate::experimental::series::statistic::{Metadata, Statistic};
-use crate::experimental::series::{FoldError, Interpolator, MatrixSampler, TimeMatrix};
+use crate::experimental::series::{
+    FoldError, Interpolator, MatrixSampler, SerializedBuffer, TimeMatrix,
+};
+use crate::experimental::vec1::Vec1;
 
 // TODO(https://fxbug.dev/375489301): It is not possible to inject a mock time matrix into this
 //                                    function. Refactor the function so that a unit test can
@@ -38,9 +41,7 @@ pub fn serve_time_matrix_inspection(
     /// The duration between interpolating data in inspected time matrices.
     const INTERPOLATION_PERIOD: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
 
-    let (sender, mut receiver) = mpsc::channel::<Arc<Mutex<dyn Interpolator<Error = FoldError>>>>(
-        TIME_MATRIX_SENDER_BUFFER_SIZE,
-    );
+    let (sender, mut receiver) = mpsc::channel::<SharedTimeMatrix>(TIME_MATRIX_SENDER_BUFFER_SIZE);
 
     let client = TimeMatrixClient::new(sender, node.clone_weak());
     let server = async move {
@@ -50,20 +51,34 @@ pub fn serve_time_matrix_inspection(
         let mut interpolation = fasync::Interval::new(INTERPOLATION_PERIOD);
         loop {
             select! {
-                // Incorporate any matrices received from the client.
+                // Incorporate time matrices received from the client.
                 matrix = receiver.next() => {
                     match matrix {
-                        Some(matrix) => matrices.push(matrix),
-                        None => info!("time matrix inspection terminated."),
+                        Some(matrix) => {
+                            matrices.push(matrix);
+                        }
+                        None => {
+                            info!("time matrix inspection terminated.");
+                        }
                     }
                 }
-                // Periodically interpolate data in each matrix.
+                // Periodically fold buffered samples into and interpolate time matrices.
                 _ = interpolation.next() => {
-                    let now = Timestamp::now();
+                    // TODO(https://fxbug.dev/375255877): Log more information, such as the name
+                    //                                    associated with the matrix.
                     for matrix in matrices.iter() {
-                        if let Err(error) = matrix.lock().interpolate(now) {
-                            // TODO(https://fxbug.dev/375255877): Log more information, such as the
-                            //                                    name associated with the matrix.
+                        let mut matrix = matrix.lock().await;
+                        if let Err(error) = matrix.fold_buffered_samples() {
+                            warn!("failed to fold samples into time matrix: {:?}", error);
+                        }
+                        // Querying the current timestamp for each matrix like this introduces a
+                        // bias: the more recently a matrix has been pushed into `matrices`, the
+                        // more recent the timestamp of its interpolation. However, folding
+                        // buffered samples may take a non-trivial amount of time and a sample may
+                        // arrive as a buffer is being drained. The current timestamp must be
+                        // queried after the drain is complete to guarantee that it is more recent
+                        // than any timestamp associated with a sample.
+                        if let Err(error) = matrix.interpolate(Timestamp::now()) {
                             warn!("failed to interpolate time matrix: {:?}", error);
                         }
                     }
@@ -72,6 +87,78 @@ pub fn serve_time_matrix_inspection(
         }
     };
     (client, server)
+}
+
+pub trait ServedTimeMatrix: Interpolator<Error = FoldError> + Send {
+    fn fold_buffered_samples(&mut self) -> Result<(), Self::Error>;
+}
+
+pub struct BufferedSampler<T, M>
+where
+    M: MatrixSampler<T>,
+{
+    receiver: mpmc::Receiver<Timed<T>>,
+    matrix: M,
+}
+
+impl<T, M> BufferedSampler<T, M>
+where
+    M: MatrixSampler<T>,
+{
+    pub fn from_time_matrix(matrix: M) -> (mpmc::Sender<Timed<T>>, Self) {
+        /// The buffer capacity of the MPMC channel through which timed samples are sent to
+        /// `BufferedSampler`s.
+        const TIMED_SAMPLE_SENDER_BUFFER_SIZE: usize = 1024;
+
+        let (sender, receiver) = mpmc::bounded(TIMED_SAMPLE_SENDER_BUFFER_SIZE);
+        (sender, BufferedSampler { receiver, matrix })
+    }
+}
+
+impl<T, M> Interpolator for BufferedSampler<T, M>
+where
+    M: MatrixSampler<T>,
+{
+    type Error = FoldError;
+
+    fn interpolate(&mut self, timestamp: Timestamp) -> Result<(), Self::Error> {
+        self.matrix.interpolate(timestamp)
+    }
+
+    fn interpolate_and_get_buffers(
+        &mut self,
+        timestamp: Timestamp,
+    ) -> Result<SerializedBuffer, Self::Error> {
+        self.matrix.interpolate_and_get_buffers(timestamp)
+    }
+}
+
+impl<T, M> ServedTimeMatrix for BufferedSampler<T, M>
+where
+    T: Send,
+    M: MatrixSampler<T> + Send,
+{
+    fn fold_buffered_samples(&mut self) -> Result<(), Self::Error> {
+        let mut errors = vec![];
+        loop {
+            match self.receiver.try_recv() {
+                Ok(sample) => {
+                    if let Err(error) = self.matrix.fold(sample) {
+                        errors.push(error);
+                    }
+                }
+                Err(error) => {
+                    return match error {
+                        mpmc::TryRecvError::Closed => Err(FoldError::Buffer),
+                        mpmc::TryRecvError::Empty => match Vec1::try_from(errors) {
+                            Ok(errors) => Err(FoldError::Flush(errors)),
+                            _ => Ok(()),
+                        },
+                    };
+                }
+            }
+        }
+    }
 }
 
 pub trait InspectSender {
@@ -115,22 +202,19 @@ pub trait InspectSender {
         P: Interpolation<FillSample<F> = F::Sample>;
 }
 
-type SharedTimeMatrix = Arc<Mutex<dyn Interpolator<Error = FoldError>>>;
+type SharedTimeMatrix = Arc<AsyncMutex<dyn ServedTimeMatrix>>;
 
 pub struct TimeMatrixClient {
-    sender: Arc<Mutex<mpsc::Sender<SharedTimeMatrix>>>,
+    // TODO(https://fxbug.dev/432324973): Synchronizing the sender end of a channel like this is an
+    //                                    anti-pattern. Consider removing the mutex. See the linked
+    //                                    bug for discussion of the ramifications.
+    sender: Arc<SyncMutex<mpsc::Sender<SharedTimeMatrix>>>,
     node: InspectNode,
-}
-
-impl Clone for TimeMatrixClient {
-    fn clone(&self) -> Self {
-        Self { sender: self.sender.clone(), node: self.node.clone_weak() }
-    }
 }
 
 impl TimeMatrixClient {
     fn new(sender: mpsc::Sender<SharedTimeMatrix>, node: InspectNode) -> Self {
-        Self { sender: Arc::new(Mutex::new(sender)), node }
+        Self { sender: Arc::new(SyncMutex::new(sender)), node }
     }
 
     fn inspect_and_record_with<F, P, R>(
@@ -143,16 +227,24 @@ impl TimeMatrixClient {
         TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
         Metadata<F>: 'static + Send + Sync,
         F: BufferStrategy<F::Aggregation, P> + Statistic,
+        F::Sample: Send,
         P: Interpolation<FillSample<F> = F::Sample>,
         R: 'static + Clone + Fn(&InspectNode) + Send + Sync,
     {
         let name = name.into();
-        let matrix = Arc::new(Mutex::new(matrix));
+        let (sender, matrix) = BufferedSampler::from_time_matrix(matrix);
+        let matrix = Arc::new(AsyncMutex::new(matrix));
         self::record_lazy_time_matrix_with(&self.node, &name, matrix.clone(), record);
-        if let Err(error) = self.sender.lock().try_send(matrix.clone()) {
+        if let Err(error) = self.sender.lock().try_send(matrix) {
             error!("failed to send time matrix \"{}\" to inspection server: {:?}", name, error);
         }
-        InspectedTimeMatrix::new(name, matrix)
+        InspectedTimeMatrix::new(name, sender)
+    }
+}
+
+impl Clone for TimeMatrixClient {
+    fn clone(&self) -> Self {
+        TimeMatrixClient { sender: self.sender.clone(), node: self.node.clone_weak() }
     }
 }
 
@@ -196,29 +288,26 @@ impl InspectSender for TimeMatrixClient {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct InspectedTimeMatrix<T> {
     name: String,
-    #[derivative(Debug = "ignore")]
-    matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
+    sender: mpmc::Sender<Timed<T>>,
 }
 
 impl<T> InspectedTimeMatrix<T> {
-    pub(crate) fn new(
-        name: impl Into<String>,
-        matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
-    ) -> Self {
-        Self { name: name.into(), matrix }
+    pub(crate) fn new(name: impl Into<String>, sender: mpmc::Sender<Timed<T>>) -> Self {
+        Self { name: name.into(), sender }
     }
 
     pub fn fold(&self, sample: Timed<T>) -> Result<(), FoldError> {
-        self.matrix.lock().fold(sample)
+        // TODO(https://fxbug.dev/432323121): Place the data that could not be sent into the
+        //                                    channel into the error. See `FoldError`.
+        self.sender.try_send(sample).map_err(|_| FoldError::Buffer)
     }
 
     pub fn fold_or_log_error(&self, sample: Timed<T>) {
-        if let Err(error) = self.matrix.lock().fold(sample) {
-            warn!("failed to fold sample into time matrix \"{}\": {:?}", self.name, error);
+        if let Err(error) = self.sender.try_send(sample) {
+            warn!("failed to buffer sample for time matrix \"{}\": {:?}", self.name, error);
         }
     }
 }
@@ -231,7 +320,7 @@ impl<T> InspectedTimeMatrix<T> {
 fn record_lazy_time_matrix_with<F>(
     node: &InspectNode,
     name: impl Into<String>,
-    matrix: Arc<Mutex<dyn Interpolator<Error = FoldError> + Send>>,
+    matrix: Arc<AsyncMutex<dyn ServedTimeMatrix + Send>>,
     f: F,
 ) where
     F: 'static + Clone + Fn(&InspectNode) + Send + Sync,
@@ -243,18 +332,19 @@ fn record_lazy_time_matrix_with<F>(
         async move {
             let inspector = Inspector::default();
             {
-                let now = Timestamp::now();
-                match matrix.lock().interpolate_and_get_buffers(now) {
-                    Ok(buffer) => {
+                let mut matrix = matrix.lock().await;
+                if let Err(error) = matrix
+                    .fold_buffered_samples()
+                    .and_then(|_| matrix.interpolate_and_get_buffers(Timestamp::now()))
+                    .map(|buffer| {
                         inspector.root().atomic_update(|node| {
                             node.record_string("type", buffer.data_semantic);
                             node.record_bytes("data", buffer.data);
                             f(node);
-                        });
-                    }
-                    Err(error) => {
-                        inspector.root().record_string("type", format!("error: {:?}", error));
-                    }
+                        })
+                    })
+                {
+                    inspector.root().record_string("type", format!("error: {:?}", error));
                 }
             }
             Ok(inspector)

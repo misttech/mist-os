@@ -665,7 +665,7 @@ mod tests {
             }
         });
 
-        let mut time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
+        let mut time_matrix_calls = test_helper.mock_time_matrix_client.fold_buffered_samples();
         assert_eq!(
             &time_matrix_calls.drain::<u64>("wlan_connectivity_states")[..],
             &[TimeMatrixCall::Fold(Timed::now(1 << 0)), TimeMatrixCall::Fold(Timed::now(1 << 2)),]
@@ -1013,7 +1013,7 @@ mod tests {
             }
         });
 
-        let mut time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
+        let mut time_matrix_calls = test_helper.mock_time_matrix_client.fold_buffered_samples();
         assert_eq!(
             &time_matrix_calls.drain::<u64>("wlan_connectivity_states")[..],
             &[TimeMatrixCall::Fold(Timed::now(1 << 0)), TimeMatrixCall::Fold(Timed::now(1 << 1)),]

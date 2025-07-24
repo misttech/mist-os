@@ -4,8 +4,9 @@
 
 use derivative::Derivative;
 use fuchsia_sync::Mutex;
-use std::any::{type_name, Any};
+use std::any::{self, Any};
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::experimental::clock::{Timed, Timestamp};
@@ -15,7 +16,9 @@ use crate::experimental::series::statistic::{Metadata, Statistic};
 use crate::experimental::series::{
     FoldError, Interpolator, MatrixSampler, Sampler, SerializedBuffer, TimeMatrix,
 };
-use crate::experimental::serve::{InspectSender, InspectedTimeMatrix};
+use crate::experimental::serve::{
+    BufferedSampler, InspectSender, InspectedTimeMatrix, ServedTimeMatrix,
+};
 
 type DynamicSample = Box<dyn Any + Send>;
 
@@ -38,24 +41,43 @@ impl<T> TimeMatrixCall<T> {
     }
 }
 
+impl<T, E> TimeMatrixCall<Result<T, E>> {
+    fn transpose(self) -> Result<TimeMatrixCall<T>, E> {
+        match self {
+            TimeMatrixCall::Fold(result) => match result.transpose() {
+                Ok(sample) => Ok(TimeMatrixCall::Fold(sample)),
+                Err(error) => Err(error),
+            },
+            TimeMatrixCall::Interpolate(timestamp) => Ok(TimeMatrixCall::Interpolate(timestamp)),
+        }
+    }
+}
+
 #[derive(Debug)]
-pub struct TimeMatrixCalls {
+pub struct TimeMatrixCallLog {
     calls: HashMap<String, Vec<TimeMatrixCall<DynamicSample>>>,
 }
 
-impl TimeMatrixCalls {
+impl TimeMatrixCallLog {
     pub fn drain<T: Any + Send + Clone>(&mut self, name: &str) -> Vec<TimeMatrixCall<T>> {
-        let mut calls = vec![];
-        if let Some(inner_calls) = self.calls.remove(name) {
-            for c in inner_calls {
-                let call = c.map(|value| match value.downcast::<T>() {
-                    Ok(v) => *v,
-                    Err(_e) => panic!("Cannot convert captured call to type {}", type_name::<T>()),
-                });
-                calls.push(call);
-            }
-        }
-        calls
+        self.calls
+            .remove(name)
+            .unwrap_or_else(|| panic!("in time matrix \"{}\": call log not found", name))
+            .into_iter()
+            .map(|call| call.map(|sample| sample.downcast::<T>().map(|sample| *sample)))
+            .map(TimeMatrixCall::transpose)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_else(|_| {
+                panic!(
+                    "in time matrix \"{}\": failed to downcast dynamic sample of type `{}`",
+                    name,
+                    any::type_name::<T>()
+                )
+            })
+    }
+
+    pub fn as_hash_map(&self) -> &HashMap<String, Vec<TimeMatrixCall<DynamicSample>>> {
+        &self.calls
     }
 
     pub fn is_empty(&self) -> bool {
@@ -65,35 +87,26 @@ impl TimeMatrixCalls {
 
 #[derive(Clone)]
 pub struct MockTimeMatrixClient {
+    matrices: Arc<Mutex<Vec<Box<dyn ServedTimeMatrix>>>>,
     calls: Arc<Mutex<Vec<(String, TimeMatrixCall<DynamicSample>)>>>,
 }
 
 impl MockTimeMatrixClient {
     pub fn new() -> Self {
-        Self { calls: Arc::new(Mutex::new(vec![])) }
+        Self { matrices: Arc::new(Mutex::new(vec![])), calls: Arc::new(Mutex::new(vec![])) }
     }
 }
 
 impl MockTimeMatrixClient {
-    pub fn drain_calls(&self) -> TimeMatrixCalls {
-        let mut calls: HashMap<String, Vec<TimeMatrixCall<DynamicSample>>> = HashMap::new();
-        for call in self.calls.lock().drain(..) {
-            calls.entry(call.0).or_default().push(call.1);
+    pub fn fold_buffered_samples(&self) -> TimeMatrixCallLog {
+        for matrix in self.matrices.lock().iter_mut() {
+            matrix.fold_buffered_samples().unwrap();
         }
-        TimeMatrixCalls { calls }
-    }
-
-    pub(crate) fn new_inspected_time_matrix<T: Send + 'static>(
-        &self,
-        name: impl Into<String>,
-    ) -> InspectedTimeMatrix<T> {
-        let name = name.into();
-        let matrix = MockTimeMatrix {
-            name: name.clone(),
-            calls: Arc::clone(&self.calls),
-            phantom: std::marker::PhantomData,
-        };
-        InspectedTimeMatrix::new(name, Arc::new(Mutex::new(matrix)))
+        let mut calls = HashMap::<_, Vec<_>>::new();
+        for (name, call) in self.calls.lock().drain(..) {
+            calls.entry(name).or_default().push(call);
+        }
+        TimeMatrixCallLog { calls }
     }
 }
 
@@ -111,12 +124,12 @@ impl InspectSender for MockTimeMatrixClient {
         P: Interpolation<FillSample<F> = F::Sample>,
     {
         let name = name.into();
-        let matrix = MockTimeMatrix {
-            name: name.clone(),
-            calls: Arc::clone(&self.calls),
-            phantom: std::marker::PhantomData,
-        };
-        InspectedTimeMatrix::new(name, Arc::new(Mutex::new(matrix)))
+        let (sender, matrix) = BufferedSampler::from_time_matrix(MockTimeMatrix::new(
+            name.clone(),
+            self.calls.clone(),
+        ));
+        self.matrices.lock().push(Box::new(matrix));
+        InspectedTimeMatrix::new(name, sender)
     }
 
     fn inspect_time_matrix_with_metadata<F, P>(
@@ -139,11 +152,21 @@ impl InspectSender for MockTimeMatrixClient {
 struct MockTimeMatrix<T> {
     name: String,
     calls: Arc<Mutex<Vec<(String, TimeMatrixCall<DynamicSample>)>>>,
-    phantom: std::marker::PhantomData<fn() -> T>,
+    phantom: PhantomData<fn() -> T>,
+}
+
+impl<T> MockTimeMatrix<T> {
+    pub fn new(
+        name: impl Into<String>,
+        calls: Arc<Mutex<Vec<(String, TimeMatrixCall<DynamicSample>)>>>,
+    ) -> Self {
+        MockTimeMatrix { name: name.into(), calls, phantom: PhantomData }
+    }
 }
 
 impl<T: Send + 'static> Sampler<Timed<T>> for MockTimeMatrix<T> {
     type Error = FoldError;
+
     fn fold(&mut self, sample: Timed<T>) -> Result<(), Self::Error> {
         let sample = sample.map(|v| Box::new(v) as DynamicSample);
         self.calls.lock().push((self.name.clone(), TimeMatrixCall::Fold(sample)));
@@ -153,6 +176,7 @@ impl<T: Send + 'static> Sampler<Timed<T>> for MockTimeMatrix<T> {
 
 impl<T> Interpolator for MockTimeMatrix<T> {
     type Error = FoldError;
+
     fn interpolate(&mut self, timestamp: Timestamp) -> Result<(), Self::Error> {
         self.calls.lock().push((self.name.clone(), TimeMatrixCall::Interpolate(timestamp)));
         Ok(())

@@ -228,6 +228,13 @@ impl<T> Timed<Option<T>> {
     }
 }
 
+impl<T, E> Timed<Result<T, E>> {
+    pub fn transpose(self) -> Result<Timed<T>, E> {
+        let Timed { timestamp, inner } = self;
+        inner.map(|inner| Timed { timestamp, inner })
+    }
+}
+
 impl<T> From<Timed<T>> for (Timestamp, T) {
     fn from(timed: Timed<T>) -> Self {
         let Timed { timestamp, inner: sample } = timed;
