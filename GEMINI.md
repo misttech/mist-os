@@ -208,13 +208,54 @@ Once you've collected this additional evidence, you should begin to ask the
 If you already know the timestamps you're interested in, use your text
 search tool to read only those regions of the file.
 
+# Jiri usage guidelines
+
+## Working with `jiri` and Manifests
+
+The Fuchsia project is composed of multiple git repositories managed by the
+tool `jiri`. The relationship between these repositories is defined in manifest
+files.
+
+### Filesystem Layout
+
+The `jiri` filesystem is organized as follows:
+
+* `[root]`: The root directory of the jiri checkout.
+* `[root]/.jiri_root`: Contains jiri metadata, including the `jiri` binary itself.
+* `[root]/.jiri_manifest`: Contains the main jiri manifest.
+* `[root]/[project]`: The root directory of a project (a git repository).
+
+### Manifests
+
+Manifest files are XML files that define the projects, packages, and hooks for
+a `jiri` checkout. Manifests can import other manifests. The main manifest is
+`.jiri_manifest`.
+
+A `<project>` tag in a manifest defines a git repository to be synced. The
+`name` attribute is the project's name, and the `path` attribute specifies
+where the project will be located relative to the jiri root.
+
+### Useful `jiri` commands.
+
+*  **Editing Manifests**: To edit a jiri manifest, to change a revision of a
+   project, you can run:
+   *  **Command:** `jiri edit -project=<project-name>=<revision> <path/to/manifest>`
+
+*  **Testing Manifest Changes Locally**: To test local changes to one or more
+   jiri manifest `<project>` tags without committing them, you can run:
+   *  **Command:** `jiri update -local-manifest-project=<project> -local-manifest-project=<another-project>`
+
+*  **Search across jiri projects**: To perform a grep search across all
+   jiri projects you can run:
+  *  **Command:** `jiri grep <text>`: Search across projects.
+
 # Git usage guidelines
 
 ## Working with Git in a Multi-repo Environment
 
-The Fuchsia project is composed of multiple git repositories (e.g., `//`
-and `//vendor/google`). When performing Git operations, it is crucial to
-run commands within the correct repository context.
+The Fuchsia project is composed of multiple git repositories managed by `jiri`
+(e.g., `//` and `//vendor/google`). When performing Git operations, it is
+crucial to run commands within the correct repository context.
 
 **Workflow for Each Git Task:**
 
