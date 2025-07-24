@@ -385,10 +385,6 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     }
   }
 
-  // TODO(https://fxbug.dev/42152065): This is a stopgap solution to support existing
-  // OnVsync() DisplayController FIDL events. In the future we'll remove this
-  // logic and only return config seqnos in OnVsync() events instead.
-
   if (vsync_config_stamp != display::kInvalidDriverConfigStamp) {
     auto& config_image_queue = display_info.config_image_queue;
 
