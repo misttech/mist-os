@@ -125,6 +125,11 @@ shared_library("zxio_standalone") {
       [ "-Wl,--version-script=" + rebase_path(version_script, root_build_dir) ]
 }
 
+static_library("zxio_static") {
+  public_deps = [ ":zxio" ]
+  public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
+}
+
 shared_out_dir =
     get_label_info(":zxio_standalone($shlib_toolchain)", "root_out_dir")
 zxio_standalone_library = "$shared_out_dir/libzxio_standalone.so"

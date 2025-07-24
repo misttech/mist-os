@@ -28,7 +28,7 @@ rustc_library("syncio") {
     "//third_party/rust_crates:zerocopy",
   ]
 
-  non_rust_deps = [ "//sdk/lib/zxio:standalone" ]
+  public_deps = [ "//sdk/lib/zxio:zxio_static" ]
 
   test_deps = [
     "//src/lib/fuchsia",
