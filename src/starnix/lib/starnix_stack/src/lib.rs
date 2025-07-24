@@ -20,19 +20,19 @@ fn get_safe_stack_ptr() -> usize {
         std::arch::asm!(
             "mov {0}, rsp",
             out(reg) sp,
-            options(nostack, nomem)
+            options(nomem)
         );
         #[cfg(target_arch = "aarch64")]
         std::arch::asm!(
             "mov {0}, sp",
             out(reg) sp,
-            options(nostack, nomem)
+            options(nomem)
         );
         #[cfg(target_arch = "riscv64")]
         std::arch::asm!(
             "mv {0}, sp",
             out(reg) sp,
-            options(nostack, nomem)
+            options(nomem)
         );
     }
     sp
