@@ -166,9 +166,6 @@ pub struct ThreadGroupMutableState {
     /// The IDs used to perform shell job control.
     pub process_group: Arc<ProcessGroup>,
 
-    /// The timers for this thread group (from timer_create(), etc.).
-    pub timers: TimerTable,
-
     pub did_exec: bool,
 
     /// A signal that indicates whether the process is going to become waitable
@@ -247,6 +244,9 @@ pub struct ThreadGroup {
 
     /// The signal actions that are registered for this process.
     pub signal_actions: Arc<SignalActions>,
+
+    /// The timers for this thread group (from timer_create(), etc.).
+    pub timers: TimerTable,
 
     /// A mechanism to be notified when this `ThreadGroup` is destroyed.
     pub drop_notifier: DropNotifier,
@@ -584,6 +584,7 @@ impl ThreadGroup {
                 leader,
                 exit_signal,
                 signal_actions,
+                timers: Default::default(),
                 drop_notifier: Default::default(),
                 // A child process created via fork(2) inherits its parent's
                 // resource limits.  Resource limits are preserved across execve(2).
@@ -610,7 +611,6 @@ impl ThreadGroup {
                     lifecycle_waiters: TypedWaitQueue::<ThreadGroupLifecycleWaitValue>::default(),
                     is_child_subreaper: false,
                     process_group: Arc::clone(&process_group),
-                    timers: Default::default(),
                     did_exec: false,
                     last_signal: None,
                     run_state: Default::default(),
@@ -1029,7 +1029,7 @@ impl ThreadGroup {
     }
 
     fn itimer_real(&self) -> IntervalTimerHandle {
-        self.write().timers.itimer_real()
+        self.timers.itimer_real()
     }
 
     pub fn set_itimer(
