@@ -6,8 +6,6 @@
 #define SRC_MEDIA_LIB_CODEC_IMPL_INCLUDE_LIB_MEDIA_CODEC_IMPL_LOG_H_
 
 #include <lib/ddk/debug.h>
-#include <lib/syslog/global.h>
-#include <lib/syslog/logger.h>
 
 #include <string_view>
 
@@ -32,7 +30,6 @@
 #define LOG(severity, format, ...)                            \
   do {                                                        \
     static_assert(true || DDK_LOG_##severity);                \
-    static_assert(true || FX_LOG_##severity);                 \
     if (DDK_LOG_##severity > DDK_LOG_INFO) {                  \
       fprintf(stderr, "[codec_impl] " format, ##__VA_ARGS__); \
     }                                                         \

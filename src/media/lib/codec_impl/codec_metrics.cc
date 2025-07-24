@@ -7,7 +7,6 @@
 #include <inttypes.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
-#include <lib/syslog/global.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
