@@ -92,7 +92,7 @@ func GetBotanistConfig(shard *Shard, buildDir string, tools build.Tools) error {
 func GetBotDimensions(shard *Shard, params *proto.Params) {
 	dimensions := map[string]string{"pool": params.Pool}
 	isEmuType := shard.Env.TargetsEmulator()
-	testBotCpu := shard.HostCPU()
+	testBotCpu := shard.HostCPU
 
 	isLinux := shard.Env.Dimensions.OS() == "" || strings.ToLower(shard.Env.Dimensions.OS()) == "linux"
 	isGCEType := shard.Env.Dimensions.DeviceType() == "GCE"
@@ -168,7 +168,7 @@ func GetEnabledExperiments(experiments []string) ([]string, error) {
 }
 
 func registerTool(shard *Shard, tools build.Tools, toolName string) (string, error) {
-	platform, err := testBotPlatform(shard.HostCPU())
+	platform, err := testBotPlatform(shard.HostCPU)
 	if err != nil {
 		return "", err
 	}

@@ -59,6 +59,7 @@ func TestAddFFXDeps(t *testing.T) {
 				},
 				Tests: []Test{{Test: build.Test{CPU: tc.targetCPU}}},
 			}
+			s.HostCPU = GetHostCPU(s.Env, false)
 			hostOS := runtime.GOOS
 			if err := AddFFXDeps(s, buildDir, build.Tools{
 				{Name: "ffx", OS: hostOS, CPU: "x64", Path: "host_x64/ffx"},

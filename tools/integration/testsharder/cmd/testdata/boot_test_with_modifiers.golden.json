@@ -39,6 +39,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "boot-test_product_bundle/zbi",
             "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_another-boot-test#meta_another-boot-test.cm.botanist.json",
@@ -139,6 +140,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "boot-test_product_bundle/zbi",
             "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm.botanist.json",

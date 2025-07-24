@@ -60,6 +60,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "AEMU.botanist.json",
             "AEMU_tests.json",
@@ -159,6 +160,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "affected:AEMU.botanist.json",
             "affected:AEMU_tests.json",
@@ -257,6 +259,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "timeout_secs": 0,
         "summary": {
             "tests": [

@@ -42,6 +42,9 @@ type Shard struct {
 	// Env is a generalized notion of the execution environment for the shard.
 	Env build.Environment `json:"environment"`
 
+	// The host CPU to run the shard on.
+	HostCPU string `json:"host_cpu"`
+
 	// Deps is the list of runtime dependencies required to be present on the host
 	// at shard execution time. It is a list of paths relative to the fuchsia
 	// build directory.
@@ -141,11 +144,33 @@ func (s *Shard) TargetCPU() string {
 }
 
 // HostCPU returns the host CPU architecture this shard will run on.
-func (s *Shard) HostCPU() string {
-	if s.Env.TargetsEmulator() && s.TargetCPU() == "arm64" && !s.UseTCG {
-		return "arm64"
+func GetHostCPU(env build.Environment, useTCG bool) string {
+	// Determine what system architecture we want this test task to run on.
+	// First, pure host tests should always run on the architecture of the
+	// host test.  We can identify this case by the absence of a device_type
+	// in the shard.
+	if env.Dimensions.DeviceType() == "" {
+		return env.Dimensions.CPU()
 	}
-	return "x64"
+
+	// Second, we use x64 controllers for all the physical hardware
+	// that runs in labs, so those should always be x64.  We also use x64
+	// cloud instances to drive testing against GCE, regardless of whether
+	// the GCE instance is x64 or arm64.  So all non-emulator shards with
+	// device_type targets set should run on x64.
+	if !env.TargetsEmulator() {
+		return "x64"
+	}
+
+	// For emulator shards, we want to take advantage of KVM where possible,
+	// so we want to use the build's target arch, unless we're using TCG to
+	// fully emulate hardware, in which case we'd rather that run on big x64
+	// machines (since we don't have any riscv64 hardware capable of running
+	// that workload).
+	if useTCG || env.UseTCG {
+		return "x64"
+	}
+	return env.Dimensions.CPU()
 }
 
 // CreatePackageRepo creates a package repository for the given shard.
@@ -347,6 +372,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
 					UseTCG:            opts.UseTCG || e.UseTCG,
+					HostCPU:           GetHostCPU(e, opts.UseTCG),
 				}
 			}
 			test := Test{Test: spec.Test, Runs: 1}
@@ -369,6 +395,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
 					UseTCG:            opts.UseTCG || e.UseTCG,
+					HostCPU:           GetHostCPU(e, opts.UseTCG),
 				})
 			} else {
 				shard.Tests = append(shard.Tests, test)

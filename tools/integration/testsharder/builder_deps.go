@@ -69,12 +69,12 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 		if len(s.Summary.Tests) > 0 {
 			continue
 		}
-		platform, err := testBotPlatform(s.HostCPU())
+		platform, err := testBotPlatform(s.HostCPU)
 		if err != nil {
 			return err
 		}
 		toolDeps := []string{"ssh"}
-		if s.HostCPU() == "x64" {
+		if s.HostCPU == "x64" {
 			// Relevant for automatic symbolization of things running on
 			// host. Only the x64 variation is available in the checkout and
 			// we have nothing that runs on an arm host that needs

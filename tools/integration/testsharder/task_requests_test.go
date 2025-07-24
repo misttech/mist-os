@@ -212,6 +212,7 @@ func TestGetBotanistConfig(t *testing.T) {
 					Name: tc.virtualDeviceSpec,
 				}
 			}
+			tc.shard.HostCPU = GetHostCPU(tc.shard.Env, tc.shard.UseTCG)
 			tc.shard.Name = environmentName(tc.shard.Env)
 			if err := GetBotanistConfig(tc.shard, buildDir, tools); err != nil {
 				t.Fatalf("failed to get botanist config: %s", err)
@@ -351,6 +352,7 @@ func TestGetBotDimensions(t *testing.T) {
 				Env:        tc.env,
 				ExpectsSSH: tc.expectsSSH,
 				UseTCG:     tc.params.UseTcg,
+				HostCPU:    GetHostCPU(tc.env, tc.params.UseTcg),
 			}
 			GetBotDimensions(shard, tc.params)
 			if diff := cmp.Diff(tc.want, shard.BotDimensions); diff != "" {
@@ -560,6 +562,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			}
 			tc.shard.UseTCG = tc.params.UseTcg
 			tc.shard.Env.Netboot = tc.netboot
+			tc.shard.HostCPU = GetHostCPU(tc.shard.Env, tc.params.UseTcg)
 			if err := ConstructBaseCommand(tc.shard, checkoutDir, buildDir, tools, tc.params, tc.variants, tc.experiments); err != nil {
 				if tc.wantErr {
 					return

@@ -54,6 +54,7 @@
                 "vbmeta_key_metadata_path": ""
             }
         },
+        "host_cpu": "x64",
         "deps": [
             "host_x64/botanist",
             "host_x64/ffx",
