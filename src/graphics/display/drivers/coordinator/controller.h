@@ -72,14 +72,16 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // `driver_dispatcher` must be shut down when `Stop()` is called.
   static zx::result<std::unique_ptr<Controller>> Create(
       std::unique_ptr<EngineDriverClient> engine_driver_client,
-      fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+      fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+      fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher);
 
   // Creates a new coordinator Controller instance. It creates a new Inspector
   // which will be solely owned by the Controller instance.
   //
   // `engine_driver_client` must not be null.
   explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                      fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+                      fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+                      fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher);
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
@@ -204,6 +206,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   inspect::Node root_;
 
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
+  fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher_;
 
   VsyncMonitor vsync_monitor_;
 

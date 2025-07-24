@@ -48,7 +48,8 @@ class InspectTest : public ::testing::Test {
   InspectTest()
       : engine_driver_client_and_server_(EngineDriverClientAndServer::Create()),
         controller_(std::move(engine_driver_client_and_server_.engine_driver_client),
-                    /*dispatcher=*/driver_runtime_.StartBackgroundDispatcher()) {}
+                    /*dispatcher=*/driver_runtime_.StartBackgroundDispatcher(),
+                    /*engine_listener_dispatcher=*/driver_runtime_.StartBackgroundDispatcher()) {}
 
  protected:
   // `logger_` must outlive `driver_runtime_` to allow for any

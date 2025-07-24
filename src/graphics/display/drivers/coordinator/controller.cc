@@ -800,11 +800,13 @@ void Controller::OpenCoordinatorWithListenerForPrimary(
 // static
 zx::result<std::unique_ptr<Controller>> Controller::Create(
     std::unique_ptr<EngineDriverClient> engine_driver_client,
-    fdf::UnownedSynchronizedDispatcher dispatcher) {
+    fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+    fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher) {
   fbl::AllocChecker alloc_checker;
 
   auto controller = fbl::make_unique_checked<Controller>(
-      &alloc_checker, std::move(engine_driver_client), std::move(dispatcher));
+      &alloc_checker, std::move(engine_driver_client), std::move(driver_dispatcher),
+      std::move(engine_listener_dispatcher));
   if (!alloc_checker.check()) {
     fdf::error("Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -843,18 +845,17 @@ void Controller::PrepareStop() {
   {
     fbl::AutoLock lock(mtx());
     unbinding_ = true;
-    // Tell each client to start releasing. We know `clients_` will not be
-    // modified here because we are holding the lock.
+
+    // Tear down all existing clients. This ensures that all clients will not
+    // send `ImportImage()` and `ApplyConfiguration()` requests.
     for (auto& client : clients_) {
       client->TearDown();
     }
 
     vsync_monitor_.Deinitialize();
 
-    // Once this call completes, the engine driver will no longer send events,
-    // and we will no longer send it ImportImage() or ApplyConfiguration()
-    // requests. This means it's safe to stop keeping track of imported
-    // resources.
+    // Once this call completes, the engine driver will no longer send events.
+    // This means it's safe to stop keeping track of imported resources.
     engine_driver_client_->UnsetListener();
 
     // Dispose of all images without calling ReleaseImage().
@@ -871,9 +872,11 @@ void Controller::PrepareStop() {
 void Controller::Stop() { fdf::info("Controller::Stop"); }
 
 Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                       fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+                       fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+                       fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher)
     : root_(inspector_.GetRoot().CreateChild("display")),
       driver_dispatcher_(std::move(driver_dispatcher)),
+      engine_listener_dispatcher_(std::move(engine_listener_dispatcher)),
       vsync_monitor_(root_.CreateChild("vsync_monitor"), driver_dispatcher_->async_dispatcher()),
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);

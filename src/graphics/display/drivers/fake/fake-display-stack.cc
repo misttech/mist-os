@@ -35,16 +35,29 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   banjo_adapter_ =
       std::make_unique<display::DisplayEngineBanjoAdapter>(display_engine_.get(), &engine_events_);
 
-  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+  zx::result<fdf::SynchronizedDispatcher> create_coordinator_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
                                           "display-client-loop",
                                           [this](fdf_dispatcher_t* dispatcher) {
                                             coordinator_driver_dispatcher_is_shut_down_.Signal();
                                           });
-  if (create_dispatcher_result.is_error()) {
-    ZX_PANIC("Failed to create dispatcher: %s", create_dispatcher_result.status_string());
+  if (create_coordinator_dispatcher_result.is_error()) {
+    ZX_PANIC("Failed to create dispatcher: %s",
+             create_coordinator_dispatcher_result.status_string());
   }
-  coordinator_driver_dispatcher_ = std::move(create_dispatcher_result).value();
+  coordinator_driver_dispatcher_ = std::move(create_coordinator_dispatcher_result).value();
+
+  zx::result<fdf::SynchronizedDispatcher> create_engine_listener_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                          "engine-listener-loop",
+                                          [this](fdf_dispatcher_t* dispatcher) {
+                                            engine_listener_dispatcher_is_shut_down_.Signal();
+                                          });
+  if (create_engine_listener_dispatcher_result.is_error()) {
+    ZX_PANIC("Failed to create dispatcher: %s",
+             create_engine_listener_dispatcher_result.status_string());
+  }
+  engine_listener_dispatcher_ = std::move(create_engine_listener_dispatcher_result).value();
 
   const display_engine_protocol_t display_engine_protocol = banjo_adapter_->GetProtocol();
   ddk::DisplayEngineProtocolClient display_engine_client(&display_engine_protocol);
@@ -52,7 +65,8 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
       std::make_unique<display_coordinator::EngineDriverClient>(display_engine_client);
   zx::result<std::unique_ptr<display_coordinator::Controller>> create_controller_result =
       display_coordinator::Controller::Create(std::move(engine_driver_client),
-                                              coordinator_driver_dispatcher_.borrow());
+                                              coordinator_driver_dispatcher_.borrow(),
+                                              engine_listener_dispatcher_.borrow());
   if (create_controller_result.is_error()) {
     ZX_PANIC("Failed to create display coordinator Controller device: %s",
              create_controller_result.status_string());
@@ -115,6 +129,9 @@ void FakeDisplayStack::SyncShutdown() {
   });
   ZX_ASSERT(post_status == ZX_OK);
   prepare_stop_completed.Wait();
+
+  engine_listener_dispatcher_.ShutdownAsync();
+  engine_listener_dispatcher_is_shut_down_.Wait();
 
   coordinator_driver_dispatcher_.ShutdownAsync();
   coordinator_driver_dispatcher_is_shut_down_.Wait();
