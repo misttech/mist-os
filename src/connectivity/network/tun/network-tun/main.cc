@@ -5,7 +5,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/svc/outgoing.h>
-#include <lib/syslog/global.h>
 
 #include <iostream>
 
@@ -20,17 +19,6 @@ int main(int argc, const char** argv) {
     std::cerr << "Failed to create driver runtime: " << runtime.status_string() << std::endl;
     return -1;
   }
-
-  fx_logger_config_t config = {
-      // TODO(brunodalbo) load severity from argc (we use this as injected-services, which doesn't
-      // seem to be respecting arguments)
-      .min_severity = FX_LOG_INFO,
-      .log_sink_channel = ZX_HANDLE_INVALID,
-      .log_sink_socket = ZX_HANDLE_INVALID,
-      .tags = nullptr,
-      .num_tags = 0,
-  };
-  fx_log_reconfigure(&config);
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();

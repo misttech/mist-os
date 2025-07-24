@@ -6,13 +6,13 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/sync/cpp/completion.h>
-#include <lib/syslog/global.h>
 #include <lib/zx/event.h>
 
 #include <queue>
 
 #include <fbl/mutex.h>
 #include <gtest/gtest.h>
+#include <sdk/lib/syslog/cpp/log_settings.h>
 
 #include "src/lib/testing/predicates/status.h"
 
@@ -133,12 +133,9 @@ class StatusWatcherTest : public ::testing::Test {
 
   void SetUp() override {
     ASSERT_OK(loop_.StartThread("test-thread", nullptr));
-    fx_logger_config_t log_cfg = {
-        .min_severity = -2,
-        .tags = nullptr,
-        .num_tags = 0,
-    };
-    fx_log_reconfigure(&log_cfg);
+    fuchsia_logging::LogSettingsBuilder()
+        .WithMinLogSeverity(fuchsia_logging::LogSeverity::Trace)
+        .BuildAndInitialize();
   }
 
   void TearDown() override {

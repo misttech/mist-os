@@ -12,7 +12,6 @@
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
-#include <lib/syslog/global.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>
 
@@ -20,6 +19,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <sdk/lib/syslog/cpp/log_settings.h>
 
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -497,12 +497,9 @@ class SimpleClient {
 class TunTest : public gtest::RealLoopFixture {
  protected:
   void SetUp() override {
-    fx_logger_config_t log_cfg = {
-        .min_severity = -2,
-        .tags = nullptr,
-        .num_tags = 0,
-    };
-    fx_log_reconfigure(&log_cfg);
+    fuchsia_logging::LogSettingsBuilder()
+        .WithMinLogSeverity(fuchsia_logging::LogSeverity::Trace)
+        .BuildAndInitialize();
     ASSERT_OK(tun_ctl_loop_.StartThread("tun-test"));
     auto result = TunCtl::Create(tun_ctl_loop_.dispatcher());
     ASSERT_OK(result.status_value());

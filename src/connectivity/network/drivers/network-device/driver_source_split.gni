@@ -48,7 +48,7 @@ template("driver_source_split") {
     }
     public_deps += [
       "//sdk/lib/driver/logging/cpp:cpp",
-      "//zircon/system/ulib/syslog",
+      "//sdk/lib/syslog/cpp",
     ]
     if (defined(invoker.non_driver_deps)) {
       public_deps += invoker.non_driver_deps

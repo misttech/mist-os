@@ -5,7 +5,7 @@
 #include "device_adapter.h"
 
 #include <lib/sync/cpp/completion.h>
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
 #include <fbl/auto_lock.h>
@@ -118,7 +118,8 @@ void DeviceAdapter::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t
     fbl::AutoLock tx_lock(&tx_lock_);
     cpp20::span buffers(buf_list, buf_count);
     if (!tx_available_) {
-      FX_VLOGF(1, "tun", "Discarding %d tx buffers, tx queue is invalid", tx_available_);
+      FX_LOGST(DEBUG, "tun") << "Discarding " << tx_available_
+                             << " tx buffers, tx queue is invalid";
       for (const tx_buffer_t& b : buffers) {
         EnqueueTx(b.id, ZX_ERR_UNAVAILABLE);
       }
@@ -179,8 +180,7 @@ void DeviceAdapter::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
 void DeviceAdapter::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
   zx_status_t status = vmos_.UnregisterVmo(vmo_id);
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "DeviceAdapter failed to unregister vmo: %s",
-            zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "DeviceAdapter failed to unregister vmo";
   }
 }
 
@@ -270,7 +270,7 @@ void DeviceAdapter::CopyTo(DeviceAdapter* other, bool return_failed_buffers) {
     if (alloc_rx.is_error()) {
       if (!return_failed_buffers) {
         // stop once we run out of rx buffers to copy to
-        FX_VLOG(1, "tun", "DeviceAdapter:CopyTo: no more rx buffers");
+        FX_LOGST(DEBUG, "tun") << "DeviceAdapter::CopyTo: no more rx buffers";
         break;
       }
       EnqueueTx(tx_buff.id(), ZX_ERR_NO_RESOURCES);
@@ -280,8 +280,8 @@ void DeviceAdapter::CopyTo(DeviceAdapter* other, bool return_failed_buffers) {
     RxBuffer rx_buff = std::move(alloc_rx.value());
     zx::result status = rx_buff.CopyFrom(tx_buff);
     if (status.is_error()) {
-      FX_LOGF(ERROR, "tun", "DeviceAdapter:CopyTo: Failed to copy buffer: %s",
-              status.status_string());
+      FX_PLOGST(ERROR, "tun", status.status_value())
+          << "DeviceAdapter::CopyTo: Failed to copy buffer";
       EnqueueTx(tx_buff.id(), status.status_value());
       other->ReclaimRxSpace(std::move(rx_buff));
     } else {
@@ -339,7 +339,8 @@ void DeviceAdapter::EnqueueRx(uint8_t port_id, fuchsia_hardware_network::wire::F
   if (meta) {
     ret.meta.flags = meta->flags;
     if (meta->info_type != fuchsia_hardware_network::wire::InfoType::kNoInfo) {
-      FX_LOGF(WARNING, "tun", "Unrecognized info type %d", static_cast<uint32_t>(meta->info_type));
+      FX_LOGST(WARNING, "tun") << "Unrecognized info type "
+                               << static_cast<uint32_t>(meta->info_type);
     }
   }
 }

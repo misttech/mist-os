@@ -6,9 +6,9 @@
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
-#include <lib/syslog/global.h>
 
 #include <gtest/gtest.h>
+#include <sdk/lib/syslog/cpp/log_settings.h>
 
 #include "src/lib/testing/predicates/status.h"
 #include "test_util.h"
@@ -20,12 +20,9 @@ class MacDeviceTest : public ::testing::Test {
  public:
   void SetUp() override {
     // enable full tracing for tests, easier to debug problems.
-    fx_logger_config_t log_cfg = {
-        .min_severity = -2,
-        .tags = nullptr,
-        .num_tags = 0,
-    };
-    fx_log_reconfigure(&log_cfg);
+    fuchsia_logging::LogSettingsBuilder()
+        .WithMinLogSeverity(fuchsia_logging::LogSeverity::Trace)
+        .BuildAndInitialize();
     CreateDispatcher();
   }
 

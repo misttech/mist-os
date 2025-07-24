@@ -6,7 +6,7 @@
 
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <fbl/auto_lock.h>
 
@@ -31,23 +31,21 @@ zx::result<std::unique_ptr<TunPair>> TunPair::Create(const DeviceInterfaceDispat
 
   zx::result left = DeviceAdapter::Create(dispatchers, shim_dispatchers, tun.get());
   if (left.is_error()) {
-    FX_LOGF(ERROR, "tun", "TunDevice::Init device init left failed with %s", left.status_string());
+    FX_PLOGST(ERROR, "tun", left.status_value()) << "TunDevice::Init device init left failed";
     return left.take_error();
   }
   tun->left_ = std::move(left.value());
 
   zx::result right = DeviceAdapter::Create(dispatchers, shim_dispatchers, tun.get());
   if (right.is_error()) {
-    FX_LOGF(ERROR, "tun", "TunDevice::Init device init right failed with %s",
-            right.status_string());
+    FX_PLOGST(ERROR, "tun", right.status_value()) << "TunDevice::Init device init right failed";
     return right.take_error();
   }
   tun->right_ = std::move(right.value());
 
   thrd_t thread;
   if (zx_status_t status = tun->loop_.StartThread("tun-pair", &thread); status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "TunDevice::Init failed to start loop thread: %s",
-            zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "TunDevice::Init failed to start loop thread";
     return zx::error(status);
   }
   tun->loop_thread_ = thread;
@@ -81,7 +79,7 @@ TunPair::~TunPair() {
   sync_completion_wait(&left_device_teardown, ZX_TIME_INFINITE);
   sync_completion_wait(&right_device_teardown, ZX_TIME_INFINITE);
   loop_.Shutdown();
-  FX_VLOG(1, "tun", "TunPair destroyed");
+  FX_LOGST(DEBUG, "tun") << "TunPair destroyed";
 }
 
 void TunPair::Teardown() {
@@ -121,12 +119,12 @@ void TunPair::AddPort(AddPortRequestView request, AddPortCompleter::Sync& comple
 
     zx_status_t status = left_->AddPort(left->adapter());
     if (status != ZX_OK) {
-      FX_LOGF(ERROR, "tun", "failed to add left port: %s", zx_status_get_string(status));
+      FX_PLOGST(ERROR, "tun", status) << "failed to add left port";
       return status;
     }
     status = right_->AddPort(right->adapter());
     if (status != ZX_OK) {
-      FX_LOGF(ERROR, "tun", "failed to add right port: %s", zx_status_get_string(status));
+      FX_PLOGST(ERROR, "tun", status) << "failed to add right port";
       return status;
     }
 
@@ -162,30 +160,28 @@ void TunPair::RemovePort(RemovePortRequestView request, RemovePortCompleter::Syn
 void TunPair::GetLeft(GetLeftRequestView request, GetLeftCompleter::Sync& _completer) {
   zx_status_t status = left_->Bind(std::move(request->device));
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "bind to left device failed: %s", zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "bind to left device failed";
   }
 }
 
 void TunPair::GetRight(GetRightRequestView request, GetRightCompleter::Sync& _completer) {
   zx_status_t status = right_->Bind(std::move(request->device));
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "bind to right device failed: %s", zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "bind to right device failed";
   }
 }
 
-void TunPair::GetLeftPort(GetLeftPortRequestView request, GetLeftPortCompleter::Sync& _completer) {
+void TunPair::GetLeftPort(GetLeftPortRequestView request, GetLeftCompleter::Sync& _completer) {
   zx_status_t status = left_->BindPort(request->id, std::move(request->port));
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "bind to left port %d failed: %s", request->id,
-            zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "bind to left port " << request->id << " failed";
   }
 }
 void TunPair::GetRightPort(GetRightPortRequestView request,
                            GetRightPortCompleter::Sync& _completer) {
   zx_status_t status = right_->BindPort(request->id, std::move(request->port));
   if (status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "bind to right port %d failed: %s", request->id,
-            zx_status_get_string(status));
+    FX_PLOGST(ERROR, "tun", status) << "bind to right port " << request->id << " failed";
   }
 }
 
