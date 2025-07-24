@@ -1496,7 +1496,9 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, ExistingEntryAction::Error, cursor, cm);
     tt_page_->mmu.num_mappings += lower_mapped;
-    accessed_since_last_check_ = true;
+    if (!accessed_since_last_check_) {
+      accessed_since_last_check_ = true;
+    }
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
@@ -1580,7 +1582,9 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, existing_action, cursor, cm);
     tt_page_->mmu.num_mappings += lower_mapped;
-    accessed_since_last_check_ = true;
+    if (!accessed_since_last_check_) {
+      accessed_since_last_check_ = true;
+    }
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
@@ -1791,7 +1795,9 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   LOCAL_KTRACE("mmu mark accessed", ("vaddr", vaddr), ("size", size));
 
   MarkAccessedPageTable(vaddr, vaddr_rel, size, top_index_shift_, tt_virt_);
-  accessed_since_last_check_ = true;
+  if (!accessed_since_last_check_) {
+    accessed_since_last_check_ = true;
+  }
 
   return ZX_OK;
 }
@@ -1799,7 +1805,7 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
 bool ArmArchVmAspace::AccessedSinceLastCheck(bool clear) {
   Guard<CriticalMutex> guard{&lock_};
   const bool accessed = accessed_since_last_check_;
-  if (clear) {
+  if (clear && accessed_since_last_check_) {
     accessed_since_last_check_ = false;
   }
   return accessed;
