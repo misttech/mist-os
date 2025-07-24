@@ -104,8 +104,9 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // Runs on dispatchers owned by the display engine driver.
   void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
   void DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id);
-  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_instant_mono_t timestamp,
-                                           const config_stamp_t* config_stamp);
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
+                                           zx_instant_mono_t banjo_timestamp,
+                                           const config_stamp_t* banjo_config_stamp);
   void DisplayEngineListenerOnCaptureComplete();
 
   // `EngineListener`:

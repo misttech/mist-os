@@ -260,14 +260,17 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
 
 void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
                                                      zx_instant_mono_t banjo_timestamp,
-                                                     const config_stamp_t* banjo_config_stamp_ptr) {
+                                                     const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_display_id != INVALID_DISPLAY_ID);
-  ZX_DEBUG_ASSERT(banjo_config_stamp_ptr != nullptr);
+  ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
 
   display::DisplayId display_id = display::DisplayId(banjo_display_id);
   zx::time_monotonic timestamp = zx::time_monotonic(banjo_timestamp);
-  display::DriverConfigStamp driver_config_stamp =
-      display::DriverConfigStamp(*banjo_config_stamp_ptr);
+  display::DriverConfigStamp driver_config_stamp = display::DriverConfigStamp(*banjo_config_stamp);
+  if (driver_config_stamp == display::kInvalidDriverConfigStamp) {
+    fdf::error("Dropping VSync with invalid DriverConfigStamp");
+    return;
+  }
 
   zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
       *engine_listener_dispatcher_->async_dispatcher(),
@@ -356,12 +359,7 @@ void Controller::OnDisplayVsync(display::DisplayId display_id, zx::time_monotoni
   fbl::AutoLock lock(mtx());
   auto displays_it = displays_.find(display_id);
   if (!displays_it.IsValid()) {
-    // TODO(https://fxbug.dev/399886375): This logging is racy. It is possible
-    // that OnDisplayAdded() was called, but the event wasn't processed on the
-    // Coordinator's driver dispatcher yet. This means we can discard the
-    // VSync, as it can't possibly report a configuration applied by
-    // Coordinator clients.
-    fdf::error("Received VSync for unknown display ID: {}", display_id.value());
+    fdf::error("Dropping VSync for unknown display ID: {}", display_id.value());
     return;
   }
   DisplayInfo& display_info = *displays_it;
@@ -432,31 +430,28 @@ void Controller::OnDisplayVsync(display::DisplayId display_id, zx::time_monotoni
     }
   }
 
-  if (driver_config_stamp != display::kInvalidDriverConfigStamp) {
-    auto& config_image_queue = display_info.config_image_queue;
+  // Evict retired configurations from the queue.
+  auto& config_image_queue = display_info.config_image_queue;
+  while (!config_image_queue.empty() &&
+         config_image_queue.front().config_stamp < driver_config_stamp) {
+    config_image_queue.pop();
+  }
 
-    // Evict retired configurations from the queue.
-    while (!config_image_queue.empty() &&
-           config_image_queue.front().config_stamp < driver_config_stamp) {
-      config_image_queue.pop();
-    }
-
-    // Since the stamps sent from Controller to drivers are in chronological
-    // order, the Vsync signals Controller receives should also be in
-    // chronological order as well.
-    //
-    // Applying empty configs won't create entries in |config_image_queue|.
-    // Otherwise, we'll get the list of images used at ApplyConfig() with
-    // the given |config_stamp|.
-    if (!config_image_queue.empty() &&
-        config_image_queue.front().config_stamp == driver_config_stamp) {
-      for (const auto& image : config_image_queue.front().images) {
-        // End of the flow for the image going to be presented.
-        //
-        // NOTE: If changing this flow name or ID, please also do so in the
-        // corresponding FLOW_BEGIN.
-        TRACE_FLOW_END("gfx", "present_image", image.image_id.value());
-      }
+  // Since the stamps sent from Controller to drivers are in chronological
+  // order, the Vsync signals Controller receives should also be in
+  // chronological order as well.
+  //
+  // Applying empty configs won't create entries in |config_image_queue|.
+  // Otherwise, we'll get the list of images used at ApplyConfig() with
+  // the given |config_stamp|.
+  if (!config_image_queue.empty() &&
+      config_image_queue.front().config_stamp == driver_config_stamp) {
+    for (const auto& image : config_image_queue.front().images) {
+      // End of the flow for the image going to be presented.
+      //
+      // NOTE: If changing this flow name or ID, please also do so in the
+      // corresponding FLOW_BEGIN.
+      TRACE_FLOW_END("gfx", "present_image", image.image_id.value());
     }
   }
 
