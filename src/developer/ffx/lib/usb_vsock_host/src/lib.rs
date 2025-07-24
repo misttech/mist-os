@@ -870,9 +870,7 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
             }
         });
     }
-}
 
-impl UsbVsockHost<fasync::Socket> {
     /// Create a new USB VSOCK host for testing. Guaranteed not to try to touch
     /// the machine's actual USB devices.
     pub fn new_for_test(event_sender: mpsc::Sender<UsbVsockHostEvent>) -> Arc<Self> {
@@ -890,7 +888,7 @@ impl UsbVsockHost<fasync::Socket> {
     /// Add a new test connection to this host.
     pub fn add_connection_for_test(
         self: &Arc<Self>,
-        connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
+        connection: Arc<usb_vsock::Connection<Vec<u8>, S>>,
         incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     ) -> u32 {
         let cid = self.next_cid.fetch_add(1, Ordering::Relaxed);
@@ -907,21 +905,21 @@ impl UsbVsockHost<fasync::Socket> {
 }
 
 /// Collection of values related to a test connection.
-pub struct TestConnection {
+pub struct TestConnection<S: AsyncRead + AsyncWrite + Send + 'static> {
     pub cid: u32,
-    pub host: Arc<UsbVsockHost<fasync::Socket>>,
-    pub connection: Arc<usb_vsock::Connection<Vec<u8>, fasync::Socket>>,
+    pub host: Arc<UsbVsockHost<S>>,
+    pub connection: Arc<usb_vsock::Connection<Vec<u8>, S>>,
     pub incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     pub abort_transfer: (AbortHandle, AbortHandle),
     pub event_receiver: mpsc::Receiver<UsbVsockHostEvent>,
     pub scope: fasync::Scope,
 }
 
-impl TestConnection {
+impl<S: AsyncRead + AsyncWrite + Send + 'static> TestConnection<S> {
     /// Creates a new host with one connected CID inside of it, and also a raw
     /// usb_vsock connection which is the other end of that connection
     /// (representing the target perspective).
-    pub fn new() -> TestConnection {
+    pub fn new() -> TestConnection<S> {
         let (a_incoming_requests_tx, a_incoming_requests) = mpsc::channel(1);
         let a = Arc::new(usb_vsock::Connection::new(
             ProtocolVersion::LATEST,
@@ -995,7 +993,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1049,7 +1047,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1101,7 +1099,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1168,7 +1166,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
         let Err(ConnectError::PortOutOfRange) =
@@ -1188,7 +1186,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
         let (sock, _) = fasync::emulated_handle::Socket::create_stream();
         let sock = fasync::Socket::from_socket(sock);
         let connect_task =
@@ -1214,7 +1212,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
         let Err(_) = connection
@@ -1243,7 +1241,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1274,7 +1272,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1305,7 +1303,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, None).unwrap();
         let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
@@ -1324,7 +1322,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let (socket, _) = fasync::emulated_handle::Socket::create_stream();
         let socket = fasync::Socket::from_socket(socket);
@@ -1358,7 +1356,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, None).unwrap();
         let Err(ListenError::PortInUse(port)) = host.listen(1234, Some(cid.try_into().unwrap()))
@@ -1378,7 +1376,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let _listener = host.listen(1234, Some(cid.try_into().unwrap())).unwrap();
         let Err(ListenError::PortInUse(port)) = host.listen(1234, None) else {
@@ -1397,7 +1395,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let Err(ListenError::NotFound(cid)) = host.listen(1234, Some(60.try_into().unwrap()))
         else {
@@ -1416,7 +1414,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let mut listener = host.listen(1234, Some(cid.try_into().unwrap())).unwrap();
 
@@ -1442,7 +1440,7 @@ mod test {
             abort_transfer: (abort_a, abort_b),
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
         let other_end = fasync::Socket::from_socket(other_end);
@@ -1515,7 +1513,7 @@ mod test {
             abort_transfer: _,
             event_receiver: _,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let listener = host.listen(1234, None).unwrap();
         std::mem::drop(listener);
@@ -1532,7 +1530,7 @@ mod test {
             abort_transfer: _,
             mut event_receiver,
             scope: _scope,
-        } = TestConnection::new();
+        } = TestConnection::<fasync::Socket>::new();
 
         let Some(UsbVsockHostEvent::AddedCid(got_cid)) = event_receiver.next().await else {
             panic!();
