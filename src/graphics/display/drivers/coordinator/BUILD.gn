@@ -66,6 +66,7 @@ source_set("shared") {
     "display-info.h",
     "engine-driver-client.cc",
     "engine-driver-client.h",
+    "engine-listener.h",
     "fence.cc",
     "fence.h",
     "id-map.h",

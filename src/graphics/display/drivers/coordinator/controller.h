@@ -35,6 +35,7 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-listener.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
@@ -57,7 +58,8 @@ class IntegrationTest;
 
 // Multiplexes between display controller clients and display engine drivers.
 class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
-                   public fidl::WireServer<fuchsia_hardware_display::Provider> {
+                   public fidl::WireServer<fuchsia_hardware_display::Provider>,
+                   public EngineListener {
  public:
   // Factory method for production use.
   // Creates and initializes a Controller instance.
@@ -106,12 +108,13 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
                                            const config_stamp_t* config_stamp);
   void DisplayEngineListenerOnCaptureComplete();
 
+  // `EngineListener`:
   // Must run on `engine_listener_dispatcher_`.
-  void OnDisplayAdded(std::unique_ptr<AddedDisplayInfo> added_display_info);
-  void OnDisplayRemoved(display::DisplayId removed_display_id);
-  void OnCaptureComplete();
+  void OnDisplayAdded(std::unique_ptr<AddedDisplayInfo> added_display_info) override;
+  void OnDisplayRemoved(display::DisplayId removed_display_id) override;
+  void OnCaptureComplete() override;
   void OnDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
-                      display::DriverConfigStamp driver_config_stamp);
+                      display::DriverConfigStamp driver_config_stamp) override;
 
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
