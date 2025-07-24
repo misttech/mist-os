@@ -46,7 +46,7 @@
     static_assert((opc1) < 8);                                        \
     static_assert((CRm) < 32);                                        \
     unsigned long long int _v;                                        \
-    __asm__ volatile("mrrc c%c[p], %o, %Q[v], %R[v], CR%c[c]"         \
+    __asm__ volatile("mrrc p%c[p], %[o], %Q[v], %R[v], CR%c[c]"       \
                      : [v] "=r"(_v)                                   \
                      : [p] "i"(coproc), [o] "i"(opc1), [c] "i"(CRm)); \
     _v;                                                               \
