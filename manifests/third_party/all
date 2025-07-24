@@ -170,7 +170,7 @@
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="1a476b9884ad25ae9f6e17e9509b2948cdda59d4"/>
     <project name="third_party/gflags"
-             path="third_party/gflags"
+             path="third_party/gflags/src"
              remote="https://fuchsia.googlesource.com/third_party/gflags"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="e482d90905743e36c97060d1afbc0ca9fccc4b25"/>
