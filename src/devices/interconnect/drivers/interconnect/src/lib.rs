@@ -33,6 +33,7 @@ struct Child {
     #[allow(unused)]
     controller: ClientEnd<NodeControllerMarker>,
     device: icc::DeviceProxy,
+    inspect: fuchsia_inspect::Node,
 }
 
 impl Child {
@@ -43,6 +44,9 @@ impl Child {
     ) -> Result<(), Status> {
         let average_bandwidth_bps = average_bandwidth_bps.ok_or(Status::INVALID_ARGS)?;
         let peak_bandwidth_bps = peak_bandwidth_bps.ok_or(Status::INVALID_ARGS)?;
+
+        self.inspect.record_uint("average_bandwidth_bps", average_bandwidth_bps);
+        self.inspect.record_uint("peak_bandwidth_bps", peak_bandwidth_bps);
 
         let requests = {
             let mut graph = self.graph.lock();
@@ -131,7 +135,21 @@ impl Driver for InterconnectDriver {
 
         let mut outgoing = ServiceFs::new();
 
+        let paths_inspect = inspector.root().create_child("paths");
+
         let graph = Arc::new(Mutex::new(graph));
+        let graph_clone = graph.clone();
+        inspector.root().record_lazy_child("nodes", move || {
+            Box::pin({
+                let graph = graph_clone.clone();
+                async move {
+                    let inspector = Inspector::default();
+                    graph.lock().record_inspect(inspector.root());
+                    Ok(inspector)
+                }
+            })
+        });
+
         let mut children = BTreeMap::new();
         for path in paths {
             let name = format!("{}-{}", path.name(), path.id());
@@ -150,8 +168,11 @@ impl Driver for InterconnectDriver {
             let controller = node.add_child(node_args).await?;
             let graph = graph.clone();
             let device = device.clone();
-            children.insert(name.clone(), Child { path, graph, controller, device });
+            let inspect = paths_inspect.create_child(path.name());
+            path.record_inspect(&inspect);
+            children.insert(name.clone(), Child { path, graph, controller, device, inspect });
         }
+        inspector.root().record(paths_inspect);
         // TODO(b/405206028): Initialize all nodes to initial bus bandwidths.
 
         context.serve_outgoing(&mut outgoing)?;
