@@ -21,6 +21,37 @@
 
 namespace usb_virtual_bus {
 
+/*
+    THEORY OF OPERATION
+
+    The usb-virtual-bus driver implements a virtual USB bus that can be used for testing USB
+    drivers (both host-side and device-side) without requiring physical hardware. It operates by
+    creating a virtual USB Host Controller Interface (HCI) and a virtual USB Device Controller
+    Interface (DCI) and connecting them back-to-back. This setup simulates a physical USB host
+    connected to a USB device.
+
+    The core of the data forwarding logic is managed by an array of UsbVirtualEp objects, with
+    each instance corresponding to a specific USB endpoint address. These objects act as the
+    communication channel between the virtual host and device. When a host-side driver queues a
+    USB request, the virtual HCI implementation receives it and places the request into the
+    appropriate UsbVirtualEp. The virtual DCI, which is connected to the same UsbVirtualEp array,
+    then makes this request available to the bound device-side driver. For data flowing from the
+    device to the host (IN transfers), the process is reversed. The UsbVirtualEp structs serve as
+    the shared transport medium, similar to a physical wire.
+
+    The bus is controlled by a test program via the fuchsia.hardware.usb.virtual.bus.Bus
+    FIDL protocol. This interface allows the test to orchestrate the test environment by
+    enabling/disabling the bus and simulating device connection and disconnection events.
+
+    The connection state is managed by a simple state machine within the driver. It can be in one
+    of three states: kDisconnected, kConnecting, or kConnected. A test initiates a connection by
+    calling the Connect() FIDL method, which transitions the state to kConnecting. The driver then
+    asynchronously completes the connection, notifies the virtual DCI that a host is "present",
+    and moves to the kConnected state. This triggers the virtual HCI to report a new device on its
+    root hub, initiating the enumeration process on the host side. Disconnection works similarly,
+    returning the state to kDisconnected.
+*/
+
 class UsbVirtualDevice;
 class UsbVirtualHost;
 
