@@ -5408,13 +5408,85 @@ zx_status_t VmCowPages::LookupReadableLocked(VmCowRange range, LookupReadableFun
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, uint64_t splice_offset,
-                                                  VmPageSpliceList* pages, uint64_t* taken_len,
-                                                  DeferredOps& deferred,
-                                                  MultiPageRequest* page_request) {
-  DEBUG_ASSERT(parent_);
+zx_status_t VmCowPages::TakePages(VmCowRange range, uint64_t splice_offset, VmPageSpliceList* pages,
+                                  uint64_t* taken_len, MultiPageRequest* page_request) {
+  canary_.Assert();
 
-  // Set up a cursor that will help us take pages from the parent.
+  DEBUG_ASSERT(range.is_page_aligned());
+
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
+
+  if (!range.IsBoundedBy(size_)) {
+    pages->Finalize();
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  if (page_source_) {
+    pages->Finalize();
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (AnyPagesPinnedLocked(range.offset, range.len)) {
+    pages->Finalize();
+    return ZX_ERR_BAD_STATE;
+  }
+
+  // On the assumption of success, unamp the entire range we are going to process. This ensures that
+  // in the unlikely event of a failure mid way through the unmap of the portion that was modified
+  // is not lost.
+  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
+
+  VmCompression* compression = Pmm::Node().GetPageCompression();
+
+  // If we do not have a parent, and the page splice list is empty, then we can use TakePages to
+  // directly move the page list nodes into the splice list. It is possible to both have not parent
+  // and not have an empty splice list if the parent was concurrently closed while performing this
+  // operation, in which case as its an infrequent race condition we fall through to the less
+  // efficient code below.
+  if (!parent_ && pages->IsEmpty() && splice_offset == 0) {
+    bool found_page = false;
+    page_list_.ForEveryPageInRangeMutable(
+        [&compression, &found_page](VmPageOrMarkerRef p, uint64_t off) {
+          found_page = true;
+          // Splice lists do not support page intervals.
+          ASSERT(!p->IsInterval());
+          // Have no parent and so should not see parent content.
+          DEBUG_ASSERT(!p->IsParentContent());
+          if (p->IsPage()) {
+            DEBUG_ASSERT(p->Page()->object.pin_count == 0);
+            // Cannot be taking pages from a pager backed VMO, hence cannot be taking a loaned page.
+            DEBUG_ASSERT(!p->Page()->is_loaned());
+            pmm_page_queues()->Remove(p->Page());
+          } else if (p->IsReference()) {
+            // A regular reference we can move are permitted in the VmPageSpliceList, it is up to
+            // the receiver of the pages to reject or otherwise deal with them. A temporary
+            // reference we need to turn back into its page so we can move it.
+            if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
+              // Don't insert the page in the page queues, since we're trying to remove the pages,
+              // just update the page list reader for TakePages below.
+              VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
+              ASSERT(compression->IsTempReference(ref));
+            }
+          }
+          return ZX_ERR_NEXT;
+        },
+        range.offset, range.end());
+
+    // If we did not find any pages, we could either be entirely inside a gap or an interval. Make
+    // sure we're not inside an interval; checking a single offset for membership should suffice.
+    ASSERT(found_page || !page_list_.IsOffsetInZeroInterval(range.offset));
+
+    zx_status_t status = page_list_.TakePages(range.offset, pages);
+    if (status != ZX_OK) {
+      DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+      return status;
+    }
+    *taken_len = range.len;
+    return ZX_OK;
+  }
+
+  // Set up a cursor that will help us perform copy-on-write from any potential parent.
   const uint64_t end = range.end();
   uint64_t position = range.offset;
   auto cursor = GetLookupCursorLocked(range);
@@ -5422,8 +5494,6 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, uint64_t spl
     return cursor.error_value();
   }
   AssertHeld(cursor->lock_ref());
-
-  VmCompression* compression = Pmm::Node().GetPageCompression();
 
   // This loop attempts to take pages from the VMO one page at a time. For each page, it:
   // 1. Allocates a zero page to replace the existing page.
@@ -5436,7 +5506,6 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, uint64_t spl
   // to take ownership of all of the pages again. On highly contended VMOs, this could lead to a
   // situation in which we get stuck in this loop and no forward progress is made.
   zx_status_t status = ZX_OK;
-  uint64_t new_pages_len = 0;
   while (position < end) {
     // Allocate a zero page to replace the content at position.
     // TODO(https://fxbug.dev/42076904): Inserting a full zero page is inefficient. We should
@@ -5478,7 +5547,6 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, uint64_t spl
       break;
     }
     VmPageOrMarker& content = *result;
-    new_pages_len += PAGE_SIZE;
     ASSERT(!content.IsInterval());
 
     // Before adding the content to the splice list, we need to make sure that it:
@@ -5511,10 +5579,6 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, uint64_t spl
     *taken_len += PAGE_SIZE;
   }
 
-  if (new_pages_len) {
-    RangeChangeUpdateLocked(range.WithLength(new_pages_len), RangeChangeOp::Unmap, &deferred);
-  }
-
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
@@ -5525,107 +5589,6 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, uint64_t spl
   }
 
   return status;
-}
-
-zx_status_t VmCowPages::TakePages(VmCowRange range, uint64_t splice_offset, VmPageSpliceList* pages,
-                                  uint64_t* taken_len, MultiPageRequest* page_request) {
-  canary_.Assert();
-
-  DEBUG_ASSERT(range.is_page_aligned());
-
-  __UNINITIALIZED DeferredOps deferred(this);
-  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
-
-  if (!range.IsBoundedBy(size_)) {
-    pages->Finalize();
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  if (page_source_) {
-    pages->Finalize();
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  if (AnyPagesPinnedLocked(range.offset, range.len)) {
-    pages->Finalize();
-    return ZX_ERR_BAD_STATE;
-  }
-
-  // If this is a child of any other kind, we need to handle it specially.
-  if (parent_) {
-    return TakePagesWithParentLocked(range, splice_offset, pages, taken_len, deferred,
-                                     page_request);
-  }
-
-  // On the assumption of success, unamp the entire range we are going to process. This ensures that
-  // in the unlikely event of a failure mid way through the unmap of the portion that was modified
-  // is not lost.
-  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
-
-  VmCompression* compression = Pmm::Node().GetPageCompression();
-  bool found_page = false;
-  page_list_.ForEveryPageInRangeMutable(
-      [&compression, &found_page](VmPageOrMarkerRef p, uint64_t off) {
-        found_page = true;
-        // Splice lists do not support page intervals.
-        ASSERT(!p->IsInterval());
-        // Parent content should have been handled by TakePagesWithParentLocked.
-        DEBUG_ASSERT(!p->IsParentContent());
-        if (p->IsPage()) {
-          DEBUG_ASSERT(p->Page()->object.pin_count == 0);
-          // Cannot be taking pages from a pager backed VMO, hence cannot be taking a loaned page.
-          DEBUG_ASSERT(!p->Page()->is_loaned());
-          pmm_page_queues()->Remove(p->Page());
-        } else if (p->IsReference()) {
-          // A regular reference we can move are permitted in the VmPageSpliceList, it is up to the
-          // receiver of the pages to reject or otherwise deal with them. A temporary reference we
-          // need to turn back into its page so we can move it.
-          if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
-            // Don't insert the page in the page queues, since we're trying to remove the pages,
-            // just update the page list reader for TakePages below.
-            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
-            ASSERT(compression->IsTempReference(ref));
-          }
-        }
-        return ZX_ERR_NEXT;
-      },
-      range.offset, range.end());
-
-  // If we did not find any pages, we could either be entirely inside a gap or an interval. Make
-  // sure we're not inside an interval; checking a single offset for membership should suffice.
-  ASSERT(found_page || !page_list_.IsOffsetInZeroInterval(range.offset));
-
-  // In the very likely case that the given VmPageSpliceList is empty, we can use the TakePages
-  // method to efficiently move the contents into the splice list. This is likely to be the case
-  // because a non-empty splice list can only ever be encountered when we are taking pages from a
-  // VMO whose parent is concurrently closed. In this case, we have to append to the splice list
-  // one VmPageOrMarker at a time.
-  if (likely(pages->IsEmpty() && splice_offset == 0)) {
-    zx_status_t status = page_list_.TakePages(range.offset, pages);
-    if (status != ZX_OK) {
-      DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
-      return status;
-    }
-  } else {
-    for (uint64_t offset = 0; offset < range.len; offset += PAGE_SIZE) {
-      VmPageOrMarker content = page_list_.RemoveContent(offset + range.offset);
-      if (!content.IsEmpty()) {
-        zx_status_t status = pages->Insert(splice_offset + offset, ktl::move(content));
-        if (status != ZX_OK) {
-          DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
-          return status;
-        }
-      }
-    }
-    pages->Finalize();
-  }
-
-  *taken_len = range.len;
-
-  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-
-  return ZX_OK;
 }
 
 zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pages,

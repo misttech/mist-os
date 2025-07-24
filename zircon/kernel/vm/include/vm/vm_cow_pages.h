@@ -884,12 +884,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   ~VmCowPages() override;
 
-  // A private helper that takes pages if this VmCowPages has a parent.
-  zx_status_t TakePagesWithParentLocked(VmCowRange range, uint64_t splice_offset,
-                                        VmPageSpliceList* pages, uint64_t* taken_len,
-                                        DeferredOps& deferred, MultiPageRequest* page_request)
-      TA_REQ(lock());
-
   friend class fbl::RefPtr<VmCowPages>;
   friend class LockedParentWalker;
 
