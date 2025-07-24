@@ -713,7 +713,8 @@ void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
   {
     fbl::AutoLock lock(&flush_lock_);
 
-    if (engine_listener_.is_valid()) {
+    if (primary_display_device_.latest_config_stamp != display::kInvalidDriverConfigStamp &&
+        engine_listener_.is_valid()) {
       zx::time_monotonic now = async::Now(dispatcher);
       const uint64_t banjo_display_id = kPrimaryDisplayId.ToBanjo();
       const config_stamp_t banjo_config_stamp =
