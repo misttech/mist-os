@@ -1013,7 +1013,6 @@ mod tests {
                 32 * 1024..36 * 1024,
                 blob.clone(),
                 epochs.add_ref(),
-                volume.scope().try_active_guard().unwrap(),
             ));
             wait(
                 || blob.chunks_supplied[1].load(Ordering::Relaxed) == 2,
@@ -1030,7 +1029,6 @@ mod tests {
                 224 * 1024..228 * 1024,
                 blob.clone(),
                 epochs.add_ref(),
-                volume.scope().try_active_guard().unwrap(),
             ));
             wait(
                 || blob.chunks_supplied[7].load(Ordering::Relaxed) == 2,

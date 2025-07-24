@@ -8,9 +8,9 @@ use crate::fuchsia::node::FxNode;
 use crate::fuchsia::profile::Recorder;
 use anyhow::Error;
 use bitflags::bitflags;
-use fuchsia_async::scope::ScopeActiveGuard;
 use fuchsia_async::{self as fasync};
 use fuchsia_sync::{Mutex, MutexGuard};
+use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::range::RangeExt;
 use fxfs::round::{round_down, round_up};
@@ -118,21 +118,19 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
             (file, ref_guard)
         };
 
-        let Some(scope_guard) = file.pager().scope.try_active_guard() else {
+        // The scope guard needs to be held and outlive the file Arc and the clones of it.
+        let Some(_scope_guard) = file.pager().scope.try_active_guard() else {
             // If an active guard can't be acquired then the filesystem must be shutting down. Fail
             // the page request to avoid leaving the client hanging.
             file.pager().report_failure(file.vmo(), contents.range(), zx::Status::BAD_STATE);
             return;
         };
         match command {
-            ZX_PAGER_VMO_READ => file.clone().page_in(PageInRange::new(
-                contents.range(),
-                file,
-                ref_guard.unwrap(),
-                scope_guard,
-            )),
+            ZX_PAGER_VMO_READ => {
+                file.clone().page_in(PageInRange::new(contents.range(), file, ref_guard.unwrap()))
+            }
             ZX_PAGER_VMO_DIRTY => {
-                file.clone().mark_dirty(MarkDirtyRange::new(contents.range(), file, scope_guard))
+                file.clone().mark_dirty(MarkDirtyRange::new(contents.range(), file))
             }
             _ => unreachable!("Unhandled commands are filtered above"),
         }
@@ -226,6 +224,13 @@ impl Pager {
             epochs: Epochs::new(),
             recorder: Mutex::new(None),
         })
+    }
+
+    /// Spawns a short term task for the pager that includes a guard that will prevent termination.
+    fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+        if let Some(guard) = self.scope.try_active_guard() {
+            self.executor.spawn_detached(FutureWithGuard::new(guard, task));
+        }
     }
 
     /// Set the current profile recorder, or set to None to not record.
@@ -523,8 +528,7 @@ pub fn default_page_in<P: PagerBacked>(
         let read_range = read_range.expand(expanded_range_for_readahead);
         for range in read_range.chunks(read_ahead_size) {
             let recorded_range = range.range.clone();
-            // Not taking an active guard since it is passed in here as part of `range`.
-            this.pager().executor.spawn_detached(page_in_chunk(this.clone(), range));
+            this.pager().spawn(page_in_chunk(this.clone(), range));
             this.pager().record_page_in(this.clone(), recorded_range);
         }
     }
@@ -619,12 +623,7 @@ pub type PageInRange<T> = PagerRange<T, PageInRequest>;
 
 impl<T: PagerBacked> PageInRange<T> {
     /// Constructs a new `PageInRange<T>`. `range` must be page aligned.
-    pub fn new(
-        range: Range<u64>,
-        file: Arc<T>,
-        ref_guard: RefGuard,
-        scope_guard: ScopeActiveGuard,
-    ) -> Self {
+    pub fn new(range: Range<u64>, file: Arc<T>, ref_guard: RefGuard) -> Self {
         debug_assert!(
             range.start % page_size() == 0 && range.end % page_size() == 0,
             "{:?} is not page aligned",
@@ -632,13 +631,21 @@ impl<T: PagerBacked> PageInRange<T> {
         );
         Self {
             range,
-            inner: Some(PagerRangeInner {
-                file,
-                _ref_guard: Some(ref_guard),
-                _scope_guard: scope_guard,
-            }),
+            inner: Some(PagerRangeInner { file, _ref_guard: Some(ref_guard) }),
             _request_type: PhantomData,
         }
+    }
+
+    /// Supplies pages to the kernel for this range. See `zx_pager_supply_pages` for more
+    /// information.
+    pub fn supply_pages(mut self, transfer_vmo: &zx::Vmo, transfer_offset: u64) {
+        let inner = self.inner.take().unwrap();
+        inner.file.pager().supply_pages(
+            inner.file.vmo(),
+            self.range.clone(),
+            transfer_vmo,
+            transfer_offset,
+        );
     }
 }
 
@@ -658,7 +665,7 @@ pub type MarkDirtyRange<T> = PagerRange<T, MarkDirtyRequest>;
 
 impl<T: PagerBacked> MarkDirtyRange<T> {
     /// Constructs a new `MarkDirtyRange<T>`. `range` must be page aligned.
-    pub fn new(range: Range<u64>, file: Arc<T>, scope_guard: ScopeActiveGuard) -> Self {
+    pub fn new(range: Range<u64>, file: Arc<T>) -> Self {
         debug_assert!(
             range.start % page_size() == 0 && range.end % page_size() == 0,
             "{:?} is not page aligned",
@@ -666,9 +673,16 @@ impl<T: PagerBacked> MarkDirtyRange<T> {
         );
         Self {
             range,
-            inner: Some(PagerRangeInner { file, _ref_guard: None, _scope_guard: scope_guard }),
+            inner: Some(PagerRangeInner { file, _ref_guard: None }),
             _request_type: PhantomData,
         }
+    }
+
+    /// Allows the kernel to dirty this range of pages. See `ZX_PAGER_OP_DIRTY` for more
+    /// information.
+    pub fn dirty_pages(mut self) {
+        let inner = self.inner.take().unwrap();
+        inner.file.pager().dirty_pages(inner.file.vmo(), self.range.clone());
     }
 }
 
@@ -681,9 +695,6 @@ struct PagerRangeInner<T: std::clone::Clone + Deref<Target: PagerBacked>> {
     /// Holds a reference to the current Epoch, so that in-flight read requests can be tracked. This
     /// should be None for MarkDirty requests.
     _ref_guard: Option<RefGuard>,
-
-    /// Holds the current scope open, so that termination can't complete until this is dropped.
-    _scope_guard: ScopeActiveGuard,
 }
 
 /// The requested range from a pager packet. This object ensures that all pager requests receive a
@@ -692,8 +703,7 @@ struct PagerRangeInner<T: std::clone::Clone + Deref<Target: PagerBacked>> {
 pub struct PagerRange<T: PagerBacked, U: PagerRequestType> {
     range: Range<u64>,
 
-    /// Contains the file and all the relevant guards. If this is None, then the request is
-    /// complete.
+    /// Contains the file and the ref guard. If this is None, then the request is complete.
     inner: Option<PagerRangeInner<Arc<T>>>,
 
     _request_type: PhantomData<U>,
@@ -783,29 +793,6 @@ impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
     #[cfg(test)]
     fn consume(mut self) {
         self.inner.take().unwrap();
-    }
-}
-
-impl<T: PagerBacked> PagerRange<T, PageInRequest> {
-    /// Supplies pages to the kernel for this range. See `zx_pager_supply_pages` for more
-    /// information.
-    pub fn supply_pages(mut self, transfer_vmo: &zx::Vmo, transfer_offset: u64) {
-        let inner = self.inner.take().unwrap();
-        inner.file.pager().supply_pages(
-            inner.file.vmo(),
-            self.range.clone(),
-            transfer_vmo,
-            transfer_offset,
-        );
-    }
-}
-
-impl<T: PagerBacked> PagerRange<T, MarkDirtyRequest> {
-    /// Allows the kernel to dirty this range of pages. See `ZX_PAGER_OP_DIRTY` for more
-    /// information.
-    pub fn dirty_pages(mut self) {
-        let inner = self.inner.take().unwrap();
-        inner.file.pager().dirty_pages(inner.file.vmo(), self.range.clone());
     }
 }
 
@@ -1424,12 +1411,7 @@ mod tests {
         let file = MockFile::new(pager.clone());
         let epoch = Epochs::new();
 
-        let pager_range = PageInRange::new(
-            0..page_size() * 5,
-            file,
-            epoch.add_ref(),
-            pager.scope.try_active_guard().unwrap(),
-        );
+        let pager_range = PageInRange::new(0..page_size() * 5, file, epoch.add_ref());
         let ranges: Vec<Range<u64>> = pager_range
             .chunks(page_size() * 2)
             .map(|pager_range| {
@@ -1455,12 +1437,7 @@ mod tests {
         let file = MockFile::new(pager.clone());
         let epoch = Epochs::new();
 
-        let pager_range = PageInRange::new(
-            0..page_size() * 10,
-            file,
-            epoch.add_ref(),
-            pager.scope.try_active_guard().unwrap(),
-        );
+        let pager_range = PageInRange::new(0..page_size() * 10, file, epoch.add_ref());
         let (left, right) = pager_range.split(page_size() * 5);
         let (left, right) = (left.unwrap(), right.unwrap());
         assert_eq!(left.range(), 0..page_size() * 5);
@@ -1478,12 +1455,7 @@ mod tests {
         let file = MockFile::new(pager.clone());
         let epoch = Epochs::new();
 
-        let pager_range = PageInRange::new(
-            0..page_size() * 2,
-            file,
-            epoch.add_ref(),
-            pager.scope.try_active_guard().unwrap(),
-        );
+        let pager_range = PageInRange::new(0..page_size() * 2, file, epoch.add_ref());
         pager_range.expand(0..page_size()).consume();
     }
 
