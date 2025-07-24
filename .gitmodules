@@ -118,11 +118,6 @@
 	url = https://fuchsia.googlesource.com/third_party/freetype2
 	name = third_party/freetype2
 	ignore = all
-[submodule "third_party/gflags"]
-	path = third_party/gflags
-	url = https://fuchsia.googlesource.com/third_party/gflags
-	name = third_party/gflags
-	ignore = all
 [submodule "third_party/github.com/ARM-software/HWCPipe"]
 	path = third_party/github.com/ARM-software/HWCPipe
 	url = https://fuchsia.googlesource.com/third_party/github.com/ARM-software/HWCPipe
@@ -702,4 +697,9 @@
 	path = third_party/perfetto
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/perfetto
 	name = third_party/perfetto
+	ignore = all
+[submodule "third_party/gflags/src"]
+	path = third_party/gflags/src
+	url = https://fuchsia.googlesource.com/third_party/gflags
+	name = third_party/gflags
 	ignore = all
