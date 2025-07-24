@@ -68,6 +68,7 @@
 #include <openthread/platform/toolchain.h>
 #include <openthread/platform/trel.h>
 #include <openthread/platform/udp.h>
+#include <openthread/random_crypto.h>
 #include <openthread/random_noncrypto.h>
 #include <openthread/server.h>
 #include <openthread/sntp.h>
@@ -80,5 +81,6 @@
 #include <openthread/thread_ftd.h>
 #include <openthread/trel.h>
 #include <openthread/udp.h>
+#include <openthread/verhoeff_checksum.h>
 
 #endif  // SRC_CONNECTIVITY_LOWPAN_LIB_OPENTHREAD_SYS_PLATGEN_H_
