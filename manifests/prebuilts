@@ -183,11 +183,6 @@
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/pigz"/>
 
-     <!-- Fastboot GBL from Android Artifacts. -->
-     <package name="fuchsia/infra/images/nuc11/gbl_x86_64.efi"
-              path="prebuilt/infra/images/nuc11/gbl_x86_64.efi"
-              version="bid:13801264"/>
-
     <!--
         ************************************************************
         Tools maintained in fuchsia.git itself.

@@ -180,11 +180,6 @@
         "instance_id": "Em7GpaZS1IGYPgJGuss23_UVGR48ZQHf1v6ddx1E2xQC"
     },
     {
-        "package": "fuchsia/infra/images/nuc11/gbl_x86_64.efi",
-        "version": "bid:13801264",
-        "instance_id": "63ZUDc_-LyQBK4LEzKWbGL4n3c_Q6MC7DzbSN9y_eQsC"
-    },
-    {
         "package": "fuchsia/infra/lkg/linux-amd64",
         "version": "git_revision:6c1aba977be6e58e18c8b0d2bd64b3e51ae5e3f9",
         "instance_id": "rP5rpYRz1fBjzZFfSU6L0Fw9Kk_kY5nG9XVo8yTU1E0C"
