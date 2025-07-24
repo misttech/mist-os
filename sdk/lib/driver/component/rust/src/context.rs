@@ -3,8 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{Incoming, Node};
+use fuchsia_async::ScopeHandle;
 use fuchsia_component::server::{ServiceFs, ServiceObjTrait};
 use fuchsia_component_config::Config;
+use fuchsia_inspect::Inspector;
+use inspect_runtime::PublishOptions;
 use log::error;
 use namespace::Namespace;
 use zx::Status;
@@ -69,6 +72,27 @@ impl DriverContext {
             error!("Failed to serve outgoing directory: {err}");
             Status::INTERNAL
         })?;
+
+        Ok(())
+    }
+
+    /// Spawns a server handling `fuchsia.inspect.Tree` requests and a handle
+    /// to the `fuchsia.inspect.Tree` is published using `fuchsia.inspect.InspectSink`.
+    ///
+    /// Whenever the client wishes to stop publishing Inspect, the Controller may be dropped.
+    pub fn publish_inspect(&self, inspector: &Inspector, scope: ScopeHandle) -> Result<(), Status> {
+        let client = self.incoming.connect_protocol().map_err(|err| {
+            error!("Error connecting to inspect : {err}");
+            Status::INTERNAL
+        })?;
+
+        let task = inspect_runtime::publish(
+            inspector,
+            PublishOptions::default().on_inspect_sink_client(client),
+        )
+        .ok_or(Status::INTERNAL)?;
+
+        scope.spawn_local(task);
 
         Ok(())
     }

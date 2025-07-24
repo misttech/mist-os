@@ -8,14 +8,17 @@ use fdf_component::{
 };
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_driver_framework::NodeControllerMarker;
-use fidl_fuchsia_hardware_interconnect as icc;
+use fuchsia_async::Scope;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use log::{error, warn};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use zx::Status;
+
+use fidl_fuchsia_hardware_interconnect as icc;
 
 mod graph;
 
@@ -84,8 +87,9 @@ impl Child {
 #[allow(unused)]
 struct InterconnectDriver {
     node: Node,
+    inspector: Inspector,
     children: Arc<BTreeMap<String, Child>>,
-    scope: fuchsia_async::Scope,
+    scope: Scope,
 }
 
 impl Driver for InterconnectDriver {
@@ -93,6 +97,9 @@ impl Driver for InterconnectDriver {
 
     async fn start(mut context: DriverContext) -> Result<Self, Status> {
         let node = context.take_node()?;
+
+        let inspector = Inspector::default();
+        context.publish_inspect(&inspector, Scope::current())?;
 
         let device = context
             .incoming
@@ -151,7 +158,7 @@ impl Driver for InterconnectDriver {
 
         let children = Arc::new(children);
 
-        let scope = fuchsia_async::Scope::new_with_name("outgoing_directory");
+        let scope = Scope::new_with_name("outgoing_directory");
         let children_clone = children.clone();
         scope.spawn_local(async move {
             outgoing
@@ -168,7 +175,7 @@ impl Driver for InterconnectDriver {
                 .await;
         });
 
-        Ok(Self { node, children, scope })
+        Ok(Self { node, inspector, children, scope })
     }
 
     async fn stop(&self) {}
