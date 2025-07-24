@@ -54,6 +54,55 @@ async fn updates_the_system() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn updates_the_system_packageless() {
+    let content_blob = vec![1; 200];
+    let content_blob_hash = fuchsia_merkle::from_slice(&content_blob).root();
+
+    let manifest = make_manifest([manifest::Blob {
+        uncompressed_size: content_blob.len() as u64,
+        delivery_blob_type: 1,
+        fuchsia_merkle_root: content_blob_hash,
+    }]);
+    let env = TestEnv::builder()
+        .ota_manifest(manifest)
+        .blob(content_blob_hash, content_blob)
+        .build()
+        .await;
+
+    env.run_packageless_update().await.unwrap();
+
+    assert_eq!(
+        env.get_ota_metrics().await,
+        OtaMetrics {
+            initiator:
+                metrics::OtaResultAttemptsMigratedMetricDimensionInitiator::UserInitiatedCheck
+                    as u32,
+            phase: metrics::OtaResultAttemptsMigratedMetricDimensionPhase::SuccessPendingReboot
+                as u32,
+            status_code: metrics::OtaResultAttemptsMigratedMetricDimensionStatusCode::Success
+                as u32,
+        }
+    );
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into(), content_blob_hash.into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![content_blob_hash.into()]),
+        Gc,
+        OtaDownloader(OtaDownloaderEvent::FetchBlob(content_blob_hash.into())),
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn requires_zbi() {
     let env = TestEnv::builder().build().await;
 

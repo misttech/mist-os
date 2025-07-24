@@ -267,7 +267,7 @@ impl Updater for RealUpdater {
             reboot_controller,
             self.structured_config.concurrent_package_resolves.into(),
             self.structured_config.concurrent_blob_fetches.into(),
-            self.structured_config.enable_attempt_v2,
+            self.structured_config.allow_packageless_update,
             cancel_receiver,
         )
         .await;
@@ -291,7 +291,7 @@ async fn update(
     reboot_controller: RebootController,
     concurrent_package_resolves: usize,
     concurrent_blob_fetches: usize,
-    enable_attempt_v2: bool,
+    allow_packageless_update: bool,
     mut cancel_receiver: oneshot::Receiver<()>,
 ) -> (String, impl FusedStream<Item = fupdate_installer_ext::State>) {
     let attempt_fut = history.lock().start_update_attempt(
@@ -330,8 +330,8 @@ async fn update(
 
         let attempt_res = {
             let attempt_fut = match config.update_url.scheme() {
-                "http" | "https" if enable_attempt_v2 => {
-                    AttemptV2 { config: &config, env: &env, concurrent_blob_fetches }
+                "http" | "https" if allow_packageless_update => {
+                    PackagelessAttempt { config: &config, env: &env, concurrent_blob_fetches }
                         .run(&mut co, &mut phase, &mut target_version)
                         .left_future()
                         .fuse()
@@ -1090,13 +1090,13 @@ async fn commit_images(
 }
 
 // Update attempt that uses a manifest instead of update package.
-struct AttemptV2<'a> {
+struct PackagelessAttempt<'a> {
     config: &'a Config,
     env: &'a Environment,
     concurrent_blob_fetches: usize,
 }
 
-impl AttemptV2<'_> {
+impl PackagelessAttempt<'_> {
     // Run the update attempt, if update is canceled, any await during this attempt could be an
     // early return point.
     async fn run(

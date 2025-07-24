@@ -59,6 +59,6 @@
         concurrent_blob_fetches: { type: "uint16" },
 
         // Whether to allow the new package-less update attempt flow.
-        enable_attempt_v2: { type: "bool" },
+        allow_packageless_update: { type: "bool" },
     },
 }

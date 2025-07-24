@@ -133,7 +133,7 @@ fuchsia_structured_config_rust_lib("config_lib") {
 structured_config_values = {
   concurrent_package_resolves = 5
   concurrent_blob_fetches = 5
-  enable_attempt_v2 = false
+  allow_packageless_update = false
 }
 
 fuchsia_structured_config_values("config_values_from_gn") {

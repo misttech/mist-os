@@ -36,7 +36,7 @@ pub struct VersionedOtaManifest {
 }
 
 /// Information about a particular version of the OS.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct OtaManifestV1 {
     /// The version of the target build.
     pub build_version: SystemVersion,
@@ -56,12 +56,19 @@ pub struct OtaManifestV1 {
     pub blobs: Vec<Blob>,
 }
 
+impl OtaManifestV1 {
+    /// Wrap in a versioned manifest.
+    pub fn into_versioned(self) -> VersionedOtaManifest {
+        VersionedOtaManifest { version1: Some(self) }
+    }
+}
+
 fn update_mode_is_normal(mode: &UpdateMode) -> bool {
     *mode == UpdateMode::Normal
 }
 
 /// The slot of an image.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
 pub enum Slot {
     /// The A or B slot.
     #[default]
@@ -71,7 +78,7 @@ pub enum Slot {
 }
 
 /// An image to be written to a partition.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Image {
     /// The slot of the image.
     pub slot: Slot,
@@ -89,7 +96,7 @@ pub struct Image {
 }
 
 /// The type of the image, asset or firmware.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ImageType {
     /// ZBI or VbMeta.
@@ -99,7 +106,7 @@ pub enum ImageType {
 }
 
 /// A content blob.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Blob {
     /// The uncompressed size of the blob.
     pub uncompressed_size: u64,
@@ -211,9 +218,7 @@ mod tests {
             }],
         };
 
-        let versioned_manifest = VersionedOtaManifest { version1: Some(manifest) };
-
-        let json = serde_json::to_value(versioned_manifest).unwrap();
+        let json = serde_json::to_value(manifest.into_versioned()).unwrap();
         let expected = serde_json::json!({
             "version1": {
                 "build_version": "1.2.3.4",
