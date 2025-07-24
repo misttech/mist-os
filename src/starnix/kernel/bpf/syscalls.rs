@@ -43,7 +43,7 @@ use starnix_uapi::{
     bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
     bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_cmd_BPF_TOKEN_CREATE,
     bpf_map_info, bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH,
-    bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
+    bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY,
 };
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -358,7 +358,7 @@ pub fn sys_bpf(
             let bpf_fd = FdNumber::from_raw(pin_attr.bpf_fd as i32);
             let object = get_bpf_object(current_task, bpf_fd)?;
             let path_addr = UserCString::new(current_task, UserAddress::from(pin_attr.pathname));
-            let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
+            let pathname = current_task.read_path(path_addr)?;
             let (parent, basename) = current_task.lookup_parent_at(
                 locked,
                 &mut LookupContext::default(),
@@ -383,7 +383,7 @@ pub fn sys_bpf(
                 0 => OpenFlags::RDWR,
                 _ => return error!(EINVAL),
             };
-            let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
+            let pathname = current_task.read_path(path_addr)?;
             let node = current_task.lookup_path_from_root(locked, pathname.as_ref())?;
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
             let object =

@@ -54,7 +54,8 @@ use starnix_uapi::{
     MADV_KEEPONFORK, MADV_MERGEABLE, MADV_NOHUGEPAGE, MADV_NORMAL, MADV_PAGEOUT,
     MADV_POPULATE_READ, MADV_RANDOM, MADV_REMOVE, MADV_SEQUENTIAL, MADV_SOFT_OFFLINE,
     MADV_UNMERGEABLE, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED,
-    MREMAP_MAYMOVE, PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
+    MREMAP_MAYMOVE, PATH_MAX, PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL,
+    UIO_MAXIOV,
 };
 use std::collections::HashMap;
 use std::ffi::CStr;
@@ -2840,6 +2841,24 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
             // Trigger a capacity increase.
             buf.reserve(index + chunk_size);
+        }
+    }
+
+    /// Read a path from `path`, returning it as a `FsString`.
+    ///
+    /// A convenience function that enforces the path length limit.
+    fn read_path(&self, path: UserCString) -> Result<FsString, Errno> {
+        self.read_c_string_to_vec(path, PATH_MAX as usize)
+    }
+
+    /// Read a path from `path`, returning it as a `FsString`, if the path is non-null.
+    ///
+    /// A convenience function that enforces the path length limit.
+    fn read_path_if_non_null(&self, path: UserCString) -> Result<FsString, Errno> {
+        if path.is_null() {
+            Ok(Default::default())
+        } else {
+            self.read_c_string_to_vec(path, PATH_MAX as usize)
         }
     }
 

@@ -68,16 +68,15 @@ use starnix_uapi::{
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLK64, F_SETLKW, F_SETLKW64, F_SETOWN,
     F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC,
     MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT,
-    O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT,
-    POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
-    POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL,
-    POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME,
-    TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
+    O_NOFOLLOW, O_PATH, O_TMPFILE, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI,
+    POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE,
+    POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED,
+    RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET,
+    XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
 use std::sync::{atomic, Arc};
 use std::usize;
 use zerocopy::{Immutable, IntoBytes};
@@ -664,7 +663,7 @@ fn open_file_at(
     mode: FileMode,
     resolve_flags: ResolveFlags,
 ) -> Result<FileHandle, Errno> {
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
     log_trace!(dir_fd:%, path:%; "open_file_at");
     current_task.open_file_at(
         locked,
@@ -687,7 +686,7 @@ fn lookup_parent_at<T, F>(
 where
     F: Fn(&mut Locked<Unlocked>, LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
     log_trace!(dir_fd:%, path:%; "lookup_parent_at");
     if path.is_empty() {
         return error!(ENOENT);
@@ -760,7 +759,7 @@ pub fn lookup_at<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
     log_trace!(dir_fd:%, path:%; "lookup_at");
     if path.is_empty() {
         if options.allow_empty_path {
@@ -1020,7 +1019,7 @@ pub fn sys_readlinkat(
     buffer: UserAddress,
     buffer_size: usize,
 ) -> Result<usize, Errno> {
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
     let lookup_flags = if path.is_empty() {
         if dir_fd == FdNumber::AT_FDCWD {
             return error!(ENOENT);
@@ -1081,7 +1080,7 @@ pub fn sys_mkdirat(
     user_path: UserCString,
     mode: FileMode,
 ) -> Result<(), Errno> {
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
 
     if path.is_empty() {
         return error!(ENOENT);
@@ -1678,12 +1677,12 @@ pub fn sys_symlinkat(
     new_dir_fd: FdNumber,
     user_path: UserCString,
 ) -> Result<(), Errno> {
-    let target = current_task.read_c_string_to_vec(user_target, PATH_MAX as usize)?;
+    let target = current_task.read_path(user_target)?;
     if target.is_empty() {
         return error!(ENOENT);
     }
 
-    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_path(user_path)?;
     // TODO: This check could probably be moved into parent.symlink(..).
     if path.is_empty() {
         return error!(ENOENT);
@@ -1862,10 +1861,9 @@ fn do_mount_remount(
     }
     let mount = target.mount_if_root()?;
 
-    let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
-    let data = current_task.read_c_string_if_non_null(data_addr, &mut data_buf)?;
+    let data = current_task.read_path_if_non_null(data_addr)?;
     let mount_options =
-        security::sb_eat_lsm_opts(current_task.kernel(), &mut MountParams::parse(data)?)?;
+        security::sb_eat_lsm_opts(current_task.kernel(), &mut MountParams::parse(data.as_ref())?)?;
     security::sb_remount(current_task, &mount, mount_options)?;
     let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
     mount.update_flags(updated_flags);
@@ -1942,16 +1940,9 @@ fn do_mount_create(
     data_addr: UserCString,
     flags: MountFlags,
 ) -> Result<(), Errno> {
-    let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
-    let source = if source_addr.is_null() {
-        Default::default()
-    } else {
-        current_task.read_c_string(source_addr, &mut source_buf)?
-    };
-    let mut fs_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
-    let fs_type = current_task.read_c_string(filesystemtype_addr, &mut fs_buf)?;
-    let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
-    let data = current_task.read_c_string_if_non_null(data_addr, &mut data_buf)?;
+    let source = current_task.read_path_if_non_null(source_addr)?;
+    let fs_type = current_task.read_path(filesystemtype_addr)?;
+    let data = current_task.read_path_if_non_null(data_addr)?;
     log_trace!(
         source:%,
         target:% = target.path(current_task),
@@ -1963,10 +1954,10 @@ fn do_mount_create(
     let options = FileSystemOptions {
         source: source.into(),
         flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: MountParams::parse(data)?,
+        params: MountParams::parse(data.as_ref())?,
     };
 
-    let fs = current_task.create_filesystem(locked, fs_type, options)?;
+    let fs = current_task.create_filesystem(locked, fs_type.as_ref(), options)?;
 
     security::sb_kern_mount(current_task, &fs)?;
     target.mount(WhatToMount::Fs(fs), flags)

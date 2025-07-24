@@ -34,7 +34,7 @@ use starnix_uapi::errors::{Errno, ErrnoCode, EAGAIN, EINTR};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserCStringPtr, UserRef};
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi, PATH_MAX};
+use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::CStr;
 use std::rc::Rc;
@@ -1001,7 +1001,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         service_address_ref: UserCStringPtr,
     ) -> Result<(), Errno> {
         let service_address = current_task.read_multi_arch_ptr(service_address_ref)?;
-        let service = current_task.read_c_string_to_vec(service_address, PATH_MAX as usize)?;
+        let service = current_task.read_path(service_address)?;
         let service_name = String::from_utf8(service.to_vec()).map_err(|_| errno!(EINVAL))?;
         let remote_controller_client =
             F::connect_to_remote_controller(current_task, &service_name)?;
