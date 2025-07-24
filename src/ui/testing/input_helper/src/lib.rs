@@ -261,6 +261,16 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                                 display_dimensions.height as i64,
                             )
                         }
+                        Some(CoordinateUnit::RegisteredDimensions) => {
+                            let dimensions =
+                                payload.display_dimensions.expect("missing dimensions");
+                            if dimensions.min_x >= dimensions.max_x
+                                || dimensions.min_y >= dimensions.max_y
+                            {
+                                panic!("invalid dimensions");
+                            }
+                            (dimensions.min_x, dimensions.max_x, dimensions.min_y, dimensions.max_y)
+                        }
                         _ => (-1000, 1000, -1000, 1000),
                     };
 
@@ -302,6 +312,16 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                                 0,
                                 display_dimensions.height as i64,
                             )
+                        }
+                        Some(CoordinateUnit::RegisteredDimensions) => {
+                            let dimensions =
+                                payload.display_dimensions.expect("missing dimensions");
+                            if dimensions.min_x >= dimensions.max_x
+                                || dimensions.min_y >= dimensions.max_y
+                            {
+                                panic!("invalid dimensions");
+                            }
+                            (dimensions.min_x, dimensions.max_x, dimensions.min_y, dimensions.max_y)
                         }
                         _ => (-1000, 1000, -1000, 1000),
                     };

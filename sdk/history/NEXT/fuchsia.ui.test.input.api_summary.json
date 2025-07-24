@@ -10,10 +10,43 @@
         "value": "1"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.test.input/CoordinateUnit.REGISTERED_DIMENSIONS",
+        "value": "2"
+    },
+    {
         "kind": "enum",
         "name": "fuchsia.ui.test.input/CoordinateUnit",
         "strictness": "flexible",
         "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.test.input/DisplayDimensions.max_x",
+        "ordinal": "3",
+        "type": "int64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.test.input/DisplayDimensions.max_y",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.test.input/DisplayDimensions.min_x",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.test.input/DisplayDimensions.min_y",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.test.input/DisplayDimensions"
     },
     {
         "kind": "protocol/member",
@@ -553,6 +586,12 @@
         "type": "server_end:fuchsia.ui.test.input/TouchScreen"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoRequest.display_dimensions",
+        "ordinal": "3",
+        "type": "fuchsia.ui.test.input/DisplayDimensions"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoRequest",
         "resourceness": "resource"
@@ -579,6 +618,12 @@
         "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenRequest.device",
         "ordinal": "1",
         "type": "server_end:fuchsia.ui.test.input/TouchScreen"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenRequest.display_dimensions",
+        "ordinal": "3",
+        "type": "fuchsia.ui.test.input/DisplayDimensions"
     },
     {
         "kind": "table",
