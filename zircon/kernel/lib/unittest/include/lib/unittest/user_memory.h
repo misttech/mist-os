@@ -94,8 +94,9 @@ class UserMemory {
 
   zx_status_t Protect(uint flags, uint64_t offset = 0) {
     ASSERT(offset < mapping_->size_locking());
-    return mapping_->Protect(mapping_->base_locking() + offset, mapping_->size_locking() - offset,
-                             ARCH_MMU_FLAG_PERM_USER | flags);
+    return mapping_->DebugProtect(mapping_->base_locking() + offset,
+                                  mapping_->size_locking() - offset,
+                                  ARCH_MMU_FLAG_PERM_USER | flags);
   }
 
   // Changes the mapping permissions to be a Read-Only Executable mapping.

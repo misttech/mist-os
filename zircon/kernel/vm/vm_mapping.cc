@@ -171,37 +171,6 @@ void VmMapping::DumpLocked(uint depth, bool verbose) const {
   }
 }
 
-zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flags) {
-  canary_.Assert();
-  LTRACEF("%p %#" PRIxPTR " %#x %#x\n", this, base_, flags_, new_arch_mmu_flags);
-
-  if (!IS_PAGE_ROUNDED(base)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  size = ROUNDUP_PAGE_SIZE(size);
-
-  Guard<CriticalMutex> guard{lock()};
-  if (state_ != LifeCycleState::ALIVE) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  if (size == 0 || !is_in_range_locked(base, size)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // Do not allow changing caching.
-  if (new_arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (!is_valid_mapping_flags(new_arch_mmu_flags)) {
-    return ZX_ERR_ACCESS_DENIED;
-  }
-
-  return ProtectLocked(base, size, new_arch_mmu_flags);
-}
-
 using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
 
 // static
@@ -280,37 +249,6 @@ zx_status_t VmMapping::ProtectLocked(vaddr_t base, size_t size, uint new_arch_mm
       base_, size_, base, size, new_arch_mmu_flags, protect_callback);
   ASSERT(status == ZX_OK || status == ZX_ERR_NO_MEMORY);
   return status;
-}
-
-zx_status_t VmMapping::Unmap(vaddr_t base, size_t size) {
-  LTRACEF("%p %#" PRIxPTR " %zu\n", this, base, size);
-
-  if (!IS_PAGE_ROUNDED(base)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  size = ROUNDUP_PAGE_SIZE(size);
-
-  fbl::RefPtr<VmAspace> aspace(aspace_);
-  if (!aspace) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  Guard<CriticalMutex> guard{lock()};
-  if (state_ != LifeCycleState::ALIVE) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  if (size == 0 || !is_in_range_locked(base, size)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // If we're unmapping everything, destroy this mapping
-  if (base == base_ && size == size_) {
-    return DestroyLocked();
-  }
-
-  return UnmapLocked(base, size);
 }
 
 zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {

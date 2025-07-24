@@ -1419,7 +1419,8 @@ static bool vm_mapping_attribution_map_unmap_test() {
 
   // Unmap from the right end of the mapping.
   auto old_base = mapping->base_locking();
-  status = mapping->Unmap(mapping->base_locking() + mapping->size_locking() - PAGE_SIZE, PAGE_SIZE);
+  status =
+      mapping->DebugUnmap(mapping->base_locking() + mapping->size_locking() - PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(old_base, mapping->base_locking());
   EXPECT_EQ(7ul * PAGE_SIZE, mapping->size_locking());
@@ -1428,7 +1429,7 @@ static bool vm_mapping_attribution_map_unmap_test() {
               make_private_attribution_counts(7ul * PAGE_SIZE, 0));
 
   // Unmap from the center of the mapping.
-  status = mapping->Unmap(mapping->base_locking() + 4 * PAGE_SIZE, PAGE_SIZE);
+  status = mapping->DebugUnmap(mapping->base_locking() + 4 * PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(old_base, mapping->base_locking());
   EXPECT_EQ(4ul * PAGE_SIZE, mapping->size_locking());
@@ -1437,7 +1438,7 @@ static bool vm_mapping_attribution_map_unmap_test() {
               make_private_attribution_counts(4ul * PAGE_SIZE, 0));
 
   // Unmap from the left end of the mapping.
-  status = mapping->Unmap(mapping->base_locking(), PAGE_SIZE);
+  status = mapping->DebugUnmap(mapping->base_locking(), PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_NE(old_base, mapping->base_locking());
   EXPECT_EQ(3ul * PAGE_SIZE, mapping->size_locking());
