@@ -19,7 +19,6 @@
 #include "fidl/fuchsia.io/cpp/markers.h"
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "lib/sync/completion.h"
-#include "lib/syslog/global.h"
 #include "log.h"
 #include "src/lib/metrics_buffer/metrics_impl.h"
 
@@ -27,7 +26,7 @@ namespace cobalt {
 
 namespace {
 
-template<class T>
+template <class T>
 constexpr bool sfinae_false_v = false;
 
 // This is essentially the same code as cobalt buckets_config BucketIndex.
@@ -48,7 +47,7 @@ uint32_t BucketIndex(std::vector<int64_t>& floors, int64_t val) {
   return static_cast<uint32_t>(floors.size());
 }
 
-} // namespace
+}  // namespace
 
 // static
 std::shared_ptr<MetricsBuffer> MetricsBuffer::Create(uint32_t project_id) {
@@ -350,25 +349,27 @@ void StringMetricBuffer::LogString(std::vector<uint32_t> dimension_values,
 HistogramMetricBuffer::HistogramMetricBuffer(std::shared_ptr<MetricsBuffer> parent,
                                              HistogramInfo histogram_info)
     : parent_(parent), histogram_info_(std::move(histogram_info)) {
-  std::visit([this](auto&& info){
-    using InfoT = std::decay_t<decltype(info)>;
-    if constexpr (std::is_same_v<InfoT, LinearIntegerBuckets>) {
-      floors_.resize(info.num_buckets + 1);
-      for (int64_t i = 0; i < info.num_buckets + 1; i++) {
-        floors_[i] = info.floor + i * info.step_size;
-      }
-    } else if constexpr (std::is_same_v<InfoT, ExponentialIntegerBuckets>) {
-      floors_.resize(info.num_buckets + 1);
-      floors_[0] = info.floor;
-      int64_t offset = info.initial_step;
-      for (uint32_t i = 1; i < info.num_buckets + 1; i++) {
-        floors_[i] = info.floor + offset;
-        offset *= info.step_multiplier;
-      }
-    } else {
-      static_assert(sfinae_false_v<InfoT>, "non-exhaustive");
-    }
-  }, histogram_info_.buckets);
+  std::visit(
+      [this](auto&& info) {
+        using InfoT = std::decay_t<decltype(info)>;
+        if constexpr (std::is_same_v<InfoT, LinearIntegerBuckets>) {
+          floors_.resize(info.num_buckets + 1);
+          for (int64_t i = 0; i < info.num_buckets + 1; i++) {
+            floors_[i] = info.floor + i * info.step_size;
+          }
+        } else if constexpr (std::is_same_v<InfoT, ExponentialIntegerBuckets>) {
+          floors_.resize(info.num_buckets + 1);
+          floors_[0] = info.floor;
+          int64_t offset = info.initial_step;
+          for (uint32_t i = 1; i < info.num_buckets + 1; i++) {
+            floors_[i] = info.floor + offset;
+            offset *= info.step_multiplier;
+          }
+        } else {
+          static_assert(sfinae_false_v<InfoT>, "non-exhaustive");
+        }
+      },
+      histogram_info_.buckets);
 }
 
 void HistogramMetricBuffer::LogValue(std::vector<uint32_t> dimension_values, int64_t value) {
