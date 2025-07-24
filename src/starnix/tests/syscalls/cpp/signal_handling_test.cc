@@ -722,21 +722,29 @@ TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureCanUseMainStack) {
 }
 
 // Checks the effect of `exec` on signal handlers. Custom signal dispositions should be reset to the
-// default, while ignored signals should remain ignored. Signal action flags should be cleared.
+// default, while ignored signals should remain ignored. Signal action flags and masks should be
+// cleared.
 TEST(SignalHandling, SigactionResetByExec) {
   test_helper::ForkHelper helper;
+
+  sigset_t mask;
+  ASSERT_THAT(sigemptyset(&mask), SyscallSucceeds());
+  ASSERT_THAT(sigaddset(&mask, SIGINT), SyscallSucceeds());
 
   struct sigaction custom = {};
   custom.sa_handler = [](int) {};
   custom.sa_flags = SA_ONSTACK;
+  custom.sa_mask = mask;
 
   struct sigaction ignore = {};
   ignore.sa_handler = SIG_IGN;
   ignore.sa_flags = SA_ONSTACK;
+  ignore.sa_mask = mask;
 
   struct sigaction dfl = {};
   dfl.sa_handler = SIG_DFL;
   dfl.sa_flags = SA_ONSTACK;
+  dfl.sa_mask = mask;
 
   helper.RunInForkedProcess([&] {
     ASSERT_THAT(sigaction(SIGUSR1, &custom, NULL), SyscallSucceeds());
