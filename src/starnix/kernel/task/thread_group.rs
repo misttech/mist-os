@@ -192,9 +192,6 @@ pub struct ThreadGroupMutableState {
     /// Channel to message when this thread group exits.
     exit_notifier: Option<futures::channel::oneshot::Sender<()>>,
 
-    /// True if the `ThreadGroup` shares any state with a parent or child process (via `clone()`).
-    pub is_sharing: bool,
-
     /// Notifier for name changes.
     pub notifier: Option<std::sync::mpsc::Sender<MemoryAttributionLifecycleEvent>>,
 }
@@ -624,7 +621,6 @@ impl ThreadGroup {
                         .unwrap_or(Default::default()),
                     allowed_ptracers: PtraceAllowedPtracers::None,
                     exit_notifier: None,
-                    is_sharing: false,
                     notifier: None,
                 }),
             };
