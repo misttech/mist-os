@@ -989,6 +989,10 @@ void DisplayEngine::OnVsync(zx::time_monotonic timestamp) {
   if (fully_initialized()) {
     current_config_stamp = video_input_unit_->GetLastConfigStampApplied();
   }
+  if (current_config_stamp == display::kInvalidDriverConfigStamp) {
+    return;
+  }
+
   fbl::AutoLock lock(&display_mutex_);
   if (engine_listener_.is_valid() && display_attached_) {
     const config_stamp_t banjo_config_stamp = current_config_stamp.ToBanjo();
