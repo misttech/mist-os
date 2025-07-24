@@ -124,6 +124,7 @@ namespace {
 const char* FUCHSIA_INSPECT_STATS = "fuchsia.inspect.Stats";
 const char* CURRENT_SIZE_KEY = "current_size";
 const char* MAXIMUM_SIZE_KEY = "maximum_size";
+const char* UTILIZATION_PER_TEN_K_KEY = "utilization_per_ten_k";
 const char* TOTAL_DYNAMIC_CHILDREN_KEY = "total_dynamic_children";
 const char* ALLOCATED_BLOCKS_KEY = "allocated_blocks";
 const char* DEALLOCATED_BLOCKS_KEY = "deallocated_blocks";
@@ -138,6 +139,10 @@ void Inspector::CreateStatsNode() {
         Inspector insp;
         insp.GetRoot().CreateUint(CURRENT_SIZE_KEY, stats.size, &insp);
         insp.GetRoot().CreateUint(MAXIMUM_SIZE_KEY, stats.maximum_size, &insp);
+        if (stats.maximum_size > 0) {
+          insp.GetRoot().CreateUint(UTILIZATION_PER_TEN_K_KEY,
+                                    (stats.size * 10000) / stats.maximum_size, &insp);
+        }
         insp.GetRoot().CreateUint(TOTAL_DYNAMIC_CHILDREN_KEY, stats.dynamic_child_count, &insp);
         insp.GetRoot().CreateUint(ALLOCATED_BLOCKS_KEY, stats.allocated_blocks, &insp);
         insp.GetRoot().CreateUint(DEALLOCATED_BLOCKS_KEY, stats.deallocated_blocks, &insp);

@@ -51,6 +51,9 @@ struct InspectStats final {
 
   // The number of failed allocations over the lifetime of the inspector.
   size_t failed_allocations;
+
+  // The current utilization ratio of the VMO, in parts-per-10k.
+  size_t utilization_per_ten_k;
 };
 
 // The entry point into the Inspection API.
