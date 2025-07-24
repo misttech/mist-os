@@ -52,7 +52,6 @@ using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::ViewportProperties;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
-using fuchsia_ui_composition::BlendMode;
 
 namespace flatland {
 namespace test {
@@ -1017,7 +1016,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   // unnormalized uint8 value in the range [0,255] will be 51U.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 1.0f, 0, 1},
-                                      .blend_mode = BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1125,7 +1124,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   // unnormalized uint8 value in the range [0,255] will be 51U.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 0.2f, 0, 1},
-                                      .blend_mode = BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1245,7 +1244,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   /// black rectangle will be clamped to the minimum allowed value.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 0, 0, 0},
-                                      .blend_mode = BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1342,7 +1341,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                           .vmo_index = i,
                           .width = kTextureWidth,
                           .height = kTextureHeight,
-                          .blend_mode = BlendMode::kSrc};
+                          .blend_mode = BlendMode::kReplace()};
   }
 
   // Use the VK renderer here so we can make use of software rendering.
@@ -1520,7 +1519,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   // Create the image metadatas.
   ImageMetadata image_metadatas[2];
   for (uint32_t i = 0; i < 2; i++) {
-    auto blend_mode = (i != 1) ? BlendMode::kSrc : BlendMode::kSrcOver;
+    auto blend_mode = (i != 1) ? BlendMode::kReplace() : BlendMode::kPremultipliedAlpha();
     image_metadatas[i] = {.collection_id = kTextureCollectionId,
                           .identifier = allocation::GenerateUniqueImageId(),
                           .vmo_index = i,
@@ -1731,7 +1730,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
                                   .vmo_index = 0,
                                   .width = kTextureWidth,
                                   .height = kTextureHeight,
-                                  .blend_mode = BlendMode::kSrc};
+                                  .blend_mode = BlendMode::kReplace()};
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), 60, 40,
@@ -2210,7 +2209,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
                           .vmo_index = i,
                           .width = kTextureWidth,
                           .height = kTextureHeight,
-                          .blend_mode = BlendMode::kSrc};
+                          .blend_mode = BlendMode::kReplace()};
   }
 
   auto& blue_image_metadata = image_metadatas[0];

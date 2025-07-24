@@ -11,6 +11,7 @@
 #include <array>
 #include <optional>
 
+#include "src/ui/scenic/lib/types/blend_mode.h"
 #include "src/ui/scenic/lib/types/rectangle.h"
 #include "src/ui/scenic/lib/types/rectangle_f.h"
 
@@ -23,6 +24,9 @@ using ImageSampleRegion = types::RectangleF;
 
 // The clip region for a transform to bound its children.
 using TransformClipRegion = types::Rectangle;
+
+// Alpha blending mode.
+using BlendMode = types::BlendMode;
 
 // Represents an image rectangle, parameterized by an origin point, an extent representing the width
 // and height. The texel UV coordinates specify, in clockwise order, the unnormalized clockwise

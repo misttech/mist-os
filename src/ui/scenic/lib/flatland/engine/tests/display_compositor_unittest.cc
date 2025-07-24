@@ -47,7 +47,6 @@ using fuchsia::ui::composition::LayoutInfo;
 using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
-using fuchsia_ui_composition::BlendMode;
 using fuchsia_ui_composition::ImageFlip;
 
 namespace fuchsia_hardware_display::wire {
@@ -714,7 +713,7 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
       .vmo_index = 0,
       .width = 128,
       .height = 256,
-      .blend_mode = BlendMode::kSrc,
+      .blend_mode = BlendMode::kReplace(),
   };
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(testing::AllOf(MatchRequestField(ImportImage, buffer_collection_id,
@@ -807,7 +806,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
       .vmo_index = kVmoIdx,
       .width = 20,
       .height = 30,
-      .blend_mode = BlendMode::kSrc,
+      .blend_mode = BlendMode::kReplace(),
   };
 
   // Make sure that the engine returns true if the display coordinator returns true.
@@ -989,7 +988,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
       .vmo_index = 0,
       .width = 128,
       .height = 256,
-      .blend_mode = BlendMode::kSrc,
+      .blend_mode = BlendMode::kReplace(),
   };
   parent_struct->images[parent_image_handle] = parent_image_metadata;
 
@@ -1012,7 +1011,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
       .vmo_index = 1,
       .width = 512,
       .height = 1024,
-      .blend_mode = BlendMode::kSrc,
+      .blend_mode = BlendMode::kReplace(),
   };
   child_struct->images[child_image_handle] = child_image_metadata;
   child_struct->local_matrices[child_image_handle] =
@@ -1242,7 +1241,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       .vmo_index = 0,
       .width = 128,
       .height = 256,
-      .blend_mode = BlendMode::kSrc,
+      .blend_mode = BlendMode::kReplace(),
       .flip = image_flip,
   };
   parent_struct->images[parent_image_handle] = parent_image_metadata;

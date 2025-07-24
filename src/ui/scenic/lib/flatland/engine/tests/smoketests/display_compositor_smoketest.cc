@@ -200,7 +200,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
                                       .vmo_index = 0,
                                       .width = kTextureWidth,
                                       .height = kTextureHeight,
-                                      .blend_mode = fuchsia_ui_composition::BlendMode::kSrc};
+                                      .blend_mode = BlendMode::kReplace()};
   auto result =
       display_compositor->ImportBufferImage(image_metadata, BufferCollectionUsage::kClientImage);
   EXPECT_TRUE(result);

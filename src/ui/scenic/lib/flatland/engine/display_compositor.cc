@@ -63,20 +63,6 @@ uint32_t BufferCollectionPixelFormatToImageTilingType(
   }
 }
 
-fuchsia_hardware_display_types::AlphaMode GetAlphaMode(
-    const fuchsia_ui_composition::BlendMode& blend_mode) {
-  fuchsia_hardware_display_types::AlphaMode alpha_mode;
-  switch (blend_mode) {
-    case fuchsia_ui_composition::BlendMode::kSrc:
-      alpha_mode = fuchsia_hardware_display_types::AlphaMode::kDisable;
-      break;
-    case fuchsia_ui_composition::BlendMode::kSrcOver:
-      alpha_mode = fuchsia_hardware_display_types::AlphaMode::kPremultiplied;
-      break;
-  }
-  return alpha_mode;
-}
-
 // Creates a duplicate of |token| in |duplicate|.
 // Returns an error string if it fails, otherwise std::nullopt.
 std::optional<std::string> DuplicateToken(
@@ -659,7 +645,8 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::wire::La
       << "Failed to call FIDL SetLayerPrimaryPosition method: "
       << set_layer_position_result.status_string();
 
-  const fuchsia_hardware_display_types::AlphaMode alpha_mode = GetAlphaMode(image.blend_mode);
+  const fuchsia_hardware_display_types::AlphaMode alpha_mode =
+      image.blend_mode.ToDisplayAlphaMode();
   const auto set_layer_alpha_result = display_coordinator_.sync()->SetLayerPrimaryAlpha(
       layer_id, alpha_mode, image.multiply_color[3]);
   FX_DCHECK(set_layer_alpha_result.ok())
@@ -681,7 +668,8 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::wire::La
   FX_DCHECK(dst.width && dst.height) << "Destination frame cannot be empty.";
   const fuchsia_hardware_display_types::CoordinateTransformation transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
-  const fuchsia_hardware_display_types::AlphaMode alpha_mode = GetAlphaMode(image.blend_mode);
+  const fuchsia_hardware_display_types::AlphaMode alpha_mode =
+      image.blend_mode.ToDisplayAlphaMode();
 
   const fuchsia_hardware_display_types::wire::ImageMetadata image_metadata =
       CreateImageMetadata(image);

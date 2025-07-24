@@ -166,18 +166,6 @@ inline ostream& operator<<(ostream& out, const fuchsia::ui::views::ViewRef& ref)
   return out;
 }
 
-inline ostream& operator<<(ostream& out, const fuchsia_ui_composition::BlendMode& blend_mode) {
-  switch (blend_mode) {
-    case fuchsia_ui_composition::BlendMode::kSrc:
-      out << "SRC";
-      break;
-    case fuchsia_ui_composition::BlendMode::kSrcOver:
-      out << "SRC_OVER";
-      break;
-  }
-  return out;
-}
-
 ostream& operator<<(ostream& out, const flatland::UberStruct& us) {
   if (us.view_ref) {
     out << *us.view_ref << "\n";

@@ -517,7 +517,7 @@ void CullRectanglesInPlace(GlobalRectangleVector* rectangles_in_out,
                          const ImageRect& rectangle,
                          const allocation::ImageMetadata& image) -> bool {
     // Only cull if the rect is opaque.
-    auto is_opaque = image.blend_mode == fuchsia_ui_composition::BlendMode::kSrc;
+    auto is_opaque = image.blend_mode == BlendMode::kReplace();
 
     // If the rect is full screen (or larger), and opaque, clear the output vectors.
     return (is_opaque && rectangle.origin.x <= 0 && rectangle.origin.y <= 0 &&

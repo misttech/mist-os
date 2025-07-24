@@ -862,7 +862,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
     const glm::vec4 multiply(image.multiply_color[0], image.multiply_color[1],
                              image.multiply_color[2], image.multiply_color[3]);
-    color_data.emplace_back(multiply, image.blend_mode == fuchsia_ui_composition::BlendMode::kSrc);
+    color_data.emplace_back(multiply, image.blend_mode == BlendMode::kReplace());
   }
 
   // Grab the output image and use it to generate a depth texture. The depth texture needs to

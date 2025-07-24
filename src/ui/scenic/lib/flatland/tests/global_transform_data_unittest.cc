@@ -1443,7 +1443,7 @@ TEST(GlobalCullRectanglesTest, MultipleFullScreenRectsWithTransparency) {
   uint64_t display_height = 500;
 
   auto transparent_image_data = allocation::ImageMetadata();
-  transparent_image_data.blend_mode = fuchsia_ui_composition::BlendMode::kSrcOver;
+  transparent_image_data.blend_mode = BlendMode::kPremultipliedAlpha();
 
   // There are full screen rects at indices [1, 3, and 6]. Indices 3 and 6 are transparent,
   // but 1 is not. So we should ultimately only cull the rect at index 0, leaving 7 output

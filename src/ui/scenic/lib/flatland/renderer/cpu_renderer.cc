@@ -23,8 +23,15 @@
 
 namespace flatland {
 
+// CpuRenderer supports a single pixel format / color space.
+constexpr auto kSupportedPixelFormat = fuchsia::images2::PixelFormat::B8G8R8A8;
+constexpr auto kSupportedPixelFormatModifier = fuchsia::images2::PixelFormatModifier::LINEAR;
+constexpr auto kSupportedColorSpace = fuchsia::images2::ColorSpace::SRGB;
+
 const std::vector<uint8_t> kTransparent = {0, 0, 0, 0};
 constexpr uint32_t kAlphaIndex = 3;
+
+constexpr float clamp(float v, float lo, float hi) { return (v < lo) ? lo : (hi < v) ? hi : v; }
 
 bool CpuRenderer::ImportBufferCollection(
     allocation::GlobalBufferCollectionId collection_id,
@@ -36,16 +43,16 @@ bool CpuRenderer::ImportBufferCollection(
 
   std::scoped_lock lock(lock_);
   auto& map = GetBufferCollectionInfosFor(usage);
-  if (map.find(collection_id) != map.end()) {
+  if (map.contains(collection_id)) {
     FX_LOGS(ERROR) << "Duplicate GlobalBufferCollectionID: " << collection_id;
     return false;
   }
   std::optional<fuchsia::sysmem2::ImageFormatConstraints> image_constraints;
   if (size.has_value()) {
     image_constraints = std::make_optional<fuchsia::sysmem2::ImageFormatConstraints>();
-    image_constraints->set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
-    image_constraints->set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
-    image_constraints->mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+    image_constraints->set_pixel_format(kSupportedPixelFormat);
+    image_constraints->set_pixel_format_modifier(kSupportedPixelFormatModifier);
+    image_constraints->mutable_color_spaces()->emplace_back(kSupportedColorSpace);
     image_constraints->set_required_min_size(
         fuchsia::math::SizeU{.width = size->width, .height = size->height});
     image_constraints->set_required_max_size(
@@ -279,20 +286,37 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                     utils::Pixel pixel =
                         utils::Pixel::FromVmo(image_ptr, image_pixels_per_row, x, y, image_type);
                     pixel.ToFormat(render_type, color);
-                    uint32_t start =
-                        y * render_target_pixels_per_row * kBytesPerPixel + x * kBytesPerPixel;
+                    uint32_t start = (y * render_target_pixels_per_row + x) * kBytesPerPixel;
                     for (uint32_t offset = 0; offset < kBytesPerPixel; offset++) {
                       const uint32_t index = start + offset;
-                      switch (image.blend_mode) {
-                        case fuchsia_ui_composition::BlendMode::kSrc:
+                      switch (image.blend_mode.enum_value()) {
+                        case BlendMode::Enum::kReplace:
                           render_target_ptr[index] = color[offset];
                           break;
-                        case fuchsia_ui_composition::BlendMode::kSrcOver:
+                        case BlendMode::Enum::kPremultipliedAlpha:
                           render_target_ptr[index] =
                               color[offset] +
                               static_cast<uint8_t>((1.f - image.multiply_color[kAlphaIndex]) *
                                                    render_target_ptr[index]);
                           break;
+                        case BlendMode::Enum::kStraightAlpha: {
+                          const float alphaF = pixel.alphaF() * image.multiply_color[kAlphaIndex];
+                          const float backgroundF =
+                              static_cast<float>(render_target_ptr[index]) / 255.f;
+                          float outputF;  // set below
+                          if (offset < kAlphaIndex) {
+                            // RGB = A(src) * RGB(src) + (1-A(src)) * RGB(dst)
+                            const float colorF = static_cast<float>(color[offset]) / 255.f;
+                            outputF = (alphaF * colorF) + ((1.f - alphaF) * backgroundF);
+                          } else {
+                            // A = A(src) + (1 - A(src)) A(dst)
+                            outputF = alphaF + ((1 - alphaF) * backgroundF);
+                          }
+                          const uint8_t output =
+                              static_cast<uint8_t>(clamp(outputF * 255.f, 0.f, 255.f));
+                          render_target_ptr[index] = output;
+                          break;
+                        }
                       }
                     }
                   }
