@@ -10,13 +10,11 @@
 #include <lib/fit/result.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
-#include <lib/zx/vmar.h>
 #include <lib/zxdump/dump.h>
 #include <lib/zxdump/fd-writer.h>
 #include <lib/zxdump/task.h>
 #include <lib/zxdump/zstd-writer.h>
 #include <unistd.h>
-#include <zircon/status.h>
 
 #include <array>
 #include <cstdio>
@@ -70,14 +68,6 @@ class TestProcess {
                              process_.reset_and_get_address(), err_msg),
               ZX_OK)
         << err_msg;
-  }
-
-  zx::vmar CreateProcess(std::string_view name) {
-    zx::vmar vmar;
-    zx_status_t status = zx::process::create(job(), name.data(), static_cast<uint32_t>(name.size()),
-                                             0, &process_, &vmar);
-    EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
-    return vmar;
   }
 
   const zx::process& process() const { return process_; }
@@ -361,34 +351,8 @@ class TestProcessForThreadState : public TestProcessForPropertiesAndInfo {
 
 class TestProcessForElfSearch : public zxdump::testing::TestProcessForPropertiesAndInfo {
  public:
-  using ByteVector = std::vector<std::byte>;
-
-  struct ElfId {
-    constexpr auto operator<=>(const ElfId&) const = default;
-
-    ByteVector build_id;
-    std::string soname;
-  };
-
-  using ElfIdList = std::vector<ElfId>;
-
-  struct ElfIdAtBase : public ElfId {
-    constexpr ElfIdAtBase(ElfId id, uint64_t id_base) : ElfId{std::move(id)}, base{id_base} {}
-
-    constexpr auto operator<=>(const ElfIdAtBase&) const = default;
-
-    uint64_t base;
-  };
-
-  using ElfIdAtBaseList = std::vector<ElfIdAtBase>;
-
-  static constexpr const char* kChildName = "zxdump-elf-search-test-child";
-
   // Start a child for ELF search testing.
   void StartChild();
-
-  // Create a process for remote dynamic linking, used instead of StartChild().
-  zx::vmar CreateProcess();
 
   // Do the full-memory dump using the dumper API.
   template <typename Writer>
@@ -399,16 +363,10 @@ class TestProcessForElfSearch : public zxdump::testing::TestProcessForProperties
   }
 
   // Verify a dump file for that child was inserted and looks right.
-  // Then found_elf() will return the modules found.
   void CheckDump(zxdump::TaskHolder& holder);
 
   // Verify the build ID PT_NOTEs in the ET_CORE file directly.
-  // Then found_elf() will return the modules found.
   void CheckNotes(int fd);
-
-  // Check for CheckDump / CheckNotes finding canonical expected modules.
-  void CheckDumpElfSearchIds() const;
-  void CheckNotesElfSearchIds() const;
 
   // These give the addresses where the modules were reported in the child.
 
@@ -416,18 +374,9 @@ class TestProcessForElfSearch : public zxdump::testing::TestProcessForProperties
 
   uint64_t dso_ptr() const { return dso_ptr_; }
 
-  const ElfIdAtBaseList& found_elf() const { return found_elf_; }
-
-  ElfIdList found_ids() const {
-    // gmock container matchers don't like ranges/views so construct a
-    // temporary vector instead of just a std::views::transform range adapter.
-    return ElfIdList{
-        found_elf_.begin(),
-        found_elf_.end(),
-    };
-  }
-
  private:
+  static constexpr const char* kChildName = "zxdump-elf-search-test-child";
+
   void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
 
   fit::result<zxdump::Error, zxdump::SegmentDisposition> DumpAllMemoryWithBuildIds(
@@ -436,29 +385,7 @@ class TestProcessForElfSearch : public zxdump::testing::TestProcessForProperties
   zxdump::ProcessDump* dump_ = nullptr;
   uint64_t dso_ptr_ = 0;
   uint64_t main_ptr_ = 0;
-  ElfIdAtBaseList found_elf_;
 };
-
-inline std::ostream& operator<<(std::ostream& os, std::span<const std::byte> bytes) {
-  for (std::byte byte : bytes) {
-    char buf[3];
-    snprintf(buf, sizeof(buf), "%02x", static_cast<unsigned int>(byte));
-    os << buf;
-  }
-  return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const TestProcessForElfSearch::ElfId& id) {
-  if (id.soname.empty()) {
-    return os << "\n    { build ID: " << id.build_id << ", no SONAME }";
-  }
-  return os << "\n    { build ID: " << id.build_id << ", SONAME: \"" << id.soname << "\" }";
-}
-
-inline std::ostream& operator<<(std::ostream& os, const TestProcessForElfSearch::ElfIdAtBase& id) {
-  return os << static_cast<const TestProcessForElfSearch::ElfId&>(id) <<  //
-         "\n        @ " << std::showbase << std::hex << id.base;
-}
 
 }  // namespace zxdump::testing
 
