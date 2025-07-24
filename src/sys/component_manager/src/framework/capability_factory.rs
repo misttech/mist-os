@@ -6,7 +6,7 @@ use crate::model::component::WeakComponentInstance;
 use crate::sandbox_util::take_handle_as_stream;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use cm_types::Name;
+use cm_types::{Name, RelativePath};
 use cm_util::WeakTaskGroup;
 use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy, ServerEnd};
 use fuchsia_sync::Mutex;
@@ -318,7 +318,7 @@ impl CapabilityFactory {
             while let Some(Ok(request)) = stream.next().await {
                 match request {
                     fruntime::DirConnectorRequest::Connect { channel, .. } => {
-                        let _ = dir_connector.send(channel);
+                        let _ = dir_connector.send(channel, RelativePath::dot(), None);
                     }
                     fruntime::DirConnectorRequest::Clone { request, .. } => {
                         self.weak_task_group.spawn(self.clone().serve_dir_connector(
@@ -767,7 +767,12 @@ struct RemoteDirReceiver {
 }
 
 impl DirConnectable for RemoteDirReceiver {
-    fn send(&self, server_end: ServerEnd<fio::DirectoryMarker>) -> Result<(), ()> {
+    fn send(
+        &self,
+        server_end: ServerEnd<fio::DirectoryMarker>,
+        _subdir: RelativePath,
+        _rights: Option<fio::Operations>,
+    ) -> Result<(), ()> {
         let _ = self.remote_receiver.receive(server_end);
         Ok(())
     }

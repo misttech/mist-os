@@ -95,6 +95,9 @@ fn program_input_dict_to_namespace(
             Ok(cap @ Capability::DirConnector(_)) => {
                 namespace.add_entry(cap, &format!("{prefix}/{key}").parse().unwrap())?;
             }
+            Ok(cap @ Capability::DirConnectorRouter(_)) => {
+                namespace.add_entry(cap, &format!("{prefix}/{key}").parse().unwrap())?;
+            }
             Ok(cap) => {
                 namespace.add_object(cap, &format!("{prefix}/{key}").parse().unwrap())?;
             }

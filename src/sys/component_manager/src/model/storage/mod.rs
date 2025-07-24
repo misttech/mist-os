@@ -426,7 +426,7 @@ pub fn build_storage_admin_dictionary(
                     component.nonblocking_task_group().as_weak(),
                     "storage admin protocol",
                     Some(component.context.policy().clone()),
-                    Arc::new(move |channel, _target| {
+                    Arc::new(move |channel, _target, _, _| {
                         let stream =
                             ServerEnd::<fsys::StorageAdminMarker>::new(channel).into_stream();
                         StorageAdmin::new()

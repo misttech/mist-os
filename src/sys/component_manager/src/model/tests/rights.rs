@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::{CapabilityProvider, FrameworkCapability};
-use crate::model::component::WeakComponentInstance;
+use crate::model::component::ComponentInstance;
+use crate::model::routing::RoutingFailureErrorReporter;
 use crate::model::testing::routing_test_helpers::*;
-use ::routing::capability_source::InternalCapability;
 use ::routing_test_helpers::rights::CommonRightsTest;
 use ::routing_test_helpers::RoutingTestModel;
-use async_trait::async_trait;
 use cm_rust::*;
 use cm_rust_testing::*;
-use cm_util::TaskGroup;
-use errors::CapabilityProviderError;
 use fidl_fuchsia_io as fio;
-use vfs::directory::entry::OpenRequest;
-use vfs::remote::remote_dir;
+use routing::error::RouteRequestErrorInfo;
+use routing::WithPorcelain;
+use sandbox::{DirConnector, Request, Router};
 
 #[fuchsia::test]
 async fn offer_increasing_rights() {
@@ -54,42 +51,6 @@ async fn offer_from_component_manager_namespace_directory_incompatible_rights() 
         .await
 }
 
-struct MockFrameworkDirectoryProvider {
-    test_dir_proxy: fio::DirectoryProxy,
-}
-struct MockFrameworkDirectory {
-    test_dir_proxy: fio::DirectoryProxy,
-}
-
-#[async_trait]
-impl CapabilityProvider for MockFrameworkDirectoryProvider {
-    async fn open(
-        self: Box<Self>,
-        _task_group: TaskGroup,
-        open_request: OpenRequest<'_>,
-    ) -> Result<(), CapabilityProviderError> {
-        open_request
-            .open_remote(remote_dir(Clone::clone(&self.test_dir_proxy)))
-            .map_err(|e| CapabilityProviderError::VfsOpenError(e))
-    }
-}
-
-impl FrameworkCapability for MockFrameworkDirectory {
-    fn matches(&self, capability: &InternalCapability) -> bool {
-        matches!(capability, InternalCapability::Directory(n) if n.as_str() == "foo_data")
-    }
-
-    fn new_provider(
-        &self,
-        _scope: WeakComponentInstance,
-        _target: WeakComponentInstance,
-    ) -> Box<dyn CapabilityProvider> {
-        let test_dir_proxy =
-            fuchsia_fs::directory::clone(&self.test_dir_proxy).expect("failed to clone test dir");
-        Box::new(MockFrameworkDirectoryProvider { test_dir_proxy })
-    }
-}
-
 #[fuchsia::test]
 async fn framework_directory_rights() {
     let components = vec![
@@ -114,12 +75,24 @@ async fn framework_directory_rights() {
         ),
     ];
     let test = RoutingTest::new("a", components).await;
-    let test_dir_proxy =
-        fuchsia_fs::directory::clone(&test.test_dir_proxy).expect("failed to clone test dir");
-    let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
-    test.model.context().add_framework_capability(directory_host).await;
-    test.check_use(["b"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
+    let foo_dir_proxy = fuchsia_fs::directory::open_directory_async(
+        &test.test_dir_proxy,
+        "foo",
+        fio::PERM_READABLE,
+    )
+    .unwrap();
+    test.model
+        .context()
+        .add_framework_capability(
+            "foo_data",
+            Router::<DirConnector>::new_ok(DirConnector::from_proxy(
+                foo_dir_proxy,
+                cm_types::RelativePath::dot(),
+                fio::PERM_READABLE,
+            )),
+        )
         .await;
+    test.check_use("b".try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok)).await;
 }
 
 #[fuchsia::test]
@@ -151,12 +124,36 @@ async fn framework_directory_incompatible_rights() {
         ),
     ];
     let test = RoutingTest::new("a", components).await;
-    let test_dir_proxy =
-        fuchsia_fs::directory::clone(&test.test_dir_proxy).expect("failed to clone test dir");
-    let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
-    test.model.context().add_framework_capability(directory_host).await;
+    test.model
+        .context()
+        .add_framework_capability(
+            "foo_data",
+            WithPorcelain::<_, _, ComponentInstance>::with_porcelain_no_default(
+                Router::<DirConnector>::new(move |_request: Option<Request>, _debug: bool| {
+                    panic!("routing should have failed before we get here")
+                }),
+                CapabilityTypeName::Directory,
+            )
+            .availability(Availability::Required)
+            .rights(Some(fio::R_STAR_DIR.into()))
+            // It would be more realistic to use component `b` here, but that would cause `a`
+            // to get resolve, fixing its sandbox before we're able to inject the additional
+            // framework capability, so we need to pass some value that doesn't result in `a`
+            // being resolved.
+            .target_above_root(test.model.top_instance())
+            .error_info(RouteRequestErrorInfo::from(&cm_rust::CapabilityDecl::Directory(
+                cm_rust::DirectoryDecl {
+                    name: "foo_data".parse().unwrap(),
+                    source_path: None,
+                    rights: fio::R_STAR_DIR,
+                },
+            )))
+            .error_reporter(RoutingFailureErrorReporter::new())
+            .build(),
+        )
+        .await;
     test.check_use(
-        ["b"].try_into().unwrap(),
+        "b".try_into().unwrap(),
         CheckUse::default_directory(ExpectedResult::Err(zx::Status::ACCESS_DENIED)),
     )
     .await;

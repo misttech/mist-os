@@ -9,7 +9,8 @@ use router_error::RouterError;
 #[cfg(target_os = "fuchsia")]
 use sandbox::RemotableCapability;
 use sandbox::{
-    Capability, Connector, Data, Dict, DirEntry, Request, Routable, Router, RouterResponse,
+    Capability, Connector, Data, Dict, DirConnector, DirEntry, Request, Routable, Router,
+    RouterResponse,
 };
 
 /// A router that will apply renames/filtering on any dictionaries routed through it.
@@ -135,6 +136,12 @@ impl WithServiceRenamesAndFilter for Router<Data> {
 }
 
 impl WithServiceRenamesAndFilter for Router<Connector> {
+    fn with_service_renames_and_filter(self, _offer: OfferDecl) -> Capability {
+        self.into()
+    }
+}
+
+impl WithServiceRenamesAndFilter for Router<DirConnector> {
     fn with_service_renames_and_filter(self, _offer: OfferDecl) -> Capability {
         self.into()
     }

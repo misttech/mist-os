@@ -30,6 +30,9 @@ pub struct ModelContext {
     config_developer_overrides: Mutex<HashMap<Moniker, HashMap<String, cm_rust::ConfigValue>>>,
     pub scope_factory: Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>,
     remote_capabilities: Arc<Mutex<RemotedRuntimeCapabilities>>,
+    #[cfg(test)]
+    pub extra_framework_capabilities:
+        std::sync::Mutex<HashMap<cm_types::Name, sandbox::Capability>>,
 }
 
 impl ModelContext {
@@ -57,6 +60,8 @@ impl ModelContext {
             config_developer_overrides: Mutex::new(HashMap::new()),
             scope_factory,
             remote_capabilities: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(test)]
+            extra_framework_capabilities: std::sync::Mutex::new(HashMap::new()),
         })
     }
 
@@ -110,11 +115,13 @@ impl ModelContext {
     }
 
     #[cfg(all(test, feature = "src_model_tests"))]
-    pub async fn add_framework_capability(&self, c: Box<dyn FrameworkCapability>) {
-        // Internal capabilities added for a test should preempt existing ones that match the
-        // same metadata.
-        let mut framework_capabilities = self.framework_capabilities.lock();
-        framework_capabilities.as_mut().unwrap().insert(0, c);
+    pub async fn add_framework_capability(
+        &self,
+        name: impl Into<String>,
+        capability: impl Into<sandbox::Capability>,
+    ) {
+        let mut framework_capabilities = self.extra_framework_capabilities.lock().unwrap();
+        framework_capabilities.insert(cm_types::Name::new(name.into()).unwrap(), capability.into());
     }
 
     /// Adds a configuration override for the component identified by moniker.

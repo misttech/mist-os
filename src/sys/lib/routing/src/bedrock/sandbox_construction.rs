@@ -17,7 +17,8 @@ use crate::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
 use crate::{DictExt, LazyGet, Sources, WithPorcelain};
 use async_trait::async_trait;
 use cm_rust::{
-    CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
+    CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDecl,
+    UseDeclCommon,
 };
 use cm_types::{Availability, BorrowedSeparatedPath, IterablePath, Name, SeparatedPath};
 use fidl::endpoints::DiscoverableProtocolMarker;
@@ -29,8 +30,8 @@ use log::warn;
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
-    RouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, DirConnector, DirEntry, Request, Routable,
+    Router, RouterResponse,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -371,6 +372,17 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 use_,
                 error_reporter.clone(),
             ),
+            UseDecl::Directory(_) => extend_dict_with_use::<DirConnector, C>(
+                component,
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_input,
+                &program_output_dict,
+                &framework_router,
+                &capability_sourced_capabilities_dict,
+                use_,
+                error_reporter.clone(),
+            ),
             cm_rust::UseDecl::Protocol(_) | cm_rust::UseDecl::Runner(_) => {
                 extend_dict_with_use::<Connector, _>(
                     component,
@@ -519,6 +531,17 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &(get_target_dict)(),
                 error_reporter.clone(),
             ),
+            cm_rust::OfferDecl::Directory(_) => extend_dict_with_offer::<DirConnector, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_output_dict,
+                &framework_router,
+                &capability_sourced_capabilities_dict,
+                first_offer,
+                &(get_target_dict)(),
+                error_reporter.clone(),
+            ),
             cm_rust::OfferDecl::Protocol(_)
             | cm_rust::OfferDecl::Runner(_)
             | cm_rust::OfferDecl::Resolver(_) => extend_dict_with_offer::<Connector, _>(
@@ -641,6 +664,16 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &component_output,
                 error_reporter.clone(),
             ),
+            cm_rust::ExposeDecl::Directory(_) => extend_dict_with_expose::<DirConnector, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &program_output_dict,
+                &framework_router,
+                &capability_sourced_capabilities_dict,
+                first_expose,
+                &component_output,
+                error_reporter.clone(),
+            ),
             cm_rust::ExposeDecl::Protocol(_)
             | cm_rust::ExposeDecl::Runner(_)
             | cm_rust::ExposeDecl::Resolver(_) => extend_dict_with_expose::<Connector, _>(
@@ -653,7 +686,6 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &component_output,
                 error_reporter.clone(),
             ),
-            _ => {}
         }
     }
 
@@ -1002,6 +1034,17 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                 &target_input.capabilities(),
                 error_reporter.clone(),
             ),
+            cm_rust::OfferDecl::Directory(_) => extend_dict_with_offer::<DirConnector, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                component_input,
+                program_output_dict,
+                framework_router,
+                capability_sourced_capabilities_dict,
+                first_offer,
+                &target_input.capabilities(),
+                error_reporter.clone(),
+            ),
             cm_rust::OfferDecl::Protocol(_)
             | cm_rust::OfferDecl::Runner(_)
             | cm_rust::OfferDecl::Resolver(_) => extend_dict_with_offer::<Connector, _>(
@@ -1027,6 +1070,7 @@ pub fn is_supported_use(use_: &cm_rust::UseDecl) -> bool {
             | cm_rust::UseDecl::Protocol(_)
             | cm_rust::UseDecl::Runner(_)
             | cm_rust::UseDecl::Service(_)
+            | cm_rust::UseDecl::Directory(_)
     )
 }
 
@@ -1203,13 +1247,19 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
     };
 
     let availability = *use_.availability();
-    let router = router
+    let mut router_builder = router
         .with_porcelain_with_default(porcelain_type)
         .availability(availability)
         .target(&component)
         .error_info(use_)
-        .error_reporter(error_reporter)
-        .build();
+        .error_reporter(error_reporter);
+    if let cm_rust::UseDecl::Directory(decl) = use_ {
+        router_builder = router_builder
+            .rights(Some(decl.rights.into()))
+            .subdir(decl.subdir.clone().into())
+            .inherit_rights(false);
+    }
+    let router = router_builder.build();
 
     if let Some(target_path) = use_.path() {
         if let Err(e) = program_input.namespace().insert_capability(target_path, router.into()) {
@@ -1252,6 +1302,7 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
         cm_rust::OfferDecl::Config(_)
             | cm_rust::OfferDecl::Protocol(_)
             | cm_rust::OfferDecl::Dictionary(_)
+            | cm_rust::OfferDecl::Directory(_)
             | cm_rust::OfferDecl::Runner(_)
             | cm_rust::OfferDecl::Resolver(_)
             | cm_rust::OfferDecl::Service(_)
@@ -1276,15 +1327,15 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
 
     let source_path = offer.source_path();
     let target_name = offer.target_name();
-    if target_dict.get_capability(&target_name).is_some() {
-        panic!(
-            "duplicate sources for {} {} in a dict, unable to populate dict entry, manifest \
-                validation should prevent this",
-            cm_rust::CapabilityTypeName::from(offer),
+    let porcelain_type = CapabilityTypeName::from(offer);
+    if target_dict.get_capability(&source_path).is_some()
+        && porcelain_type != CapabilityTypeName::Directory
+    {
+        warn!(
+            "duplicate sources for protocol {} in a dict, unable to populate dict entry",
             target_name
         );
     }
-    let porcelain_type = CapabilityTypeName::from(offer);
     let router: Router<T> = match offer.source() {
         cm_rust::OfferSource::Parent => {
             let err = if component.moniker() == &Moniker::root() {
@@ -1357,23 +1408,29 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
         }
     };
 
-    // Offered capabilities need to support default requests in the case of offer-to-dictionary.
-    // This is a corollary of the fact that program_input_dictionary and
-    // component_output_dictionary support default requests, and we need this to cover the case
-    // where the use or expose is from a dictionary.
-    //
-    // Technically, we could restrict this to the case of offer-to-dictionary, not offer in
-    // general. However, supporting the general case simplifies the logic and establishes a nice
-    // symmetry between program_input_dict, component_output_dict, and {child,collection}_inputs.
     let availability = *offer.availability();
-    let router = router
+    let mut router_builder = router
         .with_porcelain_with_default(porcelain_type)
         .availability(availability)
         .target(component)
         .error_info(offer)
-        .error_reporter(error_reporter)
-        .build()
-        .with_service_renames_and_filter(offer.clone());
+        .error_reporter(error_reporter);
+    if let cm_rust::OfferDecl::Directory(decl) = offer {
+        // Offered capabilities need to support default requests in the case of
+        // offer-to-dictionary. This is a corollary of the fact that program_input_dictionary and
+        // component_output_dictionary support default requests, and we need this to cover the case
+        // where the use or expose is from a dictionary.
+        //
+        // Technically, we could restrict this to the case of offer-to-dictionary, not offer in
+        // general. However, supporting the general case simplifies the logic and establishes a
+        // nice symmetry between program_input_dict, component_output_dict, and
+        // {child,collection}_inputs.
+        router_builder = router_builder
+            .rights(decl.rights.clone().map(Into::into))
+            .subdir(decl.subdir.clone().into())
+            .inherit_rights(true);
+    }
+    let router = router_builder.build().with_service_renames_and_filter(offer.clone());
     match target_dict.insert_capability(target_name, router.into()) {
         Ok(()) => (),
         Err(e) => warn!("failed to insert {target_name} into target dict: {e:?}"),
@@ -1417,6 +1474,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
         cm_rust::ExposeDecl::Config(_)
             | cm_rust::ExposeDecl::Protocol(_)
             | cm_rust::ExposeDecl::Dictionary(_)
+            | cm_rust::ExposeDecl::Directory(_)
             | cm_rust::ExposeDecl::Runner(_)
             | cm_rust::ExposeDecl::Resolver(_)
             | cm_rust::ExposeDecl::Service(_)
@@ -1508,16 +1566,19 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
         cm_rust::ExposeSource::Collection(_name) => return,
     };
     let availability = *expose.availability();
-    match target_dict.insert_capability(
-        target_name,
-        router
-            .with_porcelain_with_default(porcelain_type)
-            .availability(availability)
-            .target(component)
-            .error_info(expose)
-            .error_reporter(error_reporter)
-            .into(),
-    ) {
+    let mut router_builder = router
+        .with_porcelain_with_default(porcelain_type)
+        .availability(availability)
+        .target(component)
+        .error_info(expose)
+        .error_reporter(error_reporter);
+    if let cm_rust::ExposeDecl::Directory(decl) = expose {
+        router_builder = router_builder
+            .rights(decl.rights.clone().map(Into::into))
+            .subdir(decl.subdir.clone().into())
+            .inherit_rights(true);
+    };
+    match target_dict.insert_capability(target_name, router_builder.build().into()) {
         Ok(()) => (),
         Err(e) => warn!("failed to insert {target_name} into target_dict: {e:?}"),
     }

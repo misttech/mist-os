@@ -843,6 +843,25 @@ impl From<CapabilityDecl> for ComponentCapability {
     }
 }
 
+impl TryInto<CapabilityDecl> for ComponentCapability {
+    type Error = ();
+
+    fn try_into(self) -> Result<CapabilityDecl, Self::Error> {
+        match self {
+            Self::Service(c) => Ok(CapabilityDecl::Service(c)),
+            Self::Protocol(c) => Ok(CapabilityDecl::Protocol(c)),
+            Self::Directory(c) => Ok(CapabilityDecl::Directory(c)),
+            Self::Storage(c) => Ok(CapabilityDecl::Storage(c)),
+            Self::Runner(c) => Ok(CapabilityDecl::Runner(c)),
+            Self::Resolver(c) => Ok(CapabilityDecl::Resolver(c)),
+            Self::EventStream(c) => Ok(CapabilityDecl::EventStream(c)),
+            Self::Dictionary(c) => Ok(CapabilityDecl::Dictionary(c)),
+            Self::Config(c) => Ok(CapabilityDecl::Config(c)),
+            _ => Err(()),
+        }
+    }
+}
+
 impl fmt::Display for ComponentCapability {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} '{}' from component", self.type_name(), self.source_id())

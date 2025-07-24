@@ -373,7 +373,7 @@ impl RoutingTest {
                 top_instance.task_group().as_weak(),
                 name.clone(),
                 Some(model.root().context.policy().clone()),
-                Arc::new(move |server_end, _| {
+                Arc::new(move |server_end, _, _, _| {
                     EchoProtocol::serve(crate::sandbox_util::take_handle_as_stream::<
                         echo::EchoMarker,
                     >(server_end))

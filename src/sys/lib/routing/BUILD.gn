@@ -90,6 +90,7 @@ rustc_library("routing") {
     "src/policy.rs",
     "src/resolving.rs",
     "src/rights.rs",
+    "src/subdir.rs",
     "src/walk_state.rs",
   ]
 

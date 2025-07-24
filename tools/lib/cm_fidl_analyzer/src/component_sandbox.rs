@@ -29,7 +29,8 @@ use futures::{future, FutureExt};
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router, RouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, DirConnector, DirEntry, Request, Routable,
+    Router, RouterResponse,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -67,7 +68,9 @@ pub fn build_root_component_input(
         .namespace_capabilities
         .iter()
         .filter_map(|capability_decl| match capability_decl {
-            cm_rust::CapabilityDecl::Protocol(_) | cm_rust::CapabilityDecl::Runner(_) => Some((
+            cm_rust::CapabilityDecl::Protocol(_)
+            | cm_rust::CapabilityDecl::Directory(_)
+            | cm_rust::CapabilityDecl::Runner(_) => Some((
                 capability_decl.name().clone(),
                 CapabilitySource::Namespace(NamespaceSource {
                     capability: capability_decl.clone().into(),
@@ -79,16 +82,16 @@ pub fn build_root_component_input(
         })
         .chain(runtime_config.builtin_capabilities.iter().filter_map(|capability_decl| {
             match capability_decl {
-                cm_rust::CapabilityDecl::Protocol(_) | cm_rust::CapabilityDecl::Runner(_) => {
-                    Some((
-                        capability_decl.name().clone(),
-                        CapabilitySource::Builtin(BuiltinSource {
-                            capability: capability_decl.clone().into(),
-                        }),
-                        CapabilityTypeName::from(capability_decl),
-                        RouteRequestErrorInfo::from(capability_decl),
-                    ))
-                }
+                cm_rust::CapabilityDecl::Protocol(_)
+                | cm_rust::CapabilityDecl::Directory(_)
+                | cm_rust::CapabilityDecl::Runner(_) => Some((
+                    capability_decl.name().clone(),
+                    CapabilitySource::Builtin(BuiltinSource {
+                        capability: capability_decl.clone().into(),
+                    }),
+                    CapabilityTypeName::from(capability_decl),
+                    RouteRequestErrorInfo::from(capability_decl),
+                )),
                 _ => None,
             }
         }));
@@ -106,7 +109,7 @@ pub fn build_root_component_input(
             .clone()
             .try_into()
             .expect("failed to convert capability source to Data");
-        let router = match capability_type {
+        let router_capability: Capability = match capability_type {
             CapabilityTypeName::Protocol | CapabilityTypeName::Runner => {
                 let router = Router::<Connector>::new_debug(data)
                     .with_policy_check::<ComponentInstanceForAnalyzer>(
@@ -122,18 +125,44 @@ pub fn build_root_component_input(
                 .error_info(route_request_info)
                 .error_reporter(NullErrorReporter {})
                 .build()
+                .into()
+            }
+            CapabilityTypeName::Directory => {
+                let rights = match &capability_source {
+                    CapabilitySource::Namespace(namespace_src) => match &namespace_src.capability {
+                        ComponentCapability::Directory(decl) => decl.rights,
+                        _ => panic!("unsupported component capability type"),
+                    },
+                    _ => panic!("unsupported capability source type"),
+                };
+                let router = Router::<DirConnector>::new_debug(data)
+                    .with_policy_check::<ComponentInstanceForAnalyzer>(
+                        capability_source,
+                        policy.clone(),
+                    );
+                WithPorcelain::<_, _, ComponentInstanceForAnalyzer>::with_porcelain_no_default(
+                    router,
+                    capability_type,
+                )
+                .availability(Availability::Required)
+                .rights(Some(rights.into()))
+                .target_above_root(top_instance)
+                .error_info(route_request_info)
+                .error_reporter(NullErrorReporter {})
+                .build()
+                .into()
             }
             _ => unreachable!("other types were filtered out above"),
         };
         root_component_input
             .capabilities()
-            .insert_capability(&name, router.clone().into())
+            .insert_capability(&name, router_capability.try_clone().unwrap())
             .expect("failed to insert builtin capability into dictionary");
         if capability_type == CapabilityTypeName::Runner {
             root_component_input
                 .environment()
                 .runners()
-                .insert_capability(&name, router.into())
+                .insert_capability(&name, router_capability)
                 .expect("failed to insert builtin runner into dictionary");
         }
     }
@@ -210,6 +239,19 @@ impl Routable<Dict> for FrameworkRouter {
                 .insert_capability(&name, router.into())
                 .expect("failed to insert framework capability into dictionary");
         }
+        let pkg_name = cm_types::Name::new("pkg").unwrap();
+        framework_dict
+            .insert_capability(
+                &pkg_name,
+                new_debug_only_specific_router::<DirConnector>(CapabilitySource::Framework(
+                    FrameworkSource {
+                        capability: InternalCapability::Directory(pkg_name.clone()),
+                        moniker: component.moniker().clone(),
+                    },
+                ))
+                .into(),
+            )
+            .expect("failed to insert framework pkg directory capability into dictionary");
         Ok(RouterResponse::Capability(framework_dict))
     }
 }
@@ -336,6 +378,35 @@ impl program_output_dict::ProgramOutputGenerator<ComponentInstanceForAnalyzer>
             capability: ComponentCapability::from(capability.clone()),
             moniker: component.moniker().clone(),
         }))
+    }
+
+    fn new_outgoing_dir_dir_connector_router(
+        &self,
+        component: &Arc<ComponentInstanceForAnalyzer>,
+        _decl: &cm_rust::ComponentDecl,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> Router<sandbox::DirConnector> {
+        let rights = match capability {
+            cm_rust::CapabilityDecl::Directory(dir_decl) => dir_decl.rights,
+            _ => panic!("incompatible porcelain type using DirConnector"),
+        };
+        let router = new_debug_only_specific_router::<DirConnector>(CapabilitySource::Component(
+            ComponentSource {
+                capability: ComponentCapability::from(capability.clone()),
+                moniker: component.moniker().clone(),
+            },
+        ));
+
+        WithPorcelain::<_, _, ComponentInstanceForAnalyzer>::with_porcelain_no_default(
+            router,
+            capability.into(),
+        )
+        .availability(Availability::Required)
+        .rights(Some(rights.into()))
+        .target(component)
+        .error_info(RouteRequestErrorInfo::from(capability))
+        .error_reporter(NullErrorReporter {})
+        .build()
     }
 }
 

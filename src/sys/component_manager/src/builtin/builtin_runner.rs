@@ -502,7 +502,7 @@ impl ElfRunnerProgram {
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
             None,
-            Arc::new(move |server_end, _| {
+            Arc::new(move |server_end, _, _, _| {
                 inner_clone
                     .clone()
                     .serve_component_runner(sandbox_util::take_handle_as_stream::<
@@ -522,7 +522,7 @@ impl ElfRunnerProgram {
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,
             None,
-            Arc::new(move |server_end, _| {
+            Arc::new(move |server_end, _, _, _| {
                 inner_clone.clone().elf_runner.serve_memory_reporter(
                     sandbox_util::take_handle_as_stream::<fattribution::ProviderMarker>(server_end),
                 );

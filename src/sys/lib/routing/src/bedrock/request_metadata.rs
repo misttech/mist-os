@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::rights::Rights;
+use crate::subdir::SubDir;
 use cm_rust::Availability;
 use sandbox::{Capability, Data, Dict, DictKey};
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
@@ -90,6 +91,101 @@ impl Metadata<Rights> for Dict {
     }
 }
 
+/// The directory rights associated with the previous declaration in a multi-step route.
+pub struct IntermediateRights(pub Rights);
+
+impl Metadata<IntermediateRights> for Dict {
+    const KEY: &'static str = "intermediate_rights";
+
+    fn set_metadata(&self, value: IntermediateRights) {
+        let key = DictKey::new(<Self as Metadata<IntermediateRights>>::KEY)
+            .expect("dict key creation failed unexpectedly");
+        let IntermediateRights(value) = value;
+        match self.insert(key, Capability::Data(Data::Uint64(value.into()))) {
+            // When an entry already exists for a key in a Dict, insert() will
+            // still replace that entry with the new value, even though it
+            // returns an ItemAlreadyExists error. As a result, we can treat
+            // ItemAlreadyExists as a success case.
+            Ok(()) | Err(fsandbox::CapabilityStoreError::ItemAlreadyExists) => (),
+            // Dict::insert() only returns `CapabilityStoreError::ItemAlreadyExists` variant
+            Err(e) => panic!("unexpected error variant returned from Dict::insert(): {e:?}"),
+        }
+    }
+
+    fn get_metadata(&self) -> Option<IntermediateRights> {
+        let key = DictKey::new(<Self as Metadata<IntermediateRights>>::KEY)
+            .expect("dict key creation failed unexpectedly");
+        let capability = self.get(&key).ok()??;
+        let rights = match capability {
+            Capability::Data(Data::Uint64(rights)) => fio::Operations::from_bits(rights)?,
+            _ => None?,
+        };
+        Some(IntermediateRights(Rights::from(rights)))
+    }
+}
+
+/// A flag indicating that directory rights should be inherited from the capability declaration
+/// if they were not present in an expose or offer declaration.
+pub struct InheritRights(pub bool);
+
+impl Metadata<InheritRights> for Dict {
+    const KEY: &'static str = "inherit_rights";
+
+    fn set_metadata(&self, value: InheritRights) {
+        let key = DictKey::new(<Self as Metadata<InheritRights>>::KEY)
+            .expect("dict key creation failed unexpectedly");
+        let InheritRights(value) = value;
+        match self.insert(key, Capability::Data(Data::Uint64(value.into()))) {
+            // When an entry already exists for a key in a Dict, insert() will
+            // still replace that entry with the new value, even though it
+            // returns an ItemAlreadyExists error. As a result, we can treat
+            // ItemAlreadyExists as a success case.
+            Ok(()) | Err(fsandbox::CapabilityStoreError::ItemAlreadyExists) => (),
+            // Dict::insert() only returns `CapabilityStoreError::ItemAlreadyExists` variant
+            Err(e) => panic!("unexpected error variant returned from Dict::insert(): {e:?}"),
+        }
+    }
+
+    fn get_metadata(&self) -> Option<InheritRights> {
+        let key = DictKey::new(<Self as Metadata<InheritRights>>::KEY)
+            .expect("dict key creation failed unexpectedly");
+        let capability = self.get(&key).ok()??;
+        let inherit = match capability {
+            Capability::Data(Data::Uint64(inherit)) => inherit != 0,
+            _ => None?,
+        };
+        Some(InheritRights(inherit))
+    }
+}
+
+impl Metadata<SubDir> for Dict {
+    const KEY: &'static str = "subdir";
+
+    fn set_metadata(&self, value: SubDir) {
+        let key = DictKey::new(<Self as Metadata<SubDir>>::KEY)
+            .expect("dict key creation failed unexpectedly");
+        match self.insert(key, Capability::Data(Data::String(value.to_string()))) {
+            // When an entry already exists for a key in a Dict, insert() will
+            // still replace that entry with the new value, even though it
+            // returns an ItemAlreadyExists error. As a result, we can treat
+            // ItemAlreadyExists as a success case.
+            Ok(()) | Err(fsandbox::CapabilityStoreError::ItemAlreadyExists) => (),
+            // Dict::insert() only returns `CapabilityStoreError::ItemAlreadyExists` variant
+            Err(e) => panic!("unexpected error variant returned from Dict::insert(): {e:?}"),
+        }
+    }
+
+    fn get_metadata(&self) -> Option<SubDir> {
+        let key = DictKey::new(<Self as Metadata<SubDir>>::KEY)
+            .expect("dict key creation failed unexpectedly");
+        let capability = self.get(&key).ok()??;
+        match capability {
+            Capability::Data(Data::String(subdir)) => SubDir::new(subdir).ok(),
+            _ => None,
+        }
+    }
+}
+
 /// Returns a `Dict` containing Router Request metadata specifying a Protocol porcelain type.
 pub fn protocol_metadata(availability: cm_types::Availability) -> sandbox::Dict {
     let metadata = sandbox::Dict::new();
@@ -113,6 +209,37 @@ pub fn dictionary_metadata(availability: cm_types::Availability) -> sandbox::Dic
         )
         .unwrap();
     metadata.set_metadata(availability);
+    metadata
+}
+
+/// Returns a `Dict` containing Router Request metadata specifying a Directory porcelain type.
+pub fn directory_metadata(
+    availability: cm_types::Availability,
+    rights: Option<Rights>,
+    subdir: Option<SubDir>,
+) -> sandbox::Dict {
+    let metadata = sandbox::Dict::new();
+    metadata
+        .insert(
+            cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
+            sandbox::Capability::Data(sandbox::Data::String(
+                cm_rust::CapabilityTypeName::Directory.to_string(),
+            )),
+        )
+        .unwrap();
+    if let Some(subdir) = subdir {
+        metadata.set_metadata(subdir);
+    }
+    metadata.set_metadata(availability);
+    match rights {
+        Some(rights) => {
+            metadata.set_metadata(rights);
+            metadata.set_metadata(InheritRights(false));
+        }
+        None => {
+            metadata.set_metadata(InheritRights(true));
+        }
+    }
     metadata
 }
 

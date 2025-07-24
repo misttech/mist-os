@@ -9,6 +9,7 @@ use cm_rust::{CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, Off
 use cm_types::{Name, Path, RelativePath};
 use futures::FutureExt;
 use moniker::Moniker;
+use routing::capability_source::CapabilitySource;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::mapper::RouteSegment;
 use scrutiny_collection::core::{Component, ComponentSource, Components};
@@ -277,13 +278,12 @@ pub struct Source {
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub enum RouteSourceError {
     AnalyzerModelError(AnalyzerModelError),
-    RouteSegmentWithoutComponent(RouteSegment),
-    RouteSegmentAbsMonikerNotFoundInTree(RouteSegment),
+    MonikerNotFoundInTree(Moniker),
     ComponentInstanceLookupByUrlFailed(String),
     MultipleComponentsWithSameUrl(Vec<Component>),
-    RouteSegmentComponentFromUntrustedSource(RouteSegment, ComponentSource),
+    UsingCapabilityFromUntrustedSource(Moniker, ComponentSource),
     RouteMismatch(Source),
-    MissingSourceCapability(RouteSegment),
+    MissingSourceCapability,
     InvalidUrl(String),
 }
 
@@ -345,14 +345,6 @@ where
 
         Ok(matches[0])
     }
-}
-
-/// Helper for attempting to embed JSON in error messages.
-fn json_or_unformatted<S>(value: &S, type_name: &str) -> String
-where
-    S: Serialize,
-{
-    serde_json::to_string_pretty(value).unwrap_or_else(|_| format!("<unformatted {}>", type_name))
 }
 
 /// Attempt to gather exactly one match for all `routes_to_skip` and all
@@ -434,40 +426,31 @@ fn gather_routes<'a>(
 }
 
 fn check_pkg_source(
-    route_segment: &RouteSegment,
+    using_node: &Moniker,
     component_model: &Arc<ComponentModelForAnalyzer>,
     components: &Vec<Component>,
-) -> Option<RouteSourceError> {
-    let moniker = route_segment.moniker();
-    if moniker.is_none() {
-        return Some(RouteSourceError::RouteSegmentWithoutComponent(route_segment.clone()));
-    }
-    let moniker = moniker.unwrap();
-
-    let get_instance_result = component_model.get_instance(&moniker);
-    if get_instance_result.is_err() {
-        return Some(RouteSourceError::RouteSegmentAbsMonikerNotFoundInTree(route_segment.clone()));
-    }
-    let instance = get_instance_result.unwrap();
-    let instance_url = instance.url();
+) -> Result<(), RouteSourceError> {
+    let instance = component_model
+        .get_instance(using_node)
+        .map_err(|_e| RouteSourceError::MonikerNotFoundInTree(using_node.clone()))?;
 
     let matches: Vec<&Component> =
-        components.iter().filter(|component| component.url == *instance_url).collect();
+        components.iter().filter(|component| component.url == *instance.url()).collect();
     if matches.len() == 0 {
-        return Some(RouteSourceError::ComponentInstanceLookupByUrlFailed(
-            instance_url.to_string(),
+        return Err(RouteSourceError::ComponentInstanceLookupByUrlFailed(
+            instance.url().to_string(),
         ));
     }
     if matches.len() > 1 {
-        return Some(RouteSourceError::MultipleComponentsWithSameUrl(
+        return Err(RouteSourceError::MultipleComponentsWithSameUrl(
             matches.iter().map(|&component| component.clone()).collect(),
         ));
     }
 
     match &matches[0].source {
-        ComponentSource::ZbiBootfs | ComponentSource::StaticPackage(_) => None,
-        source => Some(RouteSourceError::RouteSegmentComponentFromUntrustedSource(
-            route_segment.clone(),
+        ComponentSource::ZbiBootfs | ComponentSource::StaticPackage(_) => Ok(()),
+        source => Err(RouteSourceError::UsingCapabilityFromUntrustedSource(
+            using_node.clone(),
             source.clone(),
         )),
     }
@@ -478,45 +461,45 @@ fn process_verify_result<'a>(
     route: &Binding<'a>,
     component_model: &Arc<ComponentModelForAnalyzer>,
     components: &Vec<Component>,
-) -> Result<Result<Source, RouteSourceError>> {
+) -> Result<Source, RouteSourceError> {
     match verify_result.error {
         None => {
-            for route_segment in verify_result.route.iter() {
-                if let Some(err) = check_pkg_source(route_segment, component_model, components) {
-                    return Ok(Err(err));
-                }
-            }
+            check_pkg_source(&verify_result.using_node, component_model, components)?;
 
-            let route_source = verify_result.route.last().ok_or_else(|| {
-                anyhow!(
-                    "Route verifier traced empty route for capability matching {:?}",
-                    json_or_unformatted(&route.route_match.target, "route target")
-                )
-            })?;
-            if let RouteSegment::DeclareBy { moniker, capability } = route_source {
-                let source = Source { moniker: moniker.clone(), capability: capability.clone() };
+            let source = verify_result.source.ok_or(RouteSourceError::MissingSourceCapability)?;
+            if let CapabilitySource::Component(routing::capability_source::ComponentSource {
+                capability,
+                moniker,
+            }) = source
+            {
+                let capability: CapabilityDecl =
+                    capability.try_into().map_err(|_| RouteSourceError::MissingSourceCapability)?;
                 let matches_result: Result<Vec<bool>> = vec![
-                    route.route_match.source.capability.matches(capability),
-                    route.route_match.source.capability.matches(&verify_result.route),
+                    route.route_match.source.capability.matches(&capability),
+                    if let Some(_segment) = verify_result.route.last() {
+                        route.route_match.source.capability.matches(&verify_result.route)
+                    } else {
+                        Ok(true)
+                    },
                 ]
                 .into_iter()
-                .map(|r| r)
                 .collect();
+                let source = Source { moniker, capability };
                 match matches_result {
                     Ok(source_and_cap_res) => {
                         if source_and_cap_res[0] && source_and_cap_res[1] {
-                            Ok(Ok(source))
+                            Ok(source)
                         } else {
-                            Ok(Err(RouteSourceError::RouteMismatch(source)))
+                            Err(RouteSourceError::RouteMismatch(source))
                         }
                     }
-                    Err(_) => Ok(Err(RouteSourceError::RouteMismatch(source))),
+                    Err(_) => Err(RouteSourceError::RouteMismatch(source)),
                 }
             } else {
-                Ok(Err(RouteSourceError::MissingSourceCapability(route_source.clone())))
+                Err(RouteSourceError::MissingSourceCapability)
             }
         }
-        Some(err) => Ok(Err(RouteSourceError::AnalyzerModelError(err))),
+        Some(err) => Err(RouteSourceError::AnalyzerModelError(err)),
     }
 }
 
@@ -579,7 +562,7 @@ impl RouteSourcesController {
                     .unwrap()
                 {
                     let result =
-                        process_verify_result(verify_result, &route, component_model, components)?;
+                        process_verify_result(verify_result, &route, component_model, components);
                     let query = route.route_match.clone();
                     component_results.push(VerifyRouteSourcesResult { query, result });
                 }
@@ -603,8 +586,8 @@ mod tests {
     use cm_config::RuntimeConfig;
     use cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer;
     use cm_rust::{
-        Availability, CapabilityTypeName, DependencyType, DirectoryDecl, ExposeSource, OfferSource,
-        ProgramDecl, UseDirectoryDecl, UseSource, UseStorageDecl,
+        Availability, CapabilityTypeName, DirectoryDecl, ExposeSource, OfferSource, ProgramDecl,
+        UseStorageDecl,
     };
     use cm_rust_testing::*;
     use cm_types::{Path, Url};
@@ -613,7 +596,6 @@ mod tests {
     use maplit::{hashmap, hashset};
     use moniker::Moniker;
     use routing::environment::RunnerRegistry;
-    use routing::mapper::RouteSegment;
     use scrutiny_collection::core::{Component, ComponentSource, Components};
     use scrutiny_collection::model::DataModel;
     use scrutiny_collection::v2_component_model::V2ComponentModel;
@@ -2065,35 +2047,15 @@ mod tests {
                     "two_dir_user".to_string() => vec![
                         VerifyRouteSourcesResult{
                             query: config.component_routes[0].routes_to_verify[0].clone(),
-                            result: Err(RouteSourceError::RouteSegmentComponentFromUntrustedSource(RouteSegment::UseBy {
-                                moniker: Moniker::parse_str("two_dir_user").unwrap(),
-                                capability: UseDirectoryDecl{
-                                    source: UseSource::Parent,
-                                    source_name: "routed_from_root".parse().unwrap(),
-                                    source_dictionary: Default::default(),
-                                    target_path: Path::from_str("/data/from/root").unwrap(),
-                                    rights: fio::Operations::CONNECT,
-                                    subdir: "user_subdir".parse().unwrap(),
-                                    dependency_type: DependencyType::Strong,
-                                    availability: Availability::Required,
-                                }.into(),
-                            }, untrusted_source.clone())),
+                            result: Err(RouteSourceError::UsingCapabilityFromUntrustedSource(
+                                Moniker::parse_str("two_dir_user").unwrap(),
+                                untrusted_source.clone())),
                         },
                         VerifyRouteSourcesResult{
                             query: config.component_routes[0].routes_to_verify[1].clone(),
-                            result: Err(RouteSourceError::RouteSegmentComponentFromUntrustedSource(RouteSegment::UseBy {
-                                moniker: Moniker::parse_str("two_dir_user").unwrap(),
-                                capability: UseDirectoryDecl{
-                                    source: UseSource::Parent,
-                                    source_name: "routed_from_provider".parse().unwrap(),
-                                    source_dictionary: Default::default(),
-                                    target_path: Path::from_str("/data/from/provider").unwrap(),
-                                    rights: fio::Operations::CONNECT,
-                                    subdir: "user_subdir".parse().unwrap(),
-                                    dependency_type: DependencyType::Strong,
-                                    availability: Availability::Required,
-                                }.into(),
-                            }, untrusted_source)),
+                            result: Err(RouteSourceError::UsingCapabilityFromUntrustedSource(
+                                Moniker::parse_str("two_dir_user").unwrap(),
+                                untrusted_source)),
                         }
                     ],
             }

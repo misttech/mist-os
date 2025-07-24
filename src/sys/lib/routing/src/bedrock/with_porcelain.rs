@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
+use crate::bedrock::request_metadata::{
+    InheritRights, IntermediateRights, Metadata, METADATA_KEY_TYPE,
+};
 use crate::component_instance::{ComponentInstanceInterface, WeakExtendedInstanceInterface};
 use crate::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
+use crate::rights::{Rights, RightsWalker};
+use crate::subdir::SubDir;
+use crate::walk_state::WalkStateUnit;
 use async_trait::async_trait;
 use cm_rust::CapabilityTypeName;
 use cm_types::{Availability, Name};
@@ -20,6 +25,9 @@ struct PorcelainRouter<T: CapabilityBound, R, C: ComponentInstanceInterface, con
     router: Router<T>,
     porcelain_type: CapabilityTypeName,
     availability: Availability,
+    rights: Option<Rights>,
+    subdir: Option<SubDir>,
+    inherit_rights: Option<bool>,
     target: WeakExtendedInstanceInterface<C>,
     route_request: RouteRequestErrorInfo,
     error_reporter: R,
@@ -68,6 +76,9 @@ impl<
             router,
             porcelain_type,
             availability,
+            rights,
+            subdir,
+            inherit_rights,
             target,
             route_request: _,
             error_reporter: _,
@@ -86,6 +97,12 @@ impl<
                 )
                 .expect("failed to build default metadata?");
             metadata.set_metadata(*availability);
+            if let Some(rights) = rights {
+                metadata.set_metadata(*rights);
+            }
+            if let Some(inherit_rights) = inherit_rights {
+                metadata.set_metadata(InheritRights(*inherit_rights));
+            }
             Request { target: target.clone().into(), metadata }
         };
 
@@ -95,6 +112,11 @@ impl<
         };
         check_porcelain_type(&moniker, &request, *porcelain_type)?;
         let updated_availability = check_availability(&moniker, &request, *availability)?;
+
+        check_and_compute_rights(&moniker, &request, &rights)?;
+        if let Some(new_subdir) = check_and_compute_subdir(&moniker, &request, &subdir)? {
+            request.metadata.set_metadata(new_subdir);
+        }
 
         // Everything checks out, forward the request.
         request.metadata.set_metadata(updated_availability);
@@ -150,6 +172,69 @@ fn check_availability(
         .map_err(|e| RoutingError::from(e).into())
 }
 
+fn check_and_compute_rights(
+    moniker: &ExtendedMoniker,
+    request: &Request,
+    rights: &Option<Rights>,
+) -> Result<(), RouterError> {
+    let Some(rights) = rights else {
+        return Ok(());
+    };
+    let InheritRights(inherit) = request.metadata.get_metadata().ok_or(RouterError::InvalidArgs)?;
+    let request_rights: Rights = match request.metadata.get_metadata() {
+        Some(request_rights) => request_rights,
+        None => {
+            if inherit {
+                request.metadata.set_metadata(*rights);
+                *rights
+            } else {
+                Err(RouterError::InvalidArgs)?
+            }
+        }
+    };
+    let intermediate_rights: Option<IntermediateRights> = request.metadata.get_metadata();
+    let request_rights = RightsWalker::new(request_rights, moniker.clone());
+    let router_rights = RightsWalker::new(*rights, moniker.clone());
+    // The rights of the previous step (if any) of the route must be
+    // compatible with this step of the route.
+    if let Some(IntermediateRights(intermediate_rights)) = intermediate_rights {
+        let intermediate_rights_walker = RightsWalker::new(intermediate_rights, moniker.clone());
+        intermediate_rights_walker
+            .validate_next(&router_rights)
+            .map_err(|e| router_error::RouterError::from(RoutingError::from(e)))?;
+    };
+    request.metadata.set_metadata(IntermediateRights(*rights));
+    // The rights of the request must be compatible with the
+    // rights of this step of the route.
+    request_rights.validate_next(&router_rights).map_err(RoutingError::from)?;
+    Ok(())
+}
+
+fn check_and_compute_subdir(
+    moniker: &ExtendedMoniker,
+    request: &Request,
+    subdir: &Option<SubDir>,
+) -> Result<Option<SubDir>, RouterError> {
+    let Some(mut subdir_from_decl) = subdir.clone() else {
+        return Ok(None);
+    };
+
+    let request_subdir: Option<SubDir> = request.metadata.get_metadata();
+
+    if let Some(request_subdir) = request_subdir {
+        let success = subdir_from_decl.as_mut().extend(request_subdir.clone().into());
+        if !success {
+            return Err(RoutingError::PathTooLong {
+                moniker: moniker.clone(),
+                path: subdir_from_decl.to_string(),
+                keyword: request_subdir.to_string(),
+            }
+            .into());
+        }
+    }
+    Ok(Some(subdir_from_decl))
+}
+
 pub type DefaultMetadataFn = Arc<dyn Fn(Availability) -> Dict + Send + Sync + 'static>;
 
 /// Builds a router that ensures the capability request has an availability
@@ -164,6 +249,9 @@ pub struct PorcelainBuilder<
     router: Router<T>,
     porcelain_type: CapabilityTypeName,
     availability: Option<Availability>,
+    rights: Option<Rights>,
+    subdir: Option<SubDir>,
+    inherit_rights: Option<bool>,
     target: Option<WeakExtendedInstanceInterface<C>>,
     error_info: Option<RouteRequestErrorInfo>,
     error_reporter: Option<R>,
@@ -181,6 +269,9 @@ impl<
             router,
             porcelain_type,
             availability: None,
+            rights: None,
+            subdir: None,
+            inherit_rights: None,
             target: None,
             error_info: None,
             error_reporter: None,
@@ -191,6 +282,21 @@ impl<
     /// REQUIRED.
     pub fn availability(mut self, a: Availability) -> Self {
         self.availability = Some(a);
+        self
+    }
+
+    pub fn rights(mut self, rights: Option<Rights>) -> Self {
+        self.rights = rights;
+        self
+    }
+
+    pub fn subdir(mut self, subdir: SubDir) -> Self {
+        self.subdir = Some(subdir);
+        self
+    }
+
+    pub fn inherit_rights(mut self, inherit_rights: bool) -> Self {
+        self.inherit_rights = Some(inherit_rights);
         self
     }
 
@@ -233,6 +339,9 @@ impl<
             router: self.router,
             porcelain_type: self.porcelain_type,
             availability: self.availability.expect("must set availability"),
+            rights: self.rights,
+            subdir: self.subdir,
+            inherit_rights: self.inherit_rights,
             target: self.target.expect("must set target"),
             route_request: self.error_info.expect("must set route_request"),
             error_reporter: self.error_reporter.expect("must set error_reporter"),

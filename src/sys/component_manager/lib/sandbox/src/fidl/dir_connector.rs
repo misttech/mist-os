@@ -4,12 +4,15 @@
 
 use crate::fidl::registry;
 use crate::{ConversionError, DirConnector, DirReceiver};
+use cm_types::{Name, RelativePath};
 use fidl::endpoints::ClientEnd;
 use futures::channel::mpsc;
 use std::sync::Arc;
-use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
+use vfs::object_request::ObjectRequestRef;
+use vfs::remote::RemoteLike;
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 impl DirConnector {
     pub(crate) fn new_with_owned_receiver(
@@ -23,13 +26,49 @@ impl DirConnector {
     }
 }
 
+impl RemoteLike for DirConnector {
+    fn open(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        mut path: vfs::path::Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        let mut relative_path = RelativePath::dot();
+        while let Some(segment) = path.next() {
+            let name = Name::new(segment).map_err(|_e|
+                // The VFS path isn't valid according to RelativePath.
+                zx::Status::INVALID_ARGS)?;
+            let success = relative_path.push(name);
+            if !success {
+                // The path is too long
+                return Err(zx::Status::INVALID_ARGS);
+            }
+        }
+        let operations = fio::Operations::from_bits_retain(flags.bits());
+        self.send(object_request.take().into_server_end(), relative_path, Some(operations))
+            .map_err(|_| zx::Status::INTERNAL)
+    }
+}
+
+impl DirectoryEntry for DirConnector {
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_remote(self)
+    }
+}
+
+impl GetEntryInfo for DirConnector {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+}
+
 impl crate::RemotableCapability for DirConnector {
     fn try_into_directory_entry(
         self,
         _scope: ExecutionScope,
     ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
-        // We may wish to implement this in the future, but for now nothing needs it.
-        Err(ConversionError::NotSupported)
+        Ok(Arc::new(self))
     }
 }
 

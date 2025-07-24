@@ -11,7 +11,9 @@ use cm_rust::NativeIntoFidl;
 use cm_types::Path;
 use log::warn;
 use router_error::RouterError;
-use sandbox::{Connector, Data, Dict, DirEntry, Request, Routable, Router, RouterResponse};
+use sandbox::{
+    Connector, Data, Dict, DirConnector, DirEntry, Request, Routable, Router, RouterResponse,
+};
 use std::sync::Arc;
 
 pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
@@ -41,6 +43,15 @@ pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
         decl: &cm_rust::ComponentDecl,
         capability: &cm_rust::CapabilityDecl,
     ) -> Router<DirEntry>;
+
+    /// Get an outgoing directory router for `capability` that returns [DirConnector]. `capability`
+    /// should be a type that maps to [DirConnector].
+    fn new_outgoing_dir_dir_connector_router(
+        &self,
+        component: &Arc<C>,
+        decl: &cm_rust::ComponentDecl,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> Router<DirConnector>;
 }
 
 pub fn build_program_output_dictionary<C: ComponentInstanceInterface + 'static>(
@@ -74,8 +85,25 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
     router_gen: &impl ProgramOutputGenerator<C>,
 ) {
     match capability {
-        cm_rust::CapabilityDecl::Service(_) | cm_rust::CapabilityDecl::Directory(_) => {
+        cm_rust::CapabilityDecl::Service(_) => {
             let router = router_gen.new_outgoing_dir_dir_entry_router(component, decl, capability);
+            let router = router.with_policy_check::<C>(
+                CapabilitySource::Component(ComponentSource {
+                    capability: ComponentCapability::from(capability.clone()),
+                    moniker: component.moniker().clone(),
+                }),
+                component.policy_checker().clone(),
+            );
+            match program_output_dict.insert_capability(capability.name(), router.into()) {
+                Ok(()) => (),
+                Err(e) => {
+                    warn!("failed to add {} to program output dict: {e:?}", capability.name())
+                }
+            }
+        }
+        cm_rust::CapabilityDecl::Directory(_) => {
+            let router =
+                router_gen.new_outgoing_dir_dir_connector_router(component, decl, capability);
             let router = router.with_policy_check::<C>(
                 CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::from(capability.clone()),

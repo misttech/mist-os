@@ -179,11 +179,12 @@ mod tests {
         source_name: Name,
         rights: fio::Operations,
     ) -> UseDirectoryDecl {
+        let target_path = format!("/{source_name}").parse().unwrap();
         UseDirectoryDecl {
             source,
             source_name,
             source_dictionary: Default::default(),
-            target_path: "/dir".parse().unwrap(),
+            target_path,
             rights,
             subdir: Default::default(),
             dependency_type: DependencyType::Strong,
@@ -988,7 +989,7 @@ mod tests {
                                         "source_dictionary": ".",
                                         "source_name": "bad_dir",
                                         "subdir": ".",
-                                        "target_path": "/dir",
+                                        "target_path": "/bad_dir",
                                         "type": "directory"
                                     }
                                 },
@@ -1017,7 +1018,7 @@ mod tests {
                                         "source_dictionary": ".",
                                         "source_name": "good_dir",
                                         "subdir": ".",
-                                        "target_path": "/dir",
+                                        "target_path": "/good_dir",
                                         "type": "directory"
                                     }
                                 },
@@ -1110,7 +1111,7 @@ mod tests {
                                         "source_dictionary": ".",
                                         "source_name": "bad_dir",
                                         "subdir": ".",
-                                        "target_path": "/dir",
+                                        "target_path": "/bad_dir",
                                         "type": "directory"
                                     }
                                 },
@@ -1139,7 +1140,7 @@ mod tests {
                                         "source_dictionary": ".",
                                         "source_name": "good_dir",
                                         "subdir": ".",
-                                        "target_path": "/dir",
+                                        "target_path": "/good_dir",
                                         "type": "directory"
                                     }
                                 },
@@ -1232,7 +1233,7 @@ mod tests {
                                         "source_dictionary": ".",
                                         "source_name": "bad_dir",
                                         "subdir": ".",
-                                        "target_path": "/dir",
+                                        "target_path": "/bad_dir",
                                         "type": "directory"
                                     }
                                 },
@@ -1325,7 +1326,7 @@ mod tests {
                                         "source_dictionary": ".",
                                         "source_name": "bad_dir",
                                         "subdir": ".",
-                                        "target_path": "/dir",
+                                        "target_path": "/bad_dir",
                                         "type": "directory"
                                     }
                                 },

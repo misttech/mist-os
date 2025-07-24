@@ -48,6 +48,7 @@ use crate::model::events::source_factory::{EventSourceFactory, EventSourceFactor
 use crate::model::events::stream_provider::EventStreamProvider;
 use crate::model::model::{Model, ModelParams};
 use crate::model::resolver::{Resolver, ResolverRegistry};
+use crate::model::routing::RoutingFailureErrorReporter;
 use crate::model::token::InstanceRegistry;
 use crate::root_stop_notifier::RootStopNotifier;
 use crate::sandbox_util::{take_handle_as_stream, LaunchTaskOnReceive};
@@ -55,6 +56,7 @@ use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
 use ::router_error::RouterError;
 use ::routing::bedrock::dict_ext::DictExt;
+use ::routing::bedrock::request_metadata::Metadata;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_porcelain::WithPorcelain;
 use ::routing::capability_source::{
@@ -91,7 +93,7 @@ use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
 use cm_rust::{
     Availability, CapabilityTypeName, RunnerRegistration, UseEventStreamDecl, UseSource,
 };
-use cm_types::{Name, Url};
+use cm_types::{Name, RelativePath, Url};
 use cm_util::WeakTaskGroup;
 use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::ProcessLauncher;
@@ -110,6 +112,7 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
 use log::{error, info, warn};
 use routing::resolving::ComponentAddress;
+use sandbox::{DirConnector, Router, RouterResponse};
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
@@ -547,7 +550,7 @@ impl RootComponentInputBuilder {
             self.task_group.clone(),
             name.clone(),
             Some(self.policy_checker.clone()),
-            Arc::new(move |server_end, _| {
+            Arc::new(move |server_end, _, _, _| {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         );
@@ -581,7 +584,7 @@ impl RootComponentInputBuilder {
             self.task_group.clone(),
             "namespace capability dispatcher",
             Some(self.policy_checker.clone()),
-            Arc::new(move |server_end, _| {
+            Arc::new(move |server_end, _, _, _| {
                 let path = path.clone();
                 let fut = async move {
                     fuchsia_fs::node::open_channel_in_namespace(
@@ -622,6 +625,77 @@ impl RootComponentInputBuilder {
         }
     }
 
+    fn add_namespace_directory(&mut self, directory: &cm_rust::DirectoryDecl) {
+        let path = directory.source_path.as_ref().unwrap().clone();
+        let capability_source = CapabilitySource::Namespace(NamespaceSource {
+            capability: ComponentCapability::Directory(directory.clone()),
+        });
+        let router =
+            Router::<DirConnector>::new(move |request: Option<sandbox::Request>, debug| {
+                if debug {
+                    return futures::future::ready(Ok(RouterResponse::Debug(
+                        capability_source
+                            .clone()
+                            .try_into()
+                            .expect("failed to convert capability source to Data"),
+                    )))
+                    .boxed();
+                }
+                let mut path = path.clone();
+                async move {
+                    let request = request.ok_or(RouterError::InvalidArgs)?;
+                    let rights: ::routing::rights::Rights =
+                        request.metadata.get_metadata().ok_or(RouterError::InvalidArgs)?;
+                    let subdir: ::routing::subdir::SubDir = request
+                        .metadata
+                        .get_metadata()
+                        .or(Some(::routing::subdir::SubDir::dot()))
+                        .unwrap();
+                    let success = path.extend(subdir.clone().into());
+                    if !success {
+                        return Err(::routing::error::RoutingError::PathTooLong {
+                            moniker: moniker::ExtendedMoniker::ComponentManager,
+                            path: format!("{path}/{subdir}"),
+                            keyword: "subdir".to_string(),
+                        }
+                        .into());
+                    }
+                    let path = path.to_string();
+                    let flags = fio::Flags::from_bits(rights.into()).unwrap();
+                    let dir_proxy = match fuchsia_fs::directory::open_in_namespace(&path, flags) {
+                        Ok(proxy) => proxy,
+                        Err(e) => {
+                            warn!(
+                                "failed to open path {} in component manager's namespace: {:?}",
+                                path, e
+                            );
+                            return Err(RouterError::Internal);
+                        }
+                    };
+                    let dir_connector =
+                        DirConnector::from_proxy(dir_proxy, RelativePath::dot(), flags);
+                    Ok(RouterResponse::Capability(dir_connector))
+                }
+                .boxed()
+            });
+        let router = WithPorcelain::<_, _, ComponentInstance>::with_porcelain_no_default(
+            router,
+            CapabilityTypeName::Directory,
+        )
+        .availability(Availability::Required)
+        .rights(Some(directory.rights.into()))
+        .target_above_root(&self.top_instance)
+        .error_info(RouteRequestErrorInfo::from(&cm_rust::CapabilityDecl::Directory(
+            directory.clone(),
+        )))
+        .error_reporter(RoutingFailureErrorReporter::new())
+        .build();
+        match self.input.insert_capability(&directory.name, router.into()) {
+            Ok(()) => (),
+            Err(e) => warn!("failed to add {} to root component input: {e:?}", directory.name),
+        }
+    }
+
     pub fn add_resolver(
         &mut self,
         resolver_schema: String,
@@ -657,7 +731,7 @@ impl RootComponentInputBuilder {
             self.task_group.clone(),
             resolver_schema.clone(),
             Some(self.policy_checker.clone()),
-            Arc::new(move |server_end, weak_target| {
+            Arc::new(move |server_end, weak_target, _, _| {
                 let resolver = resolver.clone();
                 let name_for_warn = name_for_warn.clone();
                 async move {
@@ -758,7 +832,7 @@ impl RootComponentInputBuilder {
             self.task_group.clone(),
             runner.name().clone(),
             Some(self.policy_checker.clone()),
-            Arc::new(move |server_end, weak_component| {
+            Arc::new(move |server_end, weak_component, _, _| {
                 const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
                 let mut object_request = FLAGS.to_object_request(server_end);
                 runner
@@ -924,6 +998,9 @@ impl BuiltinEnvironment {
             match namespace_capability {
                 cm_rust::CapabilityDecl::Protocol(p) => {
                     root_input_builder.add_namespace_protocol(&p);
+                }
+                cm_rust::CapabilityDecl::Directory(d) => {
+                    root_input_builder.add_namespace_directory(&d);
                 }
                 _ => {
                     // Bedrock doesn't support these capability types yet, they'll fall back to

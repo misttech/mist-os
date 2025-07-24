@@ -9,18 +9,25 @@ use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
+use ::routing::rights::Rights;
 use ::routing::WeakInstanceTokenExt;
 use async_trait::async_trait;
 use cm_rust::CapabilityTypeName;
+use cm_types::RelativePath;
 use cm_util::WeakTaskGroup;
-use fidl::endpoints::{ProtocolMarker, RequestStream};
+use fidl::endpoints::{ProtocolMarker, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl::AsyncChannel;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::warn;
 use router_error::{Explain, RouterError};
-use sandbox::{Connectable, Connector, Message, Request, Routable, Router, RouterResponse};
+use routing::bedrock::request_metadata::Metadata;
+use routing::subdir::SubDir;
+use sandbox::{
+    Connectable, Connector, DirConnectable, DirConnector, Message, Request, Routable, Router,
+    RouterResponse,
+};
 use std::fmt::Debug;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
@@ -41,7 +48,12 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
 pub struct LaunchTaskOnReceive {
     capability_source: CapabilitySource,
     task_to_launch: Arc<
-        dyn Fn(zx::Channel, WeakComponentInstance) -> BoxFuture<'static, Result<(), anyhow::Error>>
+        dyn Fn(
+                zx::Channel,
+                WeakComponentInstance,
+                RelativePath,
+                fio::Operations,
+            ) -> BoxFuture<'static, Result<(), anyhow::Error>>
             + Sync
             + Send
             + 'static,
@@ -74,6 +86,8 @@ impl LaunchTaskOnReceive {
             dyn Fn(
                     zx::Channel,
                     WeakComponentInstance,
+                    RelativePath,
+                    fio::Operations,
                 ) -> BoxFuture<'static, Result<(), anyhow::Error>>
                 + Sync
                 + Send
@@ -92,12 +106,72 @@ impl LaunchTaskOnReceive {
 
         impl Connectable for TaskAndTarget {
             fn send(&self, message: Message) -> Result<(), ()> {
-                self.task.launch_task(message.channel, self.target.clone());
+                self.task.launch_task(
+                    message.channel,
+                    self.target.clone(),
+                    RelativePath::dot(),
+                    fio::R_STAR_DIR,
+                );
                 Ok(())
             }
         }
 
         Connector::new_sendable(TaskAndTarget { task: self, target })
+    }
+
+    pub fn into_dir_connector(
+        self: Arc<Self>,
+        target: WeakComponentInstance,
+        relative_path: RelativePath,
+        allowed_rights: fio::Operations,
+    ) -> DirConnector {
+        #[derive(Debug)]
+        struct TaskAndTarget {
+            task: Arc<LaunchTaskOnReceive>,
+            target: WeakComponentInstance,
+            relative_path: RelativePath,
+            allowed_rights: fio::Operations,
+        }
+
+        impl DirConnectable for TaskAndTarget {
+            fn send(
+                &self,
+                dir: ServerEnd<fio::DirectoryMarker>,
+                subdir: RelativePath,
+                rights: Option<fio::Operations>,
+            ) -> Result<(), ()> {
+                let mut relative_path = self.relative_path.clone();
+                if !subdir.is_dot() {
+                    let subdir_str = format!("{subdir}");
+                    let success = relative_path.extend(subdir);
+                    if !success {
+                        log::warn!("path too long! {relative_path}/{subdir_str}");
+                        return Err(());
+                    }
+                }
+                let allowed_flags = fio::Flags::from_bits(self.allowed_rights.bits()).unwrap();
+                let flags = if let Some(rights) = rights {
+                    fio::Flags::from_bits(rights.bits()).ok_or(())?
+                } else {
+                    allowed_flags | fio::Flags::PROTOCOL_DIRECTORY
+                };
+                let operations = fio::Operations::from_bits_retain(flags.bits());
+                self.task.launch_task(
+                    dir.into_channel(),
+                    self.target.clone(),
+                    relative_path,
+                    operations,
+                );
+                Ok(())
+            }
+        }
+
+        DirConnector::new_sendable(TaskAndTarget {
+            task: self,
+            target,
+            relative_path,
+            allowed_rights,
+        })
     }
 
     pub fn into_router(self) -> Router<Connector> {
@@ -133,7 +207,49 @@ impl LaunchTaskOnReceive {
         Router::<Connector>::new(LaunchTaskRouter { inner: Arc::new(self) })
     }
 
-    fn launch_task(&self, channel: zx::Channel, instance: WeakComponentInstance) {
+    pub fn into_dir_router(self) -> Router<DirConnector> {
+        #[derive(Debug)]
+        struct LaunchTaskRouter {
+            inner: Arc<LaunchTaskOnReceive>,
+        }
+        #[async_trait]
+        impl Routable<DirConnector> for LaunchTaskRouter {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<RouterResponse<DirConnector>, RouterError> {
+                let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
+                let WeakExtendedInstance::Component(target) = request.target.to_instance() else {
+                    return Err(cm_unexpected());
+                };
+                let subdir: SubDir = request.metadata.get_metadata().unwrap();
+                let rights: Rights = request.metadata.get_metadata().unwrap();
+                let conn =
+                    self.inner.clone().into_dir_connector(target, subdir.into(), rights.into());
+                if !debug {
+                    Ok(RouterResponse::<DirConnector>::Capability(conn))
+                } else {
+                    let data = self
+                        .inner
+                        .capability_source
+                        .clone()
+                        .try_into()
+                        .expect("failed to convert capability source to Data");
+                    Ok(RouterResponse::<DirConnector>::Debug(data))
+                }
+            }
+        }
+        Router::<DirConnector>::new(LaunchTaskRouter { inner: Arc::new(self) })
+    }
+
+    fn launch_task(
+        &self,
+        channel: zx::Channel,
+        instance: WeakComponentInstance,
+        relative_path: RelativePath,
+        rights: fio::Operations,
+    ) {
         if let Some(policy_checker) = &self.policy {
             if let Err(_e) =
                 policy_checker.can_route_capability(&self.capability_source, &instance.moniker)
@@ -145,7 +261,7 @@ impl LaunchTaskOnReceive {
             }
         }
 
-        let fut = (self.task_to_launch)(channel, instance);
+        let fut = (self.task_to_launch)(channel, instance, relative_path, rights);
         let task_name = self.task_name.clone();
         self.task_group.spawn(async move {
             if let Err(error) = fut.await {
@@ -167,7 +283,7 @@ impl LaunchTaskOnReceive {
             component.nonblocking_task_group().as_weak(),
             "framework hook dispatcher",
             Some(component.context.policy().clone()),
-            Arc::new(move |channel, target| {
+            Arc::new(move |channel, target, _, _| {
                 let weak_component = weak_component.clone();
                 let capability_source = capability_source.clone();
                 async move {
