@@ -20,6 +20,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/param.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -535,8 +536,8 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
   s->st_mode = attr.has.mode ? attr.mode : approximate_posix_mode(attr.protocols, attr.abilities);
   s->st_ino = attr.has.id ? attr.id : fio::wire::kInoUnknown;
   s->st_size = static_cast<off_t>(attr.content_size);
-  s->st_blksize = VNATTR_BLKSIZE;
-  s->st_blocks = static_cast<blkcnt_t>(attr.storage_size) / VNATTR_BLKSIZE;
+  s->st_blksize = DEV_BSIZE;
+  s->st_blocks = static_cast<blkcnt_t>(attr.storage_size) / DEV_BSIZE;
   s->st_nlink = attr.link_count;
   // `attr.change_time` will be reported as 0 if the underlying filesystem does not support it. In
   // that case, fake ctime with modification time.
