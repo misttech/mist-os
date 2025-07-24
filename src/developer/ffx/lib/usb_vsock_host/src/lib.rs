@@ -598,6 +598,11 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
         ret
     }
 
+    /// Get all CIDs for currently-existing connections.
+    pub fn active_conns(&self) -> Vec<u32> {
+        self.inner.lock().unwrap().conns.keys().copied().collect()
+    }
+
     /// Connect to a new USB device by device path and assign it a CID. Returns
     /// `true` if the device was added successfully. `false` could just indicate
     /// the device wasn't a USB VSOCK device, so it's a normal event, not an
