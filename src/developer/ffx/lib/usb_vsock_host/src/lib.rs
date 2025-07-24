@@ -855,10 +855,12 @@ impl<S: AsyncRead + AsyncWrite + Send + 'static> UsbVsockHost<S> {
                     if let Err(_) = accept_channel.send(IncomingConnection {acceptor: sender, address: *incoming.address() }).await {
                         log::warn!(cid; "Listener disappeared while accepting connection");
                     } else if let Ok(responder) = receiver.await {
+                        let address = incoming.address().clone();
                         if let Err(_) = responder.send(connection.accept_late(incoming).await) {
                             log::warn!(cid; "Accepting connection request failed");
+                            let _: Result<_, _> = connection.reset(&address).await;
                         }
-                        return;
+                        continue;
                     } else {
                         log::debug!(cid; "Listener rejected incoming connection");
                     }
@@ -1056,44 +1058,49 @@ mod test {
             },
         ) = TestConnection::<fasync::Socket>::new();
 
-        let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
-        let other_end = fasync::Socket::from_socket(other_end);
-        let mut listener = host.listen(1234, None).unwrap();
-        let connect_task = fasync::Task::spawn(async move {
-            connection
-                .connect(
-                    usb_vsock::Address {
-                        device_cid: cid,
-                        host_cid: 2,
-                        device_port: 16384,
-                        host_port: 1234,
-                    },
-                    other_end,
-                )
-                .await
-        });
+        let connection = Arc::new(connection);
 
-        let (b, other_end) = fasync::emulated_handle::Socket::create_stream();
-        let other_end = fasync::Socket::from_socket(other_end);
-        let _state = listener.next().await.unwrap().accept(other_end).await.unwrap();
-        let _remote_state = connect_task.await.unwrap();
+        for port_offset in 0..2 {
+            let (a, other_end) = fasync::emulated_handle::Socket::create_stream();
+            let other_end = fasync::Socket::from_socket(other_end);
+            let mut listener = host.listen(1234, None).unwrap();
+            let connection_clone = Arc::clone(&connection);
+            let connect_task = fasync::Task::spawn(async move {
+                connection_clone
+                    .connect(
+                        usb_vsock::Address {
+                            device_cid: cid,
+                            host_cid: 2,
+                            device_port: 16384 + port_offset,
+                            host_port: 1234,
+                        },
+                        other_end,
+                    )
+                    .await
+            });
 
-        let mut a = fasync::Socket::from_socket(a);
-        let mut b = fasync::Socket::from_socket(b);
+            let (b, other_end) = fasync::emulated_handle::Socket::create_stream();
+            let other_end = fasync::Socket::from_socket(other_end);
+            let _state = listener.next().await.unwrap().accept(other_end).await.unwrap();
+            let _remote_state = connect_task.await.unwrap();
 
-        const TEST_STR_1: &[u8] = b"Y'all seem disenchanted with my whimsical diversions.";
-        const TEST_STR_2: &[u8] = b"Why were we programmed to get bored anyway?";
+            let mut a = fasync::Socket::from_socket(a);
+            let mut b = fasync::Socket::from_socket(b);
 
-        a.write_all(TEST_STR_1).await.unwrap();
-        b.write_all(TEST_STR_2).await.unwrap();
+            const TEST_STR_1: &[u8] = b"Y'all seem disenchanted with my whimsical diversions.";
+            const TEST_STR_2: &[u8] = b"Why were we programmed to get bored anyway?";
 
-        let mut buf = vec![0u8; TEST_STR_2.len()];
-        a.read_exact(&mut buf).await.unwrap();
-        assert_eq!(&buf, TEST_STR_2);
+            a.write_all(TEST_STR_1).await.unwrap();
+            b.write_all(TEST_STR_2).await.unwrap();
 
-        let mut buf = vec![0u8; TEST_STR_1.len()];
-        b.read_exact(&mut buf).await.unwrap();
-        assert_eq!(&buf, TEST_STR_1);
+            let mut buf = vec![0u8; TEST_STR_2.len()];
+            a.read_exact(&mut buf).await.unwrap();
+            assert_eq!(&buf, TEST_STR_2);
+
+            let mut buf = vec![0u8; TEST_STR_1.len()];
+            b.read_exact(&mut buf).await.unwrap();
+            assert_eq!(&buf, TEST_STR_1);
+        }
     }
 
     #[fuchsia::test]
