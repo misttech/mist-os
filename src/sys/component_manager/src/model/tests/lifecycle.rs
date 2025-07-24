@@ -69,7 +69,7 @@ async fn bind_root() {
         new_model(vec![("root", component_decl_with_test_runner())]).await;
     let res = model.root().start_instance(&Moniker::root(), &StartReason::Root).await;
     assert!(res.is_ok());
-    mock_runner.wait_for_url("test:///root_resolved").await;
+    mock_runner.wait_for_url("test:///root").await;
     let actual_children = get_live_children(&model.root()).await;
     assert!(actual_children.is_empty());
 }
@@ -165,7 +165,7 @@ async fn bind_concurrent() {
     second_start.await.expect("second start failed");
 
     // Verify that the component was started only once.
-    mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///system"]).await;
 }
 
 #[fuchsia::test]
@@ -188,7 +188,7 @@ async fn bind_parent_then_child() {
     // Start the system.
     let m: Moniker = ["system"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
-    mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///system"]).await;
 
     // Validate children. system is resolved, but not echo.
     let actual_children = get_live_children(&*root).await;
@@ -205,7 +205,7 @@ async fn bind_parent_then_child() {
     // Start echo.
     let m: Moniker = ["echo"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
-    mock_runner.wait_for_urls(&["test:///system_resolved", "test:///echo_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///system", "test:///echo"]).await;
 
     // Validate children. Now echo is resolved.
     let echo_component = get_live_child(&*root, "echo").await;
@@ -240,23 +240,17 @@ async fn bind_child_doesnt_bind_parent() {
     // Start logger (before ever starting system).
     let m: Moniker = ["system", "logger"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
-    mock_runner.wait_for_urls(&["test:///logger_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///logger"]).await;
 
     // Start netstack.
     let m: Moniker = ["system", "netstack"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
-    mock_runner.wait_for_urls(&["test:///logger_resolved", "test:///netstack_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///logger", "test:///netstack"]).await;
 
     // Finally, start the system.
     let m: Moniker = ["system"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
-    mock_runner
-        .wait_for_urls(&[
-            "test:///system_resolved",
-            "test:///logger_resolved",
-            "test:///netstack_resolved",
-        ])
-        .await;
+    mock_runner.wait_for_urls(&["test:///system", "test:///logger", "test:///netstack"]).await;
 
     // validate the component topology.
     assert_eq!("(system(logger,netstack))", hook.print());
@@ -274,14 +268,14 @@ async fn bind_child_non_existent() {
     // Start the system.
     let m: Moniker = ["system"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
-    mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///system"]).await;
 
     // Can't start the logger. It does not exist.
     let m: Moniker = ["system", "logger"].try_into().unwrap();
     let res = root.start_instance(&m, &StartReason::Root).await;
     let expected_res: Result<(), ModelError> = Err(ModelError::instance_not_found(m));
     assert_eq!(format!("{:?}", res), format!("{:?}", expected_res));
-    mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///system"]).await;
 }
 
 /// Create a hierarchy of children:
@@ -322,14 +316,7 @@ async fn bind_eager_children() {
         let m = Moniker::parse_str("/a").unwrap();
         let res = model.root().start_instance(&m, &StartReason::Root).await;
         assert!(res.is_ok());
-        mock_runner
-            .wait_for_urls(&[
-                "test:///a_resolved",
-                "test:///b_resolved",
-                "test:///c_resolved",
-                "test:///d_resolved",
-            ])
-            .await;
+        mock_runner.wait_for_urls(&["test:///a", "test:///b", "test:///c", "test:///d"]).await;
     }
     // Verify that the topology of started components matches expectations.
     assert_eq!("(a(b,c(d)))", hook.print());
@@ -376,7 +363,7 @@ async fn bind_eager_children_reentrant() {
         format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
         runner_service,
     );
-    mock_runner.add_host_fn("test:///a_resolved", out_dir.host_fn());
+    mock_runner.add_host_fn("test:///a", out_dir.host_fn());
 
     // Start the top component, and check that it and the eager components were started.
     {
@@ -389,11 +376,11 @@ async fn bind_eager_children_reentrant() {
         // `b` uses the runner offered by `a`.
         assert_eq!(
             wait_for_runner_request(&mut receiver).await.resolved_url,
-            Some("test:///b_resolved".to_string())
+            Some("test:///b".to_string())
         );
         bind_handle.await.expect("start `a` failed");
         // `root` and `a` use the test runner.
-        mock_runner.wait_for_urls(&["test:///a_resolved"]).await;
+        mock_runner.wait_for_urls(&["test:///a"]).await;
     }
     // Verify that the topology of started components matches expectations.
     assert_eq!("(a(b))", hook.print());
@@ -418,7 +405,7 @@ async fn bind_no_execute() {
     // is non-executable so it is not run.
     let m: Moniker = ["a"].try_into().unwrap();
     assert!(model.root().start_instance(&m, &StartReason::Root).await.is_ok());
-    mock_runner.wait_for_urls(&["test:///b_resolved"]).await;
+    mock_runner.wait_for_urls(&["test:///b"]).await;
 }
 
 #[fuchsia::test]
@@ -520,7 +507,7 @@ async fn on_terminate_stop_triggers_reboot() {
 
     // First stop of the critical component exits cleanly and so does not trigger a reboot.
     test.mock_runner.add_controller_response(
-        "test:///system_resolved",
+        "test:///system",
         Box::new(|| ControllerActionResponse {
             close_channel: true,
             delay: None,
@@ -535,7 +522,7 @@ async fn on_terminate_stop_triggers_reboot() {
 
     // Second stop of the critical component does not exit cleanly and so does trigger a reboot.
     test.mock_runner.add_controller_response(
-        "test:///system_resolved",
+        "test:///system",
         Box::new(|| ControllerActionResponse {
             close_channel: true,
             delay: None,
@@ -595,7 +582,7 @@ async fn on_terminate_exit_triggers_reboot() {
     test.start_instance_and_wait_start(&["system"].try_into().unwrap()).await.unwrap();
     let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
-    test.mock_runner.wait_for_url("test:///system_resolved").await;
+    test.mock_runner.wait_for_url("test:///system").await;
     test.mock_runner.abort_controller(&info.channel_id);
     let reasons = match receiver.next().await.unwrap() {
         fstatecontrol::AdminRequest::PerformReboot {
@@ -676,7 +663,7 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
     test.start_instance_and_wait_start(&["system"].try_into().unwrap()).await.unwrap();
     let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
-    test.mock_runner.wait_for_url("test:///system_resolved").await;
+    test.mock_runner.wait_for_url("test:///system").await;
     test.mock_runner.abort_controller(&info.channel_id);
     let () = pending().await;
 }
@@ -724,7 +711,7 @@ async fn on_terminate_with_failed_reboot_panics() {
     test.start_instance_and_wait_start(&["system"].try_into().unwrap()).await.unwrap();
     let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
-    test.mock_runner.wait_for_url("test:///system_resolved").await;
+    test.mock_runner.wait_for_url("test:///system").await;
     test.mock_runner.abort_controller(&info.channel_id);
     match receiver.next().await.unwrap() {
         fstatecontrol::AdminRequest::PerformReboot { responder, .. } => {
@@ -744,7 +731,7 @@ async fn open_then_stop_with_escrow() {
 
     // Create and start a component.
     let components = vec![("root", ComponentDeclBuilder::new().build())];
-    let url = "test:///root_resolved";
+    let url = "test:///root";
     let test = ActionsTest::new(components[0].0, components, None).await;
     test.runner.add_host_fn(
         url,
@@ -841,7 +828,7 @@ async fn stop_with_exit_code(expected_code: i64) {
     model.start().await;
     let events = get_n_events(&event_stream, 1).await;
     assert_event_type_and_moniker(&events[0], fcomponent::EventType::Started, Moniker::root());
-    let url = "test:///root_resolved";
+    let url = "test:///root";
     mock_runner.wait_for_url(url).await;
 
     // Stop the root component with an exit code.

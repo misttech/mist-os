@@ -1063,7 +1063,7 @@ mod tests {
         let moniker = Moniker::try_from(["signal_then_hang"]).unwrap();
         let token = elf_runner_resources.instance_registry.add_for_tests(moniker);
         let start_info = StartInfo {
-            resolved_url: "fuchsia://signal-then-hang.cm".to_string(),
+            url: "fuchsia://signal-then-hang.cm".to_string(),
             program: Dictionary {
                 entries: Some(vec![
                     DictionaryEntry {

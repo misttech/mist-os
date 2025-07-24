@@ -1132,7 +1132,7 @@ async fn use_runner_from_parent_environment() {
         async move {
             assert_eq!(
                 wait_for_runner_request(&mut receiver).await.resolved_url,
-                Some("test:///b_resolved".to_string())
+                Some("test:///b".to_string())
             );
         }
     );
@@ -1191,7 +1191,7 @@ async fn use_runner_from_environment_in_collection() {
         async move {
             assert_eq!(
                 wait_for_runner_request(&mut receiver).await.resolved_url,
-                Some("test:///b_resolved".to_string())
+                Some("test:///b".to_string())
             );
         }
     );
@@ -1260,7 +1260,7 @@ async fn use_runner_from_grandparent_environment() {
         async move {
             assert_eq!(
                 wait_for_runner_request(&mut receiver).await.resolved_url,
-                Some("test:///c_resolved".to_string())
+                Some("test:///c".to_string())
             );
         }
     );
@@ -1325,7 +1325,7 @@ async fn use_runner_from_sibling_environment() {
         async move {
             assert_eq!(
                 wait_for_runner_request(&mut receiver).await.resolved_url,
-                Some("test:///c_resolved".to_string())
+                Some("test:///c".to_string())
             );
         }
     );
@@ -1388,7 +1388,7 @@ async fn use_runner_from_inherited_environment() {
         async move {
             assert_eq!(
                 wait_for_runner_request(&mut receiver).await.resolved_url,
-                Some("test:///c_resolved".to_string())
+                Some("test:///c".to_string())
             );
         }
     );
@@ -3217,12 +3217,12 @@ async fn source_component_stopping_when_routing() {
             open_request_tx.unbounded_send(channel).unwrap();
         }),
     );
-    test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+    test_topology.runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
     // Configure the component runner to take 3 seconds to stop the component.
     let response_delay = zx::MonotonicDuration::from_seconds(3);
     test_topology.runner.add_controller_response(
-        "test:///root_resolved",
+        "test:///root",
         Box::new(move || ControllerActionResponse {
             close_channel: true,
             delay: Some(response_delay),
@@ -3239,7 +3239,7 @@ async fn source_component_stopping_when_routing() {
         .start_instance(&Moniker::root(), &StartReason::Root)
         .await
         .expect("failed to start root");
-    test_topology.runner.wait_for_urls(&["test:///root_resolved"]).await;
+    test_topology.runner.wait_for_urls(&["test:///root"]).await;
     assert!(root.is_started().await);
 
     // Start to stop the component. This will stall because the framework will be
@@ -3310,7 +3310,7 @@ async fn source_component_stopped_after_routing_before_open() {
             open_request_tx.unbounded_send(channel).unwrap();
         }),
     );
-    test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+    test_topology.runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
     let root = test_topology.look_up(Moniker::default()).await;
     assert!(!root.is_started().await);
@@ -3382,7 +3382,7 @@ async fn source_component_shutdown_after_routing_before_open() {
             unreachable!();
         }),
     );
-    test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+    test_topology.runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
     let root = test_topology.look_up(Moniker::default()).await;
     assert!(!root.is_started().await);

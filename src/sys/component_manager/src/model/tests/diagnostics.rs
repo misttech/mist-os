@@ -136,7 +136,7 @@ mod tests {
         let out_dir_tx = fsync::Mutex::new(out_dir_tx);
 
         let components = vec![("root", ComponentDeclBuilder::new().build())];
-        let url = "test:///root_resolved";
+        let url = "test:///root";
         let test = ActionsTest::new(components[0].0, components, None).await;
         test.runner.add_host_fn(
             url,

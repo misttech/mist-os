@@ -4279,7 +4279,7 @@ mod tests {
                 .detach();
             }),
         );
-        test.runner.add_host_fn("test:///b_resolved", test_runner_out_dir.host_fn());
+        test.runner.add_host_fn("test:///b", test_runner_out_dir.host_fn());
 
         let root = test.model.root();
         let component_a = test.look_up(["a"].try_into().unwrap()).await;

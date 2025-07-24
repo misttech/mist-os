@@ -34,7 +34,7 @@ use ::routing::component_instance::{
     WeakComponentInstanceInterface,
 };
 use ::routing::error::{ComponentInstanceError, RouteRequestErrorInfo, RoutingError};
-use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
+use ::routing::resolving::{ComponentAddress, ComponentResolutionContext, ResolverError};
 use ::routing::rights::Rights;
 use ::routing::subdir::SubDir;
 use ::routing::{DictExt, RouteRequest, WeakInstanceTokenExt, WithPorcelain};
@@ -55,6 +55,7 @@ use errors::{
     ResolveActionError, StopError,
 };
 use fidl::endpoints::{create_proxy, ServerEnd};
+use flyweights::FlyStr;
 use futures::future::BoxFuture;
 use hooks::{CapabilityReceiver, EventPayload};
 use log::warn;
@@ -343,7 +344,7 @@ pub struct ResolvedInstanceState {
 
     /// The as-resolved location of the component: either an absolute component
     /// URL, or (with a package context) a relative path URL.
-    address: ComponentAddress,
+    address: ComponentDomain,
 
     /// The sandbox holds all dictionaries involved in capability routing.
     pub sandbox: ComponentSandbox,
@@ -352,6 +353,39 @@ pub struct ResolvedInstanceState {
     /// its outgoing directory server endpoint. Present if and only if the component
     /// has a program.
     program_escrow: Option<escrow::Actor>,
+}
+
+/// Abbreviated equivalent to [ComponentAddress] that omits the actual url string.
+/// This is a memory optimization: we can reconstruct the full [ComponentAddress]
+/// by combining this type with the string [`ComponentInstance::component_url`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ComponentDomain {
+    /// A fully-qualified component URL.
+    Absolute,
+
+    /// A relative Component URL, starting with the package path; for example a
+    /// subpackage relative URL such as "needed_package#meta/dep_component.cm".
+    RelativePath {
+        /// An opaque value (from the perspective of component resolution)
+        /// required by the resolver when resolving a relative package path.
+        /// For a given child component, this property is populated from a
+        /// parent component's `resolution_context`, as returned by the parent
+        /// component's resolver.
+        context: ComponentResolutionContext,
+
+        scheme: FlyStr,
+    },
+}
+
+impl From<ComponentAddress> for ComponentDomain {
+    fn from(a: ComponentAddress) -> Self {
+        match a {
+            ComponentAddress::Absolute { .. } => ComponentDomain::Absolute,
+            ComponentAddress::RelativePath { context, scheme, .. } => {
+                ComponentDomain::RelativePath { context, scheme: scheme.into() }
+            }
+        }
+    }
 }
 
 /// Extracts a mutable reference to the `target` field of an `OfferDecl`, or
@@ -373,7 +407,7 @@ impl ResolvedInstanceState {
     pub async fn new(
         component: &Arc<ComponentInstance>,
         resolved_component: Component,
-        address: ComponentAddress,
+        address: ComponentDomain,
         instance_token_state: InstanceTokenState,
         component_input: ComponentInput,
     ) -> Result<Self, ResolveActionError> {
@@ -665,11 +699,11 @@ impl ResolvedInstanceState {
         self.program_escrow.as_ref()
     }
 
-    pub fn address_for_relative_url(
+    pub async fn address_for_relative_url(
         &self,
         fragment: &str,
     ) -> Result<ComponentAddress, ::routing::resolving::ResolverError> {
-        self.address.clone_with_new_resource(fragment.strip_prefix("#"))
+        self.address().await?.consume_with_new_resource(fragment.strip_prefix("#"))
     }
 
     /// Returns an iterator over all children.
@@ -1222,6 +1256,7 @@ impl ResolvedInstanceState {
     }
 }
 
+#[async_trait]
 impl ResolvedInstanceInterface for ResolvedInstanceState {
     type Component = ComponentInstance;
 
@@ -1262,8 +1297,21 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
         ResolvedInstanceState::children_in_collection(self, collection)
     }
 
-    fn address(&self) -> ComponentAddress {
-        self.address.clone()
+    async fn address(&self) -> Result<ComponentAddress, ResolverError> {
+        let component = self.weak_component.upgrade()?;
+        match &self.address {
+            ComponentDomain::Absolute => {
+                ComponentAddress::from_url(&component.component_url, &component).await
+            }
+            ComponentDomain::RelativePath { context, scheme: _ } => {
+                ComponentAddress::from_url_and_context(
+                    &component.component_url,
+                    context.clone(),
+                    &component,
+                )
+                .await
+            }
+        }
     }
 
     fn context_to_resolve_children(&self) -> Option<ComponentResolutionContext> {

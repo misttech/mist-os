@@ -1361,7 +1361,7 @@ async fn dictionary_from_program() {
             });
         }),
     );
-    test.mock_runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+    test.mock_runner.add_host_fn("test:///root", root_out_dir.host_fn());
 
     // Using "A" from the dictionary should succeed.
     for _ in 0..3 {

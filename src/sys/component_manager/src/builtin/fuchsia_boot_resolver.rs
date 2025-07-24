@@ -459,9 +459,8 @@ impl Resolver for FuchsiaBootResolver {
         if component_address.is_relative_path() {
             return Err(ResolverError::UnexpectedRelativePath(component_address.url().to_string()));
         }
-        let fresolution::Component { url, decl, package, config_values, abi_revision, .. } =
+        let fresolution::Component { url: _, decl, package, config_values, abi_revision, .. } =
             self.resolve_async(component_address.url()).await?;
-        let resolved_url = url.unwrap();
         let decl = decl.ok_or_else(|| {
             ResolverError::ManifestInvalid(
                 anyhow!("missing manifest from resolved component").into(),
@@ -474,7 +473,6 @@ impl Resolver for FuchsiaBootResolver {
             None
         };
         Ok(ResolvedComponent {
-            resolved_url,
             context_to_resolve_children: None,
             decl,
             package: package.map(|p| p.try_into()).transpose()?,
@@ -546,8 +544,7 @@ mod tests {
         // Check that both the returned component manifest and the component manifest in
         // the returned package dir match the expected value. This also tests that
         // the resolver returned the right package dir.
-        let ResolvedComponent { resolved_url, decl, package, abi_revision, .. } = component;
-        assert_eq!(url, resolved_url);
+        let ResolvedComponent { decl, package, abi_revision, .. } = component;
         version_history_data::HISTORY
             .check_abi_revision_for_runtime(
                 abi_revision.expect("boot component should present ABI revision"),
@@ -683,8 +680,7 @@ mod tests {
         let component =
             resolver.resolve(&ComponentAddress::from_absolute_url(&url).unwrap()).await.unwrap();
 
-        let ResolvedComponent { resolved_url, decl, config_values, .. } = component;
-        assert_eq!(url, resolved_url);
+        let ResolvedComponent { decl, config_values, .. } = component;
 
         let config_decl = decl.config.unwrap();
         let config_values = config_values.unwrap();

@@ -110,7 +110,7 @@ fn get_logsink_decl<'a>(decl: &'a cm_rust::ComponentDecl) -> Option<&'a cm_rust:
 #[cfg(test)]
 mod tests {
     use super::{LoggerCache, CACHE_SIZE, LOGGER_CACHE};
-    use crate::model::component::instance::ResolvedInstanceState;
+    use crate::model::component::instance::{ComponentDomain, ResolvedInstanceState};
     use crate::model::component::{Component, ComponentInstance, WeakExtendedInstance};
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
@@ -122,7 +122,6 @@ mod tests {
     use fidl_fuchsia_logger as flogger;
     use hooks::Hooks;
     use routing::bedrock::structured_dict::ComponentInput;
-    use routing::resolving::ComponentAddress;
     use sandbox::{Capability, Connector, Receiver, Router};
     use std::str::FromStr;
     use std::sync::{Arc, Weak};
@@ -151,7 +150,6 @@ mod tests {
         )
         .await;
         let resolved_component = Component {
-            resolved_url: "".to_string(),
             context_to_resolve_children: None,
             decl,
             package: None,
@@ -161,7 +159,7 @@ mod tests {
         let resolved_state = ResolvedInstanceState::new(
             &instance,
             resolved_component,
-            ComponentAddress::from_absolute_url(&url).unwrap(),
+            ComponentDomain::Absolute,
             Default::default(),
             parent_capabilities,
         )

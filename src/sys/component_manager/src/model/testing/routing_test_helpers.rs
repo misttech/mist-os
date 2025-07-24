@@ -254,7 +254,7 @@ impl RoutingTestModelBuilder for RoutingTestBuilder {
 /// A test for capability routing.
 ///
 /// All string arguments are referring to component names, not URLs, ex: "a", not "test:///a" or
-/// "test:///a_resolved".
+/// "test:///a".
 pub struct RoutingTest {
     components: Vec<(&'static str, ComponentDecl)>,
     pub model: Arc<Model>,
@@ -303,7 +303,7 @@ impl RoutingTest {
                 )
                 .host_fn(),
             };
-            mock_runner.add_host_fn(&format!("test:///{}_resolved", name), host_fn);
+            mock_runner.add_host_fn(&format!("test:///{}", name), host_fn);
             mock_resolver.add_component(name, decl.clone());
         }
         for (name, blocker) in builder.blockers {
@@ -546,7 +546,7 @@ impl RoutingTest {
 
         // Get the paths in the component's namespace.
         let mut actual_paths: Vec<String> = runner
-            .get_namespace(&format!("test:///{}_resolved", component_name))
+            .get_namespace(&format!("test:///{}", component_name))
             .expect("component not in namespace")
             .lock()
             .await
@@ -678,7 +678,7 @@ impl RoutingTest {
     }
 
     pub fn resolved_url(component_name: &str) -> String {
-        format!("test:///{}_resolved", component_name)
+        format!("test:///{}", component_name)
     }
 
     /// Create a new event stream for the test components.

@@ -54,10 +54,8 @@ type ComponentNamespaceEntry = resource table {
 
 /// Parameters for starting a new component instance.
 type ComponentStartInfo = resource table {
-    /// The resolved URL of the component.
-    ///
-    /// This is the canonical URL obtained by the component resolver after
-    /// following redirects and resolving relative paths.
+    /// The URL of the component. Called `resolved_url` instead of just `url`
+    /// for historical reasons.
     1: resolved_url fuchsia.url.Url;
 
     /// The component's program declaration.

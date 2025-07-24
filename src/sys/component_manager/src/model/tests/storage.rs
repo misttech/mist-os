@@ -1527,7 +1527,7 @@ fn storage_does_not_block_shutdown_when_backing_dir_hangs() {
         // Setup a backing_dir that hangs.
         let (out_dir_tx, mut out_dir_rx) = mpsc::channel(1);
         let out_dir_tx = fsync::Mutex::new(out_dir_tx);
-        let url = "test:///a_resolved";
+        let url = "test:///a";
         test.mock_runner.add_host_fn(
             url,
             Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {

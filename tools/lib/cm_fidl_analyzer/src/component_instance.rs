@@ -27,7 +27,7 @@ use routing::component_instance::{
 use routing::environment::RunnerRegistry;
 use routing::error::{ComponentInstanceError, ErrorReporter, RouteRequestErrorInfo};
 use routing::policy::GlobalPolicyChecker;
-use routing::resolving::{ComponentAddress, ComponentResolutionContext};
+use routing::resolving::{ComponentAddress, ComponentResolutionContext, ResolverError};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -302,6 +302,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     }
 }
 
+#[async_trait]
 impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
     type Component = Self;
 
@@ -334,8 +335,8 @@ impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
         vec![]
     }
 
-    fn address(&self) -> ComponentAddress {
-        ComponentAddress::from_absolute_url(&"none://not_used".parse().unwrap()).unwrap()
+    async fn address(&self) -> Result<ComponentAddress, ResolverError> {
+        Ok(ComponentAddress::from_absolute_url(&"none://not_used".parse().unwrap()).unwrap())
     }
 
     fn context_to_resolve_children(&self) -> Option<ComponentResolutionContext> {

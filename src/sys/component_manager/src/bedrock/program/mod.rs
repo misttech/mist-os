@@ -234,11 +234,8 @@ impl Program {
 
 /// Information and capabilities used to start a program.
 pub struct StartInfo {
-    /// The resolved URL of the component.
-    ///
-    /// This is the canonical URL obtained by the component resolver after
-    /// following redirects and resolving relative paths.
-    pub resolved_url: String,
+    /// The URL of the component.
+    pub url: String,
 
     /// The component's program declaration.
     /// This information originates from `ComponentDecl.program`.
@@ -317,7 +314,7 @@ impl StartInfo {
         let EscrowedState { outgoing_dir, escrowed_dictionary } = escrowed_state;
         let ns = self.namespace.serve().map_err(StartError::ServeNamespace)?;
         Ok(fcrunner::ComponentStartInfo {
-            resolved_url: Some(self.resolved_url),
+            resolved_url: Some(self.url),
             program: Some(self.program),
             ns: Some(ns.into()),
             outgoing_dir: Some(outgoing_dir),
