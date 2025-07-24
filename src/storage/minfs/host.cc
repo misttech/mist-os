@@ -488,15 +488,15 @@ DIR* emu_opendir(const char* name) {
 dirent* emu_readdir(DIR* dirp) {
   MinDir* dir = reinterpret_cast<MinDir*>(dirp);
   for (;;) {
-    if (dir->size >= sizeof(vdirent_t)) {
-      vdirent_t* vde = reinterpret_cast<vdirent_t*>(dir->ptr);
+    if (dir->size >= sizeof(fs::DirectoryEntry)) {
+      fs::DirectoryEntry* vde = reinterpret_cast<fs::DirectoryEntry*>(dir->ptr);
       dirent* ent = &dir->de;
-      size_t name_len = vde->size;
-      size_t entry_len = vde->size + sizeof(vdirent_t);
+      size_t name_len = vde->name_length;
+      size_t entry_len = vde->name_length + sizeof(fs::DirectoryEntry);
       ZX_DEBUG_ASSERT(dir->size >= entry_len);
       memcpy(ent->d_name, vde->name, name_len);
       ent->d_name[name_len] = '\0';
-      ent->d_type = vde->type;
+      ent->d_type = uint8_t{vde->type};
       dir->ptr += entry_len;
       dir->size -= entry_len;
       return ent;

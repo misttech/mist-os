@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
-#include <lib/fdio/vfs.h>
 #include <lib/zx/result.h>
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
@@ -238,6 +237,23 @@ enum class CreationMode : uint8_t {
   // Always create an object. Will return `ZX_ERR_ALREADY_EXISTS` if one already exists.
   kAlways,
 };
+
+/// The format of directory entries returned by fuchsia.io/Directory.ReadDirents.
+struct DirectoryEntry {
+  /// The entry's inode number.
+  uint64_t ino;
+  /// Length of the entry's `name` field.
+  uint8_t name_length;
+  /// The entry type for the entry (e.g. DT_REG).
+  fuchsia_io::DirentType type;
+  /// Null-terminated name of the entry of size `name_length`.
+  char name[0];
+} __PACKED;
+
+static_assert(sizeof(DirectoryEntry) == 10);
+static_assert(std::is_standard_layout_v<DirectoryEntry>);
+static_assert(std::is_trivially_copyable_v<DirectoryEntry>);
+static_assert(std::has_unique_object_representations_v<DirectoryEntry>);
 
 namespace internal {
 

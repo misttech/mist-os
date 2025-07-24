@@ -256,10 +256,10 @@ void FileTester::CheckChildrenFromReaddir(Dir *dir, std::unordered_set<std::stri
   uint8_t *buf_ptr = buf;
 
   while (len > 0 && buf_ptr < buf + kPageSize) {
-    auto entry = reinterpret_cast<const vdirent_t *>(buf_ptr);
-    size_t entry_size = entry->size + sizeof(vdirent_t);
+    auto entry = reinterpret_cast<const fs::DirectoryEntry *>(buf_ptr);
+    size_t entry_size = entry->name_length + sizeof(fs::DirectoryEntry);
 
-    std::string_view entry_name(entry->name, entry->size);
+    std::string_view entry_name(entry->name, entry->name_length);
     auto iter = childs.begin();
     for (; iter != childs.end(); ++iter) {
       if (entry_name == *iter) {

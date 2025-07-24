@@ -64,7 +64,7 @@ zx_status_t LazyDir::Readdir(VdirCookie* cookie, void* dirents, size_t len, size
 
   const uint64_t ino = fio::wire::kInoUnknown;
   if (DoDot(cookie)) {
-    if ((r = df.Next(".", VTYPE_TO_DTYPE(V_TYPE_DIR), ino)) != ZX_OK) {
+    if ((r = df.Next(".", fuchsia_io::DirentType::kDirectory, ino)) != ZX_OK) {
       *out_actual = df.BytesFilled();
       return r;
     }
@@ -76,7 +76,8 @@ zx_status_t LazyDir::Readdir(VdirCookie* cookie, void* dirents, size_t len, size
     if (cookie->n >= it->id) {
       continue;
     }
-    if ((r = df.Next(it->name, VTYPE_TO_DTYPE(it->type), ino)) != ZX_OK) {
+    const uint8_t d_type = VTYPE_TO_DTYPE(it->type);
+    if ((r = df.Next(it->name, fio::DirentType{d_type}, ino)) != ZX_OK) {
       *out_actual = df.BytesFilled();
       return r;
     }

@@ -124,7 +124,8 @@ void Dnode::Readdir(fs::DirentFiller& df, void* cookie) const {
   dircookie_t* c = static_cast<dircookie_t*>(cookie);
 
   if (c->order == 0) {
-    if (zx_status_t status = df.Next(".", DT_DIR, vnode_->ino()); status != ZX_OK) {
+    if (zx_status_t status = df.Next(".", fuchsia_io::DirentType::kDirectory, vnode_->ino());
+        status != ZX_OK) {
       return;
     }
     c->order = 1;
@@ -134,8 +135,9 @@ void Dnode::Readdir(fs::DirentFiller& df, void* cookie) const {
     if (dn.ordering_token_ < c->order) {
       continue;
     }
-    uint8_t dtype = dn.IsDirectory() ? DT_DIR : DT_REG;
-    if (zx_status_t status = df.Next(dn.name_, dtype, dn.AcquireVnode()->ino()); status != ZX_OK) {
+    fuchsia_io::DirentType type =
+        dn.IsDirectory() ? fuchsia_io::DirentType::kDirectory : fuchsia_io::DirentType::kFile;
+    if (zx_status_t status = df.Next(dn.name_, type, dn.AcquireVnode()->ino()); status != ZX_OK) {
       return;
     }
     c->order = dn.ordering_token_ + 1;

@@ -135,13 +135,13 @@ zx_status_t WatcherContainer::WatchDir(FuchsiaVfs* vfs, Vnode* vn, fio::wire::Wa
           break;
         }
         char* ptr = readdir_buf;
-        while (actual >= sizeof(vdirent_t)) {
-          auto dirent = reinterpret_cast<vdirent_t*>(ptr);
+        while (actual >= sizeof(fs::DirectoryEntry)) {
+          auto dirent = reinterpret_cast<fs::DirectoryEntry*>(ptr);
           if (dirent->name[0]) {
             wb.AddMsg(watcher->server_end, fio::wire::WatchEvent::kExisting,
-                      std::string_view(dirent->name, dirent->size));
+                      std::string_view(dirent->name, dirent->name_length));
           }
-          size_t entry_len = dirent->size + sizeof(vdirent_t);
+          size_t entry_len = dirent->name_length + sizeof(fs::DirectoryEntry);
           ZX_ASSERT(entry_len <= actual);  // Prevent underflow
           actual -= entry_len;
           ptr += entry_len;

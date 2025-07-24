@@ -613,7 +613,7 @@ zx_status_t Directory::Readdir(fs::VdirCookie* cookie, void* dirents, size_t len
 
       if (de->ino && name != "..") {
         zx_status_t status;
-        if ((status = df.Next(name, de->type, de->ino)) != ZX_OK) {
+        if ((status = df.Next(name, fuchsia_io::DirentType{de->type}, de->ino)) != ZX_OK) {
           // no more space
           goto done;
         }

@@ -365,7 +365,7 @@ class DirentFiller {
 
   // Attempts to add the name to the end of the dirent buffer
   // which is returned by readdir.
-  zx_status_t Next(std::string_view name, uint8_t type, uint64_t ino);
+  zx_status_t Next(std::string_view name, fuchsia_io::DirentType type, uint64_t ino);
 
   zx_status_t BytesFilled() const { return static_cast<zx_status_t>(pos_); }
 

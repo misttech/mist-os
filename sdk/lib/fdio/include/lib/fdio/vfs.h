@@ -46,14 +46,6 @@ __BEGIN_CDECLS
 #define VTYPE_TO_DTYPE(mode) (((mode) & V_TYPE_MASK) >> 12)
 #define DTYPE_TO_VTYPE(type) (((type) & 15) << 12)
 
-/// The format of directory entries returned by fuchsia.io/Directory.ReadDirents.
-typedef struct vdirent {
-  uint64_t ino;
-  uint8_t size;
-  uint8_t type;
-  char name[0];
-} __PACKED vdirent_t;
-
 __END_CDECLS
 
 #endif  // LIB_FDIO_VFS_H_
