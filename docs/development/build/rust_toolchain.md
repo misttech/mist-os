@@ -326,7 +326,7 @@ DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
   export LDFLAGS="-L${DEV_ROOT}/install/zlib/lib -L${DEV_ROOT}/install/zstd/lib" && \
   export RUSTFLAGS="-Clink-arg=-L${DEV_ROOT}/install/zlib/lib -Clink-arg=-L${DEV_ROOT}/install/zstd/lib" && \
   \
-  source "${DEV_ROOT}fuchsia-env.sh && \
+  source "${DEV_ROOT}/fuchsia-env.sh" && \
   \
   ./x.py build \
   --config \
