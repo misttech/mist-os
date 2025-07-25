@@ -94,11 +94,45 @@ pub enum FhoHandler<M: FfxTool> {
     Metadata(MetadataCmd),
 }
 
+#[derive(FromArgs)]
+#[argh(subcommand)]
+pub enum StandaloneFhoHandler<M: SubCommand> {
+    //FhoVersion1(M),
+    /// Run the tool as if under ffx
+    Standalone(M),
+    /// Print out the subtool's metadata json
+    Metadata(MetadataCmd),
+}
+
 #[derive(Debug, FromArgs)]
 #[argh(subcommand, name = "metadata", description = "Print out this subtool's FHO metadata json")]
 pub struct MetadataCmd {
     #[argh(positional)]
     output_path: Option<PathBuf>,
+}
+
+impl MetadataCmd {
+    pub async fn run(self, info: &'static CommandInfo) -> Result<ExitStatus> {
+        let meta = FhoToolMetadata::new(info.name, info.description);
+        match &self.output_path {
+            Some(path) => serde_json::to_writer_pretty(
+                &File::create(path).with_user_message(|| {
+                    format!("Failed to create metadata file {}", path.display())
+                })?,
+                &meta,
+            ),
+            None => serde_json::to_writer_pretty(&std::io::stdout(), &meta),
+        }
+        .user_message("Failed writing metadata")?;
+        Ok(ExitStatus::from_raw(0))
+    }
+}
+
+#[derive(FromArgs)]
+/// Fuchsia Host Objects Runner for standalone commands.
+pub struct StandaloneToolCommand<M: SubCommand> {
+    #[argh(subcommand)]
+    pub subcommand: StandaloneFhoHandler<M>,
 }
 
 #[derive(FromArgs)]
@@ -135,18 +169,7 @@ impl ToolRunner for MetadataRunner {
     async fn run(self: Box<Self>, _metrics: MetricsSession) -> Result<ExitStatus> {
         // We don't ever want to emit metrics for a metadata query, it's a tool-level
         // command
-        let meta = FhoToolMetadata::new(self.info.name, self.info.description);
-        match &self.cmd.output_path {
-            Some(path) => serde_json::to_writer_pretty(
-                &File::create(path).with_user_message(|| {
-                    format!("Failed to create metadata file {}", path.display())
-                })?,
-                &meta,
-            ),
-            None => serde_json::to_writer_pretty(&std::io::stdout(), &meta),
-        }
-        .user_message("Failed writing metadata")?;
-        Ok(ExitStatus::from_raw(0))
+        self.cmd.run(self.info).await
     }
 }
 
