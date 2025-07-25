@@ -9,7 +9,7 @@
 #include <lib/elfldltl/testing/loader.h>
 #include <lib/ld/abi.h>
 #include <lib/ld/testing/test-processargs.h>
-#include <lib/ld/testing/test-vmo.h>
+#include <lib/ld/testing/vdso.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>

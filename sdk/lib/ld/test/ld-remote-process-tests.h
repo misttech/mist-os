@@ -13,7 +13,7 @@
 #include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-load-module.h>
 #include <lib/ld/testing/mock-loader-service.h>
-#include <lib/ld/testing/test-vmo.h>
+#include <lib/ld/testing/vdso.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>

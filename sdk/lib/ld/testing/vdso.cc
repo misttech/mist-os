@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/ld/testing/test-vmo.h"
+#include "lib/ld/testing/vdso.h"
 
 #include <lib/zx/process.h>
 #include <zircon/processargs.h>

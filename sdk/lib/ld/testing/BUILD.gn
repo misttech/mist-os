@@ -22,7 +22,7 @@ library_headers("headers") {
       "lib/ld/testing/mock-debugdata.h",
       "lib/ld/testing/mock-loader-service.h",
       "lib/ld/testing/test-processargs.h",
-      "lib/ld/testing/test-vmo.h",
+      "lib/ld/testing/vdso.h",
     ]
     public_deps += [
       "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp",
@@ -52,7 +52,7 @@ static_library("ld-testing") {
       "mock-debugdata.cc",
       "mock-loader-service.cc",
       "test-processargs.cc",
-      "test-vmo.cc",
+      "vdso.cc",
     ]
     deps += [
       "//sdk/lib/async",
