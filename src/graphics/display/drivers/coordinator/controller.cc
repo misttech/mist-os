@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -215,70 +214,6 @@ void Controller::RemoveDisplay(display::DisplayId removed_display_id) {
   if (primary_client_ready_) {
     ZX_DEBUG_ASSERT(primary_client_ != nullptr);
     primary_client_->OnDisplaysChanged(/*added_display_ids=*/{}, removed_display_ids);
-  }
-}
-
-void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info) {
-  ZX_DEBUG_ASSERT(banjo_display_info != nullptr);
-
-  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
-      AddedDisplayInfo::Create(*banjo_display_info);
-  if (added_display_info_result.is_error()) {
-    // AddedDisplayInfo::Create() has already logged the error.
-    return;
-  }
-  std::unique_ptr<AddedDisplayInfo> added_display_info =
-      std::move(added_display_info_result).value();
-
-  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *engine_listener_dispatcher_->async_dispatcher(),
-      [this, added_display_info = std::move(added_display_info)]() mutable {
-        OnDisplayAdded(std::move(added_display_info));
-      });
-  if (post_task_result.is_error()) {
-    fdf::error("Failed to dispatch OnDisplayAdded task: {}", post_task_result);
-  }
-}
-
-void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
-  display::DisplayId display_id(banjo_display_id);
-  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *engine_listener_dispatcher_->async_dispatcher(),
-      [this, display_id]() { OnDisplayRemoved(display_id); });
-  if (post_task_result.is_error()) {
-    fdf::error("Failed to dispatch OnDisplayVsync task: {}", post_task_result);
-  }
-}
-
-void Controller::DisplayEngineListenerOnCaptureComplete() {
-  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *engine_listener_dispatcher_->async_dispatcher(), [this]() { OnCaptureComplete(); });
-  if (post_task_result.is_error()) {
-    fdf::error("Failed to dispatch OnDisplayVsync task: {}", post_task_result);
-  }
-}
-
-void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
-                                                     zx_instant_mono_t banjo_timestamp,
-                                                     const config_stamp_t* banjo_config_stamp) {
-  ZX_DEBUG_ASSERT(banjo_display_id != INVALID_DISPLAY_ID);
-  ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-
-  display::DisplayId display_id = display::DisplayId(banjo_display_id);
-  zx::time_monotonic timestamp = zx::time_monotonic(banjo_timestamp);
-  display::DriverConfigStamp driver_config_stamp = display::DriverConfigStamp(*banjo_config_stamp);
-  if (driver_config_stamp == display::kInvalidDriverConfigStamp) {
-    fdf::error("Dropping VSync with invalid DriverConfigStamp");
-    return;
-  }
-
-  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
-      *engine_listener_dispatcher_->async_dispatcher(),
-      [this, display_id, timestamp, driver_config_stamp]() {
-        OnDisplayVsync(display_id, timestamp, driver_config_stamp);
-      });
-  if (post_task_result.is_error()) {
-    fdf::error("Failed to dispatch OnDisplayVsync task: {}", post_task_result);
   }
 }
 
@@ -870,10 +805,8 @@ zx::result<> Controller::Initialize() {
     return vsync_monitor_init_result.take_error();
   }
 
-  engine_info_ = engine_driver_client_->CompleteCoordinatorConnection({
-      .ops = &display_engine_listener_protocol_ops_,
-      .ctx = this,
-  });
+  engine_info_ = engine_driver_client_->CompleteCoordinatorConnection(
+      engine_listener_banjo_adapter_.GetProtocol());
   fdf::info("Engine capabilities - max layers: {}, max displays: {}, display capture: {}",
             int{engine_info_->max_layer_count()}, int{engine_info_->max_connected_display_count()},
             engine_info_->is_capture_supported() ? "yes" : "no");
@@ -919,6 +852,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
     : root_(inspector_.GetRoot().CreateChild("display")),
       driver_dispatcher_(std::move(driver_dispatcher)),
       engine_listener_dispatcher_(std::move(engine_listener_dispatcher)),
+      engine_listener_banjo_adapter_(this, engine_listener_dispatcher_->borrow()),
       vsync_monitor_(root_.CreateChild("vsync_monitor"), driver_dispatcher_->async_dispatcher()),
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);

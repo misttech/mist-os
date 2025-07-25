@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CONTROLLER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -35,6 +34,7 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-listener-banjo-adapter.h"
 #include "src/graphics/display/drivers/coordinator/engine-listener.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -57,8 +57,7 @@ class DisplayConfig;
 class IntegrationTest;
 
 // Multiplexes between display controller clients and display engine drivers.
-class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
-                   public fidl::WireServer<fuchsia_hardware_display::Provider>,
+class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
                    public EngineListener {
  public:
   // Factory method for production use.
@@ -99,15 +98,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   //
   // Must be called after `driver_dispatcher_` is shut down.
   void Stop();
-
-  // fuchsia.hardware.display.controller/DisplayEngineListener:
-  // Runs on dispatchers owned by the display engine driver.
-  void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
-  void DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id);
-  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
-                                           zx_instant_mono_t banjo_timestamp,
-                                           const config_stamp_t* banjo_config_stamp);
-  void DisplayEngineListenerOnCaptureComplete();
 
   // `EngineListener`:
   // Must run on `engine_listener_dispatcher_`.
@@ -219,6 +209,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher_;
+
+  EngineListenerBanjoAdapter engine_listener_banjo_adapter_;
 
   VsyncMonitor vsync_monitor_;
 
