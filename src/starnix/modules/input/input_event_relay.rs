@@ -17,9 +17,9 @@ use fidl_fuchsia_ui_pointer::{
     TouchPointerSample, TouchResponse as FidlTouchResponse, TouchResponseType,
     {self as fuipointer},
 };
-use futures::{FutureExt, StreamExt as _};
+use futures::StreamExt as _;
 use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
-use starnix_core::task::Kernel;
+use starnix_core::task::{Kernel, LockedAndTask};
 use starnix_logging::{
     log_warn, trace_duration, trace_duration_begin, trace_duration_end, trace_flow_step,
 };
@@ -29,9 +29,7 @@ use starnix_uapi::uapi;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
-use {
-    fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync,
-};
+use {fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews};
 
 const INPUT_RELAY_ROLE_NAME: &str = "fuchsia.starnix.kthread.input_relay";
 
@@ -139,81 +137,125 @@ impl InputEventsRelay {
         default_keyboard_device_inspect: Option<Arc<InputDeviceStatus>>,
         default_mouse_device_inspect: Option<Arc<InputDeviceStatus>>,
     ) {
-        self.start_touch_relay(
-            kernel,
-            event_proxy_mode,
-            touch_source_client_end,
-            default_touch_device_opened_files,
-            default_touch_device_inspect,
-        );
-        self.start_keyboard_relay(
-            kernel,
-            keyboard,
-            view_ref,
-            default_keyboard_device_opened_files.clone(),
-            None,
-        );
-        self.start_button_relay(
-            kernel,
-            registry_proxy,
-            event_proxy_mode,
-            default_keyboard_device_opened_files,
-            default_keyboard_device_inspect,
-        );
-        self.start_mouse_relay(
-            kernel,
-            event_proxy_mode,
-            mouse_source_client_end,
-            default_mouse_device_opened_files,
-            default_mouse_device_inspect,
-        );
-    }
-
-    fn start_touch_relay(
-        self: &Arc<Self>,
-        kernel: &Kernel,
-        event_proxy_mode: EventProxyMode,
-        touch_source_client_end: ClientEnd<fuipointer::TouchSourceMarker>,
-        default_touch_device_opened_files: OpenedFiles,
-        device_inspect_status: Option<Arc<InputDeviceStatus>>,
-    ) {
         let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
-                log_warn!(e:%; "Failed to set touch relay role.");
-            }
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-            let (mut default_touch_device, touch_source_proxy, message_counter) = setup_touch_relay(
-                event_proxy_mode,
-                touch_source_client_end,
-                default_touch_device_opened_files,
-                device_inspect_status);
-            let mut previous_event_disposition:Vec<FidlTouchResponse> = vec![];
+        kernel.kthreads.spawn_async_with_role(INPUT_RELAY_ROLE_NAME, async move |_: LockedAndTask<'_>| {
+            // For event types (touch, mouse, or button stream), the sequence for handling events
+            // MUST be:
+            //
+            // 1. create future
+            // 2. decrease counter
+            // 3. await future
+            //
+            // for allowing suspend - wake.
+
+            // touch
+            let (mut default_touch_device, touch_source_proxy, touch_message_counter) =
+                setup_touch_relay(
+                    event_proxy_mode,
+                    touch_source_client_end,
+                    default_touch_device_opened_files,
+                    default_touch_device_inspect,
+                );
+            let mut previous_touch_event_disposition: Vec<FidlTouchResponse> = vec![];
+            // Create the touch future to watch for the the next input events, but don't execute
+            // it...
+            let mut touch_future = touch_source_proxy.watch(&previous_touch_event_disposition);
+            // .. until the counter that we passed to the runner has been decremented. This prevents
+            // the container from suspending between calls to `watch`.
+            touch_message_counter.as_ref().map(mark_proxy_message_handled);
+
+            // mouse
+            let (mut default_mouse_device, mouse_source_proxy, mouse_message_counter) =
+                setup_mouse_relay(
+                    event_proxy_mode,
+                    mouse_source_client_end,
+                    default_mouse_device_opened_files,
+                    default_mouse_device_inspect,
+                );
+
+            // Create the mouse future to watch for the the next input events, but don't execute
+            // it...
+            let mut mouse_future = mouse_source_proxy.watch();
+            // .. until the message counter has been decremented. This prevents
+            // the container from suspending between calls to `watch`.
+            mouse_message_counter.as_ref().map(mark_proxy_message_handled);
+
+            // keyboard
+            let (mut default_keyboard_device, mut keyboard_event_stream) = setup_keyboard_relay(
+                keyboard,
+                view_ref,
+                default_keyboard_device_opened_files.clone(),
+                default_keyboard_device_inspect.clone(),
+            );
+
+            // button
+            let (mut default_button_device, mut button_event_stream, button_message_counter) =
+                setup_button_relay(
+                    registry_proxy,
+                    event_proxy_mode,
+                    default_keyboard_device_opened_files,
+                    default_keyboard_device_inspect,
+                );
+            button_message_counter.as_ref().map(mark_proxy_message_handled);
+
+            let mut power_was_pressed = false;
+            let mut function_was_pressed = false;
+
             loop {
-                // Create the future to watch for the the next input events, but don't execute
-                // it...
-                let mut watch_future = touch_source_proxy.watch(&previous_event_disposition).fuse();
-
-                // .. until the counter that we passed to the runner has been decremented. This prevents
-                // the container from suspending between calls to `watch`.
-                message_counter.as_ref().map(mark_proxy_message_handled);
-
                 futures::select! {
-                    watch_future_res = watch_future => {
-                        match watch_future_res {
+                    touch_future_res = touch_future => {
+                        match touch_future_res {
                             Ok(touch_events) => {
-                                previous_event_disposition = slf.process_touch_event(&mut default_touch_device, touch_events);
+                                previous_touch_event_disposition = slf.process_touch_event(&mut default_touch_device, touch_events);
+                                // Create the touch future to watch for the the next input events, but don't execute
+                                // it...
+                                touch_future = touch_source_proxy.watch(&previous_touch_event_disposition);
+                                // .. until the counter that we passed to the runner has been decremented. This prevents
+                                // the container from suspending between calls to `watch`.
+                                touch_message_counter.as_ref().map(mark_proxy_message_handled);
                             }
                             Err(e) => {
                                 log_warn!("error {:?} reading from TouchSourceProxy; input is stopped", e);
-                                // TODO(b/430288871): need to mark the proxy is end.
                             }
                         };
                     }
+                    mouse_future_res = mouse_future => {
+                        match mouse_future_res {
+                            Ok(mouse_events) => {
+                                slf.process_mouse_event(&mut default_mouse_device, mouse_events);
+                                // Create the mouse future to watch for the the next input events, but don't execute
+                                // it...
+                                mouse_future = mouse_source_proxy.watch();
+                                // .. until the message counter has been decremented. This prevents
+                                // the container from suspending between calls to `watch`.
+                                mouse_message_counter.as_ref().map(mark_proxy_message_handled);
+                            }
+                            Err(e) => {
+                                log_warn!("error {:?} reading from MouseSourceProxy; input is stopped", e);
+                            }
+                        }
+                    }
+                    e = keyboard_event_stream.next() => {
+                        match e  {
+                            Some(Ok(request)) => {
+                                slf.process_keyboard(&mut default_keyboard_device, request);
+                            }
+                            _ => {}
+                        }
+                    }
+                    e = button_event_stream.next() => {
+                        match e {
+                            Some(Ok(event)) => {
+                                (power_was_pressed, function_was_pressed) = slf.process_button_event(&mut default_button_device, event, power_was_pressed, function_was_pressed);
+                            }
+                            _ => {}
+                        }
+                        button_message_counter.as_ref().map(mark_proxy_message_handled);
+                    }
                     complete => break,
                 }
-            }});
-        })
+            }
+        });
     }
 
     fn process_touch_event(
@@ -330,46 +372,6 @@ impl InputEventsRelay {
         previous_event_disposition
     }
 
-    fn start_keyboard_relay(
-        self: &Arc<Self>,
-        kernel: &Kernel,
-        keyboard: KeyboardSynchronousProxy,
-        view_ref: fuiviews::ViewRef,
-        default_keyboard_device_opened_files: OpenedFiles,
-        device_inspect_status: Option<Arc<InputDeviceStatus>>,
-    ) {
-        let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
-                log_warn!(e:%; "Failed to set keyboard relay role.");
-            }
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let (mut default_keyboard_device, mut event_stream) = setup_keyboard_relay(
-                    keyboard,
-                    view_ref,
-                    default_keyboard_device_opened_files,
-                    device_inspect_status,
-                );
-
-                loop {
-                    futures::select! {
-                        e = event_stream.next() => {
-                            match e  {
-                                Some(Ok(request)) => {
-                                    slf.process_keyboard(&mut default_keyboard_device, request);
-                                }
-                                _ => {
-                                    // TODO(b/430288871): need to mark the proxy is end.
-                                }
-                            }
-                        }
-                        complete => break,
-                    }
-                }
-            });
-        });
-    }
-
     fn process_keyboard(
         self: &Arc<Self>,
         default_keyboard_device: &mut DeviceState,
@@ -408,47 +410,6 @@ impl InputEventsRelay {
                 responder.send(KeyEventStatus::Handled).expect("");
             }
         }
-    }
-
-    fn start_button_relay(
-        self: &Arc<Self>,
-        kernel: &Kernel,
-        registry_proxy: fuipolicy::DeviceListenerRegistrySynchronousProxy,
-        event_proxy_mode: EventProxyMode,
-        default_keyboard_device_opened_files: OpenedFiles,
-        device_inspect_status: Option<Arc<InputDeviceStatus>>,
-    ) {
-        let slf: Arc<InputEventsRelay> = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
-                log_warn!(e:%; "Failed to set button relay role.");
-            }
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let (mut default_button_device, mut listener_stream, message_counter) = setup_button_relay(registry_proxy, event_proxy_mode, default_keyboard_device_opened_files, device_inspect_status);
-
-                let mut power_was_pressed = false;
-                let mut function_was_pressed = false;
-
-                loop {
-                    // The previous hanging get has been handled, so decrement the unhandled message counter.
-                    message_counter.as_ref().map(mark_proxy_message_handled);
-
-                    futures::select! {
-                        stream_event = listener_stream.next() => {
-                            match stream_event {
-                                Some(Ok(event)) => {
-                                    (power_was_pressed, function_was_pressed) = slf.process_button_event(&mut default_button_device, event, power_was_pressed, function_was_pressed);
-                                }
-                                _ => {
-                                    // TODO(b/430288871): need to mark the proxy is end.
-                                }
-                            }
-                        }
-                        complete => break,
-                    }
-                }
-            })
-        });
     }
 
     fn process_button_event(
@@ -538,54 +499,6 @@ impl InputEventsRelay {
         }
 
         (power_was_pressed_after, function_was_pressed_after)
-    }
-
-    fn start_mouse_relay(
-        self: &Arc<Self>,
-        kernel: &Kernel,
-        event_proxy_mode: EventProxyMode,
-        mouse_source_client_end: ClientEnd<fuipointer::MouseSourceMarker>,
-        default_mouse_device_opened_files: OpenedFiles,
-        device_inspect_status: Option<Arc<InputDeviceStatus>>,
-    ) {
-        let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
-                log_warn!(e:%; "Failed to set mouse relay role.");
-            }
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let (mut default_mouse_device, mouse_source_proxy, message_counter) = setup_mouse_relay(
-                    event_proxy_mode,
-                    mouse_source_client_end,
-                    default_mouse_device_opened_files,
-                    device_inspect_status,
-                );
-
-                loop {
-                    // Create the future to watch for the the next input events, but don't execute
-                    // it...
-                    let mut event_future = mouse_source_proxy.watch();
-
-                    // .. until the message counter has been decremented. This prevents
-                    // the container from suspending between calls to `watch`.
-                    message_counter.as_ref().map(mark_proxy_message_handled);
-                    futures::select! {
-                        e = event_future => {
-                            match e {
-                                Ok(mouse_events) => {
-                                    slf.process_mouse_event(&mut default_mouse_device, mouse_events);
-                                }
-                                Err(e) => {
-                                    log_warn!("error {:?} reading from MouseSourceProxy; input is stopped", e);
-                                    // TODO(b/430288871): need to mark the proxy is end.
-                                }
-                            }
-                        }
-                        complete => break,
-                    }
-                }
-            })
-        });
     }
 
     fn process_mouse_event(
@@ -858,7 +771,7 @@ mod test {
 
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
-    fn start_input_relays(
+    async fn start_input_relays(
         locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> (
@@ -870,9 +783,9 @@ mod test {
         FileHandle,
         FileHandle,
         TouchSourceRequestStream,
-        fuiinput::KeyboardRequestStream,
         fuipointer::MouseSourceRequestStream,
-        fuipolicy::DeviceListenerRegistryRequestStream,
+        fuiinput::KeyboardListenerProxy,
+        fuipolicy::MediaButtonsListenerProxy,
     ) {
         let inspector = fuchsia_inspect::Inspector::default();
 
@@ -892,11 +805,11 @@ mod test {
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
         let (mouse_source_client_end, mouse_stream) =
             fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
-        let (keyboard_proxy, keyboard_stream) =
+        let (keyboard_proxy, mut keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
-        let (device_registry_proxy, device_listener_stream) =
+        let (device_registry_proxy, mut device_listener_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
             );
 
@@ -917,6 +830,33 @@ mod test {
             Some(mouse_device.inspect_status.clone()),
         );
 
+        let keyboard_listener = match keyboard_stream.next().await {
+            Some(Ok(fuiinput::KeyboardRequest::AddListener {
+                view_ref: _,
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy()
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy()
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
         (
             relay,
             touch_device,
@@ -926,9 +866,9 @@ mod test {
             keyboard_file,
             mouse_file,
             touch_source_stream,
-            keyboard_stream,
             mouse_stream,
-            device_listener_stream,
+            keyboard_listener,
+            buttons_listener,
         )
     }
 
@@ -1094,10 +1034,10 @@ mod test {
             _keyboard_file,
             _mouse_file,
             mut touch_source_stream,
-            _keyboard_stream,
             _mouse_source_stream,
-            _device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            _keyboard_listener,
+            _buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         const DEVICE_ID: u32 = 10;
 
@@ -1158,10 +1098,10 @@ mod test {
             _keyboard_file,
             _mouse_file,
             mut touch_source_stream,
-            _keyboard_stream,
             _mouse_source_stream,
-            _device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            _keyboard_listener,
+            _buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         const DEVICE_ID_10: u32 = 10;
         const DEVICE_ID_11: u32 = 11;
@@ -1238,26 +1178,12 @@ mod test {
             keyboard_file,
             _mouse_file,
             _touch_source_stream,
-            mut keyboard_stream,
             _mouse_source_stream,
-            _device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            keyboard_listener,
+            _buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         const DEVICE_ID: u32 = 10;
-
-        let keyboard_listener = match keyboard_stream.next().await {
-            Some(Ok(fuiinput::KeyboardRequest::AddListener {
-                view_ref: _,
-                listener,
-                responder,
-            })) => {
-                let _ = responder.send();
-                listener.into_proxy()
-            }
-            _ => {
-                panic!("Failed to get event");
-            }
-        };
 
         let key_event = fuiinput::KeyEvent {
             timestamp: Some(0),
@@ -1301,7 +1227,6 @@ mod test {
         // file of device id 10 should receive events.
         assert_ne!(events.len(), 0);
 
-        std::mem::drop(keyboard_stream); // Close Zircon channel.
         std::mem::drop(keyboard_listener); // Close Zircon channel.
     }
 
@@ -1318,25 +1243,12 @@ mod test {
             keyboard_file,
             _mouse_file,
             _touch_source_stream,
-            _keyboard_stream,
             _mouse_source_stream,
-            mut device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            _keyboard_listener,
+            buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         const DEVICE_ID: u32 = 10;
-
-        let buttons_listener = match device_listener_stream.next().await {
-            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
-                listener,
-                responder,
-            })) => {
-                let _ = responder.send();
-                listener.into_proxy()
-            }
-            _ => {
-                panic!("Failed to get event");
-            }
-        };
 
         let power_pressed_event = MediaButtonsEvent {
             volume: Some(0),
@@ -1395,7 +1307,6 @@ mod test {
         assert_ne!(events.len(), 0);
 
         std::mem::drop(buttons_listener); // Close Zircon channel.
-        std::mem::drop(device_listener_stream); // Close Zircon channel.
     }
 
     #[::fuchsia::test]
@@ -1411,10 +1322,10 @@ mod test {
             _keyboard_file,
             _mouse_file,
             mut touch_source_stream,
-            _keyboard_stream,
             _mouse_source_stream,
-            _device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            _keyboard_listener,
+            _buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         let touch_reader2 =
             touch_device.open_test(locked, &current_task).expect("Failed to create input file");
@@ -1456,29 +1367,15 @@ mod test {
             keyboard_reader1,
             _mouse_file,
             _touch_source_stream,
-            mut keyboard_stream,
             _mouse_source_stream,
-            _device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            keyboard_listener,
+            _buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         let keyboard_reader2 =
             keyboard_device.open_test(locked, &current_task).expect("Failed to create input file");
 
         const DEVICE_ID: u32 = 10;
-
-        let keyboard_listener = match keyboard_stream.next().await {
-            Some(Ok(fuiinput::KeyboardRequest::AddListener {
-                view_ref: _,
-                listener,
-                responder,
-            })) => {
-                let _ = responder.send();
-                listener.into_proxy()
-            }
-            _ => {
-                panic!("Failed to get event");
-            }
-        };
 
         let key_event = fuiinput::KeyEvent {
             timestamp: Some(0),
@@ -1510,10 +1407,10 @@ mod test {
             keyboard_reader1,
             _mouse_file,
             _touch_source_stream,
-            _keyboard_stream,
             _mouse_source_stream,
-            mut device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            _keyboard_listener,
+            buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         let keyboard_reader2 =
             keyboard_device.open_test(locked, &current_task).expect("Failed to create input file");
@@ -1529,19 +1426,6 @@ mod test {
             function: Some(false),
             device_id: Some(DEVICE_ID),
             ..Default::default()
-        };
-
-        let buttons_listener = match device_listener_stream.next().await {
-            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
-                listener,
-                responder,
-            })) => {
-                let _ = responder.send();
-                listener.into_proxy()
-            }
-            _ => {
-                panic!("Failed to get event");
-            }
         };
 
         let _ = buttons_listener.on_event(&power_pressed_event).await;
@@ -1566,10 +1450,10 @@ mod test {
             _keyboard_file,
             mouse_reader1,
             _touch_stream,
-            _keyboard_stream,
             mut mouse_stream,
-            _device_listener_stream,
-        ) = start_input_relays(locked, &current_task);
+            _keyboard_listener,
+            _buttons_listener,
+        ) = start_input_relays(locked, &current_task).await;
 
         let mouse_reader2 =
             mouse_device.open_test(locked, &current_task).expect("Failed to create input file");
