@@ -25,13 +25,6 @@ PseudoDir::~PseudoDir() {
   entries_by_id_.clear();
 }
 
-zx::result<VnodeAttributes> PseudoDir::GetAttributes() const {
-  return zx::ok(fs::VnodeAttributes{
-      .content_size = 0,
-      .storage_size = 0,
-  });
-}
-
 zx_status_t PseudoDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) {
   std::lock_guard lock(mutex_);
 
