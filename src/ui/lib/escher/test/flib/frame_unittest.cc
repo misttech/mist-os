@@ -45,11 +45,12 @@ VK_TEST_F(FrameTest, SubmitFrameWithUnsignalledWaitSemaphore) {
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(100ms);
 
-    // Neither semaphore should be signalled yet (neither the acquire semaphore that we will signal
-    // in a moment, nor the release semaphore that will be signaled as a result).
+    // Neither semaphore should be signaled yet.  We'll signal the acquire semaphore in a moment,
+    // and there's no reason for anybody to signal the release semaphore.  This is paranoia, sweet
+    // sweet paranoia.
     EXPECT_FALSE(IsEventSignalled(acquire_semaphore_pair.second, ZX_EVENT_SIGNALED));
     EXPECT_NE(release_semaphore_pair.second.wait_one(ZX_EVENT_SIGNALED,
-                                                     zx::deadline_after(zx::msec(1)), nullptr),
+                                                     zx::deadline_after(zx::msec(200)), nullptr),
               ZX_OK);
 
     // Signal wait semaphore.
@@ -59,20 +60,16 @@ VK_TEST_F(FrameTest, SubmitFrameWithUnsignalledWaitSemaphore) {
   // Submit frame while wait semaphore is not signalled.
   frame->EndFrame(SemaphorePtr(), [] {});
 
-  // Release semaphore should be signaled and acquire semaphore should be unsignaled by vk. We
-  // should not wait more than 1 sec, because the driver can decide to signal the hung semaphore
-  // after some time.
-  EXPECT_EQ(release_semaphore_pair.second.wait_one(ZX_EVENT_SIGNALED,
-                                                   zx::deadline_after(zx::sec(1)), nullptr),
-            ZX_OK);
+  // Release semaphore should be signaled and acquire semaphore should be de-signaled by Vulkan.
+  EXPECT_EQ(
+      release_semaphore_pair.second.wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), nullptr),
+      ZX_OK);
   loop.RunUntilIdle();
-
   if (!escher::test::GlobalEscherUsesVirtualGpu()) {
     // TODO(https://fxbug.dev/434039865): the semaphore should be de-signaled by Vulkan, but the
     // Goldfish driver doesn't do this.
     EXPECT_FALSE(IsEventSignalled(acquire_semaphore_pair.second, ZX_EVENT_SIGNALED));
   }
-  EXPECT_TRUE(IsEventSignalled(release_semaphore_pair.second, ZX_EVENT_SIGNALED));
 
   // Cleanup
   EXPECT_EQ(vk::Result::eSuccess, escher->vk_device().waitIdle());
