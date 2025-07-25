@@ -116,20 +116,20 @@ zx::result<std::unique_ptr<EngineDriverClient>> EngineDriverClient::Create(
 }
 
 EngineDriverClient::EngineDriverClient(ddk::DisplayEngineProtocolClient banjo_engine)
-    : use_engine_(false), banjo_engine_(banjo_engine) {
+    : use_fidl_(false), banjo_engine_(banjo_engine) {
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
 }
 
 EngineDriverClient::EngineDriverClient(
     fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> fidl_engine)
-    : use_engine_(true), fidl_engine_(std::move(fidl_engine)) {
+    : use_fidl_(true), fidl_engine_(std::move(fidl_engine)) {
   ZX_DEBUG_ASSERT(fidl_engine_.is_valid());
 }
 
 EngineDriverClient::~EngineDriverClient() { fdf::trace("EngineDriverClient::~EngineDriverClient"); }
 
 void EngineDriverClient::ReleaseImage(display::DriverImageId driver_image_id) {
-  if (use_engine_) {
+  if (use_fidl_) {
     fdf::Arena arena(kArenaTag);
     fidl::OneWayStatus result = fidl_engine_.buffer(arena)->ReleaseImage(driver_image_id.ToFidl());
     if (!result.ok()) {
@@ -144,7 +144,7 @@ void EngineDriverClient::ReleaseImage(display::DriverImageId driver_image_id) {
 
 zx::result<> EngineDriverClient::ReleaseCapture(
     display::DriverCaptureImageId driver_capture_image_id) {
-  if (use_engine_) {
+  if (use_fidl_) {
     fdf::Arena arena(kArenaTag);
     auto result = fidl_engine_.buffer(arena)->ReleaseCapture(driver_capture_image_id.ToFidl());
     return zx::make_result(result.status());
@@ -161,7 +161,7 @@ display::ConfigCheckResult EngineDriverClient::CheckConfiguration(
   ZX_DEBUG_ASSERT(display_config->layers_count != 0);
   ZX_DEBUG_ASSERT(display_config->layers_list != nullptr);
 
-  if (use_engine_) {
+  if (use_fidl_) {
     return display::ConfigCheckResult::kUnsupportedDisplayModes;
   }
 
@@ -183,7 +183,7 @@ void EngineDriverClient::ApplyConfiguration(const display_config_t* display_conf
   ZX_DEBUG_ASSERT(display_config->layers_count != 0);
   ZX_DEBUG_ASSERT(display_config->layers_list != nullptr);
 
-  if (use_engine_) {
+  if (use_fidl_) {
     return;
   }
 
@@ -194,7 +194,7 @@ void EngineDriverClient::ApplyConfiguration(const display_config_t* display_conf
 
 display::EngineInfo EngineDriverClient::CompleteCoordinatorConnection(
     const display_engine_listener_protocol_t& protocol) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return display::EngineInfo({});
   }
 
@@ -208,7 +208,7 @@ display::EngineInfo EngineDriverClient::CompleteCoordinatorConnection(
 }
 
 void EngineDriverClient::UnsetListener() {
-  if (use_engine_) {
+  if (use_fidl_) {
     return;
   }
 
@@ -219,7 +219,7 @@ void EngineDriverClient::UnsetListener() {
 zx::result<display::DriverImageId> EngineDriverClient::ImportImage(
     const display::ImageMetadata& image_metadata, display::DriverBufferCollectionId collection_id,
     uint32_t index) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -236,7 +236,7 @@ zx::result<display::DriverImageId> EngineDriverClient::ImportImage(
 
 zx::result<display::DriverCaptureImageId> EngineDriverClient::ImportImageForCapture(
     display::DriverBufferCollectionId collection_id, uint32_t index) {
-  if (use_engine_) {
+  if (use_fidl_) {
     fdf::Arena arena(kArenaTag);
     fdf::WireUnownedResult result =
         fidl_engine_.buffer(arena)->ImportImageForCapture(collection_id.ToFidl(), index);
@@ -263,7 +263,7 @@ zx::result<display::DriverCaptureImageId> EngineDriverClient::ImportImageForCapt
 zx::result<> EngineDriverClient::ImportBufferCollection(
     display::DriverBufferCollectionId collection_id,
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> collection_token) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -275,7 +275,7 @@ zx::result<> EngineDriverClient::ImportBufferCollection(
 
 zx::result<> EngineDriverClient::ReleaseBufferCollection(
     display::DriverBufferCollectionId collection_id) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -286,7 +286,7 @@ zx::result<> EngineDriverClient::ReleaseBufferCollection(
 
 zx::result<> EngineDriverClient::SetBufferCollectionConstraints(
     const display::ImageBufferUsage& usage, display::DriverBufferCollectionId collection_id) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -299,7 +299,7 @@ zx::result<> EngineDriverClient::SetBufferCollectionConstraints(
 
 zx::result<> EngineDriverClient::StartCapture(
     display::DriverCaptureImageId driver_capture_image_id) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -309,7 +309,7 @@ zx::result<> EngineDriverClient::StartCapture(
 }
 
 zx::result<> EngineDriverClient::SetDisplayPower(display::DisplayId display_id, bool power_on) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -319,7 +319,7 @@ zx::result<> EngineDriverClient::SetDisplayPower(display::DisplayId display_id, 
 }
 
 zx::result<> EngineDriverClient::SetMinimumRgb(uint8_t minimum_rgb) {
-  if (use_engine_) {
+  if (use_fidl_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 

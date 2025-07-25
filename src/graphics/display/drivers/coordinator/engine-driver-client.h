@@ -76,7 +76,7 @@ class EngineDriverClient {
 
  private:
   // Whether to use the FIDL client. If false, use the Banjo client.
-  bool use_engine_;
+  bool use_fidl_;
 
   // FIDL Client
   fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> fidl_engine_;
