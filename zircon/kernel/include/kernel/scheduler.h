@@ -512,7 +512,7 @@ class Scheduler {
   // requirement that any threads we lock in this method are not discoverable
   // and lockable from another scheduler that is also holding the "sched token."
   // Failure to meet this requirement will result in deadlock.
-  void ProcessSaveStateList(SchedTime now) TA_REQ(chainlock_transaction_token);
+  void ProcessSaveStateList() TA_REQ(chainlock_transaction_token);
 
   // Returns true if the given thread needs to be migrated from one CPU to another.
   static bool NeedsMigration(Thread* thread)
@@ -552,6 +552,24 @@ class Scheduler {
 
   // Returns the current system time as a SchedTime value.
   static SchedTime CurrentTime() { return SchedTime{current_mono_time()}; }
+
+  // A coherent pair of corresponding time/ticks values in the monotonic and
+  // boot timelines.
+  struct SchedMonoTimeAndBootTicks {
+    SchedTime mono_time;
+    zx_instant_boot_ticks_t boot_ticks;
+  };
+
+  // Returns the current monotonic time / boot ticks using coherent samples of
+  // the respective timelines.
+  // TODO(eieio): Look into making this non-static and requiring the queue lock
+  // of the respective scheduler to ensure this is always called with the queue
+  // lock held.
+  static SchedMonoTimeAndBootTicks CurrentMonoTimeAndBootTicks() {
+    InstantMonoTimeAndBootTicks mono_time_and_boot_ticks = current_mono_time_and_boot_ticks();
+    return {.mono_time = SchedTime{mono_time_and_boot_ticks.mono_time},
+            .boot_ticks = mono_time_and_boot_ticks.boot_ticks};
+  }
 
   // Returns the Scheduler instance for the current CPU.
   static Scheduler* Get();
@@ -629,9 +647,8 @@ class Scheduler {
   using EndTraceCallback = fit::inline_function<void(), sizeof(void*)>;
 
   // Common logic for reschedule API.
-  void RescheduleCommon(Thread* current_thread, SchedTime now,
-                        EndTraceCallback end_outer_trace = nullptr) TA_EXCL(queue_lock_)
-      TA_REQ(chainlock_transaction_token, current_thread->get_lock());
+  void RescheduleCommon(Thread* current_thread, EndTraceCallback end_outer_trace = nullptr)
+      TA_EXCL(queue_lock_) TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
   // A utility result type to help avoid missing updates to a thread's
   // start/finish times when dequeuing from a run queue with a variable
@@ -941,8 +958,8 @@ class Scheduler {
 
   // Computes the estimated energy consumed since the last reschedule and
   // updates the current thread and CPU energy accumulators.
-  inline void UpdateEstimatedEnergyConsumption(Thread* current_thread,
-                                               SchedDuration actual_runtime_ns)
+  void UpdateEstimatedEnergyConsumption(Thread* current_thread, SchedMonoTimeAndBootTicks now,
+                                        SchedDuration actual_runtime_ns)
       TA_REQ(current_thread->get_lock(), queue_lock_);
 
   // Utilities to scale up or down the given value by the performance scale of the CPU.

@@ -51,6 +51,10 @@
   KTRACE_CPU_COUNTER_ENABLE(LOCAL_KTRACE_LEVEL_ENABLED(level), "kernel:sched", string, counter_id, \
                             ##args)
 
+#define LOCAL_KTRACE_COUNTER_TIMESTAMP(level, string, timestamp, counter_id, args...)            \
+  KTRACE_CPU_COUNTER_TIMESTAMP_ENABLE(LOCAL_KTRACE_LEVEL_ENABLED(level), "kernel:sched", string, \
+                                      timestamp, counter_id, ##args)
+
 #define LOCAL_KTRACE_BEGIN_SCOPE(level, string, args...) \
   KTRACE_CPU_BEGIN_SCOPE_ENABLE(LOCAL_KTRACE_LEVEL_ENABLED(level), "kernel:sched", string, ##args)
 

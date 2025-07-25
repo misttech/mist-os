@@ -453,6 +453,20 @@
                    FXT_INTERN_STRING(label), KTrace::Timestamp(), KTrace::Context::Cpu,       \
                    counter_id, ##__VA_ARGS__)
 
+// Similar to KTRACE_CPU_COUNTER, but accepts an expression to use for the event timestamp.
+#define KTRACE_CPU_COUNTER_TIMESTAMP(category, label, timestamp, counter_id, ...)         \
+  FXT_EVENT_COMMON(true, KTrace::CategoryEnabled, KTrace::EmitCounter, category,          \
+                   FXT_INTERN_STRING(label), timestamp, KTrace::Context::Cpu, counter_id, \
+                   ##__VA_ARGS__)
+
+// Similar to KTRACE_CPU_COUNTER_TIMESTAMP, but checks the given constexpr_condition to determine
+// whether the event is enabled at compile time.
+#define KTRACE_CPU_COUNTER_TIMESTAMP_ENABLE(constexpr_enabled, category, label, timestamp,    \
+                                            counter_id, ...)                                  \
+  FXT_EVENT_COMMON(constexpr_enabled, KTrace::CategoryEnabled, KTrace::EmitCounter, category, \
+                   FXT_INTERN_STRING(label), timestamp, KTrace::Context::Cpu, counter_id,     \
+                   ##__VA_ARGS__)
+
 //
 // ## FLOW_BEGIN
 //

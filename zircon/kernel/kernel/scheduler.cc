@@ -1446,7 +1446,7 @@ void Scheduler::UpdateTimeline(SchedTime now) {
 }
 #endif  // !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
-void Scheduler::ProcessSaveStateList(SchedTime now) {
+void Scheduler::ProcessSaveStateList() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   // Move the save_state_list_ to a local, stack allocated list. This allows us to relinquish the
@@ -1494,9 +1494,9 @@ void Scheduler::ProcessSaveStateList(SchedTime now) {
     // another CPU search, provided that the CPU is still online and load
     // balancing constraints still hold.
     const cpu_num_t target_cpu =
-        FindActiveSchedulerForThread(to_migrate, [now](Thread* thread, Scheduler* target) {
+        FindActiveSchedulerForThread(to_migrate, [](Thread* thread, Scheduler* target) {
           MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
-          target->Insert(now, thread, Placement::Migration);
+          target->Insert(CurrentTime(), thread, Placement::Migration);
         });
     cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
     to_migrate->get_lock().Release();
@@ -1509,28 +1509,25 @@ void Scheduler::ProcessSaveStateList(SchedTime now) {
   }
 }
 
-inline void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
-                                                        SchedDuration actual_runtime_ns) {
+void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
+                                                 SchedMonoTimeAndBootTicks now,
+                                                 SchedDuration actual_runtime_ns) {
+  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "update_energy");
+
   // Time in a low-power idle state should only accrue when running the idle
   // thread.
   const SchedDuration idle_processor_time_ns{IdlePowerThread::TakeProcessorIdleTime()};
-
-  // TODO(https://fxbug.dev/379576294): Re-enable this assertion once we understand why the
-  // idle_processor_time_ns is occasionally larger than actual_runtime_ns. Once the assertion
-  // is back in place, the ktl::max below that clamps active_processor_time_ns to 0 can be
-  // removed.
-  // DEBUG_ASSERT_MSG(
-  //  idle_processor_time_ns <= actual_runtime_ns,
-  //  "idle_processor_time_ns=%" PRId64 " actual_runtime_ns=%" PRId64 " current_thread=%s",
-  //  idle_processor_time_ns.raw_value(), actual_runtime_ns.raw_value(), current_thread->name());
+  DEBUG_ASSERT_MSG(
+      idle_processor_time_ns <= actual_runtime_ns,
+      "idle_processor_time_ns=%" PRId64 " actual_runtime_ns=%" PRId64 " current_thread=%s",
+      idle_processor_time_ns.raw_value(), actual_runtime_ns.raw_value(), current_thread->name());
 
   // Subtract any time the processor spent in the low-power idle state from the
   // runtime to ensure that active vs. idle power consumption is attributed
   // correctly. Processors can accumulate both active or idle power consumption,
   // but threads, including the idle power thread, accumulate only active power
   // consumption.
-  const SchedDuration active_processor_time_ns =
-      ktl::max<SchedDuration>(actual_runtime_ns - idle_processor_time_ns, SchedDuration(0));
+  const SchedDuration active_processor_time_ns = actual_runtime_ns - idle_processor_time_ns;
 
   cpu_stats& stats = percpu::GetCurrent().stats;
 
@@ -1556,12 +1553,17 @@ inline void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
         power_level_control_.max_idle_power_coefficient_nw() * idle_processor_time_ns.raw_value();
     stats.idle_energy_consumption_nj += idle_energy_consumption_nj;
   }
+
+  LOCAL_KTRACE_COUNTER_TIMESTAMP(
+      COMMON, "Energy (nJ)", now.boot_ticks, this_cpu(),
+      ("CPU", stats.active_energy_consumption_nj + stats.idle_energy_consumption_nj));
+
+  trace = KTRACE_END_SCOPE(("active_processor_time_ns", active_processor_time_ns),
+                           ("idle_processor_time_ns", idle_processor_time_ns));
 }
 
-void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
-                                 EndTraceCallback end_outer_trace) {
-  ktrace::Scope trace =
-      LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "reschedule_common", ("now", Round<uint64_t>(now)));
+void Scheduler::RescheduleCommon(Thread* const current_thread, EndTraceCallback end_outer_trace) {
+  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "reschedule_common");
 
   DEBUG_ASSERT(current_thread == Thread::Current::Get());
   const cpu_num_t current_cpu = arch_curr_cpu_num();
@@ -1589,13 +1591,9 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
 
   // Process all threads in the save_state_list_. We do this before performing any
   // other reschedule operation.
-  ProcessSaveStateList(now);
+  ProcessSaveStateList();
 
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
-#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
-  UpdateTimeline(now);
-#endif
-
   // When calling into reschedule, the current thread is only allowed to be in a
   // limited number of states, depending on where it came from.
   //
@@ -1612,6 +1610,16 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     current_thread->set_ready();
   }
 
+  // Sample the current time after acquiring the queue lock to avoid large skews
+  // between accounting based on now and trace events that should occur
+  // approximately now.
+  const SchedMonoTimeAndBootTicks mono_and_boot_now = CurrentMonoTimeAndBootTicks();
+  const SchedTime now = mono_and_boot_now.mono_time;
+
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  UpdateTimeline(now);
+#endif
+
   // TODO(https://fxbug.dev/381899402): Find the root cause of small negative values in the actual
   // runtime calculation.
   const SchedDuration actual_runtime_ns =
@@ -1625,7 +1633,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
 
   // Update the energy consumption accumulators for the current task and
   // processor.
-  UpdateEstimatedEnergyConsumption(current_thread, actual_runtime_ns);
+  UpdateEstimatedEnergyConsumption(current_thread, mono_and_boot_now, actual_runtime_ns);
 
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   // Update the used time slice before evaluating the next task. Scale the
@@ -2908,8 +2916,7 @@ void Scheduler::Block(Thread* const current_thread) {
   current_thread->canary().Assert();
   DEBUG_ASSERT(current_thread->state() != THREAD_RUNNING);
 
-  const SchedTime now = CurrentTime();
-  Scheduler::Get()->RescheduleCommon(current_thread, now, trace.Completer());
+  Scheduler::Get()->RescheduleCommon(current_thread, trace.Completer());
 }
 
 void Scheduler::Unblock(Thread* thread) {
@@ -3050,7 +3057,7 @@ void Scheduler::Yield(Thread* const current_thread) {
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
     if (current_state.start_time() < now) {
       current_state.time_slice_used_ns_ = current_state.time_slice_ns_;
-      current_scheduler.RescheduleCommon(current_thread, now, trace.Completer());
+      current_scheduler.RescheduleCommon(current_thread, trace.Completer());
     }
 #else
     {
@@ -3072,7 +3079,7 @@ void Scheduler::Yield(Thread* const current_thread) {
       ep.set_normalized_timeslice_remainder(SchedRemainder{1});
     }
 
-    current_scheduler.RescheduleCommon(current_thread, now, trace.Completer());
+    current_scheduler.RescheduleCommon(current_thread, trace.Completer());
 #endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   }
 }
@@ -3093,8 +3100,7 @@ void Scheduler::PreemptLocked(Thread* current_thread) {
   DEBUG_ASSERT(current_state.last_cpu_ == current_state.curr_cpu_);
   DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
 
-  const SchedTime now = CurrentTime();
-  Get()->RescheduleCommon(current_thread, now, trace.Completer());
+  Get()->RescheduleCommon(current_thread, trace.Completer());
 }
 
 void Scheduler::Reschedule(Thread* const current_thread) {
@@ -3117,13 +3123,12 @@ void Scheduler::Reschedule(Thread* const current_thread) {
   DEBUG_ASSERT(current_state->curr_cpu_ == current_cpu);
   DEBUG_ASSERT(current_state->last_cpu_ == current_state->curr_cpu_);
 
-  const SchedTime now = CurrentTime();
-  Get()->RescheduleCommon(current_thread, now, trace.Completer());
+  Get()->RescheduleCommon(current_thread, trace.Completer());
 }
 
 void Scheduler::RescheduleInternal(Thread* const current_thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_resched_internal");
-  Get()->RescheduleCommon(current_thread, CurrentTime(), trace.Completer());
+  Get()->RescheduleCommon(current_thread, trace.Completer());
 }
 
 void Scheduler::MigrateUnpinnedThreads() {
