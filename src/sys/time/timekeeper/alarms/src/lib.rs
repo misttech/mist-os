@@ -1561,7 +1561,9 @@ async fn schedule_hrtimer(
                 }
                 let driver_error_str = format!("{:?}", e);
                 trace::instant!(c"alarms", c"hrtimer:response:driver_error", trace::Scope::Process, "error" => &driver_error_str[..]);
-                warn!("schedule_hrtimer: hrtimer driver error: {:?}", e);
+                // This is very common. For example, a "timer canceled" event
+                // will result in this code path being hit.
+                debug!("schedule_hrtimer: hrtimer driver error: {:?}", e);
                 command_send
                     .start_send(Cmd::AlarmDriverError { expired_deadline: now, error: e })
                     .unwrap();
