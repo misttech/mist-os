@@ -17,6 +17,7 @@ driver_bind_rules("dwc3_bind") {
     "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.interconnect",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.regulator",
   ]
 }
 

@@ -23,6 +23,7 @@ fuchsia_driver_bind_bytecode(
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.interconnect",
         "@fuchsia_sdk//bind/fuchsia.platform",
+        "@fuchsia_sdk//bind/fuchsia.regulator",
         "@fuchsia_sdk//fidl/fuchsia.hardware.interconnect:fuchsia.hardware.interconnect_bindlib",
         "@fuchsia_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
     ],
