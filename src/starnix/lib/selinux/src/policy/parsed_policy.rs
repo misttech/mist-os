@@ -15,7 +15,7 @@ use super::arrays::{
 use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
 use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
-use super::parser::PolicyCursor;
+use super::parser::{PolicyCursor, PolicyData};
 use super::security_context::{Level, SecurityContext};
 use super::symbols::{
     Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, MlsLevel, Role,
@@ -490,7 +490,7 @@ where
 {
     /// Parses the binary policy stored in `bytes`. It is an error for `bytes` to have trailing
     /// bytes after policy parsing completes.
-    pub(super) fn parse(bytes: PolicyCursor) -> Result<(Self, Vec<u8>), anyhow::Error> {
+    pub(super) fn parse(bytes: PolicyCursor) -> Result<(Self, PolicyData), anyhow::Error> {
         let (policy, tail) =
             <ParsedPolicy as Parse>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
         let num_bytes = tail.len();

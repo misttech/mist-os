@@ -46,6 +46,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::num::{NonZeroU32, NonZeroU64};
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 use zerocopy::{Immutable, IntoBytes};
@@ -283,7 +284,10 @@ impl PolicyFile {
 
 impl BytesFileOps for PolicyFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        self.security_server.get_binary_policy().map(Into::into).ok_or_else(|| errno!(EINVAL))
+        self.security_server
+            .get_binary_policy()
+            .map(|policy| policy.deref().clone().into())
+            .ok_or_else(|| errno!(EINVAL))
     }
 }
 

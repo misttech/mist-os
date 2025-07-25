@@ -8,6 +8,7 @@ use crate::access_vector_cache::{
 use crate::exceptions_config::ExceptionsConfig;
 use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
+use crate::policy::parser::PolicyData;
 
 use crate::policy::{
     parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
@@ -33,7 +34,7 @@ struct ActivePolicy {
     parsed: Arc<Policy>,
 
     /// The binary policy that was previously passed to `load_policy()`.
-    binary: Vec<u8>,
+    binary: PolicyData,
 
     /// Allocates and maintains the mapping between `SecurityId`s (SIDs) and Security Contexts.
     sid_table: SidTable,
@@ -236,7 +237,7 @@ impl SecurityServer {
     }
 
     /// Returns the active policy in binary form, or `None` if no policy has yet been loaded.
-    pub fn get_binary_policy(&self) -> Option<Vec<u8>> {
+    pub fn get_binary_policy(&self) -> Option<PolicyData> {
         self.state.lock().active_policy.as_ref().map(|p| p.binary.clone())
     }
 

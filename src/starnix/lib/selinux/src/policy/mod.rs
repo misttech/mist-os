@@ -16,6 +16,7 @@ mod symbols;
 
 pub use arrays::{FsUseType, XpermsBitmap};
 pub use index::FsUseLabelAndType;
+pub use parser::PolicyCursor;
 pub use security_context::{SecurityContext, SecurityContextError};
 
 use crate as sc;
@@ -24,8 +25,9 @@ use error::ParseError;
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
-use parser::PolicyCursor;
+use parser::PolicyData;
 use std::fmt::{Debug, Display, LowerHex};
+use std::sync::Arc;
 
 use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
@@ -246,11 +248,12 @@ impl IoctlAccessDecision {
 /// parsed output and the binary policy when parsing succeeds, the code will look something like:
 ///
 /// ```rust,ignore
-/// let (unvalidated_policy, _) = parse_policy_by_value(binary_policy.clone())?;
+/// let (unvalidated_policy, _) = parse_policy_by_value(binary_policy)?;
 /// ```
 pub fn parse_policy_by_value(
     binary_policy: Vec<u8>,
-) -> Result<(Unvalidated, Vec<u8>), anyhow::Error> {
+) -> Result<(Unvalidated, PolicyData), anyhow::Error> {
+    let binary_policy = Arc::new(binary_policy);
     let (parsed_policy, binary_policy) =
         ParsedPolicy::parse(PolicyCursor::new(binary_policy)).context("parsing policy")?;
     Ok((Unvalidated(parsed_policy), binary_policy))
@@ -989,7 +992,7 @@ pub(super) mod tests {
             assert_eq!(expectations.expected_handle_unknown, policy.handle_unknown());
 
             // Returned policy bytes must be identical to input policy bytes.
-            assert_eq!(policy_bytes, returned_policy_bytes);
+            assert_eq!(&policy_bytes, returned_policy_bytes.deref());
         }
     }
 

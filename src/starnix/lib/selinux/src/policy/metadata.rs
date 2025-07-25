@@ -196,10 +196,11 @@ mod tests {
 
     use crate::policy::parser::PolicyCursor;
     use crate::policy::testing::{as_parse_error, as_validate_error};
+    use std::sync::Arc;
 
     macro_rules! validate_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
-            let data = $data;
+            let data = Arc::new($data);
             fn check_by_value(
                 $result: Result<(), <$parse_output as crate::policy::Validate>::Error>,
             ) {
@@ -219,8 +220,8 @@ mod tests {
         let mut bytes = [SELINUX_MAGIC.to_le_bytes().as_slice()].concat();
         // One byte short of magic.
         bytes.pop();
-        let bytes = bytes;
-        assert_eq!(None, PolicyCursor::parse::<Magic>(PolicyCursor::new(bytes)),);
+        let data = Arc::new(bytes);
+        assert_eq!(None, PolicyCursor::parse::<Magic>(PolicyCursor::new(data)),);
     }
 
     #[test]
@@ -232,7 +233,8 @@ mod tests {
         let expected_invalid_magic =
             u32::from_le_bytes(bytes.clone().as_slice().try_into().unwrap());
 
-        let (magic, tail) = PolicyCursor::parse::<Magic>(PolicyCursor::new(bytes)).expect("magic");
+        let (magic, tail) =
+            PolicyCursor::parse::<Magic>(PolicyCursor::new(Arc::new(bytes))).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidMagic { found_magic: expected_invalid_magic }),
@@ -262,7 +264,7 @@ mod tests {
     #[test]
     fn missing_signature() {
         let bytes = [(1 as u32).to_le_bytes().as_slice()].concat();
-        match Signature::parse(PolicyCursor::new(bytes)).err().map(as_parse_error) {
+        match Signature::parse(PolicyCursor::new(Arc::new(bytes))).err().map(as_parse_error) {
             Some(ParseError::MissingData { type_name: "u8", type_size: 1, num_bytes: 0 }) => {}
             parse_err => {
                 assert!(false, "Expected Some(MissingData...), but got {:?}", parse_err);
@@ -292,7 +294,8 @@ mod tests {
     fn invalid_policy_version() {
         let bytes = [(POLICYDB_VERSION_MIN - 1).to_le_bytes().as_slice()].concat();
         let (policy_version, tail) =
-            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(bytes)).expect("magic");
+            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(Arc::new(bytes)))
+                .expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {
@@ -303,7 +306,8 @@ mod tests {
 
         let bytes = [(POLICYDB_VERSION_MAX + 1).to_le_bytes().as_slice()].concat();
         let (policy_version, tail) =
-            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(bytes)).expect("magic");
+            PolicyCursor::parse::<PolicyVersion>(PolicyCursor::new(Arc::new(bytes)))
+                .expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {
@@ -316,7 +320,7 @@ mod tests {
     #[test]
     fn config_missing_mls_flag() {
         let bytes = [(!CONFIG_MLS_FLAG).to_le_bytes().as_slice()].concat();
-        match Config::parse(PolicyCursor::new(bytes)).err() {
+        match Config::parse(PolicyCursor::new(Arc::new(bytes))).err() {
             Some(ParseError::ConfigMissingMlsFlag { .. }) => {}
             parse_err => {
                 assert!(false, "Expected Some(ConfigMissingMlsFlag...), but got {:?}", parse_err);
@@ -336,7 +340,7 @@ mod tests {
             Some(ParseError::InvalidHandleUnknownConfigurationBits {
                 masked_bits: CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG | CONFIG_HANDLE_UNKNOWN_REJECT_FLAG
             }),
-            Config::parse(PolicyCursor::new(bytes)).err()
+            Config::parse(PolicyCursor::new(Arc::new(bytes))).err()
         );
     }
 }

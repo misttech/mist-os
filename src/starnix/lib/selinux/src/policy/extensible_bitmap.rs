@@ -281,12 +281,12 @@ mod tests {
     use crate::policy::parser::PolicyCursor;
     use crate::policy::testing::{as_parse_error, as_validate_error};
     use crate::policy::Parse;
-
     use std::borrow::Borrow;
+    use std::sync::Arc;
 
     macro_rules! parse_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
-            let data = $data;
+            let data = Arc::new($data);
             fn check_by_value(
                 $result: Result<
                     ($parse_output, PolicyCursor),
