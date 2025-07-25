@@ -40,6 +40,8 @@ impl SocketTunnelFile {
     }
 }
 impl SocketTunnelSysfsFile {
+    #[allow(dead_code)]
+    // TODO(b/433761169): Remove this dead code.
     pub fn new(socket_label: FsString) -> SocketTunnelSysfsFile {
         SocketTunnelSysfsFile { socket_label: Arc::new(socket_label) }
     }

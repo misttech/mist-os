@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::nanohub_comms_directory::build_nanohub_comms_directory;
+use crate::nanohub_comms_directory::{
+    build_display_comms_directory, build_nanohub_comms_directory,
+};
 use crate::socket_tunnel_file::register_socket_tunnel_device;
 use fidl_fuchsia_hardware_serial as fserial;
 use futures::TryStreamExt;
@@ -27,6 +29,15 @@ pub fn nanohub_procfs_builder(mutator: &SimpleDirectoryMutator) {
 }
 
 pub fn nanohub_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        "/dev/display_comms".into(),
+        "display_comms".into(),
+        "display".into(),
+        build_display_comms_directory,
+    );
+
     struct Descriptor {
         socket_label: FsString,
         dev_node_name: FsString,

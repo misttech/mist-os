@@ -4,6 +4,7 @@
 
 use component_events::events::{EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
+use fake_display_server::{mock_display_server, DisplayRequests};
 use fake_nanohub_server::mock_nanohub_server;
 use fake_socket_tunnel::mock_socket_tunnel;
 use fuchsia_component_test::{
@@ -14,6 +15,7 @@ use {
     fidl_fuchsia_hardware_google_nanohub as fnanohub,
     fidl_fuchsia_hardware_sockettunnel as fsockettunnel,
 };
+mod fake_display_server;
 mod fake_nanohub_server;
 mod fake_socket_tunnel;
 
@@ -27,6 +29,31 @@ async fn main() {
     )
     .await
     .unwrap();
+
+    let display_requests = DisplayRequests::default();
+    let display_server_mock = builder
+        .add_local_child(
+            "fake_display_server",
+            {
+                let display_requests = display_requests.clone();
+                move |handles: LocalComponentHandles| {
+                    Box::pin(mock_display_server(handles, display_requests.clone()))
+                }
+            },
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fnanohub::DisplayDeviceMarker>())
+                .from(&display_server_mock)
+                .to(Ref::child("kernel")),
+        )
+        .await
+        .unwrap();
 
     let nanohub_server_mock = builder
         .add_local_child(
@@ -83,4 +110,7 @@ async fn main() {
     let status = stopped.result().unwrap().status;
     info!(status:?; "sysfs_reader stopped");
     assert_eq!(status, ExitStatus::Clean);
+
+    let display_requests = display_requests.lock().unwrap();
+    assert_eq!(*display_requests, vec!["GetDisplayState", "GetDisplayInfo", "GetDisplaySelect"]);
 }

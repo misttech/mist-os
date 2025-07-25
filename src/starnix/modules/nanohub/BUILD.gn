@@ -36,6 +36,7 @@ rustc_library("nanohub") {
   ]
 
   sources = [
+    "display_sysfs_files.rs",
     "lib.rs",
     "nanohub.rs",
     "nanohub_comms_directory.rs",
@@ -43,6 +44,7 @@ rustc_library("nanohub") {
     "nanohub_socket_file.rs",
     "nanohub_sysfs_files.rs",
     "socket_tunnel_file.rs",
+    "sysfs.rs",
   ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
