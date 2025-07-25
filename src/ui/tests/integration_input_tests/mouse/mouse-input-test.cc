@@ -21,7 +21,6 @@
 #include <fidl/fuchsia.session.scene/cpp/fidl.h>
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
-#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
 #include <fidl/fuchsia.web/cpp/fidl.h>
@@ -295,7 +294,6 @@ class ChromiumInputTest : public MouseInputBase {
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
-                 Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_scenic::Scenic>},
              },
          .source = kTestUIStackRef,
          .targets = {target}},
@@ -315,8 +313,11 @@ class ChromiumInputTest : public MouseInputBase {
             .source = ParentRef(),
             .targets =
                 {
-                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureSignaler},
-                    ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider},
+                    target,
+                    ChildRef{kFontsProvider},
+                    ChildRef{kMemoryPressureSignaler},
+                    ChildRef{kBuildInfoProvider},
+                    ChildRef{kWebContextProvider},
                     ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
                     // FATAL errors.

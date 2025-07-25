@@ -63,8 +63,6 @@ async fn assemble_realm(
     b.route_from_parent::<fidl_fuchsia_scheduler::RoleManagerMarker>(&scenic_test_realm).await;
 
     // Allow the a11y manager to access the capabilities it needs.
-    b.route_to_peer::<fidl_fuchsia_ui_scenic::ScenicMarker>(&scenic_test_realm, &a11y_test_realm)
-        .await;
     b.route_to_peer::<fidl_fuchsia_ui_observation_scope::RegistryMarker>(
         &scenic_test_realm,
         &a11y_test_realm,
@@ -79,8 +77,6 @@ async fn assemble_realm(
     // Allow scene manager to access the capabilities it needs to provide
     // input. All of these capabilities are run hermetically, so they are all
     // routed from peers.
-    b.route_to_peer::<fidl_fuchsia_ui_scenic::ScenicMarker>(&scenic_test_realm, &scene_manager)
-        .await;
     b.route_to_peer::<fidl_fuchsia_ui_composition::FlatlandMarker>(
         &scenic_test_realm,
         &scene_manager,

@@ -13,15 +13,12 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/scenic/lib/scenic/event_reporter.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 
 namespace utils {
 namespace test {
 
 using scenic_impl::ErrorReporter;
-using scenic_impl::EventReporter;
-using scenic_impl::EventReporterWeakPtr;
 
 // Use of this macro allows us to remain consistent with gtest syntax, aiding
 // readability.
@@ -38,44 +35,13 @@ class TestErrorReporter : public ErrorReporter {
   std::vector<std::string> reported_errors_;
 };
 
-class TestEventReporter : public EventReporter {
- public:
-  TestEventReporter() : weak_factory_(this) {}
-
-  const std::vector<fuchsia::ui::scenic::Event>& events() const { return events_; }
-
-  // Clear the accumulated events.  Afterward, the result of |events()| will be empty.
-  void ClearEvents() { events_.clear(); }
-
-  // |EventReporter|
-  EventReporterWeakPtr GetWeakPtr() override { return weak_factory_.GetWeakPtr(); }
-
- private:
-  // |EventReporter|
-  void EnqueueEvent(fuchsia::ui::gfx::Event event) override;
-  void EnqueueEvent(fuchsia::ui::input::InputEvent event) override;
-  void EnqueueEvent(fuchsia::ui::scenic::Command unhandled) override;
-
-  std::vector<fuchsia::ui::scenic::Event> events_;
-
-  fxl::WeakPtrFactory<TestEventReporter> weak_factory_;  // must be last
-};
-
 class ErrorReportingTest : public ::gtest::TestLoopFixture {
  protected:
   ErrorReportingTest();
   virtual ~ErrorReportingTest();
 
   ErrorReporter* error_reporter() const;
-  EventReporter* event_reporter() const;
   std::shared_ptr<ErrorReporter> shared_error_reporter() const;
-  std::shared_ptr<EventReporter> shared_event_reporter() const;
-
-  // Return the events that were enqueued on the EventReporter returned by |event_reporter()|.
-  const std::vector<fuchsia::ui::scenic::Event>& events() const;
-
-  // Clear the accumulated events.  Afterward, the result of |events()| will be empty.
-  void ClearEvents() { event_reporter_->ClearEvents(); }
 
   // Verify that the expected number of errors were reported.
   void ExpectErrorCount(size_t errors_expected) {
@@ -98,7 +64,6 @@ class ErrorReportingTest : public ::gtest::TestLoopFixture {
 
  private:
   std::shared_ptr<TestErrorReporter> error_reporter_;
-  std::shared_ptr<TestEventReporter> event_reporter_;
 
   // Help subclasses remember to call SetUp() and TearDown() on superclass.
   bool setup_called_ = false;

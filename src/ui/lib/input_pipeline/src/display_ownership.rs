@@ -112,7 +112,7 @@ impl DisplayOwnership {
     /// Creates a new handler that watches `display_ownership_event` for events.
     ///
     /// The `display_ownership_event` is assumed to be an [Event] obtained from
-    /// Scenic using `fuchsia.ui.scenic.Scenic/GetDisplayOwnershipEvent`.  There
+    /// `fuchsia.ui.composition.internal.DisplayOwnership/GetEvent`.  There
     /// isn't really a way for this code to know here whether this is true or
     /// not, so implementor beware.
     pub fn new(

@@ -8,7 +8,6 @@
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input3/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
@@ -55,7 +54,6 @@ class CarnelianPixelTest : public ui_testing::PortableUITest {
 
     realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
                                                Protocol{fuchsia::ui::composition::Allocator::Name_},
-                                               Protocol{fuchsia::ui::scenic::Scenic::Name_},
                                                Protocol{fuchsia::ui::input3::Keyboard::Name_}},
                               .source = kTestUIStackRef,
                               .targets = {ChildRef{kCarnelianClient}}});

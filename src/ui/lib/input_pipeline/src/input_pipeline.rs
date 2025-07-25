@@ -133,8 +133,8 @@ impl InputPipelineAssembly {
 
     /// Adds the [DisplayOwnership] to the input pipeline.  The `display_ownership_event` is
     /// assumed to be the Scenic event used to report changes in display ownership, obtained
-    /// by `fuchsia.ui.scenic/Scenic.GetDisplayOwnershipEvent`. This code has no way to check
-    /// whether that invariant is upheld, so this is something that the user will need to
+    /// by `fuchsia.ui.composition.internal.DisplayOwnership/GetEvent`. This code has no way to
+    /// check whether that invariant is upheld, so this is something that the user will need to
     /// ensure.
     pub fn add_display_ownership(
         self,

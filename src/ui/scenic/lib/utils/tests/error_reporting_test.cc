@@ -37,24 +37,6 @@ void TestErrorReporter::ReportError(fuchsia_logging::LogSeverity severity,
   reported_errors_.push_back(error_string);
 }
 
-void TestEventReporter::EnqueueEvent(fuchsia::ui::gfx::Event event) {
-  fuchsia::ui::scenic::Event scenic_event;
-  scenic_event.set_gfx(std::move(event));
-  events_.push_back(std::move(scenic_event));
-}
-
-void TestEventReporter::EnqueueEvent(fuchsia::ui::input::InputEvent event) {
-  fuchsia::ui::scenic::Event scenic_event;
-  scenic_event.set_input(std::move(event));
-  events_.push_back(std::move(scenic_event));
-}
-
-void TestEventReporter::EnqueueEvent(fuchsia::ui::scenic::Command unhandled) {
-  fuchsia::ui::scenic::Event scenic_event;
-  scenic_event.set_unhandled(std::move(unhandled));
-  events_.push_back(std::move(scenic_event));
-}
-
 ErrorReportingTest::ErrorReportingTest() = default;
 
 ErrorReportingTest::~ErrorReportingTest() {
@@ -64,21 +46,9 @@ ErrorReportingTest::~ErrorReportingTest() {
 
 ErrorReporter* ErrorReportingTest::error_reporter() const { return shared_error_reporter().get(); }
 
-EventReporter* ErrorReportingTest::event_reporter() const { return shared_event_reporter().get(); }
-
 std::shared_ptr<ErrorReporter> ErrorReportingTest::shared_error_reporter() const {
   FX_CHECK(setup_called_) << kSetUpTearDownErrorMsg;
   return error_reporter_;
-}
-
-std::shared_ptr<EventReporter> ErrorReportingTest::shared_event_reporter() const {
-  FX_CHECK(setup_called_) << kSetUpTearDownErrorMsg;
-  return event_reporter_;
-}
-
-const std::vector<fuchsia::ui::scenic::Event>& ErrorReportingTest::events() const {
-  FX_CHECK(setup_called_) << kSetUpTearDownErrorMsg;
-  return event_reporter_->events();
 }
 
 void ErrorReportingTest::ExpectErrorAt(size_t pos, const char* expected_error_string) {
@@ -105,14 +75,12 @@ void ErrorReportingTest::SetUp() {
   setup_called_ = true;
 
   error_reporter_ = std::make_shared<TestErrorReporter>();
-  event_reporter_ = std::make_shared<TestEventReporter>();
 }
 
 void ErrorReportingTest::TearDown() {
   teardown_called_ = true;
 
   error_reporter_.reset();
-  event_reporter_.reset();
 }
 
 }  // namespace test
