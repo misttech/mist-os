@@ -1573,56 +1573,6 @@ TEST_F(IntegrationTest, VsyncEventsAfterClientChange) {
   EXPECT_EQ(0u, virtcon_client->state().vsync_count());
 }
 
-TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
-  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
-  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp, {}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-  const display::DriverConfigStamp virtcon_initial_driver_config_stamp =
-      DisplayEngineAppliedConfigStamp();
-
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  // Present an image
-  static constexpr display::ConfigStamp kPrimaryInitialConfigStamp(2);
-  ASSERT_EQ(virtcon_initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kPrimaryInitialConfigStamp,
-                                        primary_client->CreateFullscreenLayerConfig()));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() > virtcon_initial_driver_config_stamp; }));
-
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  TriggerDisplayEngineVsync();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
-  EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
-  EXPECT_EQ(1u, primary_client->state().vsync_count());
-
-  // Send the controller a vsync for an image / a config it won't recognize anymore.
-  //
-  // TODO(https://fxbug.dev/388885807): The comment above describes the behavior
-  // of a misbehaving display engine driver. Consider whether it's suitable to
-  // disconnect the driver, rather than working around the error.
-  const config_stamp_t invalid_banjo_config_stamp = virtcon_initial_driver_config_stamp.ToBanjo();
-  CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
-      primary_client->state().display_id().ToBanjo(), 0u, &invalid_banjo_config_stamp);
-
-  // Send a second vsync, using the config the client applied.
-  ASSERT_EQ(1u, primary_client->state().vsync_count());
-  TriggerDisplayEngineVsync();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
-  EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
-  EXPECT_EQ(2u, primary_client->state().vsync_count());
-}
-
 TEST_F(IntegrationTest, SendVsyncsAfterClientDies) {
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
