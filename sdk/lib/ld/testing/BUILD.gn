@@ -23,6 +23,7 @@ library_headers("headers") {
   ]
   if (is_fuchsia) {
     headers += [
+      "lib/ld/testing/get-test-vmo.h",
       "lib/ld/testing/mock-debugdata.h",
       "lib/ld/testing/mock-loader-service.h",
       "lib/ld/testing/test-processargs.h",
@@ -48,10 +49,14 @@ static_library("ld-testing") {
     ":ld-abi-testing",
   ]
 
-  sources = [ "test-elf-object.cc" ]
+  sources = [
+    "interp.cc",
+    "test-elf-object.cc",
+  ]
   deps = [ "//src/lib/elfldltl/testing" ]
   if (is_fuchsia) {
     sources += [
+      "get-test-vmo.cc",
       "mock-debugdata.cc",
       "mock-loader-service.cc",
       "test-processargs.cc",

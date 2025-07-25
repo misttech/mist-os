@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/testing/diagnostics.h>
-#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-perfect-symbol-filter.h>
 #include <lib/ld/remote-zygote.h>
+#include <lib/ld/testing/get-test-vmo.h>
 #include <lib/ld/testing/test-elf-object.h>
 
 #include <gtest/gtest.h>
@@ -54,12 +54,12 @@ TEST_F(LdRemoteTests, RemoteDynamicLinker) {
   linker.set_abi_stub(ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize));
   ASSERT_TRUE(linker.abi_stub());
 
-  // The main executable is an ELF file in a VMO.  The GetExecutableVmo()
+  // The main executable is an ELF file in a VMO.  The GetExecutableVmoo()
   // method in the test fixture returns the (read-only, executable) zx::vmo for
   // the main executable.  The user of the API must acquire this VMO by their
   // own means.
   zx::vmo exec_vmo;
-  ASSERT_NO_FATAL_FAILURE(exec_vmo = GetExecutableVmo("many-deps"));
+  ASSERT_NO_FATAL_FAILURE(exec_vmo = ld::testing::GetExecutableVmo("many-deps"));
 
   // This makes sure the Needed() call below finds the files in the test
   // packaging correctly.  These are only aspects of the test framework API,
@@ -215,7 +215,7 @@ TEST_F(LdRemoteTests, Preplaced) {
   ASSERT_TRUE(linker.abi_stub());
 
   zx::vmo exec_vmo;
-  ASSERT_NO_FATAL_FAILURE(exec_vmo = GetExecutableVmo("fixed-load-address"));
+  ASSERT_NO_FATAL_FAILURE(exec_vmo = ld::testing::GetExecutableVmo("fixed-load-address"));
 
   Linker::Module::DecodedPtr decoded_executable =
       Linker::Module::Decoded::Create(diag, std::move(exec_vmo), kPageSize);
@@ -271,7 +271,7 @@ TEST_F(LdRemoteTests, SecondSession) {
   ld::RemoteAbiStub<>::Ptr abi_stub = ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize);
   ASSERT_TRUE(abi_stub);
 
-  zx::vmo exec_vmo = GetExecutableVmo("second-session");
+  zx::vmo exec_vmo = ld::testing::GetExecutableVmo("second-session");
   ASSERT_TRUE(exec_vmo);
   ConfigFromInterp(exec_vmo.borrow());
 
@@ -445,7 +445,7 @@ TEST_F(LdRemoteTests, Zygote) {
   using ZygoteLinker = ld::RemoteZygote<>::Linker;
   ZygoteLinker linker{abi_stub};
 
-  zx::vmo exec_vmo = GetExecutableVmo("zygote");
+  zx::vmo exec_vmo = ld::testing::GetExecutableVmo("zygote");
   ASSERT_TRUE(exec_vmo);
   ConfigFromInterp(exec_vmo.borrow());
 
@@ -550,7 +550,7 @@ TEST_F(LdRemoteTests, Zygote) {
   constexpr ZygoteLinker::Soname kSecondaryName{"zygote-secondary"};
   LdsvcPathPrefix(kSecondaryName.str());
   zx::vmo secondary_vmo;
-  ASSERT_NO_FATAL_FAILURE(secondary_vmo = GetExecutableVmo(kSecondaryName.str()));
+  ASSERT_NO_FATAL_FAILURE(secondary_vmo = ld::testing::GetExecutableVmo(kSecondaryName.str()));
   EXPECT_TRUE(secondary_vmo);
   ConfigFromInterp(secondary_vmo.borrow());
   Linker::Module::DecodedPtr secondary =
@@ -663,7 +663,7 @@ TEST_F(LdRemoteTests, LoadedBy) {
   LdsvcPathPrefix("many-deps");
 
   // Decode the main executable.
-  zx::vmo vmo = GetExecutableVmo("many-deps");
+  zx::vmo vmo = ld::testing::GetExecutableVmo("many-deps");
   ASSERT_TRUE(vmo);
   ConfigFromInterp(vmo.borrow());
 
@@ -755,7 +755,7 @@ TEST_F(LdRemoteTests, SymbolFilter) {
   zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
   EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
-  zx::vmo exec_vmo = GetExecutableVmo("symbol-filter");
+  zx::vmo exec_vmo = ld::testing::GetExecutableVmo("symbol-filter");
   ASSERT_TRUE(exec_vmo);
   ConfigFromInterp(exec_vmo.borrow());
 
@@ -836,7 +836,7 @@ void PerfectSymbolFilterTest(Test& test, std::string_view path_prefix) {
           std::filesystem::path("test") / path_prefix / "lib" / path_prefix;
       exec_vmo = elfldltl::testing::GetTestLibVmo(executable_path);
     } else {
-      exec_vmo = Test::GetExecutableVmo(path_prefix);
+      exec_vmo = ld::testing::GetExecutableVmo(path_prefix);
     }
     test.ConfigFromInterp(exec_vmo.borrow());
   }

@@ -7,12 +7,11 @@
 #include <lib/elfldltl/vmo.h>
 #include <lib/fit/defer.h>
 #include <lib/ld/abi.h>
+#include <lib/ld/testing/get-test-vmo.h>
 #include <lib/ld/testing/interp.h>
 #include <lib/ld/testing/test-elf-object.h>
 
 #include <filesystem>
-
-#include "load-tests.h"
 
 namespace ld::testing {
 
@@ -21,22 +20,14 @@ std::string LdLoadZirconLdsvcTestsBase::FindInterp(zx::unowned_vmo vmo) {
 }
 
 std::optional<std::string> LdLoadZirconLdsvcTestsBase::ConfigFromInterp(  //
-    std::filesystem::path interp, std::optional<std::string_view> expected_config) {
-  EXPECT_EQ(interp.filename(), abi::kInterp) << interp;
-
-  if (!interp.has_parent_path()) {
-    EXPECT_EQ(std::nullopt, expected_config) << interp;
-    return std::nullopt;
-  }
-
-  std::filesystem::path prefix = interp.parent_path();
-  std::optional<std::string> config = prefix;
+    const std::filesystem::path& interp, std::optional<std::string_view> expected_config) {
+  std::optional<std::string> config = ld::testing::ConfigFromInterp(interp, expected_config);
   if (expected_config) {
-    EXPECT_EQ(config, expected_config) << interp;
     return std::nullopt;
   }
-
-  mock_.path_prefix_append(prefix);
+  if (config) {
+    mock_.path_prefix_append(*config);
+  }
   return config;
 }
 
@@ -93,6 +84,11 @@ void LdLoadZirconLdsvcTestsBase::NeededViaLoadSet(  //
     LdsvcPathPrefix(set_name.str(), it->second.libprefix);
     ASSERT_NO_FATAL_FAILURE(LdsvcExpectDependency(dep));
   }
+}
+
+void LdLoadZirconLdsvcTestsBase::LdsvcPathPrefix(  //
+    std::string_view executable, std::optional<std::string_view> libprefix) {
+  mock_.set_path_prefix(GetExecutableLibPath(executable, libprefix));
 }
 
 }  // namespace ld::testing

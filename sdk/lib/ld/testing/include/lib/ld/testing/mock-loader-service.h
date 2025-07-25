@@ -103,6 +103,15 @@ class MockLoaderServiceForTest {
     path_prefix_ = std::forward<T>(path);
   }
 
+  template <typename T>
+  void set_path_prefix(std::optional<T> path) {
+    if (path) {
+      path_prefix_ = *std::move(path);
+    } else {
+      path_prefix_ = std::filesystem::path{};
+    };
+  }
+
   // Do std::filesystem::path::append to that prefix unless source is empty.
   void path_prefix_append(const auto& source) {
     if (!source.empty()) {

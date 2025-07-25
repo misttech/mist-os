@@ -7,9 +7,9 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/testing/diagnostics.h>
-#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/elfldltl/vmo.h>
 #include <lib/fdio/spawn.h>
+#include <lib/ld/testing/get-test-vmo.h>
 #include <lib/zx/job.h>
 #include <unistd.h>
 #include <zircon/processargs.h>
