@@ -78,7 +78,6 @@ KCOUNTER(vm_reclaim_incorrect_page, "vm.reclaim.incorrect_page")
 KCOUNTER(vm_reclaim_high_priority, "vm.reclaim.high_priority")
 KCOUNTER(vm_reclaim_pinned, "vm.reclaim.pinned")
 KCOUNTER(vm_reclaim_dirty, "vm.reclaim.dirty")
-KCOUNTER(vm_reclaim_not_pager_backed, "vm.reclaim.not_pager_backed")
 KCOUNTER(vm_reclaim_uncached, "vm.reclaim.uncached")
 
 template <typename T>
@@ -193,7 +192,6 @@ void VmCowPages::DebugDumpReclaimCounters() {
   printf("Failed reclaim high_priority %ld\n", vm_reclaim_high_priority.SumAcrossAllCpus());
   printf("Failed reclaim pinned %ld\n", vm_reclaim_pinned.SumAcrossAllCpus());
   printf("Failed reclaim dirty %ld\n", vm_reclaim_dirty.SumAcrossAllCpus());
-  printf("Failed reclaim not_pager_backed %ld\n", vm_reclaim_not_pager_backed.SumAcrossAllCpus());
   printf("Failed reclaim uncached %ld\n", vm_reclaim_uncached.SumAcrossAllCpus());
 }
 
@@ -6767,10 +6765,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
                                                              EvictionAction eviction_action) {
   canary_.Assert();
   // Without a page source to bring the page back in we cannot even think about eviction.
-  if (!can_evict()) {
-    vm_reclaim_not_pager_backed.Add(1);
-    return ReclaimCounts{};
-  }
+  DEBUG_ASSERT(can_evict());
 
   __UNINITIALIZED DeferredOps deferred(this);
   Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
@@ -6794,6 +6789,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   // We cannot evict the page unless it is clean. If the page is dirty, it will already have been
   // moved to the dirty page queue.
   if (!is_page_clean(page)) {
+    DEBUG_ASSERT(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
     DEBUG_ASSERT(!page->is_loaned());
     vm_reclaim_dirty.Add(1);
     return ReclaimCounts{};
