@@ -47,11 +47,6 @@ const (
 	// Timeout to observe fastbootIdleSignature before proceeding anyway
 	// after hard power cycle
 	fastbootIdleWaitTimeoutSecs = 10
-
-	// One of the possible InstallMode mode types.
-	// Indicates that the target device is idling in fastboot mode.
-	// TOD0(betramlalusha): Remove once NUC11 migration to flashing is complete.
-	fastbootMode = "fastboot"
 )
 
 // DeviceConfig contains the static properties of a target device.
@@ -84,12 +79,13 @@ type DeviceConfig struct {
 	// failure, not papering over it with retries.
 	MaxFlashAttempts int `json:"max_flash_attempts,omitempty"`
 
-	// InstallMode is an optional string that tells botanist what
-	// method to use to install fuchsia. This will be used to help
-	// botanist distinguish between NUC11s that should be paved and
-	// those that will be flashed (if the install_mode is fastboot).
-	// TOD0(betramlalusha): Remove once NUC11 migration to flashing is complete.
-	InstallMode string `json:"install_mode,omitempty"`
+	// TCPFastboot is an optional bool that tells botanist whether
+	// a device idles in TCP fastboot or not. Botanist uses TCP
+	// ffx commands to flash devices in fastboot TCP as opposed to
+	// devices in USB fastboot. This distinction is important for
+	// botanist to determine which commands to use to flash devices
+	// in fastboot.
+	TCPFastboot bool `json:"tcp_fastboot,omitempty"`
 }
 
 // NetworkProperties are the static network properties of a target.
@@ -142,7 +138,7 @@ func NewDevice(ctx context.Context, config DeviceConfig, opts Options) (*Device,
 	}
 	var s io.ReadWriteCloser
 	if config.SerialMux != "" {
-		if config.FastbootSernum == "" && config.InstallMode != fastbootMode {
+		if config.FastbootSernum == "" && !config.TCPFastboot {
 			s, err = serial.NewSocket(ctx, config.SerialMux)
 			if err != nil {
 				return nil, fmt.Errorf("unable to open: %s: %w", config.SerialMux, err)
@@ -275,7 +271,7 @@ func (t *Device) Start(ctx context.Context, args []string, pbPath string, isBoot
 	}
 
 	// Boot Fuchsia.
-	if t.config.FastbootSernum != "" || t.config.InstallMode == fastbootMode {
+	if t.config.FastbootSernum != "" || t.config.TCPFastboot {
 		maxAllowedAttempts := 1
 		if t.config.MaxFlashAttempts > maxAllowedAttempts {
 			maxAllowedAttempts = t.config.MaxFlashAttempts
