@@ -399,28 +399,27 @@ impl DeliveryBlobWriter {
             _ => return Err(FxfsError::Inconsistent.into()),
         };
 
-        let mut deferred_work = None;
-
-        transaction
+        let deferred_work = transaction
             .commit_with_callback(|_| {
                 let handle = self.stage.complete();
-                if let Some((old_id, reservation)) = replacing {
+                self.parent.did_add(&name, None);
+                replacing.and_then(|(old_id, reservation)| {
                     self.parent.did_remove(&name);
                     // If the blob is in the cache, then we need to swap it.
-                    if let Some(old_blob) = handle.owner().cache().get(old_id) {
+                    handle.owner().cache().get(old_id).and_then(|old_blob| {
                         let old_blob = old_blob.into_any().downcast::<FxBlob>().unwrap();
-                        let (new_blob, deferred) = old_blob.overwrite_me(handle, compression_info);
-                        deferred_work = deferred;
+                        let (new_blob, deferred_work) =
+                            old_blob.overwrite_me(handle, compression_info);
                         old_blob.mark_to_be_purged();
                         reservation.commit(&(new_blob as Arc<dyn FxNode>));
-                    }
-                }
-                self.parent.did_add(&name, None);
+                        deferred_work
+                    })
+                })
             })
             .await
             .context("Failed to commit transaction!")?;
-        if let Some(deferred) = deferred_work {
-            deferred.await;
+        if let Some(deferred_work) = deferred_work {
+            deferred_work.await;
         }
         Ok(())
     }
