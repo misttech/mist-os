@@ -340,7 +340,7 @@ pub struct ResolvedInstanceState {
     /// Invariant: the `target` field of all offers must refer to a live dynamic
     /// child (i.e., a member of `live_children`), and if the `source` field
     /// refers to a dynamic child, it must also be live.
-    dynamic_offers: Vec<cm_rust::OfferDecl>,
+    pub dynamic_offers: Vec<cm_rust::OfferDecl>,
 
     /// The as-resolved location of the component: either an absolute component
     /// URL, or (with a package context) a relative path URL.

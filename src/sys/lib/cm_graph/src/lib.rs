@@ -71,6 +71,7 @@ fn ref_to_dependency_node<'a>(ref_: Option<&'a fdecl::Ref>) -> Option<Dependency
 fn get_dependencies_from_uses<'a>(
     strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     decl: &'a fdecl::Component,
+    dynamic_children: &Vec<(&'a str, &'a str)>,
 ) {
     if let Some(uses) = decl.uses.as_ref() {
         for use_ in uses.iter() {
@@ -134,12 +135,8 @@ fn get_dependencies_from_uses<'a>(
                 }
                 Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })) => {
                     let mut nodes = vec![];
-                    if let Some(children) = decl.children.as_ref() {
-                        for child in children {
-                            if let Some(child_name) = child.name.as_ref() {
-                                nodes.push(DependencyNode::Child(child_name, Some(name)));
-                            }
-                        }
+                    for child_name in dynamic_children_in_collection(dynamic_children, &name) {
+                        nodes.push(DependencyNode::Child(child_name, Some(&name)));
                     }
                     nodes
                 }
@@ -507,7 +504,7 @@ pub fn generate_dependency_graph<'a>(
     dynamic_children: &Vec<(&'a str, &'a str)>,
     dynamic_offers: &'a Vec<fdecl::Offer>,
 ) {
-    get_dependencies_from_uses(strong_dependencies, decl);
+    get_dependencies_from_uses(strong_dependencies, decl, dynamic_children);
     get_dependencies_from_offers(strong_dependencies, decl, dynamic_children, dynamic_offers);
     get_dependencies_from_capabilities(strong_dependencies, decl);
     get_dependencies_from_environments(strong_dependencies, decl);

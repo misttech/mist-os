@@ -418,6 +418,12 @@ pub enum ActionError {
         #[from]
         err: DestroyActionError,
     },
+
+    #[error("shutdown: {err}")]
+    ShutdownError {
+        #[from]
+        err: ShutdownActionError,
+    },
 }
 
 impl Explain for ActionError {
@@ -429,6 +435,7 @@ impl Explain for ActionError {
             ActionError::StartError { err } => err.as_zx_status(),
             ActionError::StopError { .. } => zx::Status::INTERNAL,
             ActionError::DestroyError { .. } => zx::Status::INTERNAL,
+            ActionError::ShutdownError { .. } => zx::Status::INTERNAL,
         }
     }
 }
@@ -448,6 +455,7 @@ impl From<ActionError> for fcomponent::Error {
             ActionError::StartError { err } => err.into(),
             ActionError::StopError { err } => err.into(),
             ActionError::DestroyError { err } => err.into(),
+            ActionError::ShutdownError { .. } => fcomponent::Error::Internal,
         }
     }
 }
@@ -939,6 +947,17 @@ impl PartialEq for StopActionError {
             _ => false,
         }
     }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum ShutdownActionError {
+    #[error("child name invalid: {}", err)]
+    InvalidChildName {
+        #[from]
+        err: MonikerError,
+    },
+    #[error("cycles detected in graph")]
+    CyclesDetected {},
 }
 
 #[derive(Debug, Clone, Error)]

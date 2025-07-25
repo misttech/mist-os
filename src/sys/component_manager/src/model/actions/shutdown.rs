@@ -10,14 +10,15 @@ use crate::model::component::ComponentInstance;
 use async_trait::async_trait;
 use cm_rust::{
     CapabilityDecl, ChildRef, CollectionDecl, DependencyType, DictionaryDecl, EnvironmentDecl,
-    ExposeDecl, OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl,
-    OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
-    OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource, SourcePath,
-    StorageDecl, StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDirectoryDecl,
-    UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
+    ExposeDecl, NativeIntoFidl, OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl,
+    OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
+    OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource,
+    SourcePath, StorageDecl, StorageDirectorySource, UseConfigurationDecl, UseDecl,
+    UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
+    UseSource, UseStorageDecl,
 };
 use cm_types::{IterablePath, Name};
-use errors::ActionError;
+use errors::{ActionError, ShutdownActionError};
 use futures::future::select_all;
 use futures::prelude::*;
 use log::*;
@@ -65,12 +66,18 @@ impl Action for ShutdownAction {
     }
 }
 
-async fn shutdown_component(
-    target: ShutdownInfo,
+/// Used to track information during the shutdown process.
+struct ShutdownComponentInfo<'a> {
+    dependency_node: DependencyNode<'a>,
+    component: Arc<ComponentInstance>,
+}
+
+async fn shutdown_component<'a>(
+    target: ShutdownComponentInfo<'a>,
     shutdown_type: ShutdownType,
-) -> Result<ComponentRef, ActionError> {
-    match target.ref_ {
-        ComponentRef::Self_ => {
+) -> Result<DependencyNode<'a>, ActionError> {
+    match target.dependency_node {
+        DependencyNode::Self_ => {
             // TODO: Put `self` in a "shutting down" state so that if it creates
             // new instances after this point, they are created in a shut down
             // state.
@@ -82,30 +89,33 @@ async fn shutdown_component(
             // Shutdown action will block Stop actions, so registering the latter will deadlock.
             target.component.stop_instance_internal(true).await?;
         }
-        ComponentRef::Child(_) => {
+        DependencyNode::Child(..) => {
             ActionsManager::register(target.component, ShutdownAction::new(shutdown_type)).await?;
         }
-        ComponentRef::Capability(_) => {
+        _ => {
             // This is just an intermediate node that exists to track dependencies on storage
             // and dictionary capabilities from Self, which aren't associated with the running
             // program. Nothing to do.
         }
     }
 
-    Ok(target.ref_.clone())
+    Ok(target.dependency_node.clone())
 }
 
-/// Structure which holds bidirectional capability maps used during the
-/// shutdown process.
+/// Contains all the information necessary to shut down a single component
+/// instance. The shutdown process is recursive: shutting down a component requires
+/// shutting down all of its children first.
 struct ShutdownJob {
-    /// A map from users of capabilities to the components that provide those
-    /// capabilities
-    target_to_sources: HashMap<ComponentRef, Vec<ComponentRef>>,
-    /// A map from providers of capabilities to those components which use the
-    /// capabilities
-    source_to_targets: HashMap<ComponentRef, ShutdownInfo>,
     /// The type of shutdown being performed. For debug purposes.
     shutdown_type: ShutdownType,
+    /// The declaration of the component being shut down.
+    component_decl: fdecl::Component,
+    /// A reference-counted pointer to the component instance being shut down.
+    instance: Arc<ComponentInstance>,
+    /// A map of the live children of the `instance`.
+    children: HashMap<ChildName, Arc<ComponentInstance>>,
+    /// Dynamic offers from a parent to a collection that this instance may be a part of.
+    dynamic_offers: Vec<fdecl::Offer>,
 }
 
 /// ShutdownJob encapsulates the logic and state require to shutdown a component.
@@ -118,147 +128,59 @@ impl ShutdownJob {
         state: &ResolvedInstanceState,
         shutdown_type: ShutdownType,
     ) -> ShutdownJob {
-        // `dependency_map` represents the dependency relationships between the
-        // nodes in this realm (the children, and the component itself).
-        // `dependency_map` maps server => clients (a.k.a. provider => consumers,
-        // or source => targets)
-        let dependency_map = process_component_dependencies(state);
-        let mut source_to_targets: HashMap<ComponentRef, ShutdownInfo> = HashMap::new();
+        let component_decl: fdecl::Component = state.decl().to_owned().into();
 
-        for (source, targets) in dependency_map {
-            let component = match &source {
-                ComponentRef::Self_ => instance.clone(),
-                ComponentRef::Child(moniker) => {
-                    state.get_child(&moniker).expect("component not found in children").clone()
-                }
-                ComponentRef::Capability(_) => instance.clone(),
-            };
+        let dynamic_offers: Vec<fdecl::Offer> =
+            state.dynamic_offers.iter().map(|g| g.clone().native_into_fidl()).collect();
 
-            source_to_targets.insert(
-                source.clone(),
-                ShutdownInfo { ref_: source, dependents: targets, component },
-            );
-        }
-        // `target_to_sources` is the inverse of `source_to_targets`, and maps a target to all of
-        // its dependencies. This inverse mapping gives us a way to do quick lookups when updating
-        // `source_to_targets` as we shutdown components in execute().
-        let mut target_to_sources: HashMap<ComponentRef, Vec<ComponentRef>> = HashMap::new();
-        for provider in source_to_targets.values() {
-            // All listed siblings are ones that depend on this child
-            // and all those siblings must stop before this one
-            for consumer in &provider.dependents {
-                // Make or update a map entry for the consumer that points to the
-                // list of siblings that offer it capabilities
-                target_to_sources
-                    .entry(consumer.clone())
-                    .or_insert(vec![])
-                    .push(provider.ref_.clone());
-            }
-        }
-        let new_job = ShutdownJob { source_to_targets, target_to_sources, shutdown_type };
+        let children = state.children.clone();
+
+        let new_job = ShutdownJob {
+            shutdown_type,
+            component_decl,
+            instance: instance.clone(),
+            children,
+            dynamic_offers,
+        };
         return new_job;
     }
 
-    /// Perform shutdown of the Component that was used to create this ShutdownJob A Component must
-    /// wait to shut down until all its children are shut down.  The shutdown procedure looks at
-    /// the children, if any, and determines the dependency relationships of the children.
+    /// Perform shutdown of the Component that was used to create this ShutdownJob.
     pub async fn execute(&mut self) -> Result<(), ActionError> {
-        // Relationship maps are maintained to track dependencies. A map is
-        // maintained both from a Component to its dependents and from a Component to
-        // that Component's dependencies. With this dependency tracking, the
-        // children of the Component can be shut down progressively in dependency
-        // order.
-        //
-        // The progressive shutdown of Component is performed in this order:
-        // Note: These steps continue until the shutdown process is no longer
-        // asynchronously waiting for any shut downs to complete.
-        //   * Identify the one or more Component that have no dependents
-        //   * A shutdown action is set to the identified components. During the
-        //     shut down process, the result of the process is received
-        //     asynchronously.
-        //   * After a Component is shut down, the Component are removed from the list
-        //     of dependents of the Component on which they had a dependency.
-        //   * The list of Component is checked again to see which Component have no
-        //     remaining dependents.
+        let dynamic_offers = self.dynamic_offers.clone();
 
-        // Look for any children that have no dependents
-        let mut stop_targets = vec![];
+        let mut dynamic_children = vec![];
+        dynamic_children.extend(
+            self.children.keys().filter_map(|key| {
+                key.collection().map(|coll| (key.name().as_str(), coll.as_str()))
+            }),
+        );
 
-        #[allow(clippy::needless_collect)] // avoid overlapping mutable and immutable borrows
-        for component_ref in
-            self.source_to_targets.keys().map(|key| key.clone()).collect::<Vec<_>>()
-        {
-            let no_dependents = {
-                let info =
-                    self.source_to_targets.get(&component_ref).expect("key disappeared from map");
-                info.dependents.is_empty()
-            };
-            if no_dependents {
-                stop_targets.push(
-                    self.source_to_targets
-                        .remove(&component_ref)
-                        .expect("key disappeared from map"),
-                );
-            }
-        }
+        let deps = process_deps(&self.component_decl, &dynamic_children, &dynamic_offers);
 
-        let mut futs = vec![];
-        // Continue while we have new stop targets or unfinished futures
-        while !stop_targets.is_empty() || !futs.is_empty() {
-            for target in stop_targets.drain(..) {
-                futs.push(Box::pin(shutdown_component(target, self.shutdown_type)));
-            }
+        let sorted_map = deps.topological_sort().map_err(|_| ActionError::ShutdownError {
+            err: ShutdownActionError::CyclesDetected {},
+        })?;
 
-            let (component_ref, _, remaining) = select_all(futs).await;
-            futs = remaining;
+        for dependency_node in sorted_map.into_iter() {
+            let component = match dependency_node {
+                DependencyNode::Child(name, coll) => {
+                    let moniker = &ChildName::try_new(name, coll)
+                        .map_err(|err| ShutdownActionError::InvalidChildName { err })?;
 
-            let component_ref = component_ref?;
-
-            // Look up the dependencies of the component that stopped
-            match self.target_to_sources.remove(&component_ref) {
-                Some(sources) => {
-                    for source in sources {
-                        let ready_to_stop = {
-                            if let Some(info) = self.source_to_targets.get_mut(&source) {
-                                info.dependents.remove(&component_ref);
-                                // Have all of this components dependents stopped?
-                                info.dependents.is_empty()
-                            } else {
-                                // The component that provided a capability to
-                                // the stopped component doesn't exist or
-                                // somehow already stopped. This is unexpected.
-                                panic!(
-                                    "The component '{:?}' appears to have stopped before its \
-                                     dependency '{:?}'",
-                                    component_ref, source
-                                );
-                            }
-                        };
-
-                        // This components had zero remaining dependents
-                        if ready_to_stop {
-                            stop_targets.push(
-                                self.source_to_targets
-                                    .remove(&source)
-                                    .expect("A key that was just available has disappeared."),
-                            );
-                        }
+                    let child_instance_res = self.children.get(moniker);
+                    if child_instance_res.is_none() {
+                        continue;
                     }
+                    child_instance_res.unwrap().clone()
                 }
-                None => {
-                    // Oh well, component didn't have any dependencies
-                }
-            }
+                _ => self.instance.clone(),
+            };
+            let target: ShutdownComponentInfo<'_> =
+                ShutdownComponentInfo { dependency_node, component };
+            shutdown_component(target, self.shutdown_type).await?;
         }
 
-        // We should have stopped all children, if not probably there is a
-        // dependency cycle
-        if !self.source_to_targets.is_empty() {
-            panic!(
-                "Something failed, all children should have been removed! {:?}",
-                self.source_to_targets
-            );
-        }
         Ok(())
     }
 }
@@ -467,6 +389,7 @@ pub fn process_deps<'a>(
             strong_dependencies.add_edge(DependencyNode::Self_, dependency_node);
         }
     }
+    strong_dependencies.add_node(DependencyNode::Self_);
     strong_dependencies
 }
 
@@ -2575,9 +2498,9 @@ mod tests {
         .topological_sort()
         .unwrap();
         let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Self_,
             DependencyNode::Child("dynamic_child1", Some("coll")),
             DependencyNode::Child("dynamic_child2", Some("coll")),
-            DependencyNode::Self_,
         ];
         assert_eq!(ans, sorted_map)
     }
