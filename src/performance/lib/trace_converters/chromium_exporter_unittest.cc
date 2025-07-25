@@ -11,6 +11,8 @@
 #include <gtest/gtest.h>
 #include <trace-reader/records.h>
 
+#include "rapidjson/filewritestream.h"
+
 namespace {
 
 TEST(ChromiumExporterTest, ValidUtf8) {
@@ -25,7 +27,7 @@ TEST(ChromiumExporterTest, ValidUtf8) {
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    std::ofstream output("/tmp/test-trace-valid-utf8.json");
+    const std::filesystem::path& output = "/tmp/test-trace-valid-utf8.json";
     tracing::ChromiumExporter exporter(output);
     exporter.ExportRecord(record);
   }
@@ -62,8 +64,8 @@ TEST(ChromiumExporterTest, UnknownLargeBlobEventDropped) {
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    std::ofstream output("/tmp/test-trace-unknow-blob.json");
-    tracing::ChromiumExporter exporter(output);
+    std::string file_name = "/tmp/test-trace-unknow-blob.json";
+    tracing::ChromiumExporter exporter(file_name);
     exporter.ExportRecord(record);
   }
 
@@ -92,7 +94,7 @@ TEST(ChromiumExporterTest, UnknownLargeBlobAttachmentDropped) {
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    std::ofstream output("/tmp/test-trace-dropped-blob.json");
+    const std::filesystem::path& output = "/tmp/test-trace-dropped-blob.json";
     tracing::ChromiumExporter exporter(output);
     exporter.ExportRecord(record);
   }
@@ -124,8 +126,8 @@ TEST(ChromiumExporterTest, FidlBlobExported) {
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    std::ofstream output("/tmp/test-trace-fidl-blob.json");
-    tracing::ChromiumExporter exporter(output);
+    const std::filesystem::path& file_name = "/tmp/test-trace-fidl-blob.json";
+    tracing::ChromiumExporter exporter(file_name);
     exporter.ExportRecord(record);
   }
 
@@ -148,8 +150,8 @@ TEST(ChromiumExporterTest, EmptyTrace) {
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    std::ofstream output("/tmp/test-trace-empty-trace.json");
-    tracing::ChromiumExporter exporter(output);
+    const std::filesystem::path& file_name = "/tmp/test-trace-empty-trace.json";
+    tracing::ChromiumExporter exporter(file_name);
   }
 
   std::stringstream buffer;
@@ -188,7 +190,7 @@ TEST(ChromiumExporterTest, LastBranchRecords) {
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
   {
-    std::ofstream output("/tmp/test-trace-large-branch.json");
+    const std::filesystem::path& output = "/tmp/test-trace-large-branch.json";
     tracing::ChromiumExporter exporter(output);
     exporter.ExportRecord(record);
   }

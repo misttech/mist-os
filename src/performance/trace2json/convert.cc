@@ -63,24 +63,7 @@ bool ConvertTrace(ConvertSettings settings) {
     return false;
   }
 
-  std::unique_ptr<std::ofstream> output_file_stream;
-  std::ofstream* out_stream;
-
-  if (!settings.output_file_name.empty()) {
-    output_file_stream = std::make_unique<std::ofstream>(
-        settings.output_file_name.c_str(),
-        std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-    if (!output_file_stream->is_open()) {
-      FX_LOGS(ERROR) << "Error opening output file.";
-      return false;
-    }
-    out_stream = static_cast<std::ofstream*>(output_file_stream.get());
-  } else {
-    FX_LOGS(ERROR) << "Stdout is not supported. Please specify --output-file";
-    return false;
-  }
-
-  tracing::FuchsiaTraceParser parser(out_stream);
+  tracing::FuchsiaTraceParser parser(settings.output_file_name);
   if (!parser.ParseComplete(in_stream)) {
     return false;
   }

@@ -13,7 +13,7 @@
 
 #include <trace-reader/reader.h>
 
-#include "rapidjson/ostreamwrapper.h"
+#include "rapidjson/filewritestream.h"
 #include "rapidjson/writer.h"
 #include "src/performance/lib/perfmon/writer.h"
 
@@ -21,8 +21,7 @@ namespace tracing {
 
 class ChromiumExporter {
  public:
-  explicit ChromiumExporter(std::unique_ptr<std::ofstream> stream_out);
-  explicit ChromiumExporter(std::ofstream& out);
+  explicit ChromiumExporter(const std::filesystem::path& out_path);
   ~ChromiumExporter();
 
   enum class Pass {
@@ -50,10 +49,11 @@ class ChromiumExporter {
   // Writes argument data. Assumes it is already within an
   // "args" key object.
   void WriteArgs(const std::vector<trace::Argument>& arguments);
-
-  std::unique_ptr<std::ofstream> stream_out_;
-  rapidjson::OStreamWrapper wrapper_;
-  rapidjson::Writer<rapidjson::OStreamWrapper> writer_;
+  static constexpr size_t WRITE_BUFFER_SIZE_IN_BYTES = 65536;
+  char write_buffer_[WRITE_BUFFER_SIZE_IN_BYTES];
+  FILE* fp_;
+  rapidjson::FileWriteStream wrapper_;
+  rapidjson::Writer<rapidjson::FileWriteStream> writer_;
 
   // Scale factor to get to microseconds.
   // By default ticks are in nanoseconds.

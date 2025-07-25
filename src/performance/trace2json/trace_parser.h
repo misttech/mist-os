@@ -10,6 +10,7 @@
 
 #include <array>
 #include <ostream>
+#include <string>
 #include <vector>
 
 #include <trace-reader/reader.h>
@@ -20,7 +21,7 @@ namespace tracing {
 
 class FuchsiaTraceParser {
  public:
-  explicit FuchsiaTraceParser(std::ofstream* out);
+  explicit FuchsiaTraceParser(const std::filesystem::path& out);
   ~FuchsiaTraceParser();
 
   bool ParseComplete(std::istream*);

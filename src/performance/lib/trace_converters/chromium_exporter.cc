@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/types.h>
 
+#include <filesystem>
 #include <fstream>
 #include <string_view>
 #include <utility>
@@ -87,16 +88,17 @@ std::string CleanString(std::string_view str) {
 
 }  // namespace
 
-ChromiumExporter::ChromiumExporter(std::unique_ptr<std::ofstream> stream_out)
-    : stream_out_(std::move(stream_out)), wrapper_(*stream_out_), writer_(wrapper_) {
+ChromiumExporter::ChromiumExporter(const std::filesystem::path& out_path)
+    : fp_(std::fopen(out_path.c_str(), "wb")),
+      wrapper_(fp_, write_buffer_, sizeof(write_buffer_)),
+      writer_(wrapper_) {
   Start();
 }
 
-ChromiumExporter::ChromiumExporter(std::ofstream& out) : wrapper_(out), writer_(wrapper_) {
-  Start();
+ChromiumExporter::~ChromiumExporter() {
+  Stop();
+  std::fclose(fp_);
 }
-
-ChromiumExporter::~ChromiumExporter() { Stop(); }
 
 void ChromiumExporter::Start() {
   writer_.StartObject();

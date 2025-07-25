@@ -272,7 +272,7 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
     record_consumer = [](trace::Record record) {};
     error_handler = [](std::string_view error) {};
   } else {
-    exporter_ = std::make_unique<ChromiumExporter>(std::move(out_stream));
+    exporter_ = std::make_unique<ChromiumExporter>(std::move(options_.output_file_name));
 
     bytes_consumer = [](const unsigned char* buffer, size_t n_bytes) {};
     record_consumer = [this](trace::Record record) { exporter_->ExportRecord(record); };

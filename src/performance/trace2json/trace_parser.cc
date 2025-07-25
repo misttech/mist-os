@@ -7,14 +7,14 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/assert.h>
 
-#include <fstream>
+#include <utility>
 
 #include "src/performance/lib/trace_converters/chromium_exporter.h"
 
 namespace tracing {
 
-FuchsiaTraceParser::FuchsiaTraceParser(std::ofstream* out)
-    : exporter_(*out),
+FuchsiaTraceParser::FuchsiaTraceParser(const std::filesystem::path& out)
+    : exporter_(out),
       reader_([this](trace::Record record) { exporter_.ExportRecord(record); },
               [](std::string_view error) { FX_LOGS(ERROR) << error; }) {}
 
