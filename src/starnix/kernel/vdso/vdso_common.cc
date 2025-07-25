@@ -5,18 +5,13 @@
 #include "vdso_common.h"
 
 #include <errno.h>
+#include <lib/fasttime/time.h>
 #include <sys/syscall.h>
 #include <zircon/time.h>
 
+#include "vdso_calculate_time.h"
 #include "vdso_platform.h"
 
-#if !defined(__arm__)
-#include <lib/fasttime/time.h>
-
-#include "vdso_calculate_time.h"
-#endif
-
-#if !defined(__arm__)
 int64_t calculate_monotonic_time_nsec() {
   zx_vaddr_t time_values_addr = reinterpret_cast<zx_vaddr_t>(&time_values);
   return fasttime::compute_monotonic_time(time_values_addr);
@@ -41,11 +36,9 @@ static void to_nanoseconds(uint64_t time_in_ns, time_t* tv_sec, long int* tv_nse
     *tv_nsec = static_cast<long int>(tv_nsec64);
   }
 }
-#endif
 
 int clock_gettime_impl(int clock_id, timespec* tp) {
   int ret = 0;
-#if !defined(__arm__)
   if ((clock_id == CLOCK_MONOTONIC) || (clock_id == CLOCK_MONOTONIC_RAW) ||
       (clock_id == CLOCK_MONOTONIC_COARSE)) {
     int64_t monot_nsec = calculate_monotonic_time_nsec();
@@ -86,10 +79,6 @@ int clock_gettime_impl(int clock_id, timespec* tp) {
     ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
                   reinterpret_cast<intptr_t>(tp), 0);
   }
-#else
-  ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id), reinterpret_cast<intptr_t>(tp),
-                0);
-#endif
   return ret;
 }
 
@@ -125,7 +114,6 @@ int clock_getres_impl(int clock_id, timespec* tp) {
 }
 
 int gettimeofday_impl(timeval* tv, struct timezone* tz) {
-#if !defined(__arm__)
   if (tz != nullptr) {
     int ret = syscall(__NR_gettimeofday, reinterpret_cast<intptr_t>(tv),
                       reinterpret_cast<intptr_t>(tz), 0);
@@ -138,10 +126,11 @@ int gettimeofday_impl(timeval* tv, struct timezone* tz) {
   if (utc_nsec != kUtcInvalid) {
     // TODO(https://fxbug.dev/380431929): Are we going to lose any necessary precision?
     to_nanoseconds(utc_nsec, &tv->tv_sec, &tv->tv_usec);
-    tv->tv_usec /= 1'000;
+    // Perform the division unsigned to reuse the same helpers (arm).
+    uint64_t usec = tv->tv_usec / 1'000;
+    tv->tv_usec = static_cast<long>(usec);
     return 0;
   }
-#endif
 
   // The syscall is used instead of endlessly retrying to acquire the seqlock. This gives the
   // writer thread of the seqlock a chance to run, even if it happens to have a lower priority

@@ -693,15 +693,12 @@ loadable_module("vdso") {
     sources += [ "vdso/vdso_arm_eabi.cc" ]
   }
 
-  deps = [ "//zircon/system/public" ]
-
-  if (current_cpu != "arm") {
-    deps += [
-      ":vdso_calculate_utc",
-      "//zircon/kernel/lib/fasttime:headers",
-      "//zircon/system/ulib/affine",
-    ]
-  }
+  deps = [
+    ":vdso_calculate_utc",
+    "//zircon/kernel/lib/fasttime:headers",
+    "//zircon/system/public",
+    "//zircon/system/ulib/affine",
+  ]
 
   output_name = "libvdso"
   configs += [ ":vdso_config" ]
@@ -711,7 +708,11 @@ loadable_module("vdso") {
     configs -= [ "//build/config/linux:implicit-host-libs" ]
   }
 
-  exclude_toolchain_tags = [ "instrumented" ]
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+    "instrumented",
+  ]
 }
 
 resource("vdso_data") {
