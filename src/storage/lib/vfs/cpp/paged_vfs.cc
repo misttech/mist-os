@@ -120,6 +120,14 @@ zx::result<> PagedVfs::ReportPagerError(const zx::vmo& node_vmo, uint64_t offset
   return zx::make_result(pager_.op_range(ZX_PAGER_OP_FAIL, node_vmo, offset, length, err));
 }
 
+zx::result<zx_pager_vmo_stats_t> PagedVfs::QueryVmoStats(const zx::vmo& node_vmo,
+                                                         uint32_t options) {
+  zx_pager_vmo_stats_t vmo_stats;
+  zx_status_t status = zx_pager_query_vmo_stats(pager_.get(), node_vmo.get(), options, &vmo_stats,
+                                                sizeof(zx_pager_vmo_stats_t));
+  return zx::make_result(status, vmo_stats);
+}
+
 zx::result<PagedVfs::VmoCreateInfo> PagedVfs::CreatePagedNodeVmo(PagedVnode* node, uint64_t size,
                                                                  uint32_t options) {
   // Register this node with a unique ID to associated it with pager requests.

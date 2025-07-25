@@ -72,6 +72,11 @@ class PagedVfs : public ManagedVfs {
   zx::result<> WritebackEnd(const zx::vmo& node_vmo, uint64_t offset, uint64_t length)
       __TA_EXCLUDES(vfs_lock_);
 
+  // Checks if the VMO has been modified since the VMO was created or the last time this function
+  // was called with the option `ZX_PAGER_RESET_VMO_STATS`.
+  zx::result<zx_pager_vmo_stats_t> QueryVmoStats(const zx::vmo& node_vmo, uint32_t options)
+      __TA_EXCLUDES(vfs_lock_);
+
   // Allocates a VMO of the given size associated with the given PagedVnode. VMOs for use with
   // the pager must be allocated by this method so the page requests are routed to the correct
   // PagedVnode.
@@ -115,11 +120,6 @@ class PagedVfs : public ManagedVfs {
   // Returns the number of VMOs registered for notifications. Used for testing.
   size_t GetRegisteredPagedVmoCount() const __TA_EXCLUDES(vfs_lock_)
       __TA_EXCLUDES(live_nodes_lock_);
-
- protected:
-  // Provides direct access to the underlying zx::pager. This is only exposed so clients can make
-  // pager syscalls that haven't been stabilized yet.
-  const zx::pager& pager_for_next_vdso_syscalls() const { return pager_; }
 
  private:
   std::unique_ptr<PagerThreadPool> pager_pool_;  // Threadsafe, does not need locking.
