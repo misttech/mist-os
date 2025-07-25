@@ -56,9 +56,7 @@ class FakeDirectory final {
     if (!fsl::VmoFromString(data, &file_vmo)) {
       return nullptr;
     }
-    return std::make_unique<vfs::VmoFile>(std::move(file_vmo.vmo()), file_vmo.size(),
-                                          vfs::VmoFile::WriteMode::kWritable,
-                                          vfs::VmoFile::DefaultSharingMode::kCloneCow);
+    return std::make_unique<vfs::VmoFile>(std::move(file_vmo.vmo()), file_vmo.size());
   }
 
   // Pseudo-directory to serve the resources from.
