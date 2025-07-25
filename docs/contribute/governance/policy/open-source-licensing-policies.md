@@ -175,6 +175,8 @@ The following are the approved licenses for production target devices:
 *   Creative Commons Attribution 4.0 International license at
     [https://creativecommons.org/licenses/by/4.0/legalcode](https://creativecommons.org/licenses/by/4.0/legalcode)
 
+*   Intel-ACPI license, specifically the text at [https://github.com/acpica/acpica/blob/master/LICENSE#L3-L107](https://github.com/acpica/acpica/blob/master/LICENSE#L3-L107)
+
 Code not under one of these licenses and not explicitly granted an exemption is
 not permitted in the production target.
 
