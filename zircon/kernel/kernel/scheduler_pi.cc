@@ -909,7 +909,7 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       }
 
       DEBUG_ASSERT(scheduler.weight_total_ >= SchedWeight{0});
-      DEBUG_ASSERT(scheduler.total_deadline_utilization_ >= SchedUtilization{0});
+      DEBUG_ASSERT(scheduler.power_level_control_.normalized_utilization() >= SchedUtilization{0});
 
 #if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
       static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep, now.mono_time);

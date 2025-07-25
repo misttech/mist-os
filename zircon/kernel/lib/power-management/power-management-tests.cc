@@ -199,15 +199,15 @@ bool SchedulerFlushesPendingControlRequests() {
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.
-  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetActivePowerLevel();
   auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
     scheduler.ExchangePowerDomain(previous_domian);
     if (restore_power_level.has_value()) {
-      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+      DEBUG_ASSERT(scheduler.UpdateActivePowerLevel(*restore_power_level).is_ok());
     }
   });
   ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
-  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
+  ASSERT_OK(scheduler.UpdateActivePowerLevel(kMaxPowerLevel).status_value());
 
   // Request a transition to each active power level.
   for (size_t count = 0;
@@ -227,7 +227,7 @@ bool SchedulerFlushesPendingControlRequests() {
     // Simulate the controller acking the transition. Failing to ack the transition will cause this
     // loop to get stuck in FakePowerLevelController::Wait if the requested transition matches the
     // current power level (i.e. kMaxPowerLevel set above), since redundant requests are dropped.
-    ASSERT_OK(scheduler.SetPowerLevel(power_level).status_value());
+    ASSERT_OK(scheduler.UpdateActivePowerLevel(power_level).status_value());
 
     controller->request().reset();
   }
@@ -260,15 +260,15 @@ bool SchedulerElidesPendingControlRequests() {
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.
-  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetActivePowerLevel();
   auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
     scheduler.ExchangePowerDomain(previous_domian);
     if (restore_power_level.has_value()) {
-      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+      DEBUG_ASSERT(scheduler.UpdateActivePowerLevel(*restore_power_level).is_ok());
     }
   });
   ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
-  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
+  ASSERT_OK(scheduler.UpdateActivePowerLevel(kMaxPowerLevel).status_value());
 
   for (size_t i = 0; i < 150; ++i) {
     scheduler.RequestPowerLevelForTesting(kHighPowerLevel);
@@ -307,15 +307,15 @@ bool SchedulerCanPendControlRequestsInIrqContext() {
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.
-  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetActivePowerLevel();
   auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
     scheduler.ExchangePowerDomain(previous_domian);
     if (restore_power_level.has_value()) {
-      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+      DEBUG_ASSERT(scheduler.UpdateActivePowerLevel(*restore_power_level).is_ok());
     }
   });
   ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
-  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
+  ASSERT_OK(scheduler.UpdateActivePowerLevel(kMaxPowerLevel).status_value());
 
   auto timer_handler = +[](Timer* timer, zx_instant_mono_t now, void* arg) {
     Scheduler* scheduler = static_cast<Scheduler*>(arg);
@@ -364,15 +364,15 @@ bool SchedulerCanPendControlRequestsAcrossCpus() {
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.
-  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetActivePowerLevel();
   auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
     scheduler.ExchangePowerDomain(previous_domian);
     if (restore_power_level.has_value()) {
-      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+      DEBUG_ASSERT(scheduler.UpdateActivePowerLevel(*restore_power_level).is_ok());
     }
   });
   ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
-  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
+  ASSERT_OK(scheduler.UpdateActivePowerLevel(kMaxPowerLevel).status_value());
 
   // Move the test thread to a different CPU than the target scheduler serves.
   const cpu_mask_t temporary_affinity =

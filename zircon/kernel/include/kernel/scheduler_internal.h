@@ -85,7 +85,7 @@ inline void Scheduler::UpdateTotalExpectedRuntime(SchedDuration delta_ns) {
   total_expected_runtime_ns_ += delta_ns;
   DEBUG_ASSERT(total_expected_runtime_ns_ >= 0);
   const SchedDuration scaled_ns = ScaleUp(total_expected_runtime_ns_);
-  exported_total_expected_runtime_ns_ = scaled_ns;
+  exported_queue_time_ns_ = scaled_ns;
   LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(), ("Demand", scaled_ns.raw_value()));
 }
 
@@ -93,12 +93,11 @@ inline void Scheduler::UpdateTotalExpectedRuntime(SchedDuration delta_ns) {
 // exported value is scaled by the relative performance factor of the CPU to
 // account for performance differences in the estimate.
 inline void Scheduler::UpdateTotalDeadlineUtilization(SchedUtilization delta) {
-  total_deadline_utilization_ += delta;
-  DEBUG_ASSERT(total_deadline_utilization_ >= 0);
-  const SchedUtilization scaled = ScaleUp(total_deadline_utilization_);
-  exported_total_deadline_utilization_ = scaled;
+  const SchedUtilization utilization = power_level_control_.UpdateNormalizedUtilization(delta);
+  DEBUG_ASSERT(utilization >= 0);
+  exported_deadline_utilization_ = utilization;
   LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(),
-                       ("Utilization", ffl::Round<uint64_t>(scaled * 1000)));
+                       ("Utilization", ffl::Round<uint64_t>(utilization * 1000)));
 }
 
 inline void Scheduler::TraceTotalRunnableThreads() const {

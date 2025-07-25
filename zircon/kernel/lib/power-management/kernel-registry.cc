@@ -77,7 +77,7 @@ zx::result<> KernelPowerDomainRegistry::UpdateDomainPowerLevel(
         const cpu_num_t cpu_num = static_cast<cpu_num_t>(j + cpu_offset);
         ZX_DEBUG_ASSERT(cpu_num < arch_max_num_cpus());
 
-        zx::result result = percpu::Get(cpu_num).scheduler.SetPowerLevel(*power_level);
+        zx::result result = percpu::Get(cpu_num).scheduler.UpdateActivePowerLevel(*power_level);
         ZX_ASSERT_MSG(result.is_ok(), "Unexpected error setting power level: %d",
                       result.status_value());
       }

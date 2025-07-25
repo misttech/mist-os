@@ -153,38 +153,40 @@ RecurringCallback g_threadload_callback([]() {
       "   sysc"
       " ints (hw  tmr tmr_cb)"
       " ipi (rs  gen)"
-      " pwr (active   idle)\n");
+      "     watts\n");
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
     const Thread& idle_power_thread = percpu::Get(i).idle_power_thread.thread();
     struct cpu_stats stats;
 
-    SingleChainLockGuard thread_guard{IrqSaveOption, idle_power_thread.get_lock(),
-                                      CLT_TAG("g_threadload_callback")};
-    using optional_duration = ktl::optional<zx_duration_mono_t>;
-    auto maybe_idle_time = Scheduler::RunInLockedScheduler(i, [&]() -> optional_duration {
-      // dont display time for inactive cpus
-      if (!Scheduler::PeekIsActive(i)) {
-        return ktl::nullopt;
-      }
+    ktl::optional<zx_duration_mono_t> maybe_idle_time;
+    {
+      SingleChainLockGuard thread_guard{IrqSaveOption, idle_power_thread.get_lock(),
+                                        CLT_TAG("g_threadload_callback")};
 
-      {
+      maybe_idle_time = Scheduler::RunInLockedScheduler(i, [&]() -> ktl::optional<zx_duration_t> {
+        // Don't display time for inactive cpus.
+        if (!Scheduler::PeekIsActive(i)) {
+          return ktl::nullopt;
+        }
+
+        // The scheduler queue lock synchronizes this copy.
         const auto& percpu = percpu::Get(i);
         concurrent::WellDefinedCopyFrom<concurrent::SyncOpt::None, alignof(decltype(stats))>(
             &stats, &percpu.stats, sizeof(stats));
-      }
 
-      // if the cpu is currently idle, add the time since it went idle up until now to the idle
-      // counter
-      if (Scheduler::PeekIsIdle(i)) {
-        ChainLockTransaction::AssertActive();
-        idle_power_thread.get_lock().AssertHeld();
-        zx_duration_mono_t recent_idle_time = zx_time_sub_time(
-            current_mono_time(), idle_power_thread.scheduler_state().last_started_running());
-        return zx_duration_add_duration(stats.idle_time, recent_idle_time);
-      } else {
+        // If the cpu is currently idle, add the time since it went idle up until now to the idle
+        // counter.
+        if (Scheduler::PeekIsIdle(i)) {
+          ChainLockTransaction::AssertActive();
+          idle_power_thread.get_lock().AssertHeld();
+          zx_duration_mono_t recent_idle_time = zx_time_sub_time(
+              current_mono_time(), idle_power_thread.scheduler_state().last_started_running());
+          return zx_duration_add_duration(stats.idle_time, recent_idle_time);
+        }
+
         return stats.idle_time;
-      }
-    });
+      });
+    }
 
     if (!maybe_idle_time.has_value()) {
       continue;
@@ -196,18 +198,15 @@ RecurringCallback g_threadload_callback([]() {
         (ZX_SEC(1) > delta_time) ? zx_duration_sub_duration(ZX_SEC(1), delta_time) : 0;
     zx_duration_mono_t busypercent = zx_duration_mul_int64(busy_time, 10000) / ZX_SEC(1);
 
-    const uint64_t kNanosToMillis = 1'000'000u;
-    const uint64_t kRoundNanosToMillis = 500'000u;
-
     const uint64_t active_energy_delta_nj =
         stats.active_energy_consumption_nj - old_stats[i].active_energy_consumption_nj;
-    const uint64_t active_power_mw =
-        (active_energy_delta_nj + kRoundNanosToMillis) / kNanosToMillis / ZX_SEC(1);
-
     const uint64_t idle_energy_delta_nj =
         stats.idle_energy_consumption_nj - old_stats[i].idle_energy_consumption_nj;
-    const uint64_t idle_power_mw =
-        (idle_energy_delta_nj + kRoundNanosToMillis) / kNanosToMillis / ZX_SEC(1);
+
+    const uint64_t kNanosToMicros = 1'000;
+    const uint64_t kRoundToMicros = 500;
+    const uint64_t total_power_uw =
+        (active_energy_delta_nj + idle_energy_delta_nj + kRoundToMicros) / kNanosToMicros;
 
     printf(
         "%3u"
@@ -216,7 +215,7 @@ RecurringCallback g_threadload_callback([]() {
         " %7lu"
         " %8lu %4lu %6lu"
         " %8lu %4lu"
-        " %8u.%03u %2u.%03u"
+        " %3u.%06u"
         "\n",
         i, static_cast<uint>(busypercent / 100), static_cast<uint>(busypercent % 100),
         stats.context_switches - old_stats[i].context_switches, stats.yields - old_stats[i].yields,
@@ -224,9 +223,8 @@ RecurringCallback g_threadload_callback([]() {
         stats.syscalls - old_stats[i].syscalls, stats.interrupts - old_stats[i].interrupts,
         stats.timer_ints - old_stats[i].timer_ints, stats.timers - old_stats[i].timers,
         stats.reschedule_ipis - old_stats[i].reschedule_ipis,
-        stats.generic_ipis - old_stats[i].generic_ipis, static_cast<uint>(active_power_mw / 1000),
-        static_cast<uint>(active_power_mw % 1000), static_cast<uint>(idle_power_mw / 1000),
-        static_cast<uint>(idle_power_mw % 1000));
+        stats.generic_ipis - old_stats[i].generic_ipis, static_cast<uint>(total_power_uw / 1000000),
+        static_cast<uint>(total_power_uw % 1000000));
 
     old_stats[i] = stats;
     last_idle_time[i] = idle_time;
@@ -372,7 +370,7 @@ static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags) {
       Scheduler& scheduler = percpu->scheduler;
 
       fbl::RefPtr domain = scheduler.GetPowerDomainForTesting();
-      ktl::optional<uint8_t> current_power_level = scheduler.GetPowerLevel();
+      ktl::optional<uint8_t> current_power_level = scheduler.GetActivePowerLevel();
       ktl::optional<uint64_t> active_power_coefficient_nw =
           scheduler.GetActivePowerCoefficientNwForTesting();
       ktl::optional<uint64_t> max_idle_power_coefficient_nw =
@@ -437,18 +435,23 @@ static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags) {
       const uint8_t power_level = static_cast<uint8_t>(argv[3].u);
 
       if (is_set_level) {
-        const zx::result result = scheduler.SetPowerLevel(power_level);
+        const zx::result result = scheduler.UpdateActivePowerLevel(power_level);
         if (result.is_error()) {
           printf("Failed to set power level: %d\n", result.status_value());
         } else {
           printf("Set CPU %u to power level %u\n", cpu, power_level);
         }
       } else if (is_req_level) {
-        scheduler.RequestPowerLevelForTesting(power_level);
-        printf("CPU %u request for power level %u posted.\n", cpu, power_level);
+        if (scheduler.RequestPowerLevelForTesting(power_level)) {
+          printf("CPU %u request for power level %u posted.\n", cpu, power_level);
+        } else {
+          printf("CPU %u request for power level %u ignored.\n", cpu, power_level);
+          goto getlevel;
+        }
       }
     } else if (is_get_level) {
-      ktl::optional<uint8_t> maybe_power_level = scheduler.GetPowerLevel();
+    getlevel:
+      ktl::optional<uint8_t> maybe_power_level = scheduler.GetActivePowerLevel();
       if (maybe_power_level.has_value()) {
         printf("CPU %u at power level %u\n", cpu, maybe_power_level.value());
       } else {

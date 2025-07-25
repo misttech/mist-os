@@ -368,9 +368,10 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   //
   // Uses relaxed semantics, since the value does not need to synchronize with other memory accesses
   // and innaccuracy is acceptable.
-  uint64_t total_normalized_utilization() const {
+  int64_t total_normalized_utilization() const {
     return total_normalized_utilization_.load(std::memory_order_relaxed);
   }
+
   // Handler for transitions where the target level's control interface is not kernel handled.
   const fbl::RefPtr<PowerLevelController>& controller() const { return controller_; }
 
@@ -401,7 +402,7 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   const uint32_t id_;
   const EnergyModel energy_model_;
 
-  std::atomic<uint64_t> total_normalized_utilization_{0};
+  std::atomic<int64_t> total_normalized_utilization_{0};
   const fbl::RefPtr<PowerLevelController> controller_ = nullptr;
 
   std::atomic<bool> scheduler_control_enabled_ = false;

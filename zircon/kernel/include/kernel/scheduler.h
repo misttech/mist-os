@@ -161,16 +161,20 @@ class Scheduler {
   // is associated with.
   size_t cluster() const { return cluster_; }
 
-  // Returns the lock-free value of the predicted queue time for the CPU this
-  // scheduler instance is associated with.
-  SchedDuration predicted_queue_time_ns() const {
-    return exported_total_expected_runtime_ns_.load();
+  // Returns the lock-free value of the estimated queue time for the CPU this
+  // scheduler is associated with.
+  SchedDuration exported_queue_time_ns() const { return exported_queue_time_ns_.load(); }
+
+  // Returns the lock-free value of the estimated deadline utilization for the
+  // CPU this scheduler is associated with.
+  SchedUtilization exported_deadline_utilization() const {
+    return exported_deadline_utilization_.load();
   }
 
-  // Returns the lock-free value of the predicted deadline utilization for the
-  // CPU this scheduler instance is associated with.
-  SchedUtilization predicted_deadline_utilization() const {
-    return exported_total_deadline_utilization_.load();
+  // Returns the lock-free value of the performance scale for the CPU this
+  // scheduler is associated with.
+  SchedPerformanceScale exported_performance_scale() const {
+    return exported_performance_scale_.load();
   }
 
   // Returns the performance scale of the CPU this scheduler instance is
@@ -428,20 +432,23 @@ class Scheduler {
 
   // Updates the current power level for this CPU with the value reported by the power level
   // controller. Called by kernel tests and sys_system_set_processor_power_state.
-  zx::result<> SetPowerLevel(uint8_t power_level) TA_EXCL(queue_lock_) {
+  zx::result<> UpdateActivePowerLevel(uint8_t power_level) TA_EXCL(queue_lock_) {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
-    return power_level_control_.UpdatePowerLevel(power_level);
+    return power_level_control_.UpdateActivePowerLevel(power_level);
   }
 
   // Returns the current active power level, if any.
-  ktl::optional<uint8_t> GetPowerLevel() const TA_EXCL(queue_lock_) {
+  ktl::optional<uint8_t> GetActivePowerLevel() const TA_EXCL(queue_lock_) {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
-    return power_level_control_.GetPowerLevel();
+    return power_level_control_.active_power_level();
   }
+
   // Sends a power level request through this scheduler's power level controller for testing. This
   // method is called from thread and IRQ context to ensure that the underlying machinery can be
   // safely called within Block, Unblock, and other scheduling operations.
-  void RequestPowerLevelForTesting(uint8_t power_level) TA_EXCL(queue_lock_);
+  //
+  // Returns true if the request was sent, false otherwise.
+  bool RequestPowerLevelForTesting(uint8_t power_level) TA_EXCL(queue_lock_);
 
   // Returns the current power domain for this scheduler instance.
   fbl::RefPtr<PowerDomain> GetPowerDomainForTesting() TA_EXCL(queue_lock_) {
@@ -454,6 +461,7 @@ class Scheduler {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
     return power_level_control_.active_power_coefficient_nw();
   }
+
   // Returns the max idle power coefficient.
   ktl::optional<uint64_t> GetMaxIdlePowerCoefficientNwForTesting() const TA_EXCL(queue_lock_) {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
@@ -833,7 +841,7 @@ class Scheduler {
   // Attempts to steal work from other busy CPUs. Returns nullptr if no work was
   // stolen, otherwise returns a pointer to the stolen thread that is partially
   // associated with the local Scheduler instance.
-  DequeueResult StealWork(SchedTime now, SchedPerformanceScale scale_up_factor)
+  DequeueResult StealWork(SchedTime now, SchedPerformanceScale performance_scale)
       TA_REQ(chainlock_transaction_token) TA_EXCL(queue_lock_);
 
   // Returns the time that the next deadline task will become eligible or infinite
@@ -1297,11 +1305,6 @@ class Scheduler {
   TA_GUARDED(queue_lock_)
   SchedDuration total_expected_runtime_ns_{0};
 
-  // The sum of the worst case utilization of all active deadline threads on
-  // this CPU.
-  TA_GUARDED(queue_lock_)
-  SchedUtilization total_deadline_utilization_{0};
-
 #if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   // Scheduling period in which every runnable task executes once in units of
   // minimum granularity.
@@ -1323,18 +1326,22 @@ class Scheduler {
   // Performance scale of this CPU relative to the highest performance CPU. This
   // value is initially determined from the system topology, when available, and
   // by userspace performance/thermal management at runtime.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_ { 1 };
   TA_GUARDED(queue_lock_)
-  RelaxedAtomic<SchedPerformanceScale> performance_scale_reciprocal_{SchedPerformanceScale{1}};
+  SchedPerformanceScale performance_scale_{1};
+
+  TA_GUARDED(queue_lock_)
+  SchedPerformanceScale performance_scale_reciprocal_{1};
 
   // Performance scale requested by userspace. The operational performance scale
   // is updated to this value (possibly adjusted for the minimum allowed value)
   // on the next reschedule, after the current thread's accounting is updated.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_ { 1 };
+  TA_GUARDED(queue_lock_)
+  SchedPerformanceScale pending_user_performance_scale_{1};
 
   // Default performance scale, determined from the system topology, when
   // available.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_ { 1 };
+  TA_GUARDED(queue_lock_)
+  SchedPerformanceScale default_performance_scale_{1};
 
   // The CPU this scheduler instance is associated with.
   // NOTE: This member is not initialized to prevent clobbering the value set
@@ -1365,8 +1372,9 @@ class Scheduler {
   // CPUs.
   // TODO(eieio): Look at cache line alignment for these members to optimize
   // cache performance.
-  RelaxedAtomic<SchedDuration> exported_total_expected_runtime_ns_{SchedNs(0)};
-  RelaxedAtomic<SchedUtilization> exported_total_deadline_utilization_{SchedUtilization{0}};
+  RelaxedAtomic<SchedDuration> exported_queue_time_ns_{SchedNs(0)};
+  RelaxedAtomic<SchedUtilization> exported_deadline_utilization_{SchedUtilization{0}};
+  RelaxedAtomic<SchedPerformanceScale> exported_performance_scale_{SchedPerformanceScale{1}};
 
   // The thread which ran just before this thread was scheduled.  Used by
   // Scheduler::LockHandoff to release the previous thread's lock after a
@@ -1389,14 +1397,23 @@ class Scheduler {
       return power_state_.SetOrUpdateDomain(ktl::move(domain));
     }
 
-    // Returns the current active power level.
-    ktl::optional<uint8_t> GetPowerLevel() const { return power_state_.active_power_level(); }
-
     // Called by power level controller server (e.g. the userspace component servicing the kernel
     // power level control interface) for the domain associated with this scheduler to acknowledge
     // that a power level request has been completed.
-    zx::result<> UpdatePowerLevel(uint8_t power_level) {
+    zx::result<> UpdateActivePowerLevel(uint8_t power_level) {
       return power_state_.UpdateActivePowerLevel(power_level);
+    }
+
+    // Returns true if the given power level is a valid active power level.
+    bool IsValidActivePowerLevel(uint8_t power_level) const {
+      return power_state_.IsValidActivePowerLevel(power_level);
+    }
+
+    // Updates the normalized utilization for this processor and the total normalized utilization
+    // for the domain it belongs to with the given delta. Returns the updated utilization for this
+    // processor.
+    SchedUtilization UpdateNormalizedUtilization(SchedUtilization delta) {
+      return SchedUtilization::FromRaw(power_state_.UpdateUtilization(delta.raw_value()));
     }
 
     // Called by the scheduler to request a power level change for the domain associated with this
@@ -1412,15 +1429,25 @@ class Scheduler {
       }
     }
 
-    // Gets the power domain associated with this scheduler.
+    // Returns the power domain associated with this scheduler.
     const fbl::RefPtr<PowerDomain>& domain() const { return power_state_.domain(); }
 
+    // Returns the current active power level.
+    ktl::optional<uint8_t> active_power_level() const { return power_state_.active_power_level(); }
+
+    // Returns the power coefficient for the current active power level.
     uint64_t active_power_coefficient_nw() const {
       return power_state_.active_power_coefficient_nw();
     }
 
+    // Returns the power coefficient of the maximum idle power level (e.g. clock gating).
     uint64_t max_idle_power_coefficient_nw() const {
       return power_state_.max_idle_power_coefficient_nw();
+    }
+
+    // Returns the normalized utilization of this processor.
+    SchedUtilization normalized_utilization() const {
+      return SchedUtilization::FromRaw(power_state_.normalized_utilization());
     }
 
    private:

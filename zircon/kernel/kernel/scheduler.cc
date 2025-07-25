@@ -310,9 +310,9 @@ void Scheduler::Dump(FILE* output_target, bool queue_state_only) {
             "\n\tmono_ref=%" PRId64 " var_ref=%" PRId64 " slope=%s\n",
             Format(weight_total_).c_str(), Format(min_weight).c_str(), fair_period_.raw_value(),
             runnable_task_count_, total_expected_runtime_ns_.raw_value(),
-            Format(total_deadline_utilization_).c_str(), Format(min_utilization).c_str(),
-            now.raw_value(), variable_now.raw_value(), monotonic_eligible_time.raw_value(),
-            variable_eligible_time.raw_value(),
+            Format(power_level_control_.normalized_utilization()).c_str(),
+            Format(min_utilization).c_str(), now.raw_value(), variable_now.raw_value(),
+            monotonic_eligible_time.raw_value(), variable_eligible_time.raw_value(),
             fair_affine_transform_.monotonic_reference_time().raw_value(),
             fair_affine_transform_.variable_reference_time().raw_value(),
             Format(fair_affine_transform_.slope()).c_str());
@@ -322,7 +322,8 @@ void Scheduler::Dump(FILE* output_target, bool queue_state_only) {
             " tutil=%s\n",
             Format(weight_total_).c_str(), runnable_fair_task_count_, runnable_deadline_task_count_,
             virtual_time_.raw_value(), scheduling_period_grans_.raw_value(),
-            total_expected_runtime_ns_.raw_value(), Format(total_deadline_utilization_).c_str());
+            total_expected_runtime_ns_.raw_value(),
+            Format(power_level_control_.normalized_utilization()).c_str());
 #endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
     if (queue_state_only) {
@@ -669,10 +670,9 @@ Scheduler::DequeueResult Scheduler::DequeueThread(
   // across processors, it should be unnecessary to latch the value. Change the
   // annotations to allow this.
   DequeueResult result;
-  SchedPerformanceScale scale_up_factor = performance_scale_reciprocal_.load();
-  queue_guard.CallUnlocked([&] {
+  queue_guard.CallUnlocked([&, performance_scale = performance_scale_] {
     ChainLockTransaction::AssertActive();
-    result = StealWork(now, scale_up_factor);
+    result = StealWork(now, performance_scale);
   });
 
   if (result) {
@@ -686,7 +686,7 @@ Scheduler::DequeueResult Scheduler::DequeueThread(
 // queues. Returns a pointer to the stolen thread that is now associated with
 // the local Scheduler instance, or nullptr is no work was stolen.
 Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
-                                              SchedPerformanceScale scale_up_factor) {
+                                              SchedPerformanceScale performance_scale) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "StealWork");
 
   const cpu_num_t current_cpu = this_cpu();
@@ -700,7 +700,7 @@ Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
 
       // Only steal across clusters if the target is above the load threshold.
       if (cluster() != entry.cluster &&
-          scheduler->predicted_queue_time_ns() <= kInterClusterThreshold) {
+          scheduler->exported_queue_time_ns() <= kInterClusterThreshold) {
         continue;
       }
 
@@ -815,15 +815,16 @@ Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
       };
 
       // Returns true if the given thread in the run queue meets the criteria to
-      // run on this CPU.
-      const auto deadline_predicate = [check_affinity, scale_up_factor](const auto& iter) -> bool {
+      // run on this CPU.  Don't attempt to steal any threads which are
+      // currently in the process of being scheduled.
+      const auto deadline_predicate = [check_affinity,
+                                       performance_scale](const auto& iter) -> bool {
         const Thread& thread = *iter;
         MarkHasOwnedThreadAccess(thread);
 
         const SchedulerState& state = thread.scheduler_state();
         const EffectiveProfile& ep = state.effective_profile_;
-        const SchedUtilization scaled_utilization = ep.deadline().utilization * scale_up_factor;
-        const bool is_scheduleable = scaled_utilization <= kThreadUtilizationMax;
+        const bool is_scheduleable = ep.deadline().utilization <= performance_scale;
 
         return check_affinity(thread) && is_scheduleable && !thread.has_migrate_fn();
       };
@@ -1308,109 +1309,106 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
              current_cpu, starting_cpu, active_mask, &thread, &search_set, search_set.cpu_count(),
              search_set.const_iterator().data());
 
-  // A combination of a scheduler and its latched scale-up factor.  Whenever we
-  // consider a scheduler, we observe its current scale factor exactly once, so
-  // that we can be sure that the value remains consistent for all of the
-  // comparisons we do in |compare| and |is_sufficient| (below).  Note that we
-  // skip obtaining the queue lock when we observe the performance scale factor.
-  //
-  // Finding a target CPU is a best effort heuristic, and we would really rather
-  // not be fighting over scheduler's queue lock while we do it.  Other places
-  // in the scheduler code use the queue lock to protect these scale factors,
-  // but here it should be sufficient to simply atomically load the scale
-  // factor, which is also atomically written during its only update location in
-  // RescheduleCommon, which avoids formal C++ data races.  All of these atomic
-  // accesses are relaxed, however, meaning that their values have no defined
-  // ordering relationship relative to other non-locked queue values (like
-  // predicted queue time).
-  struct CandidateQueue {
-    CandidateQueue() = default;
-    explicit CandidateQueue(const Scheduler* s)
-        : queue{s}, scale_up_factor{LatchScaleUpFactor(s)} {}
+  // Latches a potential candidate placement for the thread and essential values
+  // for making comparisons with other candidates. These values are exposed as
+  // relaxed atomics to avoid queue lock contention, since these values are
+  // subject to change as soon as the queue lock is dropped, and the comparisons
+  // only require approximate consistency. Latching the values ensures that each
+  // comparison of a particular candidate with other candidates uses the same
+  // values.
+  class Candidate {
+   public:
+    Candidate() = default;
 
-    const Scheduler* queue{nullptr};
-    SchedPerformanceScale scale_up_factor{1};
+    // Latches the performance scale, utilization, and queue time from the given
+    // using relaxed atomic reads.
+    explicit Candidate(const Scheduler* scheduler)
+        : scheduler_{scheduler},
+          performance_scale_{scheduler->exported_performance_scale()},
+          deadline_utilization_{scheduler->exported_deadline_utilization()},
+          queue_time_ns_{scheduler->exported_queue_time_ns()} {}
 
-    static SchedPerformanceScale LatchScaleUpFactor(const Scheduler* s)
-        TA_NO_THREAD_SAFETY_ANALYSIS {
-      return s->performance_scale_reciprocal_.load();
-    }
+    Candidate(const Candidate&) = default;
+    Candidate& operator=(const Candidate&) = default;
+
+    explicit operator bool() const { return scheduler_ != nullptr; }
+
+    const Scheduler* scheduler() const { return scheduler_; }
+    SchedPerformanceScale performance_scale() const { return performance_scale_; }
+    SchedUtilization deadline_utilization() const { return deadline_utilization_; }
+    SchedDuration queue_time_ns() const { return queue_time_ns_; }
+
+   private:
+    const Scheduler* scheduler_{nullptr};
+    SchedPerformanceScale performance_scale_{0};
+    SchedUtilization deadline_utilization_{0};
+    SchedDuration queue_time_ns_{0};
   };
 
-  // Compares candidate queues and returns true if |queue_a| is a better
-  // alternative than |queue_b|. This is used by the target selection loop to
-  // determine whether the next candidate is better than the current target.
-  const auto compare = [&thread_state](const CandidateQueue& a, const CandidateQueue& b) {
-    const SchedDuration a_predicted_queue_time_ns = a.queue->predicted_queue_time_ns();
-    const SchedDuration b_predicted_queue_time_ns = b.queue->predicted_queue_time_ns();
+  const bool is_fair = IsFairThread(thread);
+  const SchedUtilization thread_deadline_utilization =
+      is_fair ? SchedUtilization{0} : thread_state.effective_profile().deadline().utilization;
 
+  // Compares candidates and returns true if alternate_target is a better
+  // alternative than current_target for placing the thread.
+  const auto compare = [is_fair](const Candidate& alternate_target,
+                                 const Candidate& current_target) {
     ktrace::Scope trace_compare = LOCAL_KTRACE_BEGIN_SCOPE(
-        DETAILED, "compare", ("predicted queue time a", Round<uint64_t>(a_predicted_queue_time_ns)),
-        ("predicted queue time b", Round<uint64_t>(b_predicted_queue_time_ns)));
+        DETAILED, "compare", ("Alternate target queue time", alternate_target.queue_time_ns()),
+        ("Current target queue time", current_target.queue_time_ns()));
 
-    const EffectiveProfile& ep = thread_state.effective_profile_;
-    if (ep.IsFair()) {
+    if (is_fair) {
       // CPUs in the same logical cluster are considered equivalent in terms of
       // cache affinity. Choose the least loaded among the members of a cluster.
-      if (a.queue->cluster() == b.queue->cluster()) {
-        ktl::pair a_pair{a_predicted_queue_time_ns, a.queue->predicted_deadline_utilization()};
-        ktl::pair b_pair{b_predicted_queue_time_ns, b.queue->predicted_deadline_utilization()};
-        return a_pair < b_pair;
+      if (alternate_target.scheduler()->cluster() == current_target.scheduler()->cluster()) {
+        ktl::tuple alternate_criteria{alternate_target.queue_time_ns(),
+                                      alternate_target.deadline_utilization()};
+        ktl::tuple current_criteria{current_target.queue_time_ns(),
+                                    current_target.deadline_utilization()};
+        return alternate_criteria < current_criteria;
       }
 
       // Only consider crossing cluster boundaries if the current candidate is
       // above the threshold.
-      return b_predicted_queue_time_ns > kInterClusterThreshold &&
-             a_predicted_queue_time_ns < b_predicted_queue_time_ns;
-    } else {
-      const SchedUtilization utilization = ep.deadline().utilization;
-      const SchedUtilization scaled_utilization_a = utilization * a.scale_up_factor;
-      const SchedUtilization scaled_utilization_b = utilization * b.scale_up_factor;
-
-      ktl::pair a_pair{scaled_utilization_a, a_predicted_queue_time_ns};
-      ktl::pair b_pair{scaled_utilization_b, b_predicted_queue_time_ns};
-      ktl::pair a_prime{a.queue->predicted_deadline_utilization(), a_pair};
-      ktl::pair b_prime{b.queue->predicted_deadline_utilization(), b_pair};
-      return a_prime < b_prime;
+      return current_target.queue_time_ns() > kInterClusterThreshold &&
+             alternate_target.queue_time_ns() < current_target.queue_time_ns();
     }
+
+    ktl::tuple alternate_criteria{alternate_target.deadline_utilization(),
+                                  alternate_target.queue_time_ns()};
+    ktl::tuple current_criteria{current_target.deadline_utilization(),
+                                current_target.queue_time_ns()};
+    return alternate_criteria < current_criteria;
   };
 
   // Determines whether the current target is sufficiently good to terminate the
   // selection loop.
-  const auto is_sufficient = [&thread_state](const CandidateQueue& q) {
-    const SchedDuration candidate_queue_time_ns = q.queue->predicted_queue_time_ns();
-
+  const auto is_sufficient = [is_fair,
+                              thread_deadline_utilization](const Candidate& current_target) {
     ktrace::Scope trace_is_sufficient = LOCAL_KTRACE_BEGIN_SCOPE(
-        DETAILED, "is_sufficient",
-        ("intra cluster threshold", Round<uint64_t>(kIntraClusterThreshold)),
-        ("candidate q.queue time", Round<uint64_t>(candidate_queue_time_ns)));
+        DETAILED, "is_sufficient", ("intra cluster threshold", kIntraClusterThreshold),
+        ("candidate queue time", current_target.queue_time_ns()));
 
-    const EffectiveProfile& ep = thread_state.effective_profile_;
-    if (ep.IsFair()) {
-      return candidate_queue_time_ns <= kIntraClusterThreshold;
+    if (is_fair) {
+      return current_target.queue_time_ns() <= kIntraClusterThreshold;
     }
 
-    const SchedUtilization predicted_utilization = q.queue->predicted_deadline_utilization();
-    const SchedUtilization utilization = ep.deadline().utilization;
-    const SchedUtilization scaled_utilization = utilization * q.scale_up_factor;
-
-    return candidate_queue_time_ns <= kIntraClusterThreshold &&
-           scaled_utilization <= kThreadUtilizationMax &&
-           predicted_utilization + scaled_utilization <= kCpuUtilizationLimit;
+    return current_target.queue_time_ns() <= kIntraClusterThreshold &&
+           current_target.deadline_utilization() + thread_deadline_utilization <=
+               current_target.performance_scale();
   };
 
   // Loop over the search set for CPU the task last ran on to find a suitable
   // target.
   cpu_num_t target_cpu = INVALID_CPU;
-  CandidateQueue target_queue{};
+  Candidate target_queue{};
 
   for (const auto& entry : search_set.const_iterator()) {
     const cpu_num_t candidate_cpu = entry.cpu;
     const bool candidate_available = available_mask & cpu_num_to_mask(candidate_cpu);
-    const CandidateQueue candidate_queue{Get(candidate_cpu)};
+    const Candidate candidate_queue{Get(candidate_cpu)};
 
-    if (candidate_available &&
-        (target_queue.queue == nullptr || compare(candidate_queue, target_queue))) {
+    if (candidate_available && (!target_queue || compare(candidate_queue, target_queue))) {
       target_cpu = candidate_cpu;
       target_queue = candidate_queue;
 
@@ -1529,19 +1527,28 @@ void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
   // consumption.
   const SchedDuration active_processor_time_ns = actual_runtime_ns - idle_processor_time_ns;
 
+  using FractionalSeconds = ffl::Fixed<uint64_t, 20>;
+  using Energy = ffl::Fixed<uint64_t, 0>;
+
   cpu_stats& stats = percpu::GetCurrent().stats;
 
-  // The dynamic and leakage contributions are split between the active and max
-  // idle (e.g. clock gating idle) power coefficients, respectively.
+  // The energy consumption over the active interval is computed as:
+  //
+  // E_active = (P_dyamic + P_leak) * dt_active
+  //
+  // P_dynamic is the power coefficient of the current active power level.
+  // P_leak is the power coefficient of the maximum idle power level, typically
+  // corresponding to clock gating, where only leakage power is significant.
   if (power_level_control_.active_power_coefficient_nw() > 0) {
-    const uint64_t active_energy_consumption_nj =
-        (power_level_control_.active_power_coefficient_nw() +
-         power_level_control_.max_idle_power_coefficient_nw()) *
-        active_processor_time_ns.raw_value();
+    const FractionalSeconds active_interval_s = active_processor_time_ns / ZX_SEC(1);
+    const uint64_t active_power_nw = power_level_control_.active_power_coefficient_nw() +
+                                     power_level_control_.max_idle_power_coefficient_nw();
 
-    stats.active_energy_consumption_nj += active_energy_consumption_nj;
+    const Energy active_energy_consumption_nj = active_power_nw * active_interval_s;
+
+    stats.active_energy_consumption_nj += active_energy_consumption_nj.raw_value();
     current_thread->scheduler_state().estimated_energy_consumption_nj +=
-        active_energy_consumption_nj;
+        active_energy_consumption_nj.raw_value();
   }
 
   // TODO(https://fxbug.dev/377583571): Select the correct power coefficient
@@ -1549,9 +1556,12 @@ void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
   // coefficient corresponds to the most general arch idle state (e.g. WFI,
   // halt).
   if (power_level_control_.max_idle_power_coefficient_nw() > 0 && idle_processor_time_ns > 0) {
-    const uint64_t idle_energy_consumption_nj =
-        power_level_control_.max_idle_power_coefficient_nw() * idle_processor_time_ns.raw_value();
-    stats.idle_energy_consumption_nj += idle_energy_consumption_nj;
+    const FractionalSeconds idle_interval_s = idle_processor_time_ns / ZX_SEC(1);
+    const uint64_t idle_power_nw = power_level_control_.max_idle_power_coefficient_nw();
+
+    const Energy idle_energy_consumption_nj = idle_power_nw * idle_interval_s;
+
+    stats.idle_energy_consumption_nj += idle_energy_consumption_nj.raw_value();
   }
 
   LOCAL_KTRACE_COUNTER_TIMESTAMP(
@@ -1959,11 +1969,11 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, EndTraceCallback 
   // TODO(eieio): Shed load when total utilization is above kCpuUtilizationLimit.
   const bool performance_scale_updated = performance_scale_ != pending_user_performance_scale_;
   if (performance_scale_updated) {
-    performance_scale_ = pending_user_performance_scale_;
+    exported_performance_scale_ = performance_scale_ = pending_user_performance_scale_;
     performance_scale_reciprocal_ = 1 / performance_scale_;
   }
 
-  // Flush any pending power level request.
+  // Send any pending power level request.
   power_level_control_.SendPendingPowerLevelRequest();
 
   SetIdle(next_thread->IsIdle());
@@ -3337,6 +3347,7 @@ void Scheduler::InitializePerformanceScale(SchedPerformanceScale scale)
   performance_scale_ = scale;
   default_performance_scale_ = scale;
   pending_user_performance_scale_ = scale;
+  exported_performance_scale_ = scale;
   performance_scale_reciprocal_ = 1 / scale;
 }
 
@@ -3561,16 +3572,18 @@ cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity,
                                          do_transaction);
 }
 
-void Scheduler::RequestPowerLevelForTesting(uint8_t power_level) {
+bool Scheduler::RequestPowerLevelForTesting(uint8_t power_level) {
   InterruptDisableGuard interrupts_disabled;
   bool need_reschedule;
   {
     Guard<MonitoredSpinLock, NoIrqSave> guard{&queue_lock_, SOURCE_TAG};
-    need_reschedule = power_level_control_.RequestPowerLevel(power_level);
+    need_reschedule = power_level_control_.IsValidActivePowerLevel(power_level) &&
+                      power_level_control_.RequestPowerLevel(power_level);
   }
   if (need_reschedule) {
     RescheduleMask(cpu_num_to_mask(this_cpu()));
   }
+  return need_reschedule;
 }
 
 bool Scheduler::PowerLevelControl::RequestPowerLevel(uint8_t power_level) {
