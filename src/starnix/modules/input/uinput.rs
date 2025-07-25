@@ -8,7 +8,7 @@ use crate::{
 };
 use bit_vec::BitVec;
 use fidl_fuchsia_ui_test_input::{
-    self as futinput, KeyboardSimulateKeyEventRequest,
+    self as futinput, CoordinateUnit, DisplayDimensions, KeyboardSimulateKeyEventRequest,
     RegistryRegisterKeyboardAndGetDeviceInfoRequest,
     RegistryRegisterTouchScreenAndGetDeviceInfoRequest,
 };
@@ -40,7 +40,7 @@ const UINPUT_VERSION: u32 = 5;
 #[derive(Clone)]
 enum DeviceType {
     Keyboard,
-    Touchscreen,
+    Touchscreen(i32, i32),
 }
 
 pub fn register_uinput_device(
@@ -122,12 +122,18 @@ enum CreatedDevice {
     Touchscreen(futinput::TouchScreenSynchronousProxy, Box<LinuxTouchEventParser>),
 }
 
+struct Range {
+    min: i32,
+    max: i32,
+}
 struct UinputDeviceMutableState {
     enabled_evbits: BitVec,
     input_id: Option<uapi::input_id>,
     created_device: CreatedDevice,
     k_device: Option<Device>,
     device_id: Option<u32>,
+    x_range: Option<Range>,
+    y_range: Option<Range>,
 }
 
 impl UinputDeviceMutableState {
@@ -140,7 +146,19 @@ impl UinputDeviceMutableState {
         // EV_ABS, consider it is Touchscreen. This need to be revisit when we
         // want to support more device types.
         let device_type = match self.enabled_evbits.clone().get(uapi::EV_ABS as usize) {
-            Some(true) => DeviceType::Touchscreen,
+            Some(true) => {
+                // TODO(b/304595635): Check if screen size is required.
+                let mut touchscreen_width = 1000;
+                let mut touchscreen_height = 1000;
+
+                if self.x_range.is_some() && self.y_range.is_some() {
+                    let x_range = self.x_range.as_ref().unwrap();
+                    let y_range = self.y_range.as_ref().unwrap();
+                    touchscreen_width = x_range.max - x_range.min;
+                    touchscreen_height = y_range.max - y_range.min;
+                }
+                DeviceType::Touchscreen(touchscreen_width, touchscreen_height)
+            }
             Some(false) | None => DeviceType::Keyboard,
         };
 
@@ -163,6 +181,8 @@ impl UinputDeviceFile {
                 created_device: CreatedDevice::None,
                 k_device: None,
                 device_id: None,
+                x_range: None,
+                y_range: None,
             }),
         }
     }
@@ -181,6 +201,31 @@ impl UinputDeviceFile {
                 error!(EPERM)
             }
         }
+    }
+
+    /// UI_ABS_SETUP caller pass in event codes and min and max value for
+    /// the event code.
+    fn ui_abs_setup(
+        &self,
+        current_task: &CurrentTask,
+        abs_setup: UserRef<starnix_uapi::uinput_abs_setup>,
+    ) -> Result<SyscallResult, Errno> {
+        let setup: starnix_uapi::uinput_abs_setup = current_task.read_object(abs_setup)?;
+        let code: u32 = setup.code.into();
+        match code {
+            uapi::ABS_MT_POSITION_X => {
+                self.inner.lock().x_range =
+                    Some(Range { min: setup.absinfo.minimum, max: setup.absinfo.maximum });
+            }
+            uapi::ABS_MT_POSITION_Y => {
+                self.inner.lock().y_range =
+                    Some(Range { min: setup.absinfo.minimum, max: setup.absinfo.maximum });
+            }
+            _ => {
+                log_warn!("UI_ABS_SETUP ignore event code {}", setup.code);
+            }
+        }
+        Ok(SUCCESS)
     }
 
     /// UI_GET_VERSION caller pass a address for u32 to `arg` to receive the
@@ -292,7 +337,7 @@ impl UinputDeviceFile {
                             }
                         }
                     }
-                    DeviceType::Touchscreen => {
+                    DeviceType::Touchscreen(_width, _height) => {
                         let (touch_client, touch_server) =
                             fidl::endpoints::create_sync_proxy::<futinput::TouchScreenMarker>();
                         inner.created_device = CreatedDevice::Touchscreen(
@@ -300,12 +345,27 @@ impl UinputDeviceFile {
                             Box::new(LinuxTouchEventParser::create()),
                         );
 
+                        let mut request = RegistryRegisterTouchScreenAndGetDeviceInfoRequest {
+                            device: Some(touch_server),
+                            coordinate_unit: Some(CoordinateUnit::PhysicalPixels),
+                            ..Default::default()
+                        };
+
+                        if inner.x_range.is_some() && inner.y_range.is_some() {
+                            request.coordinate_unit = Some(CoordinateUnit::RegisteredDimensions);
+                            let x_range = inner.x_range.as_ref().unwrap();
+                            let y_range = inner.y_range.as_ref().unwrap();
+                            request.display_dimensions = Some(DisplayDimensions {
+                                min_x: x_range.min.into(),
+                                max_x: x_range.max.into(),
+                                min_y: y_range.min.into(),
+                                max_y: y_range.max.into(),
+                            });
+                        }
+
                         // Register a touchscreen
                         let register_res = proxy.register_touch_screen_and_get_device_info(
-                            RegistryRegisterTouchScreenAndGetDeviceInfoRequest {
-                                device: Some(touch_server),
-                                ..Default::default()
-                            },
+                            request,
                             zx::Instant::INFINITE,
                         );
 
@@ -425,14 +485,14 @@ impl FileOps for UinputDeviceFile {
         match request {
             uapi::UI_GET_VERSION => self.ui_get_version(current_task, arg.into()),
             uapi::UI_SET_EVBIT => self.ui_set_evbit(arg),
+            uapi::UI_ABS_SETUP => self.ui_abs_setup(current_task, arg.into()),
             // `fuchsia.ui.test.input.Registry` does not use some uinput ioctl
             // request, just ignore the request and return SUCCESS, even args
             // is invalid.
             uapi::UI_SET_KEYBIT
             | uapi::UI_SET_ABSBIT
             | uapi::UI_SET_PHYS
-            | uapi::UI_SET_PROPBIT
-            | uapi::UI_ABS_SETUP => Ok(SUCCESS),
+            | uapi::UI_SET_PROPBIT => Ok(SUCCESS),
             uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg.into()),
             uapi::UI_DEV_CREATE => self.ui_dev_create(locked, current_task),
             uapi::UI_DEV_DESTROY => self.ui_dev_destroy(locked, current_task),
@@ -535,9 +595,8 @@ impl DeviceOps for VirtualDevice {
     ) -> Result<Box<dyn FileOps>, Errno> {
         let input_file = match &self.device_type {
             DeviceType::Keyboard => Arc::new(InputFile::new_keyboard(self.input_id, None)),
-            DeviceType::Touchscreen => {
-                // TODO(b/304595635): Check if screen size is required.
-                Arc::new(InputFile::new_touch(self.input_id, 1000, 1000, None))
+            DeviceType::Touchscreen(width, height) => {
+                Arc::new(InputFile::new_touch(self.input_id, width.clone(), height.clone(), None))
             }
         };
 
