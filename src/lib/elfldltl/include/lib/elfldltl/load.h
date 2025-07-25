@@ -20,6 +20,13 @@
 
 namespace elfldltl {
 
+// Like elfldltl::FileApi but for Ehdr and Phdr as required by functions in
+// this file, and with only a concrete Phdr allocator rather than a template
+// for allocators of various types.
+template <class File, class Elf, typename PhdrAllocator>
+concept FileApiForLoad = CanReadFromFile<File, typename Elf::Ehdr> &&
+                         CanReadArrayFromFile<File, typename Elf::Phdr, PhdrAllocator, uint32_t>;
+
 // Read the ELF file header (Ehdr) from an ELF file using the File API (see
 // memory.h), and validate it for loading on this machine.
 //
@@ -69,8 +76,7 @@ constexpr auto LoadEhdrFromFile(Diagnostics& diagnostics,
 // ```
 template <class Elf, class Diagnostics, class File,
           ReadArrayFromFileAllocator<typename Elf::Phdr, uint32_t> PhdrAllocator>
-  requires CanReadFromFile<File, typename Elf::Ehdr> &&
-           CanReadArrayFromFile<File, typename Elf::Phdr, PhdrAllocator>
+  requires FileApiForLoad<File, Elf, PhdrAllocator>
 constexpr auto LoadHeadersFromFile(Diagnostics& diagnostics, File& file,
                                    PhdrAllocator&& phdr_allocator,
                                    std::optional<ElfMachine> machine = ElfMachine::kNative)

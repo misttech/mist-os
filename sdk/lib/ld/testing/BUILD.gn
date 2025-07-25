@@ -12,10 +12,14 @@ group("testing") {
 library_headers("headers") {
   testonly = true
 
-  headers = [ "lib/ld/testing/test-elf-object.h" ]
+  headers = [
+    "lib/ld/testing/interp.h",
+    "lib/ld/testing/test-elf-object.h",
+  ]
   public_deps = [
     ":abi-headers",
-    "//src/lib/elfldltl",
+    "//src/lib/elfldltl:headers",
+    "//src/lib/elfldltl/testing:headers",
   ]
   if (is_fuchsia) {
     headers += [
@@ -29,7 +33,6 @@ library_headers("headers") {
       "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
       "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/async-loop:async-loop-default",
-      "//src/lib/elfldltl:headers",
       "//third_party/googletest:gmock",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zx",
@@ -61,6 +64,7 @@ static_library("ld-testing") {
       "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/fdio",
+      "//src/lib/elfldltl/testing",
       "//src/storage/lib/vfs/cpp",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/zx",

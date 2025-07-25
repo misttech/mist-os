@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 
+#include <concepts>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -14,6 +15,7 @@
 #include <utility>
 
 #include "diagnostics.h"
+#include "memory.h"
 
 namespace elfldltl {
 
@@ -22,27 +24,53 @@ inline auto DefaultMakeInvalidHandle() {
   return Handle();
 }
 
+// Classes derived from elfldltl::File instantiations should meet the
+// elfldltl::FileWithDiagnosticsApi concept.  The constructor should take two
+// arguments with deducible types.  Each of the two template parameters to the
+// concept can either be a class template parameter to the implementation or
+// just a function template parameter to its two-argument constructor.
+template <class T, class Diagnostics, class Handle,
+          auto MakeInvalidHandle = &DefaultMakeInvalidHandle<Handle>>
+concept FileWithDiagnosticsApi =
+    // Move-constructible, but not default-constructible or move-assignable.
+    // The Diagnostics& is stored as a reference, but the Handle may move.
+    std::move_constructible<T> && std::move_constructible<Handle> &&
+    // The one-argument constructor requires Handle to be default-constructed.
+    std::default_initializable<Handle> &&  //
+    requires(Handle&& handle, Diagnostics& diag) {
+      { MakeInvalidHandle() } -> std::convertible_to<Handle>;
+
+      // Two-argument constructor: handle moved, diag always by reference.
+      { T{std::forward<Handle>(handle), diag} };
+
+      // One-argument constructor: MakeInvalidHandle() construction.
+      { T{diag} };
+    };
+
 // elfldltl::File<Handle, Offset, Read, MakeInvalidHandle> implements the File
 // API (see memory.h) by holding a Handle object and calling Read as a function
 // fit::result<...>(Handle&, Offset, std::span<byte>) that returns some error
 // value that Diagnostics::SystemError can handle.  MakeInvalidHandle can be
 // supplied if default-construction isn't the way.
-template <class Diagnostics, typename Handle, typename Offset, auto Read,
-          auto MakeInvalidHandle = &DefaultMakeInvalidHandle<Handle>>
+template <class Diagnostics, std::move_constructible Handle, std::integral Offset,
+          std::invocable<Handle&, Offset, std::span<std::byte>> auto Read,
+          std::invocable<> auto MakeInvalidHandle = &DefaultMakeInvalidHandle<Handle>>
+  requires std::convertible_to<decltype(MakeInvalidHandle()), Handle>
 class File {
  public:
-  static_assert(std::is_invocable_v<decltype(Read), Handle&, Offset, std::span<std::byte>>);
-  static_assert(std::is_convertible_v<decltype(MakeInvalidHandle()), Handle>);
-
   using offset_type = Offset;
 
   File(const File&) noexcept(std::is_nothrow_copy_constructible_v<Handle>) = default;
 
   File(File&&) noexcept(std::is_nothrow_move_constructible_v<Handle>) = default;
-  explicit File(Diagnostics& diag) : diag_(diag) {}
+  explicit File(Diagnostics& diag) : diag_(diag) {
+    static_assert(FileWithDiagnosticsApi<File, Diagnostics, Handle, MakeInvalidHandle>);
+  }
 
   File(Handle handle, Diagnostics& diag) noexcept(std::is_nothrow_move_constructible_v<Handle>)
-      : handle_(std::move(handle)), diag_(diag) {}
+      : handle_(std::move(handle)), diag_(diag) {
+    static_assert(FileWithDiagnosticsApi<File, Diagnostics, Handle, MakeInvalidHandle>);
+  }
 
   File& operator=(const File&) noexcept(std::is_nothrow_copy_assignable_v<Handle>) = default;
 
@@ -60,9 +88,9 @@ class File {
     return result;
   }
 
-  template <typename T, typename Allocator>
+  template <typename T, ReadArrayFromFileAllocator<T> Allocator>
   auto ReadArrayFromFile(off_t offset, Allocator&& allocator, size_t count) {
-    auto result = allocator(count);
+    auto result = std::forward<Allocator>(allocator)(count);
     if (result) {
       std::span<T> data = *result;
       FinishReadFromFile(offset, data, result);
@@ -71,6 +99,8 @@ class File {
   }
 
  protected:
+  using UnsignedOffset = std::make_unsigned_t<Offset>;
+
   Handle& handle() { return handle_; }
   const Handle& handle() const { return handle_; }
 
@@ -82,10 +112,10 @@ class File {
     if (read.is_error()) {
       // FileOffset takes an unsigned type, but off_t is signed.
       // No value passed to Read should be negative.
-      auto diagnose = [offset = static_cast<std::make_unsigned_t<Offset>>(offset),
-                       bytes = data.size_bytes(), this](auto&& error) {
+      auto diagnose = [offset = static_cast<UnsignedOffset>(offset), bytes = data.size_bytes(),
+                       this]<typename Error>(Error&& error) {
         diag_.SystemError("cannot read "sv, bytes, " bytes"sv, FileOffset{offset}, ": "sv,
-                          std::move(error));
+                          std::forward<Error>(error));
       };
       auto error = std::move(read).error_value();
       if (error == decltype(error){}) {

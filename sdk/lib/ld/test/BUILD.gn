@@ -106,7 +106,6 @@ source_set("load-tests") {
       ":remote-perfect-symbol-filter-test",
       "..:fuchsia-debugdata",
       "..:remote",
-      "../testing",
       "//sdk/lib/fdio",
       "//sdk/lib/fit",
       "//zircon/system/ulib/zx",

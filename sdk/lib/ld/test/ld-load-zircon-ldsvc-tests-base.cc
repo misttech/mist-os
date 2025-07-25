@@ -7,6 +7,7 @@
 #include <lib/elfldltl/vmo.h>
 #include <lib/fit/defer.h>
 #include <lib/ld/abi.h>
+#include <lib/ld/testing/interp.h>
 #include <lib/ld/testing/test-elf-object.h>
 
 #include <filesystem>
