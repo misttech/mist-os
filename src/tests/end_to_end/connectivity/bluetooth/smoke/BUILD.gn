@@ -29,7 +29,6 @@ if (is_host) {
       vim3_env,
       sherlock_env,
       nelson_env,
-      sorrel_env,
     ]
   }
 }
