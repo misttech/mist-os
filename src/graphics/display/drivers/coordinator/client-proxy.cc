@@ -244,6 +244,8 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instan
 }
 
 void ClientProxy::OnClientDead() {
+  ZX_DEBUG_ASSERT_MSG(on_client_disconnected_, "OnClientDead() called twice");
+
   // Stash any data members we need to access after the ClientProxy is deleted.
   fit::function<void()> on_client_disconnected = std::move(on_client_disconnected_);
 
