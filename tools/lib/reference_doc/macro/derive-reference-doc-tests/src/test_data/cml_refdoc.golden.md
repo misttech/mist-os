@@ -94,13 +94,14 @@ use: [
     {
         protocol: [
             "fuchsia.posix.socket.Provider",
+            "fuchsia.logger.LogSink",
         ],
     },
 ],
 
 // syslog.client.shard.cml
 use: [
-    { protocol: "fuchsia.logger.LogSink", from: "parent/diagnostics" },
+    { protocol: "fuchsia.logger.LogSink" },
 ],
 ```
 
@@ -137,10 +138,9 @@ include: [ "syslog.client.shard.cml" ]
 use: [
     {
         protocol: [
-            "fuchsia.logger.LogSink",
             "fuchsia.posix.socket.Provider",
+            "fuchsia.logger.LogSink",
         ],
-        from: "parent/diagnostics",
         availability: "optional",
     },
 ],
@@ -148,9 +148,8 @@ use: [
 // syslog.client.shard.cml
 use: [
     {
-        protocol: "fuchsia.logger.LogSink"
+        protocol: "fuchsia.logger.LogSink
         availability: "required",  // This is the default
-        from: "parent/diagnostics",
     },
 ],
 ```
@@ -166,7 +165,6 @@ use: [
     {
         protocol: "fuchsia.logger.LogSink",
         availability: "required",
-        from: "parent/diagnostics",
     },
 ],
 ```
