@@ -15,6 +15,7 @@ rustc_library("lib") {
   visibility = [
     ":*",
     "//src/developer/ffx/frontends/*",
+    "//src/developer/ffx/tools/usb_driver:*",
 
     # TODO(b/386792198) Move ToolSuite to internal crate.
     "//src/developer/ffx/lib/fho:*",
