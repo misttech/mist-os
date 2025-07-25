@@ -66,6 +66,8 @@ source_set("shared") {
     "display-info.h",
     "engine-driver-client.cc",
     "engine-driver-client.h",
+    "engine-listener-banjo-adapter.cc",
+    "engine-listener-banjo-adapter.h",
     "engine-listener.h",
     "fence.cc",
     "fence.h",
@@ -123,6 +125,7 @@ test("display-coordinator-unittests") {
     "added-display-info-test.cc",
     "client-proxy-test.cc",
     "display-info-test.cc",
+    "engine-listener-banjo-adapter-test.cc",
     "fence-test.cc",
     "image-test.cc",
     "inspect-test.cc",
@@ -158,6 +161,8 @@ static_library("testing") {
     "testing/base.h",
     "testing/mock-coordinator-listener.cc",
     "testing/mock-coordinator-listener.h",
+    "testing/mock-engine-listener.cc",
+    "testing/mock-engine-listener.h",
   ]
   deps = [
     "//src/devices/testing/mock-ddk",
