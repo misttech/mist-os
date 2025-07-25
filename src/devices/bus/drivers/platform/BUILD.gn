@@ -105,6 +105,7 @@ test("platform-bus-unittest") {
     "//src/devices/testing/fake-bti",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 

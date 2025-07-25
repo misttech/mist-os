@@ -16,6 +16,7 @@
 #include "lib/fidl/cpp/wire/channel.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform_bus_config.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -177,36 +178,44 @@ class TestConfig final {
 class PlatformBusTest : public ::testing::Test {
  public:
   void SetUp() override {
-    zx::result<> result =
-        driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& args) {
-          platform_bus_config::Config config;
-          args.config(config.ToVmo());
-        });
-    ASSERT_EQ(ZX_OK, result.status_value());
-  }
-  void TearDown() override {
-    zx::result<> result = driver_test().StopDriver();
-    ASSERT_EQ(ZX_OK, result.status_value());
+    ASSERT_OK(driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& args) {
+      platform_bus_config::Config config;
+      args.config(config.ToVmo());
+    }));
+
+    zx::result iommu = driver_test_.Connect<fuchsia_hardware_platform_bus::Service::Iommu>("pt");
+    ASSERT_OK(iommu);
+    iommu_.Bind(std::move(iommu.value()));
   }
 
-  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+  void TearDown() override { ASSERT_OK(driver_test().StopDriver()); }
+
+  fdf_testing::BackgroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+  fdf::WireSyncClient<fuchsia_hardware_platform_bus::Iommu>& iommu() { return iommu_; }
 
  private:
-  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
+  fdf_testing::BackgroundDriverTest<TestConfig> driver_test_;
+  fdf::WireSyncClient<fuchsia_hardware_platform_bus::Iommu> iommu_;
 };
 
 uint32_t g_bti_created = 0;
 
 TEST_F(PlatformBusTest, IommuGetBti) {
   g_bti_created = 0;
+  fdf::Arena arena{'PBUS'};
 
-  auto& pbus = *driver_test().driver();
   EXPECT_EQ(g_bti_created, 0u);
-  ASSERT_EQ(ZX_OK, pbus.GetBti(0, 0).status_value());
+  fdf::WireUnownedResult bti1 = iommu().buffer(arena)->GetBti(0, 0);
+  ASSERT_OK(bti1.status());
+  ASSERT_TRUE(bti1->is_ok());
   EXPECT_EQ(g_bti_created, 1u);
-  ASSERT_EQ(ZX_OK, pbus.GetBti(0, 0).status_value());
+  fdf::WireUnownedResult bti2 = iommu().buffer(arena)->GetBti(0, 0);
+  ASSERT_OK(bti2.status());
+  ASSERT_TRUE(bti2->is_ok());
   EXPECT_EQ(g_bti_created, 1u);
-  ASSERT_EQ(ZX_OK, pbus.GetBti(0, 1).status_value());
+  fdf::WireUnownedResult bti3 = iommu().buffer(arena)->GetBti(0, 1);
+  ASSERT_OK(bti3.status());
+  ASSERT_TRUE(bti3->is_ok());
   EXPECT_EQ(g_bti_created, 2u);
 }
 
