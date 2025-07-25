@@ -142,15 +142,6 @@ def capture(
     )
 
 
-# TODO: Remove after soft transition to `capture()` is complete
-def capture_and_compute_metrics(
-    dut: FuchsiaDevice,
-    principal_groups: Mapping[str, str] | None = None,
-    process_groups: Mapping[str, str] | None = None,
-) -> trace_metrics.MetricsProcessor:
-    return capture(dut, principal_groups, process_groups)
-
-
 def process_component_profile(
     principal_groups: Mapping[str, str], component_profile: Any
 ) -> list[trace_metrics.TestCaseResult]:

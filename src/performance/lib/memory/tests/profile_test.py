@@ -192,7 +192,7 @@ class ProfileTest(unittest.TestCase):
 
         dut = Mock()
         dut.ffx.run.side_effect = ffx_run_fake_implementation
-        metrics_processor = profile.capture_and_compute_metrics(
+        metrics_processor = profile.capture(
             dut,
             process_groups={
                 "starnix_kernel": "starnix_kernel.cm",
@@ -304,7 +304,7 @@ class ProfileTest(unittest.TestCase):
 
         dut = Mock()
         dut.ffx.run.side_effect = ffx_run_fake_implementation
-        metrics_processor = profile.capture_and_compute_metrics(
+        metrics_processor = profile.capture(
             dut, principal_groups={"fxfs": "*/fxfs"}
         )
 
