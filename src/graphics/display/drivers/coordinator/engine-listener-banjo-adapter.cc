@@ -76,6 +76,10 @@ void EngineListenerBanjoAdapter::DisplayEngineListenerOnDisplayVsync(
   display::DisplayId display_id = display::DisplayId(banjo_display_id);
   zx::time_monotonic timestamp = zx::time_monotonic(banjo_timestamp);
   display::DriverConfigStamp driver_config_stamp(*banjo_config_stamp_ptr);
+  if (driver_config_stamp == display::kInvalidDriverConfigStamp) {
+    fdf::error("Dropping VSync with invalid DriverConfigStamp");
+    return;
+  }
 
   zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
       *dispatcher_->async_dispatcher(),

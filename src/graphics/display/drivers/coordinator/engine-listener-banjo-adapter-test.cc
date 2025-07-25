@@ -51,14 +51,14 @@ class EngineListenerBanjoAdapterTest : public ::testing::Test {
 };
 
 TEST_F(EngineListenerBanjoAdapterTest, OnDisplayAdded) {
-  constexpr display::DisplayId kDisplayId(1);
-  constexpr fuchsia_images2_pixel_format_enum_value_t kPixelFormats[] = {
+  static constexpr display::DisplayId kDisplayId(1);
+  static constexpr fuchsia_images2_pixel_format_enum_value_t kPixelFormats[] = {
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(
           fuchsia_images2::PixelFormat::kR8G8B8A8),
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(
           fuchsia_images2::PixelFormat::kB8G8R8A8),
   };
-  constexpr display_mode_t kPreferredModes[] = {
+  static constexpr display_mode_t kPreferredModes[] = {
       {
           .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
           .h_addressable = 0x0f'0f,
@@ -72,9 +72,9 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayAdded) {
           .flags = MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK,
       },
   };
-  constexpr std::span<const uint8_t> kEdidBytes = edid::kDellP2719hEdid;
+  static constexpr std::span<const uint8_t> kEdidBytes = edid::kDellP2719hEdid;
 
-  const raw_display_info_t valid_banjo_display_info = {
+  static constexpr raw_display_info_t valid_banjo_display_info = {
       .display_id = kDisplayId.ToBanjo(),
       .preferred_modes_list = kPreferredModes,
       .preferred_modes_count = std::size(kPreferredModes),
@@ -117,7 +117,7 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayAdded) {
 }
 
 TEST_F(EngineListenerBanjoAdapterTest, OnDisplayRemoved) {
-  constexpr display::DisplayId kDisplayId(1);
+  static constexpr display::DisplayId kDisplayId(1);
 
   libsync::Completion completion;
   mock_engine_listener_.ExpectOnDisplayRemoved([&](display::DisplayId display_id) {
@@ -133,9 +133,9 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayRemoved) {
 }
 
 TEST_F(EngineListenerBanjoAdapterTest, OnDisplayVsync) {
-  constexpr display::DisplayId kDisplayId(1);
-  const zx::time_monotonic kTimestamp = zx::clock::get_monotonic();
-  constexpr config_stamp_t kConfigStamp = {.value = 123};
+  static constexpr display::DisplayId kDisplayId(1);
+  static constexpr zx::time_monotonic kTimestamp(4242);
+  static constexpr display::DriverConfigStamp kConfigStamp(123);
 
   libsync::Completion completion;
   mock_engine_listener_.ExpectOnDisplayVsync([&](display::DisplayId display_id,
@@ -145,12 +145,47 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayVsync) {
 
     EXPECT_EQ(display_id, kDisplayId);
     EXPECT_EQ(timestamp, kTimestamp);
-    EXPECT_EQ(driver_config_stamp.value(), kConfigStamp.value);
+    EXPECT_EQ(driver_config_stamp, kConfigStamp);
+    completion.Signal();
+  });
+
+  static constexpr config_stamp_t kBanjoConfigStamp = kConfigStamp.ToBanjo();
+
+  ddk::DisplayEngineListenerProtocolClient client = CreateEngineListenerClient();
+  client.OnDisplayVsync(kDisplayId.ToBanjo(), kTimestamp.get(), &kBanjoConfigStamp);
+  completion.Wait();
+}
+
+TEST_F(EngineListenerBanjoAdapterTest, OnDisplayVsyncAdapterFiltersInvalidTimestamp) {
+  static constexpr display::DisplayId kDisplayId(1);
+  static constexpr zx::time_monotonic kTimestamp(4242);
+  static constexpr display::DriverConfigStamp kConfigStamp(123);
+
+  libsync::Completion completion;
+  mock_engine_listener_.ExpectOnDisplayVsync([&](display::DisplayId display_id,
+                                                 zx::time_monotonic timestamp,
+                                                 display::DriverConfigStamp driver_config_stamp) {
+    ASSERT_EQ(fdf::Dispatcher::GetCurrent()->get(), dispatcher_->get());
+
+    EXPECT_EQ(display_id, kDisplayId);
+    EXPECT_EQ(timestamp, kTimestamp);
+    EXPECT_EQ(driver_config_stamp, kConfigStamp);
     completion.Signal();
   });
 
   ddk::DisplayEngineListenerProtocolClient client = CreateEngineListenerClient();
-  client.OnDisplayVsync(kDisplayId.ToBanjo(), kTimestamp.get(), &kConfigStamp);
+
+  static constexpr config_stamp_t kBanjoInvalidConfigStamp =
+      display::kInvalidDriverConfigStamp.ToBanjo();
+  static constexpr config_stamp_t kBanjoConfigStamp = {.value = 123};
+
+  // This call will be filtered by the Banjo adapter.
+  client.OnDisplayVsync(kDisplayId.ToBanjo(), kTimestamp.get(), &kBanjoInvalidConfigStamp);
+
+  // This call will be passed through by the Banjo adapter. Receiving the translated
+  // call on the dispatcher lets us know that the previous call was processed, so
+  // it's safe to stop the test.
+  client.OnDisplayVsync(kDisplayId.ToBanjo(), kTimestamp.get(), &kBanjoConfigStamp);
   completion.Wait();
 }
 
