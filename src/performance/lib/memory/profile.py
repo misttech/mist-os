@@ -5,7 +5,7 @@
 
 import fnmatch
 import json
-from typing import Any, Mapping, Sequence, cast
+from typing import Any, Mapping, MutableSequence, cast
 
 from honeydew.fuchsia_device.fuchsia_device import FuchsiaDevice
 from honeydew.transports.ffx import errors as ffx_errors
@@ -44,7 +44,7 @@ class _MemoryProfileMetrics(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> MutableSequence[trace_metrics.TestCaseResult]:
         metrics = process_component_profile(
             self._principal_groups, self._component_profile
         )

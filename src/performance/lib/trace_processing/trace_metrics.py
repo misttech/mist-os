@@ -20,6 +20,7 @@ from typing import (
     Any,
     Iterable,
     Mapping,
+    MutableSequence,
     NotRequired,
     Sequence,
     TypeAlias,
@@ -166,7 +167,7 @@ class MetricsProcessor:
 
     def process_metrics_with_fxt(
         self, fxt_path: str
-    ) -> Sequence[TestCaseResult]:
+    ) -> MutableSequence[TestCaseResult]:
         """Generates metrics from the file at the given fxt_path.
 
         Args:
@@ -179,7 +180,7 @@ class MetricsProcessor:
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[TestCaseResult]:
+    ) -> MutableSequence[TestCaseResult]:
         """Generates metrics from the given model.
 
         Args:
