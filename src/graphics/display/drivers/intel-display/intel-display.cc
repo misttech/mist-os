@@ -229,7 +229,8 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_instant_mono_t timestamp) {
     vsync_config_stamp = pipe->GetVsyncConfigStamp(handles);
   }
 
-  if (pipe_attached_display_id != display::kInvalidDisplayId) {
+  if (pipe_attached_display_id != display::kInvalidDisplayId &&
+      vsync_config_stamp != display::kInvalidDriverConfigStamp) {
     const uint64_t banjo_display_id = pipe_attached_display_id.ToBanjo();
     const config_stamp_t banjo_config_stamp = vsync_config_stamp.ToBanjo();
     engine_listener_.OnDisplayVsync(banjo_display_id, timestamp, &banjo_config_stamp);
