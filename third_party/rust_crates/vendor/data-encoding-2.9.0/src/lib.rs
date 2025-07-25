@@ -70,21 +70,22 @@
 //! # Properties
 //!
 //! The [`HEXUPPER`], [`BASE32`], [`BASE32HEX`], [`BASE64`], and [`BASE64URL`] predefined encodings
-//! are conform to [RFC4648].
+//! conform to [RFC4648].
 //!
 //! In general, the encoding and decoding functions satisfy the following properties:
 //!
 //! - They are deterministic: their output only depends on their input
-//! - They have no side-effects: they do not modify a hidden mutable state
-//! - They are correct: encoding then decoding gives the initial data
-//! - They are canonical (unless [`is_canonical`] returns false): decoding then encoding gives the
-//!   initial data
+//! - They have no side-effects: they do not modify any hidden mutable state
+//! - They are correct: encoding followed by decoding gives the initial data
+//! - They are canonical (unless [`is_canonical`] returns false): decoding followed by encoding
+//!   gives the initial data
 //!
 //! This last property is usually not satisfied by base64 implementations. This is a matter of
 //! choice and this crate has made the choice to let the user choose. Support for canonical encoding
 //! as described by the [RFC][canonical] is provided. But it is also possible to disable checking
 //! trailing bits, to add characters translation, to decode concatenated padded inputs, and to
-//! ignore some characters.
+//! ignore some characters. Note that non-canonical encodings may be an attack vector as described
+//! in [Base64 Malleability in Practice](https://eprint.iacr.org/2022/361.pdf).
 //!
 //! Since the RFC specifies the encoding function on all inputs and the decoding function on all
 //! possible encoded outputs, the differences between implementations come from the decoding
@@ -96,9 +97,9 @@
 //! | Input      | `data-encoding` | `base64`  | GNU `base64`  |
 //! | ---------- | --------------- | --------- | ------------- |
 //! | `AAB=`     | `Trailing(2)`   | `Last(2)` | `\x00\x00`    |
-//! | `AA\nB=`   | `Length(4)`     | `Length`  | `\x00\x00`    |
-//! | `AAB`      | `Length(0)`     | `Last(2)` | Invalid input |
-//! | `AAA`      | `Length(0)`     | `[0, 0]`  | Invalid input |
+//! | `AA\nB=`   | `Length(4)`     | `Byte(2)` | `\x00\x00`    |
+//! | `AAB`      | `Length(0)`     | `Padding` | Invalid input |
+//! | `AAA`      | `Length(0)`     | `Padding` | Invalid input |
 //! | `A\rA\nB=` | `Length(4)`     | `Byte(1)` | Invalid input |
 //! | `-_\r\n`   | `Symbol(0)`     | `Byte(0)` | Invalid input |
 //! | `AA==AA==` | `[0, 0]`        | `Byte(2)` | `\x00\x00`    |
@@ -143,7 +144,7 @@
 //! [wrapping]: struct.Specification.html#structfield.wrap
 
 #![no_std]
-#![warn(unused_results, missing_docs)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -158,6 +159,8 @@ use alloc::string::String;
 use alloc::vec;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+use core::convert::TryInto;
+use core::debug_assert as safety_assert;
 
 macro_rules! check {
     ($e: expr, $c: expr) => {
@@ -238,21 +241,16 @@ macro_rules! dispatch {
     ($body: expr) => { $body };
 }
 
-unsafe fn chunk_unchecked(x: &[u8], n: usize, i: usize) -> &[u8] {
-    debug_assert!((i + 1) * n <= x.len());
-    let ptr = x.as_ptr().add(n * i);
-    core::slice::from_raw_parts(ptr, n)
+fn chunk_unchecked<T>(x: &[T], n: usize, i: usize) -> &[T] {
+    safety_assert!((i + 1) * n <= x.len());
+    // SAFETY: Ensured by correctness requirements (and asserted above).
+    unsafe { core::slice::from_raw_parts(x.as_ptr().add(n * i), n) }
 }
 
-unsafe fn chunk_mut_unchecked(x: &mut [u8], n: usize, i: usize) -> &mut [u8] {
-    debug_assert!((i + 1) * n <= x.len());
-    let ptr = x.as_mut_ptr().add(n * i);
-    core::slice::from_raw_parts_mut(ptr, n)
-}
-
-unsafe fn as_array(x: &[u8]) -> &[u8; 256] {
-    debug_assert_eq!(x.len(), 256);
-    &*(x.as_ptr() as *const [u8; 256])
+fn chunk_mut_unchecked<T>(x: &mut [T], n: usize, i: usize) -> &mut [T] {
+    safety_assert!((i + 1) * n <= x.len());
+    // SAFETY: Ensured by correctness requirements (and asserted above).
+    unsafe { core::slice::from_raw_parts_mut(x.as_mut_ptr().add(n * i), n) }
 }
 
 fn div_ceil(x: usize, m: usize) -> usize {
@@ -263,6 +261,7 @@ fn floor(x: usize, m: usize) -> usize {
     x / m * m
 }
 
+#[inline]
 fn vectorize<F: FnMut(usize)>(n: usize, bs: usize, mut f: F) {
     for k in 0 .. n / bs {
         for i in k * bs .. (k + 1) * bs {
@@ -291,7 +290,7 @@ pub enum DecodeKind {
 }
 
 impl core::fmt::Display for DecodeKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let description = match self {
             DecodeKind::Length => "invalid length",
             DecodeKind::Symbol => "invalid symbol",
@@ -318,7 +317,7 @@ pub struct DecodeError {
 impl std::error::Error for DecodeError {}
 
 impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{} at {}", self.kind, self.position)
     }
 }
@@ -352,8 +351,8 @@ fn order(msb: bool, n: usize, i: usize) -> usize {
     }
 }
 
+#[inline]
 fn enc(bit: usize) -> usize {
-    debug_assert!(1 <= bit && bit <= 6);
     match bit {
         1 | 2 | 4 => 1,
         3 | 6 => 3,
@@ -362,6 +361,7 @@ fn enc(bit: usize) -> usize {
     }
 }
 
+#[inline]
 fn dec(bit: usize) -> usize {
     enc(bit) * 8 / bit
 }
@@ -383,7 +383,7 @@ fn encode_block<B: Static<usize>, M: Static<bool>>(
     }
     for (i, output) in output.iter_mut().enumerate() {
         let y = x >> (bit * order(msb, dec(bit), i));
-        *output = symbols[y as usize % 256];
+        *output = symbols[(y & 0xff) as usize];
     }
 }
 
@@ -400,8 +400,8 @@ fn encode_mut<B: Static<usize>, M: Static<bool>>(
         _ => 1,
     };
     vectorize(n, bs, |i| {
-        let input = unsafe { chunk_unchecked(input, enc, i) };
-        let output = unsafe { chunk_mut_unchecked(output, dec, i) };
+        let input = chunk_unchecked(input, enc, i);
+        let output = chunk_mut_unchecked(output, dec, i);
         encode_block(bit, msb, symbols, input, output);
     });
     encode_block(bit, msb, symbols, &input[enc * n ..], &mut output[dec * n ..]);
@@ -423,7 +423,7 @@ fn decode_block<B: Static<usize>, M: Static<bool>>(
         x |= u64::from(y) << (bit * order(msb, dec(bit), j));
     }
     for (j, output) in output.iter_mut().enumerate() {
-        *output = (x >> (8 * order(msb, enc(bit), j))) as u8;
+        *output = ((x >> (8 * order(msb, enc(bit), j))) & 0xff) as u8;
     }
     Ok(())
 }
@@ -439,8 +439,8 @@ fn decode_mut<B: Static<usize>, M: Static<bool>>(
     let dec = dec(bit.val());
     let n = input.len() / dec;
     for i in 0 .. n {
-        let input = unsafe { chunk_unchecked(input, dec, i) };
-        let output = unsafe { chunk_mut_unchecked(output, enc, i) };
+        let input = chunk_unchecked(input, dec, i);
+        let output = chunk_mut_unchecked(output, enc, i);
         decode_block(bit, msb, values, input, output).map_err(|e| dec * i + e)?;
     }
     decode_block(bit, msb, values, &input[dec * n ..], &mut output[enc * n ..])
@@ -547,8 +547,8 @@ fn encode_wrap_mut<
     let olen = dec - end.len();
     let n = input.len() / enc;
     for i in 0 .. n {
-        let input = unsafe { chunk_unchecked(input, enc, i) };
-        let output = unsafe { chunk_mut_unchecked(output, dec, i) };
+        let input = chunk_unchecked(input, enc, i);
+        let output = chunk_mut_unchecked(output, dec, i);
         encode_base(bit, msb, symbols, input, &mut output[.. olen]);
         output[olen ..].copy_from_slice(end);
     }
@@ -809,10 +809,6 @@ fn decode_wrap_mut<B: Static<usize>, M: Static<bool>, P: Static<bool>, I: Static
 /// assert_eq!(msb.encode(&[0b01010011]), "01010011");
 /// assert_eq!(lsb.encode(&[0b01010011]), "11001010");
 /// ```
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg(feature = "alloc")]
 pub enum BitOrder {
@@ -875,7 +871,8 @@ pub type InternalEncoding = &'static [u8];
 // - width % dec(bit) == 0
 // - for all x in separator values[x] is IGNORE
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Encoding(pub InternalEncoding);
+#[repr(transparent)]
+pub struct Encoding(#[doc(hidden)] pub InternalEncoding);
 
 /// How to translate characters when decoding
 ///
@@ -883,10 +880,6 @@ pub struct Encoding(pub InternalEncoding);
 /// of the `to` field. The second to the second. Etc.
 ///
 /// See [Specification](struct.Specification.html) for more information.
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Clone)]
 #[cfg(feature = "alloc")]
 pub struct Translate {
@@ -900,10 +893,6 @@ pub struct Translate {
 /// How to wrap the output when encoding
 ///
 /// See [Specification](struct.Specification.html) for more information.
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Clone)]
 #[cfg(feature = "alloc")]
 pub struct Wrap {
@@ -992,7 +981,7 @@ pub struct Wrap {
 /// ### Ignore characters when decoding
 ///
 /// Ignoring characters when decoding is useful if after encoding some characters are added for
-/// convenience or any other reason (like wrapping). In that case we want to first ignore thoses
+/// convenience or any other reason (like wrapping). In that case we want to first ignore those
 /// characters before decoding.
 ///
 /// To preserve correctness, ignored characters must not contain symbols or the padding character.
@@ -1158,10 +1147,6 @@ pub struct Wrap {
 /// assert_eq!(base.decode(b"BOIl"), base.decode(b"b011"));
 /// ```
 ///
-/// # Features
-///
-/// Requires the `alloc` feature.
-///
 /// [base-conversion]: https://en.wikipedia.org/wiki/Positional_notation#Base_conversion
 /// [canonical]: https://tools.ietf.org/html/rfc4648#section-3.5
 #[derive(Debug, Clone)]
@@ -1220,11 +1205,11 @@ impl Default for Specification {
 
 impl Encoding {
     fn sym(&self) -> &[u8; 256] {
-        unsafe { as_array(&self.0[0 .. 256]) }
+        self.0[0 .. 256].try_into().unwrap()
     }
 
     fn val(&self) -> &[u8; 256] {
-        unsafe { as_array(&self.0[256 .. 512]) }
+        self.0[256 .. 512].try_into().unwrap()
     }
 
     fn pad(&self) -> Option<u8> {
@@ -1247,6 +1232,15 @@ impl Encoding {
         (self.0[513] & 0x7) as usize
     }
 
+    /// Minimum number of input and output blocks when encoding
+    fn block_len(&self) -> (usize, usize) {
+        let bit = self.bit();
+        match self.wrap() {
+            Some((col, end)) => (col / dec(bit) * enc(bit), col + end.len()),
+            None => (enc(bit), dec(bit)),
+        }
+    }
+
     fn wrap(&self) -> Option<(usize, &[u8])> {
         if self.0.len() <= 515 {
             return None;
@@ -1263,6 +1257,7 @@ impl Encoding {
     /// See [`encode_mut`] for when to use it.
     ///
     /// [`encode_mut`]: struct.Encoding.html#method.encode_mut
+    #[must_use]
     pub fn encode_len(&self, len: usize) -> usize {
         dispatch! {
             let bit: usize = self.bit();
@@ -1303,6 +1298,34 @@ impl Encoding {
         }
     }
 
+    /// Encodes `input` in `output` and returns it as a `&str`
+    ///
+    /// It is guaranteed that `output` and the return value only differ by their type. They both
+    /// point to the same range of memory (pointer and length).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `output` length does not match the result of [`encode_len`] for the `input`
+    /// length.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use data_encoding::BASE64;
+    /// # let mut buffer = vec![0; 100];
+    /// let input = b"Hello world";
+    /// let output = &mut buffer[0 .. BASE64.encode_len(input.len())];
+    /// assert_eq!(BASE64.encode_mut_str(input, output), "SGVsbG8gd29ybGQ=");
+    /// ```
+    ///
+    /// [`encode_len`]: struct.Encoding.html#method.encode_len
+    pub fn encode_mut_str<'a>(&self, input: &[u8], output: &'a mut [u8]) -> &'a str {
+        self.encode_mut(input, output);
+        safety_assert!(output.is_ascii());
+        // SAFETY: Ensured by correctness guarantees of encode_mut (and asserted above).
+        unsafe { core::str::from_utf8_unchecked(output) }
+    }
+
     /// Appends the encoding of `input` to `output`
     ///
     /// # Examples
@@ -1315,16 +1338,76 @@ impl Encoding {
     /// BASE64.encode_append(input, &mut output);
     /// assert_eq!(output, "Result: SGVsbG8gd29ybGQ=");
     /// ```
-    ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
     #[cfg(feature = "alloc")]
     pub fn encode_append(&self, input: &[u8], output: &mut String) {
+        // SAFETY: Ensured by correctness guarantees of encode_mut (and asserted below).
         let output = unsafe { output.as_mut_vec() };
         let output_len = output.len();
         output.resize(output_len + self.encode_len(input.len()), 0u8);
         self.encode_mut(input, &mut output[output_len ..]);
+        safety_assert!(output[output_len ..].is_ascii());
+    }
+
+    /// Returns an object to encode a fragmented input and append it to `output`
+    ///
+    /// See the documentation of [`Encoder`] for more details and examples.
+    #[cfg(feature = "alloc")]
+    pub fn new_encoder<'a>(&'a self, output: &'a mut String) -> Encoder<'a> {
+        Encoder::new(self, output)
+    }
+
+    /// Writes the encoding of `input` to `output`
+    ///
+    /// This allocates a buffer of 1024 bytes on the stack. If you want to control the buffer size
+    /// and location, use [`Encoding::encode_write_buffer()`] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing to the output fails.
+    pub fn encode_write(
+        &self, input: &[u8], output: &mut impl core::fmt::Write,
+    ) -> core::fmt::Result {
+        self.encode_write_buffer(input, output, &mut [0; 1024])
+    }
+
+    /// Writes the encoding of `input` to `output` using a temporary `buffer`
+    ///
+    /// # Panics
+    ///
+    /// Panics if the buffer is shorter than 510 bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing to the output fails.
+    pub fn encode_write_buffer(
+        &self, input: &[u8], output: &mut impl core::fmt::Write, buffer: &mut [u8],
+    ) -> core::fmt::Result {
+        assert!(510 <= buffer.len());
+        let (enc, dec) = self.block_len();
+        for input in input.chunks(buffer.len() / dec * enc) {
+            let buffer = &mut buffer[.. self.encode_len(input.len())];
+            self.encode_mut(input, buffer);
+            safety_assert!(buffer.is_ascii());
+            // SAFETY: Ensured by correctness guarantees of encode_mut (and asserted above).
+            output.write_str(unsafe { core::str::from_utf8_unchecked(buffer) })?;
+        }
+        Ok(())
+    }
+
+    /// Returns an object to display the encoding of `input`
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use data_encoding::BASE64;
+    /// assert_eq!(
+    ///     format!("Payload: {}", BASE64.encode_display(b"Hello world")),
+    ///     "Payload: SGVsbG8gd29ybGQ=",
+    /// );
+    /// ```
+    #[must_use]
+    pub fn encode_display<'a>(&'a self, input: &'a [u8]) -> Display<'a> {
+        Display { encoding: self, input }
     }
 
     /// Returns encoded `input`
@@ -1335,20 +1418,20 @@ impl Encoding {
     /// use data_encoding::BASE64;
     /// assert_eq!(BASE64.encode(b"Hello world"), "SGVsbG8gd29ybGQ=");
     /// ```
-    ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
     #[cfg(feature = "alloc")]
+    #[must_use]
     pub fn encode(&self, input: &[u8]) -> String {
         let mut output = vec![0u8; self.encode_len(input.len())];
         self.encode_mut(input, &mut output);
+        safety_assert!(output.is_ascii());
+        // SAFETY: Ensured by correctness guarantees of encode_mut (and asserted above).
         unsafe { String::from_utf8_unchecked(output) }
     }
 
-    /// Returns the decoded length of an input of length `len`
+    /// Returns the maximum decoded length of an input of length `len`
     ///
-    /// See [`decode_mut`] for when to use it.
+    /// See [`decode_mut`] for when to use it. In particular, the actual decoded length might be
+    /// smaller if the actual input contains padding or ignored characters.
     ///
     /// # Errors
     ///
@@ -1445,10 +1528,6 @@ impl Encoding {
     /// assert_eq!(BASE64.decode(b"SGVsbA==byB3b3JsZA==").unwrap(), b"Hello world");
     /// ```
     ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
-    ///
     /// [`Length`]: enum.DecodeKind.html#variant.Length
     /// [`Symbol`]: enum.DecodeKind.html#variant.Symbol
     /// [`Trailing`]: enum.DecodeKind.html#variant.Trailing
@@ -1463,6 +1542,7 @@ impl Encoding {
     }
 
     /// Returns the bit-width
+    #[must_use]
     pub fn bit_width(&self) -> usize {
         self.bit()
     }
@@ -1475,6 +1555,7 @@ impl Encoding {
     /// - padding is used
     /// - characters are ignored
     /// - characters are translated
+    #[must_use]
     pub fn is_canonical(&self) -> bool {
         if !self.ctb() {
             return false;
@@ -1489,7 +1570,7 @@ impl Encoding {
             if val[i] >= 1 << bit {
                 return false;
             }
-            if sym[val[i] as usize] != i as u8 {
+            if sym[val[i] as usize] as usize != i {
                 return false;
             }
         }
@@ -1497,11 +1578,9 @@ impl Encoding {
     }
 
     /// Returns the encoding specification
-    ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
+    #[allow(clippy::missing_panics_doc)] // no panic
     #[cfg(feature = "alloc")]
+    #[must_use]
     pub fn specification(&self) -> Specification {
         let mut specification = Specification::new();
         specification
@@ -1541,6 +1620,7 @@ impl Encoding {
     }
 
     #[doc(hidden)]
+    #[must_use]
     pub const fn internal_new(implementation: &'static [u8]) -> Encoding {
         #[cfg(feature = "alloc")]
         let encoding = Encoding(Cow::Borrowed(implementation));
@@ -1550,8 +1630,99 @@ impl Encoding {
     }
 
     #[doc(hidden)]
+    #[must_use]
     pub fn internal_implementation(&self) -> &[u8] {
         &self.0
+    }
+}
+
+/// Encodes fragmented input to an output
+///
+/// It is equivalent to use an [`Encoder`] with multiple calls to [`Encoder::append()`] than to
+/// first concatenate all the input and then use [`Encoding::encode_append()`]. In particular, this
+/// function will not introduce padding or wrapping between inputs.
+///
+/// # Examples
+///
+/// ```rust
+/// // This is a bit inconvenient but we can't take a long-term reference to data_encoding::BASE64
+/// // because it's a constant. We need to use a static which has an address instead. This will be
+/// // fixed in version 3 of the library.
+/// static BASE64: data_encoding::Encoding = data_encoding::BASE64;
+/// let mut output = String::new();
+/// let mut encoder = BASE64.new_encoder(&mut output);
+/// encoder.append(b"hello");
+/// encoder.append(b"world");
+/// encoder.finalize();
+/// assert_eq!(output, BASE64.encode(b"helloworld"));
+/// ```
+#[derive(Debug)]
+#[cfg(feature = "alloc")]
+pub struct Encoder<'a> {
+    encoding: &'a Encoding,
+    output: &'a mut String,
+    buffer: [u8; 255],
+    length: u8,
+}
+
+#[cfg(feature = "alloc")]
+impl Drop for Encoder<'_> {
+    fn drop(&mut self) {
+        self.encoding.encode_append(&self.buffer[.. self.length as usize], self.output);
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> Encoder<'a> {
+    fn new(encoding: &'a Encoding, output: &'a mut String) -> Self {
+        Encoder { encoding, output, buffer: [0; 255], length: 0 }
+    }
+
+    /// Encodes the provided input fragment and appends the result to the output
+    pub fn append(&mut self, mut input: &[u8]) {
+        #[allow(clippy::cast_possible_truncation)] // no truncation
+        let max = self.encoding.block_len().0 as u8;
+        if self.length != 0 {
+            let len = self.length;
+            #[allow(clippy::cast_possible_truncation)] // no truncation
+            let add = core::cmp::min((max - len) as usize, input.len()) as u8;
+            self.buffer[len as usize ..][.. add as usize].copy_from_slice(&input[.. add as usize]);
+            self.length += add;
+            input = &input[add as usize ..];
+            if self.length != max {
+                debug_assert!(self.length < max);
+                debug_assert!(input.is_empty());
+                return;
+            }
+            self.encoding.encode_append(&self.buffer[.. max as usize], self.output);
+            self.length = 0;
+        }
+        let len = floor(input.len(), max as usize);
+        self.encoding.encode_append(&input[.. len], self.output);
+        input = &input[len ..];
+        #[allow(clippy::cast_possible_truncation)] // no truncation
+        let len = input.len() as u8;
+        self.buffer[.. len as usize].copy_from_slice(input);
+        self.length = len;
+    }
+
+    /// Makes sure all inputs have been encoded and appended to the output
+    ///
+    /// This is equivalent to dropping the encoder and required for correctness, otherwise some
+    /// encoded data may be missing at the end.
+    pub fn finalize(self) {}
+}
+
+/// Wraps an encoding and input for display purposes.
+#[derive(Debug)]
+pub struct Display<'a> {
+    encoding: &'a Encoding,
+    input: &'a [u8],
+}
+
+impl core::fmt::Display for Display<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.encoding.encode_write(self.input, f)
     }
 }
 
@@ -1571,17 +1742,13 @@ enum SpecificationErrorImpl {
 use crate::SpecificationErrorImpl::*;
 
 /// Specification error
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Copy, Clone)]
 #[cfg(feature = "alloc")]
 pub struct SpecificationError(SpecificationErrorImpl);
 
 #[cfg(feature = "alloc")]
 impl core::fmt::Display for SpecificationError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self.0 {
             BadSize => write!(f, "invalid number of symbols"),
             NotAscii => write!(f, "non-ascii character"),
@@ -1614,6 +1781,7 @@ impl std::error::Error for SpecificationError {
 #[cfg(feature = "alloc")]
 impl Specification {
     /// Returns a default specification
+    #[must_use]
     pub fn new() -> Specification {
         Specification {
             symbols: String::new(),
@@ -1633,7 +1801,7 @@ impl Specification {
     /// Returns an error if the specification is invalid.
     pub fn encoding(&self) -> Result<Encoding, SpecificationError> {
         let symbols = self.symbols.as_bytes();
-        let bit: usize = match symbols.len() {
+        let bit: u8 = match symbols.len() {
             2 => 1,
             4 => 2,
             8 => 3,
@@ -1653,6 +1821,7 @@ impl Specification {
             Ok(())
         };
         for (v, symbols) in symbols.iter().enumerate() {
+            #[allow(clippy::cast_possible_truncation)] // no truncation
             set(&mut values, *symbols, v as u8)?;
         }
         let msb = self.bit_order == MostSignificantFirst;
@@ -1672,15 +1841,19 @@ impl Specification {
         let wrap = if self.wrap.separator.is_empty() || self.wrap.width == 0 {
             None
         } else {
-            Some((self.wrap.width, self.wrap.separator.as_bytes()))
-        };
-        if let Some((col, end)) = wrap {
+            let col = self.wrap.width;
+            let end = self.wrap.separator.as_bytes();
             check!(SpecificationError(WrapLength), col < 256 && end.len() < 256);
-            check!(SpecificationError(WrapWidth(dec(bit) as u8)), col % dec(bit) == 0);
-            for i in end.iter() {
-                set(&mut values, *i, IGNORE)?;
+            #[allow(clippy::cast_possible_truncation)] // no truncation
+            let col = col as u8;
+            #[allow(clippy::cast_possible_truncation)] // no truncation
+            let dec = dec(bit as usize) as u8;
+            check!(SpecificationError(WrapWidth(dec)), col % dec == 0);
+            for &i in end {
+                set(&mut values, i, IGNORE)?;
             }
-        }
+            Some((col, end))
+        };
         let from = self.translate.from.as_bytes();
         let to = self.translate.to.as_bytes();
         check!(SpecificationError(FromTo), from.len() == to.len());
@@ -1700,7 +1873,7 @@ impl Specification {
             None => encoding.push(INVALID),
             Some(pad) => encoding.push(pad),
         }
-        encoding.push(bit as u8);
+        encoding.push(bit);
         if msb {
             encoding[513] |= 0x08;
         }
@@ -1708,7 +1881,7 @@ impl Specification {
             encoding[513] |= 0x10;
         }
         if let Some((col, end)) = wrap {
-            encoding.push(col as u8);
+            encoding.push(col);
             encoding.extend_from_slice(end);
         } else if values.contains(&IGNORE) {
             encoding.push(0);
@@ -1934,7 +2107,7 @@ const HEXUPPER_PERMISSIVE_IMPL: &[u8] = &[
 /// assert_eq!(BASE32, spec.encoding().unwrap());
 /// ```
 ///
-/// It is conform to [RFC4648].
+/// It conforms to [RFC4648].
 ///
 /// [RFC4648]: https://tools.ietf.org/html/rfc4648#section-6
 pub const BASE32: Encoding = Encoding::internal_new(BASE32_IMPL);
@@ -2003,6 +2176,86 @@ const BASE32_NOPAD_IMPL: &[u8] = &[
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 29,
 ];
 
+/// Unpadded base32 encoding with case-insensitive decoding
+///
+/// This encoding is a static version of:
+///
+/// ```rust
+/// # use data_encoding::{Specification, BASE32_NOPAD_NOCASE};
+/// let mut spec = Specification::new();
+/// spec.symbols.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567");
+/// spec.translate.from.push_str("abcdefghijklmnopqrstuvwxyz");
+/// spec.translate.to.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+/// assert_eq!(BASE32_NOPAD_NOCASE, spec.encoding().unwrap());
+/// ```
+pub const BASE32_NOPAD_NOCASE: Encoding = Encoding::internal_new(BASE32_NOPAD_NOCASE_IMPL);
+const BASE32_NOPAD_NOCASE_IMPL: &[u8] = &[
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72,
+    73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55,
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72,
+    73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55,
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 26, 27, 28, 29, 30, 31, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+    25, 128, 128, 128, 128, 128, 128, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+    18, 19, 20, 21, 22, 23, 24, 25, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 29,
+];
+
+/// Unpadded base32 encoding with visual error correction during decoding
+///
+/// This encoding is a static version of:
+///
+/// ```rust
+/// # use data_encoding::{Specification, BASE32_NOPAD_VISUAL};
+/// let mut spec = Specification::new();
+/// spec.symbols.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567");
+/// spec.translate.from.push_str("01l8");
+/// spec.translate.to.push_str("OIIB");
+/// assert_eq!(BASE32_NOPAD_VISUAL, spec.encoding().unwrap());
+/// ```
+pub const BASE32_NOPAD_VISUAL: Encoding = Encoding::internal_new(BASE32_NOPAD_VISUAL_IMPL);
+const BASE32_NOPAD_VISUAL_IMPL: &[u8] = &[
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72,
+    73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55,
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72,
+    73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55,
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 50, 51, 52, 53, 54, 55, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 14, 8, 26, 27, 28, 29, 30, 31, 1, 128, 128, 128, 128, 128, 128, 128, 128,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 8, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 29,
+];
+
 /// Padded base32hex encoding
 ///
 /// This encoding is a static version of:
@@ -2015,7 +2268,7 @@ const BASE32_NOPAD_IMPL: &[u8] = &[
 /// assert_eq!(BASE32HEX, spec.encoding().unwrap());
 /// ```
 ///
-/// It is conform to [RFC4648].
+/// It conforms to [RFC4648].
 ///
 /// [RFC4648]: https://tools.ietf.org/html/rfc4648#section-7
 pub const BASE32HEX: Encoding = Encoding::internal_new(BASE32HEX_IMPL);
@@ -2097,7 +2350,7 @@ const BASE32HEX_NOPAD_IMPL: &[u8] = &[
 /// assert_eq!(BASE32_DNSSEC, spec.encoding().unwrap());
 /// ```
 ///
-/// It is conform to [RFC5155]:
+/// It conforms to [RFC5155]:
 ///
 /// - It uses a base32 extended hex alphabet.
 /// - It is case-insensitive when decoding and uses lowercase when encoding.
@@ -2134,6 +2387,7 @@ const BASE32_DNSSEC_IMPL: &[u8] = &[
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 29,
 ];
 
+#[allow(clippy::doc_markdown)]
 /// DNSCurve base32 encoding
 ///
 /// This encoding is a static version of:
@@ -2148,7 +2402,7 @@ const BASE32_DNSSEC_IMPL: &[u8] = &[
 /// assert_eq!(BASE32_DNSCURVE, spec.encoding().unwrap());
 /// ```
 ///
-/// It is conform to [DNSCurve].
+/// It conforms to [DNSCurve].
 ///
 /// [DNSCurve]: https://dnscurve.org/in-implement.html
 pub const BASE32_DNSCURVE: Encoding = Encoding::internal_new(BASE32_DNSCURVE_IMPL);
@@ -2193,7 +2447,7 @@ const BASE32_DNSCURVE_IMPL: &[u8] = &[
 /// assert_eq!(BASE64, spec.encoding().unwrap());
 /// ```
 ///
-/// It is conform to [RFC4648].
+/// It conforms to [RFC4648].
 ///
 /// [RFC4648]: https://tools.ietf.org/html/rfc4648#section-4
 pub const BASE64: Encoding = Encoding::internal_new(BASE64_IMPL);
@@ -2269,7 +2523,7 @@ const BASE64_NOPAD_IMPL: &[u8] = &[
 /// This encoding is a static version of:
 ///
 /// ```rust
-/// # use data_encoding::{Specification, Wrap, BASE64_MIME};
+/// # use data_encoding::{Specification, BASE64_MIME};
 /// let mut spec = Specification::new();
 /// spec.symbols.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
 /// spec.padding = Some('=');
@@ -2278,7 +2532,7 @@ const BASE64_NOPAD_IMPL: &[u8] = &[
 /// assert_eq!(BASE64_MIME, spec.encoding().unwrap());
 /// ```
 ///
-/// It is not exactly conform to [RFC2045] because it does not print the header
+/// It does not exactly conform to [RFC2045] because it does not print the header
 /// and does not ignore all characters.
 ///
 /// [RFC2045]: https://tools.ietf.org/html/rfc2045
@@ -2311,6 +2565,54 @@ const BASE64_MIME_IMPL: &[u8] = &[
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 61, 30, 76, 13, 10,
 ];
 
+/// MIME base64 encoding without trailing bits check
+///
+/// This encoding is a static version of:
+///
+/// ```rust
+/// # use data_encoding::{Specification, BASE64_MIME_PERMISSIVE};
+/// let mut spec = Specification::new();
+/// spec.symbols.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+/// spec.padding = Some('=');
+/// spec.wrap.width = 76;
+/// spec.wrap.separator.push_str("\r\n");
+/// spec.check_trailing_bits = false;
+/// assert_eq!(BASE64_MIME_PERMISSIVE, spec.encoding().unwrap());
+/// ```
+///
+/// It does not exactly conform to [RFC2045] because it does not print the header
+/// and does not ignore all characters.
+///
+/// [RFC2045]: https://tools.ietf.org/html/rfc2045
+pub const BASE64_MIME_PERMISSIVE: Encoding = Encoding::internal_new(BASE64_MIME_PERMISSIVE_IMPL);
+const BASE64_MIME_PERMISSIVE_IMPL: &[u8] = &[
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114,
+    115, 116, 117, 118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 65, 66,
+    67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+    97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
+    116, 117, 118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 65, 66, 67,
+    68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97,
+    98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+    117, 118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 65, 66, 67, 68,
+    69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98,
+    99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
+    118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 129, 128, 128, 129, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 62, 128, 128, 128, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 128, 128, 128, 130, 128,
+    128, 128, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+    24, 25, 128, 128, 128, 128, 128, 128, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 61, 14, 76, 13, 10,
+];
+
 /// Padded base64url encoding
 ///
 /// This encoding is a static version of:
@@ -2323,7 +2625,7 @@ const BASE64_MIME_IMPL: &[u8] = &[
 /// assert_eq!(BASE64URL, spec.encoding().unwrap());
 /// ```
 ///
-/// It is conform to [RFC4648].
+/// It conforms to [RFC4648].
 ///
 /// [RFC4648]: https://tools.ietf.org/html/rfc4648#section-5
 pub const BASE64URL: Encoding = Encoding::internal_new(BASE64URL_IMPL);

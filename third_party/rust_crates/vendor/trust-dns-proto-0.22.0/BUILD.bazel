@@ -82,7 +82,7 @@ rust_library(
     version = "0.22.0",
     deps = [
         "//third_party/rust_crates/vendor/cfg-if-1.0.0:cfg_if",
-        "//third_party/rust_crates/vendor/data-encoding-2.3.2:data_encoding",
+        "//third_party/rust_crates/vendor/data-encoding-2.9.0:data_encoding",
         "//third_party/rust_crates/vendor/futures-channel-0.3.30:futures_channel",
         "//third_party/rust_crates/vendor/futures-io-0.3.30:futures_io",
         "//third_party/rust_crates/vendor/futures-util-0.3.30:futures_util",

@@ -238,7 +238,7 @@ group("darling") {
 }
 
 group("data-encoding") {
-  public_deps = [ ":data-encoding-v2_3_2" ]
+  public_deps = [ ":data-encoding-v2_9_0" ]
 }
 
 if (current_os == "fuchsia") {
@@ -5071,17 +5071,17 @@ rustc_macro("darling_macro-v0_20_11") {
   applicable_licenses = [ ":darling_macro-v0_20_11.license" ]
 }
 
-license("data-encoding-v2_3_2.license") {
+license("data-encoding-v2_9_0.license") {
   public_package_name = "data_encoding"
   license_files =
-      [ "//third_party/rust_crates/vendor/data-encoding-2.3.2/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/data-encoding-2.9.0/LICENSE" ]
 }
 
-rustc_library("data-encoding-v2_3_2") {
+rustc_library("data-encoding-v2_9_0") {
   crate_name = "data_encoding"
   source_root =
-      "//third_party/rust_crates/vendor/data-encoding-2.3.2/src/lib.rs"
-  output_name = "data_encoding-182ebdb900ce1527"
+      "//third_party/rust_crates/vendor/data-encoding-2.9.0/src/lib.rs"
+  output_name = "data_encoding-ab4e44a27ccc3b50"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -5093,8 +5093,8 @@ rustc_library("data-encoding-v2_3_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=182ebdb900ce1527",
-    "-Cextra-filename=-182ebdb900ce1527",
+    "-Cmetadata=ab4e44a27ccc3b50",
+    "-Cextra-filename=-ab4e44a27ccc3b50",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
@@ -5102,7 +5102,7 @@ rustc_library("data-encoding-v2_3_2") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":data-encoding-v2_3_2.license" ]
+  applicable_licenses = [ ":data-encoding-v2_9_0.license" ]
 }
 
 license("dbl-v0_3_2.license") {
@@ -18789,7 +18789,7 @@ rustc_library("trust-dns-proto-v0_22_0") {
   deps = []
   deps += [ ":async-trait-v0_1_88($host_toolchain)" ]
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":data-encoding-v2_3_2" ]
+  deps += [ ":data-encoding-v2_9_0" ]
   deps += [ ":enum-as-inner-v0_5_1($host_toolchain)" ]
   deps += [ ":futures-channel-v0_3_30" ]
   deps += [ ":futures-io-v0_3_30" ]
@@ -18945,7 +18945,7 @@ rustc_library("tuf-v0_3_0-beta13") {
   deps = []
   deps += [ ":ring-v0_17_8" ]
   deps += [ ":chrono-v0_4_41" ]
-  deps += [ ":data-encoding-v2_3_2" ]
+  deps += [ ":data-encoding-v2_9_0" ]
   deps += [ ":futures-io-v0_3_30" ]
   deps += [ ":futures-util-v0_3_30" ]
   deps += [ ":http-v0_2_4" ]

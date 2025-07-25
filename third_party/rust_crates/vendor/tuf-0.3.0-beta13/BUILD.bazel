@@ -82,7 +82,7 @@ rust_library(
     deps = [
         "//third_party/rust_crates/forks/ring-0.17.8:ring",
         "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
-        "//third_party/rust_crates/vendor/data-encoding-2.3.2:data_encoding",
+        "//third_party/rust_crates/vendor/data-encoding-2.9.0:data_encoding",
         "//third_party/rust_crates/vendor/futures-io-0.3.30:futures_io",
         "//third_party/rust_crates/vendor/futures-util-0.3.30:futures_util",
         "//third_party/rust_crates/vendor/http-0.2.4:http",

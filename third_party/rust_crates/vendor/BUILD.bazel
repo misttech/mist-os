@@ -679,14 +679,14 @@ alias(
 )
 
 alias(
-    name = "data-encoding-2.3.2",
-    actual = "//third_party/rust_crates/vendor/data-encoding-2.3.2:data_encoding",
+    name = "data-encoding-2.9.0",
+    actual = "//third_party/rust_crates/vendor/data-encoding-2.9.0:data_encoding",
     tags = ["manual"],
 )
 
 alias(
     name = "data-encoding",
-    actual = "//third_party/rust_crates/vendor/data-encoding-2.3.2:data_encoding",
+    actual = "//third_party/rust_crates/vendor/data-encoding-2.9.0:data_encoding",
     tags = ["manual"],
 )
 
