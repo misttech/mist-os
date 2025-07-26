@@ -312,6 +312,11 @@ class EnergyModel {
     return std::nullopt;
   }
 
+  // Returns the processing rate of the fastest power level.
+  constexpr uint64_t max_processing_rate() const {
+    return levels().size() > 0 ? levels().back().processing_rate() : 0u;
+  }
+
   // Following the same rules as `levels()` but returns only the set of power levels whose type is
   // `PowerLevel::Type::kActive`. This set may be empty.
   constexpr std::span<const PowerLevel> active_levels() const {

@@ -61,13 +61,13 @@
 // Scales the given value up by the reciprocal of the CPU performance scale.
 template <typename T>
 inline T Scheduler::ScaleUp(T value) const {
-  return value * performance_scale_reciprocal();
+  return value * processing_rate_reciprocal();
 }
 
 // Scales the given value down by the CPU performance scale.
 template <typename T>
 inline T Scheduler::ScaleDown(T value) const {
-  return value * performance_scale();
+  return value * processing_rate();
 }
 
 // Returns a new flow id when flow tracing is enabled, zero otherwise.
@@ -78,7 +78,7 @@ inline uint64_t Scheduler::NextFlowId() {
   return 0;
 }
 
-// Updates the total expected runtime estimator with the given delta. The
+// Updates the total estimated runtime estimator with the given delta. The
 // exported value is scaled by the relative performance factor of the CPU to
 // account for performance differences in the estimate.
 inline void Scheduler::UpdateTotalExpectedRuntime(SchedDuration delta_ns) {
@@ -86,7 +86,7 @@ inline void Scheduler::UpdateTotalExpectedRuntime(SchedDuration delta_ns) {
   DEBUG_ASSERT(total_expected_runtime_ns_ >= 0);
   const SchedDuration scaled_ns = ScaleUp(total_expected_runtime_ns_);
   exported_queue_time_ns_ = scaled_ns;
-  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(), ("Demand", scaled_ns.raw_value()));
+  LOCAL_KTRACE_COUNTER(COUNTER, "Estimated Runtime", this_cpu(), ("CPU", scaled_ns.raw_value()));
 }
 
 // Updates the total deadline utilization estimator with the given delta. The
@@ -96,12 +96,29 @@ inline void Scheduler::UpdateTotalDeadlineUtilization(SchedUtilization delta) {
   const SchedUtilization utilization = power_level_control_.UpdateNormalizedUtilization(delta);
   DEBUG_ASSERT(utilization >= 0);
   exported_deadline_utilization_ = utilization;
-  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(),
-                       ("Utilization", ffl::Round<uint64_t>(utilization * 1000)));
+  LOCAL_KTRACE_COUNTER(COUNTER, "Utilization", this_cpu(),
+                       ("CPU", ffl::Round<uint64_t>(utilization * 1000)));
+
+  if (const ktl::optional<uint32_t> domain_id = power_level_control_.domain_id()) {
+    const SchedUtilization domain_utilization = power_level_control_.total_normalized_utilization();
+    LOCAL_KTRACE_COUNTER(COUNTER, "Utilization", domain_id.value(),
+                         ("Domain", ffl::Round<uint64_t>(domain_utilization * 1000)));
+  }
+}
+
+inline bool Scheduler::UpdateProcessingRate() {
+  if (power_level_control_.is_processing_rate_update_pending()) {
+    const SchedProcessingRate processing_rate = power_level_control_.UpdateProcessingRate();
+    exported_processing_rate_ = processing_rate;
+    LOCAL_KTRACE_COUNTER(COUNTER, "Processing Rate", this_cpu(),
+                         ("CPU", ffl::Round<uint64_t>(processing_rate * 1000)));
+    return true;
+  }
+  return false;
 }
 
 inline void Scheduler::TraceTotalRunnableThreads() const {
-  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(), ("Queue Length", runnable_task_count()));
+  LOCAL_KTRACE_COUNTER(COUNTER, "Queue Length", this_cpu(), ("CPU", runnable_task_count()));
 }
 
 inline void Scheduler::RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) {

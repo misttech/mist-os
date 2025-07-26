@@ -666,13 +666,13 @@ Scheduler::DequeueResult Scheduler::DequeueThread(
   // Release the queue lock while attempting to steal work, leaving IRQs
   // disabled.  Latch our scale up factor to use while determining whether or
   // not we can steal a given thread before we drop our lock.
-  // TODO(eieio): Since the performance scale is CPU-local and not accessed
-  // across processors, it should be unnecessary to latch the value. Change the
+  // TODO(eieio): Since the processing rate is CPU-local and not accessed across
+  // processors, it should be unnecessary to latch the value. Change the
   // annotations to allow this.
   DequeueResult result;
-  queue_guard.CallUnlocked([&, performance_scale = performance_scale_] {
+  queue_guard.CallUnlocked([&, processing_rate = power_level_control_.processing_rate()] {
     ChainLockTransaction::AssertActive();
-    result = StealWork(now, performance_scale);
+    result = StealWork(now, processing_rate);
   });
 
   if (result) {
@@ -685,8 +685,7 @@ Scheduler::DequeueResult Scheduler::DequeueThread(
 // Attempts to steal work from other busy CPUs and move it to the local run
 // queues. Returns a pointer to the stolen thread that is now associated with
 // the local Scheduler instance, or nullptr is no work was stolen.
-Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
-                                              SchedPerformanceScale performance_scale) {
+Scheduler::DequeueResult Scheduler::StealWork(SchedTime now, SchedProcessingRate processing_rate) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "StealWork");
 
   const cpu_num_t current_cpu = this_cpu();
@@ -817,14 +816,13 @@ Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
       // Returns true if the given thread in the run queue meets the criteria to
       // run on this CPU.  Don't attempt to steal any threads which are
       // currently in the process of being scheduled.
-      const auto deadline_predicate = [check_affinity,
-                                       performance_scale](const auto& iter) -> bool {
+      const auto deadline_predicate = [check_affinity, processing_rate](const auto& iter) -> bool {
         const Thread& thread = *iter;
         MarkHasOwnedThreadAccess(thread);
 
         const SchedulerState& state = thread.scheduler_state();
         const EffectiveProfile& ep = state.effective_profile_;
-        const bool is_scheduleable = ep.deadline().utilization <= performance_scale;
+        const bool is_scheduleable = ep.deadline().utilization <= processing_rate;
 
         return check_affinity(thread) && is_scheduleable && !thread.has_migrate_fn();
       };
@@ -1320,13 +1318,12 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
    public:
     Candidate() = default;
 
-    // Latches the performance scale, utilization, and queue time from the given
-    // using relaxed atomic reads.
+    // Latches key values using relaxed atomic reads.
     explicit Candidate(const Scheduler* scheduler)
         : scheduler_{scheduler},
-          performance_scale_{scheduler->exported_performance_scale()},
-          deadline_utilization_{scheduler->exported_deadline_utilization()},
-          queue_time_ns_{scheduler->exported_queue_time_ns()} {}
+          queue_time_ns_{scheduler->exported_queue_time_ns()},
+          processing_rate_{scheduler->exported_processing_rate()},
+          deadline_utilization_{scheduler->exported_deadline_utilization()} {}
 
     Candidate(const Candidate&) = default;
     Candidate& operator=(const Candidate&) = default;
@@ -1334,15 +1331,15 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
     explicit operator bool() const { return scheduler_ != nullptr; }
 
     const Scheduler* scheduler() const { return scheduler_; }
-    SchedPerformanceScale performance_scale() const { return performance_scale_; }
-    SchedUtilization deadline_utilization() const { return deadline_utilization_; }
     SchedDuration queue_time_ns() const { return queue_time_ns_; }
+    SchedProcessingRate processing_rate() const { return processing_rate_; }
+    SchedUtilization deadline_utilization() const { return deadline_utilization_; }
 
    private:
     const Scheduler* scheduler_{nullptr};
-    SchedPerformanceScale performance_scale_{0};
-    SchedUtilization deadline_utilization_{0};
     SchedDuration queue_time_ns_{0};
+    SchedProcessingRate processing_rate_{0};
+    SchedUtilization deadline_utilization_{0};
   };
 
   const bool is_fair = IsFairThread(thread);
@@ -1395,7 +1392,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
 
     return current_target.queue_time_ns() <= kIntraClusterThreshold &&
            current_target.deadline_utilization() + thread_deadline_utilization <=
-               current_target.performance_scale();
+               current_target.processing_rate();
   };
 
   // Loop over the search set for CPU the task last ran on to find a suitable
@@ -1958,20 +1955,15 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, EndTraceCallback 
     }
   }
 
-  // Update the current performance scale only after any uses in the reschedule
+  // Update the current processing rate only after any uses in the reschedule
   // path above to ensure the scale is applied consistently over the interval
   // between reschedules (i.e. not earlier than the requested update).
   //
-  // Updating the performance scale also results in updating the target
-  // preemption time below when the current thread is deadline scheduled.
+  // Updating the processing rate also results in updating the target preemption
+  // time below when the current thread is deadline scheduled.
   //
-  // TODO(eieio): Apply a minimum value threshold to the userspace value.
-  // TODO(eieio): Shed load when total utilization is above kCpuUtilizationLimit.
-  const bool performance_scale_updated = performance_scale_ != pending_user_performance_scale_;
-  if (performance_scale_updated) {
-    exported_performance_scale_ = performance_scale_ = pending_user_performance_scale_;
-    performance_scale_reciprocal_ = 1 / performance_scale_;
-  }
+  // TODO(eieio): Shed load when total utilization is above the processing rate.
+  const bool processing_rate_updated = UpdateProcessingRate();
 
   // Send any pending power level request.
   power_level_control_.SendPendingPowerLevelRequest();
@@ -2031,8 +2023,8 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, EndTraceCallback 
     DEBUG_ASSERT(current_thread == next_thread);
 
     // Update the target preemption time for consistency with the updated CPU
-    // performance scale.
-    if (performance_scale_updated && IsDeadlineThread(next_thread)) {
+    // processing rate.
+    if (processing_rate_updated && IsDeadlineThread(next_thread)) {
       target_preemption_time_ns_ = NextThreadTimeslice(next_thread, now);
     }
 
@@ -3338,20 +3330,14 @@ void Scheduler::TimerTick(SchedTime now) {
   Thread::Current::preemption_state().PreemptSetPending();
 }
 
-void Scheduler::InitializePerformanceScale(SchedPerformanceScale scale)
-    TA_NO_THREAD_SAFETY_ANALYSIS {
-  // This happens early in boot, before the scheduler is actually running.  We
-  // should be able to treat these assignments as if they were done in a
-  // constructor and skip obtaining the queue lock.
-  DEBUG_ASSERT(scale > 0);
-  performance_scale_ = scale;
-  default_performance_scale_ = scale;
-  pending_user_performance_scale_ = scale;
-  exported_performance_scale_ = scale;
-  performance_scale_reciprocal_ = 1 / scale;
+void Scheduler::InitializeProcessingRate(SchedProcessingRate scale) TA_NO_THREAD_SAFETY_ANALYSIS {
+  // Since this happens early in boot, before the scheduler is actually running,
+  // acquiring the queue lock is unnecessary.
+  power_level_control_.TopologySetDefaultProcessingRate(scale);
+  exported_processing_rate_ = scale;
 }
 
-void Scheduler::UpdatePerformanceScales(zx_cpu_performance_info_t* info, size_t count) {
+void Scheduler::UpdateProcessingRates(zx_cpu_performance_info_t* info, size_t count) {
   DEBUG_ASSERT(count <= percpu::processor_count());
   InterruptDisableGuard irqd;
 
@@ -3363,12 +3349,12 @@ void Scheduler::UpdatePerformanceScales(zx_cpu_performance_info_t* info, size_t 
     Scheduler* scheduler = Scheduler::Get(entry.logical_cpu_number);
     Guard<MonitoredSpinLock, NoIrqSave> guard{&scheduler->queue_lock_, SOURCE_TAG};
 
-    // TODO(eieio): Apply a minimum value threshold and update the entry if
-    // the requested value is below it.
-    scheduler->pending_user_performance_scale_ = ToSchedPerformanceScale(entry.performance_scale);
+    // TODO(eieio): Apply a minimum value threshold.
+    scheduler->power_level_control_.UserSetProcessingRate(
+        ToSchedProcessingRate(entry.performance_scale));
 
-    // Return the original performance scale.
-    entry.performance_scale = ToUserPerformanceScale(scheduler->performance_scale());
+    // Return the original performance scale (i.e. processing rate).
+    entry.performance_scale = ToUserPerformanceScale(scheduler->processing_rate());
   }
 
   RescheduleMask(cpus_to_reschedule_mask);
@@ -3380,7 +3366,8 @@ void Scheduler::GetPerformanceScales(zx_cpu_performance_info_t* info, size_t cou
     Scheduler* scheduler = Scheduler::Get(i);
     Guard<MonitoredSpinLock, IrqSave> guard{&scheduler->queue_lock_, SOURCE_TAG};
     info[i].logical_cpu_number = i;
-    info[i].performance_scale = ToUserPerformanceScale(scheduler->pending_user_performance_scale_);
+    info[i].performance_scale =
+        ToUserPerformanceScale(scheduler->power_level_control_.updated_processing_rate());
   }
 }
 
@@ -3390,7 +3377,8 @@ void Scheduler::GetDefaultPerformanceScales(zx_cpu_performance_info_t* info, siz
     Scheduler* scheduler = Scheduler::Get(i);
     Guard<MonitoredSpinLock, IrqSave> guard{&scheduler->queue_lock_, SOURCE_TAG};
     info[i].logical_cpu_number = i;
-    info[i].performance_scale = ToUserPerformanceScale(scheduler->default_performance_scale_);
+    info[i].performance_scale =
+        ToUserPerformanceScale(scheduler->power_level_control_.default_processing_rate());
   }
 }
 

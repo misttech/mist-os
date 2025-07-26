@@ -70,6 +70,14 @@ class PowerState {
   // Domain the PowerState is being modeled after.
   const fbl::RefPtr<PowerDomain>& domain() const { return domain_; }
 
+  // Returns the id of the domain this power state belongs to.
+  std::optional<uint32_t> domain_id() const {
+    if (domain()) {
+      return domain()->id();
+    }
+    return std::nullopt;
+  }
+
   // Returns whether the domain's controller is serving requests. Returns false if there is no
   // domain.
   bool is_serving() const { return domain() && domain()->controller()->is_serving(); }
@@ -124,6 +132,23 @@ class PowerState {
              power_level < domain()->model().levels().size();
     }
     return false;
+  }
+
+  // Returns the processing rate of the fastest power level in this domain.
+  uint64_t max_processing_rate() const {
+    if (domain()) {
+      return domain()->model().max_processing_rate();
+    }
+    return 0;
+  }
+
+  // Returns the processing rate of the current active power level. Returns zero if there is no
+  // active power level or no domain is set.
+  uint64_t active_processing_rate() const {
+    if (domain() && active_power_level_.has_value()) {
+      return domain()->model().levels()[*active_power_level_].processing_rate();
+    }
+    return 0;
   }
 
   // Returns the current utilization of the processor.

@@ -670,7 +670,7 @@ zx_status_t sys_system_set_performance_info(zx_handle_t resource, uint32_t topic
     }
   }
 
-  Scheduler::UpdatePerformanceScales(performance_info.get(), count);
+  Scheduler::UpdateProcessingRates(performance_info.get(), count);
   return ZX_OK;
 }
 
