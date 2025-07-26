@@ -262,10 +262,10 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   display::DisplayId display_id_ TA_GUARDED(display_mutex_) = kPanelDisplayId;
   bool display_attached_ TA_GUARDED(display_mutex_) = false;
 
-  // The DisplayMode applied most recently to the display.
+  // The DisplayTiming applied most recently to the display.
   //
   // Default-constructed if no configuration is applied to the display yet or
-  // DisplayMode is ignored.
+  // DisplayTiming is ignored.
   display::DisplayTiming current_display_timing_ TA_GUARDED(display_mutex_) = {};
 
   std::unique_ptr<HotPlugDetection> hot_plug_detection_;

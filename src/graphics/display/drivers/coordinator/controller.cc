@@ -122,7 +122,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
     test_layer.display_destination.width = width;
     test_layer.display_destination.height = height;
 
-    test_config.mode = display::ToBanjoDisplayMode(edid_timing);
+    test_config.mode = display::ToBanjoDisplayTiming(edid_timing);
 
     display::ConfigCheckResult config_check_result =
         engine_driver_client_->CheckConfiguration(&test_config);

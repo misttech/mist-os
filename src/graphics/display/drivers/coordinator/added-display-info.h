@@ -55,7 +55,7 @@ struct AddedDisplayInfo {
   // equivalent does not convey detailed timing information. We will be able to
   // remove this Banjo dependency once we move detailed timing information
   // management to engine / panel drivers.
-  fbl::Vector<display_mode_t> banjo_preferred_modes;
+  fbl::Vector<display_timing_t> banjo_preferred_modes;
 };
 
 }  // namespace display_coordinator

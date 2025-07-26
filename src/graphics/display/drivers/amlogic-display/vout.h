@@ -125,7 +125,7 @@ class Vout {
     PanelConfig panel_config;
 
     // Matches the timing in `panel_config`.
-    display_mode_t banjo_display_mode;
+    display_timing_t banjo_display_timing;
   } dsi_;
 
   struct hdmi_t {

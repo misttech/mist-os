@@ -71,7 +71,7 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
                         "it was not supposed to allocate at all");
   }
 
-  fbl::Vector<display_mode_t> banjo_display_modes;
+  fbl::Vector<display_timing_t> banjo_display_modes;
   if (banjo_display_info.preferred_modes_count != 0) {
     banjo_display_modes.reserve(banjo_display_info.preferred_modes_count, &alloc_checker);
     if (!alloc_checker.check()) {

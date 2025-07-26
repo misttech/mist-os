@@ -94,7 +94,7 @@ type RawDisplayInfo = resource struct {
     /// only supported operational mode in this member. Drivers that support
     /// seamless display handoff from a bootloader report the display's initial
     /// mode in this member.
-    preferred_modes vector<DisplayMode>:MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES;
+    preferred_modes vector<DisplayTiming>:MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES;
 
     /// Display capabilities, encoded using the E-EDID standard.
     ///
@@ -201,10 +201,8 @@ type ModeFlag = strict enum : uint32 {
     DOUBLE_CLOCKED = 0x10;
 };
 
-/// The video parameters which specify the display mode.
-///
-/// A superset of the [`fuchsia.hardware.display.types/Mode`] FIDL type.
-type DisplayMode = struct {
+/// The video timing parameters which specify the display mode.
+type DisplayTiming = struct {
     /// The rate at which pixel data gets transferred to the display.
     ///
     /// Valid modes have positive pixel clock rates. This constraint effectively
@@ -248,7 +246,7 @@ type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id uint64;
 
-    mode DisplayMode;
+    mode DisplayTiming;
 
     /// Bitmask of flags defined in the ColorConversion enum.
     cc_flags uint32;

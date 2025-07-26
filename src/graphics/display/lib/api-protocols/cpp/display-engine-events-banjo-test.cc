@@ -114,8 +114,8 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithEdidBytes) {
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
 
-    cpp20::span<const display_mode_t> banjo_preferred_modes(info->preferred_modes_list,
-                                                            info->preferred_modes_count);
+    cpp20::span<const display_timing_t> banjo_preferred_modes(info->preferred_modes_list,
+                                                              info->preferred_modes_count);
     EXPECT_THAT(banjo_preferred_modes, ::testing::IsEmpty());
 
     cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);
@@ -143,8 +143,8 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPixelFormats) {
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
 
-    cpp20::span<const display_mode_t> banjo_preferred_modes(info->preferred_modes_list,
-                                                            info->preferred_modes_count);
+    cpp20::span<const display_timing_t> banjo_preferred_modes(info->preferred_modes_list,
+                                                              info->preferred_modes_count);
     EXPECT_THAT(banjo_preferred_modes, ::testing::IsEmpty());
 
     cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);

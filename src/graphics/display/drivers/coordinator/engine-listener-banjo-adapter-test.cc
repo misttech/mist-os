@@ -58,7 +58,7 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayAdded) {
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(
           fuchsia_images2::PixelFormat::kB8G8R8A8),
   };
-  static constexpr display_mode_t kPreferredModes[] = {
+  static constexpr display_timing_t kPreferredModes[] = {
       {
           .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
           .h_addressable = 0x0f'0f,
@@ -93,7 +93,7 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayAdded) {
                                                             display::PixelFormat::kB8G8R8A8));
 
     ASSERT_EQ(info->banjo_preferred_modes.size(), 1u);
-    const display_mode_t& banjo_preferred_mode = info->banjo_preferred_modes[0];
+    const display_timing_t& banjo_preferred_mode = info->banjo_preferred_modes[0];
 
     EXPECT_EQ(banjo_preferred_mode.pixel_clock_hz, 0x1f'1f'1f'1f'1f);
     EXPECT_EQ(banjo_preferred_mode.h_addressable, 0x0f'0fu);

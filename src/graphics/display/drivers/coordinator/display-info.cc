@@ -89,7 +89,7 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
       fdf::error("Failed to allocate DisplayTiming list for display ID: {}", display_id.value());
       return zx::error(ZX_ERR_NO_MEMORY);
     }
-    for (const display_mode_t& banjo_preferred_mode : added_display_info.banjo_preferred_modes) {
+    for (const display_timing_t& banjo_preferred_mode : added_display_info.banjo_preferred_modes) {
       ZX_DEBUG_ASSERT_MSG(
           preferred_modes.size() < added_display_info.banjo_preferred_modes.size(),
           "The push_back() below was not supposed to allocate memory, but it might");

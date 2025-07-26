@@ -1028,7 +1028,7 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
     display_attached_ = true;
 
     // When the new display is attached to the display engine, it's not set
-    // up with any DisplayMode. This clears the display mode set previously
+    // up with any DisplayTiming. This clears the display mode set previously
     // to force a Vout modeset to be performed on the next
     // ApplyConfiguration().
     current_display_timing_ = {};

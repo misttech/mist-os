@@ -125,8 +125,8 @@ TEST_F(AddedDisplayInfoTest, CreateCopiesDisplayModes) {
 
   static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kBanjoPixelFormats = {
       kPixelFormats[0].ToBanjo()};
-  static constexpr std::array<display_mode_t, 2> kBanjoDisplayModes = {
-      display_mode_t{
+  static constexpr std::array<display_timing_t, 2> kBanjoDisplayTimings = {
+      display_timing_t{
           .pixel_clock_hz = int64_t{60} * (640 + 10 + 20 + 30) * (480 + 40 + 50 + 60),
           .h_addressable = 640,
           .h_front_porch = 10,
@@ -138,7 +138,7 @@ TEST_F(AddedDisplayInfoTest, CreateCopiesDisplayModes) {
           .v_blanking = 40 + 50 + 60,  // VBP is 60.
           .flags = 0,
       },
-      display_mode_t{
+      display_timing_t{
           .pixel_clock_hz = int64_t{60} * (1024 + 10 + 20 + 30) * (768 + 40 + 50 + 60),
           .h_addressable = 1024,
           .h_front_porch = 10,
@@ -153,8 +153,8 @@ TEST_F(AddedDisplayInfoTest, CreateCopiesDisplayModes) {
   };
   static constexpr raw_display_info_t kBanjoDisplayInfo = {
       .display_id = 42,
-      .preferred_modes_list = kBanjoDisplayModes.data(),
-      .preferred_modes_count = kBanjoDisplayModes.size(),
+      .preferred_modes_list = kBanjoDisplayTimings.data(),
+      .preferred_modes_count = kBanjoDisplayTimings.size(),
       .edid_bytes_list = nullptr,
       .edid_bytes_count = 0,
       .pixel_formats_list = kBanjoPixelFormats.data(),

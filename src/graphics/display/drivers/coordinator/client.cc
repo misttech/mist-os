@@ -413,7 +413,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
-  display_config.draft_.mode = display::ToBanjoDisplayMode(*display_timing_it);
+  display_config.draft_.mode = display::ToBanjoDisplayTiming(*display_timing_it);
   display_config.has_draft_nonlayer_config_change_ = true;
   draft_display_config_was_validated_ = false;
 }
@@ -1240,7 +1240,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
-    display_config->applied_.mode = display::ToBanjoDisplayMode(display_timings[0]);
+    display_config->applied_.mode = display::ToBanjoDisplayTiming(display_timings[0]);
 
     display_config->applied_.cc_flags = 0;
 

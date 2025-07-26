@@ -52,7 +52,7 @@ void DisplayConfig::DiscardNonLayerDraftConfig() {
   // We preserve the draft display mode to work
   // around a Scenic issue where it forgets to call SetDisplayMode() again after
   // discarding a draft configuration with a load-bearing SetDisplayMode().
-  const display_mode_t draft_mode = draft_.mode;
+  const display_timing_t draft_mode = draft_.mode;
 
   draft_ = applied_;
   has_draft_nonlayer_config_change_ = false;
