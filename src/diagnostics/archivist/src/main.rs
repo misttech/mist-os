@@ -49,6 +49,15 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
+fn write_to_serial(msg: &str) {
+    let msg = msg.as_bytes();
+    for chunk in msg.chunks(MAX_SERIAL_WRITE_SIZE) {
+        unsafe {
+            zx::sys::zx_debug_write(chunk.as_ptr(), chunk.len());
+        }
+    }
+}
+
 async fn async_main(config: Config) -> Result<(), Error> {
     let ring_buffer = create_ring_buffer(config.logs_max_cached_original_bytes as usize);
 
@@ -56,13 +65,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
     let is_embedded = !config.enable_klog;
 
     if let Err(e) = init_diagnostics(&ring_buffer, is_embedded).await {
-        let msg = format!("archivist: init_diagnostics failed: {e:?}\n");
-        let msg = msg.as_bytes();
-        for chunk in msg.chunks(MAX_SERIAL_WRITE_SIZE) {
-            unsafe {
-                zx::sys::zx_debug_write(chunk.as_ptr(), chunk.len());
-            }
-        }
+        write_to_serial(&format!("archivist: init_diagnostics failed: {e:?}\n"));
         return Err(e).context("init_diagnostics");
     }
 
@@ -91,6 +94,12 @@ async fn init_diagnostics(
     ring_buffer: &ring_buffer::Reader,
     is_embedded: bool,
 ) -> Result<(), Error> {
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        write_to_serial(&format!("[archivist] FATAL: {info}\n"));
+        previous_hook(info);
+    }));
+
     struct Logger {
         iob: zx::Iob,
         dropped: AtomicU64,
