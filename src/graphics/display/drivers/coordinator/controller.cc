@@ -279,6 +279,20 @@ void Controller::OnDisplayVsync(display::DisplayId display_id, zx::time_monotoni
                                 display::DriverConfigStamp driver_config_stamp) {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->get() == engine_listener_dispatcher_->get());
 
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *driver_dispatcher()->async_dispatcher(),
+      [this, display_id, timestamp, driver_config_stamp]() {
+        ProcessDisplayVsync(display_id, timestamp, driver_config_stamp);
+      });
+  if (post_task_result.is_error()) {
+    fdf::error("Failed to dispatch ProcessVsync task: {}", post_task_result);
+  }
+}
+
+void Controller::ProcessDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                                     display::DriverConfigStamp driver_config_stamp) {
+  ZX_DEBUG_ASSERT(IsRunningOnDriverDispatcher());
+
   // TODO(https://fxbug.dev/402445178): This trace event is load bearing for fps trace processor.
   // Remove it after changing the dependency.
   TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", display_id.value());

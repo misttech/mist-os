@@ -203,6 +203,12 @@ class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
   // Must be called on the driver dispatcher.
   void PopulateDisplayTimings(DisplayInfo& info) __TA_EXCLUDES(mtx());
 
+  // Processes a VSync signal from an engine driver.
+  //
+  // Must be called on the driver dispatcher.
+  void ProcessDisplayVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                           display::DriverConfigStamp driver_config_stamp);
+
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
   inspect::Node root_;
