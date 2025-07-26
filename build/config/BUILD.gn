@@ -104,7 +104,19 @@ config("stack-size-section") {
       asmflags = cflags
       ldflags = cflags
     }
-    rustflags = [ "-Zemit-stack-sizes" ]
+
+    if (is_fuchsia) {
+      rust_link_prefix = ""
+    } else {
+      rust_link_prefix = "-Wl,"
+    }
+
+    rustflags = [
+      "-Zemit-stack-sizes",
+
+      #TODO(https://fxbug.dev/434231527): remove the stack-size-section workaround once the rustc does this.
+      "-Clink-arg=${rust_link_prefix}--mllvm=--stack-size-section",
+    ]
   }
 }
 
