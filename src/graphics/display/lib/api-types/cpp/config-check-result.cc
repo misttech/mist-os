@@ -28,4 +28,26 @@ static_assert(ConfigCheckResult::kTooManyDisplays.ToBanjo() == CONFIG_CHECK_RESU
 static_assert(ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo() ==
               CONFIG_CHECK_RESULT_UNSUPPORTED_MODES);
 
+std::string_view ConfigCheckResult::ToString() const {
+  if (*this == ConfigCheckResult::kOk) {
+    return "Ok";
+  }
+  if (*this == ConfigCheckResult::kEmptyConfig) {
+    return "EmptyConfig";
+  }
+  if (*this == ConfigCheckResult::kInvalidConfig) {
+    return "InvalidConfig";
+  }
+  if (*this == ConfigCheckResult::kUnsupportedConfig) {
+    return "UnsupportedConfig";
+  }
+  if (*this == ConfigCheckResult::kTooManyDisplays) {
+    return "TooManyDisplays";
+  }
+  if (*this == ConfigCheckResult::kUnsupportedDisplayModes) {
+    return "UnsupportedDisplayModes";
+  }
+  return "Unknown";
+}
+
 }  // namespace display

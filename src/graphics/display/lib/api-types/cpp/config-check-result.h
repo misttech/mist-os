@@ -10,6 +10,11 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <string_view>
+
+#if __cplusplus >= 202002L
+#include <format>
+#endif
 
 namespace display {
 
@@ -52,6 +57,9 @@ class ConfigCheckResult {
   // and Inspect. The values have the same stability guarantees as the
   // equivalent FIDL type.
   constexpr uint32_t ValueForLogging() const;
+
+  // Returns a developer-facing string representing the result.
+  std::string_view ToString() const;
 
   static const ConfigCheckResult kOk;
   static const ConfigCheckResult kEmptyConfig;
@@ -140,5 +148,14 @@ inline constexpr const ConfigCheckResult ConfigCheckResult::kUnsupportedDisplayM
     fuchsia_hardware_display_types::wire::ConfigResult::kUnsupportedDisplayModes);
 
 }  // namespace display
+
+#if __cplusplus >= 202002L
+template <>
+struct std::formatter<display::ConfigCheckResult> : std::formatter<std::string_view> {
+  auto format(const display::ConfigCheckResult& result, std::format_context& ctx) const {
+    return std::formatter<std::string_view>::format(result.ToString(), ctx);
+  }
+};
+#endif
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_CONFIG_CHECK_RESULT_H_
