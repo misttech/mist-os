@@ -4,7 +4,7 @@
 
 use crate::graph::{NodeGraph, NodeId, Path, PathId};
 use fdf_component::{
-    driver_register, Driver, DriverContext, Node, NodeBuilder, ZirconServiceOffer,
+    Driver, DriverContext, Node, NodeBuilder, ZirconServiceOffer, driver_register,
 };
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_driver_framework::NodeControllerMarker;
@@ -59,7 +59,8 @@ impl Child {
             graph.make_bandwidth_requests(&self.path)
         };
 
-        self.device
+        let result = self
+            .device
             .set_nodes_bandwidth(&requests)
             .await
             .map_err(|err| {
@@ -67,6 +68,13 @@ impl Child {
                 Status::INTERNAL
             })?
             .map_err(Status::from_raw)?;
+
+        for node in result {
+            ftrace::instant!(c"interconnect", c"node_bandwidth", ftrace::Scope::Process,
+                "id" => node.node_id.unwrap_or(0),
+                "average_bandwidth_bps" => node.average_bandwidth_bps.unwrap_or(0),
+                "peak_bandwidth_bps" => node.peak_bandwidth_bps.unwrap_or(0));
+        }
 
         // TODO(b/405206028): On failure, try to set old values?
 
