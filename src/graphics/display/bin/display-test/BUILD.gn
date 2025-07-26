@@ -8,7 +8,6 @@ import("//build/components.gni")
 executable("bin") {
   output_name = "display-test"
 
-  visibility = [ ":*" ]
   sources = [
     "display.cc",
     "image.cc",
@@ -17,14 +16,12 @@ executable("bin") {
   ]
 
   deps = [
-    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fidl",
     "//src/graphics/display/lib/api-types/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
@@ -39,12 +36,8 @@ bootfs_files_for_assembly("bootfs") {
   deps = [ ":bin" ]
 }
 
-fuchsia_package_with_single_component("display-test-pkg") {
-  component_name = "display_test"
+fuchsia_package_with_single_component("display-test") {
+  component_name = "display-test"
   manifest = "meta/display-test.cml"
   deps = [ ":bin" ]
-}
-
-group("display-test") {
-  deps = [ ":display-test-pkg" ]
 }
