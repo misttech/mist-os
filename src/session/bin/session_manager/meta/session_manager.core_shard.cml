@@ -137,11 +137,6 @@
             to: "#session-manager",
         },
         {
-            protocol: "fuchsia.ssh.AuthorizedKeys",
-            from: "#ssh-key-manager",
-            to: "#session-manager",
-        },
-        {
             protocol: "fuchsia.starnix.runner.Manager",
             from: "#starnix_runner",
             to: "#session-manager",

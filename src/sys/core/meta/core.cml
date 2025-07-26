@@ -91,10 +91,6 @@
             environment: "#core-env",
         },
         {
-            name: "ssh-key-manager",
-            url: "fuchsia-pkg://fuchsia.com/ssh-key-manager#meta/ssh-key-manager.cm",
-        },
-        {
             name: "network",
             url: "fuchsia-pkg://fuchsia.com/network#meta/network.cm",
             startup: "eager",
@@ -391,13 +387,6 @@
             from: "parent",
             to: "#cobalt_system_metrics",
             subdir: "cobalt_system_metrics",
-        },
-        {
-            directory: "data",
-            from: "parent",
-            as: "ssh",
-            to: "#ssh-key-manager",
-            subdir: "ssh",
         },
         {
             storage: "data",

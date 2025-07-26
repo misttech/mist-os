@@ -163,7 +163,6 @@
                 "fuchsia.settings.NightMode",
                 "fuchsia.settings.Privacy",
                 "fuchsia.settings.Setup",
-                "fuchsia.ssh.AuthorizedKeys",
                 "fuchsia.starnix.runner.Manager",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.time.alarms.WakeAlarms",

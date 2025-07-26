@@ -155,7 +155,6 @@
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.session.Launcher",
                 "fuchsia.space.Manager",
-                "fuchsia.ssh.AuthorizedKeys",
                 "fuchsia.stash.SecureStore",
                 "fuchsia.stash.Store",
                 "fuchsia.stash.Store2",

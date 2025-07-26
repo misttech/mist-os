@@ -284,11 +284,6 @@
             to: "#sshd-host",
         },
         {
-            protocol: "fuchsia.ssh.AuthorizedKeys",
-            from: "#ssh-key-manager",
-            to: "#sshd-host",
-        },
-        {
             protocol: [
                 "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
