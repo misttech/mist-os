@@ -643,7 +643,6 @@ assembly_input_bundle("bootstrap_eng") {
     # tests
     "//src/devices/block/bin/blktest:bootfs",
     "//src/devices/tee/bin:bootfs",
-    "//src/graphics/display/bin/display-test:bootfs",
     "//src/zircon/tests/evil:bootfs",
   ]
 
@@ -1404,6 +1403,10 @@ assembly_input_bundle("core_realm_eng") {
     {
       package = "bt-avrcp-controller"
       components = [ "bt-avrcp-controller" ]
+    },
+    {
+      package = "display-test"
+      components = [ "display-test" ]
     },
     {
       package = "display-tool"
