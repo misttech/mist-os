@@ -306,7 +306,7 @@ pub(crate) trait ClientIface: Sync + Send {
     async fn connect_to_network(
         &self,
         ssid: &[u8],
-        passphrase: Option<Vec<u8>>,
+        credential: Credential,
         requested_bssid: Option<Bssid>,
     ) -> Result<ConnectResult, Error>;
     async fn disconnect(&self) -> Result<(), Error>;
@@ -496,7 +496,7 @@ impl ClientIface for SmeClientIface {
     async fn connect_to_network(
         &self,
         ssid: &[u8],
-        passphrase: Option<Vec<u8>>,
+        credential: Credential,
         bssid: Option<Bssid>,
     ) -> Result<ConnectResult, Error> {
         // Sometimes a connect request is sent before the first scan.
@@ -550,7 +550,6 @@ impl ClientIface for SmeClientIface {
             None => bail!("Requested network not found"),
         };
 
-        let credential = passphrase.map(Credential::Password).unwrap_or(Credential::None);
         let authenticator =
             match get_authenticator(bss_description.bssid, compatible, &credential) {
                 Some(authenticator) => authenticator,
@@ -785,7 +784,7 @@ pub mod test_utils {
         TriggerScan,
         AbortScan,
         GetLastScanResults,
-        ConnectToNetwork { ssid: Vec<u8>, passphrase: Option<Vec<u8>>, bssid: Option<Bssid> },
+        ConnectToNetwork { ssid: Vec<u8>, credential: Credential, bssid: Option<Bssid> },
         Disconnect,
         GetConnectedNetworkRssi,
         OnDisconnect { info: fidl_sme::DisconnectSource },
@@ -845,12 +844,12 @@ pub mod test_utils {
         async fn connect_to_network(
             &self,
             ssid: &[u8],
-            passphrase: Option<Vec<u8>>,
+            credential: Credential,
             bssid: Option<Bssid>,
         ) -> Result<ConnectResult, Error> {
             self.calls.lock().push(ClientIfaceCall::ConnectToNetwork {
                 ssid: ssid.to_vec(),
-                passphrase: passphrase.clone(),
+                credential: credential.clone(),
                 bssid,
             });
             if *self.connect_success.lock() {
@@ -1609,7 +1608,7 @@ mod tests {
     #[test_case(
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
-        None,
+        Credential::None,
         false,
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Open,
@@ -1620,7 +1619,7 @@ mod tests {
     #[test_case(
         FakeProtectionCfg::Wpa2,
         vec![fidl_security::Protocol::Wpa2Personal],
-        Some(b"password".to_vec()),
+        Credential::Password(b"password".to_vec()),
         false,
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Wpa2Personal,
@@ -1633,7 +1632,7 @@ mod tests {
     #[test_case(
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
-        None,
+        Credential::None,
         false,
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Open,
@@ -1645,7 +1644,7 @@ mod tests {
     fn test_connect_to_network(
         fake_protection_cfg: FakeProtectionCfg,
         mutual_security_protocols: Vec<fidl_security::Protocol>,
-        passphrase: Option<Vec<u8>>,
+        credential: Credential,
         bssid_specified: bool,
         expected_authentication: fidl_security::Authentication,
     ) {
@@ -1668,7 +1667,7 @@ mod tests {
         ));
 
         let bssid = if bssid_specified { Some(Bssid::from([1, 2, 3, 4, 5, 6])) } else { None };
-        let mut connect_fut = iface.connect_to_network(b"foo", passphrase, bssid);
+        let mut connect_fut = iface.connect_to_network(b"foo", credential, bssid);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -1701,7 +1700,8 @@ mod tests {
             ssid: Ssid::try_from("foo").unwrap(),
             bssid: bssid,
         );
-        let mut connect_fut = iface.connect_to_network(b"foo", None, Some(Bssid::from(bssid)));
+        let mut connect_fut =
+            iface.connect_to_network(b"foo", Credential::None, Some(Bssid::from(bssid)));
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (_req, responder) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -1765,7 +1765,8 @@ mod tests {
             ssid: Ssid::try_from("foo").unwrap(),
             bssid: bssid,
         );
-        let mut connect_fut = iface.connect_to_network(b"foo", None, Some(Bssid::from(bssid)));
+        let mut connect_fut =
+            iface.connect_to_network(b"foo", Credential::None, Some(Bssid::from(bssid)));
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (_req, responder) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -1805,7 +1806,7 @@ mod tests {
         false,
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
-        None,
+        Credential::None,
         None;
         "network_not_found"
     )]
@@ -1813,7 +1814,7 @@ mod tests {
         true,
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
-        Some(b"password".to_vec()),
+        Credential::Password(b"password".to_vec()),
         None;
         "open_with_password"
     )]
@@ -1821,7 +1822,7 @@ mod tests {
         true,
         FakeProtectionCfg::Wpa2,
         vec![fidl_security::Protocol::Wpa2Personal],
-        None,
+        Credential::None,
         None;
         "wpa2_without_password"
     )]
@@ -1829,7 +1830,7 @@ mod tests {
         true,
         FakeProtectionCfg::Wpa2,
         vec![fidl_security::Protocol::Open],
-        None,
+        Credential::None,
         Some([24, 51, 32, 52, 41, 32].into());
         "bssid_not_found"
     )]
@@ -1838,7 +1839,7 @@ mod tests {
         has_network: bool,
         fake_protection_cfg: FakeProtectionCfg,
         mutual_security_protocols: Vec<fidl_security::Protocol>,
-        passphrase: Option<Vec<u8>>,
+        credential: Credential,
         bssid: Option<Bssid>,
     ) {
         let (mut exec, _monitor_stream, _sme_stream, _telemetry_stream, _manager, iface) =
@@ -1864,7 +1865,7 @@ mod tests {
                 Some(LastScanResults::new(fasync::BootInstant::now(), vec![]));
         }
 
-        let mut connect_fut = iface.connect_to_network(b"foo", passphrase, bssid);
+        let mut connect_fut = iface.connect_to_network(b"foo", credential, bssid);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_e)));
     }
 
@@ -1888,7 +1889,7 @@ mod tests {
             }],
         ));
 
-        let mut connect_fut = iface.connect_to_network(b"foo", None, None);
+        let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -1937,7 +1938,7 @@ mod tests {
             }],
         ));
 
-        let mut connect_fut = iface.connect_to_network(b"foo", None, None);
+        let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (_req, _connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -2038,7 +2039,7 @@ mod tests {
                 }],
             ));
 
-            let mut connect_fut = iface.connect_to_network(b"foo", None, None);
+            let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
             let (_req, connect_txn) = assert_variant!(
                 exec.run_until_stalled(&mut sme_stream.next()),
@@ -2062,7 +2063,7 @@ mod tests {
                 .collect::<Vec<_>>(),
         ));
 
-        let mut connect_fut = iface.connect_to_network(b"foo", None, None);
+        let mut connect_fut = iface.connect_to_network(b"foo", Credential::None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, _connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),

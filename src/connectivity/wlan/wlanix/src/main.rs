@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security::Credential;
 use anyhow::{bail, Context, Error};
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_wlan_wlanix::{
@@ -468,11 +469,16 @@ async fn serve_wifi<I: IfaceManager>(
     .await;
 }
 
-#[derive(Default)]
 struct SupplicantStaNetworkState {
     ssid: Option<Vec<u8>>,
-    passphrase: Option<Vec<u8>>,
+    credential: Credential,
     bssid: Option<Bssid>,
+}
+
+impl Default for SupplicantStaNetworkState {
+    fn default() -> Self {
+        Self { ssid: None, credential: Credential::None, bssid: None }
+    }
 }
 
 struct SupplicantStaIfaceState {
@@ -706,17 +712,17 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
         fidl_wlanix::SupplicantStaNetworkRequest::SetPskPassphrase { payload, .. } => {
             info!("fidl_wlanix::SupplicantStaNetworkRequest::SetPskPassphrase");
             if let Some(passphrase) = payload.passphrase {
-                sta_network_state.lock().passphrase.replace(passphrase);
+                sta_network_state.lock().credential = Credential::Password(passphrase);
             }
         }
         fidl_wlanix::SupplicantStaNetworkRequest::Select { responder } => {
             info!("fidl_wlanix::SupplicantStaNetworkRequest::Select");
-            let (ssid, passphrase, bssid) = {
+            let (ssid, credential, bssid) = {
                 let state = sta_network_state.lock();
-                (state.ssid.clone(), state.passphrase.clone(), state.bssid)
+                (state.ssid.clone(), state.credential.clone(), state.bssid)
             };
             let (result, status_code, connected_bssid, connection_ctx) = match ssid {
-                Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase, bssid).await {
+                Some(ssid) => match iface.connect_to_network(&ssid[..], credential, bssid).await {
                     Ok(ConnectResult::Success(connected)) => {
                         info!("Connected to requested network");
                         telemetry_sender.send(TelemetryEvent::ConnectResult {
@@ -2531,12 +2537,12 @@ mod tests {
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let (ssid, passphrase, bssid) = assert_variant!(
+        let (ssid, credential, bssid) = assert_variant!(
             iface_calls.lock()[0].clone(),
-            ClientIfaceCall::ConnectToNetwork { ssid, passphrase, bssid } => (ssid, passphrase, bssid)
+            ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
         assert_eq!(ssid, vec![b'f', b'o', b'o']);
-        assert_eq!(passphrase, None);
+        assert_eq!(credential, Credential::None);
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
@@ -2577,9 +2583,10 @@ mod tests {
         );
         assert_variant!(result, Ok(()));
 
+        let passphrase = vec![b'p', b'a', b's', b's'];
         let result = test_helper.supplicant_sta_network_proxy.set_psk_passphrase(
             &fidl_wlanix::SupplicantStaNetworkSetPskPassphraseRequest {
-                passphrase: Some(vec![b'p', b'a', b's', b's']),
+                passphrase: Some(passphrase.clone()),
                 ..Default::default()
             },
         );
@@ -2595,12 +2602,12 @@ mod tests {
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let (ssid, passphrase, bssid) = assert_variant!(
+        let (ssid, credential, bssid) = assert_variant!(
             iface_calls.lock()[0].clone(),
-            ClientIfaceCall::ConnectToNetwork { ssid, passphrase, bssid } => (ssid, passphrase, bssid)
+            ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
         assert_eq!(ssid, vec![b'f', b'o', b'o']);
-        assert_eq!(passphrase, Some(vec![b'p', b'a', b's', b's']));
+        assert_eq!(credential, Credential::Password(passphrase));
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
@@ -2645,12 +2652,12 @@ mod tests {
         );
 
         let iface_calls = test_helper.iface_manager.get_iface_call_history();
-        let (ssid, passphrase, bssid) = assert_variant!(
+        let (ssid, credential, bssid) = assert_variant!(
             iface_calls.lock()[0].clone(),
-            ClientIfaceCall::ConnectToNetwork { ssid, passphrase, bssid } => (ssid, passphrase, bssid)
+            ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
         );
         assert_eq!(ssid, vec![b'f', b'o', b'o']);
-        assert_eq!(passphrase, None);
+        assert_eq!(credential, Credential::None);
         assert_eq!(bssid, Some(Bssid::from([1, 2, 3, 4, 5, 6])));
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);

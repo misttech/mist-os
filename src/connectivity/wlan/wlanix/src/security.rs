@@ -17,6 +17,8 @@ use wlan_common::security::{SecurityAuthenticator, SecurityDescriptor};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Credential {
+    /// The Credential type None is not set through the starnix, rather the None variant will be
+    /// used if a credential is not set.
     None,
     Password(Vec<u8>),
 }
