@@ -43,7 +43,7 @@ namespace driver_runtime {
 
 namespace {
 
-constexpr uint64_t kStallTimeMs = 100;
+constexpr uint64_t kStallTimeMs = 350;
 constexpr uint64_t kStaleTimeMs = kStallTimeMs * 5;
 
 const async_ops_t g_dispatcher_ops = {
@@ -1741,7 +1741,7 @@ zx_status_t DispatcherCoordinator::SetThreadLimit(std::string_view scheduler_rol
   return thread_pool->set_max_threads(max_threads);
 }
 
-void DispatcherCoordinator::ScanThreadsForStalls() {
+zx_duration_mono_t DispatcherCoordinator::ScanThreadsForStalls() {
   fbl::AutoLock lock(&lock_);
   default_thread_pool_.ScanThreadsForStalls();
   // Thread safety note: It is important that thread pools be removed from this list before
@@ -1751,6 +1751,9 @@ void DispatcherCoordinator::ScanThreadsForStalls() {
   for (auto& thread_pool : role_to_thread_pool_) {
     thread_pool.ScanThreadsForStalls();
   }
+  // tell the caller to check again in half the stall time, so we worst-case to finding stalled
+  // threads in (stalltime*1.5).
+  return zx::msec(kStallTimeMs / 2).get();
 }
 
 void DispatcherCoordinator::NotifyDispatcherShutdown(

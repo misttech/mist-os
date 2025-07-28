@@ -873,7 +873,7 @@ class DispatcherCoordinator {
   // Implementation of fdf_env_*.
   static uint32_t GetThreadLimit(std::string_view scheduler_role);
   static zx_status_t SetThreadLimit(std::string_view scheduler_role, uint32_t max_threads);
-  void ScanThreadsForStalls();
+  zx_duration_mono_t ScanThreadsForStalls();
 
   // Returns ZX_OK if |dispatcher| was added successfully.
   // Returns ZX_ERR_BAD_STATE if the driver is currently shutting down.
