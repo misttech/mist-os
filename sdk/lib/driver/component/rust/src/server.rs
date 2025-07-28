@@ -83,7 +83,8 @@ impl<T: Driver> DriverServer<T> {
                     // create and run a fuchsia-async executor, giving it the "root" dispatcher to
                     // actually execute driver tasks on, as this thread will be effectively blocked
                     // by the reactor loop.
-                    let mut executor = fuchsia_async::LocalExecutor::new();
+                    let port = zx::Port::create_with_opts(zx::PortOptions::BIND_TO_INTERRUPT);
+                    let mut executor = fuchsia_async::LocalExecutor::new_with_port(port);
                     executor.run_singlethreaded(async move {
                         server.message_loop(root_dispatcher).await;
                         // take the server handle so it can drop after the async block is done,
