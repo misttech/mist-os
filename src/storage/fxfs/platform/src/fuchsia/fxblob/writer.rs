@@ -662,6 +662,7 @@ mod tests {
     use fidl_fuchsia_io::UnlinkOptions;
     use fuchsia_async::{self as fasync, TimeoutExt as _};
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
+    use fxfs::filesystem::SyncOptions;
 
     fn generate_list_of_writes(compressed_data_len: u64) -> Vec<Range<u64>> {
         let mut list_of_writes = vec![];
@@ -1259,10 +1260,11 @@ mod tests {
             connect_to_protocol_at_dir_svc::<BlobCreatorMarker>(fixture.volume_out_dir())
                 .expect("failed to connect to the BlobCreator service");
         let hash_cpy = hash;
-        let graveyard = fixture.fs().graveyard().clone();
+        let fs = fixture.fs().clone();
         // Repeatedly overwrite the blob.
         let overwrite_loop = fasync::Task::spawn(async move {
             let hash = hash_cpy;
+            let mut i = 0;
             while !stop_looping.load(Ordering::Relaxed) {
                 let writer = creator_proxy
                     .create(&hash.into(), true)
@@ -1283,7 +1285,16 @@ mod tests {
                     .expect("transport error on bytes_ready")
                     .expect("failed to write data to vmo");
                 // Await graveyard so that we don't fill up the disk.
-                graveyard.flush().await;
+                fs.graveyard().flush().await;
+                i += 1;
+                if i % 5 == 0 {
+                    // Flush every 5th overwrite to limit the total space usage of the test. Until
+                    // the journal is flushed and the device is synced the data blocks cannot be
+                    // safely released by the allocator.
+                    fs.sync(SyncOptions { flush_device: true, precondition: None })
+                        .await
+                        .expect("Syncing");
+                }
             }
         });
 
