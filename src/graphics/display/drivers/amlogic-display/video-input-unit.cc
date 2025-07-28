@@ -292,7 +292,7 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
   fdf::trace("Table index {} used", next_table_idx);
   fdf::trace("AFBC {}", info->is_afbc ? "enabled" : "disabled");
 
-  const display::DisplayTiming display_timing = display::ToDisplayTiming(config.mode);
+  const display::DisplayTiming display_timing = display::ToDisplayTiming(config.timing);
 
   PixelGridSize2D display_contents_size = {.width = display_timing.horizontal_active_px,
                                            .height = display_timing.vertical_active_lines};

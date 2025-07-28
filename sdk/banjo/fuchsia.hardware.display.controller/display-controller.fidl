@@ -246,7 +246,7 @@ type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id uint64;
 
-    mode DisplayTiming;
+    timing DisplayTiming;
 
     /// Bitmask of flags defined in the ColorConversion enum.
     cc_flags uint32;

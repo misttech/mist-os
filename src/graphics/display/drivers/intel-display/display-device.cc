@@ -151,7 +151,7 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
   ZX_ASSERT(banjo_display_config);
 
   const display::DisplayTiming display_timing_params =
-      display::ToDisplayTiming(banjo_display_config->mode);
+      display::ToDisplayTiming(banjo_display_config->timing);
   if (CheckNeedsModeset(display_timing_params)) {
     if (pipe_) {
       // TODO(https://fxbug.dev/42067272): When ApplyConfiguration() early returns on the

@@ -446,7 +446,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.mode);
+  display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.timing);
   if (!IgnoreDisplayMode()) {
     // `current_display_timing_` is already applied to the display so it's
     // guaranteed to be supported. We only perform the timing check if there
@@ -558,7 +558,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
       // Setting up OSD may require Vout framebuffer information, which may be
       // changed on each ApplyConfiguration(), so we need to apply the
       // configuration to Vout first before initializing the display and OSD.
-      display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.mode);
+      display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.timing);
       if (IsNewDisplayTiming(display_timing)) {
         zx::result<> apply_config_result = vout_->ApplyConfiguration(display_timing);
         if (!apply_config_result.is_ok()) {

@@ -52,13 +52,13 @@ void DisplayConfig::DiscardNonLayerDraftConfig() {
   // We preserve the draft display mode to work
   // around a Scenic issue where it forgets to call SetDisplayMode() again after
   // discarding a draft configuration with a load-bearing SetDisplayMode().
-  const display_timing_t draft_mode = draft_.mode;
+  const display_timing_t draft_timing = draft_.timing;
 
   draft_ = applied_;
   has_draft_nonlayer_config_change_ = false;
 
   // TODO(https://fxbug.dev/402804098): Remove this workaround.
-  draft_.mode = draft_mode;
+  draft_.timing = draft_timing;
 }
 
 }  // namespace display_coordinator

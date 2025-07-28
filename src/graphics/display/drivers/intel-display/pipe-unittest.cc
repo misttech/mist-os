@@ -112,7 +112,7 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   const layer_t test_layers_1[] = {layer_1};
   display_config_t config = {
       .display_id = 1u,
-      .mode = {},
+      .timing = {},
       .cc_flags = 0u,
       .layers_list = test_layers_1,
       .layers_count = 1,
@@ -137,7 +137,7 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   const layer_t test_layers_2[] = {layer_2, layer_3};
   display_config_t config_2 = {
       .display_id = 1u,
-      .mode = {},
+      .timing = {},
       .cc_flags = 0u,
       .layers_list = test_layers_2,
       .layers_count = 1,

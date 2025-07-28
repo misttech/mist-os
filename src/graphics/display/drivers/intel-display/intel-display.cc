@@ -1461,7 +1461,7 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t> banjo_di
     const display_config_t& banjo_display_config = banjo_display_configs[i];
 
     const display::DisplayTiming display_timing =
-        display::ToDisplayTiming(banjo_display_config.mode);
+        display::ToDisplayTiming(banjo_display_config.timing);
     // The intel display controller doesn't support these flags
     if (display_timing.vblank_alternates) {
       return false;
@@ -1508,7 +1508,7 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t> banjo_di
 
     // Either the pipe pixel rate or the link pixel rate can't support a simple
     // configuration at this display resolution.
-    const int64_t pixel_clock_hz = banjo_display_config.mode.pixel_clock_hz;
+    const int64_t pixel_clock_hz = banjo_display_config.timing.pixel_clock_hz;
     if (max_pipe_pixel_rate_hz < pixel_clock_hz || !display->CheckPixelRate(pixel_clock_hz)) {
       return false;
     }

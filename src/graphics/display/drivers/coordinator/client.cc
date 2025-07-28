@@ -413,7 +413,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
-  display_config.draft_.mode = display::ToBanjoDisplayTiming(*display_timing_it);
+  display_config.draft_.timing = display::ToBanjoDisplayTiming(*display_timing_it);
   display_config.has_draft_nonlayer_config_change_ = true;
   draft_display_config_was_validated_ = false;
 }
@@ -998,8 +998,8 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
   const rect_u_t display_area = {
       .x = 0,
       .y = 0,
-      .width = display_config.draft_.mode.h_addressable,
-      .height = display_config.draft_.mode.v_addressable,
+      .width = display_config.draft_.timing.h_addressable,
+      .height = display_config.draft_.timing.v_addressable,
   };
 
   // Normalize the display configuration, and perform Coordinator-level
@@ -1240,7 +1240,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
-    display_config->applied_.mode = display::ToBanjoDisplayTiming(display_timings[0]);
+    display_config->applied_.timing = display::ToBanjoDisplayTiming(display_timings[0]);
 
     display_config->applied_.cc_flags = 0;
 
