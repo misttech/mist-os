@@ -1,5 +1,5 @@
 #!/usr/bin/env fuchsia-vendored-python
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Simple FFX host tool E2E test."""
@@ -16,7 +16,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class FfxDirectTest(ffxtestcase.FfxTestCase):
-    """FFX host tool E2E test For Direct connections."""
+    """FFX host tool E2E test for Direct connections."""
 
     def setup_class(self) -> None:
         # This just gets some things out of the way before we start turning
@@ -79,6 +79,58 @@ class FfxDirectTest(ffxtestcase.FfxTestCase):
         )
         asserts.assert_is_none(out["daemon_version"])
         asserts.assert_is_not_none(out["tool_version"])
+
+    # This tests that an arbitrary tool using RCS, that was not specifically
+    # modified to support direct mode, does on fact work in direct mode.
+    def test_component_list(self) -> None:
+        """Test `ffx --direct component list` does not query the daemon."""
+        out = self._run_ffx_direct(
+            [
+                "component",
+                "list",
+            ],
+        )
+        asserts.assert_greater(len(out["instances"]), 0)
+
+    # This tests that a tool that uses non-RCS proxies works in direct mode.
+    def test_repo_list(self) -> None:
+        """Test `ffx --direct target repository list` does not query the daemon."""
+        out = self._run_ffx_direct(
+            [
+                "target",
+                "repository",
+                "list",
+            ],
+        )
+        asserts.assert_greater(len(out["ok"]["data"]), 0)
+
+    # This tests that a tool that uses a non-standard target connection flow
+    # works in direct mode.
+    def test_ffx_log(self) -> None:
+        """Test `ffx --direct log` does not query the daemon."""
+        # Can't run with _run_ffx_direct() because the output is not
+        # valid JSON; instead each line is a JSON object.
+        out = self.run_ffx(
+            [
+                "--direct",
+                "--machine",
+                "json",
+                "log",
+                "--symbolize",
+                "off",
+                "--since-boot",
+                "1",
+                "--until-boot",
+                "2",
+            ],
+        )
+        # We can't actually guarantee that we get valid JSON from `ffx log`,
+        # but we can note when we don't.
+        try:
+            logs = [json.loads(l) for l in out.strip().split("\n")]
+            asserts.assert_greater(len(logs), 0)
+        except json.decoder.JSONDecodeError:
+            _LOGGER.info(f"Got bad JSON from ffx-log: {repr(out[:100])}")
 
 
 if __name__ == "__main__":
