@@ -45,7 +45,7 @@ use netemul::{RealmTcpListener, RealmTcpStream, RealmUdpSocket};
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::nud::apply_nud_flake_workaround;
 use netstack_testing_common::realms::{
-    constants, KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic,
+    self, KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic,
     NetCfgVersion, Netstack, Netstack3, NetstackExt, TestRealmExt as _, TestSandboxExt,
 };
 use netstack_testing_common::{
@@ -524,7 +524,7 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
         .expect("create netstack realm");
 
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None);
+        wait_for_component_stopped(&realm, realms::constants::netcfg::COMPONENT_NAME, None);
 
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -672,7 +672,7 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
         .expect("create netstack realm");
 
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None);
+        wait_for_component_stopped(&realm, realms::constants::netcfg::COMPONENT_NAME, None);
 
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -1101,7 +1101,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         )
         .expect("create netstack realm");
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+        wait_for_component_stopped(&realm, realms::constants::netcfg::COMPONENT_NAME, None).fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
 
     // Add a WLAN AP, make sure the DHCP server gets configured and starts or
@@ -1158,7 +1158,7 @@ async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
 
     let event_matcher = netstack_testing_common::get_child_component_event_matcher(
         &realm,
-        M::MANAGEMENT_AGENT.get_component_name(),
+        realms::constants::netcfg::COMPONENT_NAME,
     )
     .await
     .expect("get child moniker");
@@ -2014,7 +2014,7 @@ async fn fuchsia_networks_default_network<M: Manager>(name: &str, manager_config
     // not from the Netstack.
     let posix_socket = realm
         .connect_to_protocol_from_child::<fposix_socket::ProviderMarker>(
-            constants::socket_proxy::COMPONENT_NAME,
+            realms::constants::socket_proxy::COMPONENT_NAME,
         )
         .expect("while connecting to provider");
     let starnix_networks = realm
@@ -2092,7 +2092,7 @@ async fn fuchsia_networks_default_network<M: Manager>(name: &str, manager_config
         }
     };
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+        wait_for_component_stopped(&realm, realms::constants::netcfg::COMPONENT_NAME, None).fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
     wait_for_socket_mark(
         &posix_socket,
@@ -3024,7 +3024,7 @@ async fn add_blackhole_interface<M: Manager>(name: &str) {
         .expect("create netstack realm");
 
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None);
+        wait_for_component_stopped(&realm, realms::constants::netcfg::COMPONENT_NAME, None);
 
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()

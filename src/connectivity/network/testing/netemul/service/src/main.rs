@@ -395,6 +395,23 @@ async fn create_realm_instance(
                                 match capability
                                     .ok_or(CreateRealmError::CapabilityNameNotProvided)?
                                 {
+                                    fnetemul::ExposedCapability::WeakProtocol(capability) => {
+                                        debug!(
+                                            "weakly routing capability '{}' from component \
+                                             '{}' to '{}'",
+                                            capability, source, name
+                                        );
+                                        let () = child_dep_routes.push(
+                                            Route::new()
+                                                .capability(
+                                                    Capability::protocol_by_name(&capability)
+                                                        .weak(),
+                                                )
+                                                .from(source)
+                                                .to(&child_ref),
+                                        );
+                                        UniqueCapability::Protocol { proto_name: capability.into() }
+                                    }
                                     fnetemul::ExposedCapability::Protocol(capability) => {
                                         debug!(
                                             "routing capability '{}' from component '{}' to '{}'",

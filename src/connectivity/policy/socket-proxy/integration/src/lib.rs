@@ -9,6 +9,7 @@ use assert_matches::assert_matches;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_net::{self as fnet, MarkDomain, SocketAddress};
 use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
+use fuchsia_async::DurationExt as _;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -18,9 +19,11 @@ use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_socket_addr};
 use pretty_assertions::assert_eq;
 use socket_proxy_testing::{RegistryType, ToDnsServerList as _, ToNetwork as _};
+use std::future::Future;
 use std::sync::Arc;
 use test_case::test_case;
 use {
+    fidl_fuchsia_net_policy_properties as fnp_properties,
     fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy, fidl_fuchsia_posix as fposix,
     fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
@@ -28,6 +31,7 @@ use {
 enum IncomingService {
     Provider(fposix_socket::ProviderRequestStream),
     RawProvider(fposix_socket_raw::ProviderRequestStream),
+    DefaultNetwork(fnp_properties::DefaultNetworkRequestStream),
 }
 
 trait SetMarkRespond {
@@ -163,12 +167,14 @@ where
 async fn inner_provider_mock(
     handles: LocalComponentHandles,
     marks: Arc<Mutex<Vec<(Arc<Mutex<OptionalUint32>>, Arc<Mutex<OptionalUint32>>)>>>,
+    default_network_updates: Arc<Mutex<Vec<fnp_properties::DefaultNetworkUpdateRequest>>>,
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     let _ = fs
         .dir("svc")
         .add_fidl_service(IncomingService::Provider)
-        .add_fidl_service(IncomingService::RawProvider);
+        .add_fidl_service(IncomingService::RawProvider)
+        .add_fidl_service(IncomingService::DefaultNetwork);
     let _ = fs.serve_connection(handles.outgoing_dir)?;
 
     fn into_marks(
@@ -186,6 +192,7 @@ async fn inner_provider_mock(
 
     fs.for_each_concurrent(0, |service| {
         let marks = marks.clone();
+        let default_network_updates = default_network_updates.clone();
         async move {
             match service {
                 IncomingService::Provider(stream) => stream
@@ -402,6 +409,27 @@ async fn inner_provider_mock(
                     .await
                     .context("Failed to serve request stream")
                     .unwrap_or_else(|e| eprintln!("Error encountered: {e:?}")),
+                IncomingService::DefaultNetwork(stream) => stream
+                    .map(|result| result.context("Result came with error"))
+                    .try_for_each(|request| {
+                        let default_network_updates = default_network_updates.clone();
+                        async move {
+                            match request {
+                                fnp_properties::DefaultNetworkRequest::Update {
+                                    payload,
+                                    responder
+                                } => {
+                                    default_network_updates.lock().await.push(payload);
+                                    responder.send(Ok(())).expect("could not reply to update");
+                                }
+                                _ => panic!("Unknown method!")
+                            }
+                            Ok(())
+                        }
+                    })
+                    .await
+                    .context("Failed to serve request stream")
+                    .unwrap_or_else(|e| eprintln!("Error encountered: {e:?}")),
             }
         }
     })
@@ -433,6 +461,23 @@ fn create_fuchsia_network(id: u32) -> fnp_socketproxy::Network {
     }
 }
 
+async fn repeat_check<T, GetT, GetFut>(count: usize, get_a: GetT, b: T)
+where
+    GetT: Fn() -> GetFut,
+    GetFut: Future<Output = T>,
+    T: std::cmp::PartialEq<T> + std::fmt::Debug,
+{
+    for _ in 0..count {
+        let a = get_a().await;
+        if a == b {
+            break;
+        }
+        fuchsia_async::Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
+    }
+
+    assert_eq!(get_a().await, b);
+}
+
 #[test_case(false, OptionalUint32::Value(0); "default unset")]
 #[test_case(true, OptionalUint32::Value(123); "default set")]
 #[fuchsia::test]
@@ -440,6 +485,7 @@ fn create_fuchsia_network(id: u32) -> fnp_socketproxy::Network {
 // set as expected. Starnix and Fuchsia registries have the same handling
 // logic, so use the Starnix registry to confirm this behavior.
 async fn integration(should_set_default: bool, expected_mark: OptionalUint32) -> Result<(), Error> {
+    let default_network_updates = Arc::new(Mutex::new(Vec::new()));
     let marks = Arc::new(Mutex::new(Vec::new()));
     let builder = RealmBuilder::new().await?;
     let inner_provider = builder
@@ -447,8 +493,13 @@ async fn integration(should_set_default: bool, expected_mark: OptionalUint32) ->
             "inner_provider",
             {
                 let marks = marks.clone();
+                let default_network_updates = default_network_updates.clone();
                 move |handles: LocalComponentHandles| {
-                    Box::pin(inner_provider_mock(handles, marks.clone()))
+                    Box::pin(inner_provider_mock(
+                        handles,
+                        marks.clone(),
+                        default_network_updates.clone(),
+                    ))
                 }
             },
             ChildOptions::new(),
@@ -462,6 +513,7 @@ async fn integration(should_set_default: bool, expected_mark: OptionalUint32) ->
             Route::new()
                 .capability(Capability::protocol::<fposix_socket::ProviderMarker>())
                 .capability(Capability::protocol::<fposix_socket_raw::ProviderMarker>())
+                .capability(Capability::protocol::<fnp_properties::DefaultNetworkMarker>())
                 .from(&inner_provider)
                 .to(&socket_proxy),
         )
@@ -658,6 +710,27 @@ async fn integration(should_set_default: bool, expected_mark: OptionalUint32) ->
         assert_eq!(*first_mark, OptionalUint32::Unset(fposix_socket::Empty));
     }
 
+    if should_set_default {
+        repeat_check(
+            5,
+            || async { default_network_updates.lock().await.clone() },
+            vec![
+                // Default network 1 with mark 123 added
+                fnp_properties::DefaultNetworkUpdateRequest {
+                    interface_id: Some(1),
+                    socket_marks: Some(fnet::Marks { mark_1: Some(123), ..Default::default() }),
+                    ..Default::default()
+                },
+                // Network 1 removed
+                Default::default(),
+            ],
+        )
+        .await;
+    } else {
+        // If no default is set, no updates are expected.
+        repeat_check(5, || async { default_network_updates.lock().await.clone() }, vec![]).await;
+    }
+
     Ok(())
 }
 
@@ -667,6 +740,7 @@ async fn integration_across_registries() -> Result<(), Error> {
     const STARNIX_NETWORK_MARK: u32 = 123;
     const FUCHSIA_NETWORK_ID: u32 = 2;
 
+    let default_network_updates = Arc::new(Mutex::new(Vec::new()));
     let marks = Arc::new(Mutex::new(Vec::new()));
     let builder = RealmBuilder::new().await?;
     let inner_provider = builder
@@ -674,8 +748,13 @@ async fn integration_across_registries() -> Result<(), Error> {
             "inner_provider",
             {
                 let marks = marks.clone();
+                let default_network_updates = default_network_updates.clone();
                 move |handles: LocalComponentHandles| {
-                    Box::pin(inner_provider_mock(handles, marks.clone()))
+                    Box::pin(inner_provider_mock(
+                        handles,
+                        marks.clone(),
+                        default_network_updates.clone(),
+                    ))
                 }
             },
             ChildOptions::new(),
@@ -688,6 +767,7 @@ async fn integration_across_registries() -> Result<(), Error> {
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fposix_socket::ProviderMarker>())
+                .capability(Capability::protocol::<fnp_properties::DefaultNetworkMarker>())
                 .from(&inner_provider)
                 .to(&socket_proxy),
         )
@@ -823,6 +903,38 @@ async fn integration_across_registries() -> Result<(), Error> {
         let first_mark = locked_marks[3].0.lock().await;
         assert_eq!(*first_mark, OptionalUint32::Value(STARNIX_NETWORK_MARK));
     }
+
+    repeat_check(
+        5,
+        || async { default_network_updates.lock().await.clone() },
+        vec![
+            // Set starnix as default network.
+            fnp_properties::DefaultNetworkUpdateRequest {
+                interface_id: Some(STARNIX_NETWORK_ID.into()),
+                socket_marks: Some(fnet::Marks {
+                    mark_1: Some(STARNIX_NETWORK_MARK),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            // Fuchsia network comes up, becomes the new default.
+            fnp_properties::DefaultNetworkUpdateRequest {
+                interface_id: Some(FUCHSIA_NETWORK_ID.into()),
+                socket_marks: Some(fnet::Marks::default()),
+                ..Default::default()
+            },
+            // Fuchsia network deleted, fall back to starnix.
+            fnp_properties::DefaultNetworkUpdateRequest {
+                interface_id: Some(STARNIX_NETWORK_ID.into()),
+                socket_marks: Some(fnet::Marks {
+                    mark_1: Some(STARNIX_NETWORK_MARK),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ],
+    )
+    .await;
 
     Ok(())
 }
@@ -1025,11 +1137,38 @@ async fn watch_dns_with_registry() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn watch_dns_across_registries() -> Result<(), Error> {
+    let default_network_updates = Arc::new(Mutex::new(Vec::new()));
+    let marks = Arc::new(Mutex::new(Vec::new()));
     let builder = RealmBuilder::new().await?;
+    let inner_provider = builder
+        .add_local_child(
+            "inner_provider",
+            {
+                let marks = marks.clone();
+                let default_network_updates = default_network_updates.clone();
+                move |handles: LocalComponentHandles| {
+                    Box::pin(inner_provider_mock(
+                        handles,
+                        marks.clone(),
+                        default_network_updates.clone(),
+                    ))
+                }
+            },
+            ChildOptions::new(),
+        )
+        .await?;
     let socket_proxy = builder
         .add_child("socket_proxy", "#meta/network-socket-proxy.cm", ChildOptions::new().eager())
         .await?;
 
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fnp_properties::DefaultNetworkMarker>())
+                .from(&inner_provider)
+                .to(&socket_proxy),
+        )
+        .await?;
     builder
         .add_route(
             Route::new()
@@ -1135,6 +1274,22 @@ async fn watch_dns_across_registries() -> Result<(), Error> {
     // DNS update due to there not being a Fuchsia default network set.
     assert_eq!(fuchsia_networks.remove(2).await?, Ok(()));
     assert!(dns_watcher.watch_servers().now_or_never().is_none());
+
+    repeat_check(
+        5,
+        || async { default_network_updates.lock().await.clone() },
+        vec![
+            // Network id 3 with no marks.
+            fnp_properties::DefaultNetworkUpdateRequest {
+                interface_id: Some(3),
+                socket_marks: Some(Default::default()),
+                ..Default::default()
+            },
+            // Default network removed, empty update.
+            Default::default(),
+        ],
+    )
+    .await;
 
     Ok(())
 }

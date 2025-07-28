@@ -11,7 +11,7 @@ use futures::future::{FutureExt as _, LocalBoxFuture};
 use net_types::ip::{self as net_types_ip, Ip};
 use netemul::{TestEndpoint, TestNetwork, TestRealm};
 use netstack_testing_common::realms::{
-    KnownServiceProvider, Manager, ManagerConfig, Netstack, TestRealmExt, TestSandboxExt,
+    constants, KnownServiceProvider, Manager, ManagerConfig, Netstack, TestRealmExt, TestSandboxExt,
 };
 use netstack_testing_common::{
     interfaces, wait_for_component_stopped, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -141,7 +141,7 @@ pub async fn verify_interface_added<'a, M: Manager>(
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("connect to fuchsia.net.interfaces/State service");
     let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+        wait_for_component_stopped(&realm, constants::netcfg::COMPONENT_NAME, None).fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
     let (if_id, if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
         &interface_state,

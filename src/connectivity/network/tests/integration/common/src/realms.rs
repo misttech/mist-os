@@ -147,14 +147,6 @@ pub enum ManagementAgent {
 }
 
 impl ManagementAgent {
-    /// Gets the component name for this management agent.
-    pub fn get_component_name(&self) -> &'static str {
-        match self {
-            Self::NetCfg(NetCfgVersion::Basic) => constants::netcfg::basic::COMPONENT_NAME,
-            Self::NetCfg(NetCfgVersion::Advanced) => constants::netcfg::advanced::COMPONENT_NAME,
-        }
-    }
-
     /// Gets the URL for this network manager component.
     pub fn get_url(&self) -> &'static str {
         match self {
@@ -269,12 +261,11 @@ pub mod constants {
         pub const COMPONENT_NAME: &str = "netstack";
     }
     pub mod netcfg {
+        pub const COMPONENT_NAME: &str = "netcfg";
         pub mod basic {
-            pub const COMPONENT_NAME: &str = "netcfg";
             pub const COMPONENT_URL: &str = "#meta/netcfg-basic.cm";
         }
         pub mod advanced {
-            pub const COMPONENT_NAME: &str = "netcfg-advanced";
             pub const COMPONENT_URL: &str = "#meta/netcfg-advanced.cm";
         }
         // These capability names and filepaths should match the devfs capabilities used by netcfg
@@ -317,6 +308,17 @@ pub mod constants {
     pub mod fake_clock {
         pub const COMPONENT_NAME: &str = "fake_clock";
         pub const COMPONENT_URL: &str = "#meta/fake_clock.cm";
+    }
+}
+
+fn weak_protocol_dep<P>(component_name: &'static str) -> fnetemul::ChildDep
+where
+    P: fidl::endpoints::DiscoverableProtocolMarker,
+{
+    fnetemul::ChildDep {
+        name: Some(component_name.into()),
+        capability: Some(fnetemul::ExposedCapability::WeakProtocol(P::PROTOCOL_NAME.to_string())),
+        ..Default::default()
     }
 }
 
@@ -401,7 +403,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 };
 
                 fnetemul::ChildDef {
-                    name: Some(agent.get_component_name().to_string()),
+                    name: Some(constants::netcfg::COMPONENT_NAME.to_string()),
                     source: Some(fnetemul::ChildSource::Component(agent.get_url().to_string())),
                     program_args: Some(
                         agent
@@ -719,6 +721,11 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                             constants::netstack::COMPONENT_NAME,
                         ),
                     ),
+                    fnetemul::Capability::ChildDep(weak_protocol_dep::<
+                        fnp_properties::DefaultNetworkMarker,
+                    >(
+                        constants::netcfg::COMPONENT_NAME
+                    )),
                 ])),
                 ..Default::default()
             },

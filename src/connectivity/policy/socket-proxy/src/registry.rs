@@ -4,6 +4,7 @@
 
 //! Implements fuchsia.net.policy.socketproxy.NetworkRegistry.
 
+use crate::BackgroundTask;
 use anyhow::{Context, Error};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_net_policy_socketproxy::{
@@ -11,16 +12,19 @@ use fidl_fuchsia_net_policy_socketproxy::{
     NetworkDnsServers, NetworkInfo, NetworkRegistryAddError, NetworkRegistryRemoveError,
     NetworkRegistrySetDefaultError, StarnixNetworksRequest,
 };
+use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect_derive::{IValue, Inspect, Unit};
-use futures::channel::mpsc;
+use futures::channel::mpsc::{self, Sender};
 use futures::lock::Mutex;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use log::{error, info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
+
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_policy_properties as fnp_properties,
     fidl_fuchsia_posix_socket as fposix_socket,
 };
 
@@ -60,6 +64,19 @@ impl IpAddressExt for fnet::Ipv6Address {
             port: DEFAULT_DNS_PORT,
             zone_index: 0,
         })
+    }
+}
+
+trait IntoOptionalUint32 {
+    fn into_optional_uint32(self) -> fposix_socket::OptionalUint32;
+}
+
+impl IntoOptionalUint32 for Option<u32> {
+    fn into_optional_uint32(self) -> fposix_socket::OptionalUint32 {
+        match self {
+            Some(value) => fposix_socket::OptionalUint32::Value(value),
+            None => fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        }
     }
 }
 
@@ -235,6 +252,17 @@ impl NetworkRegistry {
     pub(crate) fn has_default_network(&self) -> bool {
         self.networks.default_network_id.is_some()
     }
+
+    /// Returns current socket mark for the default network.
+    pub(crate) fn current_mark(&self) -> Option<u32> {
+        self.networks.current_mark()
+    }
+
+    /// Constructs a [`DefaultNetworkUpdateRequest`] for sending to
+    /// `fuchsia.net.policy.properties/DefaultNetwork`.
+    pub(crate) fn default_network_update(&self) -> fnp_properties::DefaultNetworkUpdateRequest {
+        self.networks.default_network_update()
+    }
 }
 
 #[derive(Unit, Debug, Default)]
@@ -336,14 +364,22 @@ impl RegisteredNetworks {
             .collect()
     }
 
-    fn current_mark(&self) -> fposix_socket::OptionalUint32 {
-        use fposix_socket::OptionalUint32::*;
+    fn current_mark(&self) -> Option<u32> {
         match (self.default_network_id, self.networks.is_empty()) {
-            (None, false) => Value(DEFAULT_SOCKET_MARK),
-            (id, _) => match id.and_then(|id| self.networks[&id].info.mark()) {
-                Some(value) => Value(value),
-                None => Unset(fposix_socket::Empty),
-            },
+            (None, false) => Some(DEFAULT_SOCKET_MARK),
+            (id, _) => id.and_then(|id| self.networks[&id].info.mark()),
+        }
+    }
+
+    fn default_network_update(&self) -> fnp_properties::DefaultNetworkUpdateRequest {
+        fnp_properties::DefaultNetworkUpdateRequest {
+            interface_id: self.default_network_id.map(u64::from),
+            socket_marks: Some(fnet::Marks {
+                mark_1: self.current_mark(),
+                mark_2: None,
+                ..Default::default()
+            }),
+            ..Default::default()
         }
     }
 
@@ -362,10 +398,13 @@ impl NetworkRegistries {
     // When Fuchsia has a default network, then prefer its mark
     // over any existing mark. When it is unset, then fallback
     // to the mark provided by Starnix.
-    async fn current_mark(&self) -> fposix_socket::OptionalUint32 {
-        if self.fuchsia.lock().await.has_default_network() {
-            info!("FuchsiaNetworks has a default network, preferring Fuchsia mark.");
-            return self.fuchsia.lock().await.networks.current_mark();
+    async fn current_mark(&self) -> Option<u32> {
+        {
+            let fuchsia = self.fuchsia.lock().await;
+            if fuchsia.has_default_network() {
+                info!("FuchsiaNetworks has a default network, preferring Fuchsia mark.");
+                return fuchsia.current_mark();
+            }
         }
 
         return self.starnix.lock().await.networks.current_mark();
@@ -375,30 +414,88 @@ impl NetworkRegistries {
     // over any existing DNS servers. When it is unset, then
     // fallback to the DNS servers provided by Starnix.
     async fn current_dns_servers(&self) -> Vec<fnp_socketproxy::DnsServerList> {
-        if self.fuchsia.lock().await.has_default_network() {
-            info!("FuchsiaNetworks has a default network, preferring Fuchsia DNS.");
-            return self.fuchsia.lock().await.dns_servers();
+        {
+            let fuchsia = self.fuchsia.lock().await;
+            if fuchsia.has_default_network() {
+                info!("FuchsiaNetworks has a default network, preferring Fuchsia DNS.");
+                return fuchsia.dns_servers();
+            }
         }
 
         return self.starnix.lock().await.dns_servers();
     }
+
+    async fn default_network_update(&self) -> fnp_properties::DefaultNetworkUpdateRequest {
+        {
+            let fuchsia = self.fuchsia.lock().await;
+            if fuchsia.has_default_network() {
+                info!("FuchsiaNetworks has a default network, preferring Fuchsia network.");
+                return fuchsia.default_network_update();
+            }
+        }
+
+        {
+            let starnix = self.starnix.lock().await;
+            if starnix.has_default_network() {
+                return starnix.default_network_update();
+            }
+        }
+
+        // An empty update to signify that there is no default.
+        Default::default()
+    }
+}
+
+struct DefaultNetwork<DN> {
+    proxy: DN,
+    last_update: fnp_properties::DefaultNetworkUpdateRequest,
+}
+
+impl<DN> DefaultNetwork<DN> {
+    fn new(proxy: DN) -> Self {
+        Self { proxy, last_update: Default::default() }
+    }
+}
+
+impl<DN: fnp_properties::DefaultNetworkProxyInterface> DefaultNetwork<DN> {
+    async fn update(
+        &mut self,
+        update: fnp_properties::DefaultNetworkUpdateRequest,
+    ) -> Result<fnp_properties::DefaultNetworkUpdateResult, fidl::Error> {
+        if self.last_update != update {
+            let result = self.proxy.update(&update).await?;
+            self.last_update = update;
+            Ok(result)
+        } else {
+            Ok(Ok(()))
+        }
+    }
+}
+
+#[derive(Debug)]
+enum RegistryType {
+    Starnix,
+    Fuchsia,
 }
 
 #[derive(Inspect, Clone, Debug)]
-pub struct Registry {
+pub struct Registry<
+    DN: fnp_properties::DefaultNetworkProxyInterface = fnp_properties::DefaultNetworkProxy,
+> {
     #[inspect(forward)]
     networks: NetworkRegistries,
     // Reflects the marks that are set on the sockets vended
     // by this component.
     marks: Arc<Mutex<crate::SocketMarks>>,
     dns_tx: mpsc::Sender<Vec<fnp_socketproxy::DnsServerList>>,
+    default_network: Arc<Mutex<DefaultNetwork<DN>>>,
 
     starnix_occupant: Arc<Mutex<()>>,
     fuchsia_occupant: Arc<Mutex<()>>,
 }
 
 macro_rules! handle_registry_request {
-    ($request_type:ident, $request:expr, $network_registry:expr, $name:expr) => {{
+    ($request_type:ident, $request:expr, $network_registry:expr, $registry_type:expr) => {{
         let mut networks = $network_registry.networks.as_mut();
         let (op, send, did_state_change): (
             _,
@@ -431,8 +528,8 @@ macro_rules! handle_registry_request {
         if did_state_change {
             let new_mark = networks.current_mark();
             info!(
-                "{} registry {op}. mark: {new_mark:?}, networks count: {}",
-                $name,
+                "{:?} registry {op}. mark: {new_mark:?}, networks count: {}",
+                $registry_type,
                 networks.len()
             );
         }
@@ -441,23 +538,30 @@ macro_rules! handle_registry_request {
     }};
 }
 
-impl Registry {
+impl Registry<fnp_properties::DefaultNetworkProxy> {
     pub(crate) fn new(
         marks: Arc<Mutex<crate::SocketMarks>>,
         dns_tx: mpsc::Sender<Vec<fnp_socketproxy::DnsServerList>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, anyhow::Error> {
+        Ok(Self {
             networks: Default::default(),
             marks,
             dns_tx,
+            default_network: Arc::new(Mutex::new(DefaultNetwork::new(
+                connect_to_protocol::<fnp_properties::DefaultNetworkMarker>()
+                    .context("while connecting to fuchsia.net.policy.properties/DefaultNetwork")?,
+            ))),
             starnix_occupant: Default::default(),
             fuchsia_occupant: Default::default(),
-        }
+        })
     }
+}
 
+impl<DefaultNetwork: fnp_properties::DefaultNetworkProxyInterface> Registry<DefaultNetwork> {
     pub(crate) async fn run_starnix(
         &self,
         stream: fnp_socketproxy::StarnixNetworksRequestStream,
+        task_tx: Sender<BackgroundTask>,
     ) -> Result<(), Error> {
         let _occupant = match self.starnix_occupant.try_lock() {
             Some(o) => o,
@@ -472,43 +576,32 @@ impl Registry {
         self.networks.starnix.lock().await.networks.as_mut().clear();
         stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async {
-                let mut network_registry = self.networks.starnix.lock().await;
-                let (send, did_state_change): (
-                    Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>,
-                    bool,
-                ) = handle_registry_request!(
-                    StarnixNetworksRequest,
-                    request,
-                    network_registry,
-                    "starnix"
-                );
-                std::mem::drop(network_registry);
+            .try_for_each(|request| {
+                let mut task_tx = task_tx.clone();
+                async move {
+                    let mut network_registry = self.networks.starnix.lock().await;
+                    let (send, did_state_change): (
+                        Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>,
+                        bool,
+                    ) = handle_registry_request!(
+                        StarnixNetworksRequest,
+                        request,
+                        network_registry,
+                        RegistryType::Starnix
+                    );
+                    std::mem::drop(network_registry);
 
-                if did_state_change {
-                    // We do feed here instead of send so that we don't wait for a flush
-                    // in the event that the DnsServerWatcher is not running.
-                    self.dns_tx
-                        .clone()
-                        .feed(self.networks.current_dns_servers().await)
-                        .await
-                        .unwrap_or_else(|e| {
-                            if !e.is_disconnected() {
-                                // Log if the feed fails for reasons other than disconnection.
-                                error!("Unable to feed DNS update: {e:?}")
-                            }
-                        });
-
-                    // Ensure the mark is updated prior to sending out the response
-                    // and dropping the registry.
-                    self.marks.lock().await.mark_1 = self.networks.current_mark().await;
-                    send().context("error sending response")?;
-                } else {
-                    // Not a request involving a state change,
-                    // so ignore any errors.
-                    let _: Result<(), fidl::Error> = send();
+                    if did_state_change {
+                        self.handle_state_changed().await?;
+                        task_tx.send(BackgroundTask::UpdateDefaultNetworks).await?;
+                        send().context("error sending response")?;
+                    } else {
+                        // Not a request involving a state change,
+                        // so ignore any errors.
+                        let _: Result<(), fidl::Error> = send();
+                    }
+                    Ok(())
                 }
-                Ok(())
             })
             .await
     }
@@ -516,6 +609,7 @@ impl Registry {
     pub(crate) async fn run_fuchsia(
         &self,
         stream: fnp_socketproxy::FuchsiaNetworksRequestStream,
+        task_tx: Sender<BackgroundTask>,
     ) -> Result<(), Error> {
         let _occupant = match self.fuchsia_occupant.try_lock() {
             Some(o) => o,
@@ -530,45 +624,67 @@ impl Registry {
         self.networks.fuchsia.lock().await.networks.as_mut().clear();
         stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async {
-                let mut network_registry = self.networks.fuchsia.lock().await;
-                let (send, did_state_change): (
-                    Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>,
-                    bool,
-                ) = handle_registry_request!(
-                    FuchsiaNetworksRequest,
-                    request,
-                    network_registry,
-                    "fuchsia"
-                );
-                std::mem::drop(network_registry);
+            .try_for_each(|request| {
+                let mut task_tx = task_tx.clone();
+                async move {
+                    let mut network_registry = self.networks.fuchsia.lock().await;
+                    let (send, did_state_change): (
+                        Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>,
+                        bool,
+                    ) = handle_registry_request!(
+                        FuchsiaNetworksRequest,
+                        request,
+                        network_registry,
+                        RegistryType::Fuchsia
+                    );
+                    std::mem::drop(network_registry);
 
-                if did_state_change {
-                    // We do feed here instead of send so that we don't wait for a flush
-                    // in the event that the DnsServerWatcher is not running.
-                    self.dns_tx
-                        .clone()
-                        .feed(self.networks.current_dns_servers().await)
-                        .await
-                        .unwrap_or_else(|e| {
-                            if !e.is_disconnected() {
-                                // Log if the feed fails for reasons other than disconnection.
-                                error!("Unable to feed DNS update: {e:?}")
-                            }
-                        });
-
-                    // Ensure the mark is updated prior to sending out the response
-                    // and dropping the registry.
-                    self.marks.lock().await.mark_1 = self.networks.current_mark().await;
-                    send().context("error sending response")?;
-                } else {
-                    // Not a request involving a state change,
-                    // so ignore any errors.
-                    let _: Result<(), fidl::Error> = send();
+                    if did_state_change {
+                        self.handle_state_changed().await?;
+                        task_tx.send(BackgroundTask::UpdateDefaultNetworks).await?;
+                        send().context("error sending response")?;
+                    } else {
+                        // Not a request involving a state change,
+                        // so ignore any errors.
+                        let _: Result<(), fidl::Error> = send();
+                    }
+                    Ok(())
                 }
-                Ok(())
             })
             .await
+    }
+
+    async fn handle_state_changed(&self) -> Result<(), Error> {
+        // We do feed here instead of send so that we don't wait for a flush
+        // in the event that the DnsServerWatcher is not running.
+        self.dns_tx.clone().feed(self.networks.current_dns_servers().await).await.unwrap_or_else(
+            |e| {
+                if !e.is_disconnected() {
+                    // Log if the feed fails for reasons other than disconnection.
+                    error!("Unable to feed DNS update: {e:?}")
+                }
+            },
+        );
+
+        // Ensure the mark is updated prior to sending out the response
+        // and dropping the registry.
+        // TODO(https://fxbug.dev/431822969): Replace this with a common definition of
+        // which mark domain is used for which purpose.
+        self.marks.lock().await.mark_1 = self.networks.current_mark().await.into_optional_uint32();
+        Ok(())
+    }
+
+    pub(crate) async fn update_default_network(&self) -> Result<(), Error> {
+        let mut default_network = self.default_network.lock().await;
+        if let Err(e) = default_network
+            .update(self.networks.default_network_update().await)
+            .await
+            .context("error updating default network")?
+        {
+            warn!("Couldn't update default network: {e:?}");
+        }
+
+        Ok(())
     }
 }
 
@@ -580,6 +696,7 @@ mod test {
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
     };
     use futures::channel::mpsc::Receiver;
+    use futures::future;
     use net_declare::{fidl_ip, fidl_socket_addr};
     use pretty_assertions::assert_eq;
     use socket_proxy_testing::{RegistryType, ToDnsServerList as _, ToNetwork};
@@ -663,12 +780,13 @@ mod test {
         FuchsiaNetworks(fnp_socketproxy::FuchsiaNetworksRequestStream),
     }
 
-    async fn run_registry(
+    async fn run_registry<DN: fnp_properties::DefaultNetworkProxyInterface>(
         handles: LocalComponentHandles,
         starnix_networks: Arc<Mutex<NetworkRegistry>>,
         fuchsia_networks: Arc<Mutex<NetworkRegistry>>,
         marks: Arc<Mutex<crate::SocketMarks>>,
         dns_tx: mpsc::Sender<Vec<fnp_socketproxy::DnsServerList>>,
+        default_network: Arc<Mutex<DefaultNetwork<DN>>>,
     ) -> Result<(), Error> {
         let mut fs = ServiceFs::new();
         let _ = fs
@@ -681,29 +799,83 @@ mod test {
             networks: NetworkRegistries { starnix: starnix_networks, fuchsia: fuchsia_networks },
             marks,
             dns_tx,
+            default_network,
             starnix_occupant: Default::default(),
             fuchsia_occupant: Default::default(),
         };
 
-        fs.for_each_concurrent(0, |service| async {
-            match service {
-                IncomingService::StarnixNetworks(stream) => registry.run_starnix(stream).await,
-                IncomingService::FuchsiaNetworks(stream) => registry.run_fuchsia(stream).await,
-            }
-            .unwrap_or_else(|e| error!("{e:?}"))
-        })
+        let (task_tx, task_rx) = mpsc::channel(1);
+
+        futures::future::join(
+            async {
+                fs.for_each_concurrent(0, |service| {
+                    let task_tx = task_tx.clone();
+                    let registry = &registry;
+                    async move {
+                        match service {
+                            IncomingService::StarnixNetworks(stream) => {
+                                registry.run_starnix(stream, task_tx).await
+                            }
+                            IncomingService::FuchsiaNetworks(stream) => {
+                                registry.run_fuchsia(stream, task_tx).await
+                            }
+                        }
+                        .unwrap_or_else(|e| error!("{e:?}"))
+                    }
+                })
+                .await
+            },
+            async {
+                task_rx
+                    .for_each(|task| async {
+                        match task {
+                            BackgroundTask::UpdateDefaultNetworks => {
+                                registry.update_default_network().await
+                            }
+                        }
+                        .unwrap_or_else(|e| error!("{e:?}"))
+                    })
+                    .await
+            },
+        )
         .await;
 
         Ok(())
     }
 
-    async fn setup_test(
-    ) -> Result<(RealmInstance, Receiver<Vec<fnp_socketproxy::DnsServerList>>), Error> {
+    #[derive(Default)]
+    struct MockDefaultNetworks {
+        updates_seen: Arc<std::sync::Mutex<Vec<fnp_properties::DefaultNetworkUpdateRequest>>>,
+    }
+
+    impl fnp_properties::DefaultNetworkProxyInterface for MockDefaultNetworks {
+        type UpdateResponseFut =
+            future::Ready<Result<fnp_properties::DefaultNetworkUpdateResult, fidl::Error>>;
+
+        fn r#update(
+            &self,
+            payload: &fidl_fuchsia_net_policy_properties::DefaultNetworkUpdateRequest,
+        ) -> Self::UpdateResponseFut {
+            self.updates_seen.lock().unwrap().push(payload.clone());
+            future::ok(Ok(()))
+        }
+    }
+
+    async fn setup_test() -> Result<
+        (
+            RealmInstance,
+            Receiver<Vec<fnp_socketproxy::DnsServerList>>,
+            Arc<Mutex<DefaultNetwork<MockDefaultNetworks>>>,
+        ),
+        Error,
+    > {
         let builder = RealmBuilder::new().await?;
         let starnix_networks = Arc::new(Mutex::new(Default::default()));
         let fuchsia_networks = Arc::new(Mutex::new(Default::default()));
         let (dns_tx, dns_rx) = mpsc::channel(1);
         let marks = Arc::new(Mutex::new(crate::SocketMarks::default()));
+        let default_networks =
+            Arc::new(Mutex::new(DefaultNetwork::new(MockDefaultNetworks::default())));
         let registry = builder
             .add_local_child(
                 "registry",
@@ -712,6 +884,7 @@ mod test {
                     let fuchsia_networks = fuchsia_networks.clone();
                     let marks = marks.clone();
                     let dns_tx = dns_tx.clone();
+                    let default_networks = default_networks.clone();
                     move |handles: LocalComponentHandles| {
                         Box::pin(run_registry(
                             handles,
@@ -719,6 +892,7 @@ mod test {
                             fuchsia_networks.clone(),
                             marks.clone(),
                             dns_tx.clone(),
+                            default_networks.clone(),
                         ))
                     }
                 },
@@ -746,7 +920,7 @@ mod test {
 
         let realm = builder.build().await?;
 
-        Ok((realm, dns_rx))
+        Ok((realm, dns_rx, default_networks))
     }
 
     #[test_case(&[
@@ -811,7 +985,7 @@ mod test {
     ]; "many updates")]
     #[fuchsia::test]
     async fn test_operations<N: ToNetwork + Clone>(operations: &[Op<N>]) -> Result<(), Error> {
-        let (realm, _) = setup_test().await?;
+        let (realm, _, _) = setup_test().await?;
         let starnix_networks = realm
             .root
             .connect_to_protocol_at_exposed_dir()
@@ -872,7 +1046,7 @@ mod test {
         operations: &[Op<N>],
         dns_servers: Vec<fnp_socketproxy::DnsServerList>,
     ) -> Result<(), Error> {
-        let (realm, mut dns_rx) = setup_test().await?;
+        let (realm, mut dns_rx, _) = setup_test().await?;
         let starnix_networks = realm
             .root
             .connect_to_protocol_at_exposed_dir()
@@ -942,7 +1116,7 @@ mod test {
         operations: &[(RegistryType, Op<N>)],
         dns_servers: Vec<fnp_socketproxy::DnsServerList>,
     ) -> Result<(), Error> {
-        let (realm, mut dns_rx) = setup_test().await?;
+        let (realm, mut dns_rx, _) = setup_test().await?;
         let starnix_networks = realm
             .root
             .connect_to_protocol_at_exposed_dir()
@@ -973,6 +1147,77 @@ mod test {
         let mut last_dns = last_dns.expect("there should be at least one dns update");
         last_dns.sort_by_key(|a| a.source_network_id);
         assert_eq!(last_dns, dns_servers);
+
+        Ok(())
+    }
+
+    trait ToDefaultNetworkUpdateRequest {
+        fn to_default_network_update_request(self) -> fnp_properties::DefaultNetworkUpdateRequest;
+    }
+
+    impl ToDefaultNetworkUpdateRequest for (u64, (u32, Option<u32>)) {
+        fn to_default_network_update_request(self) -> fnp_properties::DefaultNetworkUpdateRequest {
+            fnp_properties::DefaultNetworkUpdateRequest {
+                interface_id: Some(self.0),
+                socket_marks: Some(fnet::Marks {
+                    mark_1: Some(self.1 .0),
+                    mark_2: self.1 .1,
+                    __source_breaking: fidl::marker::SourceBreaking,
+                }),
+                __source_breaking: fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    #[test_case(&[
+        Op::Add { network: (1, vec![fidl_ip!("192.0.2.0")]), result: Ok(()) },
+    ], vec![]
+    ; "Add but no default")]
+    #[test_case(&[
+        Op::Add { network: (1, vec![fidl_ip!("192.0.2.0")]), result: Ok(()) },
+        Op::SetDefault { network_id: Some(1), result: Ok(()) },
+    ], vec![(1, (1, None)).to_default_network_update_request()]
+    ; "Add and set default")]
+    #[test_case(&[
+        Op::Add { network: (1, vec![fidl_ip!("192.0.2.0")]), result: Ok(()) },
+        Op::Add { network: (2, vec![fidl_ip!("192.0.2.0")]), result: Ok(()) },
+        Op::SetDefault { network_id: Some(1), result: Ok(()) },
+        Op::SetDefault { network_id: Some(2), result: Ok(()) },
+    ], vec![
+        (1, (1, None)).to_default_network_update_request(),
+        (2, (2, None)).to_default_network_update_request(),
+    ]
+    ; "Add two and set default")]
+    #[test_case(&[
+        Op::Add { network: (1, vec![fidl_ip!("192.0.2.0")]), result: Ok(()) },
+        Op::SetDefault { network_id: Some(1), result: Ok(()) },
+        Op::SetDefault { network_id: None, result: Ok(()) },
+        Op::Remove { network_id: 1, result: Ok(()) },
+    ], vec![
+        (1, (1, None)).to_default_network_update_request(),
+        // An empty update means the default network has been removed.
+        Default::default(),
+    ]
+    ; "Add default and delete")]
+    #[fuchsia::test]
+    async fn test_default_network_update<N: ToNetwork + Clone>(
+        operations: &[Op<N>],
+        default_server_updates: Vec<fnp_properties::DefaultNetworkUpdateRequest>,
+    ) -> Result<(), Error> {
+        let (realm, _, default_networks) = setup_test().await?;
+        let starnix_networks = realm
+            .root
+            .connect_to_protocol_at_exposed_dir()
+            .context("While connecting to StarnixNetworks")?;
+
+        for op in operations {
+            op.execute_starnix(&starnix_networks).await?;
+        }
+
+        assert_eq!(
+            *default_networks.lock().await.proxy.updates_seen.lock().unwrap(),
+            default_server_updates
+        );
 
         Ok(())
     }
