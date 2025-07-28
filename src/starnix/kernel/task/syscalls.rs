@@ -1516,8 +1516,6 @@ pub fn sys_capset(
     if header.pid != 0 && header.pid != current_task.tid {
         return error!(EPERM);
     }
-    let weak = get_task_or_current(current_task, header.pid);
-    let target_task = Task::from_weak(&weak)?;
 
     let (new_permitted, new_effective, new_inheritable) = match header.version {
         _LINUX_CAPABILITY_VERSION_1 => {
@@ -1545,7 +1543,7 @@ pub fn sys_capset(
     };
 
     // Permission checks. Copied out of TLPI section 39.7.
-    let mut creds = target_task.real_creds();
+    let mut creds = current_task.current_creds();
     {
         log_trace!("Capabilities({{permitted={:?} from {:?}, effective={:?} from {:?}, inheritable={:?} from {:?}}}, bounding={:?})", new_permitted, creds.cap_permitted, new_effective, creds.cap_effective, new_inheritable, creds.cap_inheritable, creds.cap_bounding);
         if !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable) {
