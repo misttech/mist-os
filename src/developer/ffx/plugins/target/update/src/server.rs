@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
+use target_holders::{RemoteControlProxyHolder, TargetInfoHolder};
 use timeout::timeout;
 use zx_status::Status;
 
@@ -56,8 +56,8 @@ pub(crate) struct PackageServerTask {
 }
 
 pub(crate) async fn package_server_task(
-    target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
+    target_info: TargetInfoHolder,
     context: EnvironmentContext,
     product_bundle: PathBuf,
     repo_port: u16,
@@ -117,8 +117,8 @@ pub(crate) async fn package_server_task(
         let tool = ffx_repository_server_start::ServerStartTool {
             cmd,
             context,
-            target_proxy_connector: target_proxy_connector.clone(),
             rcs_proxy_connector: connector.clone(),
+            target_info: target_info.clone(),
         };
 
         let stdout = LogWriter::new("repo_server stdout");
@@ -451,6 +451,7 @@ mod tests {
     use ffx_target::fho::FhoConnectionBehavior;
     use ffx_target::TargetProxy;
     use fho::{FhoEnvironment, TryFromEnv as _};
+    use fidl_fuchsia_developer_ffx::TargetInfo;
     use fidl_fuchsia_developer_remotecontrol::{
         ConnectCapabilityError, RemoteControlProxy, RemoteControlRequest,
     };
@@ -470,7 +471,7 @@ mod tests {
     struct FakeTestEnv {
         pub context: EnvironmentContext,
         pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-        pub target_proxy_connector: Connector<TargetProxyHolder>,
+        pub target_info: TargetInfoHolder,
     }
 
     impl FakeTestEnv {
@@ -496,12 +497,13 @@ mod tests {
                 .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
                 .expect("set_behavior");
 
-            let target_proxy_connector = Connector::try_from_env(&fho_env)
-                .await
-                .expect("Could not make target proxy test connector");
             let rcs_proxy_connector =
                 Connector::try_from_env(&fho_env).await.expect("Could not make RCS test connector");
-            Self { context: test_env.context.clone(), rcs_proxy_connector, target_proxy_connector }
+            let target_info = TargetInfoHolder::from(TargetInfo {
+                nodename: Some("test_target_info".to_string()),
+                ..Default::default()
+            });
+            Self { context: test_env.context.clone(), rcs_proxy_connector, target_info }
         }
     }
 
@@ -679,8 +681,8 @@ mod tests {
         let product_bundle = PathBuf::from("/path/to/product_bundle");
 
         let result = package_server_task(
-            fake_env.target_proxy_connector,
             fake_env.rcs_proxy_connector,
+            fake_env.target_info,
             fake_env.context,
             product_bundle,
             0,

@@ -21,7 +21,7 @@ use futures::{pin_mut, select, TryStreamExt};
 use std::path::PathBuf;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{moniker, RemoteControlProxyHolder, TargetProxyHolder};
+use target_holders::{moniker, RemoteControlProxyHolder, TargetInfoHolder};
 use {ffx_update_args as args, fidl_fuchsia_update_installer_ext as installer};
 
 mod server;
@@ -41,8 +41,8 @@ pub struct UpdateTool {
     installer_proxy: Deferred<InstallerProxy>,
     #[with(moniker("/core/system-update"))]
     commit_status_provider_proxy: CommitStatusProviderProxy,
-    target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
+    target_info: TargetInfoHolder,
 }
 
 fho::embedded_plugin!(UpdateTool);
@@ -91,8 +91,8 @@ impl UpdateTool {
                 Self::get_product_bundle_path(&cmd.product_bundle_path, &self.context.clone())?;
             let repo_port: u16 = cmd.product_bundle_port()?.try_into().unwrap();
             server::package_server_task(
-                self.target_proxy_connector.clone(),
                 self.rcs_proxy_connector.clone(),
+                self.target_info.clone(),
                 self.context.clone(),
                 product_path,
                 repo_port,
@@ -201,8 +201,8 @@ impl UpdateTool {
 
             let repo_port: u16 = cmd.product_bundle_port()?.try_into().unwrap();
             server::package_server_task(
-                self.target_proxy_connector.clone(),
                 self.rcs_proxy_connector.clone(),
+                self.target_info.clone(),
                 self.context.clone(),
                 product_path,
                 repo_port,
@@ -606,6 +606,7 @@ mod tests {
     use fho::{FhoEnvironment, TryFromEnv};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl::{EventPair, Peered, Signals};
+    use fidl_fuchsia_developer_ffx::TargetInfo;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
     use fidl_fuchsia_update::{CommitStatusProviderRequest, ManagerRequest};
     use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;
@@ -760,6 +761,11 @@ mod tests {
             .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
             .expect("set_behavior");
 
+        let target_info = TargetInfoHolder::from(TargetInfo {
+            nodename: Some("test_target_info".to_string()),
+            ..Default::default()
+        });
+
         let tool = UpdateTool {
             cmd: Update {
                 cmd: args::Command::CheckNow(args::CheckNow {
@@ -775,12 +781,10 @@ mod tests {
             channel_control_proxy: fake_channel_control_proxy,
             installer_proxy: fake_installer_proxy,
             commit_status_provider_proxy: fake_commit_status_provider_proxy,
-            target_proxy_connector: Connector::try_from_env(&fho_env)
-                .await
-                .expect("Could not make target proxy test connector"),
             rcs_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make RCS test connector"),
+            target_info,
         };
         let buffers = TestBuffers::default();
         let writer = SimpleWriter::new_test(&buffers);
@@ -855,6 +859,11 @@ mod tests {
             .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
             .expect("set_behavior");
 
+        let target_info = TargetInfoHolder::from(TargetInfo {
+            nodename: Some("test_target_info".to_string()),
+            ..Default::default()
+        });
+
         let tool = UpdateTool {
             cmd: Update { cmd: args::Command::ForceInstall(args.clone()) },
             context: test_env.context.clone(),
@@ -862,12 +871,10 @@ mod tests {
             channel_control_proxy: fake_channel_control_proxy,
             installer_proxy: Deferred::from_output(Ok(fake_installer_proxy)),
             commit_status_provider_proxy: fake_commit_status_provider_proxy,
-            target_proxy_connector: Connector::try_from_env(&fho_env)
-                .await
-                .expect("Could not make target proxy test connector"),
             rcs_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make RCS test connector"),
+            target_info,
         };
 
         let buffers = TestBuffers::default();
