@@ -6,6 +6,8 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.google.nanohub") {
   sources = [
+    "datachannel.fidl",
+    "lifecycle.fidl",
     "nanohub.fidl",
     "nanohubdisplay.fidl",
     "overview.fidl",
