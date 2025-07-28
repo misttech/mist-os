@@ -405,7 +405,7 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
     if (unlikely(!test_reclaim_function_ && evicted_page == prev_evicted_page)) {
       // Print the OOPS only once per eviction attempt to prevent log spam.
       if (!printed_same_page_oops) {
-        KERNEL_OOPS("Evictor reclaiming the same page again %p\n", evicted_page);
+        printf("WARNING: Evictor reclaiming the same page again %p\n", evicted_page);
         printed_same_page_oops = true;
       }
       reclaim_failures.prev_page_evictions++;
