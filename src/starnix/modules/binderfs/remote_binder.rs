@@ -190,7 +190,7 @@ impl FileOps for RemoteBinderFileOps {
 
 /// The type of the responder function used in `TaskRequest` to send the result of a FIDL request
 /// directly from the handler thread.
-type SynchronousResponder = Box<dyn FnOnce(Result<(), Errno>) -> Result<(), fidl::Error> + Send>;
+type SynchronousResponder<T> = Box<dyn FnOnce(Result<T, Errno>) -> Result<(), fidl::Error> + Send>;
 
 /// Request sent from the FIDL server thread to the running tasks. The requests that require a
 /// response send a `Sender` to let the task return the response.
@@ -206,7 +206,7 @@ enum TaskRequest {
         mapped_address: u64,
         // a synchronous function avoids thread hops.
         #[derivative(Debug = "ignore")]
-        responder: SynchronousResponder,
+        responder: SynchronousResponder<()>,
     },
     /// Execute the given ioctl. See the Ioctl method in the Binder FIDL
     /// protocol.
@@ -217,9 +217,10 @@ enum TaskRequest {
         request: u32,
         parameter: u64,
         koid: u64,
+        vmo: zx::Vmo,
         // a synchronous function avoids thread hops.
         #[derivative(Debug = "ignore")]
-        responder: SynchronousResponder,
+        responder: SynchronousResponder<Vec<fbinder::IoctlWrite>>,
     },
     /// Open the binder device driver situated at `path` in the Task filesystem namespace.
     Open {
@@ -513,12 +514,12 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ///
     /// To use this, one should use the returned responder when they want `f` to be run, and ensure
     /// that the returned future is either waited, or dropped on the executor thread.
-    fn make_synchronous_responder<R: Send + 'static, C>(
+    fn make_synchronous_responder<T, R: Send + 'static, C>(
         responder: R,
         f: C,
-    ) -> (SynchronousResponder, impl Future<Output = ()>)
+    ) -> (SynchronousResponder<T>, impl Future<Output = ()>)
     where
-        C: FnOnce(R, Result<(), Errno>) -> Result<(), fidl::Error> + Send + 'static,
+        C: FnOnce(R, Result<T, Errno>) -> Result<(), fidl::Error> + Send + 'static,
     {
         let (tx, rx) = futures::channel::oneshot::channel();
         let responder = Arc::new(Mutex::new(Some(responder)));
@@ -551,7 +552,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     }
 
     async fn serve_binder_request(
-        &self,
+        self: &Arc<Self>,
         remote_binder_connection: Arc<RemoteBinderConnection>,
         request: fbinder::BinderRequest,
     ) -> Result<(), Error> {
@@ -575,22 +576,25 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 );
                 waiter.await;
             }
-            fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
+            fbinder::BinderRequest::Ioctl { tid, request, parameter, responder, vmo } => {
                 trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_SEND_WORK, "request" => request);
                 trace_flow_begin!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, tid.into(), "request" => request);
 
-                let (responder, waiter) =
-                    Self::make_synchronous_responder(responder, move |responder, e| {
-                        trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_FIDL_REPLY);
-                        trace_flow_end!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, tid.into());
+                let (responder, waiter) = Self::make_synchronous_responder::<
+                    Vec<fbinder::IoctlWrite>,
+                    _,
+                    _,
+                >(responder, move |responder, e| {
+                    trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_FIDL_REPLY);
+                    trace_flow_end!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, tid.into());
 
-                        let e = e.map_err(|e| {
-                            fposix::Errno::from_primitive(e.code.error_code() as i32)
-                                .unwrap_or(fposix::Errno::Einval)
-                        });
-
-                        responder.send(e)
-                    });
+                    match e {
+                        Ok(user_writes) => responder.send(Ok(user_writes.as_slice())),
+                        Err(e) => responder
+                            .send(Err(fposix::Errno::from_primitive(e.code.error_code() as i32)
+                                .unwrap_or(fposix::Errno::Einval))),
+                    }
+                });
                 self.lock().enqueue_task_request(BoundTaskRequest {
                     koid: tid,
                     request: TaskRequest::Ioctl {
@@ -598,6 +602,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         request,
                         parameter,
                         koid: tid,
+                        vmo,
                         responder,
                     },
                 });
@@ -1106,6 +1111,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     request,
                     parameter,
                     koid,
+                    vmo,
                     responder,
                 } => {
                     trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_WORKER_PROCESS);
@@ -1115,6 +1121,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         current_task,
                         request,
                         parameter.into(),
+                        vmo,
                     );
                     // Once the potentially blocking calls is made, the task is ready to handle the
                     // next request.
@@ -1412,11 +1419,24 @@ mod tests {
             binder.set_vmo(vmo, addr as u64).expect("set_vmo");
             let mut version = uapi::binder_version { protocol_version: 0 };
             let version_ref = &mut version as *mut uapi::binder_version;
-            binder
-                .ioctl(42, uapi::BINDER_VERSION, version_ref as u64)
+            let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("Vmo::create");
+            let dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate_handle");
+            let user_writes = binder
+                .ioctl(42, uapi::BINDER_VERSION, version_ref as u64, vmo)
                 .await
                 .expect("ioctl")
                 .expect("ioctl");
+            for user_write in user_writes.iter() {
+                // SAFETY This is required to emulate the scattered writes for tests.
+                unsafe {
+                    dup.read_raw(
+                        user_write.address as *mut u8,
+                        user_write.length as usize,
+                        user_write.offset,
+                    )
+                    .expect("read_raw")
+                }
+            }
             // SAFETY This is safe, because version is repr(C)
             let version = unsafe { std::ptr::read_volatile(version_ref) };
             assert_eq!(version.protocol_version, uapi::BINDER_CURRENT_PROTOCOL_VERSION as i32);
