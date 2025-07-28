@@ -68,7 +68,7 @@ int main(int argc, const char **argv) {
   fidl::WireSyncClient<fuchsia_hardware_fastboot::FastbootImpl> device(
       std::move(connect_device.value()));
 
-  fastboot::Fastboot fastboot(zx_system_get_physmem());
+  fastboot::Fastboot fastboot;
   while (true) {
     // Note: fastboot.remaining_download_size() returns 0 in command stage.
     size_t request_size =

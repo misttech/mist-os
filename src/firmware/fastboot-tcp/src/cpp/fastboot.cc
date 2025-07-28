@@ -13,13 +13,9 @@ int fastboot_process(size_t packet_size, int (*read_packet_callback)(void *, siz
                      int (*write_packet_callback)(const void *, size_t, void *), void *ctx) {
   static fastboot::Fastboot *fastboot = nullptr;
   if (!fastboot) {
-    // Use the total system memory as an optimistic max download size. Actual
-    // download buffer is dynamically allocated when executing the download
-    // command based on available memory and released after.
-    //
     // Since the life time of the object is the same as the component, we simply
     // create it once and don't delete it.
-    fastboot = new fastboot::Fastboot(zx_system_get_physmem());
+    fastboot = new fastboot::Fastboot;
   }
 
   FastbootTCPTransport transport(ctx, packet_size, read_packet_callback, write_packet_callback);

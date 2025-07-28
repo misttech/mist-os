@@ -138,7 +138,17 @@ const Fastboot::VariableHashTable& Fastboot::GetVariableTable() {
   return *kVariableTable;
 }
 
-Fastboot::Fastboot(size_t max_download_size) : max_download_size_(max_download_size) {}
+Fastboot::Fastboot() {
+  // Allocate up to 2% of total memory for the fastboot download buffer.
+  //
+  // We may need to tweak this further; low-memory devices need to be conservative here to avoid
+  // OOMing the system, but a smaller buffer results in slower downloads since images need to be
+  // split into more chunks which creates more overhead.
+  //
+  // The VMO will only be instantiated when a download is requested, and will be released when the
+  // download is finished.
+  max_download_size_ = zx_system_get_physmem() / 50;
+}
 
 Fastboot::Fastboot(size_t max_download_size, fidl::ClientEnd<fuchsia_io::Directory> svc_root)
     : max_download_size_(max_download_size), svc_root_(std::move(svc_root)) {}
