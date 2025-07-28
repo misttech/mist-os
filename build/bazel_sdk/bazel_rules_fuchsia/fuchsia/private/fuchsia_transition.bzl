@@ -114,8 +114,6 @@ def _fuchsia_transition_impl(settings, attr):
 
     return {
         "//command_line_option:cpu": output_cpu,
-        "//command_line_option:crosstool_top": "@fuchsia_clang//:toolchain",
-        "//command_line_option:host_crosstool_top": "@bazel_tools//tools/cpp:toolchain",
         "//command_line_option:copt": copt,
         "//command_line_option:strip": "never",
         "//command_line_option:platforms": fuchsia_platform,
@@ -133,8 +131,6 @@ fuchsia_transition = transition(
     outputs = [
         FUCHSIA_API_LEVEL_TARGET,
         "//command_line_option:cpu",
-        "//command_line_option:crosstool_top",
-        "//command_line_option:host_crosstool_top",
         "//command_line_option:copt",
         "//command_line_option:strip",
         "//command_line_option:platforms",
