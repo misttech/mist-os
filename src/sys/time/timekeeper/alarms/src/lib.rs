@@ -1266,18 +1266,15 @@ async fn wake_timer_loop(
                         if needs_cancel {
                             log_long_op!(stop_hrtimer(&timer_proxy, &timer_config));
                         }
-                        hrtimer_status = Some(
-                            schedule_hrtimer(
-                                scope.clone(),
-                                now,
-                                &timer_proxy,
-                                schedulable_deadline,
-                                snd.clone(),
-                                &timer_config,
-                                &schedule_delay_prop,
-                            )
-                            .await,
-                        );
+                        hrtimer_status = Some(log_long_op!(schedule_hrtimer(
+                            scope.clone(),
+                            now,
+                            &timer_proxy,
+                            schedulable_deadline,
+                            snd.clone(),
+                            &timer_config,
+                            &schedule_delay_prop,
+                        )));
                     }
                 }
             }
@@ -1307,7 +1304,7 @@ async fn wake_timer_loop(
                     if let Some(deadline) = deadline_after {
                         // Reschedule the hardware timer if the removed timer is the earliest one,
                         // and another one exists.
-                        let new_timer_state = schedule_hrtimer(
+                        let new_timer_state = log_long_op!(schedule_hrtimer(
                             scope.clone(),
                             now,
                             &timer_proxy,
@@ -1315,12 +1312,13 @@ async fn wake_timer_loop(
                             snd.clone(),
                             &timer_config,
                             &schedule_delay_prop,
-                        )
-                        .await;
+                        ));
                         let old_hrtimer_status = hrtimer_status.replace(new_timer_state);
                         if let Some(task) = old_hrtimer_status.map(|ev| ev.task) {
-                            // Allow the task to complete, I suppose.
-                            task.await;
+                            // Allow the task to complete. Since this task should have been
+                            // canceled or completed already, this call should not block for
+                            // a long time.
+                            log_long_op!(task);
                         }
                     } else {
                         // No next timer, clean up the hrtimer status.
@@ -1354,18 +1352,15 @@ async fn wake_timer_loop(
                 // There is a timer to reschedule, do that now.
                 hrtimer_status = match timers.peek_deadline() {
                     None => None,
-                    Some(deadline) => Some(
-                        schedule_hrtimer(
-                            scope.clone(),
-                            now,
-                            &timer_proxy,
-                            deadline,
-                            snd.clone(),
-                            &timer_config,
-                            &schedule_delay_prop,
-                        )
-                        .await,
-                    ),
+                    Some(deadline) => Some(log_long_op!(schedule_hrtimer(
+                        scope.clone(),
+                        now,
+                        &timer_proxy,
+                        deadline,
+                        snd.clone(),
+                        &timer_config,
+                        &schedule_delay_prop,
+                    ))),
                 }
             }
             Cmd::AlarmFidlError { expired_deadline, error } => {
@@ -1387,18 +1382,15 @@ async fn wake_timer_loop(
                     .expect("notification succeeds");
                 hrtimer_status = match timers.peek_deadline() {
                     None => None, // No remaining timers, nothing to schedule.
-                    Some(deadline) => Some(
-                        schedule_hrtimer(
-                            scope.clone(),
-                            now,
-                            &timer_proxy,
-                            deadline,
-                            snd.clone(),
-                            &timer_config,
-                            &schedule_delay_prop,
-                        )
-                        .await,
-                    ),
+                    Some(deadline) => Some(log_long_op!(schedule_hrtimer(
+                        scope.clone(),
+                        now,
+                        &timer_proxy,
+                        deadline,
+                        snd.clone(),
+                        &timer_config,
+                        &schedule_delay_prop,
+                    ))),
                 }
             }
             Cmd::AlarmDriverError { expired_deadline, error } => {
@@ -1427,18 +1419,15 @@ async fn wake_timer_loop(
                         // today.
                         hrtimer_status = match timers.peek_deadline() {
                             None => None,
-                            Some(deadline) => Some(
-                                schedule_hrtimer(
-                                    scope.clone(),
-                                    now,
-                                    &timer_proxy,
-                                    deadline,
-                                    snd.clone(),
-                                    &timer_config,
-                                    &schedule_delay_prop,
-                                )
-                                .await,
-                            ),
+                            Some(deadline) => Some(log_long_op!(schedule_hrtimer(
+                                scope.clone(),
+                                now,
+                                &timer_proxy,
+                                deadline,
+                                snd.clone(),
+                                &timer_config,
+                                &schedule_delay_prop,
+                            ))),
                         }
                     }
                 }
