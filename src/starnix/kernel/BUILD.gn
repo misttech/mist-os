@@ -178,6 +178,7 @@ rustc_library("starnix_core") {
     "power/sync_on_suspend.rs",
     "power/wake_lock.rs",
     "power/wakeup_count.rs",
+    "security/audit.rs",
     "security/hooks.rs",
     "security/mod.rs",
     "security/selinux_hooks/audit.rs",

@@ -22,6 +22,10 @@ mod selinux_hooks;
 mod hooks;
 pub use hooks::*;
 
+/// Audit logging to be used from different kernel components
+mod audit;
+pub use audit::*;
+
 /// Opaque structure encapsulating security subsystem state for the whole system.
 pub struct KernelState {
     state: Option<selinux_hooks::KernelState>,

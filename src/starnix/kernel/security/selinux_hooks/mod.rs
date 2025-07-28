@@ -228,6 +228,7 @@ fn check_ioctl_permission(
         }
 
         audit_decision(
+            kernel.audit_logger(),
             permission_check,
             result.clone(),
             subject_sid,
@@ -376,6 +377,7 @@ fn todo_check_permission<P: ClassPermission + Into<KernelPermission> + Clone + '
 
         if result.audit {
             audit_todo_decision(
+                kernel.audit_logger(),
                 bug,
                 permission_check,
                 result,
@@ -413,6 +415,7 @@ fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'stati
         }
 
         audit_decision(
+            kernel.audit_logger(),
             permission_check,
             result.clone(),
             source_sid,

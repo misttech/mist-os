@@ -7,11 +7,12 @@ use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::{ClassPermission, KernelPermission, SecurityId};
 use starnix_core::task::{CurrentTask, Task};
 use starnix_core::vfs::{FileObject, FileSystem, FsNode, FsStr};
-use starnix_logging::{
-    log_warn, BugRef, __track_stub_inner, trace_instant, CATEGORY_STARNIX_SECURITY,
-};
+use starnix_logging::{BugRef, __track_stub_inner, trace_instant, CATEGORY_STARNIX_SECURITY};
 use std::fmt::{Display, Error};
 use std::num::NonZeroU64;
+use std::sync::Arc;
+
+use crate::security::AuditLogger;
 
 /// Container for a reference to kernel state from which to include details when emitting audit
 /// logging.  [`Auditable`] instances are created from references to objects via `into()`, e.g:
@@ -108,6 +109,7 @@ impl<'a, const N: usize> From<&'a [Auditable<'a>; N]> for Auditable<'a> {
 /// Callers must supply an [`Auditable`] with context for the check (e.g. the calling task, target
 /// file object or filesystem node, etc.).
 pub(super) fn audit_decision(
+    audit_fw: Arc<AuditLogger>,
     permission_check: &PermissionCheck<'_>,
     result: PermissionCheckResult,
     source_sid: SecurityId,
@@ -171,12 +173,16 @@ pub(super) fn audit_decision(
     let tcontext = security_server.sid_to_security_context(target_sid).unwrap();
     let tcontext = BStr::new(&tcontext);
 
-    log_warn!("avc: {decision} {{ {permission_name} }}{audit_data} scontext={scontext} tcontext={tcontext} tclass={tclass}");
+    audit_fw.audit_log(
+        "avc",
+        &format!("{decision} {{ {permission_name} }} {audit_data} scontext={scontext} tcontext={tcontext} tclass={tclass}")
+    );
 }
 
 /// Emits an audit log entry for a check that failed, but will still be granted because it was made
 /// with the [`super::todo_check_permission()`] API.
 pub(super) fn audit_todo_decision(
+    audit_fw: Arc<AuditLogger>,
     bug: BugRef,
     permission_check: &PermissionCheck<'_>,
     mut result: PermissionCheckResult,
@@ -186,7 +192,15 @@ pub(super) fn audit_todo_decision(
     audit_context: Auditable<'_>,
 ) {
     result.todo_bug = Some(bug.into());
-    audit_decision(permission_check, result, source_sid, target_sid, permission, audit_context)
+    audit_decision(
+        audit_fw,
+        permission_check,
+        result,
+        source_sid,
+        target_sid,
+        permission,
+        audit_context,
+    )
 }
 
 impl Display for Auditable<'_> {

@@ -9,7 +9,7 @@ use crate::execution::CrashReporter;
 use crate::fs::fuchsia::nmfs::NetworkManagerHandle;
 use crate::mm::{FutexTable, MappingSummary, MlockPinFlavor, MlockShadowProcess, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
-use crate::security;
+use crate::security::{self, AuditLogger};
 use crate::task::container_namespace::ContainerNamespace;
 use crate::task::limits::SystemLimits;
 use crate::task::memory_attribution::MemoryAttributionManager;
@@ -641,6 +641,13 @@ impl Kernel {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.device_registry.open_device(locked, current_task, node, flags, dev, mode)
+    }
+
+    /// Return a reference to the Audit Framework
+    ///
+    /// This function follows the lazy initialization pattern.
+    pub fn audit_logger(&self) -> Arc<AuditLogger> {
+        self.expando.get_or_init(|| AuditLogger::new())
     }
 
     /// Return a reference to the GenericNetlink implementation.
