@@ -234,12 +234,8 @@ CobaltApp::CobaltApp(
 
   if (current_channel_provider_ != nullptr) {
     current_channel_provider_->GetCurrentChannel([this](const std::string& current_channel) {
-      // TODO(https://fxbug.dev/369213457): Call SetChannel instead.
       // TODO(https://fxbug.dev/341104129): Verify this is called in a unit test.
-      const system_data::SoftwareDistributionInfo info{
-          .channel = current_channel,
-      };
-      cobalt_service_->system_data()->SetSoftwareDistributionInfo(info);
+      cobalt_service_->system_data()->SetChannel(current_channel);
     });
   }
 
