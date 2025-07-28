@@ -215,7 +215,7 @@ enum TaskRequest {
         #[derivative(Debug = "ignore")]
         remote_binder_connection: Arc<RemoteBinderConnection>,
         request: u32,
-        parameter: u64,
+        arg: u64,
         koid: u64,
         vmo: zx::Vmo,
         // a synchronous function avoids thread hops.
@@ -230,7 +230,7 @@ enum TaskRequest {
         responder: oneshot::Sender<Result<Arc<RemoteBinderConnection>, Errno>>,
     },
     /// Have the task returns to userspace. `spawn_thread` must be returned to the caller through
-    /// the ioctl command parameter.
+    /// the ioctl command arg.
     Return { spawn_thread: bool },
 }
 
@@ -576,7 +576,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 );
                 waiter.await;
             }
-            fbinder::BinderRequest::Ioctl { tid, request, parameter, responder, vmo } => {
+            fbinder::BinderRequest::Ioctl { tid, request, arg, responder, vmo } => {
                 trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_SEND_WORK, "request" => request);
                 trace_flow_begin!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, tid.into(), "request" => request);
 
@@ -600,7 +600,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     request: TaskRequest::Ioctl {
                         remote_binder_connection: remote_binder_connection.clone(),
                         request,
-                        parameter,
+                        arg,
                         koid: tid,
                         vmo,
                         responder,
@@ -1109,7 +1109,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 TaskRequest::Ioctl {
                     remote_binder_connection,
                     request,
-                    parameter,
+                    arg,
                     koid,
                     vmo,
                     responder,
@@ -1120,7 +1120,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         locked,
                         current_task,
                         request,
-                        parameter.into(),
+                        arg.into(),
                         vmo,
                     );
                     // Once the potentially blocking calls is made, the task is ready to handle the

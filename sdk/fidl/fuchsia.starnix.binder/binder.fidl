@@ -229,7 +229,7 @@ open protocol Binder {
         /// The ioctl being called.
         request uint32;
         /// Optional argument for the ioctl.
-        parameter uint64;
+        arg uint64;
         /// The VMO to return writes for this ioctl through.
         vmo zx.Handle:VMO;
     }) -> (struct {
