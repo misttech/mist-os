@@ -241,8 +241,18 @@ class PortDispatcher final : public SoloDispatcher<PortDispatcher, ZX_DEFAULT_PO
   bool can_bind_to_interrupt() const { return options_ & ZX_PORT_BIND_TO_INTERRUPT; }
   void on_zero_handles() final;
 
-  zx_status_t Queue(PortPacket* port_packet, zx_signals_t observed);
+  // Queues a packet on the port.
+  zx_status_t Queue(PortPacket* port_packet);
+
+  // Queues a packet based on a signal observation and deregisters the observer from the port.
+  // If |observer| is non-null, also removes it from the observer list.
+  zx_status_t QueueAndRemoveObserver(PortPacket* port_packet, zx_signals_t observed,
+                                     PortObserver* observer);
+
+  // Queues a user packet.
   zx_status_t QueueUser(const zx_port_packet_t& packet);
+
+  // Queues an interrupt packet.
   bool QueueInterruptPacket(PortInterruptPacket* port_packet, zx_instant_boot_t timestamp);
   zx_status_t Dequeue(const Deadline& deadline, zx_port_packet_t* packet);
   bool RemoveInterruptPacket(PortInterruptPacket* port_packet);
@@ -284,6 +294,14 @@ class PortDispatcher final : public SoloDispatcher<PortDispatcher, ZX_DEFAULT_PO
   // Cancel all queued port packets matching |handle| (if not nullptr) and |key|.
   // Returns true if any packets were canceled.
   bool CancelQueuedPacketsLocked(const void* handle, uint64_t key) TA_REQ(get_lock());
+
+  zx_status_t QueuePacketLocked(PortPacket* port_packet, zx_signals_t observed) TA_REQ(get_lock());
+
+  // Unlinks an observer from its dispatcher and remove it from our observer
+  // list if it is not already removed. This may place the observer into
+  // |destroyer| for the caller to destroy after releasing get_lock().
+  void MaybeReapLocked(PortObserver* observer, PortPacket* port_packet,
+                       object_cache::UniquePtr<PortObserver>& destroyer) TA_REQ(get_lock());
 
   const uint32_t options_;
   Semaphore sema_;

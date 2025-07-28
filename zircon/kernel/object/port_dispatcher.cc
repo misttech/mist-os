@@ -130,15 +130,24 @@ void PortObserver::OnMatch(zx_signals_t signals) {
     packet_.packet.signal.timestamp = current_boot_time();
   }
 
-  // The packet is not allocated in the packet arena and does not count against the per-port limit
-  // so |Queue| cannot fail due to the packet count.  However, the last handle to the port may have
-  // been closed so it can still fail with ZX_ERR_BAD_HANDLE.  Just ignore ZX_ERR_BAD_HANDLE because
-  // there is nothing to be done.
-  const zx_status_t status = port_->Queue(&packet_, signals);
-  DEBUG_ASSERT_MSG(status == ZX_OK || status == ZX_ERR_BAD_HANDLE, "status %d\n", status);
+  // Queuing the packet will transfer ownership of the observer's reference to the PortDispatcher
+  // to the observers_ container guarded by get_lock(). This container including its reference(s) to
+  // the PortDispatcher could be destroyed by another thread. QueueAndRemoveObserver requires that
+  // the PortDispatcher be alive for the entire call so we have to retain a reference on this thread
+  // until it returns.
+  fbl::RefPtr<PortDispatcher> port_ref(port_);
 
-  port_->MaybeReap(this, &packet_);
-  // The |MaybeReap| call may have deleted |this|, so it is not safe to access any members now.
+  const zx_status_t status = port_ref->QueueAndRemoveObserver(&packet_, signals, this);
+  // The |QueueAndRemoveObserver| call may have deleted |this|, so it is not safe to access any
+  // members now.
+
+  // The packet is not allocated in the packet arena and does not count against the per-port limit
+  // so |QueueAndRemoveObserver| cannot fail due to the packet count. However, the last handle to
+  // the port may have been closed so it can still fail with ZX_ERR_BAD_HANDLE.  Just ignore
+  // ZX_ERR_BAD_HANDLE because there is nothing to be done.
+  DEBUG_ASSERT_MSG(status == ZX_OK || status == ZX_ERR_BAD_HANDLE || status == ZX_ERR_CANCELED ||
+                       status == ZX_ERR_SHOULD_WAIT,
+                   "status %d\n", status);
 }
 
 void PortObserver::OnCancel(zx_signals_t signals) {
@@ -240,7 +249,7 @@ zx_status_t PortDispatcher::QueueUser(const zx_port_packet_t& packet) {
   port_packet->packet = packet;
   port_packet->packet.type = ZX_PKT_TYPE_USER;
 
-  auto status = Queue(port_packet, 0u);
+  auto status = Queue(port_packet);
   if (status != ZX_OK)
     port_packet->Free();
   return status;
@@ -273,46 +282,74 @@ bool PortDispatcher::QueueInterruptPacket(PortInterruptPacket* port_packet,
   return true;
 }
 
-zx_status_t PortDispatcher::Queue(PortPacket* port_packet, zx_signals_t observed) {
+zx_status_t PortDispatcher::Queue(PortPacket* port_packet) {
+  return QueueAndRemoveObserver(port_packet, ZX_SIGNAL_NONE, nullptr);
+}
+
+zx_status_t PortDispatcher::QueueAndRemoveObserver(PortPacket* port_packet, zx_signals_t observed,
+                                                   PortObserver* observer) {
   canary_.Assert();
+
+  // This pointer is declared before the guard because we want the destructor to execute
+  // outside the critical section below (if it ends up being the last/only references).
+  object_cache::UniquePtr<PortObserver> destroyer;
 
   {
     Guard<CriticalMutex> guard{get_lock()};
-    if (zero_handles_) {
-      return ZX_ERR_BAD_HANDLE;
+
+    zx_status_t status = QueuePacketLocked(port_packet, observed);
+
+    if (observer != nullptr) {
+      MaybeReapLocked(observer, port_packet, destroyer);
     }
 
-    // We have to acquire get_lock() before we can check the canceled flag.
-    if (port_packet->is_canceled()) {
-      return ZX_OK;
-    }
-
-    if (IsDefaultAllocatedEphemeral(*port_packet) &&
-        num_ephemeral_packets_ > kMaxAllocatedPacketCountPerPort) {
-      kcounter_add(port_full_count, 1);
-      RaisePacketLimitException(get_koid(), num_ephemeral_packets_);
-      // The usermode caller sees the exception, not the return code.
-      return ZX_ERR_SHOULD_WAIT;
-    }
-
-    if (observed) {
-      port_packet->packet.signal.observed = observed;
-
-      // |count| previously stored the number of pending messages on
-      // a channel. It is now deprecated, but we set it to 1 for backwards
-      // compatibility, so that readers attempt to read at least 1 message and
-      // continue to make progress.
-      port_packet->packet.signal.count = 1u;
-    }
-    packets_.push_back(port_packet);
-    if (IsDefaultAllocatedEphemeral(*port_packet)) {
-      ++num_ephemeral_packets_;
+    if (status != ZX_OK) {
+      return status;
     }
   }
+
+  // Assert that we haven't deleted ourselves by dropping our lock.
+  canary_.Assert();
 
   // If |Post| unblocks a thread, that thread will attempt to acquire the lock. We drop the lock
   // before calling |Post| to allow the unblocked thread to acquire the lock without blocking.
   sema_.Post();
+  return ZX_OK;
+}
+
+zx_status_t PortDispatcher::QueuePacketLocked(PortPacket* port_packet, zx_signals_t observed) {
+  canary_.Assert();
+
+  if (zero_handles_) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  // We have to acquire get_lock() before we can check the canceled flag.
+  if (port_packet->is_canceled()) {
+    return ZX_ERR_CANCELED;
+  }
+
+  if (IsDefaultAllocatedEphemeral(*port_packet) &&
+      num_ephemeral_packets_ > kMaxAllocatedPacketCountPerPort) {
+    kcounter_add(port_full_count, 1);
+    RaisePacketLimitException(get_koid(), num_ephemeral_packets_);
+    // The usermode caller sees the exception, not the return code.
+    return ZX_ERR_SHOULD_WAIT;
+  }
+
+  if (observed != ZX_SIGNAL_NONE) {
+    port_packet->packet.signal.observed = observed;
+
+    // |count| previously stored the number of pending messages on
+    // a channel. It is now deprecated, but we set it to 1 for backwards
+    // compatibility, so that readers attempt to read at least 1 message and
+    // continue to make progress.
+    port_packet->packet.signal.count = 1u;
+  }
+  packets_.push_back(port_packet);
+  if (IsDefaultAllocatedEphemeral(*port_packet)) {
+    ++num_ephemeral_packets_;
+  }
   return ZX_OK;
 }
 
@@ -389,24 +426,32 @@ void PortDispatcher::MaybeReap(PortObserver* observer, PortPacket* port_packet) 
   {
     Guard<CriticalMutex> guard{get_lock()};
 
-    // We may be racing with on_zero_handles. Whichever one of us unlinks the dispatcher will be
-    // responsible for ensuring the observer is cleaned up.
-    Dispatcher* dispatcher = observer->UnlinkDispatcherLocked();
-    if (dispatcher != nullptr) {
-      observers_.erase(*observer);
-
-      // If the packet is queued, then the observer will be destroyed by Dequeue() or
-      // CancelQueued().
-      DEBUG_ASSERT(!port_packet->is_ephemeral());
-      if (port_packet->InContainer()) {
-        DEBUG_ASSERT(port_packet->observer == nullptr);
-        port_packet->observer.reset(observer);
-      } else {
-        // Otherwise, it'll be destroyed when this method returns.
-        destroyer.reset(observer);
-      }
-    }  // else on_zero_handles must have beat us and is responsible for destroying this observer.
+    MaybeReapLocked(observer, port_packet, destroyer);
   }
+}
+
+void PortDispatcher::MaybeReapLocked(PortObserver* observer, PortPacket* port_packet,
+                                     object_cache::UniquePtr<PortObserver>& destroyer) {
+  canary_.Assert();
+
+  // We may be racing with on_zero_handles. Whichever one of us unlinks the dispatcher will be
+  // responsible for ensuring the observer is cleaned up.
+  Dispatcher* dispatcher = observer->UnlinkDispatcherLocked();
+  if (dispatcher != nullptr) {
+    observers_.erase(*observer);
+
+    // If the packet is queued, then the observer will be destroyed by Dequeue() or
+    // CancelQueued().
+    DEBUG_ASSERT(!port_packet->is_ephemeral());
+    if (port_packet->InContainer()) {
+      DEBUG_ASSERT(port_packet->observer == nullptr);
+      port_packet->observer.reset(observer);
+    } else {
+      // Otherwise, it'll be destroyed after this method returns.
+      DEBUG_ASSERT(destroyer.get() == nullptr);
+      destroyer.reset(observer);
+    }
+  }  // else on_zero_handles must have beat us and is responsible for destroying this observer.
 }
 
 zx_status_t PortDispatcher::MakeObserver(uint32_t options, Handle* handle, uint64_t key,

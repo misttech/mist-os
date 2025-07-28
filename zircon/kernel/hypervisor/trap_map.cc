@@ -89,7 +89,7 @@ zx::result<> Trap::Queue(const zx_port_packet_t& packet, StateInvalidator* inval
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   port_packet->packet = packet;
-  zx_status_t status = port_->Queue(port_packet, ZX_SIGNAL_NONE);
+  zx_status_t status = port_->Queue(port_packet);
   if (status != ZX_OK) {
     port_allocator_.Free(port_packet);
     if (status == ZX_ERR_BAD_HANDLE) {

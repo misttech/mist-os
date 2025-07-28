@@ -51,7 +51,7 @@ void PortPowerLevelController::PacketQueue::Queue(const zx_port_packet_t& packet
   // if its not yet in the port, updates will be stashed in the other entry.
   // It is not possible to hit `ZX_ERR_SHOULD_WAIT` since none of these packets is allocated with
   // the port's default allocator.
-  ZX_ASSERT(port_->Queue(curr, ZX_SIGNAL_NONE) != ZX_ERR_SHOULD_WAIT);
+  ZX_ASSERT(port_->Queue(curr) != ZX_ERR_SHOULD_WAIT);
 }
 
 void PortPowerLevelController::PacketQueue::Free(PortPacket* packet) {
@@ -72,7 +72,7 @@ void PortPowerLevelController::PacketQueue::Free(PortPacket* packet) {
   // `curr` without holding the lock.
   // It is not possible to hit `ZX_ERR_SHOULD_WAIT` since none of these packets is allocated with
   // the port's default allocator.
-  ZX_ASSERT(port_->Queue(curr, ZX_SIGNAL_NONE) != ZX_ERR_SHOULD_WAIT);
+  ZX_ASSERT(port_->Queue(curr) != ZX_ERR_SHOULD_WAIT);
 }
 
 zx::result<> PortPowerLevelController::Post(const PowerLevelUpdateRequest& pending) {
