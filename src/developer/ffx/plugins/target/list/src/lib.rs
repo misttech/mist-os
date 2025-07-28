@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use addr::TargetAddr;
 use analytics::add_custom_event;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -14,7 +15,8 @@ use fho::{deferred, Deferred, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
 use futures::{StreamExt, TryStreamExt};
-use std::time::Duration;
+use netext::IsLocalAddr;
+use std::{cmp::Ordering, time::Duration};
 use target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use target_holders::daemon_protocol;
 
@@ -227,6 +229,10 @@ async fn handle_to_info(
     } else {
         (ffx::RemoteControlState::Unknown, None, None)
     };
+    let addresses = addresses.map(|mut addrs| {
+        addrs.sort_by(|a, b| prefer_local(a, b));
+        addrs
+    });
     let addresses =
         addresses.map(|ta| ta.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>());
     Ok(ffx::TargetInfo {
@@ -240,6 +246,18 @@ async fn handle_to_info(
         is_manual: Some(handle.manual),
         ..Default::default()
     })
+}
+
+// For ipv6 addresses, prefer link-local to non-local
+fn prefer_local(a: &TargetAddr, b: &TargetAddr) -> Ordering {
+    match (
+        a.ip().map(|x| x.is_link_local_addr()).unwrap_or(false),
+        b.ip().map(|x| x.is_link_local_addr()).unwrap_or(false),
+    ) {
+        (true, true) | (false, false) => a.cmp(b),
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+    }
 }
 
 async fn local_list_targets(
@@ -679,5 +697,30 @@ mod test {
         let tool = build_list_tool(list_cmd, &env, fho_env).await;
         let cmd = tool.update_from_target();
         assert_eq!(cmd.nodename, Some(String::from("mytarget")));
+    }
+
+    #[fuchsia::test]
+    async fn test_handle_to_info_address_sorting() {
+        let env = ffx_config::test_init().await.unwrap();
+        let non_link_local_addr: TargetAddr = "[2001:db8::1]:0".parse().unwrap();
+        let link_local_addr: TargetAddr = "[fe80::1]:0".parse().unwrap();
+
+        let handle = discovery::TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: discovery::TargetState::Product {
+                addrs: vec![non_link_local_addr.clone(), link_local_addr.clone()],
+                serial: None,
+            },
+            manual: false,
+        };
+
+        let info = handle_to_info(&env.context, handle, false).await.unwrap();
+
+        let addrs = info.addresses.unwrap();
+        assert_eq!(addrs.len(), 2);
+        let addrs: Vec<TargetAddr> = addrs.into_iter().map(|a| a.into()).collect();
+        // The link-local address should come first.
+        assert_eq!(addrs[0], link_local_addr);
+        assert_eq!(addrs[1], non_link_local_addr);
     }
 }
