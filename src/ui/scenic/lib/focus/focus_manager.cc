@@ -25,9 +25,8 @@ zx_koid_t FocusKoidOf(const std::vector<zx_koid_t>& chain) {
 }
 }  // namespace
 
-FocusManager::FocusManager(inspect::Node inspect_node, LegacyFocusListener legacy_focus_listener)
-    : legacy_focus_listener_(std::move(legacy_focus_listener)),
-      view_focuser_registry_(
+FocusManager::FocusManager(inspect::Node inspect_node)
+    : view_focuser_registry_(
           /*request_focus*/
           [this](zx_koid_t requestor, zx_koid_t request) {
             return RequestFocus(requestor, request) == FocusChangeStatus::kAccept;
@@ -134,9 +133,6 @@ void FocusManager::DispatchFocusChain() const {
 void FocusManager::DispatchFocusEvents(zx_koid_t old_focus, zx_koid_t new_focus) {
   if (old_focus == new_focus)
     return;
-
-  // Send over fuchsia.ui.scenic.SessionListener ("GFX").
-  legacy_focus_listener_(old_focus, new_focus);
 
   // Send over fuchsia.ui.views.ViewRefFocused.
   view_ref_focused_registry_.UpdateFocus(old_focus, new_focus);

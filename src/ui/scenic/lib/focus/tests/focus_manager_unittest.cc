@@ -524,8 +524,7 @@ TEST_F(FocusChainTest, FocusChainChangedButNotFocus) {
   const zx_koid_t koid_C = utils::ExtractKoid(*view_ref_C);
 
   // Initialize focus manager.
-  int legacy_focus_change_count = 0;
-  FocusManager focus_manager(inspect::Node(), [&](auto...) { legacy_focus_change_count++; });
+  FocusManager focus_manager;
   RegisterFocusListener(focus_manager);
   fuchsia::ui::views::ViewRefFocusedPtr vrf;
   focus_manager.RegisterViewRefFocused(koid_B, vrf.NewRequest());
@@ -549,7 +548,6 @@ TEST_F(FocusChainTest, FocusChainChangedButNotFocus) {
 
   EXPECT_EQ(num_focus_chains_received_, 2u);
   EXPECT_THAT(last_received_chain_, testing::ElementsAre(koid_A, koid_B));
-  EXPECT_EQ(legacy_focus_change_count, 1);
   EXPECT_EQ(view_ref_focused_count, 1);
 
   // Scene 2.
@@ -567,7 +565,6 @@ TEST_F(FocusChainTest, FocusChainChangedButNotFocus) {
 
   EXPECT_EQ(num_focus_chains_received_, 3u);
   EXPECT_THAT(last_received_chain_, testing::ElementsAre(koid_A, koid_C, koid_B));
-  EXPECT_EQ(legacy_focus_change_count, 1);
   EXPECT_EQ(view_ref_focused_count, 1);
 }
 
