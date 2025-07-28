@@ -528,23 +528,6 @@ impl ImageAssemblyConfigBuilder {
         // Create PackageEntry
         let (d, package_entry) = PackageEntry::parse_from(origin, to_package_set.clone(), &path)?;
 
-        // Allow duplicate packages if and only if they were previously added by the board's input
-        // bundle. This allows us to migrate package inclusion from board definitions to product
-        // definitions using soft transitions.
-        // Construct an entry as if the board was adding it, instead of whatever is adding it, to
-        // check if the baord has already added it.
-        if let Ok((board_origin_destination, _)) =
-            PackageEntry::parse_from(PackageOrigin::Board, to_package_set.clone(), &path)
-        {
-            if let Some(PackageSetDestination::Blob(PackageDestination::FromBoard(_))) =
-                self.packages.existing_key(board_origin_destination)
-            {
-                // We only want to return early if this package exists and it was added by the
-                // _board_ previously.
-                return Ok(());
-            }
-        }
-
         // Now store the package and its destination.
         self.packages
             .try_insert_unique(d, package_entry)
@@ -1248,18 +1231,6 @@ impl Packages {
         self.inner
             .try_insert_unique(MapEntry(destination, entry))
             .map_err(|e| anyhow!("Duplicate package found {}", e.existing_entry.key()))
-    }
-
-    /// Get the destination for a package by its name, if it has already been added. Returns None if
-    /// the package has not been added yet.
-    fn existing_key(
-        &mut self,
-        destination: PackageSetDestination,
-    ) -> Option<PackageSetDestination> {
-        match self.inner.entry(destination) {
-            std::collections::btree_map::Entry::Vacant(_) => None,
-            std::collections::btree_map::Entry::Occupied(entry) => Some(entry.key().clone()),
-        }
     }
 
     /// Remove a package entry by its destination.
@@ -2585,56 +2556,6 @@ mod tests {
         );
         builder.add_parsed_bundle(root, first_aib).unwrap();
         assert!(builder.add_parsed_bundle(root.join("second"), second_aib).is_err());
-    }
-
-    #[test]
-    fn test_builder_allows_duplicate_packages_if_added_by_board_first() {
-        let temp = TempDir::new().unwrap();
-        let root = Utf8Path::from_path(temp.path()).unwrap();
-        let mut builder = ImageAssemblyConfigBuilder::new(
-            BuildType::Eng,
-            "my_board".into(),
-            None::<Utf8PathBuf>,
-            FilesystemImageMode::default(),
-            FeatureSetLevel::Standard,
-            SystemReleaseInfo::new_for_testing(),
-        );
-
-        let board_package_path = root.join("board");
-        let product_package_path = root.join("product");
-
-        std::fs::create_dir(board_package_path.clone()).unwrap();
-        std::fs::create_dir(product_package_path.clone()).unwrap();
-
-        let board_package = write_empty_pkg(board_package_path, "pkg_name", None);
-        let product_package = write_empty_pkg(product_package_path, "pkg_name", None);
-
-        assert!(builder
-            .add_package_from_path(board_package, PackageOrigin::Board, &PackageSet::Base)
-            .is_ok(),);
-        assert!(builder
-            .add_package_from_path(product_package, PackageOrigin::Product, &PackageSet::Base)
-            .is_ok(),);
-
-        // We should have kept the board package in the set, and discarded the product one.
-        assert!(builder.packages.inner.len() == 1);
-        assert_eq!(
-            builder.packages.existing_key(PackageSetDestination::Blob(
-                PackageDestination::FromBoard(String::from("pkg_name"))
-            )),
-            Some(PackageSetDestination::Blob(PackageDestination::FromBoard(String::from(
-                "pkg_name"
-            ))))
-        );
-
-        assert_eq!(
-            builder.packages.existing_key(PackageSetDestination::Blob(
-                PackageDestination::FromProduct(String::from("pkg_name"))
-            )),
-            Some(PackageSetDestination::Blob(PackageDestination::FromBoard(String::from(
-                "pkg_name"
-            ))))
-        );
     }
 
     #[test]
