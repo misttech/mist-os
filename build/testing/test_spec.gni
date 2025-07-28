@@ -193,38 +193,41 @@ if (allowed_device_types == []) {
 #         element-wise subsets of the test platform entries defined in
 #         //build/testing/platforms.gni.
 #
-#       virtual_device_spec (optional)
-#         [scope] Info about the virtual device spec to run the emulator with.
-#         Valid specs can be found at //build/virtual-devices/BUILD.gn.
+#       emulator (optional)
+#         [scope] Emulator-specific configuration, mirroring the command-line
+#         options of `ffx emu start`.
+#
+#         Each scope contains the following:
 #
 #           name (required)
-#             [string] The name of the virtual device spec.
+#             [string] A unique name to describe this configuration, which will also
+#             be featured into the name of the test shard in which this emulator
+#             configuration is to run.
 #
-#           env_name (optional)
-#             [string] The name to use to append to the environment name when
-#             constructing a unique name for the shard that runs with this env.
-#             By default, it will use the name specified above.
+#           device (optional, default: "${board_name}-emu-recommended")
+#             [string] The name of a virtual device specification to run. See
+#             //build/virtual-devices/BUILD.gn for valid options.
 #
-#       gpt_uefi_disk (optional)
-#         [scope] Info about the creation of full system GPT disks with UEFI support.
-#         If provided, the emulator will start with a single flat file containing a full GPT
-#         partitioned disk with the ABR partitioning scheme Fuchsia is using.
+#           accel (optional, default: "auto")
+#             [string] Virtualization acceleration. Valid choices are "none" to
+#             disable acceleration, "hyper" to use the host's hypervisor interface
+#             (KVM on Linux and HVF on MacOS), or "auto" to use the hypervisor if
+#             detected.
 #
-#           name (required)
-#             [string] The name of the key config. This can be chosen arbitrarily, its purpose is
-#             to easily differentiate between different test scenarios by looking at the shard name.
+#           kernel_args (optional)
+#             [list of strings] Additional kernel arguments to pass to the emulator.
 #
-#           vbmeta_key_path (required)
+#           uefi (optional)
+#             [bool] Whether to create and start an emulator with a full GPT disk including
+#             UEFI boot environment and all partitions in one flat file.
+#
+#           vbmeta_key (required if uefi=true)
 #             [string] The path to a certificate (PEM file) to be used to sign the vbmeta.
 #             There is no default, the path has to be specified explicitly.
 #
-#           vbmeta_key_metadata_path (required)
+#           vbmeta_key_metadata (required if uefi=true)
 #             [string] The path to the metadata file (bin file) accompanying the certificate.
 #             There is no default, the path has to be specified explicitly.
-#
-#       use_tcg (optional)
-#         [bool] Whether to use TCG instead of KVM for emulators. This value only
-#         takes effect if the `device_type` in the `dimensions` is an emulator type.
 #
 #       tags (optional)
 #         [list of strings] keys on which tests may be grouped. Tests with
@@ -510,6 +513,19 @@ template("test_spec") {
       # enforce the "mac" tag in that case to filter out other tests.
       assert(defined(env.tags) && [ "mac" ] + env.tags - env.tags == [],
              "Mac environments must have a tag of \"mac\"")
+    }
+
+    if (defined(env.emulator)) {
+      emu_config = env.emulator
+      assert(defined(emu_config.name),
+             "The `emulator` scope requires a unique `name`")
+      if (defined(emu_config.uefi) && emu_config.uefi) {
+        assert(
+            defined(emu_config.vbmeta_key) &&
+                defined(emu_config.vbmeta_key_metadata),
+            "Emulator environments with `uefi` set to true must provide a `vbmeta_key` and `vbmeta_key_metadata`")
+      }
+      not_needed([ "emu_config" ])
     }
 
     has_allowed_device_type = defined(dims.device_type) &&

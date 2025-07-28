@@ -59,6 +59,7 @@ func TestGetBotanistConfig(t *testing.T) {
 		targetCPU         string
 		virtualDeviceSpec string
 		uefi              bool
+		useTCG            bool
 		wantConfig        *configWithType
 		wantDeps          []string
 	}{
@@ -86,12 +87,12 @@ func TestGetBotanistConfig(t *testing.T) {
 			wantConfig: &configWithType{
 				Type: "qemu",
 				EmulatorConfig: targets.EmulatorConfig{
-					Path:    "./qemu/bin",
-					EDK2Dir: "./edk2",
-					Target:  targets.Target("x64"),
-					KVM:     true,
-					FVMTool: "host_x64/fvm",
-					ZBITool: "host_x64/zbi",
+					Path:     "./qemu/bin",
+					EDK2Dir:  "./edk2",
+					Target:   targets.Target("x64"),
+					Emulator: build.EmulatorInfo{Accel: build.AccelHyper},
+					FVMTool:  "host_x64/fvm",
+					ZBITool:  "host_x64/zbi",
 				}},
 			wantDeps: []string{"QEMU.botanist.json", "host_x64/fvm", "host_x64/zbi"},
 		},
@@ -105,12 +106,12 @@ func TestGetBotanistConfig(t *testing.T) {
 			wantConfig: &configWithType{
 				Type: "qemu",
 				EmulatorConfig: targets.EmulatorConfig{
-					Path:    "./qemu/bin",
-					EDK2Dir: "./edk2",
-					Target:  targets.Target("x64"),
-					KVM:     true,
-					Serial:  true,
-					ZBITool: "host_x64/zbi",
+					Path:     "./qemu/bin",
+					EDK2Dir:  "./edk2",
+					Target:   targets.Target("x64"),
+					Emulator: build.EmulatorInfo{Accel: build.AccelHyper},
+					Serial:   true,
+					ZBITool:  "host_x64/zbi",
 				}},
 			wantDeps: []string{"QEMU-netboot.botanist.json", "host_x64/zbi"},
 		},
@@ -125,11 +126,11 @@ func TestGetBotanistConfig(t *testing.T) {
 			wantConfig: &configWithType{
 				Type: "qemu",
 				EmulatorConfig: targets.EmulatorConfig{
-					Path:    "./qemu/bin",
-					EDK2Dir: "./edk2",
-					Target:  targets.Target("arm64"),
-					KVM:     true,
-					ZBITool: "host_arm64/zbi",
+					Path:     "./qemu/bin",
+					EDK2Dir:  "./edk2",
+					Target:   targets.Target("arm64"),
+					Emulator: build.EmulatorInfo{Accel: build.AccelHyper},
+					ZBITool:  "host_arm64/zbi",
 				}},
 			wantDeps: []string{"QEMU-netboot.botanist.json", "host_arm64/zbi"},
 		},
@@ -138,19 +139,19 @@ func TestGetBotanistConfig(t *testing.T) {
 			shard: &Shard{
 				Env:        arm64EmuEnv,
 				ExpectsSSH: true,
-				UseTCG:     true,
 			},
 			targetCPU:         "arm64",
 			virtualDeviceSpec: "virtual_device",
+			useTCG:            true,
 			wantConfig: &configWithType{
 				Type: "qemu",
 				EmulatorConfig: targets.EmulatorConfig{
-					Path:              "./qemu/bin",
-					EDK2Dir:           "./edk2",
-					Target:            targets.Target("arm64"),
-					VirtualDeviceSpec: "virtual_device",
-					FVMTool:           "host_x64/fvm",
-					ZBITool:           "host_x64/zbi",
+					Path:     "./qemu/bin",
+					EDK2Dir:  "./edk2",
+					Target:   targets.Target("arm64"),
+					Emulator: build.EmulatorInfo{Name: "virtual_device", Device: "virtual_device", Accel: build.AccelNone},
+					FVMTool:  "host_x64/fvm",
+					ZBITool:  "host_x64/zbi",
 				}},
 			wantDeps: []string{"QEMU-virtual_device.botanist.json", "host_x64/fvm", "host_x64/zbi"},
 		},
@@ -159,23 +160,21 @@ func TestGetBotanistConfig(t *testing.T) {
 			shard: &Shard{
 				Env:        arm64EmuEnv,
 				ExpectsSSH: true,
-				UseTCG:     true,
 			},
 			targetCPU: "arm64",
 			uefi:      true,
+			useTCG:    true,
 			wantConfig: &configWithType{
 				Type: "qemu",
 				EmulatorConfig: targets.EmulatorConfig{
-					Path:           "./qemu/bin",
-					EDK2Dir:        "./edk2",
-					Target:         targets.Target("arm64"),
-					Uefi:           true,
-					VbmetaKey:      "key",
-					VbmetaMetadata: "metadata",
-					FVMTool:        "host_x64/fvm",
-					ZBITool:        "host_x64/zbi",
+					Path:     "./qemu/bin",
+					EDK2Dir:  "./edk2",
+					Target:   targets.Target("arm64"),
+					Emulator: build.EmulatorInfo{Name: "uefi-name", Accel: build.AccelNone, Uefi: true, VbmetaKey: "key", VbmetaKeyMetadata: "metadata"},
+					FVMTool:  "host_x64/fvm",
+					ZBITool:  "host_x64/zbi",
 				}},
-			wantDeps: []string{"QEMU-uefi-uefi_name.botanist.json", "host_x64/fvm", "host_x64/zbi"},
+			wantDeps: []string{"QEMU-uefi_name.botanist.json", "host_x64/fvm", "host_x64/zbi"},
 		},
 		{
 			name: "nuc shard",
@@ -200,19 +199,19 @@ func TestGetBotanistConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			buildDir := t.TempDir()
 			tc.shard.Env.Netboot = tc.netboot
+			tc.shard.Env.Emulator = build.EmulatorInfo{}
 			if tc.uefi {
-				tc.shard.Env.GptUefiDisk = build.GptUefiDiskInfo{
-					Name:                  "uefi-name",
-					VbmetaKeyPath:         "key",
-					VbmetaKeyMetadataPath: "metadata",
-				}
+				tc.shard.Env.Emulator.Name = "uefi-name"
+				tc.shard.Env.Emulator.Uefi = true
+				tc.shard.Env.Emulator.VbmetaKey = "key"
+				tc.shard.Env.Emulator.VbmetaKeyMetadata = "metadata"
 			}
 			if tc.virtualDeviceSpec != "" {
-				tc.shard.Env.VirtualDeviceSpec = build.VirtualDeviceSpecInfo{
-					Name: tc.virtualDeviceSpec,
-				}
+				tc.shard.Env.Emulator.Name = "virtual_device"
+				tc.shard.Env.Emulator.Device = tc.virtualDeviceSpec
 			}
-			tc.shard.HostCPU = GetHostCPU(tc.shard.Env, tc.shard.UseTCG)
+			tc.shard.Env = populateEnvDefaults(tc.shard.Env, tc.targetCPU, tc.useTCG)
+			tc.shard.HostCPU = GetHostCPU(tc.shard.Env, tc.useTCG)
 			tc.shard.Name = environmentName(tc.shard.Env)
 			if err := GetBotanistConfig(tc.shard, buildDir, tools); err != nil {
 				t.Fatalf("failed to get botanist config: %s", err)
@@ -349,9 +348,8 @@ func TestGetBotDimensions(t *testing.T) {
 			shard := &Shard{
 				Name:       environmentName(tc.env),
 				Tests:      []Test{test},
-				Env:        tc.env,
+				Env:        populateEnvDefaults(tc.env, tc.cpu, tc.params.UseTcg),
 				ExpectsSSH: tc.expectsSSH,
-				UseTCG:     tc.params.UseTcg,
 				HostCPU:    GetHostCPU(tc.env, tc.params.UseTcg),
 			}
 			GetBotDimensions(shard, tc.params)
@@ -560,7 +558,7 @@ func TestConstructBaseCommand(t *testing.T) {
 			if tc.params == nil {
 				tc.params = &proto.Params{}
 			}
-			tc.shard.UseTCG = tc.params.UseTcg
+			tc.shard.Env = populateEnvDefaults(tc.shard.Env, tc.targetCPU, tc.params.UseTcg)
 			tc.shard.Env.Netboot = tc.netboot
 			tc.shard.HostCPU = GetHostCPU(tc.shard.Env, tc.params.UseTcg)
 			if err := ConstructBaseCommand(tc.shard, checkoutDir, buildDir, tools, tc.params, tc.variants, tc.experiments); err != nil {

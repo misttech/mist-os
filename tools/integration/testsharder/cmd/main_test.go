@@ -137,6 +137,15 @@ func TestExecute(t *testing.T) {
 								"other_dimension": "foo",
 							},
 						},
+						{
+							Dimensions: build.DimensionSet{
+								"device_type": "AEMU",
+							},
+							Emulator: build.EmulatorInfo{
+								Name:   "emu-min",
+								Device: "min",
+							},
+						},
 					},
 				},
 				{
@@ -153,6 +162,16 @@ func TestExecute(t *testing.T) {
 								"cpu":             "x64",
 								"os":              "Linux",
 								"other_dimension": "bar",
+							},
+						},
+						{
+							Dimensions: build.DimensionSet{
+								"device_type": "AEMU",
+							},
+							Emulator: build.EmulatorInfo{
+								Name:   "emu-min-tcg",
+								Device: "min",
+								Accel:  "none",
 							},
 						},
 					},

@@ -50,13 +50,9 @@
                 "cpu": "x64",
                 "device_type": "AEMU"
             },
-            "virtual_device_spec": {
-                "name": ""
-            },
-            "gpt_uefi_disk": {
+            "emulator": {
                 "name": "",
-                "vbmeta_key_path": "",
-                "vbmeta_key_metadata_path": ""
+                "accel": "hyper"
             }
         },
         "host_cpu": "x64",
@@ -172,13 +168,9 @@
                 "cpu": "x64",
                 "device_type": "AEMU"
             },
-            "virtual_device_spec": {
-                "name": ""
-            },
-            "gpt_uefi_disk": {
+            "emulator": {
                 "name": "",
-                "vbmeta_key_path": "",
-                "vbmeta_key_metadata_path": ""
+                "accel": "hyper"
             }
         },
         "host_cpu": "x64",
@@ -294,13 +286,9 @@
                 "cpu": "x64",
                 "device_type": "AEMU"
             },
-            "virtual_device_spec": {
-                "name": ""
-            },
-            "gpt_uefi_disk": {
+            "emulator": {
                 "name": "",
-                "vbmeta_key_path": "",
-                "vbmeta_key_metadata_path": ""
+                "accel": "hyper"
             }
         },
         "host_cpu": "x64",
@@ -414,13 +402,9 @@
                 "cpu": "x64",
                 "device_type": "AEMU"
             },
-            "virtual_device_spec": {
-                "name": ""
-            },
-            "gpt_uefi_disk": {
+            "emulator": {
                 "name": "",
-                "vbmeta_key_path": "",
-                "vbmeta_key_metadata_path": ""
+                "accel": "hyper"
             }
         },
         "host_cpu": "x64",

@@ -201,18 +201,8 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	if err := m.Args().Get("target_cpu", &defaultCPU); err != nil {
 		return fmt.Errorf("failed to look up value of target_cpu arg: %w", err)
 	}
-	for ti := range testSpecs {
-		for ei, env := range testSpecs[ti].Envs {
-			dt := env.Dimensions.DeviceType()
-			// Only applies to host and emulator tests.
-			if dt == "" || env.TargetsEmulator() {
-				if _, ok := env.Dimensions["cpu"]; !ok {
-					testSpecs[ti].Envs[ei].Dimensions["cpu"] = defaultCPU
-				}
-			}
-		}
-	}
-	shards := testsharder.MakeShards(m.TestSpecs(), testListEntries, opts, metadataMap)
+	opts.DefaultCPU = defaultCPU
+	shards := testsharder.MakeShards(testSpecs, testListEntries, opts, metadataMap)
 
 	var shardsToRun []*testsharder.Shard
 	for _, s := range shards {
@@ -528,14 +518,14 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 }
 
 func duplicatedShardNames(shards []*testsharder.Shard) []string {
-	nameCounts := make(map[string]int)
+	nameCounts := make(map[string][]build.Environment)
 	for _, s := range shards {
-		nameCounts[s.Name]++
+		nameCounts[s.Name] = append(nameCounts[s.Name], s.Env)
 	}
 	var dupes []string
 	for name, count := range nameCounts {
-		if count > 1 {
-			dupes = append(dupes, name)
+		if len(count) > 1 {
+			dupes = append(dupes, fmt.Sprintf("%s:%v", name, count))
 		}
 	}
 	return dupes

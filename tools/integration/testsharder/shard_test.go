@@ -31,6 +31,9 @@ func assertEqual(t *testing.T, expected, actual []*Shard) {
 	opts := cmp.Options{
 		// We don't care about ordering of shards.
 		cmpopts.SortSlices(func(s1, s2 *Shard) bool {
+			if s1.Name == s2.Name {
+				return environmentKey(s1.Env) < environmentKey(s2.Env)
+			}
 			return s1.Name < s2.Name
 		}),
 		cmp.FilterValues(func(s1, s2 fintpb.SetArtifacts_Metadata) bool {
@@ -92,9 +95,9 @@ func shard(env build.Environment, os string, ids ...int) *Shard {
 	return &Shard{
 		Name:       environmentName(env),
 		Tests:      tests,
-		Env:        env,
+		Env:        populateEnvDefaults(env, "x64", false),
 		ExpectsSSH: true,
-		HostCPU:    GetHostCPU(env, false),
+		HostCPU:    GetHostCPU(env, env.Emulator.Accel == build.AccelNone),
 	}
 }
 
@@ -106,9 +109,9 @@ func shardWithMetadata(env build.Environment, os string, testMetadata metadata.T
 	return &Shard{
 		Name:       environmentName(env),
 		Tests:      tests,
-		Env:        env,
+		Env:        populateEnvDefaults(env, "x64", false),
 		ExpectsSSH: true,
-		HostCPU:    GetHostCPU(env, false),
+		HostCPU:    GetHostCPU(env, env.Emulator.Accel == build.AccelNone),
 	}
 }
 
@@ -128,6 +131,23 @@ func TestMakeShards(t *testing.T) {
 	env4 := build.Environment{
 		Dimensions: build.DimensionSet{"device_type": "AEMU", "cpu": "arm64"},
 		Tags:       []string{},
+	}
+	env5 := build.Environment{
+		Dimensions: build.DimensionSet{"device_type": "AEMU"},
+		Emulator: build.EmulatorInfo{
+			Name:   "emu-min",
+			Device: "min",
+		},
+		Tags: []string{},
+	}
+	env6 := build.Environment{
+		Dimensions: build.DimensionSet{"device_type": "AEMU"},
+		Emulator: build.EmulatorInfo{
+			Name:   "emu-min",
+			Device: "min",
+			Accel:  "none",
+		},
+		Tags: []string{},
 	}
 
 	basicOpts := &ShardOptions{
@@ -151,6 +171,21 @@ func TestMakeShards(t *testing.T) {
 			make(map[string]metadata.TestMetadata),
 		)
 		expected := []*Shard{fuchsiaShard(env1, 1, 2), fuchsiaShard(env2, 1), fuchsiaShard(env3, 2, 3)}
+		assertEqual(t, expected, actual)
+	})
+
+	t.Run("tests with diff emulator envs should be separate", func(t *testing.T) {
+		actual := MakeShards(
+			[]build.TestSpec{spec(1, env5), spec(2, env5), spec(3, env6)},
+			nil,
+			basicOpts,
+			make(map[string]metadata.TestMetadata),
+		)
+		// env5 and env6 only differ by the accel mode but should end up having
+		// the same name. They should still be sharded separately due to the
+		// different emulator configuration. Shard names are checked for duplication
+		// later in main.go.
+		expected := []*Shard{fuchsiaShard(env5, 1, 2), fuchsiaShard(env6, 3)}
 		assertEqual(t, expected, actual)
 	})
 
@@ -342,13 +377,13 @@ func TestMakeShards(t *testing.T) {
 			{
 				Name:       environmentName(env1),
 				Tests:      []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(2, "fuchsia")},
-				Env:        env1,
+				Env:        populateEnvDefaults(env1, "x64", false),
 				ExpectsSSH: true,
 				HostCPU:    GetHostCPU(env1, false),
 			}, {
 				Name:       environmentName(env2),
 				Tests:      []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(3, "fuchsia")},
-				Env:        env2,
+				Env:        populateEnvDefaults(env2, "x64", false),
 				ExpectsSSH: true,
 				HostCPU:    GetHostCPU(env2, false),
 			},
@@ -443,7 +478,7 @@ func TestMakeShards(t *testing.T) {
 			{
 				Name:       environmentName(env1),
 				Tests:      []Test{makeTestWithPackageManifest(1), makeTest(2, "fuchsia"), makeTest(3, "fuchsia")},
-				Env:        env1,
+				Env:        populateEnvDefaults(env1, "x64", false),
 				ExpectsSSH: true,
 				PkgRepo:    fmt.Sprintf("repo_%s", environmentName(env1)),
 				Deps:       []string{fmt.Sprintf("repo_%s", environmentName(env1))},
@@ -451,7 +486,7 @@ func TestMakeShards(t *testing.T) {
 			}, {
 				Name:       environmentName(env2),
 				Tests:      []Test{makeTestWithPackageManifest(1)},
-				Env:        env2,
+				Env:        populateEnvDefaults(env2, "x64", false),
 				ExpectsSSH: true,
 				PkgRepo:    fmt.Sprintf("repo_%s", environmentName(env2)),
 				Deps:       []string{fmt.Sprintf("repo_%s", environmentName(env2))},

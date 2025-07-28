@@ -109,9 +109,6 @@ type Shard struct {
 	// `-deps-file` flag is provided meaning that local artifacts will be used and
 	// thus the builder itself won't have the fint set artifacts available.
 	BuildMetadata fintpb.SetArtifacts_Metadata `json:"build_metadata,omitempty"`
-
-	// Whether to use TCG with this shard if running against an emulator.
-	UseTCG bool `json:"use_tcg,omitempty"`
 }
 
 // CIPDPackage describes the CIPD package, version and subdir to download the package to
@@ -167,7 +164,7 @@ func GetHostCPU(env build.Environment, useTCG bool) string {
 	// fully emulate hardware, in which case we'd rather that run on big x64
 	// machines (since we don't have any riscv64 hardware capable of running
 	// that workload).
-	if useTCG || env.UseTCG {
+	if useTCG {
 		return "x64"
 	}
 	return env.Dimensions.CPU()
@@ -320,6 +317,31 @@ type ShardOptions struct {
 
 	// Whether to use TCG with this shard if running against an emulator.
 	UseTCG bool
+
+	// The default CPU to apply to host or emulator envs.
+	DefaultCPU string
+}
+
+// populateEnvDefaults returns an env with certain defaults populated.
+// This helps shard environments with those values explicitly provided together
+// with those that would have the same values using the defaults.
+func populateEnvDefaults(env build.Environment, defaultCPU string, useTCG bool) build.Environment {
+	dt := env.Dimensions.DeviceType()
+	// The default CPU only applies to host and emulator tests.
+	if dt == "" || env.TargetsEmulator() {
+		if _, ok := env.Dimensions["cpu"]; !ok {
+			env.Dimensions["cpu"] = defaultCPU
+		}
+	}
+	// Accel mode only applies to emulators.
+	if env.TargetsEmulator() && env.Emulator.Accel == "" {
+		if useTCG {
+			env.Emulator.Accel = build.AccelNone
+		} else {
+			env.Emulator.Accel = build.AccelHyper
+		}
+	}
+	return env
 }
 
 // MakeShards returns the list of shards associated with a given build.
@@ -336,6 +358,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 	envToSuites := make(map[string][]build.TestSpec)
 	for _, spec := range specs {
 		for _, e := range spec.Envs {
+			e = populateEnvDefaults(e, opts.DefaultCPU, opts.UseTCG)
 			// Tags should not differ by ordering.
 			slices.Sort(e.Tags)
 			if !slices.Equal(opts.Tags, e.Tags) {
@@ -371,8 +394,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
-					UseTCG:            opts.UseTCG || e.UseTCG,
-					HostCPU:           GetHostCPU(e, opts.UseTCG),
+					HostCPU:           GetHostCPU(e, opts.UseTCG || e.Emulator.Accel == build.AccelNone),
 				}
 			}
 			test := Test{Test: spec.Test, Runs: 1}
@@ -394,8 +416,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
-					UseTCG:            opts.UseTCG || e.UseTCG,
-					HostCPU:           GetHostCPU(e, opts.UseTCG),
+					HostCPU:           GetHostCPU(e, opts.UseTCG || e.Emulator.Accel == build.AccelNone),
 				})
 			} else {
 				shard.Tests = append(shard.Tests, test)
@@ -509,18 +530,10 @@ func environmentName(env build.Environment) string {
 	if env.Netboot {
 		addToken("netboot")
 	}
-	if env.VirtualDeviceSpec.EnvName != "" {
-		addToken(env.VirtualDeviceSpec.EnvName)
-	} else if env.VirtualDeviceSpec.Name != "" {
-		addToken(env.VirtualDeviceSpec.Name)
+	if env.Emulator.Name != "" {
+		addToken(env.Emulator.Name)
 	}
-	if env.GptUefiDisk.Name != "" {
-		addToken("uefi")
-		addToken(env.GptUefiDisk.Name)
-	}
-	if env.TargetsEmulator() && env.UseTCG {
-		addToken("tcg")
-	}
+
 	return strings.Join(tokens, "-")
 }
 

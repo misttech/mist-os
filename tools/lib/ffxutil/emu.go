@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -36,7 +37,7 @@ type EmuStartArgs struct {
 
 	ProductBundle string
 	KernelArgs    []string
-	Accel         string
+	Accel         build.AccelMode
 	Device        string
 }
 
@@ -85,7 +86,7 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 			args = append(args, "--kernel-args", k)
 		}
 		if startArgs.Accel != "" {
-			args = append(args, "--accel", startArgs.Accel)
+			args = append(args, "--accel", string(startArgs.Accel))
 		}
 		if startArgs.Device != "" {
 			args = append(args, "--device", startArgs.Device)

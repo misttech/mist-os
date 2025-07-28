@@ -51,14 +51,10 @@ func GetBotanistConfig(shard *Shard, buildDir string, tools build.Tools) error {
 	emuConfig := configWithType{
 		Type: strings.ToLower(deviceType),
 		EmulatorConfig: targets.EmulatorConfig{
-			Path:              fmt.Sprintf("./%s/bin", strings.ToLower(deviceType)),
-			EDK2Dir:           "./edk2",
-			Target:            targets.Target(shard.TargetCPU()),
-			VirtualDeviceSpec: shard.Env.VirtualDeviceSpec.Name,
-			Uefi:              shard.Env.GptUefiDisk.Name != "",
-			VbmetaKey:         shard.Env.GptUefiDisk.VbmetaKeyPath,
-			VbmetaMetadata:    shard.Env.GptUefiDisk.VbmetaKeyMetadataPath,
-			KVM:               !shard.UseTCG,
+			Path:     fmt.Sprintf("./%s/bin", strings.ToLower(deviceType)),
+			EDK2Dir:  "./edk2",
+			Target:   targets.Target(shard.TargetCPU()),
+			Emulator: shard.Env.Emulator,
 			// Is a directive to run the emu process in a way in which we can
 			// synthesize a 'serial device'. We need only do this in the bringup
 			// case, this being used for executing tests at that level;
@@ -99,7 +95,7 @@ func GetBotDimensions(shard *Shard, params *proto.Params) {
 
 	if isEmuType {
 		dimensions["os"] = "Debian"
-		if !shard.UseTCG {
+		if shard.Env.Emulator.Accel != build.AccelNone {
 			dimensions["kvm"] = "1"
 		}
 		dimensions["cpu"] = testBotCpu
@@ -117,10 +113,10 @@ func GetBotDimensions(shard *Shard, params *proto.Params) {
 		for k, v := range shard.Env.Dimensions {
 			dimensions[k] = v
 		}
-	}
-	// Ensure we use GCE VMs whenever possible.
-	if isLinux && !isGCEType && testBotCpu == "x64" && !shard.UseTCG {
-		dimensions["kvm"] = "1"
+		// Ensure we use GCE VMs whenever possible.
+		if isLinux && testBotCpu == "x64" {
+			dimensions["kvm"] = "1"
+		}
 	}
 	if (isEmuType || shard.Env.Dimensions.DeviceType() == "") && testBotCpu == "x64" && isLinux {
 		dimensions["gce"] = "1"
@@ -273,7 +269,7 @@ func ConstructBaseCommand(shard *Shard, checkoutRoot, buildDir string, tools bui
 	for _, arg := range params.ZirconArgs {
 		cmd = append(cmd, "-zircon-args", arg)
 	}
-	if shard.Env.TargetsEmulator() && shard.UseTCG {
+	if shard.Env.TargetsEmulator() && shard.Env.Emulator.Accel == build.AccelNone {
 		// Used by botanist to scale the test timeout since tests can
 		// run much slower on QEMU bots running with TCG.
 		cmd = append(cmd, "-test-timeout-scale-factor", "2")

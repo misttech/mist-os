@@ -118,14 +118,8 @@ type Environment struct {
 	// Dimensions gives the Swarming dimensions a test wishes to target.
 	Dimensions DimensionSet `json:"dimensions"`
 
-	// VirtualDeviceSpec specifies the virtual device spec to use if targeting an emulator.
-	VirtualDeviceSpec VirtualDeviceSpecInfo `json:"virtual_device_spec,omitempty"`
-
-	// GptUefiDisk specifies whether to run the emulator tests with full GPT/UEFI system disks.
-	GptUefiDisk GptUefiDiskInfo `json:"gpt_uefi_disk,omitempty"`
-
-	// UseTCG specifies whether to run the emulator with TCG instead of KVM.
-	UseTCG bool `json:"use_tcg,omitempty"`
+	// Emulator specifies fields to pass to `ffx emu start`.
+	Emulator EmulatorInfo `json:"emulator,omitempty"`
 
 	// Tags are keys given to an environment on which the testsharder may filter.
 	Tags []string `json:"tags,omitempty"`
@@ -171,13 +165,36 @@ func (ds DimensionSet) Pool() string {
 	return ds["pool"]
 }
 
-type VirtualDeviceSpecInfo struct {
-	Name    string `json:"name"`
-	EnvName string `json:"env_name,omitempty"`
-}
+// AccelMode is a supported mode to pass to `ffx emu start --accel`.
+type AccelMode string
 
-type GptUefiDiskInfo struct {
-	Name                  string `json:"name"`
-	VbmetaKeyPath         string `json:"vbmeta_key_path"`
-	VbmetaKeyMetadataPath string `json:"vbmeta_key_metadata_path"`
+const (
+	AccelNone  AccelMode = "none"
+	AccelHyper AccelMode = "hyper"
+)
+
+// EmulatorInfo encapsulates details about how to configure the emlator.
+type EmulatorInfo struct {
+	// Name is a unique name for this emulator configuration.
+	Name string `json:"name"`
+
+	// Device specifies the virtual device spec to use.
+	Device string `json:"device,omitempty"`
+
+	// Accel specifies the hardware acceleration type to use.
+	Accel AccelMode `json:"accel,omitempty"`
+
+	// KernelArgs are extra kernel args to pass to the emulator.
+	KernelArgs []string `json:"kernel_args,omitempty"`
+
+	// Uefi specifies whether to run the emulator tests with full GPT/UEFI system disks.
+	// If true, `vbmeta_key` and `vbmeta_key_metadata` must be provided as well.
+	Uefi bool `json:"uefi,omitempty"`
+
+	// VbmetaKey is the path to the vbmeta key to use when running the emulator with UEFI.
+	VbmetaKey string `json:"vbmeta_key,omitempty"`
+
+	// VbmetaKeyMetadata is the path to the vbmeta key metadata to use when running the
+	// emulator with UEFI.
+	VbmetaKeyMetadata string `json:"vbmeta_key_metadata,omitempty"`
 }
