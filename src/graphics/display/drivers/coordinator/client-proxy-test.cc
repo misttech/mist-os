@@ -105,7 +105,7 @@ class ClientProxyTest : public ::testing::Test {
   fdf_testing::ScopedGlobalLogger logger_;
 };
 
-TEST_F(ClientProxyTest, ClientVSyncOk) {
+TEST_F(ClientProxyTest, ClientVSyncDelivery) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr display::DriverConfigStamp kDriverStampValue(1);
@@ -139,7 +139,7 @@ TEST_F(ClientProxyTest, ClientVSyncOk) {
       .client_stamp = kClientStampValue,
   });
 
-  EXPECT_OK(clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, kDriverStampValue));
+  clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, kDriverStampValue);
 
   MockCoordinatorListener mock_coordinator_listener;
   fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener> listener_server_binding =
@@ -184,8 +184,7 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
   clientproxy.SetVsyncEventDelivery(true);
   fbl::AutoLock lock(controller.mtx());
   listener_client_end.reset();
-  EXPECT_OK(clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                       display::kInvalidDriverConfigStamp));
+  clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
   clientproxy.CloseForTesting();
 
   engine_listener_dispatcher.ShutdownAsync();
@@ -194,7 +193,7 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
   driver_shutdown_completion->Wait();
 }
 
-TEST_F(ClientProxyTest, ClientVSyncNotSupported) {
+TEST_F(ClientProxyTest, ClientVSyncDeliveryDisabled) {
   fdf_testing::DriverRuntime driver_runtime;
 
   auto [coordinator_client_end, coordinator_server_end] =
@@ -219,9 +218,7 @@ TEST_F(ClientProxyTest, ClientVSyncNotSupported) {
                                        std::move(listener_client_end)));
 
   fbl::AutoLock lock(controller.mtx());
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                           display::kInvalidDriverConfigStamp));
+  clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
   clientproxy.CloseForTesting();
 
   engine_listener_dispatcher.ShutdownAsync();
@@ -267,9 +264,8 @@ TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
     });
   }
 
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                           display::DriverConfigStamp(kDriverStampValues.back())));
+  clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
+                             display::DriverConfigStamp(kDriverStampValues.back()));
 
   // Even if Vsync is disabled, ClientProxy should always drain pending
   // controller stamps.

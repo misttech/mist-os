@@ -115,20 +115,18 @@ void ClientProxy::ReapplyConfig() {
   }
 }
 
-zx_status_t ClientProxy::OnCaptureComplete() {
+void ClientProxy::OnCaptureComplete() {
   AssertHeld(*controller_.mtx());
   fbl::AutoLock l(&mtx_);
   if (enable_capture_) {
     handler_.CaptureCompleted();
   }
   enable_capture_ = false;
-  return ZX_OK;
 }
 
-zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
-                                        display::DriverConfigStamp driver_config_stamp) {
+void ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
+                                 display::DriverConfigStamp driver_config_stamp) {
   AssertHeld(*controller_.mtx());
-  fidl::Status event_sending_result = fidl::Status::Ok();
 
   display::ConfigStamp client_stamp = {};
   auto it =
@@ -147,7 +145,7 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instan
   {
     fbl::AutoLock l(&mtx_);
     if (!vsync_delivery_enabled_) {
-      return ZX_ERR_NOT_SUPPORTED;
+      return;
     }
   }
 
@@ -186,52 +184,21 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instan
         .timestamp = timestamp,
         .config_stamp = client_stamp,
     });
-    return ZX_ERR_BAD_STATE;
+    return;
   }
-
-  auto cleanup = fit::defer([&]() {
-    if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
-      --vsync_cookie_sequence_;
-    }
-    // Make sure status is not `ZX_ERR_BAD_HANDLE`, otherwise channel write may crash (depending on
-    // policy setting).
-    ZX_DEBUG_ASSERT(event_sending_result.status() != ZX_ERR_BAD_HANDLE);
-    if (event_sending_result.status() == ZX_ERR_NO_MEMORY) {
-      total_oom_errors_++;
-      // OOM errors are most likely not recoverable. Print the error message
-      // once every kChannelErrorPrintFreq cycles.
-      if (chn_oom_print_freq_++ == 0) {
-        fdf::error("Failed to send vsync event (OOM) (total occurrences: {})", total_oom_errors_);
-      }
-      if (chn_oom_print_freq_ >= kChannelOomPrintFreq) {
-        chn_oom_print_freq_ = 0;
-      }
-    } else {
-      fdf::warn("Failed to send vsync event: {}", event_sending_result.FormatDescription());
-    }
-  });
 
   // Send buffered vsync events before sending the latest.
   while (!buffered_vsync_messages_.empty()) {
     VsyncMessageData vsync_message_data = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
-    event_sending_result = handler_.NotifyVsync(
-        vsync_message_data.display_id, zx::time_monotonic{vsync_message_data.timestamp},
-        vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
-    if (!event_sending_result.ok()) {
-      fdf::error("Failed to send all buffered vsync messages: {}\n",
-                 event_sending_result.FormatDescription());
-      return event_sending_result.status();
-    }
+    handler_.NotifyVsync(vsync_message_data.display_id,
+                         zx::time_monotonic{vsync_message_data.timestamp},
+                         vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
     number_of_vsyncs_sent_++;
   }
 
   // Send the latest vsync event.
-  event_sending_result = handler_.NotifyVsync(display_id, zx::time_monotonic{timestamp},
-                                              client_stamp, vsync_ack_cookie);
-  if (!event_sending_result.ok()) {
-    return event_sending_result.status();
-  }
+  handler_.NotifyVsync(display_id, zx::time_monotonic{timestamp}, client_stamp, vsync_ack_cookie);
 
   // Update vsync tracking states.
   if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
@@ -239,8 +206,6 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instan
     last_cookie_sent_ = vsync_ack_cookie;
   }
   number_of_vsyncs_sent_++;
-  cleanup.cancel();
-  return ZX_OK;
 }
 
 void ClientProxy::OnClientDead() {

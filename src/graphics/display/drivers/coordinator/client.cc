@@ -1146,20 +1146,17 @@ void Client::SetOwnership(bool is_owner) {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnDriverDispatcher());
   is_owner_ = is_owner;
 
-  fidl::Status result = NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
-  if (!result.ok()) {
-    fdf::error("Error writing remove message: {}", result.FormatDescription());
-  }
+  NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
 
   // Only apply the current config if the client has previously applied a config.
   ReapplyConfig();
 }
 
-fidl::Status Client::NotifyDisplayChanges(
+void Client::NotifyDisplayChanges(
     std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
     std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
   if (!coordinator_listener_.is_valid()) {
-    return fidl::Status::Ok();
+    return;
   }
 
   // TODO(https://fxbug.dev/42052765): `OnDisplayChanged()` takes `VectorView`s
@@ -1172,34 +1169,40 @@ fidl::Status Client::NotifyDisplayChanges(
       const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
       removed_display_ids.size());
 
-  fidl::OneWayStatus call_result = coordinator_listener_->OnDisplaysChanged(
+  fidl::OneWayStatus fidl_status = coordinator_listener_->OnDisplaysChanged(
       fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
           non_const_added_display_infos.data(), non_const_added_display_infos.size()),
       fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
           non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
-  return call_result;
+  if (!fidl_status.ok()) {
+    fdf::error("OnDisplaysChanged dispatch failed: {}", fidl_status.error());
+  }
 }
 
-fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
+void Client::NotifyOwnershipChange(bool client_has_ownership) {
   if (!coordinator_listener_.is_valid()) {
-    return fidl::Status::Ok();
+    return;
   }
 
-  fidl::OneWayStatus call_result =
+  fidl::OneWayStatus fidl_status =
       coordinator_listener_->OnClientOwnershipChange(client_has_ownership);
-  return call_result;
+  if (!fidl_status.ok()) {
+    fdf::error("OnClientOwnershipChange dispatch failed: {}", fidl_status.error());
+  }
 }
 
-fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
-                                 display::ConfigStamp config_stamp,
-                                 display::VsyncAckCookie vsync_ack_cookie) {
+void Client::NotifyVsync(display::DisplayId display_id, zx::time_monotonic timestamp,
+                         display::ConfigStamp config_stamp,
+                         display::VsyncAckCookie vsync_ack_cookie) {
   if (!coordinator_listener_.is_valid()) {
-    return fidl::Status::Ok();
+    return;
   }
 
-  fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
+  fidl::OneWayStatus fidl_status = coordinator_listener_->OnVsync(
       display_id.ToFidl(), timestamp, config_stamp.ToFidl(), vsync_ack_cookie.ToFidl());
-  return send_call_result;
+  if (!fidl_status.ok()) {
+    fdf::error("OnNotifyVsync dispatch failed: {}", fidl_status.error());
+  }
 }
 
 void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
@@ -1352,10 +1355,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
   }
 
   if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
-    fidl::Status result = NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
-    if (!result.ok()) {
-      fdf::error("Error writing remove message: {}", result.FormatDescription());
-    }
+    NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
   }
 }
 
@@ -1414,9 +1414,7 @@ void Client::TearDown(zx_status_t epitaph) {
   }
   valid_ = false;
 
-  // Break FIDL connections. First stop Vsync messages from the controller since there will be no
-  // FIDL connections to forward the messages over.
-  proxy_->SetVsyncEventDelivery(false);
+  // Break FIDL connections.
   binding_->Close(epitaph);
   binding_.reset();
   coordinator_listener_.AsyncTeardown();

@@ -62,12 +62,12 @@ class ClientProxy {
   void TearDown();
 
   // Requires holding `controller_.mtx()` lock.
-  zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
-                             display::DriverConfigStamp driver_config_stamp);
+  void OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
+                      display::DriverConfigStamp driver_config_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                          std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
-  zx_status_t OnCaptureComplete();
+  void OnCaptureComplete();
 
   // See `Client::ReapplyConfig()`.
   void ReapplyConfig();
@@ -141,11 +141,6 @@ class ClientProxy {
 
   fbl::Mutex task_mtx_;
   std::vector<std::unique_ptr<async::Task>> client_scheduled_tasks_ __TA_GUARDED(task_mtx_);
-
-  // This variable is used to limit the number of errors logged in case of channel OOM error.
-  static constexpr uint32_t kChannelOomPrintFreq = 600;  // 1 per 10 seconds (assuming 60fps)
-  uint32_t chn_oom_print_freq_ = 0;
-  uint64_t total_oom_errors_ = 0;
 
   struct VsyncMessageData {
     display::DisplayId display_id;
