@@ -312,7 +312,7 @@ fn one_string_arg() {
 #[test]
 fn one_kv_arg() {
     let mut map = HashMap::new();
-    map.insert(1, String::from("abc"));
+    let _old = map.insert(1, String::from("abc"));
 
     test_roundtrips(
         highlevel::Response::Success(highlevel::Success::Testm { field: map }),
@@ -497,7 +497,7 @@ fn multiple_paren_args() {
 #[test]
 fn multiple_paren_kv_args() {
     let mut map = HashMap::new();
-    map.insert(1, String::from("abc"));
+    let _old = map.insert(1, String::from("abc"));
     test_roundtrips(
         highlevel::Response::Success(highlevel::Success::Testpmpil {
             field1: map,

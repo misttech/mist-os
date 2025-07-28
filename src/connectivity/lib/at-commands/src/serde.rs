@@ -173,8 +173,11 @@ pub(crate) mod internal {
 /// serializing multiple items.
 #[derive(Debug)]
 pub struct SerializeError<T> {
+    #[cfg_attr(test, allow(unused))]
     pub remaining: Vec<T>,
+    #[cfg_attr(test, allow(unused))]
     pub failed: T,
+    #[cfg_attr(test, allow(unused))]
     pub cause: SerializeErrorCause,
 }
 
