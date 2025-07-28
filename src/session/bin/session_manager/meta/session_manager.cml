@@ -166,6 +166,7 @@
                 "fuchsia.starnix.runner.Manager",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.time.alarms.WakeAlarms",
+                "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.ultrasound.Factory",
                 "fuchsia.update.CommitStatusProvider",

@@ -780,5 +780,12 @@
             to: "#session-manager",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.tracing.controller.Provisioner",
+            from: "#trace_manager",
+            to: "#session-manager",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
 }
