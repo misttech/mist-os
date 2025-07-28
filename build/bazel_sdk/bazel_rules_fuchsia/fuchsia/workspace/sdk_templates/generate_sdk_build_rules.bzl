@@ -199,21 +199,7 @@ def _get_visibility_list(values):
     """
     if not values:
         return ["//visibility:public"]
-
-    visibility_list = []
-    for entry in values:
-        repo_name = entry.repo_name
-
-        # If this repo_name is empty we change it to refer to the root
-        # repo to avoid confusing it with the generated repo.
-        if repo_name == "":
-            repo_name = "@"
-        visibility_list.append("@{}//{}:{}".format(
-            repo_name,
-            entry.package,
-            entry.name,
-        ))
-    return visibility_list
+    return [str(v) for v in values]
 
 def _get_target_name(name):
     return name.rpartition("/")[2]
