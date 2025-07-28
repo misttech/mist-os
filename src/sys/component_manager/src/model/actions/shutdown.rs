@@ -6,15 +6,11 @@ use crate::model::actions::{Action, ActionKey, ActionsManager};
 use crate::model::component::instance::{InstanceState, ResolvedInstanceState};
 use crate::model::component::ComponentInstance;
 use async_trait::async_trait;
-use cm_rust::{
-    CapabilityDecl, CollectionDecl, EnvironmentDecl, ExposeDecl, NativeIntoFidl, OfferDecl, UseDecl,
-};
-use cm_types::Name;
+use cm_rust::NativeIntoFidl;
 use errors::{ActionError, ShutdownActionError};
 use futures::prelude::*;
 use log::*;
 use moniker::ChildName;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -240,65 +236,6 @@ pub async fn do_shutdown(
     }
 
     Ok(())
-}
-
-/// Trait exposing all component state necessary to compute shutdown order.
-///
-/// This trait largely mirrors `ComponentDecl`, but will reflect changes made to
-/// the component's state at runtime (e.g., dynamically created children,
-/// dynamic offers).
-///
-/// In production, this will probably only be implemented for
-/// `ResolvedInstanceState`, but exposing this trait allows for easier testing.
-#[allow(dead_code)]
-pub trait Component {
-    /// Current view of this component's `uses` declarations.
-    fn uses(&self) -> Vec<UseDecl>;
-
-    /// Current view of this component's `exposes` declarations.
-    fn exposes(&self) -> Vec<ExposeDecl>;
-
-    /// Current view of this component's `offers` declarations.
-    fn offers(&self) -> Vec<OfferDecl>;
-
-    /// Current view of this component's `capabilities` declarations.
-    fn capabilities(&self) -> Vec<CapabilityDecl>;
-
-    /// Current view of this component's `collections` declarations.
-    fn collections(&self) -> Vec<CollectionDecl>;
-
-    /// Current view of this component's `environments` declarations.
-    fn environments(&self) -> Vec<EnvironmentDecl>;
-
-    /// Returns metadata about each child of this component.
-    fn children(&self) -> Vec<Child>;
-
-    /// Returns the live child that has the given `name` and `collection`, or
-    /// returns `None` if none match. In the case of dynamic children, it's
-    /// possible for multiple children to match a given `name` and `collection`,
-    /// but at most one of them can be live.
-    ///
-    /// Note: `name` is a `&str` because it could be either a `Name` or `LongName`.
-    fn find_child(&self, name: &str, collection: Option<&Name>) -> Option<Child> {
-        self.children().into_iter().find(|child| {
-            child.moniker.name().as_str() == name
-                && child.moniker.collection() == collection.map(Borrow::borrow)
-        })
-    }
-}
-
-/// Child metadata necessary to compute shutdown order.
-///
-/// A `Component` returns information about its children by returning a vector
-/// of these.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Child {
-    /// The moniker identifying the name of the child, complete with
-    /// `instance_id`.
-    pub moniker: ChildName,
-
-    /// Name of the environment associated with this child, if any.
-    pub environment_name: Option<Name>,
 }
 
 /// For a given component `decl`, identify capability dependencies between the

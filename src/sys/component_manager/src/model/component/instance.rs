@@ -4,7 +4,7 @@
 
 use crate::bedrock::program::{Program, StopConclusion, StopDisposition};
 use crate::framework::{controller, get_framework_router};
-use crate::model::actions::{shutdown, StopAction};
+use crate::model::actions::StopAction;
 use crate::model::component::{
     Component, ComponentInstance, ExtendedInstance, IncarnationId, Package, StartReason,
     WeakComponentInstance, WeakExtendedInstance,
@@ -253,47 +253,6 @@ impl UnresolvedInstanceState {
             instance_token_state: std::mem::take(&mut self.instance_token_state),
             component_input: self.component_input.clone(),
         }
-    }
-}
-
-/// Expose instance state in the format in which the `shutdown` action expects
-/// to see it.
-///
-/// Largely shares its implementation with `ResolvedInstanceInterface`.
-impl shutdown::Component for ResolvedInstanceState {
-    fn uses(&self) -> Vec<UseDecl> {
-        <Self as ResolvedInstanceInterface>::uses(self)
-    }
-
-    fn exposes(&self) -> Vec<cm_rust::ExposeDecl> {
-        <Self as ResolvedInstanceInterface>::exposes(self)
-    }
-
-    fn offers(&self) -> Vec<cm_rust::OfferDecl> {
-        // Includes both static and dynamic offers.
-        <Self as ResolvedInstanceInterface>::offers(self)
-    }
-
-    fn capabilities(&self) -> Vec<cm_rust::CapabilityDecl> {
-        <Self as ResolvedInstanceInterface>::capabilities(self)
-    }
-
-    fn collections(&self) -> Vec<cm_rust::CollectionDecl> {
-        <Self as ResolvedInstanceInterface>::collections(self)
-    }
-
-    fn environments(&self) -> Vec<cm_rust::EnvironmentDecl> {
-        self.resolved_component.decl.environments.clone()
-    }
-
-    fn children(&self) -> Vec<shutdown::Child> {
-        // Includes both static and dynamic children.
-        ResolvedInstanceState::children(self)
-            .map(|(moniker, instance)| shutdown::Child {
-                moniker: moniker.clone(),
-                environment_name: instance.environment().name().cloned(),
-            })
-            .collect()
     }
 }
 
