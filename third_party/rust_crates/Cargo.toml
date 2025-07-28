@@ -317,7 +317,7 @@ fs_extra = "1.2.0"
 fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.9"
 hyper-rustls = { version = "0.24.2", default-features = false, features = ["rustls-native-certs"] }
-indoc = "1.0.3"
+indoc = "2.0.6"
 loom = "0.7.1"
 # TODO(https://fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio

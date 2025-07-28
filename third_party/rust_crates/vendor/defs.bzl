@@ -604,7 +604,7 @@ _PROC_MACRO_DEPENDENCIES = {
             "typed-builder": Label("//third_party/rust_crates/vendor/typed-builder-0.10.0:typed_builder"),
         },
         "cfg(not(target_os = \"fuchsia\"))": {
-            "indoc": Label("//third_party/rust_crates/vendor/indoc-1.0.3:indoc"),
+            "indoc": Label("//third_party/rust_crates/vendor/indoc-2.0.6:indoc"),
         },
     },
 }

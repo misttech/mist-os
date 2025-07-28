@@ -461,7 +461,7 @@ group("indexmap") {
 
 if (!(current_os == "fuchsia")) {
   group("indoc") {
-    public_deps = [ ":indoc-v1_0_3($host_toolchain)" ]
+    public_deps = [ ":indoc-v2_0_6($host_toolchain)" ]
   }
 }
 
@@ -8565,37 +8565,36 @@ rustc_library("indexmap-v1_9_2") {
   applicable_licenses = [ ":indexmap-v1_9_2.license" ]
 }
 
-license("indoc-v1_0_3.license") {
+license("indoc-v2_0_6.license") {
   public_package_name = "indoc"
   license_files = [
-    "//third_party/rust_crates/vendor/indoc-1.0.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/indoc-1.0.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/indoc-2.0.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/indoc-2.0.6/LICENSE-MIT",
   ]
 }
 
-rustc_macro("indoc-v1_0_3") {
+rustc_macro("indoc-v2_0_6") {
   crate_name = "indoc"
-  source_root = "//third_party/rust_crates/vendor/indoc-1.0.3/src/lib.rs"
-  output_name = "indoc-da3b32d05f72f95e"
-  edition = "2018"
+  source_root = "//third_party/rust_crates/vendor/indoc-2.0.6/src/lib.rs"
+  output_name = "indoc-8d03f77c1ee5778"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":unindent-v0_1_7" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=da3b32d05f72f95e",
-    "-Cextra-filename=-da3b32d05f72f95e",
+    "-Cmetadata=8d03f77c1ee5778",
+    "-Cextra-filename=-8d03f77c1ee5778",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":indoc-v1_0_3.license" ]
+  applicable_licenses = [ ":indoc-v2_0_6.license" ]
 }
 
 license("inotify-v0_9_6.license") {
@@ -19576,38 +19575,6 @@ rustc_library("unicode-xid-v0_2_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":unicode-xid-v0_2_0.license" ]
-}
-
-license("unindent-v0_1_7.license") {
-  public_package_name = "unindent"
-  license_files = [
-    "//third_party/rust_crates/vendor/unindent-0.1.7/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/unindent-0.1.7/LICENSE-MIT",
-  ]
-}
-
-rustc_library("unindent-v0_1_7") {
-  crate_name = "unindent"
-  source_root = "//third_party/rust_crates/vendor/unindent-0.1.7/src/lib.rs"
-  output_name = "unindent-d666df4068b09289"
-  edition = "2018"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=d666df4068b09289",
-    "-Cextra-filename=-d666df4068b09289",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":unindent-v0_1_7.license" ]
 }
 
 license("universal-hash-v0_5_1.license") {
