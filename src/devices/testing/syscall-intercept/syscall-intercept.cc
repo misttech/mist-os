@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.test.syscalls/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zircon-internal/thread_annotations.h>
+#include <zircon/syscalls-next.h>
 
 #include <memory>
 
@@ -115,9 +116,11 @@ SuspendObserver::~SuspendObserver() {
 
 }  // namespace syscall_intercept
 
-extern "C" {
-
-zx_status_t zx_system_suspend_enter(zx_handle_t, zx_time_t time) {
+__EXPORT zx_status_t zx_system_suspend_enter(zx_handle_t resource,
+                                             zx_instant_boot_t resume_deadline, uint64_t options,
+                                             zx_wake_source_report_header_t* out_header,
+                                             zx_wake_source_report_entry_t* out_entries,
+                                             uint32_t num_entries, uint32_t* actual_entries) {
   {
     fbl::AutoLock lock(&syscall_intercept::state_instance_lock);
     if (syscall_intercept::state_instance != nullptr) {
@@ -137,5 +140,3 @@ zx_status_t zx_system_suspend_enter(zx_handle_t, zx_time_t time) {
   // may be.
   return ZX_ERR_INTERNAL;
 }
-
-}  // extern "C"

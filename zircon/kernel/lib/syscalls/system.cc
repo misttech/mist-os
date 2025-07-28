@@ -721,7 +721,11 @@ zx_status_t sys_system_get_performance_info(zx_handle_t resource, uint32_t topic
 
 // TODO(https://fxbug.dev/42182544): Reconcile with HaltToken, zx_system_powerctl, and
 // kernel-initiated-oom-reboot.
-zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_instant_boot_t resume_deadline) {
+zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_instant_boot_t resume_deadline,
+                                     uint64_t options,
+                                     user_out_ptr<zx_wake_source_report_header_t> out_header,
+                                     user_out_ptr<zx_wake_source_report_entry_t> out_entries,
+                                     uint32_t num_entries, user_out_ptr<uint32_t> actual_entries) {
   const zx_status_t validate_status =
       validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_CPU_BASE, 1);
   if (validate_status != ZX_OK) {

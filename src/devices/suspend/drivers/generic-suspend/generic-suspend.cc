@@ -147,7 +147,8 @@ zx_status_t GenericSuspend::SystemSuspendEnter() {
   // LINT.IfChange
   TRACE_DURATION("power", "generic-suspend:suspend");
   // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
-  return zx_system_suspend_enter(cpu_resource_.get(), ZX_TIME_INFINITE);
+  return zx_system_suspend_enter(cpu_resource_.get(), ZX_TIME_INFINITE, 0, nullptr, nullptr, 0,
+                                 nullptr);
 }
 
 void GenericSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {

@@ -58,6 +58,8 @@ pub type zx_restricted_reason_t = u64;
 pub type zx_processor_power_level_options_t = u64;
 pub type zx_processor_power_control_t = u64;
 pub type zx_system_memory_stall_type_t = u32;
+pub type zx_system_suspend_option_t = u64;
+pub type zx_system_wake_report_entry_flag_t = u32;
 
 macro_rules! const_assert {
     ($e:expr $(,)?) => {
@@ -2738,6 +2740,25 @@ pub union zx_iob_region_extension_t {
     pub private_region: zx_iob_region_private_t,
     pub shared_region: zx_iob_region_shared_t,
     pub max_extension: [u8; 32],
+}
+
+#[repr(C)]
+pub struct zx_wake_source_report_entry_t {
+    pub koid: zx_koid_t,
+    pub name: [u8; ZX_MAX_NAME_LEN],
+    pub initial_signal_time: zx_instant_boot_t,
+    pub last_signal_time: zx_instant_boot_t,
+    pub last_ack_time: zx_instant_boot_t,
+    pub signal_count: u32,
+    pub flags: u32,
+}
+
+#[repr(C)]
+pub struct zx_wake_source_report_header_t {
+    pub report_time: zx_instant_boot_t,
+    pub suspend_start_time: zx_instant_boot_t,
+    pub total_wake_sources: u32,
+    pub unreported_wake_report_entries: u32,
 }
 
 #[cfg(test)]
