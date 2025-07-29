@@ -297,7 +297,6 @@ source_set("wcs") {
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "wcscasecmp.c",
-    "wcsdup.c",
     "wcsncasecmp.c",
     "wcswcs.c",
   ]
