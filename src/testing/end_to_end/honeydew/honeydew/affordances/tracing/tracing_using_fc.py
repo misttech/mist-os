@@ -143,7 +143,6 @@ class TracingUsingFc(tracing.Tracing):
                 to acknowledge that they've started tracing. NB: trace providers
                 that don't ACK by this deadline may still emit tracing events
                 starting at some later point.
-            buffering_mode: Type of buffering mode used.
 
         Raises:
             TracingStateError: When trace session is already initialized.
