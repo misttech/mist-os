@@ -43,6 +43,27 @@
         "type": "uint32"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.composition/BlendMode2.PREMULTIPLIED_ALPHA",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.composition/BlendMode2.REPLACE",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.composition/BlendMode2.STRAIGHT_ALPHA",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.ui.composition/BlendMode2",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
         "kind": "struct/member",
         "name": "fuchsia.ui.composition/BufferCollectionExportToken.value",
         "ordinal": "1",
@@ -338,6 +359,14 @@
         "ordinal": "3587628904518745316",
         "direction": "one_way",
         "request": "fuchsia.ui.composition/FlatlandSetHitRegionsRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.composition/Flatland.SetImageBlendMode",
+        "strictness": "strict",
+        "ordinal": "6563547792541998695",
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetImageBlendModeRequest"
     },
     {
         "kind": "protocol/member",
@@ -841,6 +870,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.ui.composition/FlatlandSetHitRegionsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageBlendModeRequest.blend_mode",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/BlendMode2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageBlendModeRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetImageBlendModeRequest"
     },
     {
         "kind": "struct/member",
