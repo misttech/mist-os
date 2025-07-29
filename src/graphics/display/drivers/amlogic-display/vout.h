@@ -23,6 +23,7 @@
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 
 namespace amlogic_display {
 
@@ -125,7 +126,7 @@ class Vout {
     PanelConfig panel_config;
 
     // Matches the timing in `panel_config`.
-    display_timing_t banjo_display_timing;
+    display_mode_t banjo_mode;
   } dsi_;
 
   struct hdmi_t {

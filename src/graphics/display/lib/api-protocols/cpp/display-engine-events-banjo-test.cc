@@ -77,17 +77,17 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredModes) {
 
     ASSERT_EQ(3u, info->preferred_modes_count);
 
-    EXPECT_EQ(640u, info->preferred_modes_list[0].h_addressable);
-    EXPECT_EQ(480u, info->preferred_modes_list[0].v_addressable);
-    EXPECT_EQ(640 * 480 * 60u, info->preferred_modes_list[0].pixel_clock_hz);
+    EXPECT_EQ(640u, info->preferred_modes_list[0].active_area.width);
+    EXPECT_EQ(480u, info->preferred_modes_list[0].active_area.height);
+    EXPECT_EQ(60'000u, info->preferred_modes_list[0].refresh_rate_millihertz);
 
-    EXPECT_EQ(640u, info->preferred_modes_list[1].h_addressable);
-    EXPECT_EQ(480u, info->preferred_modes_list[1].v_addressable);
-    EXPECT_EQ(640 * 480 * 30u, info->preferred_modes_list[1].pixel_clock_hz);
+    EXPECT_EQ(640u, info->preferred_modes_list[1].active_area.width);
+    EXPECT_EQ(480u, info->preferred_modes_list[1].active_area.height);
+    EXPECT_EQ(30'000u, info->preferred_modes_list[1].refresh_rate_millihertz);
 
-    EXPECT_EQ(800u, info->preferred_modes_list[2].h_addressable);
-    EXPECT_EQ(600u, info->preferred_modes_list[2].v_addressable);
-    EXPECT_EQ(800 * 600 * 30u, info->preferred_modes_list[2].pixel_clock_hz);
+    EXPECT_EQ(800u, info->preferred_modes_list[2].active_area.width);
+    EXPECT_EQ(600u, info->preferred_modes_list[2].active_area.height);
+    EXPECT_EQ(30'000u, info->preferred_modes_list[2].refresh_rate_millihertz);
 
     cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);
     EXPECT_THAT(banjo_edid_bytes, ::testing::IsEmpty());
@@ -114,8 +114,8 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithEdidBytes) {
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
 
-    cpp20::span<const display_timing_t> banjo_preferred_modes(info->preferred_modes_list,
-                                                              info->preferred_modes_count);
+    cpp20::span<const display_mode_t> banjo_preferred_modes(info->preferred_modes_list,
+                                                            info->preferred_modes_count);
     EXPECT_THAT(banjo_preferred_modes, ::testing::IsEmpty());
 
     cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);
@@ -143,8 +143,8 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPixelFormats) {
   mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
     EXPECT_EQ(kBanjoDisplayId, info->display_id);
 
-    cpp20::span<const display_timing_t> banjo_preferred_modes(info->preferred_modes_list,
-                                                              info->preferred_modes_count);
+    cpp20::span<const display_mode_t> banjo_preferred_modes(info->preferred_modes_list,
+                                                            info->preferred_modes_count);
     EXPECT_THAT(banjo_preferred_modes, ::testing::IsEmpty());
 
     cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);
@@ -204,17 +204,17 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredModeAndEdidBytes
 
     ASSERT_EQ(3u, info->preferred_modes_count);
 
-    EXPECT_EQ(640u, info->preferred_modes_list[0].h_addressable);
-    EXPECT_EQ(480u, info->preferred_modes_list[0].v_addressable);
-    EXPECT_EQ(640 * 480 * 60u, info->preferred_modes_list[0].pixel_clock_hz);
+    EXPECT_EQ(640u, info->preferred_modes_list[0].active_area.width);
+    EXPECT_EQ(480u, info->preferred_modes_list[0].active_area.height);
+    EXPECT_EQ(60'000u, info->preferred_modes_list[0].refresh_rate_millihertz);
 
-    EXPECT_EQ(640u, info->preferred_modes_list[1].h_addressable);
-    EXPECT_EQ(480u, info->preferred_modes_list[1].v_addressable);
-    EXPECT_EQ(640 * 480 * 30u, info->preferred_modes_list[1].pixel_clock_hz);
+    EXPECT_EQ(640u, info->preferred_modes_list[1].active_area.width);
+    EXPECT_EQ(480u, info->preferred_modes_list[1].active_area.height);
+    EXPECT_EQ(30'000u, info->preferred_modes_list[1].refresh_rate_millihertz);
 
-    EXPECT_EQ(800u, info->preferred_modes_list[2].h_addressable);
-    EXPECT_EQ(600u, info->preferred_modes_list[2].v_addressable);
-    EXPECT_EQ(800 * 600 * 30u, info->preferred_modes_list[2].pixel_clock_hz);
+    EXPECT_EQ(800u, info->preferred_modes_list[2].active_area.width);
+    EXPECT_EQ(600u, info->preferred_modes_list[2].active_area.height);
+    EXPECT_EQ(30'000u, info->preferred_modes_list[2].refresh_rate_millihertz);
 
     cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);
     EXPECT_THAT(banjo_edid_bytes, ::testing::ElementsAreArray(edid_bytes));

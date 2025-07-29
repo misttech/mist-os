@@ -34,11 +34,11 @@ namespace display_coordinator {
 
 DisplayInfo::DisplayInfo(display::DisplayId display_id,
                          fbl::Vector<display::PixelFormat> pixel_formats,
-                         fbl::Vector<display::DisplayTiming> preferred_modes,
+                         fbl::Vector<display::Mode> preferred_modes,
                          std::optional<edid::Edid> edid_info)
     : IdMappable(display_id),
       edid_info(std::move(edid_info)),
-      timings(std::move(preferred_modes)),
+      preferred_modes(std::move(preferred_modes)),
       pixel_formats(std::move(pixel_formats)) {
   ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
 
@@ -51,6 +51,15 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id().value()).c_str());
 
   size_t i = 0;
+  for (const display::Mode& mode : preferred_modes) {
+    auto child = node.CreateChild(fbl::StringPrintf("preferred-mode-%lu", ++i).c_str());
+    child.CreateDouble("vsync-hz", mode.refresh_rate_millihertz() / 1000.0, &properties);
+    child.CreateInt("width-pixels", mode.active_area().width(), &properties);
+    child.CreateInt("height-pixels", mode.active_area().height(), &properties);
+    properties.emplace(std::move(child));
+  }
+
+  i = 0;
   for (const display::DisplayTiming& t : timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
     child.CreateDouble("vsync-hz",
@@ -81,25 +90,6 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
   ZX_DEBUG_ASSERT(added_display_info.display_id != display::kInvalidDisplayId);
   display::DisplayId display_id = added_display_info.display_id;
 
-  fbl::Vector<display::DisplayTiming> preferred_modes;
-  if (!added_display_info.banjo_preferred_modes.is_empty()) {
-    fbl::AllocChecker alloc_checker;
-    preferred_modes.reserve(added_display_info.banjo_preferred_modes.size(), &alloc_checker);
-    if (!alloc_checker.check()) {
-      fdf::error("Failed to allocate DisplayTiming list for display ID: {}", display_id.value());
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
-    for (const display_timing_t& banjo_preferred_mode : added_display_info.banjo_preferred_modes) {
-      ZX_DEBUG_ASSERT_MSG(
-          preferred_modes.size() < added_display_info.banjo_preferred_modes.size(),
-          "The push_back() below was not supposed to allocate memory, but it might");
-      preferred_modes.push_back(display::ToDisplayTiming(banjo_preferred_mode), &alloc_checker);
-      ZX_DEBUG_ASSERT_MSG(alloc_checker.check(),
-                          "The push_back() above failed to allocate memory; "
-                          "it was not supposed to allocate at all");
-    }
-  }
-
   std::optional<edid::Edid> edid_info;
   if (!added_display_info.edid_bytes.is_empty()) {
     fit::result<const char*, edid::Edid> edid_result =
@@ -111,6 +101,8 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
       edid_info.emplace(std::move(edid_result).value());
     }
   }
+
+  fbl::Vector<display::Mode> preferred_modes = std::move(added_display_info.preferred_modes);
 
   if (preferred_modes.is_empty() && !edid_info.has_value()) {
     fdf::error(

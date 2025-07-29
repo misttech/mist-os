@@ -58,18 +58,10 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayAdded) {
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(
           fuchsia_images2::PixelFormat::kB8G8R8A8),
   };
-  static constexpr display_timing_t kPreferredModes[] = {
+  static constexpr display_mode_t kPreferredModes[] = {
       {
-          .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
-          .h_addressable = 0x0f'0f,
-          .h_front_porch = 0x0a'0a,
-          .h_sync_pulse = 0x01'01,
-          .h_blanking = 0x0d'0d,
-          .v_addressable = 0x0b'0b,
-          .v_front_porch = 0x03'03,
-          .v_sync_pulse = 0x04'04,
-          .v_blanking = 0x0c'0c,
-          .flags = MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK,
+          .active_area = {.width = 0x0f'0f, .height = 0x0b'0b},
+          .refresh_rate_millihertz = 60'000,
       },
   };
   static constexpr std::span<const uint8_t> kEdidBytes = edid::kDellP2719hEdid;
@@ -92,20 +84,12 @@ TEST_F(EngineListenerBanjoAdapterTest, OnDisplayAdded) {
     EXPECT_THAT(info->pixel_formats, ::testing::ElementsAre(display::PixelFormat::kR8G8B8A8,
                                                             display::PixelFormat::kB8G8R8A8));
 
-    ASSERT_EQ(info->banjo_preferred_modes.size(), 1u);
-    const display_timing_t& banjo_preferred_mode = info->banjo_preferred_modes[0];
+    ASSERT_EQ(info->preferred_modes.size(), 1u);
+    const display::Mode& preferred_mode = info->preferred_modes[0];
 
-    EXPECT_EQ(banjo_preferred_mode.pixel_clock_hz, 0x1f'1f'1f'1f'1f);
-    EXPECT_EQ(banjo_preferred_mode.h_addressable, 0x0f'0fu);
-    EXPECT_EQ(banjo_preferred_mode.h_front_porch, 0x0a'0au);
-    EXPECT_EQ(banjo_preferred_mode.h_sync_pulse, 0x01'01u);
-    EXPECT_EQ(banjo_preferred_mode.h_blanking, 0x0d'0du);
-    EXPECT_EQ(banjo_preferred_mode.v_addressable, 0x0b'0bu);
-    EXPECT_EQ(banjo_preferred_mode.v_front_porch, 0x03'03u);
-    EXPECT_EQ(banjo_preferred_mode.v_sync_pulse, 0x04'04u);
-    EXPECT_EQ(banjo_preferred_mode.v_blanking, 0x0c'0cu);
-    EXPECT_EQ(banjo_preferred_mode.flags,
-              MODE_FLAG_INTERLACED | MODE_FLAG_HSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK);
+    EXPECT_EQ(preferred_mode.active_area().width(), 0x0f'0f);
+    EXPECT_EQ(preferred_mode.active_area().height(), 0x0b'0b);
+    EXPECT_EQ(preferred_mode.refresh_rate_millihertz(), 60'000);
 
     EXPECT_THAT(info->edid_bytes, ::testing::ElementsAreArray(kEdidBytes));
     completion.Signal();

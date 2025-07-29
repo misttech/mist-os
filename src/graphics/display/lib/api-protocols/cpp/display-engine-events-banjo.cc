@@ -42,7 +42,7 @@ void DisplayEngineEventsBanjo::OnDisplayAdded(
   ZX_DEBUG_ASSERT(preferred_modes.size() <= kMaxPreferredModes);
   ZX_DEBUG_ASSERT(pixel_formats.size() <= kMaxPixelFormats);
 
-  std::array<display_timing_t, kMaxPreferredModes> banjo_preferred_modes_buffer;
+  std::array<display_mode_t, kMaxPreferredModes> banjo_preferred_modes_buffer;
   for (size_t i = 0; i < preferred_modes.size(); ++i) {
     banjo_preferred_modes_buffer[i] = preferred_modes[i].mode().ToBanjo();
   }

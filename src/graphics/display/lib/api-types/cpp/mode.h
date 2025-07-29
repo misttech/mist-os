@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <zircon/assert.h>
 
-#include <cinttypes>
 #include <cstdint>
 
 #include "src/graphics/display/lib/api-types/cpp/dimensions.h"
@@ -40,15 +39,15 @@ class Mode {
   // True iff `fidl_mode` is convertible to a valid Mode.
   [[nodiscard]] static constexpr bool IsValid(
       const fuchsia_hardware_display_types::wire::Mode& fidl_mode);
-  [[nodiscard]] static constexpr bool IsValid(const display_timing_t& banjo_timing);
+  [[nodiscard]] static constexpr bool IsValid(const display_mode_t& banjo_mode);
 
-  // `banjo_timing` must be convertible to a valid Mode.
+  // `banjo_mode` must be convertible to a valid Mode.
   //
   // This is not a constructor to allow designated initializer syntax. Making
   // this a constructor would introduce ambiguity when designated initializer
-  // syntax is used, because `display_timing_t` has the same field names as our
+  // syntax is used, because `display_mode_t` has the same field names as our
   // supported designated initializer syntax.
-  [[nodiscard]] static constexpr Mode From(const display_timing_t& banjo_timing);
+  [[nodiscard]] static constexpr Mode From(const display_mode_t& banjo_mode);
 
   // `fidl_mode` must be convertible to a valid Mode.
   //
@@ -74,7 +73,7 @@ class Mode {
   friend constexpr bool operator!=(const Mode& lhs, const Mode& rhs);
 
   constexpr fuchsia_hardware_display_types::wire::Mode ToFidl() const;
-  constexpr display_timing_t ToBanjo() const;
+  constexpr display_mode_t ToBanjo() const;
 
   // Guaranteed to meet the requirements in the FIDL documentation.
   constexpr Dimensions active_area() const { return active_area_; }
@@ -95,7 +94,7 @@ class Mode {
   static constexpr void DebugAssertIsValid(const Mode::ConstructorArgs& args);
   static constexpr void DebugAssertIsValid(
       const fuchsia_hardware_display_types::wire::Mode& fidl_mode);
-  static constexpr void DebugAssertIsValid(const display_timing_t& banjo_timing);
+  static constexpr void DebugAssertIsValid(const display_mode_t& banjo_mode);
 
   Dimensions active_area_;
   int32_t refresh_rate_millihertz_;
@@ -127,11 +126,8 @@ constexpr bool Mode::IsValid(const fuchsia_hardware_display_types::wire::Mode& f
 }
 
 // static
-constexpr bool Mode::IsValid(const display_timing_t& banjo_timing) {
-  const size_u_t banjo_active_area = {
-      .width = banjo_timing.h_addressable,
-      .height = banjo_timing.v_addressable,
-  };
+constexpr bool Mode::IsValid(const display_mode_t& banjo_mode) {
+  const size_u_t banjo_active_area = banjo_mode.active_area;
   if (!Dimensions::IsValid(banjo_active_area)) {
     return false;
   }
@@ -139,45 +135,14 @@ constexpr bool Mode::IsValid(const display_timing_t& banjo_timing) {
   const Dimensions active_area = Dimensions::From(banjo_active_area);
   ZX_DEBUG_ASSERT(!active_area.IsEmpty());
 
-  if (banjo_timing.h_front_porch != 0) {
+  if (banjo_mode.refresh_rate_millihertz <= 0) {
     return false;
   }
-  if (banjo_timing.h_sync_pulse != 0) {
-    return false;
-  }
-  if (banjo_timing.h_blanking != 0) {
-    return false;
-  }
-  if (banjo_timing.v_front_porch != 0) {
-    return false;
-  }
-  if (banjo_timing.v_sync_pulse != 0) {
-    return false;
-  }
-  if (banjo_timing.v_blanking != 0) {
+  if (banjo_mode.refresh_rate_millihertz > kMaxRefreshRateMillihertz) {
     return false;
   }
 
-  if (banjo_timing.flags != 0) {
-    return false;
-  }
-
-  if (banjo_timing.pixel_clock_hz <= 0) {
-    return false;
-  }
-
-  // The active area is at most `Dimensions::kMaxWidth` x
-  // `Dimensions::kMaxHeight`, so the number of pixels in the active area is at
-  // most std::pow(2, 32).
-  const int64_t active_area_pixels = int64_t{active_area.width()} * active_area.height();
-
-  // The multiplication does not overflow (causing UB) because
-  // `active_area_pixels` is at most std::pow(2, 32) and
-  // `kMaxRefreshRateMillihertz` is less than std::pow(2, 20), so the product is
-  // less than std::pow(2, 52).
-  const int64_t max_pixel_clock_millihertz = active_area_pixels * kMaxRefreshRateMillihertz;
-
-  if (banjo_timing.pixel_clock_hz > max_pixel_clock_millihertz / 1'000) {
+  if (banjo_mode.flags != 0) {
     return false;
   }
 
@@ -203,32 +168,14 @@ constexpr Mode Mode::From(const fuchsia_hardware_display_types::wire::Mode& fidl
 }
 
 // static
-constexpr Mode Mode::From(const display_timing_t& banjo_timing) {
-  DebugAssertIsValid(banjo_timing);
-
-  const Dimensions active_area = Dimensions::From(
-      size_u_t{.width = banjo_timing.h_addressable, .height = banjo_timing.v_addressable});
-
-  // The active area is at most `Dimensions::kMaxWidth` x
-  // `Dimensions::kMaxHeight`, so the number of pixels in the active area is at
-  // most std::pow(2, 32).
-  const int64_t active_area_pixels = int64_t{active_area.width()} * active_area.height();
-
-  // The multiplication does not overflow (causing UB) because the
-  // display stack limitations checked in DebugAssertIsValid() guarantee that
-  // the product is at most 2^52.
-  const int64_t pixel_clock_millihertz = banjo_timing.pixel_clock_hz * 1'000;
-
-  // The cast does not overflow (causing UB) because the display
-  // stack limitations checked in DebugAssertIsValid() guarantee
-  // that the rate is at most `kMaxRefreshRateMillihertz`.
-  const int32_t refresh_rate_millihertz =
-      static_cast<int32_t>(pixel_clock_millihertz / active_area_pixels);
+constexpr Mode Mode::From(const display_mode_t& banjo_mode) {
+  DebugAssertIsValid(banjo_mode);
+  const Dimensions active_area = Dimensions::From(banjo_mode.active_area);
 
   return Mode({
       .active_width = active_area.width(),
       .active_height = active_area.height(),
-      .refresh_rate_millihertz = refresh_rate_millihertz,
+      .refresh_rate_millihertz = static_cast<int32_t>(banjo_mode.refresh_rate_millihertz),
   });
 }
 
@@ -249,31 +196,13 @@ constexpr fuchsia_hardware_display_types::wire::Mode Mode::ToFidl() const {
   };
 }
 
-constexpr display_timing_t Mode::ToBanjo() const {
-  const size_u_t banjo_active_area = active_area_.ToBanjo();
+constexpr display_mode_t Mode::ToBanjo() const {
+  return display_mode_t{
+      .active_area = active_area_.ToBanjo(),
 
-  // The active area is at most `Dimensions::kMaxWidth` x
-  // `Dimensions::kMaxHeight`, so the number of pixels in the active area is at
-  // most std::pow(2, 32).
-  const int64_t active_area_pixels = int64_t{active_area_.width()} * active_area_.height();
-
-  // The multiplication does not overflow (causing UB) because
-  // `active_area_pixels` is at most std::pow(2, 32) and
-  // `kMaxRefreshRateMillihertz` is less than std::pow(2, 20), so the product is
-  // less than std::pow(2, 52).
-  const int64_t pixel_clock_millihertz = active_area_pixels * refresh_rate_millihertz_;
-
-  return display_timing_t{
-      .pixel_clock_hz = pixel_clock_millihertz / 1'000,
-      .h_addressable = banjo_active_area.width,
-      .h_front_porch = 0,
-      .h_sync_pulse = 0,
-      .h_blanking = 0,
-      .v_addressable = banjo_active_area.height,
-      .v_front_porch = 0,
-      .v_sync_pulse = 0,
-      .v_blanking = 0,
-      .flags = 0,
+      // This cast does not cause UB because the refresh rate must be
+      // non-negative.
+      .refresh_rate_millihertz = static_cast<uint32_t>(refresh_rate_millihertz_),
   };
 }
 
@@ -300,40 +229,15 @@ constexpr void Mode::DebugAssertIsValid(
 }
 
 // static
-constexpr void Mode::DebugAssertIsValid(const display_timing_t& banjo_timing) {
-  const size_u_t banjo_active_area = {
-      .width = banjo_timing.h_addressable,
-      .height = banjo_timing.v_addressable,
-  };
-  ZX_DEBUG_ASSERT(Dimensions::IsValid(banjo_active_area));
-  const Dimensions active_area = Dimensions::From(banjo_active_area);
+constexpr void Mode::DebugAssertIsValid(const display_mode_t& banjo_mode) {
+  ZX_DEBUG_ASSERT(Dimensions::IsValid(banjo_mode.active_area));
+  const Dimensions active_area = Dimensions::From(banjo_mode.active_area);
   ZX_DEBUG_ASSERT(!active_area.IsEmpty());
 
-  ZX_DEBUG_ASSERT(banjo_timing.h_front_porch == 0);
-  ZX_DEBUG_ASSERT(banjo_timing.h_sync_pulse == 0);
-  ZX_DEBUG_ASSERT(banjo_timing.h_blanking == 0);
-  ZX_DEBUG_ASSERT(banjo_timing.v_front_porch == 0);
-  ZX_DEBUG_ASSERT(banjo_timing.v_sync_pulse == 0);
-  ZX_DEBUG_ASSERT(banjo_timing.v_blanking == 0);
+  ZX_DEBUG_ASSERT(banjo_mode.refresh_rate_millihertz > 0);
+  ZX_DEBUG_ASSERT(banjo_mode.refresh_rate_millihertz <= kMaxRefreshRateMillihertz);
 
-  ZX_DEBUG_ASSERT(banjo_timing.flags == 0);
-
-  ZX_DEBUG_ASSERT(banjo_timing.pixel_clock_hz > 0);
-
-  // The active area is at most `Dimensions::kMaxWidth` x
-  // `Dimensions::kMaxHeight`, so the number of pixels in the active area is at
-  // most std::pow(2, 32).
-  const int64_t active_area_pixels = int64_t{active_area.width()} * active_area.height();
-
-  // The multiplication does not overflow (causing UB) because
-  // `active_area_pixels` is at most std::pow(2, 32) and
-  // `kMaxRefreshRateMillihertz` is less than std::pow(2, 20), so the product is
-  // less than std::pow(2, 52).
-  const int64_t max_pixel_clock_millihertz = active_area_pixels * kMaxRefreshRateMillihertz;
-
-  ZX_DEBUG_ASSERT_MSG(banjo_timing.pixel_clock_hz <= max_pixel_clock_millihertz,
-                      "Pixel clock %" PRId64 " mHz exceeds the maximum %" PRId64 " mHz",
-                      banjo_timing.pixel_clock_hz, max_pixel_clock_millihertz);
+  ZX_DEBUG_ASSERT(banjo_mode.flags == 0);
 }
 
 }  // namespace display

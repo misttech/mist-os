@@ -71,18 +71,24 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
                         "it was not supposed to allocate at all");
   }
 
-  fbl::Vector<display_timing_t> banjo_display_modes;
+  fbl::Vector<display::Mode> preferred_modes;
   if (banjo_display_info.preferred_modes_count != 0) {
-    banjo_display_modes.reserve(banjo_display_info.preferred_modes_count, &alloc_checker);
+    preferred_modes.reserve(banjo_display_info.preferred_modes_count, &alloc_checker);
     if (!alloc_checker.check()) {
       fdf::error("AddedDisplayInfo creation failed: out of memory allocating display modes");
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     for (size_t i = 0; i < banjo_display_info.preferred_modes_count; ++i) {
       ZX_DEBUG_ASSERT_MSG(
-          banjo_display_modes.size() < banjo_display_info.preferred_modes_count,
+          preferred_modes.size() < banjo_display_info.preferred_modes_count,
           "The push_back() below was not supposed to allocate memory, but it might");
-      banjo_display_modes.push_back(banjo_display_info.preferred_modes_list[i], &alloc_checker);
+      const display_mode_t& banjo_preferred_mode = banjo_display_info.preferred_modes_list[i];
+      if (!display::Mode::IsValid(banjo_preferred_mode)) {
+        fdf::error("AddedDisplayInfo creation failed: invalid preferred mode #{} for display ID {}",
+                   i, display_id.value());
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      preferred_modes.push_back(display::Mode::From(banjo_preferred_mode), &alloc_checker);
       ZX_DEBUG_ASSERT_MSG(alloc_checker.check(),
                           "The push_back() above failed to allocate memory; "
                           "it was not supposed to allocate at all");
@@ -99,7 +105,7 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
       .display_id = display_id,
       .edid_bytes = std::move(edid_bytes),
       .pixel_formats = std::move(pixel_formats),
-      .banjo_preferred_modes = std::move(banjo_display_modes),
+      .preferred_modes = std::move(preferred_modes),
   };
   return zx::ok(std::move(display_info));
 }

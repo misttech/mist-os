@@ -163,10 +163,10 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
   //
   // Dropping some add events can result in spurious removes, but
   // those are filtered out in the clients.
-  if (!display_info->timings.is_empty()) {
+  if (!display_info->preferred_modes.is_empty() || !display_info->timings.is_empty()) {
     display_info->InitializeInspect(&root_);
   } else {
-    fdf::warn("Ignoring display with no usable display timings");
+    fdf::warn("Ignoring display with no usable display preferred modes nor display timings");
     added_ids = {};
   }
 
@@ -597,6 +597,20 @@ void Controller::OnClientDead(ClientProxy* client) {
 
   clients_.remove_if(
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
+}
+
+zx::result<std::span<const display::Mode>> Controller::GetDisplayPreferredModes(
+    display::DisplayId display_id) {
+  if (unbinding_) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  auto displays_it = displays_.find(display_id);
+  if (!displays_it.IsValid()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  const DisplayInfo& display_info = *displays_it;
+  return zx::ok(std::span(display_info.preferred_modes));
 }
 
 zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTimings(

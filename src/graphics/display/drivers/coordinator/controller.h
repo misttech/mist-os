@@ -117,9 +117,16 @@ class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
   void ReleaseImage(display::DriverImageId driver_image_id);
   void ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id);
 
-  // On success, the span of DisplayTiming objects is guaranteed to be
-  // non-empty.
+  // The display modes are guaranteed to be valid as long as the display with
+  // `display_id` is valid.
   //
+  // For a valid display, it's guaranteed that at least one of
+  // `GetDisplayPreferredModes()` and `GetDisplayTimings()` is non-empty.
+  //
+  // `mtx()` must be held for as long as the return value is retained.
+  zx::result<std::span<const display::Mode>> GetDisplayPreferredModes(display::DisplayId display_id)
+      __TA_REQUIRES(mtx());
+
   // The display timings are guaranteed to be valid as long as the display with
   // `display_id` is valid.
   //

@@ -14,6 +14,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace display_coordinator {
@@ -50,12 +51,7 @@ struct AddedDisplayInfo {
   fbl::Vector<display::PixelFormat> pixel_formats;
 
   // Empty if no preferred modes are provided.
-  //
-  // This data member uses a Banjo-generated type because the display::Mode
-  // equivalent does not convey detailed timing information. We will be able to
-  // remove this Banjo dependency once we move detailed timing information
-  // management to engine / panel drivers.
-  fbl::Vector<display_timing_t> banjo_preferred_modes;
+  fbl::Vector<display::Mode> preferred_modes;
 };
 
 }  // namespace display_coordinator

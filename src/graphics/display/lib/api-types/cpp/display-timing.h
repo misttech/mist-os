@@ -445,7 +445,7 @@ fuchsia_hardware_display_engine::wire::DisplayTiming ToFidlDisplayTiming(
     const DisplayTiming& display_timing);
 
 constexpr bool IsFidlDisplayTimingValid(
-    const fuchsia_hardware_display_engine::wire::DisplayTiming& display_mode) {
+    const fuchsia_hardware_display_engine::wire::DisplayTiming& display_timing) {
   // The "< 0" checks are always true for uint32_t members in the
   // `DisplayTiming` struct and will be eventually optimized by the compiler.
   //
@@ -453,78 +453,78 @@ constexpr bool IsFidlDisplayTimingValid(
   // definitions in `DisplayTiming` and they make it easier for readers to
   // reason about the code without checking the types of each struct member.
 
-  if (display_mode.pixel_clock_hz < 0) {
+  if (display_timing.pixel_clock_hz < 0) {
     return false;
   }
-  if (display_mode.pixel_clock_hz > kMaxPixelClockHz) {
+  if (display_timing.pixel_clock_hz > kMaxPixelClockHz) {
     return false;
   }
-  if (display_mode.h_addressable < 0) {
+  if (display_timing.h_addressable < 0) {
     return false;
   }
-  if (display_mode.h_addressable > kMaxTimingValue) {
+  if (display_timing.h_addressable > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.h_front_porch < 0) {
+  if (display_timing.h_front_porch < 0) {
     return false;
   }
-  if (display_mode.h_front_porch > kMaxTimingValue) {
+  if (display_timing.h_front_porch > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.h_sync_pulse < 0) {
+  if (display_timing.h_sync_pulse < 0) {
     return false;
   }
-  if (display_mode.h_sync_pulse > kMaxTimingValue) {
+  if (display_timing.h_sync_pulse > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.h_blanking < display_mode.h_front_porch) {
+  if (display_timing.h_blanking < display_timing.h_front_porch) {
     return false;
   }
-  if (display_mode.h_blanking < display_mode.h_sync_pulse) {
+  if (display_timing.h_blanking < display_timing.h_sync_pulse) {
     return false;
   }
-  if (display_mode.h_blanking - display_mode.h_front_porch < display_mode.h_sync_pulse) {
+  if (display_timing.h_blanking - display_timing.h_front_porch < display_timing.h_sync_pulse) {
     return false;
   }
-  if (display_mode.h_blanking - display_mode.h_front_porch - display_mode.h_sync_pulse >
+  if (display_timing.h_blanking - display_timing.h_front_porch - display_timing.h_sync_pulse >
       kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_addressable < 0) {
+  if (display_timing.v_addressable < 0) {
     return false;
   }
-  if (display_mode.v_addressable > kMaxTimingValue) {
+  if (display_timing.v_addressable > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_front_porch < 0) {
+  if (display_timing.v_front_porch < 0) {
     return false;
   }
-  if (display_mode.v_front_porch > kMaxTimingValue) {
+  if (display_timing.v_front_porch > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_sync_pulse < 0) {
+  if (display_timing.v_sync_pulse < 0) {
     return false;
   }
-  if (display_mode.v_sync_pulse > kMaxTimingValue) {
+  if (display_timing.v_sync_pulse > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_blanking < display_mode.v_front_porch) {
+  if (display_timing.v_blanking < display_timing.v_front_porch) {
     return false;
   }
-  if (display_mode.v_blanking < display_mode.v_sync_pulse) {
+  if (display_timing.v_blanking < display_timing.v_sync_pulse) {
     return false;
   }
-  if (display_mode.v_blanking - display_mode.v_front_porch < display_mode.v_sync_pulse) {
+  if (display_timing.v_blanking - display_timing.v_front_porch < display_timing.v_sync_pulse) {
     return false;
   }
-  if (display_mode.v_blanking - display_mode.v_front_porch - display_mode.v_sync_pulse >
+  if (display_timing.v_blanking - display_timing.v_front_porch - display_timing.v_sync_pulse >
       kMaxTimingValue) {
     return false;
   }
   return true;
 }
 
-constexpr bool IsBanjoDisplayTimingValid(const display_timing_t& display_mode) {
+constexpr bool IsBanjoDisplayTimingValid(const display_timing_t& display_timing) {
   // The "< 0" checks are always true for uint32_t members in the
   // `DisplayTiming` struct and will be eventually optimized by the compiler.
   //
@@ -532,66 +532,66 @@ constexpr bool IsBanjoDisplayTimingValid(const display_timing_t& display_mode) {
   // definitions in `DisplayTiming` and they make it easier for readers to
   // reason about the code without checking the types of each struct member.
 
-  if (display_mode.pixel_clock_hz < 0) {
+  if (display_timing.pixel_clock_hz < 0) {
     return false;
   }
-  if (display_mode.pixel_clock_hz > kMaxPixelClockHz) {
+  if (display_timing.pixel_clock_hz > kMaxPixelClockHz) {
     return false;
   }
-  if (display_mode.h_addressable < 0) {
+  if (display_timing.h_addressable < 0) {
     return false;
   }
-  if (display_mode.h_addressable > kMaxTimingValue) {
+  if (display_timing.h_addressable > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.h_front_porch < 0) {
+  if (display_timing.h_front_porch < 0) {
     return false;
   }
-  if (display_mode.h_front_porch > kMaxTimingValue) {
+  if (display_timing.h_front_porch > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.h_sync_pulse < 0) {
+  if (display_timing.h_sync_pulse < 0) {
     return false;
   }
-  if (display_mode.h_sync_pulse > kMaxTimingValue) {
+  if (display_timing.h_sync_pulse > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.h_blanking < display_mode.h_front_porch + display_mode.h_sync_pulse) {
+  if (display_timing.h_blanking < display_timing.h_front_porch + display_timing.h_sync_pulse) {
     return false;
   }
-  if (display_mode.h_blanking - (display_mode.h_front_porch + display_mode.h_sync_pulse) >
+  if (display_timing.h_blanking - (display_timing.h_front_porch + display_timing.h_sync_pulse) >
       kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_addressable < 0) {
+  if (display_timing.v_addressable < 0) {
     return false;
   }
-  if (display_mode.v_addressable > kMaxTimingValue) {
+  if (display_timing.v_addressable > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_front_porch < 0) {
+  if (display_timing.v_front_porch < 0) {
     return false;
   }
-  if (display_mode.v_front_porch > kMaxTimingValue) {
+  if (display_timing.v_front_porch > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_sync_pulse < 0) {
+  if (display_timing.v_sync_pulse < 0) {
     return false;
   }
-  if (display_mode.v_sync_pulse > kMaxTimingValue) {
+  if (display_timing.v_sync_pulse > kMaxTimingValue) {
     return false;
   }
-  if (display_mode.v_blanking < display_mode.v_front_porch + display_mode.v_sync_pulse) {
+  if (display_timing.v_blanking < display_timing.v_front_porch + display_timing.v_sync_pulse) {
     return false;
   }
-  if (display_mode.v_blanking - (display_mode.v_front_porch + display_mode.v_sync_pulse) >
+  if (display_timing.v_blanking - (display_timing.v_front_porch + display_timing.v_sync_pulse) >
       kMaxTimingValue) {
     return false;
   }
   constexpr uint32_t kFlagMask = MODE_FLAG_VSYNC_POSITIVE | MODE_FLAG_HSYNC_POSITIVE |
                                  MODE_FLAG_INTERLACED | MODE_FLAG_ALTERNATING_VBLANK |
                                  MODE_FLAG_DOUBLE_CLOCKED;
-  if ((display_mode.flags & (~kFlagMask)) != 0u) {
+  if ((display_timing.flags & (~kFlagMask)) != 0u) {
     return false;
   }
   return true;

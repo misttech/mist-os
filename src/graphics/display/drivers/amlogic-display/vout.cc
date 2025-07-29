@@ -46,6 +46,17 @@ constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
     .hpd = true,
 };
 
+display::Mode ToDisplayMode(const display::DisplayTiming& timing) {
+  int32_t active_width = timing.horizontal_active_px;
+  int32_t active_height = timing.vertical_active_lines;
+  int32_t refresh_rate_millihertz = timing.vertical_field_refresh_rate_millihertz();
+  return display::Mode({
+      .active_width = active_width,
+      .active_height = active_height,
+      .refresh_rate_millihertz = refresh_rate_millihertz,
+  });
+}
+
 }  // namespace
 
 Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock,
@@ -57,7 +68,7 @@ Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock,
           .dsi_host = std::move(dsi_host),
           .clock = std::move(dsi_clock),
           .panel_config = *panel_config,
-          .banjo_display_timing = display::ToBanjoDisplayTiming(panel_config->display_timing),
+          .banjo_mode = ToDisplayMode(panel_config->display_timing).ToBanjo(),
       } {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
   node_.RecordInt("vout_type", static_cast<int>(type()));
@@ -165,7 +176,7 @@ raw_display_info_t Vout::CreateRawDisplayInfo(
     case VoutType::kDsi: {
       return raw_display_info_t{
           .display_id = display_id.ToBanjo(),
-          .preferred_modes_list = &dsi_.banjo_display_timing,
+          .preferred_modes_list = &dsi_.banjo_mode,
           .preferred_modes_count = 1,
           .edid_bytes_list = nullptr,
           .edid_bytes_count = 0,

@@ -31,10 +31,10 @@
 
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
-#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 
 namespace goldfish {
 namespace {
@@ -116,32 +116,16 @@ void DisplayEngine::DisplayEngineCompleteCoordinatorConnection(
   const int32_t height = primary_display_device_.height_px;
   const int32_t refresh_rate_hz = primary_display_device_.refresh_rate_hz;
 
-  const int64_t pixel_clock_hz = int64_t{width} * height * refresh_rate_hz;
-  ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
-  ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
-
-  const display::DisplayTiming timing = {
-      .horizontal_active_px = width,
-      .horizontal_front_porch_px = 0,
-      .horizontal_sync_width_px = 0,
-      .horizontal_back_porch_px = 0,
-      .vertical_active_lines = height,
-      .vertical_front_porch_lines = 0,
-      .vertical_sync_width_lines = 0,
-      .vertical_back_porch_lines = 0,
-      .pixel_clock_frequency_hz = pixel_clock_hz,
-      .fields_per_frame = display::FieldsPerFrame::kProgressive,
-      .hsync_polarity = display::SyncPolarity::kNegative,
-      .vsync_polarity = display::SyncPolarity::kNegative,
-      .vblank_alternates = false,
-      .pixel_repetition = 0,
-  };
-
-  const display_timing_t banjo_display_timing = display::ToBanjoDisplayTiming(timing);
+  const display::Mode mode = {{
+      .active_width = width,
+      .active_height = height,
+      .refresh_rate_millihertz = refresh_rate_hz * 1'000,
+  }};
+  const display_mode_t banjo_display_mode = mode.ToBanjo();
 
   const raw_display_info_t banjo_display_info = {
       .display_id = kPrimaryDisplayId.ToBanjo(),
-      .preferred_modes_list = &banjo_display_timing,
+      .preferred_modes_list = &banjo_display_mode,
       .preferred_modes_count = 1,
       .edid_bytes_list = nullptr,
       .edid_bytes_count = 0,

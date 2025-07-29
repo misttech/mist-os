@@ -65,6 +65,13 @@ type ConfigStamp = struct {
     value uint64;
 };
 
+/// Equivalent to [`fuchsia.hardware.display.types/Mode`].
+type DisplayMode = struct {
+    active_area SizeU;
+    refresh_rate_millihertz uint32;
+    flags uint32;
+};
+
 // An E-EDID can contain up to 256 data blocks, each of which contains 128
 // bytes. So it can contain up to 256 * 128 = 32768 bytes of data.
 const MAX_COUNT_EDID_BYTES uint32 = 32768;
@@ -94,7 +101,7 @@ type RawDisplayInfo = resource struct {
     /// only supported operational mode in this member. Drivers that support
     /// seamless display handoff from a bootloader report the display's initial
     /// mode in this member.
-    preferred_modes vector<DisplayTiming>:MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES;
+    preferred_modes vector<DisplayMode>:MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES;
 
     /// Display capabilities, encoded using the E-EDID standard.
     ///
