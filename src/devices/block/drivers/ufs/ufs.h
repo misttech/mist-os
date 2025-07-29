@@ -163,6 +163,7 @@ class Ufs : public fdf::DriverBase,
 
   Ufs(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
+        hardware_power_element_runner_server_(*this),
         config_(take_config<ufs_config::Config>()) {}
   ~Ufs() override = default;
 
@@ -301,20 +302,39 @@ class Ufs : public fdf::DriverBase,
   zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireLease(
       const fidl::WireSyncClient<fuchsia_power_broker::Lessor> &lessor_client);
 
-  // Informs Power Broker of the updated |power_level| via the supplied |current_level_client|.
-  void UpdatePowerLevel(
-      const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> &current_level_client,
-      fuchsia_power_broker::PowerLevel power_level);
+  // Adjusts the hardware power level in response to SetLevel calls from the Power Broker.
+  class HardwareElementRunner : public fidl::Server<fuchsia_power_broker::ElementRunner> {
+   public:
+    explicit HardwareElementRunner(Ufs &p) : parent_(p) {}
+    void SetLevel(fuchsia_power_broker::ElementRunnerSetLevelRequest &request,
+                  SetLevelCompleter::Sync &completer) override;
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+        fidl::UnknownMethodCompleter::Sync &completer) override;
 
-  // Watches the required hardware power level and adjusts it accordingly. Also serves requests that
-  // were delayed because they were received during suspended state. Communicates power level
-  // transitions to the Power Broker.
-  void WatchHardwareRequiredLevel();
+   private:
+    Ufs &parent_;
+  };
 
-  // Watches the required wake-on-request power level and replies to the Power Broker accordingly.
-  // Does not directly effect any real power level change of storage hardware. (That happens in
-  // WatchHardwareRequiredLevel().)
-  void WatchWakeOnRequestRequiredLevel();
+  HardwareElementRunner hardware_power_element_runner_server_;
+  std::optional<fidl::ServerBinding<fuchsia_power_broker::ElementRunner>>
+      hardware_power_element_runner_server_binding_;
+
+  // Responds to wake-on-request power level changes from the Power Broker. Does not directly
+  // affect any real power level change of storage hardware. That happens in
+  // HardwareElementRunner::SetLevel().
+  class WakeOnRequestElementRunner : public fidl::Server<fuchsia_power_broker::ElementRunner> {
+   public:
+    void SetLevel(fuchsia_power_broker::ElementRunnerSetLevelRequest &request,
+                  SetLevelCompleter::Sync &completer) override;
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+        fidl::UnknownMethodCompleter::Sync &completer) override;
+  };
+
+  WakeOnRequestElementRunner wake_on_request_element_runner_server_;
+  std::optional<fidl::ServerBinding<fuchsia_power_broker::ElementRunner>>
+      wake_on_request_element_runner_server_binding_;
 
   void Serve(fidl::ServerEnd<fuchsia_hardware_ufs::Ufs> server);
 
@@ -407,15 +427,11 @@ class Ufs : public fdf::DriverBase,
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
-  fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
   zx::event hardware_power_assertive_token_;
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl>
       wake_on_request_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
-  fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
 
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
 

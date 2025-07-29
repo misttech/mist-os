@@ -110,7 +110,11 @@ TEST_F(PowerTest, PowerSuspendResume) {
 
   // Return the driver to the suspended state.
   driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
-    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
+    env.power_broker()
+        .hardware_power_element_runner_client_->SetLevel({Ufs::kPowerLevelOff})
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
 
   EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
@@ -139,7 +143,11 @@ TEST_F(PowerTest, PowerSuspendResume) {
   // 3. Trigger power level change to kPowerLevelOn.
   awake_complete.Reset();
   driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
-    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOn;
+    env.power_broker()
+        .hardware_power_element_runner_client_->SetLevel({Ufs::kPowerLevelOn})
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
 
   EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { awake_complete.Wait(); }));
@@ -168,7 +176,11 @@ TEST_F(PowerTest, PowerSuspendResume) {
   // 4. Trigger power level change to kPowerLevelOff.
   sleep_complete.Reset();
   driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
-    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
+    env.power_broker()
+        .hardware_power_element_runner_client_->SetLevel({Ufs::kPowerLevelOff})
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
 
   EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
@@ -249,7 +261,11 @@ TEST_F(PowerTest, BackgroundOperations) {
   // 2. Background Operation is enabled at power on
   awake_complete.Reset();
   driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
-    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOn;
+    env.power_broker()
+        .hardware_power_element_runner_client_->SetLevel({Ufs::kPowerLevelOn})
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
   EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { awake_complete.Wait(); }));
 
@@ -322,7 +338,11 @@ TEST_F(PowerTest, BackgroundOperations) {
   // 4. Background Operation is disabled at power off
   sleep_complete.Reset();
   driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
-    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
+    env.power_broker()
+        .hardware_power_element_runner_client_->SetLevel({Ufs::kPowerLevelOff})
+        .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          EXPECT_TRUE(result.is_ok());
+        });
   });
   EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
 
