@@ -88,7 +88,13 @@ extern "C" {
 #define UBSAN_HANDLER [[gnu::used, gnu::noinline]] inline void
 
 UBSAN_HANDLER __ubsan_handle_nonnull_arg(NonNullArgData* Data) {
-  Report failure("NULL ARG passed to NonNullarg parameter.", Data->Loc);
+  Report failure("NULL ARG passed to NonNullarg parameter, specified by nonnull attribute.",
+                 Data->Loc);
+}
+
+UBSAN_HANDLER __ubsan_handle_nullability_arg(NonNullArgData* Data) {
+  Report failure("NULL ARG passed to NonNullarg parameter, specified by _Nonnull type annotation.",
+                 Data->Loc);
 }
 
 UBSAN_HANDLER __ubsan_handle_type_mismatch_v1(TypeMismatchData* Data, ValueHandle Pointer) {
@@ -227,7 +233,6 @@ __ubsan_handle_vla_bound_not_positive(VLABoundData* Data, ValueHandle Bound) {
 }
 
 // TODO(https://fxbug.dev/42056251): Add missing handlers:
-// * nullability_arg
 // * cfi_check_fail
 // * cfi_bad_type
 
