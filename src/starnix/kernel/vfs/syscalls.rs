@@ -59,6 +59,9 @@ use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
     __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params,
     io_uring_register_op_IORING_REGISTER_BUFFERS as IORING_REGISTER_BUFFERS,
+    io_uring_register_op_IORING_REGISTER_IOWQ_MAX_WORKERS as IORING_REGISTER_IOWQ_MAX_WORKERS,
+    io_uring_register_op_IORING_REGISTER_PBUF_RING as IORING_REGISTER_PBUF_RING,
+    io_uring_register_op_IORING_REGISTER_RING_FDS as IORING_REGISTER_RING_FDS,
     io_uring_register_op_IORING_UNREGISTER_BUFFERS as IORING_UNREGISTER_BUFFERS, iocb, off_t,
     pid_t, pollfd, pselect6_sigmask, sigset_t, statx, timespec, uapi, uid_t, AT_EACCESS,
     AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
@@ -3278,7 +3281,39 @@ pub fn sys_io_uring_register(
             io_uring.unregister_buffers();
             return Ok(SUCCESS);
         }
-        _ => return error!(EINVAL),
+        IORING_REGISTER_IOWQ_MAX_WORKERS => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register IORING_REGISTER_IOWQ_MAX_WORKERS",
+                opcode
+            );
+            return error!(EINVAL);
+        }
+        IORING_REGISTER_RING_FDS => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register IORING_REGISTER_RING_FDS",
+                opcode
+            );
+            return error!(EINVAL);
+        }
+        IORING_REGISTER_PBUF_RING => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register IORING_REGISTER_PBUF_RING",
+                opcode
+            );
+            return error!(EINVAL);
+        }
+
+        _ => {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_register unknown op",
+                opcode
+            );
+            return error!(EINVAL);
+        }
     }
 }
 
