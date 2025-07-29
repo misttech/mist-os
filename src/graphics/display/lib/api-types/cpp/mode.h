@@ -14,6 +14,11 @@
 
 #include "src/graphics/display/lib/api-types/cpp/dimensions.h"
 
+#if __cplusplus >= 202002L
+#include <format>
+#include <string_view>
+#endif
+
 namespace display {
 
 // Equivalent to the FIDL type [`fuchsia.hardware.display.types/Mode`].
@@ -332,5 +337,17 @@ constexpr void Mode::DebugAssertIsValid(const display_timing_t& banjo_timing) {
 }
 
 }  // namespace display
+
+#if __cplusplus >= 202002L
+template <>
+struct std::formatter<display::Mode> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const display::Mode& mode, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}x{} @ {}.{:03} Hz", mode.active_area().width(),
+                          mode.active_area().height(), mode.refresh_rate_millihertz() / 1000,
+                          mode.refresh_rate_millihertz() % 1000);
+  }
+};
+#endif
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_MODE_H_

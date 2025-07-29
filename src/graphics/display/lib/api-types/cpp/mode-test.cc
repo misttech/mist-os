@@ -357,6 +357,13 @@ TEST(ModeTest, IsValidBanjoNonZeroFlags) {
   }));
 }
 
+TEST(ModeTest, Format) {
+#if __cplusplus >= 202002L
+  EXPECT_EQ(std::format("{}", kVga60Fps), "640x480 @ 60.000 Hz");
+  EXPECT_EQ(std::format("{}", kQvga30Fps), "240x320 @ 30.000 Hz");
+#endif
+}
+
 }  // namespace
 
 }  // namespace display
