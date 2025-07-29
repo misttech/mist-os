@@ -46,8 +46,14 @@ pub async fn forward_to_agent(socket: DebugAgentSocket) -> Result<()> {
     let mut sigint_buf = [0u8; 4];
 
     futures::select! {
-        res = sigterm_receiver.read(&mut sigterm_buf).fuse() => res?,
-        res = sigint_receiver.read(&mut sigint_buf).fuse() => res?,
+        res = sigterm_receiver.read(&mut sigterm_buf).fuse() => {
+            eprintln!("Got sigterm!");
+            res?
+        },
+        res = sigint_receiver.read(&mut sigint_buf).fuse() => {
+            eprintln!("Got sigint!");
+            res?
+        },
     };
 
     Ok(())
