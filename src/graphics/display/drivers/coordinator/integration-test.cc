@@ -729,7 +729,7 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
 }
 
 zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
-  return zx::make_result(coordinator_fidl_client_->SetVsyncEventDelivery(true).status());
+  return zx::make_result(coordinator_fidl_client_->EnableVsyncEventDelivery().status());
 }
 
 zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
@@ -1125,8 +1125,7 @@ class IntegrationTest : public TestBase {
                   "The display owner changed while holding the controller mutex");
     EXPECT_OK(
         sync_completion_wait(client_proxy->FidlUnboundCompletionForTesting(), zx::sec(1).get()));
-    // SetVsyncEventDelivery(false) has not completed here, because we are still
-    // holding controller()->mtx()
+    // Teardown has not completed here, because we are still holding controller()->mtx()
     client_proxy->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
   }
 

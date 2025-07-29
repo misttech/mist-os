@@ -185,7 +185,7 @@ impl DisplayCoordinator {
             }
         };
         fasync::Task::local(f).detach();
-        coordinator.set_vsync_event_delivery(true).context("enable_vsync failed")?;
+        coordinator.enable_vsync_event_delivery().context("enable_vsync failed")?;
 
         Ok(Self { coordinator: Rc::new(coordinator) })
     }

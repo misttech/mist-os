@@ -134,8 +134,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void ApplyConfig3(ApplyConfig3RequestView request,
                     ApplyConfig3Completer::Sync& _completer) override;
   void GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& _completer) override;
-  void SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
-                             SetVsyncEventDeliveryCompleter::Sync& _completer) override;
+  void EnableVsyncEventDelivery(EnableVsyncEventDeliveryCompleter::Sync& _completer) override;
   void SetVirtconMode(SetVirtconModeRequestView request,
                       SetVirtconModeCompleter::Sync& _completer) override;
   void ImportBufferCollection(ImportBufferCollectionRequestView request,

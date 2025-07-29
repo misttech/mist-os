@@ -233,21 +233,6 @@ void ImagePipeSurfaceDisplay::ControllerOnVsync(
       events_to_signal.push_back(std::move(pending_release_fences_.front().release_fence));
       pending_release_fences_.pop();
     }
-
-    const bool should_disable_vsyncs = pending_release_fences_.empty() ||
-                                       last_applied_config_stamp_ == applied_config_stamp.value();
-    if (should_disable_vsyncs) {
-      receiving_vsyncs_ = false;
-
-      OneWayResult result = display_coordinator_->SetVsyncEventDelivery(false);
-      if (result.is_error()) {
-        // We're probably irrevocably broken at this point, but this can't hurt.
-        receiving_vsyncs_ = true;
-
-        fprintf(stderr, "%s: SetVsyncEventDelivery(false) failed: %s\n", kTag,
-                result.error_value().FormatDescription().c_str());
-      }
-    }
   }
 
   // Signal the events accumulated above.
@@ -805,12 +790,12 @@ void ImagePipeSurfaceDisplay::PresentImage(
 
     if (should_enable_vsyncs) {
       receiving_vsyncs_ = true;
-      OneWayResult result = display_coordinator_->SetVsyncEventDelivery(true);
+      OneWayResult result = display_coordinator_->EnableVsyncEventDelivery();
       if (result.is_error()) {
         // We're probably irrevocably broken at this point, but this can't hurt.
         receiving_vsyncs_ = false;
 
-        fprintf(stderr, "%s: SetVsyncEventDelivery(true) failed: %s\n", kTag,
+        fprintf(stderr, "%s: EnableVsyncEventDelivery() failed: %s\n", kTag,
                 result.error_value().FormatDescription().c_str());
       }
     }

@@ -132,7 +132,7 @@ TEST_F(ClientProxyTest, ClientVSyncDelivery) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.SetVsyncEventDelivery(true);
+  clientproxy.EnableVsyncEventDelivery();
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
       .driver_stamp = kDriverStampValue,
@@ -181,7 +181,7 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.SetVsyncEventDelivery(true);
+  clientproxy.EnableVsyncEventDelivery();
   fbl::AutoLock lock(controller.mtx());
   listener_client_end.reset();
   clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
@@ -227,7 +227,7 @@ TEST_F(ClientProxyTest, ClientVSyncDeliveryDisabled) {
   driver_shutdown_completion->Wait();
 }
 
-TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
+TEST_F(ClientProxyTest, ClientVsyncDeliveryDisabledMustDrainPendingStamps) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr size_t kNumPendingStamps = 5;
@@ -255,7 +255,6 @@ TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.SetVsyncEventDelivery(false);
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {
     clientproxy.UpdateConfigStampMapping({

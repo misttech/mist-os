@@ -870,10 +870,9 @@ void Client::GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::S
   completer.Reply(latest_config_stamp_.ToFidl());
 }
 
-void Client::SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
-                                   SetVsyncEventDeliveryCompleter::Sync& /*_completer*/) {
-  TRACE_DURATION("gfx", "Display::Client::SetVsyncEventDelivery");
-  proxy_->SetVsyncEventDelivery(request->vsync_delivery_enabled);
+void Client::EnableVsyncEventDelivery(EnableVsyncEventDeliveryCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::EnableVsyncEventDelivery");
+  proxy_->EnableVsyncEventDelivery();
   // No reply defined.
 }
 
