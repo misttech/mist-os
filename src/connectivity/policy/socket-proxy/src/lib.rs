@@ -17,7 +17,7 @@ use fuchsia_inspect_derive::{Inspect, WithInspect as _};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::StreamExt as _;
-use log::error;
+use log::{error, warn};
 use std::sync::Arc;
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy};
 
@@ -148,7 +148,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         match task {
             BackgroundTask::UpdateDefaultNetworks => proxy.registry.update_default_network().await,
         }
-        .unwrap_or_else(|e| error!("{e:?}"))
+        .unwrap_or_else(|e|
+            // TODO(https://fxbug.dev/434963253): Upgrade to error once clean
+            // shutdown in tests is implemented.
+            warn!("{e:?}"))
     });
 
     futures::future::join(fidl, background_tasks).await;
