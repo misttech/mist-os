@@ -9,7 +9,7 @@ use rand::Rng;
 
 impl_generate! {
     for ftb::Address, ftb_next::Address => rng {
-        Self { x0: rng.gen(), x1: rng.gen(), x2: rng.gen(), x3: rng.gen() }
+        Self { x0: rng.random(), x1: rng.random(), x2: rng.random(), x3: rng.random() }
     }
 }
 
@@ -25,13 +25,13 @@ const TIMEZONE: [&str; 25] = [
 fn generate_date(rng: &mut impl Rng) -> String {
     format!(
         "{}/{}/{}:{}:{}:{} {}",
-        rng.gen_range(1..=28),
-        MONTHS[rng.gen_range(0..12)],
-        rng.gen_range(1970..=2021),
-        rng.gen_range(0..24),
-        rng.gen_range(0..60),
-        rng.gen_range(0..60),
-        TIMEZONE[rng.gen_range(0..25)],
+        rng.random_range(1..=28),
+        MONTHS[rng.random_range(0..12)],
+        rng.random_range(1970..=2021),
+        rng.random_range(0..24),
+        rng.random_range(0..60),
+        rng.random_range(0..60),
+        TIMEZONE[rng.random_range(0..25)],
     )
 }
 
@@ -55,9 +55,9 @@ const PROTOCOLS: [&str; 4] = ["HTTP/1.0", "HTTP/1.1", "HTTP/2", "HTTP/3"];
 fn generate_request(rng: &mut impl Rng) -> String {
     format!(
         "{} {} {}",
-        METHODS[rng.gen_range(0..5)],
-        ROUTES[rng.gen_range(0..7)],
-        PROTOCOLS[rng.gen_range(0..4)],
+        METHODS[rng.random_range(0..5)],
+        ROUTES[rng.random_range(0..7)],
+        PROTOCOLS[rng.random_range(0..4)],
     )
 }
 
@@ -66,11 +66,11 @@ impl_generate! {
         Self {
             address: Generate::generate(rng),
             identity: "-".into(),
-            userid: USERID[rng.gen_range(0..USERID.len())].into(),
+            userid: USERID[rng.random_range(0..USERID.len())].into(),
             date: generate_date(rng),
             request: generate_request(rng),
-            code: CODES[rng.gen_range(0..CODES.len())],
-            size: rng.gen_range(0..100_000_000),
+            code: CODES[rng.random_range(0..CODES.len())],
+            size: rng.random_range(0..100_000_000),
         }
     }
 }
