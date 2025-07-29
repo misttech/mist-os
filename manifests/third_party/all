@@ -143,7 +143,7 @@
              path="third_party/fuchsia-infra-bazel-rules/src"
              remote="https://fuchsia.googlesource.com/fuchsia-infra-bazel-rules"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="53f1f1e23553ca10b23d4b08254fe5ba7625bcca"/>
+             revision="7a6aaba051decf8ccfbc0b811d19f2f5b8dd6e3b"/>
     <project name="third_party/shac-project/checks-cpp"
              path="third_party/shac-project/checks-cpp/src"
              remote="https://fuchsia.googlesource.com/shac-project/checks-cpp"
