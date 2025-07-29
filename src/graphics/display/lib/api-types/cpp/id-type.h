@@ -8,6 +8,10 @@
 #include <functional>
 #include <type_traits>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif  // __cplusplus >= 202002L
+
 namespace display::internal {
 
 // `IdType` traits implementation that works for most display types.
@@ -51,19 +55,22 @@ struct DefaultIdTypeTraits {
 
 // Newtype pattern implementation for integer identifiers.
 //
-// Instances are value types, and support being stored in containers. Copying
-// is supported. The destructor is trivial.
+// Instances are value types, and support being stored in containers. Copying is
+// supported. The destructor is trivial.
 //
 // Instances support incrementing for sequential ID generation.
 //
-// Instances support being used as container keys, by implementing comparison with
-// strict ordering guarantees and a std::hash specialization.
+// Instances support being used as container keys, by implementing comparison
+// with strict ordering guarantees and a std::hash specialization.
+//
+// Instances support being used with std::format(), by delegating to the
+// std::formatter specialization for the underlying value type.
 //
 // This type is a zero-cost abstraction. Compiler optimizations will remove any
 // overhead associated with it.
 //
-// `IdTraits` must be a traits structure with the same type aliases and
-// static methods as `DefaultIdTraits`.
+// `IdTraits` must be a traits structure with the same type aliases and static
+// methods as `DefaultIdTraits`.
 template <typename IdTraits>
 class IdType {
  public:
@@ -191,15 +198,22 @@ constexpr BanjoT DefaultIdTypeTraits<ValueT, FidlT, BanjoT>::ToBanjo(const Value
 
 }  // namespace display::internal
 
-namespace std {
-
 template <typename IdTraits>
-struct hash<display::internal::IdType<IdTraits>> {
+struct std::hash<display::internal::IdType<IdTraits>> {
   size_t operator()(const display::internal::IdType<IdTraits>& id) const noexcept {
     return std::hash<typename IdTraits::ValueType>()(id.value());
   }
 };
 
-}  // namespace std
+#if __cplusplus >= 202002L
+template <typename IdTraits>
+struct std::formatter<display::internal::IdType<IdTraits>>
+    : std::formatter<typename display::internal::IdType<IdTraits>::ValueType> {
+  auto format(const display::internal::IdType<IdTraits>& id, std::format_context& ctx) const {
+    return std::formatter<typename display::internal::IdType<IdTraits>::ValueType>::format(
+        id.value(), ctx);
+  }
+};
+#endif  // __cplusplus >= 202002L
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_ID_TYPE_H_

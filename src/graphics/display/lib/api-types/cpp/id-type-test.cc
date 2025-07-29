@@ -14,6 +14,10 @@
 #include <map>
 #include <unordered_map>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif  // __cplusplus >= 202002L
+
 #include <gtest/gtest.h>
 
 namespace display::internal {
@@ -170,6 +174,14 @@ TEST_F(IdTypeWithBanjoDefaultTraitsTest, PostIncrement) {
   EXPECT_EQ(2u, display_id.value());
   EXPECT_EQ(1u, postincrement_result.value());
 }
+
+#if __cplusplus >= 202002L
+TEST_F(IdTypeWithBanjoDefaultTraitsTest, FormatSpecialization) {
+  EXPECT_EQ("1", std::format("{}", kOne));
+  EXPECT_EQ("2", std::format("{}", kTwo));
+  EXPECT_EQ("0x0002", std::format("{:#06x}", kTwo));
+}
+#endif  // __cplusplus >= 202002L
 
 class IdTypeWithoutBanjoDefaultTraitsTest : public ::testing::Test {
  protected:
