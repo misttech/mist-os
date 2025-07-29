@@ -9,7 +9,8 @@ use crate::security::selinux_hooks::{
     KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs, NO_PERMISSIONS,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
-use crate::task::{CurrentTask, Task};
+use crate::signals::QueuedSignals;
+use crate::task::{CurrentTask, Task, TaskMutableState};
 use crate::vfs::{FsNode, FsStr};
 use crate::TODO_DENY;
 use selinux::{
@@ -23,12 +24,16 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::syslog::SyslogAction;
-use starnix_uapi::{errno, error, rlimit};
+use starnix_uapi::{
+    errno, error, itimerval, rlimit, timeval, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL,
+};
 
-/// Corresponds to the `exec_binprm` function described in the SELinux Notebook.
+/// Resets file descriptor state and resource limits that should not be inherited during an `exec`
+/// domain transition. Next, updates the current task's SID based on the security state of the
+/// resolved executable. Finally, clears any signal state that should not be inherited by the
+/// post-`exec` context.
 ///
-/// Resets state that should not be inherited during an `exec` domain transition. Then updates the
-/// current task's SID based on the security state of the resolved executable.
+/// Corresponds to the `exec_binprm()` function described in the SELinux Notebook.
 pub(in crate::security) fn exec_binprm<L>(
     locked: &mut Locked<L>,
     security_server: &Arc<SecurityServer>,
@@ -42,6 +47,13 @@ pub(in crate::security) fn exec_binprm<L>(
 
     bprm_committing_creds(locked, security_server, current_task, previous_sid, new_sid);
 
+    // Take the write locks on:
+    // - the current task's mutable state (including pending signals)
+    // - the thread group's signal queue
+    // before updating the task's current SID. This ensures that the `bprm_committed_creds`
+    // hook only affects signals that were received under the pre-exec SID.
+    let mut task_mutable_state = current_task.write();
+    let mut thread_group_signal_queue = current_task.thread_group().pending_signals.lock();
     {
         // Commit the new SID to the current task's metadata.
         let mut task_attrs = task_consistent_attrs(current_task);
@@ -54,19 +66,22 @@ pub(in crate::security) fn exec_binprm<L>(
             sockcreate_sid: None,
         };
     }
-
-    // TODO(https://fxbug.dev/378655436): Call the `bprm_committed_creds` hook here once it is implemented.
+    bprm_committed_creds(
+        security_server,
+        current_task,
+        &mut thread_group_signal_queue,
+        &mut task_mutable_state,
+        previous_sid,
+        new_sid,
+    );
 }
 
 /// If the task SID is changing during `exec`, enforces permissions that relate to inheritance of
 /// the calling task's file descriptor access and resource limits by the callee:
 /// 1. Revoke access to any file descriptors that `current_task` is not permitted to access.
 /// 2. Reset resource limits if `current_task` is not permitted to inherit rlimits.
-/// 3. TODO(https://fxbug.dev/378655436): Reset signal state if `current task` is not
-///    permitted to inherit the parent task's signal state? Or should this happen in a separate hook,
-///    `bprm_committed_creds`, after the task SID is updated?
-/// 4. TODO(https://fxbug.dev/331815418): Wake the parent task if waiting on `current_task`.
-///    (Also move this to `bprm_committed_creds`?)
+///
+/// Corresponds to the `bprm_committing_creds()` LSM hook.
 fn bprm_committing_creds<L>(
     locked: &mut Locked<L>,
     security_server: &Arc<SecurityServer>,
@@ -81,6 +96,31 @@ fn bprm_committing_creds<L>(
     }
     close_inaccessible_file_descriptors(security_server, current_task, new_sid);
     maybe_reset_rlimits(locked, security_server, current_task, previous_sid, new_sid);
+}
+
+/// If the task SID is changing during `exec`, resets signal state if `current task` is not
+/// permitted to inherit the parent task's signal state.
+///
+/// Corresponds to the `bprm_committed_creds()` LSM hook.
+fn bprm_committed_creds(
+    security_server: &Arc<SecurityServer>,
+    current_task: &CurrentTask,
+    thread_group_signal_queue: &mut QueuedSignals,
+    task_mutable_state: &mut TaskMutableState,
+    previous_sid: SecurityId,
+    new_sid: SecurityId,
+) {
+    if new_sid == previous_sid {
+        return;
+    }
+    maybe_reset_signal_state(
+        security_server,
+        current_task,
+        thread_group_signal_queue,
+        task_mutable_state,
+        previous_sid,
+        new_sid,
+    );
 }
 
 /// "Closes" file descriptors that `current_task` does not have permission to access by remapping
@@ -183,6 +223,58 @@ fn maybe_reset_rlimits<L>(
             },
         )
     });
+}
+
+/// Checks the `siginh` permission for the current task. If the permission is denied, resets
+/// the current task's signal state.
+fn maybe_reset_signal_state(
+    security_server: &Arc<SecurityServer>,
+    current_task: &CurrentTask,
+    thread_group_signal_queue: &mut QueuedSignals,
+    task_mutable_state: &mut TaskMutableState,
+    previous_sid: SecurityId,
+    new_sid: SecurityId,
+) {
+    let audit_context = current_task.into();
+    let permission_check = security_server.as_permission_check();
+    if check_permission(
+        &permission_check,
+        current_task.kernel(),
+        previous_sid,
+        new_sid,
+        ProcessPermission::SigInh,
+        audit_context,
+    )
+    .is_ok()
+    {
+        // Allow the signal state inheritance that was applied when the current task
+        // was created.
+        return;
+    }
+
+    // Clear itimers.
+    for timer in &[ITIMER_REAL, ITIMER_PROF, ITIMER_VIRTUAL] {
+        current_task
+            .thread_group()
+            .set_itimer(
+                &current_task,
+                *timer,
+                itimerval {
+                    it_value: timeval { tv_sec: 0, tv_usec: 0 },
+                    it_interval: timeval { tv_sec: 0, tv_usec: 0 },
+                },
+            )
+            .unwrap_or_else(|_| panic!("unset itimer {}", timer));
+    }
+
+    // Clear the task-local signal state (except for pending internal Starnix signals).
+    task_mutable_state.signals_mut().reset_to_default();
+
+    // Clear the thread group's pending signals.
+    thread_group_signal_queue.clear();
+
+    // Reset signal dispositions.
+    current_task.thread_group().signal_actions.reset_to_default();
 }
 
 /// Returns `TaskAttrs` for a new `Task`, based on the `current_task` state, and the specified clone
@@ -865,8 +957,9 @@ mod tests {
     use crate::security::exec_binprm;
     use crate::security::selinux_hooks::testing::create_test_executable;
     use crate::security::selinux_hooks::{testing, InitialSid, TaskAttrs};
+    use crate::signals::SignalInfo;
     use crate::testing::create_task;
-    use starnix_uapi::signals::SIGTERM;
+    use starnix_uapi::signals::{SigSet, SIGTERM};
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
     use testing::spawn_kernel_with_selinux_hooks_test_policy_and_run;
 
@@ -1212,6 +1305,75 @@ mod tests {
                         assert_eq!(parent.rlim_max, same_domain.rlim_max);
                     })
                 }
+            },
+        )
+    }
+
+    #[fuchsia::test]
+    // The hooks_tests_policy denies the `siginh` permission for domain transitions from the initial
+    // context to contexts with type `test_siginh_no_t`, so itimers should be cleared.
+    async fn clear_itimers_on_exec_if_siginh_denied() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |mut locked, current_task, security_server| {
+                let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+
+                // Set the child task's ITIMER_REAL.
+                let child_itimer_val = itimerval {
+                    it_value: timeval { tv_sec: 100000000, tv_usec: 0 },
+                    it_interval: timeval { tv_sec: 10, tv_usec: 0 },
+                };
+                child_task
+                    .thread_group()
+                    .set_itimer(&child_task, ITIMER_REAL, child_itimer_val)
+                    .expect("set ITIMER_REAL for child");
+                let pre_exec_itimer_val =
+                    { child_task.thread_group().get_itimer(ITIMER_REAL).unwrap() };
+                assert_ne!(pre_exec_itimer_val.it_value.tv_sec, 0);
+
+                // Simulate exec of the child task into a context with type `test_siginh_no_t`.
+                let old_sid = { current_task.security_state.lock().current_sid };
+                let new_sid = security_server
+                    .security_context_to_sid(b"u:object_r:test_siginh_no_t:s0".into())
+                    .expect("invalid security context");
+                assert_ne!(old_sid, new_sid);
+                exec_binprm(locked, &child_task, &ResolvedElfState { sid: Some(new_sid) });
+
+                // Check that the child task's ITIMER_REAL is now unset.
+                let post_exec_itimer_val =
+                    { child_task.thread_group().get_itimer(ITIMER_REAL).unwrap() };
+                assert_eq!(post_exec_itimer_val.it_value.tv_sec, 0);
+            },
+        )
+    }
+
+    #[fuchsia::test]
+    // The hooks_tests_policy denies the `siginh` permission for domain transitions from the initial
+    // context to contexts with type `test_siginh_no_t`, so pending signals and signal masks should
+    // be cleared.
+    async fn clear_signal_state_on_exec_if_siginh_denied() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |mut locked, current_task, security_server| {
+                let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+
+                assert_eq!(child_task.read().signal_mask(), SigSet(0));
+                child_task.write().set_signal_mask(SigSet(starnix_uapi::SIGTERM.into()));
+
+                assert_eq!(child_task.read().pending_signal_count(), 0);
+                child_task.thread_group().write().send_signal(SignalInfo::default(SIGTERM));
+                assert_eq!(child_task.read().pending_signal_count(), 1);
+
+                // Simulate exec of the child task into a context with type `test_siginh_no_t`.
+                let old_sid = { current_task.security_state.lock().current_sid };
+                let new_sid = security_server
+                    .security_context_to_sid(b"u:object_r:test_siginh_no_t:s0".into())
+                    .expect("invalid security context");
+                assert_ne!(old_sid, new_sid);
+                exec_binprm(locked, &child_task, &ResolvedElfState { sid: Some(new_sid) });
+
+                // Check that the previously pending signal has been cleared.
+                assert_eq!(child_task.read().pending_signal_count(), 0);
+                // Check that the signal mask is now empty.
+                assert_eq!(child_task.read().signal_mask(), SigSet(0));
             },
         )
     }
