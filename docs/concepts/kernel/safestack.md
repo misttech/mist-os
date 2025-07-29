@@ -61,9 +61,10 @@ safe-stack.
 ## Use in Zircon & Fuchsia
 
 This is enabled in the Clang compiler by the `-fsanitize=safe-stack`
-command-line option.  This is the default mode of the compiler for `*-fuchsia`
-targets.  To disable it for a specific compilation, use the
-`-fno-sanitize=safe-stack` option.
+command-line option.  This is the default mode of the compiler for the
+`x86_64-fuchsia` target.  To disable it for a specific compilation, use the
+`-fno-sanitize=safe-stack` option. The `aarch64-fuchsia` and `riscv64-fuchsia`
+targets enable [shadow-call-stack](shadow_call_stack.md) by default instead.
 
 Zircon supports safe-stack for both user-mode and kernel code.
 In the x86 Zircon build, safe-stack is always enabled when building
