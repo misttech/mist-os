@@ -91,11 +91,6 @@ zx_library("fbl") {
   if (!is_fuchsia && !is_kernel) {
     deps += [ "//zircon/system/public" ]
   }
-
-  # We want internal SDK elements to have their include path similar when
-  # used through an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source
-  # code doesn't need to be changed when switching from one to the other.
-  include_base = "//"
 }
 
 # LINT.ThenChange(BUILD.bazel)

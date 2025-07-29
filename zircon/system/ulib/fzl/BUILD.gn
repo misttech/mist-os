@@ -40,11 +40,6 @@ zx_library("fzl") {
     # Many public headers here use various zx headers.
     "//zircon/system/ulib/zx",
   ]
-
-  # We want internal SDK elements to have their include path similar when
-  # used through an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source
-  # code doesn't need to be changed when switching from one to the other.
-  include_base = "//"
 }
 
 # LINT.ThenChange(BUILD.bazel)
