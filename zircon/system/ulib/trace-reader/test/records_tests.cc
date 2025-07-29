@@ -4,11 +4,11 @@
 
 #include <stdint.h>
 
+#include <sstream>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include <fbl/string_printf.h>
 #include <trace-reader/records.h>
 #include <zxtest/zxtest.h>
 
@@ -328,7 +328,7 @@ TEST(TraceRecords, MetadataData) {
   // provider info
 
   {
-    trace::MetadataContent d(trace::MetadataContent::ProviderInfo{1, "provider"});
+    trace::MetadataContent d(trace::MetadataContent::ProviderInfo{.id = 1, .name = "provider"});
     EXPECT_EQ(trace::MetadataType::kProviderInfo, d.type());
     EXPECT_EQ(1, d.GetProviderInfo().id);
     EXPECT_TRUE(d.GetProviderInfo().name == "provider");
@@ -735,9 +735,9 @@ TEST(TraceRecords, Record) {
     EXPECT_EQ(sizeof(blob), r.GetBlob().blob_size);
     EXPECT_STREQ(blob, reinterpret_cast<const char*>(r.GetBlob().blob));
 
-    auto expected =
-        fbl::StringPrintf("Blob(name: %s, size: %zu, preview: %s)", name, sizeof(blob), preview);
-    EXPECT_EQ(expected.c_str(), r.ToString());
+    std::stringstream ex;
+    ex << "Blob(name: " << name << ", size: " << sizeof(blob) << ", preview: " << preview << ")";
+    EXPECT_EQ(ex.str(), r.ToString());
   }
 
   // kernel object
@@ -1048,12 +1048,11 @@ TEST(TraceRecords, Record) {
     EXPECT_STREQ(
         blob, reinterpret_cast<const char*>(std::get<Format>(r.GetLargeRecord().GetBlob()).blob));
 
-    auto expected = fbl::StringPrintf(
-        "LargeRecord(Blob(format: blob_event, category: \"category\", name: \"name\", "
-        "ts: 123, pt: 4/5, {arg1: int32(11), arg2: double(-3.140000)}, "
-        "size: %zu, preview: %s))",
-        sizeof(blob), preview);
-    EXPECT_EQ(expected, r.ToString());
+    std::stringstream expected;
+    expected << "LargeRecord(Blob(format: blob_event, category: \"category\", name: \"name\", "
+             << "ts: 123, pt: 4/5, {arg1: int32(11), arg2: double(-3.140000)}, "
+             << "size: " << sizeof(blob) << ", preview: " << preview << "))";
+    EXPECT_EQ(expected.str(), r.ToString());
   }
 }
 

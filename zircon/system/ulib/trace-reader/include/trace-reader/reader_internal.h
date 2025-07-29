@@ -10,8 +10,8 @@
 
 #include <iterator>
 #include <memory>
+#include <string>
 
-#include <fbl/string.h>
 #include <trace-reader/reader.h>
 
 namespace trace {
@@ -28,11 +28,11 @@ class BufferHeaderReader {
   // validate the contents of the header.
   // Returns "" on success or an error message.
   // |header| must be suitably aligned to point to a header.
-  static fbl::String Create(const void* header, size_t buffer_size,
+  static std::string Create(const void* header, size_t buffer_size,
                             std::unique_ptr<BufferHeaderReader>* out_reader);
 
   static int GetBufferNumber(uint32_t wrapped_count) {
-    static_assert(std::size(trace_buffer_header{}.rolling_data_end) == 2, "");
+    static_assert(std::size(trace_buffer_header{}.rolling_data_end) == 2);
     return wrapped_count & 1;
   }
 
@@ -59,11 +59,11 @@ class BufferHeaderReader {
   uint64_t num_records_dropped() const { return header_->num_records_dropped; }
 
   // Return the offset of the durable buffer.
-  uint64_t get_durable_buffer_offset() const { return sizeof(trace_buffer_header); }
+  static uint64_t get_durable_buffer_offset() { return sizeof(trace_buffer_header); }
 
   // Given a pointer to a trace buffer, return a pointer to the durable
   // buffer contained therein.
-  const void* GetDurableBuffer(const void* buffer) const {
+  static const void* GetDurableBuffer(const void* buffer) {
     auto buf = reinterpret_cast<const uint8_t*>(buffer);
     return buf + get_durable_buffer_offset();
   }
@@ -101,7 +101,7 @@ class BufferHeaderReader {
  private:
   explicit BufferHeaderReader(const trace_buffer_header* header);
 
-  static fbl::String Validate(const trace_buffer_header& header, size_t buffer_size);
+  static std::string Validate(const trace_buffer_header& header, size_t buffer_size);
 
   const trace_buffer_header* const header_;
 
@@ -120,7 +120,7 @@ class TraceBufferReader {
   using ChunkConsumer = fit::function<void(Chunk)>;
 
   // Callback invoked when an error is detected.
-  using ErrorHandler = fit::function<void(fbl::String)>;
+  using ErrorHandler = fit::function<void(std::string)>;
 
   TraceBufferReader(ChunkConsumer chunk_consumer, ErrorHandler error_handler);
   ~TraceBufferReader() = default;
@@ -132,7 +132,7 @@ class TraceBufferReader {
   bool ReadChunks(const void* buffer, size_t buffer_size);
 
  private:
-  void CallChunkConsumerIfNonEmpty(const void* chunk, size_t size);
+  void CallChunkConsumerIfNonEmpty(const void* buf_ptr, size_t size);
 
   std::unique_ptr<BufferHeaderReader> const header_;
   ChunkConsumer chunk_consumer_;
