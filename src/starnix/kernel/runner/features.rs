@@ -20,7 +20,7 @@ use starnix_modules_gralloc::gralloc_device_init;
 use starnix_modules_hvdcp_opti::hvdcp_opti_init;
 use starnix_modules_input::uinput::register_uinput_device;
 use starnix_modules_input::{
-    EventProxyMode, InputDevice, InputEventsRelay, DEFAULT_KEYBOARD_DEVICE_ID,
+    new_input_relay, EventProxyMode, InputDevice, DEFAULT_KEYBOARD_DEVICE_ID,
     DEFAULT_MOUSE_DEVICE_ID, DEFAULT_TOUCH_DEVICE_ID,
 };
 use starnix_modules_kgsl::kgsl_device_init;
@@ -469,7 +469,7 @@ pub fn run_container_features(
             DEFAULT_MOUSE_DEVICE_ID,
         )?;
 
-        let input_events_relay = InputEventsRelay::new();
+        let (input_events_relay, input_events_relay_handle) = new_input_relay();
         input_events_relay.start_relays(
             &kernel,
             EventProxyMode::WakeContainer,
@@ -486,7 +486,7 @@ pub fn run_container_features(
             Some(mouse_device.inspect_status),
         );
 
-        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay)?;
+        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay_handle)?;
 
         // Channel we use to inform the relay of changes to `touch_standby`
         let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();

@@ -4,7 +4,7 @@
 
 use crate::uinput::vfs::{CloseFreeSafe, NamespaceNode};
 use crate::{
-    InputEventsRelay, InputFile, LinuxKeyboardEventParser, LinuxTouchEventParser, OpenedFiles,
+    InputEventsRelayHandle, InputFile, LinuxKeyboardEventParser, LinuxTouchEventParser, OpenedFiles,
 };
 use bit_vec::BitVec;
 use fidl_fuchsia_ui_test_input::{
@@ -46,12 +46,12 @@ enum DeviceType {
 pub fn register_uinput_device(
     locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
-    input_event_relay: Arc<InputEventsRelay>,
+    input_event_relay_handle: Arc<InputEventsRelayHandle>,
 ) -> Result<(), Errno> {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
-    let device = UinputDevice::new(input_event_relay);
+    let device = UinputDevice::new(input_event_relay_handle);
     registry.register_device(
         locked,
         system_task,
@@ -93,11 +93,11 @@ where
 
 #[derive(Clone)]
 struct UinputDevice {
-    input_event_relay: Arc<InputEventsRelay>,
+    input_event_relay: Arc<InputEventsRelayHandle>,
 }
 
 impl UinputDevice {
-    pub fn new(input_event_relay: Arc<InputEventsRelay>) -> Self {
+    pub fn new(input_event_relay: Arc<InputEventsRelayHandle>) -> Self {
         Self { input_event_relay }
     }
 }
@@ -167,12 +167,12 @@ impl UinputDeviceMutableState {
 }
 
 struct UinputDeviceFile {
-    input_event_relay: Arc<InputEventsRelay>,
+    input_event_relay: Arc<InputEventsRelayHandle>,
     inner: Mutex<UinputDeviceMutableState>,
 }
 
 impl UinputDeviceFile {
-    pub fn new(input_event_relay: Arc<InputEventsRelay>) -> Self {
+    pub fn new(input_event_relay: Arc<InputEventsRelayHandle>) -> Self {
         Self {
             input_event_relay,
             inner: Mutex::new(UinputDeviceMutableState {
@@ -609,19 +609,28 @@ impl DeviceOps for VirtualDevice {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::start_input_relays_for_test;
     use starnix_core::task::Kernel;
     use starnix_core::testing::{create_kernel_task_and_unlocked, AutoReleasableTask};
     use starnix_core::vfs::FileHandle;
     use std::sync::Arc;
     use test_case::test_case;
 
-    fn make_kernel_objects(
-        file: Arc<UinputDeviceFile>,
-    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, &'static mut Locked<Unlocked>) {
+    async fn new_kernel_objects() -> (
+        Arc<UinputDeviceFile>,
+        Arc<Kernel>,
+        AutoReleasableTask,
+        FileHandle,
+        &'static mut Locked<Unlocked>,
+    ) {
         let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let (input_relay_handle, _, _, _, _, _, _, _, _, _, _) =
+            start_input_relays_for_test(locked, &current_task).await;
+        let dev = Arc::new(UinputDeviceFile::new(input_relay_handle));
+
         let file_object = FileObject::new(
             &current_task,
-            Box::new(file),
+            Box::new(dev.clone()),
             // The input node doesn't really live at the root of the filesystem.
             // But the test doesn't need to be 100% representative of production.
             current_task
@@ -630,7 +639,7 @@ mod test {
             OpenFlags::empty(),
         )
         .expect("FileObject::new failed");
-        (kernel, current_task, file_object, locked)
+        (dev, kernel, current_task, file_object, locked)
     }
 
     #[test_case(uapi::EV_KEY, vec![uapi::EV_KEY as usize] => Ok(SUCCESS))]
@@ -638,8 +647,7 @@ mod test {
     #[test_case(uapi::EV_REL, vec![] => error!(EPERM))]
     #[::fuchsia::test]
     async fn ui_set_evbit(bit: u32, expected_evbits: Vec<usize>) -> Result<SyscallResult, Errno> {
-        let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let (dev, _kernel, current_task, file_object, locked) = new_kernel_objects().await;
         let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
             locked,
@@ -656,8 +664,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn ui_set_evbit_call_multi() {
-        let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let (dev, _kernel, current_task, file_object, locked) = new_kernel_objects().await;
         let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
             locked,
@@ -681,8 +688,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn ui_set_keybit() {
-        let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let (dev, _kernel, current_task, file_object, locked) = new_kernel_objects().await;
         let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
             locked,
@@ -706,8 +712,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn ui_set_absbit() {
-        let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let (dev, _kernel, current_task, file_object, locked) = new_kernel_objects().await;
         let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
             locked,
@@ -731,8 +736,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn ui_set_propbit() {
-        let dev = Arc::new(UinputDeviceFile::new(InputEventsRelay::new()));
-        let (_kernel, current_task, file_object, locked) = make_kernel_objects(dev.clone());
+        let (dev, _kernel, current_task, file_object, locked) = new_kernel_objects().await;
         let locked = locked.cast_locked::<Unlocked>();
         let r = dev.ioctl(
             locked,
