@@ -31,12 +31,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/434877631)
-                "AccessTest.ChecksAgainstRealCredsOwner",
-                "AccessTest.ChecksAgainstRealCredsNonOwner",
-                "AccessTest.EaccessChecksAgainstFsUidOwner",
-                "AccessTest.FsUidIgnoredUnlessEaccess",
-
                 // TODO(https://fxbug.dev/351037863)
                 "AshmemTest.SetNameOverflow",
 

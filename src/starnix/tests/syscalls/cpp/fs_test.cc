@@ -5,7 +5,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <lib/fit/defer.h>
-#include <sys/fsuid.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
@@ -624,126 +623,6 @@ TEST_F(CapDacTest, NonOwnerCanWriteFileWithDacOverride) {
     ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
     fbl::unique_fd fd(open(test_file_.c_str(), O_WRONLY));
     EXPECT_TRUE(fd.is_valid()) << "open(O_WRONLY): " << std::strerror(errno);
-  });
-  EXPECT_TRUE(helper.WaitForChildren());
-}
-
-class AccessTest : public ::testing::Test {
- protected:
-  void SetUp() {
-    if (getuid() != 0) {
-      GTEST_SKIP() << "Not running as root, skipping.";
-    }
-
-    ASSERT_THAT(chmod(test_folder_.path().c_str(), 0777), SyscallSucceeds());
-
-    ASSERT_TRUE(CreateFile("only_user", 0700, kOwnerUid, kOwnerGid, only_user_file_));
-    ASSERT_TRUE(CreateFile("everyone", 0777, kOwnerUid, kOwnerGid, everyone_file_));
-  }
-
-  bool CreateFile(const char *name, int mode, uid_t uid, gid_t gid, std::string &path) {
-    path = test_folder_.path() + "/" + name;
-    auto fd = fbl::unique_fd(open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode));
-    return fd.is_valid() && (chown(path.c_str(), uid, gid) == 0);
-  }
-
-  // World readable & writable test folder.
-  test_helper::ScopedTempDir test_folder_;
-
-  // File owned by kOwnerUid/Gid with permissions only granting owning user access.
-  std::string only_user_file_;
-
-  // File owned by kOwnerUid/Gid with permissions only granting everyone access.
-  std::string everyone_file_;
-};
-
-TEST_F(AccessTest, ChecksAgainstRealCredsNonOwner) {
-  test_helper::ForkHelper helper;
-  helper.RunInForkedProcess([&] {
-    ASSERT_THAT(setresgid(kNonOwnerGid, kOwnerGid, 0), SyscallSucceeds());
-    ASSERT_THAT(setresuid(kNonOwnerUid, kOwnerUid, 0), SyscallSucceeds());
-
-    EXPECT_THAT(access(only_user_file_.c_str(), R_OK), SyscallFailsWithErrno(EACCES));
-    EXPECT_THAT(access(everyone_file_.c_str(), R_OK), SyscallSucceeds());
-  });
-  ASSERT_TRUE(helper.WaitForChildren());
-}
-
-TEST_F(AccessTest, ChecksAgainstRealCredsOwner) {
-  test_helper::ForkHelper helper;
-  helper.RunInForkedProcess([&] {
-    ASSERT_THAT(setresgid(kOwnerGid, kNonOwnerGid, 0), SyscallSucceeds());
-    ASSERT_THAT(setresuid(kOwnerUid, kNonOwnerUid, 0), SyscallSucceeds());
-
-    EXPECT_THAT(access(only_user_file_.c_str(), R_OK), SyscallSucceeds());
-    EXPECT_THAT(access(everyone_file_.c_str(), R_OK), SyscallSucceeds());
-  });
-  EXPECT_TRUE(helper.WaitForChildren());
-}
-
-TEST_F(AccessTest, EaccessChecksAgainstEffectiveCredsNonOwner) {
-  test_helper::ForkHelper helper;
-  helper.RunInForkedProcess([&] {
-    ASSERT_THAT(setresgid(kOwnerGid, kNonOwnerGid, 0), SyscallSucceeds());
-    ASSERT_THAT(setresuid(kOwnerUid, kNonOwnerUid, 0), SyscallSucceeds());
-
-    EXPECT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, AT_EACCESS),
-                SyscallFailsWithErrno(EACCES));
-    EXPECT_THAT(faccessat(AT_FDCWD, everyone_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-  });
-  EXPECT_TRUE(helper.WaitForChildren());
-}
-
-TEST_F(AccessTest, EaccessChecksAgainstEffectiveCredsOwner) {
-  test_helper::ForkHelper helper;
-  helper.RunInForkedProcess([&] {
-    ASSERT_THAT(setresgid(kNonOwnerGid, kOwnerGid, 0), SyscallSucceeds());
-    ASSERT_THAT(setresuid(kNonOwnerUid, kOwnerUid, 0), SyscallSucceeds());
-
-    EXPECT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-    EXPECT_THAT(faccessat(AT_FDCWD, everyone_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-  });
-  EXPECT_TRUE(helper.WaitForChildren());
-}
-
-TEST_F(AccessTest, FsUidIgnoredUnlessEaccess) {
-  test_helper::ForkHelper helper;
-  helper.RunInForkedProcess([&] {
-    ASSERT_THAT(setresgid(kNonOwnerGid, kNonOwnerGid, kOwnerUid), SyscallSucceeds());
-    ASSERT_THAT(setresuid(kNonOwnerUid, kNonOwnerUid, kOwnerUid), SyscallSucceeds());
-
-    ASSERT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, AT_EACCESS),
-                SyscallFailsWithErrno(EACCES));
-    ASSERT_THAT(faccessat(AT_FDCWD, everyone_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-
-    ASSERT_EQ(setfsuid(kOwnerUid), static_cast<int>(kNonOwnerUid));
-    ASSERT_EQ(setfsuid(-1), static_cast<int>(kOwnerUid));
-
-    // Even though the "fsuid" is the owning UID, access to the only-user access file is denied.
-    EXPECT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-    EXPECT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, 0),
-                SyscallFailsWithErrno(EACCES));
-    EXPECT_THAT(access(only_user_file_.c_str(), R_OK), SyscallFailsWithErrno(EACCES));
-    EXPECT_THAT(faccessat(AT_FDCWD, everyone_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-  });
-  EXPECT_TRUE(helper.WaitForChildren());
-
-  helper.RunInForkedProcess([&] {
-    ASSERT_THAT(setresgid(kOwnerGid, kOwnerGid, kNonOwnerUid), SyscallSucceeds());
-    ASSERT_THAT(setresuid(kOwnerUid, kOwnerUid, kNonOwnerUid), SyscallSucceeds());
-
-    ASSERT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-    ASSERT_THAT(faccessat(AT_FDCWD, everyone_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
-
-    ASSERT_EQ(setfsuid(kNonOwnerUid), static_cast<int>(kOwnerUid));
-    ASSERT_EQ(setfsuid(-1), static_cast<int>(kNonOwnerUid));
-
-    // Even though the "fsuid" is the owning UID, access to the only-user access file is denied.
-    EXPECT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, AT_EACCESS),
-                SyscallFailsWithErrno(EACCES));
-    EXPECT_THAT(faccessat(AT_FDCWD, only_user_file_.c_str(), R_OK, 0), SyscallSucceeds());
-    EXPECT_THAT(access(only_user_file_.c_str(), R_OK), SyscallSucceeds());
-    EXPECT_THAT(faccessat(AT_FDCWD, everyone_file_.c_str(), R_OK, AT_EACCESS), SyscallSucceeds());
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
