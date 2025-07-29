@@ -26,8 +26,14 @@ void ClockDevice::Enable(EnableCompleter::Sync& completer) {
     return;
   }
   if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to enable clock %u: %s", id_,
-            zx_status_get_string(result->error_value()));
+    // TODO(https://fxbug.dev/430607596): Remove this id check.
+    if (id_ == 80 || id_ == 81) {
+      FDF_LOG(WARNING, "Known failure (https://fxbug.dev/430607596): Failed to enable clock %u: %s",
+              id_, zx_status_get_string(result->error_value()));
+    } else {
+      FDF_LOG(ERROR, "Failed to enable clock %u: %s", id_,
+              zx_status_get_string(result->error_value()));
+    }
     completer.ReplyError(result->error_value());
     return;
   }
