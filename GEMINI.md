@@ -38,19 +38,6 @@ the in-tree documentation doesn't solve your problem.
 When generating new code, follow the existing coding style. Remember to
 build code before suggesting it as a solution to ensure it compiles.
 
-## Searching the codebase
-
-IMPORTANT: Do not use the SearchText tool or the `grep` shell command
-in this code-base. If you want to use either of those tools, use `git grep` instead.
-For instance, if you'd like to search for `foo`, run `git --no-pager grep foo`.
-
-If you feel you must use the SearchText first run a `git grep` for your search term
-piped to `wc -l`. For example, `git --no-pager grep foo | wc -l`.
-
-If `wc` returns more than 100 lines, narrow your search terms and try
-to use `tree` to find the right directory to search from rather than
-running over the whole codebase.
-
 ## Finding or moving a FIDL method
 
 When trying to find FIDL methods, they are typically defined somewhere

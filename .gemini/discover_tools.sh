@@ -14,7 +14,7 @@ read -r -d '' TOOLS_JSON <<EOF
 [
   {
     "name": "search_file_content",
-    "description": "Custom implementation: Searches for a regular expression pattern within the content of files using `git grep` and returns the exact output.",
+    "description": "Custom implementation: Searches for a regular expression pattern within the content of files using `jiri grep` and returns the exact output.",
     "parameters": {
       "type": "OBJECT",
       "properties": {

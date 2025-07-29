@@ -22,9 +22,9 @@ case "$TOOL_NAME" in
     PATTERN=$(echo "$ARGS_JSON" | jq -r '.pattern')
     SEARCH_PATH=$(echo "$ARGS_JSON" | jq -r '.path // "."') # Default to current dir if null
 
-    # Run the git grep command.
+    # Run the jiri grep command.
     # The `( ... )` subshell ensures that `cd` doesn't affect the script's working directory.
-    OUTPUT=$( (cd "$SEARCH_PATH" && git grep -n "$PATTERN") 2>&1 )
+    OUTPUT=$( (cd "$SEARCH_PATH" && jiri grep -n "$PATTERN") 2>&1 )
 
     # Return the exact output in the required JSON format.
     jq -n --arg output "$OUTPUT" '{"output": $output}'
