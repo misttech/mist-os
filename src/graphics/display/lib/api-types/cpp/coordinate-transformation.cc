@@ -5,7 +5,10 @@
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <zircon/assert.h>
 
+#include <cinttypes>
+#include <string_view>
 #include <type_traits>
 
 namespace display {
@@ -32,5 +35,29 @@ static_assert(CoordinateTransformation::kRotateCcw90ReflectX.ToBanjo() ==
               COORDINATE_TRANSFORMATION_ROTATE_CCW_90_REFLECT_X);
 static_assert(CoordinateTransformation::kRotateCcw90ReflectY.ToBanjo() ==
               COORDINATE_TRANSFORMATION_ROTATE_CCW_90_REFLECT_Y);
+
+std::string_view CoordinateTransformation::ToString() const {
+  switch (transformation_) {
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kIdentity:
+      return "Identity";
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kReflectX:
+      return "ReflectX";
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kReflectY:
+      return "ReflectY";
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw90:
+      return "RotateCcw90";
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw180:
+      return "RotateCcw180";
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw270:
+      return "RotateCcw270";
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw90ReflectX:
+      return "RotateCcw90ReflectX";
+    case fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw90ReflectY:
+      return "RotateCcw90ReflectY";
+  }
+
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid CoordinateTransformation value: %" PRIu32, ValueForLogging());
+  return "(invalid value)";
+}
 
 }  // namespace display

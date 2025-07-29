@@ -10,6 +10,10 @@
 
 #include <gtest/gtest.h>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif
+
 namespace display {
 
 namespace {
@@ -74,6 +78,19 @@ TEST(ImageTilingTypeTest, FidlConversionRoundtrip) {
   EXPECT_EQ(ImageTilingType::kLinear, ImageTilingType(ImageTilingType::kLinear.ToFidl()));
   EXPECT_EQ(ImageTilingType::kCapture, ImageTilingType(ImageTilingType::kCapture.ToFidl()));
 }
+
+TEST(ImageTilingType, ToString) {
+  EXPECT_EQ(ImageTilingType::kLinear.ToString(), "Linear");
+  EXPECT_EQ(ImageTilingType::kCapture.ToString(), "Capture");
+}
+
+#if __cplusplus >= 202002L
+TEST(ImageTilingType, Format) {
+  EXPECT_EQ(std::format("{}", ImageTilingType::kLinear), "Linear");
+  EXPECT_EQ(std::format("{}", ImageTilingType::kCapture), "Capture");
+  EXPECT_EQ(std::format("{:>8}", ImageTilingType::kLinear), "  Linear");
+}
+#endif  // __cplusplus >= 202002L
 
 }  // namespace
 

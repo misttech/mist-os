@@ -10,6 +10,10 @@
 
 #include <gtest/gtest.h>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif
+
 namespace display {
 
 namespace {
@@ -164,6 +168,32 @@ TEST(PixelFormatTest, EncodingSizeMatchesImageFormat) {
               static_cast<uint32_t>(pixel_format.EncodingSize() * 8));
   }
 }
+
+TEST(PixelFormat, ToString) {
+  EXPECT_EQ(PixelFormat::kR8G8B8A8.ToString(), "R8G8B8A8");
+  EXPECT_EQ(PixelFormat::kB8G8R8A8.ToString(), "B8G8R8A8");
+  EXPECT_EQ(PixelFormat::kI420.ToString(), "I420");
+  EXPECT_EQ(PixelFormat::kNv12.ToString(), "NV12");
+  EXPECT_EQ(PixelFormat::kYuy2.ToString(), "YUY2");
+  EXPECT_EQ(PixelFormat::kYv12.ToString(), "YV12");
+  EXPECT_EQ(PixelFormat::kB8G8R8.ToString(), "B8G8R8");
+  EXPECT_EQ(PixelFormat::kR5G6B5.ToString(), "R5G6B5");
+  EXPECT_EQ(PixelFormat::kR3G3B2.ToString(), "R3G3B2");
+  EXPECT_EQ(PixelFormat::kL8.ToString(), "L8");
+  EXPECT_EQ(PixelFormat::kR8.ToString(), "R8");
+  EXPECT_EQ(PixelFormat::kA2R10G10B10.ToString(), "A2R10G10B10");
+  EXPECT_EQ(PixelFormat::kA2B10G10R10.ToString(), "A2B10G10R10");
+  EXPECT_EQ(PixelFormat::kP010.ToString(), "P010");
+  EXPECT_EQ(PixelFormat::kR8G8B8.ToString(), "R8G8B8");
+}
+
+#if __cplusplus >= 202002L
+TEST(PixelFormat, Format) {
+  EXPECT_EQ(std::format("{}", PixelFormat::kR8G8B8A8), "R8G8B8A8");
+  EXPECT_EQ(std::format("{}", PixelFormat::kI420), "I420");
+  EXPECT_EQ(std::format("{:>8}", PixelFormat::kI420), "    I420");
+}
+#endif  // __cplusplus >= 202002L
 
 }  // namespace
 
