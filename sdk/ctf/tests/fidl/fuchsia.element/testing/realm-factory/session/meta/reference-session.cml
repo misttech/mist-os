@@ -22,11 +22,6 @@
             url: "#meta/reference-graphical-presenter.cm",
             startup: "eager",
         },
-        {
-            name: "reference-scenic",
-            url: "#meta/reference-scenic.cm",
-            startup: "eager",
-        },
     ],
     collections: [
         {
