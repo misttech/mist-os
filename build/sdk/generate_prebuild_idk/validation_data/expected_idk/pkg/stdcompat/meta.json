@@ -2,7 +2,6 @@
   "bind_deps": [],
   "deps": [],
   "fidl_binding_deps": [],
-  "fidl_deps": [],
   "headers": [
     "pkg/stdcompat/include/lib/stdcompat/algorithm.h",
     "pkg/stdcompat/include/lib/stdcompat/array.h",

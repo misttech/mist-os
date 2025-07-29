@@ -4,7 +4,6 @@
     "fdio"
   ],
   "fidl_binding_deps": [],
-  "fidl_deps": [],
   "headers": [
     "pkg/driver_fake_object_cpp/include/lib/driver/fake-object/cpp/fake-object.h"
   ],

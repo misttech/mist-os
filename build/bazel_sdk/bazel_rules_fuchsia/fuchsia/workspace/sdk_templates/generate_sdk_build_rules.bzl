@@ -896,16 +896,6 @@ def _generate_cc_source_library_build_rules(
                         for suffix in suffixes
                     ],
                 )
-    elif "fidl_deps" in meta:
-        for fidl in meta["fidl_deps"]:
-            dep_path = _find_dep_path(
-                fidl,
-                "fidl/",
-                ctx.attr.parent_sdk,
-                parent_sdk_contents,
-            )
-            fidl_deps.append(dep_path + ":" + fidl + "_cc")
-            fidl_llcpp_deps.append(dep_path + ":" + fidl + "_llcpp_cc")
 
     deps = []
     for bind in meta.get("bind_deps", []):

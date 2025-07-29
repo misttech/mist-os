@@ -4,7 +4,6 @@
     "stdcompat"
   ],
   "fidl_binding_deps": [],
-  "fidl_deps": [],
   "headers": [
     "pkg/fit/include/lib/fit/defer.h",
     "pkg/fit/include/lib/fit/function.h",
