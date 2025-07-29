@@ -17,6 +17,7 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdNumber,
     FileHandle, FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
 };
+use bitflags::bitflags;
 use starnix_logging::set_zx_name;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -48,6 +49,31 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 // See https://github.com/google/gvisor/blob/master/pkg/abi/linux/iouring.go#L47
 pub const IORING_MAX_ENTRIES: u32 = 1 << 15; // 32768
 const IORING_MAX_CQ_ENTRIES: u32 = 2 * IORING_MAX_ENTRIES;
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct IoRingSetupFlags: u32 {
+        const IoPoll = starnix_uapi::IORING_SETUP_IOPOLL;
+        const SqPoll = starnix_uapi::IORING_SETUP_SQPOLL;
+        const SqAff = starnix_uapi::IORING_SETUP_SQ_AFF;
+        const CqSize = starnix_uapi::IORING_SETUP_CQSIZE;
+        const Clamp = starnix_uapi::IORING_SETUP_CLAMP;
+        const AttachWq = starnix_uapi::IORING_SETUP_ATTACH_WQ;
+        const RDisabled = starnix_uapi::IORING_SETUP_R_DISABLED;
+        const SubmitAll = starnix_uapi::IORING_SETUP_SUBMIT_ALL;
+        const CoopTaskRun = starnix_uapi::IORING_SETUP_COOP_TASKRUN;
+        const TaskRunFlag = starnix_uapi::IORING_SETUP_TASKRUN_FLAG;
+        const SqE128 = starnix_uapi::IORING_SETUP_SQE128;
+        const CqE32 = starnix_uapi::IORING_SETUP_CQE32;
+        const SingleIssuer = starnix_uapi::IORING_SETUP_SINGLE_ISSUER;
+        const DeferTaskRun = starnix_uapi::IORING_SETUP_DEFER_TASKRUN;
+        const NoMmap = starnix_uapi::IORING_SETUP_NO_MMAP;
+        const RegisteredFdOnly = starnix_uapi::IORING_SETUP_REGISTERED_FD_ONLY;
+        const NoSqArray = starnix_uapi::IORING_SETUP_NO_SQARRAY;
+    }
+}
+
+pub const IORING_SUPPORTED_SETUP_FLAGS: IoRingSetupFlags = IoRingSetupFlags::CqSize;
 
 type RingIndex = u32;
 
