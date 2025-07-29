@@ -276,6 +276,7 @@ impl InputEventsRelay {
                             }
                             _ => {}
                         }
+                        button_message_counter.as_ref().map(mark_proxy_message_handled);
                     }
                     e = self.receiver.next() => {
                         match e {
@@ -293,7 +294,6 @@ impl InputEventsRelay {
                             }
                             _ => {}
                         }
-                        button_message_counter.as_ref().map(mark_proxy_message_handled);
                     }
                     complete => break,
                 }
