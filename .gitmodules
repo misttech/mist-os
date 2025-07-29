@@ -148,11 +148,6 @@
 	url = https://chromium.googlesource.com/external/github.com/g-truc/glm
 	name = external/github.com/g-truc/glm
 	ignore = all
-[submodule "third_party/glog"]
-	path = third_party/glog
-	url = https://fuchsia.googlesource.com/third_party/glog
-	name = third_party/glog
-	ignore = all
 [submodule "third_party/go"]
 	path = third_party/go
 	url = https://fuchsia.googlesource.com/third_party/go
@@ -702,4 +697,9 @@
 	path = third_party/gflags/src
 	url = https://fuchsia.googlesource.com/third_party/gflags
 	name = third_party/gflags
+	ignore = all
+[submodule "third_party/glog/src"]
+	path = third_party/glog/src
+	url = https://fuchsia.googlesource.com/third_party/glog
+	name = third_party/glog
 	ignore = all
