@@ -23,7 +23,7 @@ package_info(
     name = "package_info",
     package_name = "anyhow",
     package_url = "https://github.com/dtolnay/anyhow",
-    package_version = "1.0.97",
+    package_version = "1.0.98",
 )
 
 license(
@@ -77,9 +77,9 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "1.0.97",
+    version = "1.0.98",
     deps = [
-        "//third_party/rust_crates/vendor/anyhow-1.0.97:build_script_build",
+        "//third_party/rust_crates/vendor/anyhow-1.0.98:build_script_build",
     ],
 )
 
@@ -132,7 +132,7 @@ cargo_build_script(
         "noclippy",
         "norustfmt",
     ],
-    version = "1.0.97",
+    version = "1.0.98",
     visibility = ["//visibility:private"],
 )
 

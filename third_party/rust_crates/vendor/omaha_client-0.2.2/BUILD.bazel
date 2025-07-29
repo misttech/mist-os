@@ -79,7 +79,7 @@ rust_library(
     }),
     version = "0.2.2",
     deps = [
-        "//third_party/rust_crates/vendor/anyhow-1.0.97:anyhow",
+        "//third_party/rust_crates/vendor/anyhow-1.0.98:anyhow",
         "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
         "//third_party/rust_crates/vendor/ecdsa-0.14.8:ecdsa",
         "//third_party/rust_crates/vendor/elliptic-curve-0.12.3:elliptic_curve",
