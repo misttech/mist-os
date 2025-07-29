@@ -4,10 +4,6 @@
 
 assert(is_fuchsia, "These can only be defined in the default toolchain")
 
-# TODO(https://fxbug.dev/42073789) Remove transitional labels
-group("manual_testing") {
-}
-
 # This provides metadata in the //:boot_tests schema.
 group("boot_tests") {
   testonly = true

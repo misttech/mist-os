@@ -6,13 +6,6 @@ group("services") {
   deps = [ "//src/connectivity/network/mdns/service:mdns" ]
 }
 
-# TODO(https://fxbug.dev/42073789) Remove transitional labels
-group("config") {
-}
-
-group("config_no_fuchsia_udp") {
-}
-
 group("utils") {
   testonly = true
   deps = [ "//src/connectivity/network/mdns/util:mdns-util" ]

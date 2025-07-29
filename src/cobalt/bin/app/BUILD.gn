@@ -111,14 +111,6 @@ executable("app") {
   ]
 }
 
-# TODO(https://fxbug.dev/42073789) Remove transitional labels
-group("config") {
-}
-group("user_config") {
-}
-group("userdebug_config") {
-}
-
 fuchsia_component("component-v2") {
   component_name = "cobalt"
   manifest = "meta/cobalt.cml"
