@@ -450,6 +450,7 @@ group("compatibility_tests") {
   visibility = [
     ":tests",
     "//:default",
+    "//sdk:generate_compatibility_goldens",
   ]
   testonly = true
   deps = [
