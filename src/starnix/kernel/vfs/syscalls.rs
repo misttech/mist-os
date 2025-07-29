@@ -891,21 +891,10 @@ pub fn sys_faccessat2(
     mode: u32,
     flags: u32,
 ) -> Result<(), Errno> {
-    current_task.override_creds(
-        |creds| {
-            // Unless `AT_ACCESS` is set, perform lookup & access-checking using real UID & GID.
-            if flags & AT_EACCESS == 0 {
-                creds.creds.fsuid = creds.creds.uid;
-                creds.creds.fsgid = creds.creds.gid;
-            }
-        },
-        || {
-            let mode = Access::try_from(mode)?;
-            let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
-            let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
-            name.check_access(locked, current_task, mode, CheckAccessReason::Access)
-        },
-    )
+    let mode = Access::try_from(mode)?;
+    let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
+    name.check_access(locked, current_task, mode, CheckAccessReason::Access)
 }
 
 pub fn sys_getdents64(
