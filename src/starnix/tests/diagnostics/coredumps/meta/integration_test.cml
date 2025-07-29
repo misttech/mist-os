@@ -28,6 +28,13 @@
             durability: "transient",
         },
     ],
+    capabilities: [
+        {
+            config: "fuchsia.starnix.config.container.CrashReportThrottling",
+            type: "bool",
+            value: false,
+        },
+    ],
     use: [
         {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
@@ -53,6 +60,11 @@
             directory: "boot-kernel",
             from: "parent",
             to: "#kernel",
+        },
+        {
+            config: "fuchsia.starnix.config.container.CrashReportThrottling",
+            from: "self",
+            to: "#debian_container",
         },
     ],
     environments: [

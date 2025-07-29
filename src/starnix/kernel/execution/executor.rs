@@ -756,11 +756,20 @@ pub fn process_completed_restricted_exit(
 
     if let Some(exit_status) = &result {
         if current_task.flags().contains(TaskFlags::DUMP_ON_EXIT) {
-            // Request a backtrace before reporting the crash to increase chance of a backtrace in
-            // logs.
-            // TODO(https://fxbug.dev/356732164) collect a backtrace ourselves
-            debug::backtrace_request_current_thread();
-            current_task.kernel().crash_reporter.handle_core_dump(&current_task, exit_status);
+            if let Some(pending_report) =
+                current_task.kernel().crash_reporter.begin_crash_report(&current_task)
+            {
+                // Request a backtrace before reporting the crash to increase chance of a backtrace
+                // in logs. This call is kept as far up in the call stack as possible to avoid
+                // additional frames that are always the same and not relevant to users.
+                // TODO(https://fxbug.dev/356732164) collect a backtrace ourselves
+                debug::backtrace_request_current_thread();
+                current_task.kernel().crash_reporter.handle_core_dump(
+                    &current_task,
+                    exit_status,
+                    pending_report,
+                );
+            }
         }
     }
     return Ok(result);

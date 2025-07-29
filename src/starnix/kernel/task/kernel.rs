@@ -115,6 +115,9 @@ pub struct KernelFeatures {
 
     /// Allows the netstack to mark packets/sockets.
     pub netstack_mark: bool,
+
+    /// Whether excessive crash reports should be throttled.
+    pub crash_report_throttling: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -379,7 +382,12 @@ impl Kernel {
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
 
-        let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
+        let crash_reporter = CrashReporter::new(
+            &inspect_node,
+            crash_reporter_proxy,
+            zx::Duration::from_minutes(8),
+            features.crash_report_throttling,
+        );
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
         let hrtimer_manager = HrTimerManager::new(&inspect_node);
 

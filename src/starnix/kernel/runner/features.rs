@@ -146,6 +146,7 @@ impl Features {
                         mlock_always_onfault,
                         mlock_pin_flavor,
                         netstack_mark,
+                        crash_report_throttling,
                     },
                 selinux,
                 ashmem,
@@ -239,6 +240,7 @@ impl Features {
                         default_seclabel.as_deref().unwrap_or_default(),
                     );
                     kernel_node.record_bool("selinux_test_suite", *selinux_test_suite);
+                    kernel_node.record_bool("crash_report_throttling", *crash_report_throttling);
                     inspect_node.record_string(
                         "default_ns_mount_options",
                         format!("{:?}", default_ns_mount_options),
@@ -263,6 +265,7 @@ pub fn parse_features(
     kernel_extra_features: &[String],
 ) -> Result<Features, Error> {
     let ContainerStructuredConfig {
+        crash_report_throttling,
         enable_utc_time_adjustment,
         extra_features,
         mlock_always_onfault,
@@ -390,6 +393,7 @@ pub fn parse_features(
 
     features.kernel.mlock_always_onfault = *mlock_always_onfault;
     features.kernel.mlock_pin_flavor = MlockPinFlavor::parse(mlock_pin_flavor.as_str())?;
+    features.kernel.crash_report_throttling = *crash_report_throttling;
 
     Ok(features)
 }
