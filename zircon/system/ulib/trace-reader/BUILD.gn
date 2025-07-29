@@ -22,10 +22,10 @@ zx_library("trace-reader") {
     # <trace-reader/records.h> has #include <trace-engine/types.h>.
     "//zircon/system/ulib/trace-engine:trace-engine-headers-for-reader",
 
-    # <trace-reader/records.h> has #include <fbl/array.h>.
-    "//zircon/system/ulib/fbl",
+    # <trace-reader/reader.h> has #include <lib/fit/function.h>.
+    "//sdk/lib/fit",
   ]
-  deps = [ "//zircon/system/ulib/fbl" ]
+  deps = [ "//sdk/lib/fit" ]
 }
 
 group("tests") {

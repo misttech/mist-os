@@ -821,29 +821,25 @@ bool TraceReader::ReadArguments(Chunk& record, size_t count, std::vector<Argumen
 std::string TraceReader::GetProviderName(ProviderId id) const {
   auto it = providers_.find(id);
   if (it != providers_.end())
-    return it->name;
+    return it->second->name;
   return std::string();
 }
 
 void TraceReader::SetCurrentProvider(ProviderId id) {
   auto it = providers_.find(id);
   if (it != providers_.end()) {
-    current_provider_ = &*it;
+    current_provider_ = it->second.get();
     return;
   }
-  std::stringstream ss;
-  ss << "Registering non-existent provider " << id;
-  ReportError(ss.str());
+  ReportError((std::stringstream() << "Registering non-existent provider " << id).str());
   RegisterProvider(id, "");
 }
 
 void TraceReader::RegisterProvider(ProviderId id, std::string name) {
-  auto provider = std::make_unique<ProviderInfo>();
-  provider->id = id;
-  provider->name = std::move(name);
+  auto provider = std::make_unique<ProviderInfo>(id, std::move(name));
   current_provider_ = provider.get();
 
-  providers_.insert_or_replace(std::move(provider));
+  providers_.insert_or_assign(id, std::move(provider));
 }
 
 void TraceReader::RegisterString(trace_string_index_t index, const std::string& string) {
