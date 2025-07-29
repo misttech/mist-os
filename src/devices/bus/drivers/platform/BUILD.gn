@@ -106,6 +106,7 @@ test("platform-bus-unittest") {
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//third_party/googletest:gmock",
   ]
 }
 

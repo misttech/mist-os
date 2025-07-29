@@ -18,6 +18,7 @@
 #include <zircon/syscalls/resource.h>
 #include <zircon/system/public/zircon/syscalls-next.h>
 
+#include <algorithm>
 #include <unordered_set>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -36,47 +37,54 @@ using namespace fuchsia_driver_framework;
 namespace {
 
 fuchsia_boot_metadata::SerialNumberMetadata CreateSerialNumberMetadata(
-    const fbl::Array<uint8_t>& bytes) {
+    std::span<const uint8_t> bytes) {
   std::string serial_number{bytes.begin(), bytes.end()};
   return fuchsia_boot_metadata::SerialNumberMetadata{{.serial_number{std::move(serial_number)}}};
 }
 
-zx::result<fuchsia_boot_metadata::PartitionMapMetadata> CreatePartitionMapMetadata(
-    const fbl::Array<uint8_t>& bytes) {
+zx::result<fuchsia_boot_metadata::PartitionMap> CreatePartitionMap(std::span<const uint8_t> bytes) {
   if (bytes.size() < sizeof(zbi_partition_map_t)) {
     fdf::error("Incorrect number of bytes: Expected at least {} bytes but actual is {} bytes",
                sizeof(zbi_partition_map_t), bytes.size());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  const auto* partition_map_entries = reinterpret_cast<zbi_partition_map_t*>(bytes.data());
-  auto partition_count = partition_map_entries[0].partition_count;
-  auto minimum_num_bytes = partition_count * sizeof(zbi_partition_map_t);
-  if (bytes.size() < minimum_num_bytes) {
-    fdf::error("Incorrect number of bytes: Expected at least {} bytes but actual is {} bytes",
-               minimum_num_bytes, bytes.size());
+  const auto& src_map = *reinterpret_cast<const zbi_partition_map_t*>(bytes.data());
+  fuchsia_boot_metadata::PartitionMap dst_map{{.block_count = src_map.block_count,
+                                               .block_size = src_map.block_size,
+                                               .reserved = src_map.reserved,
+                                               .guid{{0}}}};
+  std::ranges::copy(src_map.guid, dst_map.guid().value().begin());
+
+  auto partitions_byte_count = (bytes.size() - sizeof(zbi_partition_map_t));
+  auto expected_partitions_byte_count = src_map.partition_count * sizeof(zbi_partition_t);
+  if (partitions_byte_count != expected_partitions_byte_count) {
+    fdf::error("Incorrect number of bytes: Expected {} bytes but actual is {} bytes",
+               sizeof(zbi_partition_map_t) + expected_partitions_byte_count,
+               sizeof(zbi_partition_map_t) + partitions_byte_count);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+  const auto* first_partition =
+      reinterpret_cast<const zbi_partition_t*>(bytes.data() + sizeof(zbi_partition_map_t));
+  std::span<const zbi_partition_t> src_partitions{first_partition, src_map.partition_count};
 
-  std::vector<fuchsia_boot_metadata::PartitionMapEntry> partition_map;
-  for (uint32_t i = 0; i < partition_count; ++i) {
-    const auto& entry = partition_map_entries[i];
-    std::array<uint8_t, fuchsia_boot_metadata::kPartitionGuidLen> guid;
-    static_assert(fuchsia_boot_metadata::kPartitionGuidLen >= sizeof(zbi_partition_guid_t));
-    std::ranges::copy(std::begin(entry.guid), std::end(entry.guid), guid.begin());
-    partition_map.emplace_back(
-        fuchsia_boot_metadata::PartitionMapEntry{{.block_count = entry.block_count,
-                                                  .block_size = entry.block_size,
-                                                  .partition_count = entry.partition_count,
-                                                  .reserved = entry.reserved,
-                                                  .guid = guid}});
-  }
+  auto dst_partitions = src_partitions | std::views::transform([](const zbi_partition_t& src) {
+                          fuchsia_boot_metadata::Partition dst{{.type_guid{{0}},
+                                                                .unique_guid{{0}},
+                                                                .first_block = src.first_block,
+                                                                .last_block = src.last_block,
+                                                                .flags = src.flags,
+                                                                .name{src.name}}};
+                          std::ranges::copy(src.type_guid, dst.type_guid().begin());
+                          std::ranges::copy(src.uniq_guid, dst.unique_guid().begin());
+                          return dst;
+                        });
+  dst_map.partitions().emplace(dst_partitions.begin(), dst_partitions.end());
 
-  return zx::ok(
-      fuchsia_boot_metadata::PartitionMapMetadata{{.partition_map = std::move(partition_map)}});
+  return zx::ok(std::move(dst_map));
 }
 
 zx::result<fuchsia_boot_metadata::MacAddressMetadata> CreateMacAddressMetadata(
-    const fbl::Array<uint8_t>& bytes) {
+    std::span<const uint8_t> bytes) {
   fuchsia_net::MacAddress mac_address;
   if (bytes.size() != mac_address.octets().size()) {
     fdf::error("Size of encoded MAC address is incorrect: expected {} bytes but actual is {} bytes",
@@ -524,7 +532,7 @@ zx::result<> PlatformDevice::Init() {
           break;
         }
         case ZBI_TYPE_DRV_PARTITION_MAP: {
-          zx::result metadata = CreatePartitionMapMetadata(data.value());
+          zx::result metadata = CreatePartitionMap(data.value());
           if (metadata.is_error()) {
             fdf::error("Failed to create partition map metadata: {}", metadata);
             return metadata.take_error();
