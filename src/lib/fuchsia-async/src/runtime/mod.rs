@@ -14,7 +14,8 @@ use self::portable as implementation;
 
 // Exports common to all target os.
 pub use implementation::executor::{
-    LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, SpawnableFuture, TestExecutor,
+    LocalExecutor, LocalExecutorBuilder, MonotonicDuration, MonotonicInstant, SendExecutor,
+    SendExecutorBuilder, SpawnableFuture, TestExecutor, TestExecutorBuilder,
 };
 pub use implementation::task::{unblock, yield_now, JoinHandle, Task};
 pub use implementation::timer::Timer;
@@ -205,7 +206,7 @@ mod task_tests {
 
     fn run(f: impl Send + 'static + Future<Output = ()>) {
         const TEST_THREADS: u8 = 2;
-        SendExecutor::new(TEST_THREADS).run(f)
+        SendExecutorBuilder::new().num_threads(TEST_THREADS).build().run(f)
     }
 
     #[test]
@@ -250,7 +251,7 @@ mod task_tests {
     #[test]
     fn can_join_unblock_local() {
         // can we poll a blocked task in a local executor
-        LocalExecutor::new().run_singlethreaded(async move {
+        LocalExecutorBuilder::new().build().run_singlethreaded(async move {
             assert_eq!(42, unblock(|| 42u8).await);
         });
     }
@@ -268,7 +269,7 @@ mod task_tests {
     #[test]
     fn can_join_local() {
         // can we spawn, then join a task locally
-        LocalExecutor::new().run_singlethreaded(async move {
+        LocalExecutorBuilder::new().build().run_singlethreaded(async move {
             assert_eq!(42, Task::local(async move { 42u8 }).await);
         })
     }
@@ -298,7 +299,7 @@ mod timer_tests {
     #[test]
     fn shorter_fires_first_instant() {
         use std::time::{Duration, Instant};
-        let mut exec = LocalExecutor::new();
+        let mut exec = LocalExecutorBuilder::new().build();
         let now = Instant::now();
         let shorter = pin!(Timer::new(now + Duration::from_millis(100)));
         let longer = pin!(Timer::new(now + Duration::from_secs(1)));
@@ -311,7 +312,7 @@ mod timer_tests {
     #[cfg(target_os = "fuchsia")]
     #[test]
     fn can_use_zx_duration() {
-        let mut exec = LocalExecutor::new();
+        let mut exec = LocalExecutorBuilder::new().build();
         let start = MonotonicInstant::now();
         let timer = Timer::new(MonotonicDuration::from_millis(100));
         exec.run_singlethreaded(timer);
@@ -328,7 +329,7 @@ mod timer_tests {
         assert_eq!(
             {
                 let runs = runs.clone();
-                LocalExecutor::new().run_singlethreaded(
+                LocalExecutorBuilder::new().build().run_singlethreaded(
                     async move {
                         let mut sleep = Duration::from_millis(1);
                         loop {

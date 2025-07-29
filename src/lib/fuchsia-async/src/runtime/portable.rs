@@ -243,6 +243,30 @@ pub mod executor {
         }
     }
 
+    /// A builder for `SendExecutor`.
+    #[derive(Default)]
+    pub struct SendExecutorBuilder {
+        num_threads: Option<u8>,
+    }
+
+    impl SendExecutorBuilder {
+        /// Creates a new builder used for constructing a `SendExecutor`.
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Sets the number of threads for the executor.
+        pub fn num_threads(mut self, num_threads: u8) -> Self {
+            self.num_threads = Some(num_threads);
+            self
+        }
+
+        /// Builds the `SendExecutor`, consuming this `SendExecutorBuilder`.
+        pub fn build(self) -> SendExecutor {
+            SendExecutor::new(self.num_threads.unwrap_or(1))
+        }
+    }
+
     /// A single-threaded executor.
     ///
     /// API-compatible with the Fuchsia variant with the exception of testing APIs.
@@ -286,6 +310,22 @@ pub mod executor {
         }
     }
 
+    /// A builder for `LocalExecutor`.
+    #[derive(Default)]
+    pub struct LocalExecutorBuilder {}
+
+    impl LocalExecutorBuilder {
+        /// Creates a new builder used for constructing a `LocalExecutor`.
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Builds the `LocalExecutor`, consuming this `LocalExecutorBuilder`.
+        pub fn build(self) -> LocalExecutor {
+            LocalExecutor::new()
+        }
+    }
+
     /// A single-threaded executor for testing.
     ///
     /// The current implementation of Executor does not isolate work
@@ -304,6 +344,22 @@ pub mod executor {
         /// Create a new executor for testing.
         pub fn new() -> Self {
             Self { executor: LocalExecutor::new() }
+        }
+    }
+
+    /// A builder for `TestExecutor`.
+    #[derive(Default)]
+    pub struct TestExecutorBuilder {}
+
+    impl TestExecutorBuilder {
+        /// Creates a new builder used for constructing a `TestExecutor`.
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Builds the `TestExecutor`, consuming this `TestExecutorBuilder`.
+        pub fn build(self) -> TestExecutor {
+            TestExecutor::new()
         }
     }
 
@@ -387,7 +443,7 @@ pub mod timer {
 
 #[cfg(test)]
 mod tests {
-    use super::executor::{LocalExecutor, SendExecutor};
+    use super::executor::{LocalExecutorBuilder, SendExecutorBuilder};
     use super::task::Task;
 
     struct SpawnOnDrop(bool);
@@ -407,7 +463,7 @@ mod tests {
 
     #[test]
     fn local_exec_spawn_local_on_drop() {
-        let exec = LocalExecutor::new();
+        let exec = LocalExecutorBuilder::new().build();
         let bomb = SpawnOnDrop(true);
         Task::local(async move { drop(bomb) }).detach();
         drop(exec);
@@ -415,7 +471,7 @@ mod tests {
 
     #[test]
     fn local_exec_spawn_on_drop() {
-        let exec = LocalExecutor::new();
+        let exec = LocalExecutorBuilder::new().build();
         let bomb = SpawnOnDrop(false);
         Task::spawn(async move { drop(bomb) }).detach();
         drop(exec);
@@ -423,7 +479,7 @@ mod tests {
 
     #[test]
     fn send_exec_spawn_on_drop() {
-        let exec = SendExecutor::new(2);
+        let exec = SendExecutorBuilder::new().num_threads(2).build();
         let bomb = SpawnOnDrop(false);
         Task::spawn(async move { drop(bomb) }).detach();
         drop(exec);
