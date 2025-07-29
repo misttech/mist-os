@@ -7,7 +7,6 @@
 use crate::remote_binder::RemoteBinderDevice;
 use bitflags::bitflags;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_core::device::mem::new_null_file;
 use starnix_core::device::DeviceOps;
@@ -102,6 +101,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::vec::Vec;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
+use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder};
 
 /// The trace category used for binder command tracing.
 const TRACE_CATEGORY: &'static CStr = c"starnix:binder";
@@ -3262,6 +3262,12 @@ struct RemoteMemoryAccessor<'b> {
     remote_ioctl: &'b RemoteIoctl,
 }
 
+impl<'b> RemoteMemoryAccessor<'b> {
+    fn map_fidl_posix_errno(e: fposix::Errno) -> Errno {
+        errno_from_code!(e.into_primitive() as i16)
+    }
+}
+
 // The maximal size of buffers that zircon supports for process_{read|write}_memory.
 const MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 
@@ -3328,8 +3334,13 @@ impl<'b> MemoryAccessor for RemoteMemoryAccessor<'b> {
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         profile_duration!("RemoteWriteMemory");
-        if !bytes.is_empty() {
-            let mut ioctl_writes = self.remote_ioctl.ioctl_writes.take();
+        // No bytes to write.
+        if bytes.is_empty() {
+            return Ok(0);
+        }
+        // Writes are returned through ioctl, if there is space.
+        let mut ioctl_writes = self.remote_ioctl.ioctl_writes.take();
+        if ioctl_writes.len() < fbinder::MAX_IOCTL_WRITE_COUNT as usize {
             let last = ioctl_writes.last().unwrap_or(&fbinder::IoctlWrite {
                 address: 0,
                 offset: 0,
@@ -3343,7 +3354,30 @@ impl<'b> MemoryAccessor for RemoteMemoryAccessor<'b> {
             });
             self.remote_ioctl.ioctl_writes.set(ioctl_writes);
             self.remote_ioctl.vmo.write(bytes, offset).map_err(|_| errno!(ENOENT))?;
+            return Ok(bytes.len());
         }
+        // Otherwise use ProcessAccessor to write to the process.
+        if bytes.len() <= fbinder::MAX_WRITE_BYTES as usize {
+            self.remote_resource_accessor.process_accessor.write_bytes(
+                addr.ptr() as u64,
+                bytes,
+                zx::MonotonicInstant::INFINITE,
+            )
+        } else {
+            let vmo = with_zx_name(
+                zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?,
+                b"starnix:device_binder",
+            );
+            vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
+            vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
+            self.remote_resource_accessor.process_accessor.write_memory(
+                addr.ptr() as u64,
+                vmo,
+                zx::MonotonicInstant::INFINITE,
+            )
+        }
+        .map_err(|_| errno!(ENOENT))?
+        .map_err(Self::map_fidl_posix_errno)?;
         Ok(bytes.len())
     }
 
@@ -5551,6 +5585,7 @@ pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
+    use fuchsia_async as fasync;
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
@@ -5558,7 +5593,6 @@ pub mod tests {
     use starnix_core::testing::*;
     use starnix_core::vfs::{anon_fs, Anon};
     use starnix_uapi::errors::{EBADF, EINVAL};
-    use {fidl_fuchsia_posix as fposix, fuchsia_async as fasync};
 
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
@@ -9513,6 +9547,18 @@ pub mod tests {
                 .write_memory((vector.as_ptr() as u64).into(), &other_vector[..small_size])
                 .expect("write_memory");
             apply_writes(remote_ioctl.ioctl_writes.take(), &remote_ioctl.vmo);
+            assert_eq!(vector[1], 1);
+            assert_eq!(vector[..small_size], other_vector[..small_size]);
+
+            // Do one more write than there is space for. The last write should then use the
+            // ProcessAccessor to write to the address.
+            vector.clear();
+            vector.resize(vector_size, 0);
+            for _ in 0..=fbinder::MAX_IOCTL_WRITE_COUNT {
+                remote_memory_accessor
+                    .write_memory((vector.as_ptr() as u64).into(), &other_vector[..small_size])
+                    .expect("write_memory");
+            }
             assert_eq!(vector[1], 1);
             assert_eq!(vector[..small_size], other_vector[..small_size]);
 
