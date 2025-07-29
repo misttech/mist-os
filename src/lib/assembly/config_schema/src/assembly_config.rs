@@ -25,17 +25,16 @@ use crate::product_config::{ProductConfig, ProductPackageDetails};
 /// This is a high-level operation that takes a more abstract description of
 /// what is desired in the assembled product images, and then generates the
 /// complete Image Assembly configuration (`ImageAssemblyConfig`) from that.
-#[derive(Debug, Deserialize, Serialize, JsonSchema, WalkPaths)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths)]
+#[serde(default, deny_unknown_fields)]
 #[assembly_container(product_configuration.json)]
 pub struct AssemblyConfig {
     #[walk_paths]
     pub platform: PlatformConfig,
     #[walk_paths]
-    #[serde(default)]
     pub product: ProductConfig,
     #[walk_paths]
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(skip)]
     pub product_input_bundles: BTreeMap<String, ProductInputBundle>,
 }

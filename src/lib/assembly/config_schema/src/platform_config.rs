@@ -40,7 +40,7 @@ pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// The minimum service-level that the platform will provide, or the main
@@ -60,6 +60,8 @@ pub struct PlatformConfig {
     /// determinant of the makeup of the platform.  It selects platform
     /// components and configuration, and is used to disallow various platform
     /// configuration settings when producing Userdebug and User images.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub build_type: BuildType,
 
     /// List of logging tags to forward to the serial console.
@@ -317,11 +319,12 @@ pub enum FeatureSetLevel {
 /// These control security and behavioral settings within the platform, and can
 /// change the platform packages placed into the assembled product image.
 ///
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum BuildType {
     Eng,
     UserDebug,
+    #[default]
     User,
 }
 

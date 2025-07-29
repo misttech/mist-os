@@ -1,6 +1,5 @@
 {
     "platform": {
-        "build_type": "user",
         "connectivity": {
             "wlan": {
                 "legacy_privacy_support": true
@@ -10,43 +9,54 @@
             "enabled": true
         },
         "diagnostics": {
+            "archivist": "default",
             "additional_serial_log_components": [
                 "/core/session-manager",
                 "/core/session-manager/session:session"
             ],
-            "archivist": "default"
+            "no_console": false
         },
         "ui": {
+            "pointer_auto_focus": true,
             "supported_input_devices": [
                 "button",
                 "keyboard"
-            ]
+            ],
+            "attach_a11y_view": true
         }
     },
     "product": {
-        "base_drivers": [
-            {
-                "components": [
-                    "meta/backlight_driver.cm"
-                ],
-                "package": "packages/backlight_driver"
-            }
-        ],
         "packages": {
             "base": {
                 "ams-light-test": {
+                    "manifest": "packages/ams-light-test",
                     "config_data": [
                         {
-                            "destination": "destination.json",
-                            "source": "product/packages/base/ams-light-test/config_data/destination.json/config_data.json"
+                            "source": "product/packages/base/ams-light-test/config_data/destination.json/config_data.json",
+                            "destination": "destination.json"
                         }
-                    ],
-                    "manifest": "packages/ams-light-test"
+                    ]
                 }
             }
         },
+        "base_drivers": [
+            {
+                "package": "packages/backlight_driver",
+                "components": [
+                    "meta/backlight_driver.cm"
+                ]
+            }
+        ],
         "session": {
             "url": "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm"
+        },
+        "release_info": {
+            "info": {
+                "name": "unknown",
+                "repository": "unknown",
+                "version": "unversioned"
+            },
+            "pibs": []
         }
     }
 }
