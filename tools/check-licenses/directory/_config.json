@@ -4,6 +4,14 @@
         "skips": [
             {
                 "notes": [
+                    "Temporarily disabled to allow for third_party repository moves."
+                ],
+                "paths": [
+                    "build/secondary/third_party/glog"
+                ]
+            },
+            {
+                "notes": [
                     "Test directories under repos in bazel_vendor.",
                     "They don't have license files included."
                 ],

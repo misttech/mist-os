@@ -198,7 +198,7 @@
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="262f0c97f2fbc3839a59523cc6c6bcf500e2850b"/>
     <project name="third_party/glog"
-             path="third_party/glog"
+             path="third_party/glog/src"
              remote="https://fuchsia.googlesource.com/third_party/glog"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="41613c4940b57f13550c609c20ff31cc0b257fac"/>
