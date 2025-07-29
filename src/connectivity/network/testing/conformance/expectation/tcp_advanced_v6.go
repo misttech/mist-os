@@ -27,12 +27,12 @@ var tcpAdvancedV6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseN
 	{5, 22}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
 	{5, 23}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
 	{6, 17}:  Pass,
-	{7, 17}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
-	{7, 18}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
-	{8, 17}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
-	{8, 18}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
-	{8, 19}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
-	{8, 20}:  Pass,
+	{7, 17}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
+	{7, 18}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 17}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 18}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 19}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
+	{8, 20}:  Skip,     // https://fxbug.dev/434686230: Causes ANVL exits.
 	{8, 21}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
 	{8, 22}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
 	{8, 23}:  Skip,     // https://fxbug.dev/427248980: Causes ANVL exits.
