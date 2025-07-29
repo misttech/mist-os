@@ -7,8 +7,6 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
-#include <string_view>
-
 #include <gtest/gtest.h>
 
 #if __cplusplus >= 202002L
@@ -97,6 +95,7 @@ TEST(ConfigCheckResult, ToString) {
 TEST(ConfigCheckResult, Format) {
   EXPECT_EQ(std::format("{}", ConfigCheckResult::kOk), "Ok");
   EXPECT_EQ(std::format("{}", ConfigCheckResult::kEmptyConfig), "EmptyConfig");
+  EXPECT_EQ(std::format("{:>8}", ConfigCheckResult::kOk), "      Ok");
 }
 #endif  // __cplusplus >= 202002L
 

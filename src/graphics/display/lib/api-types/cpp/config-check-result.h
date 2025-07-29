@@ -58,7 +58,7 @@ class ConfigCheckResult {
   // equivalent FIDL type.
   constexpr uint32_t ValueForLogging() const;
 
-  // Returns a developer-facing string representing the result.
+  // Returns a developer-facing string representation.
   std::string_view ToString() const;
 
   static const ConfigCheckResult kOk;

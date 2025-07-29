@@ -4,8 +4,12 @@
 
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <zircon/assert.h>
 
+#include <cinttypes>
+#include <string_view>
 #include <type_traits>
 
 namespace display {
@@ -29,25 +33,28 @@ static_assert(ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo() ==
               CONFIG_CHECK_RESULT_UNSUPPORTED_MODES);
 
 std::string_view ConfigCheckResult::ToString() const {
-  if (*this == ConfigCheckResult::kOk) {
-    return "Ok";
+  switch (result_) {
+    case fuchsia_hardware_display_types::wire::ConfigResult::kOk:
+      return "Ok";
+
+    case fuchsia_hardware_display_types::wire::ConfigResult::kEmptyConfig:
+      return "EmptyConfig";
+
+    case fuchsia_hardware_display_types::wire::ConfigResult::kInvalidConfig:
+      return "InvalidConfig";
+
+    case fuchsia_hardware_display_types::wire::ConfigResult::kUnsupportedConfig:
+      return "UnsupportedConfig";
+
+    case fuchsia_hardware_display_types::wire::ConfigResult::kTooManyDisplays:
+      return "TooManyDisplays";
+
+    case fuchsia_hardware_display_types::wire::ConfigResult::kUnsupportedDisplayModes:
+      return "UnsupportedDisplayModes";
   }
-  if (*this == ConfigCheckResult::kEmptyConfig) {
-    return "EmptyConfig";
-  }
-  if (*this == ConfigCheckResult::kInvalidConfig) {
-    return "InvalidConfig";
-  }
-  if (*this == ConfigCheckResult::kUnsupportedConfig) {
-    return "UnsupportedConfig";
-  }
-  if (*this == ConfigCheckResult::kTooManyDisplays) {
-    return "TooManyDisplays";
-  }
-  if (*this == ConfigCheckResult::kUnsupportedDisplayModes) {
-    return "UnsupportedDisplayModes";
-  }
-  return "Unknown";
+
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid ConfigCheckResult value: %" PRIu32, ValueForLogging());
+  return "(invalid value)";
 }
 
 }  // namespace display
