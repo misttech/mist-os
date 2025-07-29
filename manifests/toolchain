@@ -75,7 +75,7 @@
     -->
     <package name="fuchsia/third_party/rust/host/${platform}"
              version="git_revisions:6caa224a242d4c7b06c317969c51862815a4454b,c435cd173059863b44262ace75e0f381bbc6cb86"
-             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
+             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
 
     <!-- Rust targets https://ci.chromium.org/p/fuchsia/g/rust/console

@@ -834,6 +834,11 @@
         "instance_id": "bbdnbQTM76KVJOe0YVTqAPys2zQmFZJc3NOa7ZYLMWMC"
     },
     {
+        "package": "fuchsia/third_party/rust/host/windows-amd64",
+        "version": "git_revisions:6caa224a242d4c7b06c317969c51862815a4454b,c435cd173059863b44262ace75e0f381bbc6cb86",
+        "instance_id": "8ZOzmXq7_wKrr4OPm0u-Ph1Hiu7o4E6B4cWpQQyAegUC"
+    },
+    {
         "package": "fuchsia/third_party/rust/target/aarch64-apple-darwin",
         "version": "git_revisions:6caa224a242d4c7b06c317969c51862815a4454b,c435cd173059863b44262ace75e0f381bbc6cb86",
         "instance_id": "KGU68ZWupwXIv1AZNEvd_IPsIu5OJWBd13VUIRcAkacC"
