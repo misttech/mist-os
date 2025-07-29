@@ -562,6 +562,7 @@ where
     message_header.flags = 0;
 
     let cmsg_buffer_size = message_header.control_len;
+
     let mut cmsg_bytes_written = 0;
     let header_size = CMsgHdrPtr::size_of_object_for(current_task);
 
@@ -763,6 +764,9 @@ where
 {
     if message_header.name_len > i32::MAX as u32 {
         return error!(EINVAL);
+    }
+    if message_header.control_len > 20480 {
+        return error!(ENOBUFS);
     }
     let dest_address = maybe_parse_socket_address(
         current_task,

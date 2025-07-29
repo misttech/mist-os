@@ -1005,6 +1005,33 @@ TEST_P(SocketFault, WriteV) {
   EXPECT_EQ(errno, EAGAIN);
 }
 
+TEST_P(SocketFault, SendmsgENOBUFS) {
+  int sockfd;
+  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  ASSERT_GT(sockfd, 0) << strerror(errno);
+
+  char data[] = "a";
+  struct iovec iov[] = {{
+      .iov_base = data,
+      .iov_len = 1,
+  }};
+  char buf[CMSG_SPACE(0)];
+  struct msghdr msg = {
+      .msg_iov = iov,
+      .msg_iovlen = 1,
+      .msg_control = buf,
+      .msg_controllen = UINT_MAX,
+  };
+  *CMSG_FIRSTHDR(&msg) = (struct cmsghdr){
+      .cmsg_len = UINT_MAX,
+      .cmsg_level = SOL_SOCKET,
+      .cmsg_type = SCM_RIGHTS,
+  };
+
+  ASSERT_EQ(sendmsg(sockfd, &msg, 0), -1);
+  ASSERT_EQ(errno, ENOBUFS);
+}
+
 INSTANTIATE_TEST_SUITE_P(SocketFault, SocketFault,
                          testing::Values(std::make_pair(SOCK_DGRAM, 0),
                                          std::make_pair(SOCK_DGRAM, IPPROTO_ICMP),
