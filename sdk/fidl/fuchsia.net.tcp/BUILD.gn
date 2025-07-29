@@ -1,0 +1,14 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.net.tcp") {
+  sources = [ "tcp.fidl" ]
+  sdk_category = "prebuilt"
+  sdk_area = "Netstack"
+  stable = true
+
+  enable_hlcpp = true
+}
