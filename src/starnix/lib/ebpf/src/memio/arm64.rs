@@ -13,3 +13,13 @@ pub(super) unsafe fn load_u64(addr: *const u64) -> u64 {
 pub(super) unsafe fn store_u64(addr: *mut u64, value: u64) {
     asm!("str {value}, [{addr}]", addr = in(reg) addr, value = in(reg) value);
 }
+
+pub(super) unsafe fn load_u32(addr: *const u32) -> u32 {
+    let result: u32;
+    asm!("ldr {result:w}, [{addr}]", addr = in(reg) addr, result = out(reg) result);
+    result
+}
+
+pub(super) unsafe fn store_u32(addr: *mut u32, value: u32) {
+    asm!("str {value:w}, [{addr}]", addr = in(reg) addr, value = in(reg) value);
+}
