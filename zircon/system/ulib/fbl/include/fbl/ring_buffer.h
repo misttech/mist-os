@@ -7,7 +7,9 @@
 
 #include <zircon/assert.h>
 
+#include <cstdint>
 #include <type_traits>
+#include <utility>
 
 #include <fbl/macros.h>
 
