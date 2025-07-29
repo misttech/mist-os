@@ -281,7 +281,9 @@ fn to_test_list_entry(args: ToTestListEntryArgs<'_, '_>) -> TestListEntry {
                 realm: realm,
                 create_no_exception_channel: test_entry
                     .create_no_exception_channel
-                    .unwrap_or(false),
+                    // TODO(https://fxbug.dev/433976599): reclaim the exception channel once the
+                    // flake is fixed.
+                    .unwrap_or(true),
             }))
         }
         None => None,
@@ -869,7 +871,7 @@ mod tests {
             realm: None,
             disable_suites: &HashMap::new(),
         });
-        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, true),);
 
         // Inner default severity.
         let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
@@ -881,7 +883,7 @@ mod tests {
             realm: None,
             disable_suites: &HashMap::new(),
         });
-        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, true),);
 
         // Explicit severity
         let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
@@ -895,7 +897,7 @@ mod tests {
         });
         assert_eq!(
             test_list_entry,
-            make_expected_test_list_entry(Some(Severity::Error), None, false)
+            make_expected_test_list_entry(Some(Severity::Error), None, true)
         );
 
         // Explicit create_no_exception_channel.
@@ -935,7 +937,7 @@ mod tests {
                 max_severity_logs: None,
                 min_severity_logs: None,
                 realm: Some("/some/moniker".into()),
-                create_no_exception_channel: false,
+                create_no_exception_channel: true,
             })),
         };
         assert_eq!(test_list_entry, expected_list);
