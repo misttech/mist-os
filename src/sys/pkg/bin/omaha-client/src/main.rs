@@ -34,7 +34,7 @@ use configuration::ClientConfiguration;
 pub fn main() -> Result<(), Error> {
     info!("Starting omaha client...");
 
-    let mut executor = fuchsia_async::LocalExecutor::new();
+    let mut executor = fuchsia_async::LocalExecutorBuilder::new().build();
 
     executor.run_singlethreaded(main_inner()).map_err(|err| {
         // Use anyhow to print the error chain.

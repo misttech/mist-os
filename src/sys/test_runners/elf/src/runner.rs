@@ -21,7 +21,7 @@ where
     S: SuiteServer,
 {
     info!("started");
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     fuchsia_trace_provider::trace_provider_wait_for_init();
 

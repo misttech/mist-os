@@ -94,7 +94,7 @@ impl ConnectedProtocol for CobaltConnectedService {
 pub fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     executor.run_singlethreaded(async move {
         match main_inner().await {
             Err(err) => {
