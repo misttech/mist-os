@@ -1212,7 +1212,7 @@ type SocketCreationOptions = table {
 /// directly to this protocol will make those changes more difficult.
 @discoverable(server="platform")
 closed protocol Provider {
-    /// Requests a stream socket with the specifed parameters and the creation
+    /// Requests a stream socket with the specified parameters and the creation
     /// options.
     @available(added=HEAD)
     strict StreamSocketWithOptions(struct {
@@ -1249,7 +1249,7 @@ closed protocol Provider {
         2: synchronous_datagram_socket client_end:SynchronousDatagramSocket;
     }) error fuchsia.posix.Errno;
 
-    /// Requests a datagram socket with the specifed parameters and the creation
+    /// Requests a datagram socket with the specified parameters and the creation
     /// options.
     @available(added=HEAD)
     strict DatagramSocketWithOptions(struct {

@@ -221,7 +221,7 @@ closed(removed=18) open(added=18) protocol BatchIterator {
         batch vector<FormattedContent>:MAXIMUM_ENTRIES_PER_BATCH;
     }) error ReaderError;
 
-    /// Indiciates that the BatchIterator has been connected. If the
+    /// Indicates that the BatchIterator has been connected. If the
     /// BatchIterator hasn't been connected, this method will hang until it is.
     @available(added=18)
     flexible WaitForReady() -> ();
