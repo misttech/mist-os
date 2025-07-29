@@ -1365,6 +1365,10 @@ class Scheduler {
   // context switch operation has fully completed.
   Thread* previous_thread_{nullptr};
 
+  // Utility type that tracks values used for comparing candidate thread
+  // placements when finding a target CPU for a waking or migrating thread.
+  class CandidatePlacement;
+
   // PowerLevelControl encapsulates the CPU energy model and power level control interface for
   // energy aware scheduling.
   //

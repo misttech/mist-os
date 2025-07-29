@@ -1273,6 +1273,41 @@ Scheduler::DequeueResult Scheduler::EvaluateNextThread(
 }
 #endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
+// Latches a potential candidate placement for the thread and essential values
+// for making comparisons with other candidates. These values are exposed as
+// relaxed atomics to avoid queue lock contention, since these values are
+// subject to change as soon as the queue lock is dropped, and the comparisons
+// only require approximate consistency. Latching the values ensures that each
+// comparison of a particular candidate with other candidates uses the same
+// values.
+class Scheduler::CandidatePlacement {
+ public:
+  CandidatePlacement() = default;
+
+  // Latches key values using relaxed atomic reads.
+  explicit CandidatePlacement(const Scheduler* scheduler)
+      : scheduler_{scheduler},
+        queue_time_ns_{scheduler->exported_queue_time_ns()},
+        processing_rate_{scheduler->exported_processing_rate()},
+        deadline_utilization_{scheduler->exported_deadline_utilization()} {}
+
+  CandidatePlacement(const CandidatePlacement&) = default;
+  CandidatePlacement& operator=(const CandidatePlacement&) = default;
+
+  explicit operator bool() const { return scheduler_ != nullptr; }
+
+  const Scheduler* scheduler() const { return scheduler_; }
+  SchedDuration queue_time_ns() const { return queue_time_ns_; }
+  SchedProcessingRate processing_rate() const { return processing_rate_; }
+  SchedUtilization deadline_utilization() const { return deadline_utilization_; }
+
+ private:
+  const Scheduler* scheduler_{nullptr};
+  SchedDuration queue_time_ns_{0};
+  SchedProcessingRate processing_rate_{0};
+  SchedUtilization deadline_utilization_{0};
+};
+
 cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "find_target");
 
@@ -1307,49 +1342,14 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
              current_cpu, starting_cpu, active_mask, &thread, &search_set, search_set.cpu_count(),
              search_set.const_iterator().data());
 
-  // Latches a potential candidate placement for the thread and essential values
-  // for making comparisons with other candidates. These values are exposed as
-  // relaxed atomics to avoid queue lock contention, since these values are
-  // subject to change as soon as the queue lock is dropped, and the comparisons
-  // only require approximate consistency. Latching the values ensures that each
-  // comparison of a particular candidate with other candidates uses the same
-  // values.
-  class Candidate {
-   public:
-    Candidate() = default;
-
-    // Latches key values using relaxed atomic reads.
-    explicit Candidate(const Scheduler* scheduler)
-        : scheduler_{scheduler},
-          queue_time_ns_{scheduler->exported_queue_time_ns()},
-          processing_rate_{scheduler->exported_processing_rate()},
-          deadline_utilization_{scheduler->exported_deadline_utilization()} {}
-
-    Candidate(const Candidate&) = default;
-    Candidate& operator=(const Candidate&) = default;
-
-    explicit operator bool() const { return scheduler_ != nullptr; }
-
-    const Scheduler* scheduler() const { return scheduler_; }
-    SchedDuration queue_time_ns() const { return queue_time_ns_; }
-    SchedProcessingRate processing_rate() const { return processing_rate_; }
-    SchedUtilization deadline_utilization() const { return deadline_utilization_; }
-
-   private:
-    const Scheduler* scheduler_{nullptr};
-    SchedDuration queue_time_ns_{0};
-    SchedProcessingRate processing_rate_{0};
-    SchedUtilization deadline_utilization_{0};
-  };
-
   const bool is_fair = IsFairThread(thread);
   const SchedUtilization thread_deadline_utilization =
       is_fair ? SchedUtilization{0} : thread_state.effective_profile().deadline().utilization;
 
   // Compares candidates and returns true if alternate_target is a better
   // alternative than current_target for placing the thread.
-  const auto compare = [is_fair](const Candidate& alternate_target,
-                                 const Candidate& current_target) {
+  const auto compare = [is_fair](const CandidatePlacement& alternate_target,
+                                 const CandidatePlacement& current_target) {
     ktrace::Scope trace_compare = LOCAL_KTRACE_BEGIN_SCOPE(
         DETAILED, "compare", ("Alternate target queue time", alternate_target.queue_time_ns()),
         ("Current target queue time", current_target.queue_time_ns()));
@@ -1380,30 +1380,30 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
 
   // Determines whether the current target is sufficiently good to terminate the
   // selection loop.
-  const auto is_sufficient = [is_fair,
-                              thread_deadline_utilization](const Candidate& current_target) {
-    ktrace::Scope trace_is_sufficient = LOCAL_KTRACE_BEGIN_SCOPE(
-        DETAILED, "is_sufficient", ("intra cluster threshold", kIntraClusterThreshold),
-        ("candidate queue time", current_target.queue_time_ns()));
+  const auto is_sufficient =
+      [is_fair, thread_deadline_utilization](const CandidatePlacement& current_target) {
+        ktrace::Scope trace_is_sufficient = LOCAL_KTRACE_BEGIN_SCOPE(
+            DETAILED, "is_sufficient", ("intra cluster threshold", kIntraClusterThreshold),
+            ("candidate queue time", current_target.queue_time_ns()));
 
-    if (is_fair) {
-      return current_target.queue_time_ns() <= kIntraClusterThreshold;
-    }
+        if (is_fair) {
+          return current_target.queue_time_ns() <= kIntraClusterThreshold;
+        }
 
-    return current_target.queue_time_ns() <= kIntraClusterThreshold &&
-           current_target.deadline_utilization() + thread_deadline_utilization <=
-               current_target.processing_rate();
-  };
+        return current_target.queue_time_ns() <= kIntraClusterThreshold &&
+               current_target.deadline_utilization() + thread_deadline_utilization <=
+                   current_target.processing_rate();
+      };
 
   // Loop over the search set for CPU the task last ran on to find a suitable
   // target.
   cpu_num_t target_cpu = INVALID_CPU;
-  Candidate target_queue{};
+  CandidatePlacement target_queue{};
 
   for (const auto& entry : search_set.const_iterator()) {
     const cpu_num_t candidate_cpu = entry.cpu;
     const bool candidate_available = available_mask & cpu_num_to_mask(candidate_cpu);
-    const Candidate candidate_queue{Get(candidate_cpu)};
+    const CandidatePlacement candidate_queue{Get(candidate_cpu)};
 
     if (candidate_available && (!target_queue || compare(candidate_queue, target_queue))) {
       target_cpu = candidate_cpu;
