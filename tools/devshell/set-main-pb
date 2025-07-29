@@ -31,7 +31,7 @@ function check_has_product_bundles() {
 function print_available {
   check_has_product_bundles "$@"
   echo "Available product bundles:"
-  printf '  %s\n' "$@"
+  printf '  %s\n' "$@" | sort
 
   echo ""
   echo "Tip: Try zsh-completion with //scripts/zsh-completion/README.md"
