@@ -21,7 +21,7 @@ extern std::string DoPrePolicyLoadWork() { return "binder.pp"; }
 namespace {
 
 constexpr int kServiceManagerHandle = 0;
-const long kBinderMMapSize = sysconf(_SC_PAGESIZE);
+const size_t kBinderMMapSize = sysconf(_SC_PAGESIZE);
 
 // Opens the binder
 fbl::unique_fd OpenBinder() { return fbl::unique_fd(open("/tmp/binder", O_RDWR | O_CLOEXEC)); }
