@@ -38,6 +38,7 @@ _tools = [
   "starnix",
   "storage",
   "triage",
+  "usb_driver",
   "wm",
 ]
 
