@@ -611,4 +611,4 @@ void PortDispatcher::InitializeCacheAllocators(uint32_t /*level*/) {
 
 // Initialize the cache after the percpu data structures are initialized.
 LK_INIT_HOOK(port_observer_cache_init, PortDispatcher::InitializeCacheAllocators,
-             LK_INIT_LEVEL_KERNEL + 1)
+             LK_INIT_LEVEL_KERNEL)

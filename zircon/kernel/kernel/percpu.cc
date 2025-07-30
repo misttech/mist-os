@@ -50,7 +50,7 @@ void percpu::InitializeBoot() {
   arch_setup_percpu(0, &boot_processor_.Get());
 }
 
-void percpu::InitializeSecondariesBegin(uint32_t /*init_level*/) {
+void percpu::InitializeSecondariesBegin() {
   processor_count_ = CpuDistanceMap::Get().cpu_count();
   DEBUG_ASSERT(processor_count_ != 0);
 
@@ -119,7 +119,3 @@ void percpu::InitializeSecondaryFinish() {
   DEBUG_ASSERT(cpu_num < processor_count());
   arch_setup_percpu(cpu_num, processor_index_[cpu_num]);
 }
-
-// Allocate secondary percpu instances before booting other processors, after
-// vm and system topology are initialized.
-LK_INIT_HOOK(percpu_heap_init, percpu::InitializeSecondariesBegin, LK_INIT_LEVEL_KERNEL)

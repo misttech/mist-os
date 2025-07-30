@@ -7899,4 +7899,4 @@ void VmCowPages::InitializePageCache(uint32_t level) {
 }
 
 // Initialize the cache after the percpu data structures are initialized.
-LK_INIT_HOOK(vm_cow_pages_cache_init, VmCowPages::InitializePageCache, LK_INIT_LEVEL_KERNEL + 1)
+LK_INIT_HOOK(vm_cow_pages_cache_init, VmCowPages::InitializePageCache, LK_INIT_LEVEL_KERNEL)

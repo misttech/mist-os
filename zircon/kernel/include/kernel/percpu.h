@@ -131,7 +131,7 @@ struct percpu {
 
   // Called once by the boot processor after heap init to initialize the percpu
   // data for the secondary processors.
-  static void InitializeSecondariesBegin(uint32_t init_level);
+  static void InitializeSecondariesBegin();
 
   // Called on each secondary processors immediately after booting.
   static void InitializeSecondaryFinish();

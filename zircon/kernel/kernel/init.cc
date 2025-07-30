@@ -7,14 +7,14 @@
 
 #include "kernel/init.h"
 
-#include <debug.h>
-#include <zircon/compiler.h>
-
 #include <kernel/mp.h>
-#include <kernel/thread.h>
-#include <kernel/timer.h>
+#include <kernel/percpu.h>
 
-void kernel_init(void) {
-  dprintf(SPEW, "initializing mp\n");
+// Called at LK_INIT_LEVEL_KERNEL
+void kernel_init() {
   mp_init();
+
+  // Allocate secondary percpu instances before booting other processors, after
+  // vm and system topology are initialized.
+  percpu::InitializeSecondariesBegin();
 }
