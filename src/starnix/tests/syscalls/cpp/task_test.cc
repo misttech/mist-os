@@ -8,6 +8,7 @@
 #include <sched.h>
 #include <strings.h>
 #include <sys/mman.h>
+#include <sys/select.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -53,6 +54,22 @@ volatile size_t g_fork_doesnt_drop_writes = 0;
 
 constexpr int kChildExpectedExitCode = 21;
 constexpr int kChildErrorExitCode = kChildExpectedExitCode + 1;
+
+constexpr uid_t kUser1Uid = 65533;
+constexpr gid_t kUser1Gid = 65534;
+
+bool change_ids(uid_t user, gid_t group) {
+  return (setresgid(group, group, group) == 0) && (setresuid(user, user, user) == 0);
+}
+
+void WaitForReadFd(int fd) {
+  fd_set read_fds;
+  FD_ZERO(&read_fds);
+  FD_SET(fd, &read_fds);
+
+  SAFE_SYSCALL(TEMP_FAILURE_RETRY(select(fd + 1, &read_fds, nullptr, nullptr, nullptr)));
+  EXPECT_TRUE(FD_ISSET(fd, &read_fds));
+}
 
 pid_t ForkUsingClone3(const clone_args* cl_args, size_t size) {
   return static_cast<pid_t>(syscall(SYS_clone3, cl_args, size));
@@ -934,6 +951,91 @@ TEST(Task, KillESRCH) {
 
     // A pid after fork is guaranteed to not collide with process group ids.
     EXPECT_THAT(kill(-pid, SIGCHLD), SyscallFailsWithErrno(ESRCH));
+  });
+}
+
+TEST(Task, KillChildEPERM) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "test requires root privileges";
+  }
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    test_helper::EventFdSem fd(0);
+
+    pid_t child_pid = SAFE_SYSCALL(fork());
+    if (child_pid == 0) {
+      fd.Wait();
+      _exit(EXIT_SUCCESS);
+    }
+
+    SAFE_SYSCALL(change_ids(kUser1Uid, kUser1Gid));
+
+    EXPECT_THAT(kill(child_pid, SIGCHLD), SyscallFailsWithErrno(EPERM));
+    fd.Notify(1);
+
+    SAFE_SYSCALL(waitpid(child_pid, nullptr, 0));
+  });
+}
+
+TEST(Task, KillZombie) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    pid_t child_pid = SAFE_SYSCALL(fork());
+    if (child_pid == 0) {
+      _exit(EXIT_SUCCESS);
+    }
+    int pidfd = test_helper::PidFdOpen(child_pid, 0);
+    WaitForReadFd(pidfd);
+    close(pidfd);
+
+    EXPECT_THAT(kill(child_pid, SIGCHLD), SyscallSucceeds());
+    SAFE_SYSCALL(waitpid(child_pid, nullptr, 0));
+  });
+}
+
+TEST(Task, KillZombieEPERM) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "test requires root privileges";
+  }
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    pid_t child_pid = SAFE_SYSCALL(fork());
+    if (child_pid == 0) {
+      _exit(EXIT_SUCCESS);
+    }
+    int pidfd = test_helper::PidFdOpen(child_pid, 0);
+    WaitForReadFd(pidfd);
+    close(pidfd);
+
+    SAFE_SYSCALL(change_ids(kUser1Uid, kUser1Gid));
+    EXPECT_THAT(kill(child_pid, SIGCHLD), SyscallFailsWithErrno(EPERM));
+    SAFE_SYSCALL(waitpid(child_pid, nullptr, 0));
+  });
+}
+
+TEST(Task, KillParentEPERM) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "test requires root privileges";
+  }
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    test_helper::EventFdSem fd(0);
+
+    pid_t child_pid = SAFE_SYSCALL(fork());
+    if (child_pid == 0) {
+      pid_t parent_pid = getppid();
+      SAFE_SYSCALL(change_ids(kUser1Uid, kUser1Gid));
+
+      EXPECT_THAT(kill(parent_pid, SIGCHLD), SyscallFailsWithErrno(EPERM));
+      SAFE_SYSCALL(fd.Notify(1));
+      _exit(EXIT_SUCCESS);
+    }
+
+    fd.Wait();
+    SAFE_SYSCALL(waitpid(child_pid, nullptr, 0));
   });
 }
 

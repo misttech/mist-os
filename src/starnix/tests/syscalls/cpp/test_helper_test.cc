@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <thread>
 
 #include <gtest/gtest.h>
 
@@ -45,6 +46,55 @@ TEST(ScopedTestDirTest, DoesntLeakFileDescriptors) {
   });
 
   EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST(EventFdSemTest, WaitFromThread) {
+  test_helper::EventFdSem sem(0);
+  std::thread t1([&sem]() { SAFE_SYSCALL(sem.Wait()); });
+
+  SAFE_SYSCALL(sem.Notify(1));
+  t1.join();
+}
+
+TEST(EventFdSemTest, WaitFromFork) {
+  test_helper::EventFdSem sem(0);
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&sem]() { SAFE_SYSCALL(sem.Wait()); });
+
+  SAFE_SYSCALL(sem.Notify(1));
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST(EventFdSemTest, CheckWaitThreaded) {
+  test_helper::EventFdSem sem(0);
+  std::atomic<bool> flag = false;
+
+  std::thread t1([&sem, &flag]() {
+    SAFE_SYSCALL(sem.Wait());
+    flag = true;
+  });
+
+  EXPECT_EQ(flag, false);
+  SAFE_SYSCALL(sem.Notify(1));
+  t1.join();
+  EXPECT_EQ(flag, true);
+}
+
+TEST(EventFdSemTest, NotifyFromThread) {
+  test_helper::EventFdSem sem(0);
+  std::thread t1([&sem]() { SAFE_SYSCALL(sem.Notify(1)); });
+
+  t1.join();
+  SAFE_SYSCALL(sem.Wait());
+}
+
+TEST(EventFdSemTest, NotifyFromFork) {
+  test_helper::EventFdSem sem(0);
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&sem]() { SAFE_SYSCALL(sem.Notify(1)); });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+  SAFE_SYSCALL(sem.Wait());
 }
 
 }  // namespace

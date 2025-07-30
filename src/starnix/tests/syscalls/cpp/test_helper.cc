@@ -452,6 +452,10 @@ int MemFdCreate(const char *name, unsigned int flags) {
   return static_cast<int>(syscall(SYS_memfd_create, name, flags));
 }
 
+int PidFdOpen(pid_t pid, unsigned int flags) {
+  return static_cast<int>(syscall(SYS_pidfd_open, pid, flags));
+}
+
 // Attempts to read a byte from the given memory address.
 // Returns whether the read succeeded or not.
 bool TryRead(uintptr_t addr) {

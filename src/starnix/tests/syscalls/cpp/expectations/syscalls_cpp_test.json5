@@ -113,6 +113,9 @@
                 // TODO(https://fxbug.dev/419882465): Need a more granular API to report these values correctly
                 "MMapProcTest.SmapsRssSplitMappingsStrict",
                 "MlockProcTest.MlockOnePageIncreasesVmLck",
+
+                // TODO(https://fxbug.dev/423010702)
+                "Task.KillZombieEPERM",
             ],
         },
         {
