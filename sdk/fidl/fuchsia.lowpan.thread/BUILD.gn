@@ -12,10 +12,14 @@ fidl("fuchsia.lowpan.thread") {
   sources = [
     "capabilities.fidl",
     "dataset.fidl",
+    "epskc.fidl",
     "feature.fidl",
     "meshcop.fidl",
     "overview.fidl",
   ]
 
-  public_deps = [ "//sdk/fidl/fuchsia.lowpan" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.lowpan",
+    "//zircon/vdso/zx",
+  ]
 }
