@@ -43,22 +43,8 @@ use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[cfg(target_arch = "aarch64")]
-use starnix_uapi::__NR_clock_getres;
-#[cfg(target_arch = "aarch64")]
-use starnix_uapi::__NR_clock_gettime;
-#[cfg(target_arch = "aarch64")]
-use starnix_uapi::__NR_gettimeofday;
-#[cfg(target_arch = "aarch64")]
 use starnix_uapi::{AUDIT_ARCH_AARCH64, AUDIT_ARCH_ARM};
 
-#[cfg(target_arch = "x86_64")]
-use starnix_uapi::__NR_clock_gettime;
-#[cfg(target_arch = "x86_64")]
-use starnix_uapi::__NR_getcpu;
-#[cfg(target_arch = "x86_64")]
-use starnix_uapi::__NR_gettimeofday;
-#[cfg(target_arch = "x86_64")]
-use starnix_uapi::__NR_time;
 #[cfg(target_arch = "x86_64")]
 use starnix_uapi::AUDIT_ARCH_X86_64;
 
@@ -254,24 +240,6 @@ impl SeccompFilterContainer {
     /// highest priority result (which contains a reference to the filter that generated it)
     pub fn run_all(&self, current_task: &CurrentTask, syscall: &Syscall) -> SeccompFilterResult {
         let mut r = SeccompFilterResult { action: SeccompAction::Allow, filter: None };
-
-        // VDSO calls can't be caught by seccomp, so most seccomp filters forget to declare them.
-        // But our VDSO implementation is incomplete, and most of the calls forward to the actual
-        // syscalls. So seccomp should ignore them until they're implemented correctly in the VDSO.
-        #[cfg(target_arch = "x86_64")] // The set of VDSO calls is arch dependent.
-        #[allow(non_upper_case_globals)]
-        if let __NR_clock_gettime | __NR_getcpu | __NR_gettimeofday | __NR_time =
-            syscall.decl.number as u32
-        {
-            return r;
-        }
-        #[cfg(target_arch = "aarch64")]
-        #[allow(non_upper_case_globals)]
-        if let __NR_clock_gettime | __NR_clock_getres | __NR_gettimeofday =
-            syscall.decl.number as u32
-        {
-            return r;
-        }
 
         let data = make_seccomp_data(
             current_task,
