@@ -623,6 +623,15 @@
                     "Unblocking the landing of some Rust crates that have a different LICENSE layout.",
                     "More info in https://fxbug.dev/397749809"
                 ]
+            },
+            {
+                "notes": [
+                    "Temporarily disabled to allow for third_party repository moves.",
+                    "See b/42137978 for more info."
+                ],
+                "paths": [
+                    "build/secondary/third_party/gflags"
+                ]
             }
         ]
     }
