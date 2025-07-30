@@ -613,7 +613,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     @parameterized.expand(
         [
             # TODO(https://fxbug.dev/435051200): Change the default to start a package server here.
-            ("default package server behavior", [], False, False),
+            ("default package server behavior", [], True, True),
             (
                 "override no temporary package server",
                 ["--no-allow-temporary-package-server"],

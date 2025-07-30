@@ -511,8 +511,8 @@ def parse_args(
     execution.add_argument(
         "--allow-temporary-package-server",
         action=argparse.BooleanOptionalAction,
-        help="Allow this script to start a temporary package server if one is not already running.",
-        default=False,
+        help="Allow this script to start a temporary package server if one is not already running. Default is True.",
+        default=True,
     )
 
     execution.add_argument(

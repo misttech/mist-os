@@ -367,6 +367,10 @@ moniker, so they are easier to visually inspect.**
 from the user's environment automatically**
   - Use `--env` (`-e`) to add new `KEY=VALUE` environment variables
   to tests. This flag may be specified multiple times.
+- **If no package server is running, a temporary server will be started
+for the duration of `fx test`'s execution**
+  - Use `--no-allow-temporary-package-server` to disable this behavior.
+  - If an existing package server is found, a temporary one will not be started.
 
 ### Output options
 
