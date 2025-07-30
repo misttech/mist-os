@@ -220,8 +220,8 @@ impl TestEnvBuilder {
         self
     }
 
-    fn ota_manifest_json(mut self, manifest_json: String) -> Self {
-        self.ota_manifest = Some(manifest_json);
+    fn ota_manifest_json(mut self, manifest_json: impl Into<String>) -> Self {
+        self.ota_manifest = Some(manifest_json.into());
         self
     }
 
@@ -595,7 +595,7 @@ impl TestEnvBuilder {
             data_path,
             build_info_path,
             interactions,
-            _blobfs: blobfs,
+            blobfs,
         }
     }
 }
@@ -614,7 +614,7 @@ struct TestEnv {
     data_path: PathBuf,
     build_info_path: PathBuf,
     interactions: SystemUpdaterInteractions,
-    _blobfs: Arc<BlobfsRamdisk>,
+    blobfs: Arc<BlobfsRamdisk>,
 }
 
 impl TestEnv {
@@ -629,6 +629,41 @@ impl TestEnv {
     #[track_caller]
     fn assert_interactions(&self, expected: impl IntoIterator<Item = SystemUpdaterInteraction>) {
         assert_eq!(self.take_interactions(), expected.into_iter().collect::<Vec<_>>());
+    }
+
+    #[track_caller]
+    fn assert_unordered_interactions(
+        &self,
+        expected_begin: impl IntoIterator<Item = SystemUpdaterInteraction>,
+        expected_unordered_middle: impl IntoIterator<Item = SystemUpdaterInteraction>,
+        expected_end: impl IntoIterator<Item = SystemUpdaterInteraction>,
+    ) {
+        let all_events = self.take_interactions();
+
+        let expected_begin = expected_begin.into_iter().collect::<Vec<_>>();
+        let all_events_start = all_events[..expected_begin.len()].to_vec();
+        assert_eq!(all_events_start, expected_begin);
+
+        let expected_end = expected_end.into_iter().collect::<Vec<_>>();
+        let all_events_end = all_events[all_events.len() - expected_end.len()..].to_vec();
+        assert_eq!(all_events_end, expected_end);
+
+        let expected_unordered_middle = expected_unordered_middle.into_iter().collect::<Vec<_>>();
+        assert!(
+            all_events.len()
+                == expected_begin.len() + expected_end.len() + expected_unordered_middle.len()
+        );
+
+        let all_events_middle = all_events
+            [expected_begin.len()..expected_begin.len() + expected_unordered_middle.len()]
+            .to_vec();
+
+        for event in expected_unordered_middle {
+            assert!(
+                all_events_middle.contains(&event),
+                "event {event:?} not found in {all_events_middle:#?}",
+            );
+        }
     }
 
     /// Set the name of the board that system-updater is running on.
@@ -853,11 +888,13 @@ async fn collect_blob_id_iterator(
     blobs
 }
 
+type OtaDownloaderResultSender = oneshot::Sender<Result<(), fpkg::ResolveError>>;
 struct MockOtaDownloaderService {
     interactions: SystemUpdaterInteractions,
     blobs: HashMap<Hash, Vec<u8>>,
     blobfs: Arc<BlobfsRamdisk>,
     fetch_blob_response: Mutex<Option<Result<(), fpkg::ResolveError>>>,
+    blockers: Mutex<HashMap<Hash, oneshot::Sender<OtaDownloaderResultSender>>>,
 }
 
 impl MockOtaDownloaderService {
@@ -866,7 +903,19 @@ impl MockOtaDownloaderService {
         blobs: HashMap<Hash, Vec<u8>>,
         blobfs: Arc<BlobfsRamdisk>,
     ) -> Self {
-        Self { interactions, blobs, blobfs, fetch_blob_response: Mutex::new(None) }
+        Self {
+            interactions,
+            blobs,
+            blobfs,
+            fetch_blob_response: Mutex::new(None),
+            blockers: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn block_once(&self, hash: Hash) -> oneshot::Receiver<OtaDownloaderResultSender> {
+        let (sender, receiver) = oneshot::channel();
+        self.blockers.lock().insert(hash, sender);
+        receiver
     }
 
     fn set_fetch_blob_response(&self, response: Result<(), fpkg::ResolveError>) {
@@ -883,11 +932,22 @@ impl MockOtaDownloaderService {
                     self.interactions
                         .lock()
                         .push(OtaDownloader(OtaDownloaderEvent::FetchBlob(hash.into())));
+                    let hash = fidl_fuchsia_pkg_ext::BlobId::from(hash).into();
+                    let blocker = self.blockers.lock().remove(&hash);
+                    if let Some(blocker) = blocker {
+                        let (resume_sender, resume_receiver) = oneshot::channel();
+                        // If the test dropped the receiver, it doesn't want to block.
+                        if blocker.send(resume_sender).is_ok() {
+                            if let Ok(response) = resume_receiver.await {
+                                responder.send(response)?;
+                                continue;
+                            }
+                        }
+                    }
                     if let Some(response) = *self.fetch_blob_response.lock() {
                         responder.send(response)?;
                         continue;
                     }
-                    let hash = fidl_fuchsia_pkg_ext::BlobId::from(hash).into();
                     if let Some(content) = self.blobs.get(&hash) {
                         let () = self.blobfs.write_blob(hash, content).await.unwrap();
                         responder.send(Ok(()))?;
@@ -926,9 +986,6 @@ impl MockHttpLoaderService {
         while let Some(event) = stream.try_next().await? {
             match event {
                 fhttp::LoaderRequest::Fetch { request, responder } => {
-                    let url = request.url.unwrap();
-                    assert_eq!(url, MANIFEST_URL);
-
                     let blocker = self.blocker.lock().take();
                     if let Some(blocker) = blocker {
                         let (resume_sender, resume_receiver) = oneshot::channel();
@@ -938,18 +995,23 @@ impl MockHttpLoaderService {
                         }
                     }
 
-                    let manifest_json = self.manifest.clone().unwrap();
-                    let (client, server) = zx::Socket::create_stream();
-                    let mut server = fasync::Socket::from_socket(server);
-                    fasync::Task::spawn(async move {
-                        server.write_all(manifest_json.as_bytes()).await.unwrap()
-                    })
-                    .detach();
+                    let url = request.url.unwrap();
+                    let response = if url == MANIFEST_URL {
+                        let manifest_json = self.manifest.clone().unwrap();
+                        let (client, server) = zx::Socket::create_stream();
+                        let mut server = fasync::Socket::from_socket(server);
+                        fasync::Task::spawn(async move {
+                            server.write_all(manifest_json.as_bytes()).await.unwrap()
+                        })
+                        .detach();
 
-                    let response = fhttp::Response {
-                        body: Some(client),
-                        status_code: Some(200),
-                        ..Default::default()
+                        fhttp::Response {
+                            body: Some(client),
+                            status_code: Some(200),
+                            ..Default::default()
+                        }
+                    } else {
+                        fhttp::Response { status_code: Some(404), ..Default::default() }
                     };
                     let _ = responder.send(response);
                 }

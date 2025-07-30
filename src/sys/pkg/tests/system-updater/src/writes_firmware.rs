@@ -86,6 +86,79 @@ async fn images_manifest_update_package_firmware_no_match() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn images_manifest_firmware_no_match_packageless() {
+    let firmware_content = b"_ contents";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: sha256(5),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_firmware(|_, _| Ok(b"not a match".to_vec())))
+        })
+        .ota_manifest(manifest)
+        .blob(firmware_hash, firmware_content.to_vec())
+        .build()
+        .await;
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions()
+            .chain([ReplaceRetainedBlobs(vec![hash(9).into(), firmware_hash.into()]), Gc]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            // Events we really care about testing
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "".to_string(),
+            }),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_hash.into())),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+                payload: b"_ contents".to_vec(),
+            }),
+        ],
+        [
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn images_manifest_update_package_firmware_match_desired_config() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .firmware_package(btreemap! {
@@ -143,6 +216,69 @@ async fn images_manifest_update_package_firmware_match_desired_config() {
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
     ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn images_manifest_firmware_match_desired_config_packageless() {
+    let firmware_content = b"matching";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: MATCHING_SHA256.parse().unwrap(),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_firmware(|_, _| Ok(b"matching".to_vec())))
+        })
+        .ota_manifest(manifest)
+        .build()
+        .await;
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions()
+            .chain([ReplaceRetainedBlobs(vec![hash(9).into(), firmware_hash.into()]), Gc]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            // Events we really care about testing
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+            }),
+        ],
+        [
+            // rest of the events.
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -215,6 +351,81 @@ async fn images_manifest_update_package_firmware_match_active_config() {
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
     ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn images_manifest_firmware_match_active_config_packageless() {
+    let firmware_content = b"matching";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: MATCHING_SHA256.parse().unwrap(),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_firmware(|configuration, _| match configuration {
+                paver::Configuration::A => Ok(b"matching".to_vec()),
+                _ => Ok(b"no match".to_vec()),
+            }))
+        })
+        .ota_manifest(manifest)
+        .build()
+        .await;
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions()
+            .chain([ReplaceRetainedBlobs(vec![hash(9).into(), firmware_hash.into()]), Gc]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            // Events we really care about testing
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "".to_string(),
+            }),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+                payload: b"matching".to_vec(),
+            }),
+        ],
+        [
+            // rest of the events.
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -302,6 +513,88 @@ async fn firmware_comparing_respects_fuchsia_mem_buffer_size() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn firmware_comparing_respects_fuchsia_mem_buffer_size_packageless() {
+    let firmware_content = b"matching";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: MATCHING_SHA256.parse().unwrap(),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_firmware_custom_buffer_size(|configuration, _| {
+                match configuration {
+                    // The read will return a VMO with the correct contents, but the
+                    // fuchsia.mem.Buffer size is too small so system-updater will not use it.
+                    paver::Configuration::A => Ok((b"matching".to_vec(), 7)),
+                    _ => Ok((b"no match".to_vec(), 8)),
+                }
+            }))
+        })
+        .ota_manifest(manifest)
+        .blob(firmware_hash, firmware_content.to_vec())
+        .build()
+        .await;
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions()
+            .chain([ReplaceRetainedBlobs(vec![hash(9).into(), firmware_hash.into()]), Gc]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+            }),
+            // Firmware in A is read.
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "".to_string(),
+            }),
+            // But because the Buffer size is respected, it is not a match and the image is downloaded.
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_hash.into())),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+                payload: b"matching".to_vec(),
+            }),
+        ],
+        [
+            // rest of the events.
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn firmware_copying_sets_fuchsia_mem_buffer_size() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .firmware_package(btreemap! {
@@ -374,6 +667,84 @@ async fn firmware_copying_sets_fuchsia_mem_buffer_size() {
         Paver(PaverEvent::BootManagerFlush),
         Reboot,
     ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn firmware_copying_sets_fuchsia_mem_buffer_size_packageless() {
+    let firmware_content = b"matching";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: MATCHING_SHA256.parse().unwrap(),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::read_firmware(|configuration, _| match configuration {
+                // The Buffer contains an extra 0u8, but ReadFirmware returns the VMO of
+                // the entire partition (not just the image), so system-updater should use
+                // the size from the manifest in the update package and still find a match and
+                // write only the 8 bytes of the image.
+                paver::Configuration::A => Ok(b"matching\0".to_vec()),
+                _ => Ok(b"no match".to_vec()),
+            }))
+        })
+        .ota_manifest(manifest)
+        .build()
+        .await;
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions()
+            .chain([ReplaceRetainedBlobs(vec![hash(9).into(), firmware_hash.into()]), Gc]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "".to_string(),
+            }),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "".to_string(),
+                // Only 8 bytes are written, the trailing 0u8 returned by ReadFirmware is ignored.
+                payload: b"matching".to_vec(),
+            }),
+        ],
+        [
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -460,6 +831,106 @@ async fn writes_multiple_firmware_types() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn writes_multiple_firmware_types_packageless() {
+    let firmware_a_content = b"A contents";
+    let firmware_a_hash = fuchsia_merkle::from_slice(firmware_a_content).root();
+    let firmware_b_content = b"B contents";
+    let firmware_b_hash = fuchsia_merkle::from_slice(firmware_b_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_a_hash,
+                sha256: sha256(5),
+                size: firmware_a_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("a".to_string()),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_b_hash,
+                sha256: sha256(5),
+                size: firmware_b_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("b".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .ota_manifest(manifest)
+        .blob(firmware_a_hash, firmware_a_content.to_vec())
+        .blob(firmware_b_hash, firmware_b_content.to_vec())
+        .build()
+        .await;
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions().chain([
+            ReplaceRetainedBlobs(vec![
+                hash(9).into(),
+                firmware_a_hash.into(),
+                firmware_b_hash.into(),
+            ]),
+            Gc,
+        ]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "a".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "a".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "b".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "b".to_string(),
+            }),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_a_hash.into())),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_b_hash.into())),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "a".to_string(),
+                payload: b"A contents".to_vec(),
+            }),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "b".to_string(),
+                payload: b"B contents".to_vec(),
+            }),
+        ],
+        [
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn skips_unsupported_firmware_type() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .firmware_package(btreemap! {
@@ -533,6 +1004,80 @@ async fn skips_unsupported_firmware_type() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn skips_unsupported_firmware_type_packageless() {
+    let firmware_content = b"A contents";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: sha256(5),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("a".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::write_firmware(|_, _, _| {
+                paver::WriteFirmwareResult::Unsupported(true)
+            }))
+        })
+        .ota_manifest(manifest)
+        .blob(firmware_hash, firmware_content.to_vec())
+        .build()
+        .await;
+    env.run_packageless_update().await.expect("run system updater");
+
+    env.assert_unordered_interactions(
+        initial_interactions()
+            .chain([ReplaceRetainedBlobs(vec![hash(9).into(), firmware_hash.into()]), Gc]),
+        [
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "a".to_string(),
+            }),
+            Paver(PaverEvent::ReadFirmware {
+                configuration: paver::Configuration::A,
+                firmware_type: "a".to_string(),
+            }),
+            OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_hash.into())),
+            Paver(PaverEvent::WriteFirmware {
+                configuration: paver::Configuration::B,
+                firmware_type: "a".to_string(),
+                payload: b"A contents".to_vec(),
+            }),
+        ],
+        [
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedBlobs(vec![]),
+            Gc,
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ],
+    );
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn fails_on_firmware_write_error() {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .firmware_package(btreemap! {
@@ -576,12 +1121,7 @@ async fn fails_on_firmware_write_error() {
     assert_eq!(attempt.next().await.unwrap().unwrap(), State::Prepare);
     assert_eq!(
         attempt.next().await.unwrap().unwrap(),
-        State::Stage(
-            UpdateInfoAndProgress::builder()
-                .info(info)
-                .progress(Progress::builder().fraction_completed(0.0).bytes_downloaded(0).build())
-                .build()
-        )
+        State::Stage(UpdateInfoAndProgress::builder().info(info).progress(progress).build())
     );
     assert_eq!(
         attempt.next().await.unwrap().unwrap(),
@@ -611,6 +1151,96 @@ async fn fails_on_firmware_write_error() {
         ReplaceRetainedPackages(vec![hashstr(5).parse().unwrap()]),
         Gc,
         PackageResolve(image_package_url_to_string("update-images-firmware", 5)),
+        Paver(PaverEvent::WriteFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+            payload: b"A contents".to_vec(),
+        }),
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn fails_on_firmware_write_error_packageless() {
+    let firmware_content = b"A contents";
+    let firmware_hash = fuchsia_merkle::from_slice(firmware_content).root();
+
+    let manifest = OtaManifestV1 {
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: hash(9),
+                sha256: EMPTY_SHA256.parse().unwrap(),
+                size: 0,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: firmware_hash,
+                sha256: sha256(5),
+                size: firmware_content.len() as u64,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Firmware("a".to_string()),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::write_firmware(|_, _, _| {
+                paver::WriteFirmwareResult::Status(Status::INTERNAL.into_raw())
+            }))
+        })
+        .ota_manifest(manifest)
+        .blob(firmware_hash, firmware_content.to_vec())
+        .build()
+        .await;
+
+    let mut attempt = env.start_packageless_update().await.unwrap();
+    let info = UpdateInfo::builder().download_size(0).build();
+    let progress = Progress::builder().fraction_completed(0.5).bytes_downloaded(0).build();
+    assert_eq!(attempt.next().await.unwrap().unwrap(), State::Prepare);
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::Stage(
+            UpdateInfoAndProgress::builder()
+                .info(info)
+                .progress(Progress::builder().fraction_completed(0.0).bytes_downloaded(0).build())
+                .build()
+        )
+    );
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::Stage(UpdateInfoAndProgress::builder().info(info).progress(progress).build())
+    );
+    assert_eq!(
+        attempt.next().await.unwrap().unwrap(),
+        State::FailStage(
+            UpdateInfoAndProgress::builder()
+                .info(info)
+                .progress(progress)
+                .build()
+                .with_stage_reason(StageFailureReason::Internal)
+        )
+    );
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into(), firmware_hash.into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::B,
+            firmware_type: "a".to_string(),
+        }),
+        Paver(PaverEvent::ReadFirmware {
+            configuration: paver::Configuration::A,
+            firmware_type: "a".to_string(),
+        }),
+        OtaDownloader(OtaDownloaderEvent::FetchBlob(firmware_hash.into())),
         Paver(PaverEvent::WriteFirmware {
             configuration: paver::Configuration::B,
             firmware_type: "a".to_string(),

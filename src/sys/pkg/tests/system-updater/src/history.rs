@@ -7,6 +7,7 @@ use assert_matches::assert_matches;
 use chrono::prelude::*;
 use pretty_assertions::assert_eq;
 use serde_json::json;
+use test_case::test_case;
 
 #[fasync::run_singlethreaded(test)]
 async fn succeeds_without_writable_data() {
@@ -43,6 +44,50 @@ async fn succeeds_without_writable_data() {
         }),
         Paver(PaverEvent::DataSinkFlush),
         ReplaceRetainedPackages(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+        Paver(PaverEvent::BootManagerFlush),
+        Reboot,
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn succeeds_without_writable_data_packageless() {
+    let env = TestEnv::builder().mount_data(false).ota_manifest(make_manifest([])).build().await;
+
+    env.resolver
+        .register_package("update", "upd4t3")
+        .add_file("packages.json", make_packages_json([]))
+        .add_file("epoch.json", make_current_epoch_json())
+        .add_file("images.json", make_images_json_zbi());
+
+    env.run_packageless_update().await.expect("run system updater");
+
+    assert_eq!(env.read_history(), None);
+
+    assert_eq!(
+        env.get_ota_metrics().await,
+        OtaMetrics {
+            initiator:
+                metrics::OtaResultAttemptsMigratedMetricDimensionInitiator::UserInitiatedCheck
+                    as u32,
+            phase: metrics::OtaResultAttemptsMigratedMetricDimensionPhase::SuccessPendingReboot
+                as u32,
+            status_code: metrics::OtaResultAttemptsMigratedMetricDimensionStatusCode::Success
+                as u32,
+        }
+    );
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![]),
         Gc,
         BlobfsSync,
         Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
@@ -97,8 +142,14 @@ fn strip_start_time(mut value: serde_json::Value) -> serde_json::Value {
     value
 }
 
+#[test_case(
+    UPDATE_PKG_URL,
+    UPDATE_HASH,
+    "838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67"
+)]
+#[test_case(MANIFEST_URL, "", "")]
 #[fasync::run_singlethreaded(test)]
-async fn writes_history() {
+async fn writes_history(update_url: &str, update_hash: &str, system_image_hash: &str) {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
@@ -115,10 +166,41 @@ async fn writes_history() {
         .clone()
         .build();
 
+    let zbi_content = b"some zbi";
+    let zbi_hash = fuchsia_merkle::from_slice(zbi_content).root();
+    let vbmeta_content = b"vbmeta contents";
+    let vbmeta_hash = fuchsia_merkle::from_slice(vbmeta_content).root();
+
+    let manifest = OtaManifestV1 {
+        build_version: "0.2".parse().unwrap(),
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: zbi_hash,
+                sha256: sha256(6),
+                size: 8,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: vbmeta_hash,
+                sha256: sha256(3),
+                size: 6,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Vbmeta),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
     let env = TestEnv::builder()
         .system_image_hash(
             "0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
         )
+        .ota_manifest(manifest)
+        .blob(zbi_hash, zbi_content.to_vec())
+        .blob(vbmeta_hash, vbmeta_content.to_vec())
         .build()
         .await;
 
@@ -128,7 +210,12 @@ async fn writes_history() {
 
     env.resolver
         .register_package("update", UPDATE_HASH)
-        .add_file("packages.json", make_packages_json(["fuchsia-pkg://fuchsia.com/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67"]))
+        .add_file(
+            "packages.json",
+            make_packages_json([
+                "fuchsia-pkg://fuchsia.com/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67"
+            ]),
+        )
         .add_file("epoch.json", make_current_epoch_json())
         .add_file("images.json", serde_json::to_string(&images_json).unwrap())
         .add_file("version", "0.2");
@@ -140,12 +227,12 @@ async fn writes_history() {
     env.resolver.url(image_package_url_to_string("update-images-fuchsia", 9)).resolve(
         &env.resolver
             .package("fuchsia", hashstr(8))
-            .add_file("zbi", "some zbi")
-            .add_file("vbmeta", "vbmeta contents"),
+            .add_file("zbi", zbi_content)
+            .add_file("vbmeta", vbmeta_content),
     );
 
     env.run_update_with_options(
-        UPDATE_PKG_URL,
+        update_url,
         fidl_fuchsia_update_installer_ext::Options {
             initiator: Initiator::Service,
             allow_attach_to_existing_attempt: false,
@@ -171,9 +258,8 @@ async fn writes_history() {
                     "epoch": SOURCE_EPOCH.to_string()
                 },
                 "target": {
-                    "update_hash": UPDATE_HASH,
-                    "system_image_hash":
-                        "838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67",
+                    "update_hash": update_hash,
+                    "system_image_hash": system_image_hash,
                     "vbmeta_hash":
                         hashstr(3),
                     "zbi_hash": hashstr(6),
@@ -185,7 +271,7 @@ async fn writes_history() {
                     "initiator": "Service",
                     "should_write_recovery": true,
                 },
-                "url": UPDATE_PKG_URL,
+                "url": update_url,
                 "state": {
                     "id": "reboot",
                     "info": {
@@ -201,9 +287,11 @@ async fn writes_history() {
     );
 }
 
+#[test_case(UPDATE_PKG_URL, UPDATE_HASH)]
+#[test_case(MANIFEST_URL, "")]
 #[fasync::run_singlethreaded(test)]
-async fn replaces_bogus_history() {
-    let env = TestEnv::builder().build().await;
+async fn replaces_bogus_history(update_url: &str, update_hash: &str) {
+    let env = TestEnv::builder().ota_manifest(make_manifest([])).build().await;
 
     env.write_history(json!({
         "valid": "no",
@@ -213,9 +301,10 @@ async fn replaces_bogus_history() {
         .register_package("update", UPDATE_HASH)
         .add_file("packages.json", make_packages_json([]))
         .add_file("epoch.json", make_current_epoch_json())
-        .add_file("images.json", make_images_json_zbi());
+        .add_file("images.json", make_images_json_zbi())
+        .add_file("version", "1.2.3.4");
 
-    env.run_update().await.unwrap();
+    env.run_update_with_options(update_url, default_options()).await.unwrap();
 
     assert_eq!(
         env.read_history().map(strip_attempt_ids).map(strip_start_time),
@@ -231,11 +320,11 @@ async fn replaces_bogus_history() {
                     "epoch": SOURCE_EPOCH.to_string()
                 },
                 "target": {
-                    "update_hash": UPDATE_HASH,
+                    "update_hash": update_hash,
                     "system_image_hash": "",
                     "vbmeta_hash": "",
                     "zbi_hash": EMPTY_SHA256,
-                    "build_version": "",
+                    "build_version": "1.2.3.4",
                     "epoch": SOURCE_EPOCH.to_string()
                 },
                 "options": {
@@ -243,7 +332,7 @@ async fn replaces_bogus_history() {
                     "initiator": "User",
                     "should_write_recovery": true,
                 },
-                "url": UPDATE_PKG_URL,
+                "url": update_url,
                 "state": {
                     "id": "reboot",
                     "info": {
@@ -259,8 +348,14 @@ async fn replaces_bogus_history() {
     );
 }
 
+#[test_case(UPDATE_PKG_URL, UPDATE_HASH, "fuchsia-pkg://fuchsia.com/not-found")]
+#[test_case(MANIFEST_URL, "", "https://fuchsia.com/not-found")]
 #[fasync::run_singlethreaded(test)]
-async fn increments_attempts_counter_on_retry() {
+async fn increments_attempts_counter_on_retry(
+    update_url: &str,
+    update_hash: &str,
+    not_found_url: &str,
+) {
     let images_json = ::update_package::ImagePackagesManifest::builder()
         .fuchsia_package(
             ::update_package::ImageMetadata::new(
@@ -277,11 +372,42 @@ async fn increments_attempts_counter_on_retry() {
         .clone()
         .build();
 
-    let env = TestEnv::builder().build().await;
+    let zbi_content = b"some zbi";
+    let zbi_hash = fuchsia_merkle::from_slice(zbi_content).root();
+    let vbmeta_content = b"vbmeta contents";
+    let vbmeta_hash = fuchsia_merkle::from_slice(vbmeta_content).root();
 
-    env.resolver
-        .url("fuchsia-pkg://fuchsia.com/not-found")
-        .fail(fidl_fuchsia_pkg::ResolveError::PackageNotFound);
+    let manifest = OtaManifestV1 {
+        build_version: "".parse().unwrap(),
+        images: vec![
+            manifest::Image {
+                fuchsia_merkle_root: zbi_hash,
+                sha256: sha256(6),
+                size: 8,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Zbi),
+                delivery_blob_type: 1,
+            },
+            manifest::Image {
+                fuchsia_merkle_root: vbmeta_hash,
+                sha256: sha256(3),
+                size: 6,
+                slot: manifest::Slot::AB,
+                image_type: manifest::ImageType::Asset(AssetType::Vbmeta),
+                delivery_blob_type: 1,
+            },
+        ],
+        ..make_manifest([])
+    };
+
+    let env = TestEnv::builder()
+        .ota_manifest(manifest)
+        .blob(zbi_hash, zbi_content.to_vec())
+        .blob(vbmeta_hash, vbmeta_content.to_vec())
+        .build()
+        .await;
+
+    env.resolver.url(not_found_url).fail(fidl_fuchsia_pkg::ResolveError::PackageNotFound);
     env.resolver
         .register_package("update", UPDATE_HASH)
         .add_file("packages.json", make_packages_json([]))
@@ -291,13 +417,13 @@ async fn increments_attempts_counter_on_retry() {
     env.resolver.url(image_package_url_to_string("update-images-fuchsia", 9)).resolve(
         &env.resolver
             .package("fuchsia", hashstr(8))
-            .add_file("zbi", "some zbi")
-            .add_file("vbmeta", "vbmeta contents"),
+            .add_file("zbi", zbi_content)
+            .add_file("vbmeta", vbmeta_content),
     );
 
     let _ = env
         .run_update_with_options(
-            "fuchsia-pkg://fuchsia.com/not-found",
+            not_found_url,
             fidl_fuchsia_update_installer_ext::Options {
                 initiator: Initiator::Service,
                 allow_attach_to_existing_attempt: false,
@@ -307,7 +433,7 @@ async fn increments_attempts_counter_on_retry() {
         .await
         .unwrap_err();
 
-    env.run_update().await.unwrap();
+    env.run_update_with_options(update_url, default_options()).await.unwrap();
 
     assert_eq!(
         env.read_history().map(strip_attempt_ids).map(strip_start_time),
@@ -324,7 +450,7 @@ async fn increments_attempts_counter_on_retry() {
                     "epoch": SOURCE_EPOCH.to_string()
                 },
                 "target": {
-                    "update_hash": UPDATE_HASH,
+                    "update_hash": update_hash,
                     "system_image_hash": "",
                     "vbmeta_hash": hashstr(3),
                     "zbi_hash": hashstr(6),
@@ -336,7 +462,7 @@ async fn increments_attempts_counter_on_retry() {
                     "initiator": "User",
                     "should_write_recovery": true,
                 },
-                "url": "fuchsia-pkg://fuchsia.com/update",
+                "url": update_url,
                 "state": {
                     "id": "reboot",
                     "info": {
@@ -370,7 +496,7 @@ async fn increments_attempts_counter_on_retry() {
                     "initiator": "Service",
                     "should_write_recovery": true,
                 },
-                "url": "fuchsia-pkg://fuchsia.com/not-found",
+                "url": not_found_url,
                 "state": {
                     "id": "fail_prepare",
                     "reason": "internal",
