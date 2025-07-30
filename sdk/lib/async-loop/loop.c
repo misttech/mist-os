@@ -20,8 +20,31 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/hypervisor.h>
 
-// The port wait key associated with the dispatcher's control messages.
-#define KEY_CONTROL (0u)
+// Key management.
+// Each async_loop instance manages a Zircon port object. Waits on the port are registered with
+// keys. The schemes used for allocating keys are:
+// * The async_loop implementation uses static key values for control messages. These key values
+//   are not valid pointers.
+// * Object async waits use address of the `async_wait_t` object instance. These objects must
+//   be alive while the wait is pending. On cancelation, the loop attempts to cancel the wait.
+//   If it cannot because another thread is in the dispatch process it's the callers responsibility
+//   to ensure that the object stays alive until the processing is complete.
+// * Queued packets use the address of the `async_receiver_t` object instance
+//   associated with the packet. These cannot be canceled.
+// * Guest bell traps use the address of the `async_guest_bell_trap_t` object instance associated
+//   with the trap. These cannot be canceled.
+// * Bound interrupt handlers use the address of the `async_irq_t` object instance associated
+//   with the interrupt. These can be canceled and use `zx_interrupt_bind` with the option
+//   ZX_INTERRUPT_UNBIND - they do not use zx_port_cancel().
+// * Paged VMO handlers use the address of the `async_paged_vmo_t` object instance associated
+//   with the VMO. These can be canceled and use `zx_pager_detach_vmo` - they do not use
+//   zx_port_cancel().
+
+// The port wait key associated with the dispatcher's control messages for the port itself.
+#define KEY_PORT_CONTROL (0x0000F00000000001ull)
+
+// The port wait key associated with the dispatcher's control messages for its timer queue.
+#define KEY_TIMER_CONTROL (0x0000F00000000002ull)
 
 static zx_time_t async_loop_now(async_dispatcher_t* dispatcher);
 static zx_status_t async_loop_begin_wait(async_dispatcher_t* dispatcher, async_wait_t* wait);
@@ -324,47 +347,50 @@ static zx_status_t async_loop_run_once(async_loop_t* loop, zx_time_t deadline) {
   if (status != ZX_OK)
     return status;
 
-  if (packet.key == KEY_CONTROL) {
-    // Handle wake-up packets.
-    if (packet.type == ZX_PKT_TYPE_USER)
-      return ZX_OK;
+  // Handle wake-up packets.
+  if (packet.key == KEY_PORT_CONTROL) {
+    ZX_ASSERT(packet.type == ZX_PKT_TYPE_USER);
+    return ZX_OK;
+  }
 
-    // Handle task timer expirations.
-    if (packet.type == ZX_PKT_TYPE_SIGNAL_ONE && packet.signal.observed & ZX_TIMER_SIGNALED) {
-      return async_loop_dispatch_tasks(loop);
-    }
-  } else {
-    // Handle wait completion packets.
-    if (packet.type == ZX_PKT_TYPE_SIGNAL_ONE) {
-      async_wait_t* wait = (void*)(uintptr_t)packet.key;
-      mtx_lock(&loop->lock);
-      list_delete(wait_to_node(wait));
-      mtx_unlock(&loop->lock);
-      return async_loop_dispatch_wait(loop, wait, packet.status, &packet.signal);
-    }
+  // Handle task timer expirations.
+  if (packet.key == KEY_TIMER_CONTROL) {
+    ZX_ASSERT(packet.type == ZX_PKT_TYPE_SIGNAL_ONE);
+    ZX_ASSERT(packet.signal.observed & ZX_TIMER_SIGNALED);
 
-    // Handle queued user packets.
-    if (packet.type == ZX_PKT_TYPE_USER) {
-      async_receiver_t* receiver = (void*)(uintptr_t)packet.key;
-      return async_loop_dispatch_packet(loop, receiver, packet.status, &packet.user);
-    }
+    return async_loop_dispatch_tasks(loop);
+  }
 
-    // Handle guest bell trap packets.
-    if (packet.type == ZX_PKT_TYPE_GUEST_BELL) {
-      async_guest_bell_trap_t* trap = (void*)(uintptr_t)packet.key;
-      return async_loop_dispatch_guest_bell_trap(loop, trap, packet.status, &packet.guest_bell);
-    }
+  // Handle wait completion packets.
+  if (packet.type == ZX_PKT_TYPE_SIGNAL_ONE) {
+    async_wait_t* wait = (void*)(uintptr_t)packet.key;
+    mtx_lock(&loop->lock);
+    list_delete(wait_to_node(wait));
+    mtx_unlock(&loop->lock);
+    return async_loop_dispatch_wait(loop, wait, packet.status, &packet.signal);
+  }
 
-    // Handle interrupt packets.
-    if (packet.type == ZX_PKT_TYPE_INTERRUPT) {
-      async_irq_t* irq = (void*)(uintptr_t)packet.key;
-      return async_loop_dispatch_irq(loop, irq, packet.status, &packet.interrupt);
-    }
-    // Handle pager packets.
-    if (packet.type == ZX_PKT_TYPE_PAGE_REQUEST) {
-      async_paged_vmo_t* paged_vmo = (void*)(uintptr_t)packet.key;
-      return async_loop_dispatch_paged_vmo(loop, paged_vmo, packet.status, &packet.page_request);
-    }
+  // Handle queued user packets.
+  if (packet.type == ZX_PKT_TYPE_USER) {
+    async_receiver_t* receiver = (void*)(uintptr_t)packet.key;
+    return async_loop_dispatch_packet(loop, receiver, packet.status, &packet.user);
+  }
+
+  // Handle guest bell trap packets.
+  if (packet.type == ZX_PKT_TYPE_GUEST_BELL) {
+    async_guest_bell_trap_t* trap = (void*)(uintptr_t)packet.key;
+    return async_loop_dispatch_guest_bell_trap(loop, trap, packet.status, &packet.guest_bell);
+  }
+
+  // Handle interrupt packets.
+  if (packet.type == ZX_PKT_TYPE_INTERRUPT) {
+    async_irq_t* irq = (void*)(uintptr_t)packet.key;
+    return async_loop_dispatch_irq(loop, irq, packet.status, &packet.interrupt);
+  }
+  // Handle pager packets.
+  if (packet.type == ZX_PKT_TYPE_PAGE_REQUEST) {
+    async_paged_vmo_t* paged_vmo = (void*)(uintptr_t)packet.key;
+    return async_loop_dispatch_paged_vmo(loop, paged_vmo, packet.status, &packet.page_request);
   }
 
   ZX_DEBUG_ASSERT(false);
@@ -505,7 +531,7 @@ static void async_loop_wake_threads(async_loop_t* loop) {
   // Issuing too many packets is also harmless.
   uint32_t n = atomic_load_explicit(&loop->active_threads, memory_order_acquire);
   for (uint32_t i = 0u; i < n; i++) {
-    zx_port_packet_t packet = {.key = KEY_CONTROL, .type = ZX_PKT_TYPE_USER, .status = ZX_OK};
+    zx_port_packet_t packet = {.key = KEY_PORT_CONTROL, .type = ZX_PKT_TYPE_USER, .status = ZX_OK};
     zx_status_t status = zx_port_queue(loop->port, &packet);
     ZX_ASSERT_MSG(status == ZX_OK, "zx_port_queue: status=%d", status);
   }
@@ -775,7 +801,7 @@ static void async_loop_restart_timer_locked(async_loop_t* loop) {
       // ZX_ERR_NOT_FOUND can happen here when a pending timer fires and
       // the packet is picked up by port_wait in another thread but has
       // not reached dispatch.
-      status = zx_port_cancel(loop->port, loop->timer, KEY_CONTROL);
+      status = zx_port_cancel(loop->port, loop->timer, KEY_TIMER_CONTROL);
       ZX_ASSERT_MSG(status == ZX_OK || status == ZX_ERR_NOT_FOUND, "zx_port_cancel: status=%d",
                     status);
       loop->timer_armed = false;
@@ -789,7 +815,7 @@ static void async_loop_restart_timer_locked(async_loop_t* loop) {
 
   if (!loop->timer_armed) {
     loop->timer_armed = true;
-    status = zx_object_wait_async(loop->timer, loop->port, KEY_CONTROL, ZX_TIMER_SIGNALED, 0);
+    status = zx_object_wait_async(loop->timer, loop->port, KEY_TIMER_CONTROL, ZX_TIMER_SIGNALED, 0);
     ZX_ASSERT_MSG(status == ZX_OK, "zx_object_wait_async: status=%d", status);
   }
 }
