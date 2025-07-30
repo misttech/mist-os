@@ -1,7 +1,6 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 use crate::doctor_ledger::*;
 use crate::ledger_view::*;
 use anyhow::{anyhow, Context, Result};
@@ -22,11 +21,13 @@ use ffx_writer::{SimpleWriter, VerifiedMachineWriter};
 use fho::{FfxMain, FfxTool, FhoEnvironment};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
+use fidl_fuchsia_developer_ffx::DaemonProxy;
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
     TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fuchsia_lockfile::{LockfileCreateError, LockfileCreateErrorKind};
 use futures::TryStreamExt;
 use serde_json::json;
@@ -187,7 +188,6 @@ async fn get_config_permission<W: Write>(
     loop {
         let mut input = String::new();
         writeln!(&mut writer, "Do you want to include your config data `ffx config get`? [y/n]")?;
-        // TODO(https://fxbug.dev/42161660) Use a generic read type instead of stdin
         std::io::stdin().read_line(&mut input)?;
         permission = match input.to_lowercase().trim() {
             "yes" | "y" => true,
@@ -909,29 +909,11 @@ fn make_ssh_fix_suggestion(ssh_log: &String) -> Option<&'static str> {
     }
 }
 
-async fn doctor_summary<W: Write>(
-    step_handler: &mut impl DoctorStepHandler,
-    daemon_manager: &impl DaemonManager,
-    target_str: &str,
-    retry_delay: Duration,
-    version_info: VersionInfo,
-    target_spec: Result<Option<String>, String>,
-    env_context: &EnvironmentContext,
-    mut show_tool: Option<ShowToolWrapper>,
-    run_additional_diagnostics: bool,
-    gchecker: impl gcheck::GChecker,
+async fn check_ffx_info<W: Write>(
     ledger: &mut DoctorLedger<W>,
-) -> Result<()> {
-    match ledger.get_ledger_mode() {
-        LedgerViewMode::Normal => {
-            step_handler.output_step(StepType::DoctorSummaryInitNormal()).await?
-        }
-        LedgerViewMode::Verbose => {
-            step_handler.output_step(StepType::DoctorSummaryInitVerbose()).await?
-        }
-    }
-
-    let mut main_node = ledger.add_node("FFX doctor", LedgerMode::Automatic)?;
+    version_info: &VersionInfo,
+) -> Result<usize> {
+    let ffx_node = ledger.add_node("FFX doctor", LedgerMode::Automatic)?;
     let frontend_version =
         version_info.build_version.clone().unwrap_or_else(|| "UNKNOWN".to_string());
     let version_node =
@@ -958,16 +940,21 @@ async fn doctor_summary<W: Write>(
         ledger.add_node(&format!("Path to ffx: {}", ffx_path), LedgerMode::Verbose)?;
     ledger.set_outcome(ffx_path_node, LedgerOutcome::Info)?;
 
-    ledger.close(main_node)?;
+    ledger.close(ffx_node)?;
 
-    main_node = ledger.add_node("FFX Environment Context", LedgerMode::Normal)?;
+    Ok(ffx_node)
+}
 
+async fn check_env_context<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    env_context: &EnvironmentContext,
+) -> Result<(), anyhow::Error> {
+    let env_node = ledger.add_node("FFX Environment Context", LedgerMode::Normal)?;
     let environment_kind_node = ledger.add_node(
         &format!("Kind of Environment: {kind}", kind = env_context.env_kind()),
         LedgerMode::Normal,
     )?;
     ledger.set_outcome(environment_kind_node, LedgerOutcome::Success)?;
-
     let (outcome, description) = match env_context.env_file_path() {
         Ok(env_file) => (
             LedgerOutcome::Success,
@@ -979,7 +966,6 @@ async fn doctor_summary<W: Write>(
     };
     let env_file_node = ledger.add_node(&description, LedgerMode::Verbose)?;
     ledger.set_outcome(env_file_node, outcome)?;
-
     let build_dir_node = if let Some(build_dir) = env_context.build_dir() {
         ledger.add_node(
             &format!(
@@ -992,9 +978,17 @@ async fn doctor_summary<W: Write>(
         ledger.add_node("No build directory discovered in the environment.", LedgerMode::Verbose)?
     };
     ledger.set_outcome(build_dir_node, LedgerOutcome::Success)?;
+    check_lock_files(ledger, env_context).await?;
+    check_ssh_keys(ledger).await?;
+    ledger.close(env_node)?;
+    Ok(())
+}
 
+async fn check_lock_files<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    env_context: &EnvironmentContext,
+) -> Result<(), anyhow::Error> {
     let lock_node = ledger.add_node("Config Lock Files", LedgerMode::Automatic)?;
-
     for (file, locked) in ffx_config::environment::Environment::check_locks(env_context).await? {
         let (outcome, description) = match locked {
             Ok(lockfile) => (
@@ -1039,15 +1033,16 @@ async fn doctor_summary<W: Write>(
         let node = ledger.add_node(&description, LedgerMode::Automatic)?;
         ledger.set_outcome(node, outcome)?;
     }
-
     ledger.close(lock_node)?;
+    Ok(())
+}
 
-    // Check SSH Keys
+async fn check_ssh_keys<W: Write>(ledger: &mut DoctorLedger<W>) -> Result<()> {
     let ssh_node: usize;
     match SshKeyFiles::load(None).await {
         Ok(ssh_files) => {
             let ( description, outcome) = match ssh_files.check_keys(false) {
-                Ok(_) => (format!("The public & private Fuchsia keys are consistent"), LedgerOutcome::Success),
+                Ok(_) => ("The public & private Fuchsia keys are consistent".to_string(), LedgerOutcome::Success),
                 Err(e)  => {
                     match e.kind {
                         SshKeyErrorKind::BadKeyType => (format!("SSH keys type not supported: {}", e.message), LedgerOutcome::Warning),
@@ -1068,10 +1063,17 @@ async fn doctor_summary<W: Write>(
         }
     };
     ledger.close(ssh_node)?;
+    Ok(())
+}
 
-    ledger.close(main_node)?;
-
-    main_node = ledger.add_node("Checking daemon", LedgerMode::Automatic)?;
+async fn check_daemon_status<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    daemon_manager: &impl DaemonManager,
+    retry_delay: Duration,
+    version_info: &VersionInfo,
+    target_spec: &Result<Option<String>, String>,
+) -> Result<Option<DaemonProxy>> {
+    let main_node = ledger.add_node("Checking daemon", LedgerMode::Automatic)?;
 
     if daemon_manager.is_daemon_running().await {
         let pid_vec = get_daemon_pid(daemon_manager, ledger).await.unwrap_or_default();
@@ -1085,7 +1087,7 @@ async fn doctor_summary<W: Write>(
         )?;
         ledger.set_outcome(node, LedgerOutcome::Failure)?;
         ledger.close(main_node)?;
-        return Ok(());
+        return Ok(None);
     }
 
     let daemon_proxy = match timeout(retry_delay, daemon_manager.find_and_connect()).await {
@@ -1101,7 +1103,7 @@ async fn doctor_summary<W: Write>(
             )?;
             ledger.set_outcome(node, LedgerOutcome::Failure)?;
             ledger.close(main_node)?;
-            return Ok(());
+            return Ok(None);
         }
         Err(_) => {
             let node = ledger.add_node(
@@ -1110,7 +1112,7 @@ async fn doctor_summary<W: Write>(
             )?;
             ledger.set_outcome(node, LedgerOutcome::Failure)?;
             ledger.close(main_node)?;
-            return Ok(());
+            return Ok(None);
         }
     };
 
@@ -1182,7 +1184,7 @@ async fn doctor_summary<W: Write>(
                 if t.is_none() || t.as_ref().unwrap().is_empty() {
                     "(none)".to_string()
                 } else {
-                    t.unwrap()
+                    t.as_ref().unwrap().clone()
                 }
             };
             let node = ledger.add_node(
@@ -1199,11 +1201,14 @@ async fn doctor_summary<W: Write>(
     }
 
     ledger.close(main_node)?;
+    Ok(Some(daemon_proxy))
+}
 
-    /*
-    Look up external sub tool suite to check for existence of gdoctor fo Googler-specific
-    network configuration checks.
-    */
+async fn run_google_network_checks<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    env_context: &EnvironmentContext,
+    gchecker: &impl gcheck::GChecker,
+) -> Result<()> {
     match ExternalSubToolSuite::from_env(&env_context) {
         Ok(sub_tool_suite) => {
             let command_line_args =
@@ -1215,7 +1220,8 @@ async fn doctor_summary<W: Write>(
             match workspace_command {
                 // If the command exists in the workspace call it and show the results
                 Some(wcmd) => {
-                    main_node = ledger.add_node("Google Network Checks", LedgerMode::Automatic)?;
+                    let main_node =
+                        ledger.add_node("Google Network Checks", LedgerMode::Automatic)?;
                     let (_exit_status, stdout, _stderr) = wcmd.run_and_capture().await?;
                     for line in stdout.trim().lines().filter(|l| !l.trim().is_empty()) {
                         match serde_json::from_str::<DoctorCheck>(&line) {
@@ -1226,9 +1232,10 @@ async fn doctor_summary<W: Write>(
                                 )?;
                                 ledger.set_outcome(
                                     node,
-                                    match data.passed {
-                                        true => LedgerOutcome::Success,
-                                        false => LedgerOutcome::Failure,
+                                    if data.passed {
+                                        LedgerOutcome::Success
+                                    } else {
+                                        LedgerOutcome::Failure
                                     },
                                 )?;
                             }
@@ -1262,8 +1269,326 @@ async fn doctor_summary<W: Write>(
             eprintln!("Warning: could not find subtool suite: {}", e);
         }
     }
+    Ok(())
+}
 
-    main_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
+// Check a single target. Most steps can fail, which means we can't (or
+// shouldn't) continue on to the later steps, so the pattern usually looks like:
+//   let done = <step>;
+//   if done { return }
+async fn check_single_target<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target: &TargetInfo,
+    tc_proxy: &TargetCollectionProxy,
+    env_context: &EnvironmentContext,
+    show_tool: Option<&mut ShowToolWrapper>,
+    run_additional_diagnostics: bool,
+    retry_delay: Duration,
+) -> Result<()> {
+    let target_name = target.nodename.clone().unwrap_or_else(|| "UNKNOWN".to_string());
+
+    let done = check_product_state(ledger, target, &target_name)?;
+    if done {
+        return Ok(());
+    }
+    let target_node = ledger.add_node(&format!("Target: {}", target_name), LedgerMode::Normal)?;
+
+    check_compatibility(ledger, target)?;
+
+    let (target_proxy, done) =
+        get_target_proxy(ledger, target, tc_proxy, retry_delay, target_node).await?;
+    if done {
+        return Ok(());
+    }
+
+    let (remote_proxy, done) =
+        get_remote_proxy(ledger, retry_delay, target_node, target_proxy).await?;
+    if done {
+        return Ok(());
+    }
+
+    let done = check_identify_host(ledger, retry_delay, target_node, remote_proxy).await?;
+    if done {
+        return Ok(());
+    }
+
+    show_target(ledger, target, show_tool).await?;
+
+    if run_additional_diagnostics {
+        run_target_diagnostics(ledger, target, env_context, retry_delay, target_name).await?;
+    }
+
+    ledger.close(target_node)?;
+    Ok(())
+}
+
+// TODO(b/423023263): This function is missing test coverage. There should either be
+// something mockable here, and the underlying crate should also be tested.
+async fn run_target_diagnostics<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target: &TargetInfo,
+    env_context: &EnvironmentContext,
+    retry_delay: Duration,
+    target_name: String,
+) -> Result<(), anyhow::Error> {
+    let node = ledger.add_node(
+        &format!("Running additional diagnostics against {target_name}"),
+        LedgerMode::Verbose,
+    )?;
+    crate::single_target_diagnostics::run_single_target_diagnostics(
+        env_context,
+        target.clone(),
+        ledger,
+        retry_delay,
+    )
+    .await?;
+    ledger.close(node)?;
+    Ok(())
+}
+
+async fn show_target<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target: &TargetInfo,
+    mut show_tool: Option<&mut ShowToolWrapper>,
+) -> Result<(), anyhow::Error> {
+    Ok(if let Some(ref mut show_tool) = show_tool {
+        let node =
+            ledger.add_node("Running `ffx target show` against device", LedgerMode::Automatic)?;
+        ledger.set_outcome(node, LedgerOutcome::Info)?;
+        match show_tool.allocate(target.nodename.clone()).await {
+            Ok(_) => {
+                let node = ledger.add(LedgerNode::new(
+                    "Allocating proxies for `target show`".to_string(),
+                    LedgerMode::Verbose,
+                ))?;
+                ledger.set_outcome(node, LedgerOutcome::Success)?;
+                match show_tool.run().await {
+                    Ok((stdout, stderr)) => {
+                        let node = ledger.add(LedgerNode::new(
+                            "Executing `ffx target show`".to_string(),
+                            LedgerMode::Verbose,
+                        ))?;
+                        ledger.set_outcome(node, LedgerOutcome::Success)?;
+                        let node = ledger.add(LedgerNode::new(
+                            format!("stdout:\n\t{}", stdout.replace("\n", "\n\t"),),
+                            LedgerMode::Verbose,
+                        ))?;
+                        ledger.set_outcome(node, LedgerOutcome::Info)?;
+                        if !stderr.is_empty() {
+                            let node = ledger.add(LedgerNode::new(
+                                format!("stderr:\n\t{}", stderr.replace("\n", "\n\t")),
+                                LedgerMode::Verbose,
+                            ))?;
+                            ledger.set_outcome(node, LedgerOutcome::Info)?;
+                        }
+                    }
+                    Err(e) => {
+                        let node = ledger.add_node(
+                            &format!("Error executing `target show`: {:?}", e),
+                            LedgerMode::Verbose,
+                        )?;
+                        ledger.set_outcome(node, LedgerOutcome::Failure)?;
+                    }
+                }
+            }
+            Err(e) => {
+                let node = ledger.add_node(
+                    &format!("Error while setting up `target show`: {:?}", e),
+                    LedgerMode::Verbose,
+                )?;
+                ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            }
+        };
+    })
+}
+
+async fn check_identify_host<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    retry_delay: Duration,
+    target_node: usize,
+    remote_proxy: RemoteControlProxy,
+) -> Result<bool, anyhow::Error> {
+    Ok(match timeout(retry_delay, remote_proxy.identify_host()).await {
+        Ok(Ok(_)) => {
+            let node = ledger
+                .add(LedgerNode::new("Communicating with RCS".to_string(), LedgerMode::Verbose))?;
+            ledger.set_outcome(node, LedgerOutcome::Success)?;
+            false
+        }
+        Ok(Err(e)) => {
+            let node = ledger.add_node(
+                &format!("Error while communicating with RCS: {}", e),
+                LedgerMode::Verbose,
+            )?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            ledger.close(target_node)?;
+            true
+        }
+        Err(_) => {
+            let node =
+                ledger.add_node("Timeout while communicating with RCS", LedgerMode::Verbose)?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            ledger.close(target_node)?;
+            true
+        }
+    })
+}
+
+fn check_product_state<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target: &TargetInfo,
+    target_name: &String,
+) -> Result<bool, anyhow::Error> {
+    Ok(match target.target_state {
+        None => false,
+        Some(TargetState::Unknown | TargetState::Disconnected | TargetState::Product) => false,
+        Some(TargetState::Fastboot) => {
+            let node = ledger.add_node(
+                &format!(
+                    "Target found in fastboot mode: {}",
+                    target.serial_number.as_deref().unwrap_or("UNKNOWN serial number")
+                ),
+                LedgerMode::Automatic,
+            )?;
+            ledger.set_outcome(node, LedgerOutcome::Success)?;
+            true
+        }
+        Some(TargetState::Zedboot) => {
+            let node = ledger.add_node(
+                &format!("Skipping target in zedboot: {}", target_name),
+                LedgerMode::Automatic,
+            )?;
+            ledger.set_outcome(node, LedgerOutcome::SoftWarning)?;
+            true
+        }
+    })
+}
+
+async fn get_remote_proxy<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    retry_delay: Duration,
+    target_node: usize,
+    target_proxy: ffx_target::TargetProxy,
+) -> Result<(RemoteControlProxy, bool), anyhow::Error> {
+    let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
+    let done = match timeout(retry_delay, target_proxy.open_remote_control(remote_server_end)).await
+    {
+        Ok(Ok(res)) => {
+            let node = ledger.add_node("Connecting to RCS", LedgerMode::Verbose)?;
+            ledger.set_outcome(node, LedgerOutcome::Success)?;
+            match res {
+                Ok(_) => false,
+                Err(_) => {
+                    let logs = target_proxy.get_ssh_logs().await?;
+                    let node = ledger.add_node(
+                        &format!("Error while connecting to RCS: could not establish SSH connection to the target: {}", logs),
+                        LedgerMode::Verbose,
+                    )?;
+                    ledger.set_outcome(node, LedgerOutcome::Failure)?;
+                    if let Some(suggestion) = make_ssh_fix_suggestion(&logs) {
+                        let node = ledger.add_node(suggestion, LedgerMode::Automatic)?;
+                        ledger.set_outcome(node, LedgerOutcome::Info)?;
+                    }
+                    ledger.close(target_node)?;
+                    true
+                }
+            }
+        }
+        Ok(Err(e)) => {
+            let node = ledger
+                .add_node(&format!("Error while connecting to RCS: {}", e), LedgerMode::Verbose)?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            ledger.close(target_node)?;
+            true
+        }
+        Err(_) => {
+            let node = ledger.add_node("Timeout while connecting to RCS", LedgerMode::Verbose)?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            ledger.close(target_node)?;
+            true
+        }
+    };
+    Ok((remote_proxy, done))
+}
+
+async fn get_target_proxy<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target: &TargetInfo,
+    tc_proxy: &TargetCollectionProxy,
+    retry_delay: Duration,
+    target_node: usize,
+) -> Result<(ffx_target::TargetProxy, bool), anyhow::Error> {
+    let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>();
+    let done = match timeout(
+        retry_delay,
+        tc_proxy.open_target(
+            &TargetQuery { string_matcher: target.nodename.clone(), ..Default::default() },
+            target_server,
+        ),
+    )
+    .await
+    {
+        Ok(Ok(_)) => {
+            let node = ledger.add_node("Opened target handle", LedgerMode::Verbose)?;
+            ledger.set_outcome(node, LedgerOutcome::Success)?;
+            false
+        }
+        Ok(Err(e)) => {
+            let node = ledger.add_node(
+                &format!("Error while opening target handle: {}", e),
+                LedgerMode::Verbose,
+            )?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            ledger.close(target_node)?;
+            true
+        }
+        Err(_) => {
+            let node =
+                ledger.add_node("Timeout while opening target handle", LedgerMode::Verbose)?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+            ledger.close(target_node)?;
+            true
+        }
+    };
+    Ok((target_proxy, done))
+}
+
+fn check_compatibility<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    target: &TargetInfo,
+) -> Result<(), anyhow::Error> {
+    let (compatibility_state, compatibility_message) = match &target.compatibility {
+        Some(info) => (info.state.into(), info.message.clone()),
+        None => (
+            compat_info::CompatibilityState::Absent,
+            "Compatibility information is not available".to_string(),
+        ),
+    };
+    let state_node = ledger
+        .add_node(&format!("Compatibility state: {compatibility_state}"), LedgerMode::Verbose)?;
+    let message_node = ledger.add_node(&compatibility_message, LedgerMode::Verbose)?;
+    let outcome = match compatibility_state {
+        compat_info::CompatibilityState::Supported => LedgerOutcome::Success,
+        compat_info::CompatibilityState::Error => LedgerOutcome::Failure,
+        compat_info::CompatibilityState::Absent => LedgerOutcome::SoftWarning,
+        compat_info::CompatibilityState::Unsupported => LedgerOutcome::Warning,
+        compat_info::CompatibilityState::Unknown => LedgerOutcome::SoftWarning,
+    };
+    ledger.set_outcome(state_node, outcome)?;
+    ledger.set_outcome(message_node, outcome)?;
+    Ok(())
+}
+
+async fn check_targets<W: Write>(
+    ledger: &mut DoctorLedger<W>,
+    daemon_proxy: &DaemonProxy,
+    target_str: &str,
+    retry_delay: Duration,
+    env_context: &EnvironmentContext,
+    mut show_tool: Option<ShowToolWrapper>,
+    run_additional_diagnostics: bool,
+) -> Result<()> {
+    let main_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
     let (tc_proxy, tc_server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>();
     match timeout(
         retry_delay,
@@ -1324,239 +1649,26 @@ async fn doctor_summary<W: Write>(
     ledger.close(main_node)?;
     let mut verify_inode = LedgerNode::new("Verifying Targets".to_string(), LedgerMode::Normal);
     verify_inode.set_fold_function(OutcomeFoldFunction::FailureToSuccess, LedgerOutcome::Failure);
-    main_node = ledger.add(verify_inode)?;
+    let main_node = ledger.add(verify_inode)?;
 
     for target in targets.iter() {
-        let target_name = target.nodename.clone().unwrap_or_else(|| "UNKNOWN".to_string());
-
-        // Note: this match statement intentionally does not have a fallback case in order to
-        // ensure that behavior is considered when we add a new state.
-        match target.target_state {
-            None => {}
-            Some(TargetState::Unknown) => {}
-            Some(TargetState::Disconnected) => {}
-            Some(TargetState::Product) => {}
-            Some(TargetState::Fastboot) => {
-                let node = ledger.add_node(
-                    &format!(
-                        "Target found in fastboot mode: {}",
-                        target.serial_number.as_deref().unwrap_or("UNKNOWN serial number")
-                    ),
-                    LedgerMode::Automatic,
-                )?;
-                ledger.set_outcome(node, LedgerOutcome::Success)?;
-                continue;
-            }
-            Some(TargetState::Zedboot) => {
-                let node = ledger.add_node(
-                    &format!("Skipping target in zedboot: {}", target_name),
-                    LedgerMode::Automatic,
-                )?;
-                ledger.set_outcome(node, LedgerOutcome::SoftWarning)?;
-                continue;
-            }
-        }
-        let target_node =
-            ledger.add_node(&format!("Target: {}", target_name), LedgerMode::Normal)?;
-
-        let (compatibility_state, compatibility_message) = match &target.compatibility {
-            Some(info) => (info.state.into(), info.message.clone()),
-            None => (
-                compat_info::CompatibilityState::Absent,
-                "Compatibility information is not available".to_string(),
-            ),
-        };
-
-        let state_node = ledger.add_node(
-            &format!("Compatibility state: {compatibility_state}"),
-            LedgerMode::Verbose,
-        )?;
-        let message_node = ledger.add_node(&compatibility_message, LedgerMode::Verbose)?;
-
-        let outcome = match compatibility_state {
-            compat_info::CompatibilityState::Supported => LedgerOutcome::Success,
-            compat_info::CompatibilityState::Error => LedgerOutcome::Failure,
-            compat_info::CompatibilityState::Absent => LedgerOutcome::SoftWarning,
-            compat_info::CompatibilityState::Unsupported => LedgerOutcome::Warning,
-            compat_info::CompatibilityState::Unknown => LedgerOutcome::SoftWarning,
-        };
-        ledger.set_outcome(state_node, outcome)?;
-        ledger.set_outcome(message_node, outcome)?;
-
-        //TODO(https://fxbug.dev/42167543): Offer a fix when we cannot connect to a device via RCS.
-        let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>();
-        match timeout(
+        check_single_target(
+            ledger,
+            target,
+            &tc_proxy,
+            env_context,
+            show_tool.as_mut(),
+            run_additional_diagnostics,
             retry_delay,
-            tc_proxy.open_target(
-                &TargetQuery { string_matcher: target.nodename.clone(), ..Default::default() },
-                target_server,
-            ),
         )
-        .await
-        {
-            Ok(Ok(_)) => {
-                let node = ledger.add_node("Opened target handle", LedgerMode::Verbose)?;
-                ledger.set_outcome(node, LedgerOutcome::Success)?;
-            }
-            Ok(Err(e)) => {
-                let node = ledger.add_node(
-                    &format!("Error while opening target handle: {}", e),
-                    LedgerMode::Verbose,
-                )?;
-                ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                ledger.close(target_node)?;
-                continue;
-            }
-            Err(_) => {
-                let node =
-                    ledger.add_node("Timeout while opening target handle", LedgerMode::Verbose)?;
-                ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                ledger.close(target_node)?;
-                continue;
-            }
-        }
-
-        let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
-
-        match timeout(retry_delay, target_proxy.open_remote_control(remote_server_end)).await {
-            Ok(Ok(res)) => {
-                let node = ledger.add_node("Connecting to RCS", LedgerMode::Verbose)?;
-                ledger.set_outcome(node, LedgerOutcome::Success)?;
-                match res {
-                    Ok(_) => {}
-                    Err(_) => {
-                        let logs = target_proxy.get_ssh_logs().await?;
-                        let node = ledger.add_node(
-                            &format!("Error while connecting to RCS: could not establish SSH connection to the target: {}", logs),
-                            LedgerMode::Verbose,
-                        )?;
-                        ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                        if let Some(suggestion) = make_ssh_fix_suggestion(&logs) {
-                            let node = ledger.add_node(suggestion, LedgerMode::Automatic)?;
-                            ledger.set_outcome(node, LedgerOutcome::Info)?;
-                        }
-                        ledger.close(target_node)?;
-                        continue;
-                    }
-                };
-            }
-            Ok(Err(e)) => {
-                let node = ledger.add_node(
-                    &format!("Error while connecting to RCS: {}", e),
-                    LedgerMode::Verbose,
-                )?;
-                ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                ledger.close(target_node)?;
-                continue;
-            }
-            Err(_) => {
-                let node =
-                    ledger.add_node("Timeout while connecting to RCS", LedgerMode::Verbose)?;
-                ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                ledger.close(target_node)?;
-                continue;
-            }
-        }
-
-        match timeout(retry_delay, remote_proxy.identify_host()).await {
-            Ok(Ok(_)) => {
-                let node = ledger.add(LedgerNode::new(
-                    "Communicating with RCS".to_string(),
-                    LedgerMode::Verbose,
-                ))?;
-                ledger.set_outcome(node, LedgerOutcome::Success)?;
-            }
-            Ok(Err(e)) => {
-                let node = ledger.add_node(
-                    &format!("Error while communicating with RCS: {}", e),
-                    LedgerMode::Verbose,
-                )?;
-                ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                ledger.close(target_node)?;
-                continue;
-            }
-            Err(_) => {
-                let node =
-                    ledger.add_node("Timeout while communicating with RCS", LedgerMode::Verbose)?;
-                ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                ledger.close(target_node)?;
-                continue;
-            }
-        }
-
-        if let Some(ref mut show_tool) = show_tool.as_mut() {
-            let node = ledger
-                .add_node("Running `ffx target show` against device", LedgerMode::Automatic)?;
-            ledger.set_outcome(node, LedgerOutcome::Info)?;
-            match show_tool.allocate(target.nodename.clone()).await {
-                Ok(_) => {
-                    let node = ledger.add(LedgerNode::new(
-                        "Allocating proxies for `target show`".to_string(),
-                        LedgerMode::Verbose,
-                    ))?;
-                    ledger.set_outcome(node, LedgerOutcome::Success)?;
-                    match show_tool.run().await {
-                        Ok((stdout, stderr)) => {
-                            let node = ledger.add(LedgerNode::new(
-                                "Executing `ffx target show`".to_string(),
-                                LedgerMode::Verbose,
-                            ))?;
-                            ledger.set_outcome(node, LedgerOutcome::Success)?;
-                            let node = ledger.add(LedgerNode::new(
-                                format!("stdout:\n\t{}", stdout.replace("\n", "\n\t"),),
-                                LedgerMode::Verbose,
-                            ))?;
-                            ledger.set_outcome(node, LedgerOutcome::Info)?;
-                            if !stderr.is_empty() {
-                                let node = ledger.add(LedgerNode::new(
-                                    format!("stderr:\n\t{}", stderr.replace("\n", "\n\t")),
-                                    LedgerMode::Verbose,
-                                ))?;
-                                ledger.set_outcome(node, LedgerOutcome::Info)?;
-                            }
-                        }
-                        Err(e) => {
-                            let node = ledger.add_node(
-                                &format!("Error executing `target show`: {:?}", e),
-                                LedgerMode::Verbose,
-                            )?;
-                            ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                        }
-                    }
-                }
-                Err(e) => {
-                    let node = ledger.add_node(
-                        &format!("Error while setting up `target show`: {:?}", e),
-                        LedgerMode::Verbose,
-                    )?;
-                    ledger.set_outcome(node, LedgerOutcome::Failure)?;
-                }
-            };
-        }
-
-        // TODO(b/423023263): This function is missing test coverage. There should either be
-        // something mockable here, and the underlying crate should also be tested.
-        if run_additional_diagnostics {
-            let node = ledger.add_node(
-                &format!("Running additional diagnostics against {target_name}"),
-                LedgerMode::Verbose,
-            )?;
-
-            crate::single_target_diagnostics::run_single_target_diagnostics(
-                env_context,
-                target.clone(),
-                ledger,
-                retry_delay,
-            )
-            .await?;
-            ledger.close(node)?;
-        }
-
-        ledger.close(target_node)?;
+        .await?;
     }
 
     ledger.close(main_node)?;
+    Ok(())
+}
 
+fn print_summary_outcome<W: Write>(ledger: &mut DoctorLedger<W>, main_node: usize) -> Result<()> {
     match ledger.calc_outcome(main_node) {
         LedgerOutcome::Failure => {
             let msg = match ledger.get_ledger_mode() {
@@ -1566,14 +1678,61 @@ async fn doctor_summary<W: Write>(
                 ),
                 _ => String::from("Doctor found issues in one or more categories."),
             };
-            main_node = ledger.add_node(&msg, LedgerMode::Automatic)?;
-            ledger.set_outcome(main_node, LedgerOutcome::Failure)?;
+            let node = ledger.add_node(&msg, LedgerMode::Automatic)?;
+            ledger.set_outcome(node, LedgerOutcome::Failure)?;
         }
         _ => {
-            main_node = ledger.add_node("No issues found", LedgerMode::Automatic)?;
-            ledger.set_outcome(main_node, LedgerOutcome::Success)?;
+            let node = ledger.add_node("No issues found", LedgerMode::Automatic)?;
+            ledger.set_outcome(node, LedgerOutcome::Success)?;
         }
     }
+    Ok(())
+}
+
+async fn doctor_summary<W: Write>(
+    step_handler: &mut impl DoctorStepHandler,
+    daemon_manager: &impl DaemonManager,
+    target_str: &str,
+    retry_delay: Duration,
+    version_info: VersionInfo,
+    target_spec: Result<Option<String>, String>,
+    env_context: &EnvironmentContext,
+    show_tool: Option<ShowToolWrapper>,
+    run_additional_diagnostics: bool,
+    gchecker: impl gcheck::GChecker,
+    ledger: &mut DoctorLedger<W>,
+) -> Result<()> {
+    match ledger.get_ledger_mode() {
+        LedgerViewMode::Normal => {
+            step_handler.output_step(StepType::DoctorSummaryInitNormal()).await?
+        }
+        LedgerViewMode::Verbose => {
+            step_handler.output_step(StepType::DoctorSummaryInitVerbose()).await?
+        }
+    }
+
+    let main_node_depth = check_ffx_info(ledger, &version_info).await?;
+    check_env_context(ledger, env_context).await?;
+
+    let daemon_proxy =
+        check_daemon_status(ledger, daemon_manager, retry_delay, &version_info, &target_spec)
+            .await?;
+
+    if let Some(daemon_proxy) = daemon_proxy {
+        run_google_network_checks(ledger, env_context, &gchecker).await?;
+        check_targets(
+            ledger,
+            &daemon_proxy,
+            target_str,
+            retry_delay,
+            env_context,
+            show_tool,
+            run_additional_diagnostics,
+        )
+        .await?;
+    }
+
+    print_summary_outcome(ledger, main_node_depth)?;
 
     Ok(())
 }
@@ -2397,7 +2556,8 @@ mod test {
                    \n        [✓] {global_file} locked by {global_file}.lock\
                    \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✗] Checking daemon\
-                   \n    [✗] No running daemons found. Run `ffx doctor --restart-daemon`\n",
+                   \n    [✗] No running daemons found. Run `ffx doctor --restart-daemon`\
+                   \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
@@ -2474,7 +2634,8 @@ mod test {
                    \n[✗] Google Network Checks\
                    \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Searching for targets\
-                   \n    [✗] No targets found!\n",
+                   \n    [✗] No targets found!\
+                   \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
@@ -2542,7 +2703,8 @@ mod test {
                    \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✗] Checking daemon\
                    \n    [✓] Daemon found: [1]\
-                   \n    [✗] Error connecting to daemon: Some error message. Run `ffx doctor --restart-daemon`\n",
+                   \n    [✗] Error connecting to daemon: Some error message. Run `ffx doctor --restart-daemon`\
+                   \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
@@ -2619,7 +2781,8 @@ mod test {
                    \n[✗] Google Network Checks\
                    \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Searching for targets\
-                   \n    [✗] No targets found!\n",
+                   \n    [✗] No targets found!\
+                   \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
@@ -2696,7 +2859,8 @@ mod test {
             \n[✗] Google Network Checks\
             \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✗] Searching for targets\
-            \n    [✗] No targets found!\n",
+            \n    [✗] No targets found!\
+            \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
@@ -3199,7 +3363,8 @@ mod test {
             \n[✗] Google Network Checks\
             \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✗] Searching for targets\
-            \n    [✗] No targets found!\n",
+            \n    [✗] No targets found!\
+            \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
@@ -3359,7 +3524,8 @@ mod test {
                     \n[✗] Google Network Checks\
                     \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                     \n\n[✗] Searching for targets\
-                    \n    [✗] No targets found!\n\n",
+                    \n    [✗] No targets found!\n\
+                    \n[✗] Doctor found issues in one or more categories.\n\n",
                     ffx_path=ffx_path(),
                     isolated_root=test_env.isolate_root.path().display(),
                     env_file=test_env.env_file.path().display(),
@@ -3446,7 +3612,8 @@ mod test {
                     \n[✗] Google Network Checks\
                     \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                     \n\n[✗] Searching for targets\
-                    \n    [✗] No targets found!\n\n",
+                    \n    [✗] No targets found!\n\
+                    \n[✗] Doctor found issues in one or more categories.\n\n",
                     ffx_path=ffx_path(),
                     isolated_root=test_env.isolate_root.path().display(),
                     env_file=test_env.env_file.path().display(),
@@ -3761,7 +3928,8 @@ mod test {
                    \n[✗] Google Network Checks\
                    \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Searching for targets\
-                   \n    [✗] No targets found!\n",
+                   \n    [✗] No targets found!\
+                   \n[✗] Doctor found issues in one or more categories.\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
