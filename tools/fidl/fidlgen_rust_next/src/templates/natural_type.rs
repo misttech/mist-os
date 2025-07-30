@@ -5,7 +5,7 @@
 use core::fmt;
 
 use super::{Context, Contextual};
-use crate::ir::{EndpointRole, InternalSubtype, Type, TypeKind};
+use crate::ir::{EndpointRole, HandleSubtype, InternalSubtype, Type, TypeKind};
 
 pub struct NaturalTypeTemplate<'a> {
     context: Context<'a>,
@@ -46,8 +46,8 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                     write!(f, "String")?;
                 }
             }
-            TypeKind::Handle { nullable, .. } => {
-                let handle_ty = &self.resource_bindings().handle.natural_path;
+            TypeKind::Handle { nullable, subtype, .. } => {
+                let handle_ty = &self.resource_bindings().handle.natural_path(*subtype);
                 if *nullable {
                     write!(f, "Option<{handle_ty}>")?;
                 } else {
@@ -64,13 +64,13 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                     write!(
                         f,
                         "Option<{role}<{protocol_id}, {}>>",
-                        self.resource_bindings().channel.natural_path
+                        self.resource_bindings().handle.natural_path(HandleSubtype::Channel),
                     )?;
                 } else {
                     write!(
                         f,
                         "{role}<{protocol_id}, {}>",
-                        self.resource_bindings().channel.natural_path
+                        self.resource_bindings().handle.natural_path(HandleSubtype::Channel),
                     )?;
                 }
             }

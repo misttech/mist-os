@@ -55,8 +55,8 @@ rustc_library("fidl_next_codec") {
 
   if (is_fuchsia) {
     sources += [
-      "src/fuchsia/channel.rs",
       "src/fuchsia/handle.rs",
+      "src/fuchsia/handle_types.rs",
       "src/fuchsia/mod.rs",
     ]
     deps += [ "//sdk/rust/zx" ]

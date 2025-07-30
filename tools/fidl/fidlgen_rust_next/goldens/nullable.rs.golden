@@ -1135,7 +1135,7 @@ impl ::core::fmt::Debug for WireOptionalSimpleUnion {
 #[derive(Debug)]
 #[repr(C)]
 pub struct StructWithNullableHandle {
-    pub val: Option<::fidl_next::fuchsia::zx::Handle>,
+    pub val: Option<::fidl_next::fuchsia::zx::Vmo>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableHandle {
@@ -1144,7 +1144,7 @@ impl ::fidl_next::Encodable for StructWithNullableHandle {
             true
 
                 && <
-                    Option<::fidl_next::fuchsia::zx::Handle> as ::fidl_next::Encodable
+                    Option<::fidl_next::fuchsia::zx::Vmo> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -1207,8 +1207,8 @@ where
 impl ::fidl_next::FromWire<WireStructWithNullableHandle> for StructWithNullableHandle {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireStructWithNullableHandle, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <Option<::fidl_next::fuchsia::zx::Handle> as ::fidl_next::FromWire<
-                ::fidl_next::fuchsia::WireOptionalHandle,
+            true && <Option<::fidl_next::fuchsia::zx::Vmo> as ::fidl_next::FromWire<
+                ::fidl_next::fuchsia::WireOptionalVmo,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -1224,7 +1224,7 @@ impl ::fidl_next::FromWire<WireStructWithNullableHandle> for StructWithNullableH
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableHandle {
-    pub val: ::fidl_next::fuchsia::WireOptionalHandle,
+    pub val: ::fidl_next::fuchsia::WireOptionalVmo,
 }
 
 unsafe impl ::fidl_next::Wire for WireStructWithNullableHandle {

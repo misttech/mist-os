@@ -996,7 +996,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ChannelProtocolMutateSocketRequest {
-    pub a: ::fidl_next::fuchsia::zx::Handle,
+    pub a: ::fidl_next::fuchsia::zx::Socket,
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolMutateSocketRequest {
@@ -1005,7 +1005,7 @@ impl ::fidl_next::Encodable for ChannelProtocolMutateSocketRequest {
         WireChannelProtocolMutateSocketRequest,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
     };
@@ -1072,8 +1072,8 @@ impl ::fidl_next::FromWire<WireChannelProtocolMutateSocketRequest>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::FromWire<
-                ::fidl_next::fuchsia::WireHandle,
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::FromWire<
+                ::fidl_next::fuchsia::WireSocket,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -1089,7 +1089,7 @@ impl ::fidl_next::FromWire<WireChannelProtocolMutateSocketRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMutateSocketRequest {
-    pub a: ::fidl_next::fuchsia::WireHandle,
+    pub a: ::fidl_next::fuchsia::WireSocket,
 }
 
 unsafe impl ::fidl_next::Wire for WireChannelProtocolMutateSocketRequest {
@@ -1125,7 +1125,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ChannelProtocolMutateSocketResponse {
-    pub b: ::fidl_next::fuchsia::zx::Handle,
+    pub b: ::fidl_next::fuchsia::zx::Socket,
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolMutateSocketResponse {
@@ -1134,7 +1134,7 @@ impl ::fidl_next::Encodable for ChannelProtocolMutateSocketResponse {
         WireChannelProtocolMutateSocketResponse,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
     };
@@ -1201,8 +1201,8 @@ impl ::fidl_next::FromWire<WireChannelProtocolMutateSocketResponse>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::FromWire<
-                ::fidl_next::fuchsia::WireHandle,
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::FromWire<
+                ::fidl_next::fuchsia::WireSocket,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -1218,7 +1218,7 @@ impl ::fidl_next::FromWire<WireChannelProtocolMutateSocketResponse>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMutateSocketResponse {
-    pub b: ::fidl_next::fuchsia::WireHandle,
+    pub b: ::fidl_next::fuchsia::WireSocket,
 }
 
 unsafe impl ::fidl_next::Wire for WireChannelProtocolMutateSocketResponse {
@@ -1518,7 +1518,7 @@ pub mod channel_protocol {
 
         impl<T0> ::fidl_next::Encodable for MutateSocket<T0>
         where
-            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             type Encoded = crate::WireChannelProtocolMutateSocketRequest;
         }
@@ -1529,7 +1529,7 @@ pub mod channel_protocol {
 
             ___E: ::fidl_next::fuchsia::HandleEncoder,
 
-            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             #[inline]
             fn encode(
@@ -1685,7 +1685,7 @@ pub mod channel_protocol {
 
                 a: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                    Encoded = ::fidl_next::fuchsia::WireSocket,
                 >,
             ) -> Result<
                 ::fidl_next::ResponseFuture<'_, super::MutateSocket, ___T>,
@@ -2209,7 +2209,7 @@ impl ::core::convert::From<ErrorEnum> for WireErrorEnum {
 #[derive(Debug)]
 #[repr(C)]
 pub struct HandleRightsProtocolNoResponseMethodRequest {
-    pub h: ::fidl_next::fuchsia::zx::Handle,
+    pub h: ::fidl_next::fuchsia::zx::Socket,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolNoResponseMethodRequest {
@@ -2218,7 +2218,7 @@ impl ::fidl_next::Encodable for HandleRightsProtocolNoResponseMethodRequest {
         WireHandleRightsProtocolNoResponseMethodRequest,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
     };
@@ -2286,8 +2286,8 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolNoResponseMethodRequest>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::FromWire<
-                ::fidl_next::fuchsia::WireHandle,
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::FromWire<
+                ::fidl_next::fuchsia::WireSocket,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -2303,7 +2303,7 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolNoResponseMethodRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolNoResponseMethodRequest {
-    pub h: ::fidl_next::fuchsia::WireHandle,
+    pub h: ::fidl_next::fuchsia::WireSocket,
 }
 
 unsafe impl ::fidl_next::Wire for WireHandleRightsProtocolNoResponseMethodRequest {
@@ -2339,7 +2339,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct HandleRightsProtocolResponseMethodRequest {
-    pub h: ::fidl_next::fuchsia::zx::Handle,
+    pub h: ::fidl_next::fuchsia::zx::Socket,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolResponseMethodRequest {
@@ -2348,7 +2348,7 @@ impl ::fidl_next::Encodable for HandleRightsProtocolResponseMethodRequest {
         WireHandleRightsProtocolResponseMethodRequest,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
     };
@@ -2416,8 +2416,8 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolResponseMethodRequest>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::FromWire<
-                ::fidl_next::fuchsia::WireHandle,
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::FromWire<
+                ::fidl_next::fuchsia::WireSocket,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -2433,7 +2433,7 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolResponseMethodRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolResponseMethodRequest {
-    pub h: ::fidl_next::fuchsia::WireHandle,
+    pub h: ::fidl_next::fuchsia::WireSocket,
 }
 
 unsafe impl ::fidl_next::Wire for WireHandleRightsProtocolResponseMethodRequest {
@@ -2469,7 +2469,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct HandleRightsProtocolResponseMethodResponse {
-    pub h: ::fidl_next::fuchsia::zx::Handle,
+    pub h: ::fidl_next::fuchsia::zx::Socket,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolResponseMethodResponse {
@@ -2478,7 +2478,7 @@ impl ::fidl_next::Encodable for HandleRightsProtocolResponseMethodResponse {
         WireHandleRightsProtocolResponseMethodResponse,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
     };
@@ -2546,8 +2546,8 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolResponseMethodResponse>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::FromWire<
-                ::fidl_next::fuchsia::WireHandle,
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::FromWire<
+                ::fidl_next::fuchsia::WireSocket,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -2563,7 +2563,7 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolResponseMethodResponse>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolResponseMethodResponse {
-    pub h: ::fidl_next::fuchsia::WireHandle,
+    pub h: ::fidl_next::fuchsia::WireSocket,
 }
 
 unsafe impl ::fidl_next::Wire for WireHandleRightsProtocolResponseMethodResponse {
@@ -2599,7 +2599,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct HandleRightsProtocolAnEventRequest {
-    pub h: ::fidl_next::fuchsia::zx::Handle,
+    pub h: ::fidl_next::fuchsia::zx::Socket,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolAnEventRequest {
@@ -2608,7 +2608,7 @@ impl ::fidl_next::Encodable for HandleRightsProtocolAnEventRequest {
         WireHandleRightsProtocolAnEventRequest,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
     };
@@ -2675,8 +2675,8 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolAnEventRequest>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::FromWire<
-                ::fidl_next::fuchsia::WireHandle,
+            true && <::fidl_next::fuchsia::zx::Socket as ::fidl_next::FromWire<
+                ::fidl_next::fuchsia::WireSocket,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -2692,7 +2692,7 @@ impl ::fidl_next::FromWire<WireHandleRightsProtocolAnEventRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolAnEventRequest {
-    pub h: ::fidl_next::fuchsia::WireHandle,
+    pub h: ::fidl_next::fuchsia::WireSocket,
 }
 
 unsafe impl ::fidl_next::Wire for WireHandleRightsProtocolAnEventRequest {
@@ -2789,7 +2789,7 @@ pub mod handle_rights_protocol {
 
         impl<T0> ::fidl_next::Encodable for NoResponseMethod<T0>
         where
-            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             type Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest;
         }
@@ -2800,7 +2800,7 @@ pub mod handle_rights_protocol {
 
             ___E: ::fidl_next::fuchsia::HandleEncoder,
 
-            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             #[inline]
             fn encode(
@@ -2827,7 +2827,7 @@ pub mod handle_rights_protocol {
 
         impl<T0> ::fidl_next::Encodable for ResponseMethod<T0>
         where
-            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             type Encoded = crate::WireHandleRightsProtocolResponseMethodRequest;
         }
@@ -2838,7 +2838,7 @@ pub mod handle_rights_protocol {
 
             ___E: ::fidl_next::fuchsia::HandleEncoder,
 
-            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             #[inline]
             fn encode(
@@ -2865,7 +2865,7 @@ pub mod handle_rights_protocol {
 
         impl<T0> ::fidl_next::Encodable for AnEvent<T0>
         where
-            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             type Encoded = crate::WireHandleRightsProtocolAnEventRequest;
         }
@@ -2876,7 +2876,7 @@ pub mod handle_rights_protocol {
 
             ___E: ::fidl_next::fuchsia::HandleEncoder,
 
-            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireSocket>,
         {
             #[inline]
             fn encode(
@@ -2920,7 +2920,7 @@ pub mod handle_rights_protocol {
 
                 h: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                    Encoded = ::fidl_next::fuchsia::WireSocket,
                 >,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
             where
@@ -2950,7 +2950,7 @@ pub mod handle_rights_protocol {
 
                 h: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                    Encoded = ::fidl_next::fuchsia::WireSocket,
                 >,
             ) -> Result<
                 ::fidl_next::ResponseFuture<'_, super::ResponseMethod, ___T>,
@@ -2999,7 +2999,7 @@ pub mod handle_rights_protocol {
 
                 h: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                    Encoded = ::fidl_next::fuchsia::WireSocket,
                 >,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
             where

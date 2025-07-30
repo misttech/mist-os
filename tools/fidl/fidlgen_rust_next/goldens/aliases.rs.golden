@@ -156,15 +156,15 @@ impl ::core::convert::From<ObjType> for WireObjType {
     }
 }
 
-pub type Channel = ::fidl_next::fuchsia::zx::Handle;
+pub type Channel = ::fidl_next::fuchsia::zx::Channel;
 
 /// The wire type corresponding to [`Channel`].
-pub type WireChannel = ::fidl_next::fuchsia::WireHandle;
+pub type WireChannel = ::fidl_next::fuchsia::WireChannel;
 
-pub type AliasOfChannel = ::fidl_next::fuchsia::zx::Handle;
+pub type AliasOfChannel = ::fidl_next::fuchsia::zx::Channel;
 
 /// The wire type corresponding to [`AliasOfChannel`].
-pub type WireAliasOfChannel = ::fidl_next::fuchsia::WireHandle;
+pub type WireAliasOfChannel = ::fidl_next::fuchsia::WireChannel;
 
 #[derive(Debug)]
 pub struct ExampleOfUseOfAliases {
@@ -178,11 +178,11 @@ pub struct ExampleOfUseOfAliases {
 
     pub field_of_vec_of_ref_me_at_most_5: Vec<::fidl_next_test_someotherlibrary::ReferenceMe>,
 
-    pub field_of_channel: ::fidl_next::fuchsia::zx::Handle,
+    pub field_of_channel: ::fidl_next::fuchsia::zx::Channel,
 
-    pub field_of_client_end: ::fidl_next::fuchsia::zx::Handle,
+    pub field_of_client_end: ::fidl_next::fuchsia::zx::Channel,
 
-    pub field_of_nullable_client_end: Option<::fidl_next::fuchsia::zx::Handle>,
+    pub field_of_nullable_client_end: Option<::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ExampleOfUseOfAliases {
@@ -331,11 +331,11 @@ pub struct WireExampleOfUseOfAliases<'de> {
     pub field_of_vec_of_ref_me_at_most_5:
         ::fidl_next::WireVector<'de, ::fidl_next_test_someotherlibrary::WireReferenceMe>,
 
-    pub field_of_channel: ::fidl_next::fuchsia::WireHandle,
+    pub field_of_channel: ::fidl_next::fuchsia::WireChannel,
 
-    pub field_of_client_end: ::fidl_next::fuchsia::WireHandle,
+    pub field_of_client_end: ::fidl_next::fuchsia::WireChannel,
 
-    pub field_of_nullable_client_end: ::fidl_next::fuchsia::WireOptionalHandle,
+    pub field_of_nullable_client_end: ::fidl_next::fuchsia::WireOptionalChannel,
 }
 
 unsafe impl ::fidl_next::Wire for WireExampleOfUseOfAliases<'static> {

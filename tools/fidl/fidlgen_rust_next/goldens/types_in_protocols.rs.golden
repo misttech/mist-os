@@ -3639,7 +3639,7 @@ impl ::core::fmt::Debug for WireOptionalResourceUnion {
 pub struct Resource {
     pub handle: ::fidl_next::fuchsia::zx::Handle,
 
-    pub vmo: ::fidl_next::fuchsia::zx::Handle,
+    pub vmo: ::fidl_next::fuchsia::zx::Vmo,
 
     pub client_end: ::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>,
 
@@ -3653,7 +3653,7 @@ pub struct Resource {
 
     pub opt_handle: Option<::fidl_next::fuchsia::zx::Handle>,
 
-    pub opt_vmo: Option<::fidl_next::fuchsia::zx::Handle>,
+    pub opt_vmo: Option<::fidl_next::fuchsia::zx::Vmo>,
 
     pub opt_client_end:
         Option<::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>>,
@@ -3667,7 +3667,7 @@ pub struct Resource {
 
     pub array_handle: [::fidl_next::fuchsia::zx::Handle; 5],
 
-    pub array_vmo: [::fidl_next::fuchsia::zx::Handle; 5],
+    pub array_vmo: [::fidl_next::fuchsia::zx::Vmo; 5],
 
     pub array_client_end:
         [::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>; 5],
@@ -3683,7 +3683,7 @@ pub struct Resource {
 
     pub vector_handle: Vec<::fidl_next::fuchsia::zx::Handle>,
 
-    pub vector_vmo: Vec<::fidl_next::fuchsia::zx::Handle>,
+    pub vector_vmo: Vec<::fidl_next::fuchsia::zx::Vmo>,
 
     pub vector_client_end:
         Vec<::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>>,
@@ -3900,7 +3900,7 @@ impl<'de> ::fidl_next::FromWire<WireResource<'de>> for Resource {
 pub struct WireResource<'de> {
     pub handle: ::fidl_next::fuchsia::WireHandle,
 
-    pub vmo: ::fidl_next::fuchsia::WireHandle,
+    pub vmo: ::fidl_next::fuchsia::WireVmo,
 
     pub client_end: ::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::WireChannel>,
 
@@ -3914,7 +3914,7 @@ pub struct WireResource<'de> {
 
     pub opt_handle: ::fidl_next::fuchsia::WireOptionalHandle,
 
-    pub opt_vmo: ::fidl_next::fuchsia::WireOptionalHandle,
+    pub opt_vmo: ::fidl_next::fuchsia::WireOptionalVmo,
 
     pub opt_client_end:
         ::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::WireOptionalChannel>,
@@ -3928,7 +3928,7 @@ pub struct WireResource<'de> {
 
     pub array_handle: [::fidl_next::fuchsia::WireHandle; 5],
 
-    pub array_vmo: [::fidl_next::fuchsia::WireHandle; 5],
+    pub array_vmo: [::fidl_next::fuchsia::WireVmo; 5],
 
     pub array_client_end:
         [::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::WireChannel>; 5],
@@ -3944,7 +3944,7 @@ pub struct WireResource<'de> {
 
     pub vector_handle: ::fidl_next::WireVector<'de, ::fidl_next::fuchsia::WireHandle>,
 
-    pub vector_vmo: ::fidl_next::WireVector<'de, ::fidl_next::fuchsia::WireHandle>,
+    pub vector_vmo: ::fidl_next::WireVector<'de, ::fidl_next::fuchsia::WireVmo>,
 
     pub vector_client_end: ::fidl_next::WireVector<
         'de,
@@ -7630,7 +7630,7 @@ pub mod protocol {
         where
             T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
 
-            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireVmo>,
 
             T2: ::fidl_next::Encodable<
                 Encoded = ::fidl_next::ClientEnd<
@@ -7654,7 +7654,7 @@ pub mod protocol {
 
             T7: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
 
-            T8: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
+            T8: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalVmo>,
 
             T9: ::fidl_next::Encodable<
                 Encoded = ::fidl_next::ClientEnd<
@@ -7678,7 +7678,7 @@ pub mod protocol {
 
             T13: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
 
-            T14: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
+            T14: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireVmo; 5]>,
 
             T15: ::fidl_next::Encodable<
                 Encoded = [::fidl_next::ClientEnd<
@@ -7705,7 +7705,7 @@ pub mod protocol {
             >,
 
             T21: ::fidl_next::Encodable<
-                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
             >,
 
             T22: ::fidl_next::Encodable<
@@ -7805,7 +7805,7 @@ pub mod protocol {
 
             T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
 
-            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireVmo>,
 
             T2: ::fidl_next::Encode<
                 ___E,
@@ -7831,7 +7831,7 @@ pub mod protocol {
 
             T7: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
 
-            T8: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
+            T8: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalVmo>,
 
             T9: ::fidl_next::Encode<
                 ___E,
@@ -7858,7 +7858,7 @@ pub mod protocol {
 
             T13: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
 
-            T14: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
+            T14: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireVmo; 5]>,
 
             T15: ::fidl_next::Encode<
                 ___E,
@@ -7889,7 +7889,7 @@ pub mod protocol {
 
             T21: ::fidl_next::Encode<
                 ___E,
-                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
             >,
 
             T22: ::fidl_next::Encode<
@@ -8165,7 +8165,7 @@ pub mod protocol {
         where
             T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
 
-            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireVmo>,
 
             T2: ::fidl_next::Encodable<
                 Encoded = ::fidl_next::ClientEnd<
@@ -8189,7 +8189,7 @@ pub mod protocol {
 
             T7: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
 
-            T8: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
+            T8: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalVmo>,
 
             T9: ::fidl_next::Encodable<
                 Encoded = ::fidl_next::ClientEnd<
@@ -8213,7 +8213,7 @@ pub mod protocol {
 
             T13: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
 
-            T14: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
+            T14: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireVmo; 5]>,
 
             T15: ::fidl_next::Encodable<
                 Encoded = [::fidl_next::ClientEnd<
@@ -8240,7 +8240,7 @@ pub mod protocol {
             >,
 
             T21: ::fidl_next::Encodable<
-                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
             >,
 
             T22: ::fidl_next::Encodable<
@@ -8340,7 +8340,7 @@ pub mod protocol {
 
             T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
 
-            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireVmo>,
 
             T2: ::fidl_next::Encode<
                 ___E,
@@ -8366,7 +8366,7 @@ pub mod protocol {
 
             T7: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
 
-            T8: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
+            T8: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalVmo>,
 
             T9: ::fidl_next::Encode<
                 ___E,
@@ -8393,7 +8393,7 @@ pub mod protocol {
 
             T13: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
 
-            T14: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
+            T14: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireVmo; 5]>,
 
             T15: ::fidl_next::Encode<
                 ___E,
@@ -8424,7 +8424,7 @@ pub mod protocol {
 
             T21: ::fidl_next::Encode<
                 ___E,
-                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
             >,
 
             T22: ::fidl_next::Encode<
@@ -8700,7 +8700,7 @@ pub mod protocol {
         where
             T0: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
 
-            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireVmo>,
 
             T2: ::fidl_next::Encodable<
                 Encoded = ::fidl_next::ClientEnd<
@@ -8724,7 +8724,7 @@ pub mod protocol {
 
             T7: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
 
-            T8: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
+            T8: ::fidl_next::Encodable<Encoded = ::fidl_next::fuchsia::WireOptionalVmo>,
 
             T9: ::fidl_next::Encodable<
                 Encoded = ::fidl_next::ClientEnd<
@@ -8748,7 +8748,7 @@ pub mod protocol {
 
             T13: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
 
-            T14: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
+            T14: ::fidl_next::Encodable<Encoded = [::fidl_next::fuchsia::WireVmo; 5]>,
 
             T15: ::fidl_next::Encodable<
                 Encoded = [::fidl_next::ClientEnd<
@@ -8775,7 +8775,7 @@ pub mod protocol {
             >,
 
             T21: ::fidl_next::Encodable<
-                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
             >,
 
             T22: ::fidl_next::Encodable<
@@ -8875,7 +8875,7 @@ pub mod protocol {
 
             T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
 
-            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireHandle>,
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireVmo>,
 
             T2: ::fidl_next::Encode<
                 ___E,
@@ -8901,7 +8901,7 @@ pub mod protocol {
 
             T7: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
 
-            T8: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalHandle>,
+            T8: ::fidl_next::Encode<___E, Encoded = ::fidl_next::fuchsia::WireOptionalVmo>,
 
             T9: ::fidl_next::Encode<
                 ___E,
@@ -8928,7 +8928,7 @@ pub mod protocol {
 
             T13: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
 
-            T14: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireHandle; 5]>,
+            T14: ::fidl_next::Encode<___E, Encoded = [::fidl_next::fuchsia::WireVmo; 5]>,
 
             T15: ::fidl_next::Encode<
                 ___E,
@@ -8959,7 +8959,7 @@ pub mod protocol {
 
             T21: ::fidl_next::Encode<
                 ___E,
-                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
             >,
 
             T22: ::fidl_next::Encode<
@@ -10610,7 +10610,7 @@ pub mod protocol {
 
                 vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                    Encoded = ::fidl_next::fuchsia::WireVmo,
                 >,
 
                 client_end: impl ::fidl_next::Encode<
@@ -10651,7 +10651,7 @@ pub mod protocol {
 
                 opt_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireOptionalHandle,
+                    Encoded = ::fidl_next::fuchsia::WireOptionalVmo,
                 >,
 
                 opt_client_end: impl ::fidl_next::Encode<
@@ -10687,7 +10687,7 @@ pub mod protocol {
 
                 array_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = [::fidl_next::fuchsia::WireHandle; 5],
+                    Encoded = [::fidl_next::fuchsia::WireVmo; 5],
                 >,
 
                 array_client_end: impl ::fidl_next::Encode<
@@ -10728,7 +10728,7 @@ pub mod protocol {
 
                 vector_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                    Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
                 >,
 
                 vector_client_end: impl ::fidl_next::Encode<
@@ -10850,7 +10850,7 @@ pub mod protocol {
 
                 vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                    Encoded = ::fidl_next::fuchsia::WireVmo,
                 >,
 
                 client_end: impl ::fidl_next::Encode<
@@ -10891,7 +10891,7 @@ pub mod protocol {
 
                 opt_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireOptionalHandle,
+                    Encoded = ::fidl_next::fuchsia::WireOptionalVmo,
                 >,
 
                 opt_client_end: impl ::fidl_next::Encode<
@@ -10927,7 +10927,7 @@ pub mod protocol {
 
                 array_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = [::fidl_next::fuchsia::WireHandle; 5],
+                    Encoded = [::fidl_next::fuchsia::WireVmo; 5],
                 >,
 
                 array_client_end: impl ::fidl_next::Encode<
@@ -10968,7 +10968,7 @@ pub mod protocol {
 
                 vector_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                    Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
                 >,
 
                 vector_client_end: impl ::fidl_next::Encode<
@@ -11790,7 +11790,7 @@ pub mod protocol {
 
                 vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireHandle,
+                    Encoded = ::fidl_next::fuchsia::WireVmo,
                 >,
 
                 client_end: impl ::fidl_next::Encode<
@@ -11831,7 +11831,7 @@ pub mod protocol {
 
                 opt_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::fuchsia::WireOptionalHandle,
+                    Encoded = ::fidl_next::fuchsia::WireOptionalVmo,
                 >,
 
                 opt_client_end: impl ::fidl_next::Encode<
@@ -11867,7 +11867,7 @@ pub mod protocol {
 
                 array_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = [::fidl_next::fuchsia::WireHandle; 5],
+                    Encoded = [::fidl_next::fuchsia::WireVmo; 5],
                 >,
 
                 array_client_end: impl ::fidl_next::Encode<
@@ -11908,7 +11908,7 @@ pub mod protocol {
 
                 vector_vmo: impl ::fidl_next::Encode<
                     <___T as ::fidl_next::Transport>::SendBuffer,
-                    Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireHandle>,
+                    Encoded = ::fidl_next::WireVector<'static, ::fidl_next::fuchsia::WireVmo>,
                 >,
 
                 vector_client_end: impl ::fidl_next::Encode<

@@ -233,7 +233,7 @@ where
 
 #[derive(Debug, Default)]
 pub struct T {
-    pub zircon_handle: Option<::fidl_next::fuchsia::zx::Handle>,
+    pub zircon_handle: Option<::fidl_next::fuchsia::zx::Event>,
 
     pub fdf_handle:
         Option<::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::zx::Channel>>,
@@ -330,7 +330,7 @@ impl<'de> ::fidl_next::FromWire<WireT<'de>> for T {
         Self {
             zircon_handle: zircon_handle.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
-                    envelope.read_unchecked::<::fidl_next::fuchsia::WireHandle>()
+                    envelope.read_unchecked::<::fidl_next::fuchsia::WireEvent>()
                 })
             }),
 
@@ -355,7 +355,7 @@ pub struct WireT<'de> {
 impl<'de> Drop for WireT<'de> {
     fn drop(&mut self) {
         let _ = self.table.get(1).map(|envelope| unsafe {
-            envelope.read_unchecked::<::fidl_next::fuchsia::WireHandle>()
+            envelope.read_unchecked::<::fidl_next::fuchsia::WireEvent>()
         });
 
         let _ = self.table.get(2)
@@ -392,7 +392,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::fuchsia::WireHandle>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::fuchsia::WireEvent>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -419,7 +419,7 @@ where
 }
 
 impl<'de> WireT<'de> {
-    pub fn zircon_handle(&self) -> Option<&::fidl_next::fuchsia::WireHandle> {
+    pub fn zircon_handle(&self) -> Option<&::fidl_next::fuchsia::WireEvent> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 

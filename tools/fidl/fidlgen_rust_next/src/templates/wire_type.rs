@@ -5,7 +5,7 @@
 use core::fmt;
 
 use super::{Context, Contextual};
-use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type, TypeKind};
+use crate::ir::{DeclType, EndpointRole, HandleSubtype, InternalSubtype, Type, TypeKind};
 
 pub struct WireTypeTemplate<'a> {
     context: Context<'a>,
@@ -59,11 +59,11 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     write!(f, "::fidl_next::WireString<{}>", self.lifetime)?;
                 }
             }
-            TypeKind::Handle { nullable, .. } => {
+            TypeKind::Handle { nullable, subtype, .. } => {
                 if *nullable {
-                    write!(f, "{}", self.resource_bindings().handle.optional_wire_path)?;
+                    write!(f, "{}", self.resource_bindings().handle.optional_wire_path(*subtype),)?;
                 } else {
-                    write!(f, "{}", self.resource_bindings().handle.wire_path)?;
+                    write!(f, "{}", self.resource_bindings().handle.wire_path(*subtype),)?;
                 }
             }
             TypeKind::Endpoint { nullable, role, protocol, .. } => {
@@ -76,13 +76,13 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     write!(
                         f,
                         "{role}<{protocol_id}, {}>",
-                        self.resource_bindings().channel.optional_wire_path
+                        self.resource_bindings().handle.optional_wire_path(HandleSubtype::Channel),
                     )?;
                 } else {
                     write!(
                         f,
                         "{role}<{protocol_id}, {}>",
-                        self.resource_bindings().channel.wire_path
+                        self.resource_bindings().handle.wire_path(HandleSubtype::Channel),
                     )?;
                 }
             }
@@ -126,9 +126,19 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     }
                     DeclType::Resource => {
                         if *nullable {
-                            write!(f, "{}", self.resource_bindings().handle.optional_wire_path)?;
+                            write!(
+                                f,
+                                "{}",
+                                self.resource_bindings()
+                                    .handle
+                                    .optional_wire_path(HandleSubtype::None)
+                            )?;
                         } else {
-                            write!(f, "{}", self.resource_bindings().handle.wire_path)?;
+                            write!(
+                                f,
+                                "{}",
+                                self.resource_bindings().handle.wire_path(HandleSubtype::None)
+                            )?;
                         }
                     }
                     _ => unimplemented!(),
