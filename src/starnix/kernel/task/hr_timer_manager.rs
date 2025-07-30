@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::power::{create_proxy_for_wake_events_counter_zero, OnWakeOps};
-use crate::task::{CurrentTask, HandleWaitCanceler, LockedAndTask, TargetTime, WaitCanceler};
+use crate::task::{CurrentTask, LockedAndTask, PortWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 use anyhow::{Context, Result};
 use fuchsia_inspect::ArrayProperty;
@@ -941,7 +941,7 @@ impl TimerOps for HrTimerHandle {
         Ok(current_task.kernel().hrtimer_manager.remove_timer(self)?)
     }
 
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler {
+    fn wait_canceler(&self, canceler: PortWaitCanceler) -> WaitCanceler {
         WaitCanceler::new_event(Arc::downgrade(&self.event), canceler)
     }
 

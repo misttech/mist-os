@@ -5,7 +5,7 @@
 use crate::fs::fuchsia::{BootZxTimer, MonotonicZxTimer};
 use crate::power::OnWakeOps;
 use crate::task::{
-    CurrentTask, EventHandler, GenericDuration, HandleWaitCanceler, HrTimer, SignalHandler,
+    CurrentTask, EventHandler, GenericDuration, HrTimer, PortWaitCanceler, SignalHandler,
     SignalHandlerInner, TargetTime, Timeline, TimerWakeup, WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
@@ -42,7 +42,7 @@ pub trait TimerOps: Send + Sync + 'static {
     fn stop(&self, current_task: &CurrentTask) -> Result<(), Errno>;
 
     /// Creates a `WaitCanceler` that can be used to wait for the timer to be cancelled.
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler;
+    fn wait_canceler(&self, canceler: PortWaitCanceler) -> WaitCanceler;
 
     /// Returns a reference to the underlying Zircon handle.
     fn as_handle_ref(&self) -> HandleRef<'_>;

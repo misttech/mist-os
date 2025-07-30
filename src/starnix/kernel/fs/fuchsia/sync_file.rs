@@ -332,8 +332,7 @@ impl FileOps for SyncFile {
                     WaitCanceler::new_counter(Arc::downgrade(&sync_point.counter), canceler_result),
                 );
             } else {
-                canceler_result.cancel(sync_point.counter.as_handle_ref());
-
+                canceler_result.cancel();
                 count.next();
             }
         }

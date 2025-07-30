@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::power::OnWakeOps;
-use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
+use crate::task::{CurrentTask, PortWaitCanceler, TargetTime, WaitCanceler};
 use crate::time::utc::estimate_boot_deadline_from_utc;
 use crate::vfs::timer::TimerOps;
 use starnix_uapi::errors::Errno;
@@ -43,7 +43,7 @@ impl TimerOps for MonotonicZxTimer {
         self.timer.cancel().map_err(|status| from_status_like_fdio!(status))
     }
 
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler {
+    fn wait_canceler(&self, canceler: PortWaitCanceler) -> WaitCanceler {
         WaitCanceler::new_mono_timer(Arc::downgrade(&self.timer), canceler)
     }
 
@@ -87,7 +87,7 @@ impl TimerOps for BootZxTimer {
         self.timer.cancel().map_err(|status| from_status_like_fdio!(status))
     }
 
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler {
+    fn wait_canceler(&self, canceler: PortWaitCanceler) -> WaitCanceler {
         WaitCanceler::new_boot_timer(Arc::downgrade(&self.timer), canceler)
     }
 
