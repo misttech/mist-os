@@ -33,7 +33,6 @@ fxfs_deps = [
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:async-trait",
-  "//third_party/rust_crates:base64",
   "//third_party/rust_crates:bincode",
   "//third_party/rust_crates:bit-vec",
   "//third_party/rust_crates:byteorder",

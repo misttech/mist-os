@@ -54,8 +54,6 @@ use crate::round::round_up;
 use crate::serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest};
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
-use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
 use fprint::TypeFingerprint;
 use fuchsia_sync::Mutex;
@@ -64,7 +62,6 @@ use fxfs_crypto::{
     Cipher, Crypt, FxfsCipher, FxfsKey, FxfsKeyV32, FxfsKeyV40, KeyPurpose, StreamCipher,
     UnwrappedKey,
 };
-use mundane::hash::{Digest, Hasher, Sha256};
 use once_cell::sync::OnceCell;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -2120,9 +2117,9 @@ impl ObjectStore {
             key.decrypt_filename(object_id, &mut link)?;
             Ok(link)
         } else {
-            let digest = Sha256::hash(&link).bytes();
-            let encrypted_link = BASE64_URL_SAFE_NO_PAD.encode(&digest);
-            Ok(encrypted_link.into())
+            let proxy_filename = fscrypt::proxy_filename::ProxyFilename::new(0, &link);
+            let proxy_filename_str: String = proxy_filename.into();
+            Ok(proxy_filename_str.as_bytes().to_vec())
         }
     }
 

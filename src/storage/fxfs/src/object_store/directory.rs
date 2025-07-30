@@ -1628,13 +1628,14 @@ mod tests {
     use crate::object_store::directory::{
         replace_child, Directory, MutableAttributesInternal, ReplacedChild,
     };
-    use crate::object_store::object_record::Timestamp;
+    use crate::object_store::object_record::{ObjectKey, ObjectValue, Timestamp};
     use crate::object_store::transaction::{lock_keys, Options};
     use crate::object_store::volume::root_volume;
     use crate::object_store::{
-        HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
-        StoreObjectHandle, NO_OWNER,
+        HandleOptions, LockKey, ObjectDescriptor, ObjectKind, ObjectStore,
+        SetExtendedAttributeMode, StoreObjectHandle, NO_OWNER,
     };
+    use anyhow::Error;
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
     use fxfs_crypto::{Cipher, Crypt};
@@ -1647,6 +1648,89 @@ mod tests {
     use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
+
+    /// The synthetic symlink we return when locked is not usable for anything but we still want
+    /// it to match that returned by fscrypt so we will verify here that we get back the
+    /// expected ProxyFilename-derived link content.
+    #[fuchsia::test]
+    async fn test_reopen_with_different_crypt_shows_proxy_name() -> Result<(), Error> {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let symlink_object_id;
+        {
+            let crypt = Arc::new(InsecureCrypt::new());
+            crypt.add_wrapping_key(2, [1; 32].into());
+            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+            let store = root_volume
+                .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
+                .await
+                .expect("new_volume failed");
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            let root_dir = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+            let _ = root_dir.set_wrapping_key(&mut transaction, 2).await?;
+            transaction.commit().await.unwrap();
+
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            let root_dir = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+            symlink_object_id = root_dir
+                .create_symlink(&mut transaction, b"some_link_text", "a")
+                .await
+                .expect("create_symlink failed");
+            transaction.commit().await.expect("commit failed");
+        };
+        fs.close().await.expect("close failed");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        // Open the volume without providing the keys.
+        let store = root_volume
+            .volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+            .await
+            .expect("volume failed");
+
+        let item = store
+            .tree()
+            .find(&ObjectKey::object(symlink_object_id))
+            .await
+            .expect("find failed")
+            .expect("found record");
+        let raw_link = match item.value {
+            ObjectValue::Object { kind: ObjectKind::EncryptedSymlink { link, .. }, .. } => link,
+            _ => panic!("Unexpected item {item:?}"),
+        };
+        let symlink_target = store.read_symlink(symlink_object_id).await?;
+        let expected_symlink_target: String = ProxyFilename::new(0, &raw_link).into();
+        assert_eq!(symlink_target, expected_symlink_target.as_bytes());
+
+        fs.close().await.expect("Close failed");
+        Ok(())
+    }
 
     async fn yield_to_executor() {
         let mut done = false;
