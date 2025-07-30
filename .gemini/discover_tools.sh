@@ -13,8 +13,27 @@
 read -r -d '' TOOLS_JSON <<EOF
 [
   {
-    "name": "search_file_content",
-    "description": "Custom implementation: Searches for a regular expression pattern within the content of files using `jiri grep` and returns the exact output.",
+    "name": "git_ls_files",
+    "description": "Custom implementation: List files in a git repository directory using \`git ls-files\` and returns the exact output.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "files": {
+          "type": "ARRAY",
+          "items": { "type": "STRING" },
+          "description": "The regular expression (regex) to search for. Defaults to all files"
+        },
+        "path": {
+          "type": "STRING",
+          "description": "An optional path to a directory to search within. Defaults to the current directory."
+        }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "jiri_grep",
+    "description": "Custom implementation: Searches for a regular expression pattern across all repositories using \`jiri grep\` and returns the exact output.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
