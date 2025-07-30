@@ -242,7 +242,7 @@ zx::result<zx::bti> PlatformDevice::GetBti(uint32_t index) const {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  return bus_->GetBti(bti.iommu_index().value(), bti.bti_id().value());
+  return bus_->GetBti(bti.iommu_index().value(), bti.bti_id().value(), name());
 }
 
 zx::result<zx::resource> PlatformDevice::GetSmc(uint32_t index) const {
