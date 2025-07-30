@@ -7,6 +7,7 @@
 
 #include "kernel/mp.h"
 
+#include <align.h>
 #include <assert.h>
 #include <debug.h>
 #include <lib/arch/intrin.h>
@@ -28,7 +29,6 @@
 #include <arch/ops.h>
 #include <dev/interrupt.h>
 #include <fbl/algorithm.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <kernel/deadline.h>
 #include <kernel/dpc.h>

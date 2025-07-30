@@ -11,6 +11,7 @@
 // TODO(https://fxbug.dev/42108268): combine common parts with x86 (after things settle)
 // TODO(https://fxbug.dev/42108269): chain event handling
 
+#include <align.h>
 #include <assert.h>
 #include <lib/perfmon.h>
 #include <lib/zircon-internal/mtrace.h>
@@ -30,7 +31,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>

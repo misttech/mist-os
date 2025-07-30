@@ -7,7 +7,8 @@
 #ifndef ZIRCON_KERNEL_LIB_LOCKUP_DETECTOR_INCLUDE_LIB_LOCKUP_DETECTOR_STATE_H_
 #define ZIRCON_KERNEL_LIB_LOCKUP_DETECTOR_INCLUDE_LIB_LOCKUP_DETECTOR_STATE_H_
 
-#include <kernel/align.h>
+#include <align.h>
+
 #include <kernel/cpu.h>
 #include <kernel/event_limiter.h>
 #include <ktl/atomic.h>

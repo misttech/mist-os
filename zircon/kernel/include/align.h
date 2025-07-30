@@ -19,4 +19,11 @@
 
 #define IS_PAGE_ROUNDED(x) IS_ROUNDED((x), PAGE_SIZE)
 
+// Use to align structures on cache lines to avoid cpu aliasing.
+#define __CPU_ALIGN __ALIGNED(MAX_CACHE_LINE)
+
+// Similar to above, but put in a special section to make sure no other
+// variable shares the same cache line.
+#define __CPU_ALIGN_EXCLUSIVE __CPU_ALIGN __SECTION(".data.cpu_align_exclusive")
+
 #endif  // ZIRCON_KERNEL_INCLUDE_ALIGN_H_

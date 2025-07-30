@@ -6,6 +6,7 @@
 
 #include "kernel/percpu.h"
 
+#include <align.h>
 #include <debug.h>
 #include <lib/counters.h>
 #include <lib/system-topology.h>
@@ -13,7 +14,6 @@
 #include <arch/ops.h>
 #include <fbl/alloc_checker.h>
 #include <ffl/string.h>
-#include <kernel/align.h>
 #include <kernel/cpu_distance_map.h>
 #include <kernel/lockdep.h>
 #include <ktl/algorithm.h>

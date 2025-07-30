@@ -30,6 +30,7 @@
 
 #ifndef __ASSEMBLER__
 
+#include <align.h>
 #include <assert.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -39,7 +40,6 @@
 #include <arch/x86.h>
 #include <arch/x86/idle_states.h>
 #include <arch/x86/idt.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <ktl/atomic.h>
 #include <ktl/declval.h>

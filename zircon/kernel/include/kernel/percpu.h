@@ -6,6 +6,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_PERCPU_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_PERCPU_H_
 
+#include <align.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/stall.h>
 #include <stddef.h>
@@ -15,7 +16,6 @@
 
 #include <arch/ops.h>
 #include <fbl/intrusive_double_list.h>
-#include <kernel/align.h>
 #include <kernel/cpu_search_set.h>
 #include <kernel/dpc.h>
 #include <kernel/idle_power_thread.h>

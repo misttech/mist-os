@@ -24,6 +24,7 @@
 // TODO(dje): rdpmc
 #include "arch/x86/perf_mon.h"
 
+#include <align.h>
 #include <assert.h>
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/ktrace.h>
@@ -50,7 +51,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
-#include <kernel/align.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
