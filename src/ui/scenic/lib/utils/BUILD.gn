@@ -75,6 +75,7 @@ source_set("utils") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
+    "//src/ui/scenic/lib/flatland:image_formats",
     "//src/ui/scenic/lib/scenic/util",
     "//zircon/system/public",
     "//zircon/system/ulib/zx",

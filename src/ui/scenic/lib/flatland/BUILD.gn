@@ -88,6 +88,14 @@ source_set("flatland_types") {
   ]
 }
 
+source_set("image_formats") {
+  sources = [
+    "image_formats.cc",
+    "image_formats.h",
+  ]
+  public_deps = [ "//src/lib/vulkan" ]
+}
+
 group("pixeltests") {
   testonly = true
 
