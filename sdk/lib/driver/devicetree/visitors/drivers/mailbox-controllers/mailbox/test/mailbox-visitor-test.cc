@@ -105,7 +105,7 @@ TEST(MailboxVisitorTest, TwoControllers) {
 
   ASSERT_TRUE((*pbus_node_0->metadata())[0].id());
   EXPECT_EQ(*(*pbus_node_0->metadata())[0].id(),
-            std::to_string(fuchsia_hardware_mailbox::kControllerInfoMetadataType));
+            fuchsia_hardware_mailbox::ControllerInfo::kSerializableName);
 
   ASSERT_TRUE((*pbus_node_0->metadata())[0].data());
   const std::vector<uint8_t>& metadata_0 = *(*pbus_node_0->metadata())[0].data();
@@ -132,7 +132,7 @@ TEST(MailboxVisitorTest, TwoControllers) {
 
   ASSERT_TRUE((*pbus_node_1->metadata())[0].id());
   EXPECT_EQ(*(*pbus_node_1->metadata())[0].id(),
-            std::to_string(fuchsia_hardware_mailbox::kControllerInfoMetadataType));
+            fuchsia_hardware_mailbox::ControllerInfo::kSerializableName);
 
   ASSERT_TRUE((*pbus_node_1->metadata())[0].data());
   const std::vector<uint8_t>& metadata_1 = *(*pbus_node_1->metadata())[0].data();
