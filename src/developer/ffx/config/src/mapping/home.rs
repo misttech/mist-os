@@ -17,9 +17,10 @@ pub(crate) fn home(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
         .as_ref()
         .map(|s| {
             replace(s, &*REGEX, |v| {
-                Ok(home::home_dir().map_or(v.to_string(), |home_path| {
-                    home_path.to_str().map_or(v.to_string(), |s| s.to_string())
-                }))
+                Ok(home::home_dir().map_or_else(
+                    || v.to_string(),
+                    |home_path| home_path.to_str().map_or_else(|| v.to_string(), |s| s.to_string()),
+                ))
             })
         })
         .map(postprocess)

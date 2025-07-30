@@ -76,7 +76,7 @@ where
         .map(|s| {
             replace_regex(s, regex, |v| {
                 match base_path() {
-                    Ok(p) => Ok(p.to_str().map_or(v.to_string(), |s| s.to_string())),
+                    Ok(p) => Ok(p.to_str().map_or_else(|| v.to_string(), |s| s.to_string())),
                     Err(_) => Ok(v.to_string()), //just pass through
                 }
             })

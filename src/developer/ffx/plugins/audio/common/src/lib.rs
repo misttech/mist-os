@@ -94,7 +94,7 @@ pub fn get_stdin_waiter() -> futures::future::BoxFuture<'static, Result<(), std:
 }
 
 fn maybe_to_str(maybe_bytes: Option<u64>) -> String {
-    maybe_bytes.map_or("Unavailable".to_owned(), |s| ToString::to_string(&s))
+    maybe_bytes.map_or_else(|| "Unavailable".to_owned(), |s| ToString::to_string(&s))
 }
 
 pub fn format_record_result(result: Result<RecordResult, Error>) -> String {

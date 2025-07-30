@@ -83,10 +83,15 @@ fn create_table(instances: Vec<Instance>) -> Table {
     table.set_titles(row!("State", "Moniker", "URL"));
 
     for instance in instances {
-        let state = instance.resolved_info.map_or(Colour::Red.paint("Stopped"), |r| {
-            r.execution_info
-                .map_or(Colour::Yellow.paint("Resolved"), |_| Colour::Green.paint("Running"))
-        });
+        let state = instance.resolved_info.map_or_else(
+            || Colour::Red.paint("Stopped"),
+            |r| {
+                r.execution_info.map_or_else(
+                    || Colour::Yellow.paint("Resolved"),
+                    |_| Colour::Green.paint("Running"),
+                )
+            },
+        );
 
         table.add_row(row!(state, instance.moniker.to_string(), instance.url));
     }

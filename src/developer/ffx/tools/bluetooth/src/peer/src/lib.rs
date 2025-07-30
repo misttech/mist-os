@@ -197,8 +197,8 @@ fn peer_to_table_row(peer: &Peer) -> Row {
         peer.id.to_string(),
         addr_short,
         format! {"{:?}", peer.technology},
-        peer.name.as_ref().map_or("".to_string(), |x| format!("{:?}", x)),
-        peer.appearance.as_ref().map_or("".to_string(), |x| format!("{:?}", x)),
+        peer.name.as_ref().map_or_else(|| "".to_string(), |x| format!("{:?}", x)),
+        peer.appearance.as_ref().map_or_else(|| "".to_string(), |x| format!("{:?}", x)),
         peer.connected.to_string(),
         peer.bonded.to_string(),
     ]

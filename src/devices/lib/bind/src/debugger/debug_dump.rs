@@ -16,7 +16,7 @@ fn dump_node(
     let node_name = decoded_rules
         .symbol_table
         .get(&node.name_id)
-        .map_or("N/A".to_string(), |name| name.clone());
+        .map_or_else(|| "N/A".to_string(), |name| name.clone());
     let mut node_dump = match node_type {
         NodeType::Primary => format!("Node (primary): {}", node_name),
         NodeType::Additional => format!("Node: {}", node_name),

@@ -1405,10 +1405,13 @@ fn select_route_for_deletion<
                 interface_id: existing_interface,
                 next_hop: existing_next_hop,
             } = view_existing_route_nlas(existing_route);
-            let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
-                crate::netlink_packet::ip_addr_from_route::<I>(&dst)
-                    .is_ok_and(|dst: I::Addr| dst == subnet.network())
-            });
+            let subnet_matches = existing_subnet.map_or_else(
+                || !subnet.network().is_specified(),
+                |dst| {
+                    crate::netlink_packet::ip_addr_from_route::<I>(&dst)
+                        .is_ok_and(|dst: I::Addr| dst == subnet.network())
+                },
+            );
             let metric_matches = priority.map_or(true, |p| p.get() == *existing_metric);
             let interface_matches =
                 outbound_interface.map_or(true, |i| i.get() == (*existing_interface).into());

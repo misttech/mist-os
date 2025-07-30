@@ -200,8 +200,8 @@ fn handle_services_found(
                 format!(
                     "{} ({}.{})",
                     a.name,
-                    p.major_version.map_or("X".to_string(), |v| v.to_string()),
-                    p.minor_version.map_or("X".to_string(), |v| v.to_string())
+                    p.major_version.map_or_else(|| "X".to_string(), |v| v.to_string()),
+                    p.minor_version.map_or_else(|| "X".to_string(), |v| v.to_string())
                 )
             })
         })
