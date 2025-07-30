@@ -64,6 +64,10 @@ source_set("shared") {
     "display-config.h",
     "display-info.cc",
     "display-info.h",
+    "engine-driver-client-banjo.cc",
+    "engine-driver-client-banjo.h",
+    "engine-driver-client-fidl.cc",
+    "engine-driver-client-fidl.h",
     "engine-driver-client.cc",
     "engine-driver-client.h",
     "engine-listener-banjo-adapter.cc",
@@ -127,6 +131,7 @@ test("display-coordinator-unittests") {
     "added-display-info-test.cc",
     "client-proxy-test.cc",
     "display-info-test.cc",
+    "engine-driver-client-fidl-test.cc",
     "engine-listener-banjo-adapter-test.cc",
     "engine-listener-fidl-adapter-test.cc",
     "fence-test.cc",
@@ -166,6 +171,8 @@ static_library("testing") {
     "testing/mock-coordinator-listener.h",
     "testing/mock-engine-listener.cc",
     "testing/mock-engine-listener.h",
+    "testing/mock-fidl-engine.cc",
+    "testing/mock-fidl-engine.h",
   ]
   deps = [
     "//src/devices/testing/mock-ddk",

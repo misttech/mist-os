@@ -13,7 +13,7 @@
 
 #include "lib/fpromise/single_threaded_executor.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client-fidl.h"
 
 namespace display_coordinator {
 
@@ -31,7 +31,7 @@ EngineDriverClientAndServer EngineDriverClientAndServer::Create() {
   auto [engine_client, engine_server] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   return {
-      .engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client)),
+      .engine_driver_client = std::make_unique<EngineDriverClientFidl>(std::move(engine_client)),
       .engine_server = std::move(engine_server),
   };
 }

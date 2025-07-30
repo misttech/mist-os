@@ -16,7 +16,7 @@
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client-banjo.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
 namespace fake_display {
@@ -62,7 +62,7 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   const display_engine_protocol_t display_engine_protocol = banjo_adapter_->GetProtocol();
   ddk::DisplayEngineProtocolClient display_engine_client(&display_engine_protocol);
   auto engine_driver_client =
-      std::make_unique<display_coordinator::EngineDriverClient>(display_engine_client);
+      std::make_unique<display_coordinator::EngineDriverClientBanjo>(display_engine_client);
   zx::result<std::unique_ptr<display_coordinator::Controller>> create_controller_result =
       display_coordinator::Controller::Create(std::move(engine_driver_client),
                                               coordinator_driver_dispatcher_.borrow(),

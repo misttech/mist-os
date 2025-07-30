@@ -25,7 +25,7 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client-fidl.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -118,7 +118,8 @@ TEST_F(ClientProxyTest, ClientVSyncDelivery) {
 
   auto [engine_client_end, engine_server_end] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+  auto engine_driver_client =
+      std::make_unique<EngineDriverClientFidl>(std::move(engine_client_end));
 
   auto [driver_dispatcher, driver_shutdown_completion] =
       CreateDispatcherAndShutdownCompletionForTesting();
@@ -167,7 +168,8 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
 
   auto [engine_client_end, engine_server_end] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+  auto engine_driver_client =
+      std::make_unique<EngineDriverClientFidl>(std::move(engine_client_end));
 
   auto [driver_dispatcher, driver_shutdown_completion] =
       CreateDispatcherAndShutdownCompletionForTesting();
@@ -203,7 +205,8 @@ TEST_F(ClientProxyTest, ClientVSyncDeliveryDisabled) {
 
   auto [engine_client_end, engine_server_end] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+  auto engine_driver_client =
+      std::make_unique<EngineDriverClientFidl>(std::move(engine_client_end));
 
   auto [driver_dispatcher, driver_shutdown_completion] =
       CreateDispatcherAndShutdownCompletionForTesting();
@@ -241,7 +244,8 @@ TEST_F(ClientProxyTest, ClientVsyncDeliveryDisabledMustDrainPendingStamps) {
 
   auto [engine_client_end, engine_server_end] =
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+  auto engine_driver_client =
+      std::make_unique<EngineDriverClientFidl>(std::move(engine_client_end));
 
   auto [driver_dispatcher, driver_shutdown_completion] =
       CreateDispatcherAndShutdownCompletionForTesting();
