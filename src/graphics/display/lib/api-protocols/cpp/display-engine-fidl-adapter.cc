@@ -46,6 +46,11 @@ void DisplayEngineFidlAdapter::CompleteCoordinatorConnection(
   completer.buffer(arena).Reply(engine_info.ToFidl());
 }
 
+void DisplayEngineFidlAdapter::UnsetListener(fdf::Arena& arena,
+                                             UnsetListenerCompleter::Sync& completer) {
+  engine_events_.SetListener({});
+}
+
 void DisplayEngineFidlAdapter::ImportBufferCollection(
     fuchsia_hardware_display_engine::wire::EngineImportBufferCollectionRequest* request,
     fdf::Arena& arena, ImportBufferCollectionCompleter::Sync& completer) {

@@ -340,6 +340,12 @@ open protocol Engine {
         engine_info EngineInfo;
     });
 
+    /// Clears the `DisplayEngineListener` connection established by
+    /// [`Engine.CompleteCoordinatorConnection`].
+    // TODO(https://fxbug.dev/435040172): Remove this when banjo->FIDL
+    // migration is done.
+    flexible UnsetListener();
+
     /// Sets up this driver to use a Sysmem BufferCollection.
     ///
     /// Fails with ZX_ERR_INTERNAL if any error occurs during the setup process,

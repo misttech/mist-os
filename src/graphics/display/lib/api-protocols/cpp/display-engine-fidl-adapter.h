@@ -42,6 +42,7 @@ class DisplayEngineFidlAdapter : public fdf::WireServer<fuchsia_hardware_display
   void CompleteCoordinatorConnection(
       fuchsia_hardware_display_engine::wire::EngineCompleteCoordinatorConnectionRequest* request,
       fdf::Arena& arena, CompleteCoordinatorConnectionCompleter::Sync& completer) override;
+  void UnsetListener(fdf::Arena& arena, UnsetListenerCompleter::Sync& completer) override;
   void ImportBufferCollection(
       fuchsia_hardware_display_engine::wire::EngineImportBufferCollectionRequest* request,
       fdf::Arena& arena, ImportBufferCollectionCompleter::Sync& completer) override;

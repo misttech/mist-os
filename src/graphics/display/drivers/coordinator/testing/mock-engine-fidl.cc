@@ -15,6 +15,7 @@ namespace display_coordinator::testing {
 // Exactly one of the members is non-null.
 struct MockEngineFidl::Expectation {
   CompleteCoordinatorConnectionChecker complete_coordinator_connection_checker;
+  UnsetListenerChecker unset_listener_checker;
   ImportBufferCollectionChecker import_buffer_collection_checker;
   ReleaseBufferCollectionChecker release_buffer_collection_checker;
   ImportImageChecker import_image_checker;
@@ -40,6 +41,11 @@ void MockEngineFidl::ExpectCompleteCoordinatorConnection(
     CompleteCoordinatorConnectionChecker checker) {
   std::lock_guard<std::mutex> lock(mutex_);
   expectations_.push_back({.complete_coordinator_connection_checker = std::move(checker)});
+}
+
+void MockEngineFidl::ExpectUnsetListener(UnsetListenerChecker checker) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  expectations_.push_back({.unset_listener_checker = std::move(checker)});
 }
 
 void MockEngineFidl::ExpectImportBufferCollection(ImportBufferCollectionChecker checker) {
@@ -126,6 +132,17 @@ void MockEngineFidl::CompleteCoordinatorConnection(
   ZX_ASSERT_MSG(call_expectation.complete_coordinator_connection_checker != nullptr,
                 "Received call type does not match expected call type");
   call_expectation.complete_coordinator_connection_checker(request, arena, completer);
+}
+
+void MockEngineFidl::UnsetListener(fdf::Arena& arena, UnsetListenerCompleter::Sync& completer) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
+  Expectation& call_expectation = expectations_[call_index_];
+  ++call_index_;
+
+  ZX_ASSERT_MSG(call_expectation.unset_listener_checker != nullptr,
+                "Received call type does not match expected call type");
+  call_expectation.unset_listener_checker(arena, completer);
 }
 
 void MockEngineFidl::ImportBufferCollection(

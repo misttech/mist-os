@@ -38,6 +38,13 @@ class EngineDriverClientFidlTest : public ::testing::Test {
   EngineDriverClientFidl fidl_client_{Connect()};
 };
 
+TEST_F(EngineDriverClientFidlTest, UnsetListener) {
+  mock_.ExpectUnsetListener(
+      [](fdf::Arena& arena, testing::MockEngineFidl::UnsetListenerCompleter::Sync& completer) {});
+
+  fidl_client_.UnsetListener();
+}
+
 TEST_F(EngineDriverClientFidlTest, ImportBufferCollection) {
   static constexpr display::DriverBufferCollectionId kCollectionId(1);
   auto [token_client, token_server] =

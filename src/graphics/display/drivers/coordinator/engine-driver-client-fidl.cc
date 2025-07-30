@@ -62,7 +62,13 @@ display::EngineInfo EngineDriverClientFidl::CompleteCoordinatorConnection(
   return display::EngineInfo({});
 }
 
-void EngineDriverClientFidl::UnsetListener() {}
+void EngineDriverClientFidl::UnsetListener() {
+  fdf::Arena arena(kArenaTag);
+  fidl::OneWayStatus result = fidl_engine_.buffer(arena)->UnsetListener();
+  if (!result.ok()) {
+    fdf::warn("UnsetListener failed: {}", result.status_string());
+  }
+}
 
 zx::result<display::DriverImageId> EngineDriverClientFidl::ImportImage(
     const display::ImageMetadata& image_metadata, display::DriverBufferCollectionId collection_id,
