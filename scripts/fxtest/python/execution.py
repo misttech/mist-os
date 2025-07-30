@@ -543,6 +543,7 @@ async def run_command(
     env: dict[str, str] | None = None,
     timeout: float | None = None,
     abort_signal: asyncio.Event | None = None,
+    quiet_mode: bool = False,
 ) -> command.CommandOutput | None:
     """Utility method to run a test command asynchronously.
 
@@ -563,6 +564,9 @@ async def run_command(
         abort_signal (asyncio.Event, optional): If set, when the
             event is signaled this command will attempt a graceful
             termination.
+        quiet_mode (bool, optional): If set, this command will run
+            quietly in the background and will not announce cancellation or
+            clutter the running task list.
 
     Returns:
         command.CommandOutput | None: The command output if it could
@@ -572,7 +576,7 @@ async def run_command(
     abort_task: asyncio.Task[None] | None = None
     if recorder is not None:
         event_id = recorder.emit_program_start(
-            name, list(args), env, parent=parent
+            name, list(args), env, parent=parent, quiet_mode=quiet_mode
         )
     try:
         started = await command.AsyncCommand.create(
@@ -586,7 +590,7 @@ async def run_command(
         async def handle_abort() -> None:
             if abort_signal is not None:
                 await abort_signal.wait()
-                if recorder is not None:
+                if recorder is not None and not quiet_mode:
                     recorder.emit_info_message(f"Aborting {name}...")
                 started.terminate()
                 await asyncio.sleep(5)

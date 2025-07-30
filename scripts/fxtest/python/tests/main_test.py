@@ -230,9 +230,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(patch.stop)
         return m
 
-    def _mock_has_device_connected(self, value: bool) -> None:
+    def _mock_has_package_server_connected_to_device(self, value: bool) -> None:
         m = mock.AsyncMock(return_value=value)
-        patch = mock.patch("main.has_device_connected", m)
+        patch = mock.patch("main.has_package_server_connected_to_device", m)
         patch.start()
         self.addCleanup(patch.stop)
 
@@ -370,7 +370,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         """Test that SIGINT before tests start running immediately stops execution"""
 
         self._mock_run_command(0)
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         ready_to_kill = asyncio.Event()
@@ -420,7 +420,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         _command_mock = self._mock_run_command(
             15, async_handler=command_handler
         )
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         recorder = event.EventRecorder()
@@ -468,7 +468,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         _command_mock = self._mock_run_command(
             15, async_handler=command_handler
         )
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         recorder = event.EventRecorder()
@@ -530,7 +530,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         """Test ?hash= is used only when --use-package-hash is set"""
 
         command_mock = self._mock_run_command(0)
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(
@@ -610,15 +610,75 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         # TODO(b/295340412): Test that suggestions are suppressed.
 
+    @parameterized.expand(
+        [
+            # TODO(https://fxbug.dev/435051200): Change the default to start a package server here.
+            ("default package server behavior", [], False, False),
+            (
+                "override no temporary package server",
+                ["--no-allow-temporary-package-server"],
+                False,
+                False,
+            ),
+            (
+                "override allow temporary package server",
+                ["--allow-temporary-package-server"],
+                True,
+                True,
+            ),
+        ]
+    )
+    async def test_missing_package_server(
+        self,
+        _unused_name: str,
+        extra_flags: list[str],
+        expect_pass: bool,
+        expect_to_serve: bool,
+    ) -> None:
+        """Test different behaviors when a package server is missing"""
+
+        command_mock = self._mock_run_command(0)
+        subprocess_mock = self._mock_subprocess_call(0)
+        self._mock_has_package_server_connected_to_device(False)
+        self._mock_has_tests_in_base([])
+
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple"] + extra_flags)
+        )
+        if expect_pass:
+            self.assertEqual(ret, 0)
+        else:
+            self.assertNotEqual(ret, 0)
+
+        call_prefixes = self._make_call_args_prefix_set(
+            command_mock.call_args_list
+        )
+
+        call_prefixes.update(
+            self._make_call_args_prefix_set(subprocess_mock.call_args_list)
+        )
+
+        if expect_to_serve:
+            self.assertIsSubset(
+                {("fx", "--dir", self.out_dir, "serve")},
+                call_prefixes,
+            )
+        else:
+            self.assertNotIn(
+                ("fx", "--dir", self.out_dir, "serve"), call_prefixes
+            )
+
     async def test_full_success(self) -> None:
         """Test that we can run all tests and report success"""
 
         command_mock = self._mock_run_command(0)
         subprocess_mock = self._mock_subprocess_call(0)
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
-        ret = await main.async_main_wrapper(args.parse_args(["--simple"]))
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--allow-temporary-package-server"])
+        )
         self.assertEqual(ret, 0)
 
         call_prefixes = self._make_call_args_prefix_set(
@@ -665,6 +725,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             },
             call_prefixes,
         )
+
+        self.assertNotIn(("fx", "--dir", self.out_dir, "serve"), call_prefixes)
 
         # Make sure we properly exclude the "broken_case" and "bad_case"
         # and count an empty test case set as passing.
@@ -718,7 +780,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         command_mock = self._mock_run_command(0)
         subprocess_mock = self._mock_subprocess_call(0)
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(
@@ -767,7 +829,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         """Test that we can run all tests and report success"""
 
         command_mock = self._mock_run_command(0)
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(
@@ -808,7 +870,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             command.CommandOutput("out", "err", 1, 10, None),
         ]
 
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(
@@ -832,7 +894,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         command_mock = self._mock_run_command(0)
 
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         # Run each test 3 times, no parallel to better match behavior of failure case test.
@@ -872,7 +934,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             "", "", 1, 10, None, was_timeout=True
         )
 
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         # Run each test 3 times, no parallel to better match behavior of failure case test.
@@ -916,7 +978,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             "foo::test\nbar::test",
         )
 
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         recorder = event.EventRecorder()
@@ -951,7 +1013,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         command_mock = self._mock_run_command(0)
 
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base(["foo-test"])
 
         ret = await main.async_main_wrapper(
@@ -1127,7 +1189,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         self._mock_run_command(0)
         self._mock_subprocess_call(0)
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         output = io.StringIO()
@@ -1151,7 +1213,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         self._mock_run_command(0)
         self._mock_subprocess_call(0)
-        self._mock_has_device_connected(True)
+        self._mock_has_package_server_connected_to_device(True)
         self._mock_has_tests_in_base([])
 
         with self.subTest("no artifact path still produces empty event"):
