@@ -266,15 +266,6 @@ class UtimensatTest : public ::testing::Test {
 };
 
 bool change_ids(uid_t user, gid_t group) {
-  // TODO(https://fxbug.dev/42076425): changing the filesystem user ID from 0 to
-  // nonzero should drop capabilities, dropping them manually as a workaround.
-  uid_t current_ruid, current_euid, current_suid;
-  SAFE_SYSCALL(getresuid(&current_ruid, &current_euid, &current_suid));
-  if (current_euid == 0 && user != 0) {
-    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
-    test_helper::UnsetCapability(CAP_FOWNER);
-  }
-
   return (setresgid(group, group, group) == 0) && (setresuid(user, user, user) == 0);
 }
 
@@ -991,7 +982,7 @@ TEST_P(FsMountTest, ChownMinusOneOnSIDFileFails) {
   EXPECT_TRUE(helper.WaitForChildren());
 
   // The file should still be set-user-ID even after failure.
-  struct stat file_stat{};
+  struct stat file_stat {};
   SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
   EXPECT_NE(file_stat.st_mode & S_ISUID, 0U);
 
@@ -1062,7 +1053,7 @@ TEST_P(FsMountTest, ChownOnSUIDFileDropsSUIDBit) {
       SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISUID | mode));
       SAFE_SYSCALL(chown(user1_file.c_str(), -1, -1));
 
-      struct stat file_stat{};
+      struct stat file_stat {};
       SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
       EXPECT_EQ(file_stat.st_mode & S_ISUID, 0U);
     }
@@ -1086,7 +1077,7 @@ TEST_P(FsMountTest, ChownOnSGIDFileDropsSGIDBit) {
       SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISGID | mode));
       SAFE_SYSCALL(chown(user1_file.c_str(), -1, -1));
 
-      struct stat file_stat{};
+      struct stat file_stat {};
       SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
       if (mode & S_IXGRP) {
         // The set-group-ID bit only takes effect if the file is
