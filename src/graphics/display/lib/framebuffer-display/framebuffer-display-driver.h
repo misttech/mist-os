@@ -5,15 +5,14 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_
 
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <memory>
 
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
 namespace framebuffer_display {
@@ -46,17 +45,16 @@ class FramebufferDisplayDriver : public fdf::DriverBase {
   zx::result<std::unique_ptr<FramebufferDisplay>> CreateAndInitializeFramebufferDisplay();
 
   // Must be called after `framebuffer_display_` is initialized.
-  zx::result<> InitializeBanjoServerNode();
+  zx::result<> InitializeFidlServiceNode();
 
-  // Must outlive `framebuffer_display_` and `engine_banjo_adapter_`.
-  display::DisplayEngineEventsBanjo engine_events_;
+  // Must outlive `framebuffer_display_` and `engine_fidl_adapter_`.
+  std::unique_ptr<display::DisplayEngineEventsFidl> engine_events_;
 
   fdf::SynchronizedDispatcher framebuffer_display_dispatcher_;
   std::unique_ptr<FramebufferDisplay> framebuffer_display_;
 
-  std::unique_ptr<display::DisplayEngineBanjoAdapter> engine_banjo_adapter_;
+  std::unique_ptr<display::DisplayEngineFidlAdapter> engine_fidl_adapter_;
 
-  compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
