@@ -75,10 +75,13 @@ impl DebugAgentSocket {
                     eprintln!("unix_rx.read returned 0!");
                     return Ok(()) as Result<()>;
                 }
+                eprintln!("unix_rx.read got {} bytes!", n);
                 let mut ofs = 0;
                 while ofs != n {
+                    eprintln!("written {} to fidl_tx!", ofs);
                     let wrote =
                         futures::io::AsyncWriteExt::write(&mut fidl_tx, &buffer[ofs..n]).await?;
+                    eprintln!("fidl_tx.write wrote {}!", wrote);
                     ofs += wrote;
                     if wrote == 0 {
                         eprintln!("fidl_tx.write returned 0!");
