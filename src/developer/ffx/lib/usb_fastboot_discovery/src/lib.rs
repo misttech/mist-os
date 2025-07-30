@@ -88,14 +88,14 @@ pub enum FastbootEvent {
 #[allow(async_fn_in_trait)]
 pub trait FastbootEventHandler: Send + 'static {
     /// Handles an event.
-    async fn handle_event(&mut self, event: Result<FastbootEvent>);
+    async fn handle_event(&mut self, event: FastbootEvent);
 }
 
 impl<F> FastbootEventHandler for F
 where
-    F: FnMut(Result<FastbootEvent>) -> () + Send + 'static,
+    F: FnMut(FastbootEvent) -> () + Send + 'static,
 {
-    async fn handle_event(&mut self, x: Result<FastbootEvent>) -> () {
+    async fn handle_event(&mut self, x: FastbootEvent) -> () {
         self(x)
     }
 }
@@ -196,7 +196,7 @@ where
     F: FastbootEventHandler,
 {
     loop {
-        let event = receiver.recv().await.map_err(|e| anyhow!(e));
+        let event = receiver.recv().await.expect("FastbootEvent stream closed?");
         log::trace!("Event loop received event: {:#?}", event);
         handler.handle_event(event).await;
     }
@@ -348,7 +348,7 @@ mod test {
 
         let (sender, mut queue) = unbounded();
         let watcher = FastbootUsbWatcher::new(
-            move |res: Result<FastbootEvent>| {
+            move |res: FastbootEvent| {
                 let _ = sender.unbounded_send(res);
             },
             serial_finder,
@@ -364,7 +364,7 @@ mod test {
         drop(watcher);
         let mut events = Vec::<FastbootEvent>::new();
         while let Ok(Some(event)) = queue.try_next() {
-            events.push(event.unwrap());
+            events.push(event);
         }
 
         // Assert state of events

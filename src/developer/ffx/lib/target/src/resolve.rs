@@ -445,7 +445,7 @@ pub async fn get_discovery_stream(
     usb: bool,
     mdns: bool,
     ctx: &EnvironmentContext,
-) -> Result<impl futures::Stream<Item = Result<TargetHandle>>> {
+) -> Result<impl futures::Stream<Item = TargetHandle>> {
     let mut sources =
         DiscoverySources::MANUAL | DiscoverySources::EMULATOR | DiscoverySources::FASTBOOT_FILE;
     if usb {
@@ -463,7 +463,7 @@ impl DefaultTargetResolver {
         &self,
         query: TargetInfoQuery,
         ctx: &EnvironmentContext,
-    ) -> Result<impl futures::Stream<Item = Result<TargetHandle>>> {
+    ) -> Result<impl futures::Stream<Item = TargetHandle>> {
         let query_clone = query.clone();
         let filter = move |handle: &TargetHandle| {
             let description = handle_to_description(handle);
@@ -513,7 +513,7 @@ impl DefaultTargetResolver {
                 let seen = seen.clone();
                 async move {
                     match ev {
-                        Ok(TargetEvent::Added(ref h)) => {
+                        TargetEvent::Added(ref h) => {
                             if seen.borrow().contains(h) {
                                 None
                             } else {
@@ -524,12 +524,11 @@ impl DefaultTargetResolver {
                                     found_ev.signal();
                                 }
                                 seen.borrow_mut().insert(h.clone());
-                                Some(Ok((*h).clone()))
+                                Some((*h).clone())
                             }
                         }
                         // We've only asked for Added events
-                        Ok(_) => unreachable!(),
-                        Err(e) => Some(Err(e)),
+                        _ => unreachable!(),
                     }
                 }
             })
@@ -621,12 +620,9 @@ impl TargetResolver for DefaultTargetResolver {
         query: TargetInfoQuery,
         ctx: &EnvironmentContext,
     ) -> Result<Vec<TargetHandle>> {
-        let results: Vec<Result<_>> = self.get_discovery_stream(query, ctx).await?.collect().await;
-        // Fail if any results are Err
+        let results: Vec<_> = self.get_discovery_stream(query, ctx).await?.collect().await;
         log::debug!("target events results: {results:?}");
-        // If any of the results in the stream are Err, cause the whole thing to
-        // be an Err.
-        results.into_iter().collect()
+        Ok(results)
     }
 
     #[allow(async_fn_in_trait)]

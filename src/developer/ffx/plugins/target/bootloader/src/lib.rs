@@ -188,7 +188,7 @@ Reboot the Target to the bootloader and re-run this command."
                         let seen = seen.clone();
                         async move {
                             match ev {
-                                Ok(TargetEvent::Added(ref h)) => {
+                                TargetEvent::Added(ref h) => {
                                     if seen.borrow().contains(h) {
                                         None
                                     } else {
@@ -207,23 +207,21 @@ Reboot the Target to the bootloader and re-run this command."
                                             _ => {}
                                         }
                                         seen.borrow_mut().insert(h.clone());
-                                        Some(Ok((*h).clone()))
+                                        Some((*h).clone())
                                     }
                                 }
                                 // We've only asked for Added events
-                                Ok(_) => unreachable!(),
-                                Err(e) => Some(Err(e)),
+                                _ => unreachable!(),
                             }
                         }
                     })
                     .take_until(futures_lite::future::race(timer, found_it));
 
-                let mut discovered_devices =
-                    discovered_devices_stream.collect::<Vec<Result<_, _>>>().await;
+                let mut discovered_devices = discovered_devices_stream.collect::<Vec<_>>().await;
 
                 assert!(discovered_devices.len() == 1);
                 let device_res = discovered_devices.pop().unwrap();
-                (device_res?).state
+                device_res.state
             }
             Some(FidlTargetState::Unknown) => {
                 ffx_bail!("Target is in an Unknown state.");

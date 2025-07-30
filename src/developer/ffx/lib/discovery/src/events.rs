@@ -121,9 +121,7 @@ impl TargetEvent {
     }
 }
 
-pub(crate) fn target_event_from_mdns_event(
-    event: ffx::MdnsEventType,
-) -> Option<Result<TargetEvent>> {
+pub(crate) fn target_event_from_mdns_event(event: ffx::MdnsEventType) -> Option<TargetEvent> {
     match event {
         ffx::MdnsEventType::SocketBound(_) => {
             // Unsupported
@@ -132,7 +130,7 @@ pub(crate) fn target_event_from_mdns_event(
         e @ _ => {
             let converted = TargetEvent::try_from(e);
             match converted {
-                Ok(m) => Some(Ok(m)),
+                Ok(m) => Some(m),
                 Err(_) => None,
             }
         }

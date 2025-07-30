@@ -16,7 +16,8 @@ use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
 use futures::{StreamExt, TryStreamExt};
 use netext::IsLocalAddr;
-use std::{cmp::Ordering, time::Duration};
+use std::cmp::Ordering;
+use std::time::Duration;
 use target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use target_holders::daemon_protocol;
 
@@ -185,17 +186,6 @@ async fn get_target_info(
     Ok((ffx::RemoteControlState::Down, None, None))
 }
 
-async fn handle_res_to_info(
-    context: &EnvironmentContext,
-    handle: Result<discovery::TargetHandle>,
-    connect_to_target: bool,
-) -> Result<ffx::TargetInfo> {
-    match handle {
-        Ok(h) => handle_to_info(context, h, connect_to_target).await,
-        Err(e) => async { Err(e) }.await,
-    }
-}
-
 async fn handle_to_info(
     context: &EnvironmentContext,
     handle: discovery::TargetHandle,
@@ -270,11 +260,11 @@ async fn local_list_targets(
 }
 
 async fn handles_to_infos(
-    stream: impl futures::Stream<Item = Result<discovery::TargetHandle>>,
+    stream: impl futures::Stream<Item = discovery::TargetHandle>,
     ctx: &EnvironmentContext,
     connect: bool,
 ) -> Result<Vec<fidl_fuchsia_developer_ffx::TargetInfo>> {
-    let info_futures = stream.then(|t| handle_res_to_info(ctx, t, connect));
+    let info_futures = stream.then(|t| handle_to_info(ctx, t, connect));
     let infos: Vec<Result<ffx::TargetInfo>> = info_futures.collect().await;
     let targets = infos.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
     Ok(targets)
@@ -283,7 +273,7 @@ async fn handles_to_infos(
 async fn get_handle_stream(
     cmd: &ListCommand,
     ctx: &EnvironmentContext,
-) -> Result<impl futures::Stream<Item = Result<discovery::TargetHandle>>> {
+) -> Result<impl futures::Stream<Item = discovery::TargetHandle>> {
     let name = cmd.nodename.clone();
     let query = TargetInfoQuery::from(name);
     let stream = ffx_target::get_discovery_stream(query, !cmd.no_usb, !cmd.no_mdns, ctx).await?;
@@ -646,14 +636,14 @@ mod test {
     async fn test_serial_addresses() {
         // USB targets should have an empty list of addresses, not None
         let env = ffx_config::test_init().await.unwrap();
-        let handle = Ok(discovery::TargetHandle {
+        let handle = discovery::TargetHandle {
             node_name: Some("nodename".to_string()),
             state: discovery::TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "12345678".to_string(),
                 connection_state: discovery::FastbootConnectionState::Usb,
             }),
             manual: false,
-        });
+        };
         let stream = futures::stream::once(async { handle });
         let targets = handles_to_infos(stream, &env.context, true).await;
         let targets = targets.unwrap();

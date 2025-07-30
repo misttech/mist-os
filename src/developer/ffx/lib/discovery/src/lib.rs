@@ -5,7 +5,7 @@
 use crate::emulator_watcher::EmulatorWatcher;
 pub use crate::events::*;
 use crate::fastboot_file_watcher::FastbootWatcher;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use bitflags::bitflags;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use futures::Stream;
@@ -51,7 +51,7 @@ pub struct TargetStream {
     fastboot_file_watcher: Option<FastbootWatcher>,
 
     /// This is where results from the various watchers are published.
-    queue: UnboundedReceiver<Result<TargetEvent>>,
+    queue: UnboundedReceiver<TargetEvent>,
 
     /// Whether we want to get Added events.
     notify_added: bool,
@@ -73,7 +73,7 @@ where
     }
 }
 
-pub trait TargetEventStream: Stream<Item = Result<TargetEvent>> + std::marker::Unpin {}
+pub trait TargetEventStream: Stream<Item = TargetEvent> + std::marker::Unpin {}
 
 impl TargetEventStream for TargetStream {}
 
@@ -213,12 +213,9 @@ where
     // MDNS Watcher
     let mdns_watcher = if sources.contains(DiscoverySources::MDNS) {
         let mdns_sender = sender.clone();
-        Some(recommended_watcher(move |res: Result<ffx::MdnsEventType>| {
+        Some(recommended_watcher(move |res: ffx::MdnsEventType| {
             // Translate the result to a TargetEvent
-            let event = match res {
-                Ok(r) => target_event_from_mdns_event(r),
-                Err(e) => Some(Err(anyhow!(e))),
-            };
+            let event = target_event_from_mdns_event(res);
             if let Some(event) = event {
                 let _ = mdns_sender.unbounded_send(event);
             }
@@ -230,16 +227,10 @@ where
     // USB Fastboot watcher
     let fastboot_usb_watcher = if sources.contains(DiscoverySources::USB) {
         let fastboot_sender = sender.clone();
-        Some(fastboot_watcher(move |res: Result<FastbootEvent>| {
+        Some(fastboot_watcher(move |res: FastbootEvent| {
             // Translate the result to a TargetEvent
             log::debug!("discovery watcher got fastboot event: {:#?}", res);
-            let event = match res {
-                Ok(r) => {
-                    let event: TargetEvent = r.into();
-                    Ok(event)
-                }
-                Err(e) => Err(anyhow!(e)),
-            };
+            let event = res.into();
             let _ = fastboot_sender.unbounded_send(event);
         }))
     } else {
@@ -249,16 +240,10 @@ where
     // Manual Targets watcher
     let manual_targets_watcher = if sources.contains(DiscoverySources::MANUAL) {
         let manual_targets_sender = sender.clone();
-        Some(manual_recommended_watcher(move |res: Result<ManualTargetEvent>| {
+        Some(manual_recommended_watcher(move |res: ManualTargetEvent| {
             // Translate the result to a TargetEvent
             log::trace!("discovery watcher got manual target event: {:#?}", res);
-            let event = match res {
-                Ok(r) => {
-                    let event: TargetEvent = r.into();
-                    Ok(event)
-                }
-                Err(e) => Err(anyhow!(e)),
-            };
+            let event = res.into();
             let _ = manual_targets_sender.unbounded_send(event);
         }))
     } else {
@@ -301,13 +286,12 @@ where
 }
 
 impl Stream for TargetStream {
-    type Item = Result<TargetEvent>;
+    type Item = TargetEvent;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Some(event) = ready!(Pin::new(&mut self.queue).poll_next(cx)) else {
             return Poll::Ready(None);
         };
-        let event = event?;
         if let Some(ref mut filter) = self.filter {
             let handle = event.as_handle();
             if !filter.filter_target(handle) {
@@ -325,7 +309,7 @@ impl Stream for TargetStream {
         let should_notify_removed = event.is_removed() && self.notify_removed;
         let should_notify = should_notify_added || should_notify_removed;
         if should_notify {
-            return Poll::Ready(Some(Ok(event)));
+            return Poll::Ready(Some(event));
         }
         // Important: must schedule the future for this to be woken up again.
         cx.waker().wake_by_ref();
@@ -353,7 +337,7 @@ pub mod test {
     /// Test authors are expected to pass the VecDeque with the events "pre filtered"
     /// You should have separate tests for your TargetFilter impls
     pub struct TestDiscovery {
-        events: Rc<RefCell<VecDeque<Result<TargetEvent>>>>,
+        events: Rc<RefCell<VecDeque<TargetEvent>>>,
     }
 
     impl<F> TargetDiscovery<F> for TestDiscovery
@@ -367,13 +351,13 @@ pub mod test {
     }
 
     pub struct TestTargetStream {
-        events: Rc<RefCell<VecDeque<Result<TargetEvent>>>>,
+        events: Rc<RefCell<VecDeque<TargetEvent>>>,
     }
 
     impl TargetEventStream for TestTargetStream {}
 
     impl Stream for TestTargetStream {
-        type Item = Result<TargetEvent>;
+        type Item = TargetEvent;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
             let event = self.events.borrow_mut().pop_front();
@@ -401,10 +385,8 @@ pub mod test {
 
     /// Writes the events in a target event stream to the given writer
     async fn write_event_stream(writer: &mut impl Write, mut stream: impl TargetEventStream) {
-        while let Some(s) = stream.next().await {
-            if let Ok(event) = s {
-                let _ = write_target_event(writer, event);
-            }
+        while let Some(event) = stream.next().await {
+            let _ = write_target_event(writer, event);
         }
     }
 
@@ -413,21 +395,21 @@ pub mod test {
         let mut writer = vec![];
         let disco = TestDiscovery {
             events: Rc::new(RefCell::new(VecDeque::from([
-                Ok(TargetEvent::Added(TargetHandle {
+                TargetEvent::Added(TargetHandle {
                     node_name: Some("magnus".to_string()),
                     state: TargetState::Unknown,
                     manual: false,
-                })),
-                Ok(TargetEvent::Added(TargetHandle {
+                }),
+                TargetEvent::Added(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
                     manual: false,
-                })),
-                Ok(TargetEvent::Removed(TargetHandle {
+                }),
+                TargetEvent::Removed(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
                     manual: false,
-                })),
+                }),
             ]))),
         };
 
@@ -526,20 +508,20 @@ pub mod test {
         };
 
         // Send a few events
-        sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
+        sender.unbounded_send(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-        })))?;
+        }))?;
 
-        sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
+        sender.unbounded_send(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-        })))?;
+        }))?;
 
         assert_eq!(
-            stream.next().await.unwrap().ok().unwrap(),
+            stream.next().await.unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
@@ -548,7 +530,7 @@ pub mod test {
         );
 
         assert_eq!(
-            stream.next().await.unwrap().ok().unwrap(),
+            stream.next().await.unwrap(),
             TargetEvent::Removed(TargetHandle {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
@@ -576,20 +558,20 @@ pub mod test {
         };
 
         // Send a few events
-        sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
+        sender.unbounded_send(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-        })))?;
+        }))?;
 
-        sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
+        sender.unbounded_send(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-        })))?;
+        }))?;
 
         assert_eq!(
-            stream.next().await.unwrap().ok().unwrap(),
+            stream.next().await.unwrap(),
             TargetEvent::Removed(TargetHandle {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
@@ -617,20 +599,20 @@ pub mod test {
         };
 
         // Send a few events
-        sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
+        sender.unbounded_send(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-        })))?;
+        }))?;
 
-        sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
+        sender.unbounded_send(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-        })))?;
+        }))?;
 
         assert_eq!(
-            stream.next().await.unwrap().ok().unwrap(),
+            stream.next().await.unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
@@ -661,20 +643,20 @@ pub mod test {
         let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let addr = TargetAddr::from(socket);
         // This should not come into the queue since the target is not in zedboot
-        sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
+        sender.unbounded_send(TargetEvent::Added(TargetHandle {
             node_name: Some("Kelsier".to_string()),
             state: TargetState::Product { addrs: vec![addr], serial: None },
             manual: false,
-        })))?;
+        }))?;
 
-        sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
+        sender.unbounded_send(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-        })))?;
+        }))?;
 
         assert_eq!(
-            stream.next().await.unwrap().ok().unwrap(),
+            stream.next().await.unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
@@ -752,7 +734,6 @@ pub mod test {
         // Assert that the existing emulator is discovered
         let next =
             stream.next().await.expect("No event was waiting after watching for existing emulator");
-        let next = next.expect("Getting emulator event failed");
         assert_eq!(
             next,
             // The node_name and the state both have to match the contents of the emu_config above.
@@ -777,7 +758,6 @@ pub mod test {
         // Assert that the newly-created emulator is discovered
         let next =
             stream.next().await.expect("No event was waiting after watching for new emulator");
-        let next = next.expect("Getting emulator event failed");
         assert_eq!(
             next,
             // The node_name and the state both have to match the contents of the emu_config above.

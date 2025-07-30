@@ -293,14 +293,14 @@ pub struct MdnsWatcher {
 
 pub trait MdnsEventHandler: Send + 'static {
     /// Handles an event.
-    fn handle_event(&mut self, event: Result<ffx::MdnsEventType>);
+    fn handle_event(&mut self, event: ffx::MdnsEventType);
 }
 
 impl<F> MdnsEventHandler for F
 where
-    F: FnMut(Result<ffx::MdnsEventType>) -> () + Send + 'static,
+    F: FnMut(ffx::MdnsEventType) -> () + Send + 'static,
 {
-    fn handle_event(&mut self, x: Result<ffx::MdnsEventType>) -> () {
+    fn handle_event(&mut self, x: ffx::MdnsEventType) -> () {
         self(x)
     }
 }
@@ -362,7 +362,7 @@ async fn handle_events_loop<F>(
     F: MdnsEventHandler,
 {
     loop {
-        let event = receiver.recv().await.map_err(|e| anyhow!(e));
+        let event = receiver.recv().await.expect("MdnsEvent stream closed?");
         handler.handle_event(event);
     }
 }

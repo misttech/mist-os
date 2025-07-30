@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use fuchsia_async::Task;
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::StreamExt;
@@ -108,14 +108,14 @@ pub enum FastbootEvent {
 #[allow(async_fn_in_trait)]
 pub trait FastbootEventHandler: Send + 'static {
     /// Handles an event.
-    async fn handle_event(&mut self, event: Result<FastbootEvent>);
+    async fn handle_event(&mut self, event: FastbootEvent);
 }
 
 impl<F> FastbootEventHandler for F
 where
-    F: FnMut(Result<FastbootEvent>) -> () + Send + 'static,
+    F: FnMut(FastbootEvent) -> () + Send + 'static,
 {
-    async fn handle_event(&mut self, x: Result<FastbootEvent>) -> () {
+    async fn handle_event(&mut self, x: FastbootEvent) -> () {
         self(x)
     }
 }
@@ -276,7 +276,7 @@ where
     F: FastbootEventHandler,
 {
     loop {
-        let event = receiver.next().await.ok_or_else(|| anyhow!("no event"));
+        let event = receiver.next().await.expect("FastbootEvent stream closed?");
         log::trace!("Event loop received event: {:#?}", event);
         handler.handle_event(event).await;
     }

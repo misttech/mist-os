@@ -17,14 +17,14 @@ pub(crate) struct EmulatorWatcher {
 impl EmulatorWatcher {
     pub(crate) fn new(
         instance_root: PathBuf,
-        sender: UnboundedSender<Result<TargetEvent>>,
+        sender: UnboundedSender<TargetEvent>,
     ) -> Result<Self> {
         let emu_instances = EmulatorInstances::new(instance_root.clone());
         let existing = emulator_instance::get_all_targets(&emu_instances)?;
         for i in existing {
             let handle = i.try_into();
             if let Ok(h) = handle {
-                let _ = sender.unbounded_send(Ok(TargetEvent::Added(h)));
+                let _ = sender.unbounded_send(TargetEvent::Added(h));
             }
         }
         let mut res = Self { drain_task: None };
@@ -37,7 +37,7 @@ impl EmulatorWatcher {
                 if let Some(act) = watcher.emulator_target_detected().await {
                     let event = act.try_into();
                     if let Ok(e) = event {
-                        let _ = sender.unbounded_send(Ok(e));
+                        let _ = sender.unbounded_send(e);
                     }
                 }
             }
