@@ -44,6 +44,9 @@ class DurationInfo:
     # If True, hide children of this duration from the display.
     hide_children: bool = False
 
+    # If True, do not display this duration in the list.
+    hide_from_display: bool = False
+
 
 @dataclass
 class DurationPrintInfo:
@@ -340,7 +343,7 @@ class ConsoleOutput:
         for id, duration in chain(
             state.active_durations.items(), state.complete_durations.items()
         ):
-            if id != event.GLOBAL_RUN_ID:
+            if id != event.GLOBAL_RUN_ID and not duration.hide_from_display:
                 duration_children[
                     duration.parent or event.GLOBAL_RUN_ID
                 ].append(id)
@@ -610,6 +613,7 @@ async def _console_event_loop(
                         f"{styled_name} {next_event.payload.program_execution.to_formatted_command_line()}",
                         next_event.timestamp,
                         parent=next_event.parent,
+                        hide_from_display=next_event.payload.program_execution.quiet_mode,
                     )
                 elif (
                     next_event.payload.event_group is not None
@@ -660,6 +664,7 @@ async def _console_event_loop(
 
             if (
                 next_event.id is not None
+                and next_event.parent is not None
                 and next_event.parent in test_suite_execution_info
             ):
                 # Track direct children of a test suite, so their
