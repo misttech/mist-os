@@ -2205,7 +2205,7 @@ mod fuzz {
         use storage_device::fake_device::FakeDevice;
         use storage_device::DeviceHolder;
 
-        fasync::SendExecutor::new(4).run(async move {
+        fasync::SendExecutorBuilder::new().num_threads(4).build().run(async move {
             let device = DeviceHolder::new(FakeDevice::new(32768, 512));
             let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
             fs.journal().inner.lock().writer.write_all(&input).expect("write failed");
@@ -2227,7 +2227,7 @@ mod fuzz {
         use storage_device::fake_device::FakeDevice;
         use storage_device::DeviceHolder;
 
-        fasync::SendExecutor::new(4).run(async move {
+        fasync::SendExecutorBuilder::new().num_threads(4).build().run(async move {
             let device = DeviceHolder::new(FakeDevice::new(32768, 512));
             let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
             {
