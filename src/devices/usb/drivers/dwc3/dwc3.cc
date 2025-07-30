@@ -272,8 +272,7 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
   bti_ = std::move(*bti);
 
-  // TODO(https://fxbug.dev/413142699) use syscalls-next.h when available.
-  auto irq = pdev_.GetInterrupt(0, /* ZX_INTERRUPT_WAKE_VECTOR*/ ((uint32_t)0x20));
+  auto irq = pdev_.GetInterrupt(0);
   if (irq.is_error()) {
     FDF_LOG(ERROR, "GetInterrupt failed: %s", irq.status_string());
     return irq.error_value();
