@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_UART_UART_H_
-#define LIB_UART_UART_H_
+#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
+#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
 
 #include <lib/arch/intrin.h>
 #include <lib/devicetree/devicetree.h>
@@ -176,12 +176,23 @@ struct MmioRange {
   uint64_t size = 0;
 };
 
+// Communicates the range of I/O Ports that the device is using.
+struct IoPortRange {
+  // Address of the first port in the address space that is used by the device.
+  uint16_t base = 0;
+  // Number of consecutive I/O Ports used by the device.
+  uint32_t count = 0;
+};
+
 // This matches either a Driver API object or a KernelDriver wrapper
 // instantiation for an MMIO-based driver.
 template <class Driver>
 concept MmioDriver = requires(const Driver& driver) {
   { driver.mmio_range() } -> std::same_as<MmioRange>;
 };
+
+template <class Driver>
+concept PioDriver = std::same_as<typename std::decay_t<Driver>::config_type, zbi_dcfg_simple_pio_t>;
 
 template <class Driver>
 concept NonMmioDriver = !MmioDriver<Driver>;
@@ -342,6 +353,12 @@ class DriverBase {
     requires(Driver::kIoType == IoRegisterType::kMmio8)
   {
     return GetMmioRange<uint8_t>();
+  }
+
+  constexpr IoPortRange ioports() const
+    requires(PioDriver<Driver>)
+  {
+    return {.base = config().base, .count = io_slots()};
   }
 
  protected:
@@ -559,6 +576,13 @@ class KernelDriver {
   }
 
   template <typename LockPolicy = DefaultLockPolicy>
+    requires(PioDriver<UartDriver>)
+  constexpr IoPortRange ioports() const {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    return uart_.ioports();
+  }
+
+  template <typename LockPolicy = DefaultLockPolicy>
   uart_type TakeUart() && {
     Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     return std::move(uart_);
@@ -684,4 +708,4 @@ void UnparseConfig(const zbi_dcfg_simple_pio_t& config, FILE* out);
 
 }  // namespace uart
 
-#endif  // LIB_UART_UART_H_
+#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
