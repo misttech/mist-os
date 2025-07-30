@@ -161,7 +161,7 @@ where
     F: FnOnce(zx::sys::zx_status_t) + 'static,
 {
     // Logger requires the executor to be initialized first.
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     logger::init();
 
     let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
@@ -174,7 +174,7 @@ where
         // NOTE: Until MLME can be made async, MLME needs two threads to be able to
         // send requests to the vendor driver and receive requests from the vendor driver
         // simultaneously.
-        let mut executor = fasync::SendExecutor::new(2);
+        let mut executor = fasync::SendExecutorBuilder::new().num_threads(2).build();
 
         info!("Starting WLAN MLME main loop");
         let future = start_and_serve(

@@ -636,7 +636,7 @@ fn cmd_stream(
     let (ack_sender, mut ack_receiver) = mpsc::channel(0);
 
     let repl_thread = thread::spawn(move || -> Result<(), Error> {
-        let mut exec = fasync::LocalExecutor::new();
+        let mut exec = fasync::LocalExecutorBuilder::new().build();
 
         let fut = async {
             let config = Config::builder()

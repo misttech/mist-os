@@ -17,7 +17,7 @@ fn main() -> Result<(), Error> {
     let opt = wlan_dev::opts::Opt::from_args();
     println!("{:?}", opt);
 
-    let mut exec = fasync::LocalExecutor::new();
+    let mut exec = fasync::LocalExecutorBuilder::new().build();
     let monitor_proxy = connect_to_protocol::<DeviceMonitorMarker>()
         .context("failed to `connect` to device monitor")?;
 

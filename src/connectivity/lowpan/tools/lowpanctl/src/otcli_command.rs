@@ -26,7 +26,7 @@ impl OtCliCommand {
         let (mut cmd_sender, cmd_receiver) = channel(OT_CLI_CMD_SIZE_MAX);
 
         let _ = std::thread::spawn(move || -> Result<(), Error> {
-            let mut exec = fasync::LocalExecutor::new();
+            let mut exec = fasync::LocalExecutorBuilder::new().build();
 
             let fut = async {
                 let mut rl = Editor::<()>::new();

@@ -157,7 +157,7 @@ fn main() -> Result<(), Error> {
         return Ok(());
     }
 
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = fasync::LocalExecutorBuilder::new().build();
     let central_svc = fuchsia_component::client::connect_to_protocol::<CentralMarker>()
         .context("Failed to connect to BLE Central service")?;
 

@@ -248,7 +248,7 @@ fn main_res() -> Result<(), Error> {
         Ok(())
     };
 
-    fasync::LocalExecutor::new().run_singlethreaded(main_future)
+    fasync::LocalExecutorBuilder::new().build().run_singlethreaded(main_future)
 }
 
 fn main() {

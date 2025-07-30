@@ -58,7 +58,7 @@ impl Runner {
         let (ack_sender, mut ack_receiver) = channel(512);
 
         let _ = thread::spawn(move || -> Result<(), Error> {
-            let mut exec = fasync::LocalExecutor::new();
+            let mut exec = fasync::LocalExecutorBuilder::new().build();
 
             let fut = async {
                 let config = Config::builder()
