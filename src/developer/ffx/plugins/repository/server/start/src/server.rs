@@ -70,7 +70,7 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
 pub async fn run_foreground_server(
     start_cmd: StartCommand,
     context: EnvironmentContext,
-    target_info: &TargetInfoHolder,
+    target_info: &mut fho::Deferred<TargetInfoHolder>,
     rcs_knocker: &impl RcsKnocker,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     w: <ServerStartTool as FfxMain>::Writer,
