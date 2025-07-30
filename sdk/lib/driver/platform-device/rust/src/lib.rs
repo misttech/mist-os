@@ -9,15 +9,13 @@ use fidl_fuchsia_hardware_platform_device as pdev_fidl;
 use log::error;
 use mmio::region::MmioRegion;
 use mmio::vmo::{VmoMapping, VmoMemory};
-use mmio::MmioSplit;
 use std::future::Future;
-use std::sync::Arc;
 use zx_status::Status;
 
 /// PlatformDevice interface.
 pub trait PlatformDevice {
     /// The type of the [Mmio] implementation returned by this platform device.
-    type Mmio: MmioSplit + Send + Sync;
+    type Mmio;
 
     /// Maps an MMIO region by its id.
     fn map_mmio_by_id(&self, id: u32) -> impl Future<Output = Result<Self::Mmio, Status>>;
@@ -32,7 +30,7 @@ pub trait PlatformDevice {
 }
 
 impl PlatformDevice for pdev_fidl::DeviceProxy {
-    type Mmio = MmioRegion<VmoMemory, Arc<VmoMemory>>;
+    type Mmio = MmioRegion<VmoMemory>;
 
     async fn map_mmio_by_id(&self, id: u32) -> Result<Self::Mmio, Status> {
         let mmio = self
@@ -75,7 +73,7 @@ impl PlatformDevice for pdev_fidl::DeviceProxy {
     }
 }
 
-fn map_mmio(mmio: pdev_fidl::Mmio) -> Result<MmioRegion<VmoMemory, Arc<VmoMemory>>, Status> {
+fn map_mmio(mmio: pdev_fidl::Mmio) -> Result<MmioRegion<VmoMemory>, Status> {
     let (Some(vmo), Some(offset), Some(size)) = (mmio.vmo, mmio.offset, mmio.size) else {
         error!("Mmio device missing vmo, offset or size");
         return Err(Status::INTERNAL);
@@ -87,7 +85,7 @@ fn map_mmio(mmio: pdev_fidl::Mmio) -> Result<MmioRegion<VmoMemory, Arc<VmoMemory
         error!("Failed to map Mmio memory for vmo: {err}");
         Status::INTERNAL
     })?;
-    Ok(mmio.into_split_send())
+    Ok(mmio)
 }
 
 #[cfg(test)]
