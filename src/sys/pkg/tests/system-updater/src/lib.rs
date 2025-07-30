@@ -24,6 +24,7 @@ use fuchsia_pkg_testing::{
 };
 use fuchsia_sync::Mutex;
 use fuchsia_url::AbsoluteComponentUrl;
+use futures::channel::oneshot;
 use futures::prelude::*;
 use mock_metrics::MockMetricEventLoggerFactory;
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
@@ -120,6 +121,13 @@ fn make_manifest(
     }
 }
 
+fn make_forced_recovery_manifest() -> OtaManifestV1 {
+    let mut manifest =
+        OtaManifestV1 { mode: ::update_package::UpdateMode::ForceRecovery, ..make_manifest([]) };
+    manifest.images[0].slot = manifest::Slot::R;
+    manifest
+}
+
 // A set of tags for interactions the system updater has with external services.
 // We aren't tracking Cobalt interactions, since those may arrive out of order,
 // and they are tested in individual tests which care about them specifically.
@@ -164,7 +172,7 @@ struct TestEnvBuilder {
     mount_data: bool,
     history: Option<serde_json::Value>,
     system_image_hash: Option<fuchsia_hash::Hash>,
-    ota_manifest: Option<OtaManifestV1>,
+    ota_manifest: Option<String>,
     blobs: HashMap<Hash, Vec<u8>>,
 }
 
@@ -206,7 +214,14 @@ impl TestEnvBuilder {
     }
 
     fn ota_manifest(mut self, manifest: OtaManifestV1) -> Self {
-        self.ota_manifest = Some(manifest);
+        let versioned_manifest = manifest.into_versioned();
+        let manifest_json = serde_json::to_string(&versioned_manifest).unwrap();
+        self.ota_manifest = Some(manifest_json);
+        self
+    }
+
+    fn ota_manifest_json(mut self, manifest_json: String) -> Self {
+        self.ota_manifest = Some(manifest_json);
         self
     }
 
@@ -569,6 +584,8 @@ impl TestEnvBuilder {
         TestEnv {
             realm_instance,
             resolver,
+            http_loader_service,
+            ota_downloader_service,
             _paver_service: paver_service,
             _reboot_service: reboot_service,
             cache_service,
@@ -586,6 +603,8 @@ impl TestEnvBuilder {
 struct TestEnv {
     realm_instance: RealmInstance,
     resolver: Arc<MockResolverService>,
+    http_loader_service: Arc<MockHttpLoaderService>,
+    ota_downloader_service: Arc<MockOtaDownloaderService>,
     _paver_service: Arc<MockPaverService>,
     _reboot_service: Arc<MockRebootService>,
     cache_service: Arc<MockCacheService>,
@@ -647,6 +666,10 @@ impl TestEnv {
 
     async fn start_update(&self) -> Result<UpdateAttempt, UpdateAttemptError> {
         self.start_update_with_options(UPDATE_PKG_URL, default_options()).await
+    }
+
+    async fn start_packageless_update(&self) -> Result<UpdateAttempt, UpdateAttemptError> {
+        self.start_update_with_options(MANIFEST_URL, default_options()).await
     }
 
     async fn start_update_with_options(
@@ -834,6 +857,7 @@ struct MockOtaDownloaderService {
     interactions: SystemUpdaterInteractions,
     blobs: HashMap<Hash, Vec<u8>>,
     blobfs: Arc<BlobfsRamdisk>,
+    fetch_blob_response: Mutex<Option<Result<(), fpkg::ResolveError>>>,
 }
 
 impl MockOtaDownloaderService {
@@ -842,7 +866,11 @@ impl MockOtaDownloaderService {
         blobs: HashMap<Hash, Vec<u8>>,
         blobfs: Arc<BlobfsRamdisk>,
     ) -> Self {
-        Self { interactions, blobs, blobfs }
+        Self { interactions, blobs, blobfs, fetch_blob_response: Mutex::new(None) }
+    }
+
+    fn set_fetch_blob_response(&self, response: Result<(), fpkg::ResolveError>) {
+        self.fetch_blob_response.lock().replace(response);
     }
 
     async fn run_ota_downloader_service(
@@ -855,6 +883,10 @@ impl MockOtaDownloaderService {
                     self.interactions
                         .lock()
                         .push(OtaDownloader(OtaDownloaderEvent::FetchBlob(hash.into())));
+                    if let Some(response) = *self.fetch_blob_response.lock() {
+                        responder.send(response)?;
+                        continue;
+                    }
                     let hash = fidl_fuchsia_pkg_ext::BlobId::from(hash).into();
                     if let Some(content) = self.blobs.get(&hash) {
                         let () = self.blobfs.write_blob(hash, content).await.unwrap();
@@ -869,13 +901,22 @@ impl MockOtaDownloaderService {
     }
 }
 
+type ResumeHandle = oneshot::Sender<()>;
+
 struct MockHttpLoaderService {
-    manifest: Option<OtaManifestV1>,
+    manifest: Option<String>,
+    blocker: Mutex<Option<oneshot::Sender<ResumeHandle>>>,
 }
 
 impl MockHttpLoaderService {
-    fn new(manifest: Option<OtaManifestV1>) -> Self {
-        Self { manifest }
+    fn new(manifest: Option<String>) -> Self {
+        Self { manifest, blocker: Mutex::new(None) }
+    }
+
+    fn block_once(&self) -> oneshot::Receiver<ResumeHandle> {
+        let (sender, receiver) = oneshot::channel();
+        *self.blocker.lock() = Some(sender);
+        receiver
     }
 
     async fn run_http_loader_service(
@@ -887,13 +928,22 @@ impl MockHttpLoaderService {
                 fhttp::LoaderRequest::Fetch { request, responder } => {
                     let url = request.url.unwrap();
                     assert_eq!(url, MANIFEST_URL);
-                    let versioned_manifest = self.manifest.clone().unwrap().into_versioned();
-                    let manifest_json = serde_json::to_vec(&versioned_manifest).unwrap();
+
+                    let blocker = self.blocker.lock().take();
+                    if let Some(blocker) = blocker {
+                        let (resume_sender, resume_receiver) = oneshot::channel();
+                        // If the test dropped the receiver, it doesn't want to block.
+                        if blocker.send(resume_sender).is_ok() {
+                            let _ = resume_receiver.await;
+                        }
+                    }
+
+                    let manifest_json = self.manifest.clone().unwrap();
                     let (client, server) = zx::Socket::create_stream();
                     let mut server = fasync::Socket::from_socket(server);
-                    fasync::Task::spawn(
-                        async move { server.write_all(&manifest_json).await.unwrap() },
-                    )
+                    fasync::Task::spawn(async move {
+                        server.write_all(manifest_json.as_bytes()).await.unwrap()
+                    })
                     .detach();
 
                     let response = fhttp::Response {
@@ -901,7 +951,7 @@ impl MockHttpLoaderService {
                         status_code: Some(200),
                         ..Default::default()
                     };
-                    responder.send(response).context("send failed")?;
+                    let _ = responder.send(response);
                 }
                 request => panic!("unsupported http loader request {request:?}"),
             }

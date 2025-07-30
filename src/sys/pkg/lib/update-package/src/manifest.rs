@@ -51,8 +51,10 @@ pub struct OtaManifestV1 {
     /// "{blob_base_url}/{delivery_blob_type}/{fuchsia_merkle_root}".
     pub blob_base_url: url::Url,
     /// The images for this version.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<Image>,
     /// The blobs for this version.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blobs: Vec<Blob>,
 }
 

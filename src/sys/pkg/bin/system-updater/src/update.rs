@@ -1216,25 +1216,25 @@ impl PackagelessAttempt<'_> {
 
         *target_version = history::Version::for_manifest(&manifest);
 
-        match manifest.mode {
-            update_package::UpdateMode::Normal => {}
+        let zbi_slot = match manifest.mode {
+            update_package::UpdateMode::Normal => update_package::manifest::Slot::AB,
             update_package::UpdateMode::ForceRecovery => {
                 if !self.config.should_write_recovery {
                     return Err(PrepareError::VerifyUpdateMode);
                 }
-                // Must have recovery zbi image in force recovery mode.
-                if !manifest.images.iter().any(|image| {
-                    image.slot == update_package::manifest::Slot::R
-                        && image.image_type
-                            == update_package::manifest::ImageType::Asset(
-                                update_package::images::AssetType::Zbi,
-                            )
-                }) {
-                    return Err(PrepareError::VerifyImages(
-                        update_package::VerifyError::MissingZbi,
-                    ));
-                }
+                update_package::manifest::Slot::R
             }
+        };
+
+        // Must have a zbi image.
+        if !manifest.images.iter().any(|image| {
+            image.slot == zbi_slot
+                && image.image_type
+                    == update_package::manifest::ImageType::Asset(
+                        update_package::images::AssetType::Zbi,
+                    )
+        }) {
+            return Err(PrepareError::VerifyImages(update_package::VerifyError::MissingZbi));
         }
 
         let () = verify_board_in_manifest(&self.env.build_info, &manifest)
@@ -1293,6 +1293,11 @@ impl PackagelessAttempt<'_> {
                 {
                     return Ok(());
                 }
+                let target_config = if image.slot == update_package::manifest::Slot::R {
+                    paver::TargetConfiguration::Single(fpaver::Configuration::Recovery)
+                } else {
+                    target_config
+                };
                 let image_type = (&image.image_type).into();
                 if should_write_image(
                     image.sha256,

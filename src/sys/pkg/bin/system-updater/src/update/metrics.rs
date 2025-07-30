@@ -87,7 +87,9 @@ pub(super) fn result_to_status_code(res: Result<(), &AttemptError>) -> StatusCod
         Err(
             AttemptError::Prepare(PrepareError::ResolveUpdate(ResolveError::Error(error, _)))
             | AttemptError::Stage(StageError::Resolve(ResolveError::Error(error, _)))
-            | AttemptError::Fetch(FetchError::Resolve(ResolveError::Error(error, _))),
+            | AttemptError::Fetch(FetchError::Resolve(ResolveError::Error(error, _)))
+            | AttemptError::Fetch(FetchError::FetchBlob(error))
+            | AttemptError::Stage(StageError::FetchBlob(error)),
         ) => error_to_status_code(error),
         Err(AttemptError::UpdateCanceled) => StatusCode::Canceled,
         // Fallback to a generic catch-all error status code when the error didn't contain

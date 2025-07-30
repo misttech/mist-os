@@ -52,6 +52,48 @@ async fn fails_setting_configuration_active() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn fails_setting_configuration_active_packageless() {
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::return_error(|event| match event {
+                PaverEvent::SetConfigurationActive { .. } => Status::INTERNAL,
+                _ => Status::OK,
+            }))
+        })
+        .ota_manifest(make_manifest([]))
+        .build()
+        .await;
+
+    let result = env.run_packageless_update().await;
+    assert!(result.is_err(), "system updater succeeded when it should fail");
+
+    assert_eq!(
+        env.get_ota_metrics().await,
+        OtaMetrics {
+            initiator:
+                metrics::OtaResultAttemptsMigratedMetricDimensionInitiator::UserInitiatedCheck
+                    as u32,
+            phase: metrics::OtaResultAttemptsMigratedMetricDimensionPhase::ImageCommit as u32,
+            status_code: metrics::OtaResultAttemptsMigratedMetricDimensionStatusCode::Error as u32,
+        }
+    );
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::B,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![]),
+        Gc,
+        BlobfsSync,
+        Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn fails_commit_recovery() {
     let env = TestEnv::builder()
         .paver_service(|builder| {
@@ -95,6 +137,50 @@ async fn fails_commit_recovery() {
         Paver(PaverEvent::DataSinkFlush),
         ReplaceRetainedPackages(vec![]),
         Gc,
+        Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::A }),
+    ]));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn fails_commit_recovery_packageless() {
+    let env = TestEnv::builder()
+        .paver_service(|builder| {
+            builder.insert_hook(mphooks::return_error(|event| match event {
+                PaverEvent::SetConfigurationUnbootable {
+                    configuration: paver::Configuration::A,
+                } => Status::INTERNAL,
+                _ => Status::OK,
+            }))
+        })
+        .ota_manifest(make_forced_recovery_manifest())
+        .build()
+        .await;
+
+    let result = env.run_packageless_update().await;
+    assert!(result.is_err(), "system updater succeeded when it should fail");
+
+    assert_eq!(
+        env.get_ota_metrics().await,
+        OtaMetrics {
+            initiator:
+                metrics::OtaResultAttemptsMigratedMetricDimensionInitiator::UserInitiatedCheck
+                    as u32,
+            phase: metrics::OtaResultAttemptsMigratedMetricDimensionPhase::ImageCommit as u32,
+            status_code: metrics::OtaResultAttemptsMigratedMetricDimensionStatusCode::Error as u32,
+        }
+    );
+
+    env.assert_interactions(initial_interactions().chain([
+        ReplaceRetainedBlobs(vec![hash(9).into()]),
+        Gc,
+        Paver(PaverEvent::ReadAsset {
+            configuration: paver::Configuration::Recovery,
+            asset: paver::Asset::Kernel,
+        }),
+        Paver(PaverEvent::DataSinkFlush),
+        ReplaceRetainedBlobs(vec![]),
+        Gc,
+        BlobfsSync,
         Paver(PaverEvent::SetConfigurationUnbootable { configuration: paver::Configuration::A }),
     ]));
 }
