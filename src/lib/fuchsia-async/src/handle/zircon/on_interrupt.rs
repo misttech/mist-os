@@ -100,7 +100,7 @@ impl<K: InterruptKind> OnInterrupt<K> {
     fn unregister(self: Pin<&mut Self>) {
         let mut this = self.project();
         if let Some((ehandle, key)) = this.registration.as_mut().unregister() {
-            let _ = ehandle.port().cancel(this.interrupt, key);
+            let _ = ehandle.port().cancel(key);
         }
     }
 }

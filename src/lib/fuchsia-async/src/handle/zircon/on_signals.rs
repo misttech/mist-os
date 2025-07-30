@@ -139,7 +139,7 @@ impl<'a, H: AsHandleRef + 'a> OnSignalsFuture<'a, H> {
                 // Ignore the error from zx_port_cancel, because it might just be a race condition.
                 // If the packet is handled between the above maybe_signals check and the port
                 // cancel, it will fail with ZX_ERR_NOT_FOUND, and we can't do anything about it.
-                let _ = ehandle.port().cancel(this.handle, key);
+                let _ = ehandle.port().cancel(key);
             }
         }
     }
@@ -310,7 +310,7 @@ mod test {
             let key = signals.future.registration.key().unwrap();
 
             std::mem::drop(signals);
-            assert!(ehandle.port().cancel(&event, key) == Err(zx::Status::NOT_FOUND));
+            assert!(ehandle.port().cancel(key) == Err(zx::Status::NOT_FOUND));
         });
 
         assert!(TestExecutor::new().run_until_stalled(&mut fut).is_ready());

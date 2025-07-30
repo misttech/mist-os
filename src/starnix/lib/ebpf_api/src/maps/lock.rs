@@ -231,7 +231,7 @@ impl<'a, T> RwMapLockState<'a, T> {
             // `wait_async()` call above. If we fail to lock here then the
             // `wait()` is guaranteed to unblock once the lock is released.
             if try_lock(num_waits) {
-                LOCK_WAIT_PORT.with(|port| port.cancel(&self.handle, WAIT_KEY).unwrap());
+                LOCK_WAIT_PORT.with(|port| port.cancel(WAIT_KEY).unwrap());
                 break;
             }
 
