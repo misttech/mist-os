@@ -142,13 +142,6 @@ void ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_
     pending_applied_config_stamps_.erase(pending_applied_config_stamps_.begin(), it);
   }
 
-  {
-    fbl::AutoLock l(&mtx_);
-    if (!vsync_delivery_enabled_) {
-      return;
-    }
-  }
-
   display::VsyncAckCookie vsync_ack_cookie = display::kInvalidVsyncAckCookie;
   if (number_of_vsyncs_sent_ >= (kVsyncMessagesWatermark - 1)) {
     // Number of  vsync events sent exceed the watermark level.

@@ -870,12 +870,6 @@ void Client::GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::S
   completer.Reply(latest_config_stamp_.ToFidl());
 }
 
-void Client::EnableVsyncEventDelivery(EnableVsyncEventDeliveryCompleter::Sync& /*_completer*/) {
-  TRACE_DURATION("gfx", "Display::Client::EnableVsyncEventDelivery");
-  proxy_->EnableVsyncEventDelivery();
-  // No reply defined.
-}
-
 void Client::SetVirtconMode(SetVirtconModeRequestView request,
                             SetVirtconModeCompleter::Sync& /*_completer*/) {
   TRACE_DURATION("gfx", "Display::Client::SetVirtconMode");

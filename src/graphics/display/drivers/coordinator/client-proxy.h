@@ -72,11 +72,6 @@ class ClientProxy {
   // See `Client::ReapplyConfig()`.
   void ReapplyConfig();
 
-  void EnableVsyncEventDelivery() {
-    fbl::AutoLock lock(&mtx_);
-    vsync_delivery_enabled_ = true;
-  }
-
   void EnableCapture(bool enable) {
     fbl::AutoLock lock(&mtx_);
     enable_capture_ = enable;
@@ -136,7 +131,6 @@ class ClientProxy {
   Controller& controller_;
 
   Client handler_;
-  bool vsync_delivery_enabled_ __TA_GUARDED(&mtx_) = false;
   bool enable_capture_ __TA_GUARDED(&mtx_) = false;
 
   fbl::Mutex task_mtx_;

@@ -158,13 +158,11 @@ impl Coordinator {
         self.inner.read().proxy.clone()
     }
 
-    /// Tell the driver to enable vsync notifications and register a channel to listen to vsync events.
+    /// Registers a channel to listen to vsync events.
     pub fn add_vsync_listener(
         &self,
         id: Option<DisplayId>,
     ) -> Result<mpsc::UnboundedReceiver<VsyncEvent>> {
-        self.inner.read().proxy.enable_vsync_event_delivery()?;
-
         // TODO(armansito): Switch to a bounded channel instead.
         let (sender, receiver) = mpsc::unbounded::<VsyncEvent>();
         self.inner.write().vsync_listeners.push((sender, id));

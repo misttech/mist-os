@@ -133,7 +133,6 @@ TEST_F(ClientProxyTest, ClientVSyncDelivery) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.EnableVsyncEventDelivery();
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
       .driver_stamp = kDriverStampValue,
@@ -183,7 +182,6 @@ TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.EnableVsyncEventDelivery();
   fbl::AutoLock lock(controller.mtx());
   listener_client_end.reset();
   clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);

@@ -100,7 +100,6 @@ class ImagePipeSurfaceDisplay final
   std::atomic_uint64_t last_applied_config_stamp_ =
       fuchsia_hardware_display::kInvalidConfigStampValue;
   std::queue<ReleaseFenceEntry> pending_release_fences_ __TA_GUARDED(mutex_);
-  bool receiving_vsyncs_ __TA_GUARDED(mutex_) = false;
 
   fidl::SharedClient<fuchsia_hardware_display::Coordinator> display_coordinator_;
   std::unique_ptr<DisplayCoordinatorListener> display_coordinator_listener_;

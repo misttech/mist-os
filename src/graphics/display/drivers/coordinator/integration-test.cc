@@ -258,8 +258,6 @@ class TestFidlClient {
       const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
       ClientPriority client_priority, async_dispatcher_t* coordinator_listener_dispatcher);
 
-  zx::result<> EnableVsyncEventDelivery();
-
   zx::result<> SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   zx::result<display::LayerId> CreateLayer();
   zx::result<> ImportBufferCollection(
@@ -728,10 +726,6 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
   });
 }
 
-zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
-  return zx::make_result(coordinator_fidl_client_->EnableVsyncEventDelivery().status());
-}
-
 zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
                                          const std::vector<LayerConfig>& layer_configs) {
   ZX_ASSERT_MSG(!layer_configs.empty(), "Empty configurations are not supported");
@@ -1169,10 +1163,6 @@ class IntegrationTest : public TestBase {
         coordinator_client->OpenCoordinator(display_provider_client, client_priority, dispatcher());
     ZX_ASSERT_MSG(open_coordinator_result.is_ok(), "Failed to open coordinator: %s",
                   open_coordinator_result.status_string());
-
-    zx::result<> enable_vsync_result = coordinator_client->EnableVsyncEventDelivery();
-    ZX_ASSERT_MSG(enable_vsync_result.is_ok(), "Failed to enable Vsync delivery for client: %s",
-                  enable_vsync_result.status_string());
 
     bool poll_success =
         PollUntilOnLoop([&]() { return coordinator_client->state().HasConnectedDisplay(); });
