@@ -262,6 +262,39 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
 
   pmt_count_++;
 
+  // TODO(427293779): Remove this after the eMMC issue has been fixed.
+  if (buffer.size >= 512 && request_.cmd_flags & SDMMC_CMD_READ) {
+    size_t offset = buffer.offset;
+
+    // Put some known data in the buffer so that we can see whether or not it was overwritten.
+    constexpr char kReadBufferId[16] = "SDMMC 427293779";
+    vmo->write(kReadBufferId, offset, sizeof(kReadBufferId));
+    offset += sizeof(kReadBufferId);
+
+    vmo->write(&buffer.offset, offset, sizeof(buffer.offset));
+    offset += sizeof(buffer.offset);
+
+    vmo->write(&buffer.size, offset, sizeof(buffer.size));
+    offset += sizeof(buffer.size);
+
+    vmo->write(&request_.cmd_idx, offset, sizeof(request_.cmd_idx));
+    offset += sizeof(request_.cmd_idx);
+
+    vmo->write(&request_.arg, offset, sizeof(request_.arg));
+    offset += sizeof(request_.arg);
+
+    vmo->write(&request_.buffers_count, offset, sizeof(request_.buffers_count));
+    offset += sizeof(request_.buffers_count);
+
+    vmo->write(&region_count_, offset, sizeof(region_count_));
+    offset += sizeof(region_count_);
+
+    vmo->write(&total_size_, offset, sizeof(total_size_));
+    offset += sizeof(total_size_);
+
+    vmo->write(kReadBufferId, offset, sizeof(kReadBufferId));
+  }
+
   // We don't own this VMO, and therefore cannot make any assumptions about the state of the
   // cache. The cache must be clean and invalidated for reads so that the final clean + invalidate
   // doesn't overwrite main memory with stale data from the cache, and must be clean for writes so
