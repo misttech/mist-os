@@ -38,6 +38,8 @@ Depends-on: turquoise-internal:I9916ccaa4b95b6e9babdee33014fa6bd3d478f2e
 
 {% dynamic endif %}
 
+The spelling `Depends-On` (with the "o" capitalized) is also accepted.
+
 ### Specification
 
 * The value of each `Depends-on` footer must be a
@@ -48,8 +50,8 @@ Depends-on: turquoise-internal:I9916ccaa4b95b6e9babdee33014fa6bd3d478f2e
   `turquoise-internal:I9916ccaa4b95b6e9babdee33014fa6bd3d478f2e`).
 * `Depends-on` footers *must* be in the last paragraph of the commit message,
   with no blank lines between `Depends-on` and the `Change-Id` footer.
-* The `Depends-on` footer is *case-sensitive* and other spellings are not
-  accepted.
+* The `Depends-on` footer is *case-sensitive*, and will only be recognized
+  if capitalized as `Depends-on` or `Depends-On`.
 * If a `Depends-on` footer references a non-existent CL, a comment will be added
   to the CL.
 
