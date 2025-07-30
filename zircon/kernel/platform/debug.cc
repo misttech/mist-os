@@ -45,7 +45,6 @@ namespace {
 struct NullLockPolicy {};
 
 bool is_tx_irq_enabled = false;
-bool is_serial_enabled = false;
 
 template <typename LockPolicy, typename Guard>
 using GuardSelector =
@@ -160,18 +159,12 @@ ktl::optional<IrqConfig> GetIrqConfigFromFlags(uint32_t uart_flags) {
 
 }  // namespace
 
-bool platform_serial_enabled(void) { return is_serial_enabled; }
+bool platform_serial_enabled(void) { return !!gUart; }
 
 void UartDriverHandoffEarly(const uart::all::Driver& serial) {
-  ktl::visit(
-      [&]<typename T>(T& driver) {
-        is_serial_enabled = !(ktl::is_same_v<ktl::decay_t<T>, uart::null::Driver>);
-      },
-      serial);
-
   gUart = serial;
   if constexpr (DPRINTF_ENABLED_FOR_LEVEL(INFO)) {
-    if (is_serial_enabled) {
+    if (gUart) {
       ktl::array<char, 128> buffer = {};
       StringFile file{buffer};
       fprintf(&file, "UART: Selected driver kernel.serial=");
