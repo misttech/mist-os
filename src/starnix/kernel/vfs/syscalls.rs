@@ -14,9 +14,7 @@ use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdType};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
-use crate::vfs::io_uring::{
-    IoRingSetupFlags, IoUringFileObject, IORING_MAX_ENTRIES, IORING_SUPPORTED_SETUP_FLAGS,
-};
+use crate::vfs::io_uring::{IoUringFileObject, IORING_MAX_ENTRIES};
 use crate::vfs::pidfd::new_pidfd;
 use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
@@ -3202,19 +3200,6 @@ pub fn sys_io_uring_setup(
         if byte != 0 {
             return error!(EINVAL);
         }
-    }
-
-    let Some(flags) = IoRingSetupFlags::from_bits(params.flags) else {
-        return error!(EINVAL);
-    };
-    let unsupported_flags = flags.difference(IORING_SUPPORTED_SETUP_FLAGS);
-    if !unsupported_flags.is_empty() {
-        track_stub!(
-            TODO("https://fxbug.dev/297431387"),
-            "io_uring flags",
-            unsupported_flags.bits()
-        );
-        return error!(EINVAL);
     }
 
     let file = IoUringFileObject::new_file(locked, current_task, entries, &mut params)?;

@@ -40,6 +40,7 @@ syscall_tests = [
   "fuse_test",
   "futex_test",
   "getrandom_test",
+  "io_uring_test",
   "loop_test",
   "memfd_test",
   "mmap_test",
