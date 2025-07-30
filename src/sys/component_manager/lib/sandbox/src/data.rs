@@ -9,8 +9,8 @@ use crate::{CapabilityBound, RemoteError};
 /// A capability that holds immutable data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Data {
-    Bytes(Vec<u8>),
-    String(String),
+    Bytes(Box<[u8]>),
+    String(Box<str>),
     Int64(i64),
     Uint64(u64),
 }
@@ -26,8 +26,8 @@ impl TryFrom<fsandbox::Data> for Data {
 
     fn try_from(data_capability: fsandbox::Data) -> Result<Self, Self::Error> {
         match data_capability {
-            fsandbox::Data::Bytes(bytes) => Ok(Self::Bytes(bytes)),
-            fsandbox::Data::String(string) => Ok(Self::String(string)),
+            fsandbox::Data::Bytes(bytes) => Ok(Self::Bytes(bytes.into())),
+            fsandbox::Data::String(string) => Ok(Self::String(string.into())),
             fsandbox::Data::Int64(num) => Ok(Self::Int64(num)),
             fsandbox::Data::Uint64(num) => Ok(Self::Uint64(num)),
             fsandbox::DataUnknown!() => Err(RemoteError::UnknownVariant),
@@ -38,8 +38,8 @@ impl TryFrom<fsandbox::Data> for Data {
 impl From<Data> for fsandbox::Data {
     fn from(data: Data) -> Self {
         match data {
-            Data::Bytes(bytes) => fsandbox::Data::Bytes(bytes),
-            Data::String(string) => fsandbox::Data::String(string),
+            Data::Bytes(bytes) => fsandbox::Data::Bytes(bytes.into()),
+            Data::String(string) => fsandbox::Data::String(string.into()),
             Data::Int64(num) => fsandbox::Data::Int64(num),
             Data::Uint64(num) => fsandbox::Data::Uint64(num),
         }
@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn clone() {
-        let data: Data = Data::String("abc".to_string());
+        let data: Data = Data::String("abc".into());
         let any: Capability = data.into();
         let clone = any.try_clone().unwrap();
         let data_back = assert_matches!(any, Capability::Data(d) => d);

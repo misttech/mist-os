@@ -19,6 +19,14 @@ type Store = sync::Mutex<HashMap<u64, Capability>>;
 
 pub async fn serve_capability_store(
     mut stream: fsandbox::CapabilityStoreRequestStream,
+    // Receiver tasks launched on behalf of a *Connector may need to outlive this
+    // `CapabilityStore`. For example, if a client creates a Connector, Export()s it right away,
+    // then drops the `CapabilityStore`, dropping the task at that point deliver a `PEER_CLOSED`
+    // to the client and make the Connector they just created unusable.
+    //
+    // We could simply detach() the Task instead, but fuchsia_async considers that holding the
+    // handle is considered better practice.
+    receiver_scope: &fasync::Scope,
 ) -> Result<(), fidl::Error> {
     let outer_store: Arc<Store> = Arc::new(Store::new(Default::default()));
     while let Some(request) = stream.try_next().await? {
@@ -58,7 +66,7 @@ pub async fn serve_capability_store(
             }
             fsandbox::CapabilityStoreRequest::ConnectorCreate { id, receiver, responder } => {
                 let result = (|| {
-                    let connector = Connector::new_with_owned_receiver(receiver);
+                    let connector = Connector::new_with_fidl_receiver(receiver, receiver_scope);
                     insert_capability(&mut store, id, Capability::Connector(connector))
                 })();
                 responder.send(result)?;
@@ -73,7 +81,7 @@ pub async fn serve_capability_store(
             }
             fsandbox::CapabilityStoreRequest::DirConnectorCreate { id, receiver, responder } => {
                 let result = (|| {
-                    let connector = DirConnector::new_with_owned_receiver(receiver);
+                    let connector = DirConnector::new_with_fidl_receiver(receiver, receiver_scope);
                     insert_capability(&mut store, id, Capability::DirConnector(connector))
                 })();
                 responder.send(result)?;
@@ -473,7 +481,10 @@ mod tests {
     async fn import_export() {
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let (ch, _) = fidl::Channel::create();
         let handle = ch.into_handle();
@@ -499,7 +510,10 @@ mod tests {
     async fn import_error() {
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let cap1 = Capability::Data(Data::Int64(42));
         store.import(1, cap1.try_clone().unwrap().into()).await.unwrap().unwrap();
@@ -520,7 +534,10 @@ mod tests {
     async fn export_error() {
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let cap1 = Capability::Data(Data::Int64(42));
         store.import(1, cap1.try_clone().unwrap().into()).await.unwrap().unwrap();
@@ -535,7 +552,10 @@ mod tests {
     async fn drop() {
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let (ch, _) = fidl::Channel::create();
         let handle = ch.into_handle();
@@ -569,7 +589,10 @@ mod tests {
     async fn drop_error() {
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let cap1 = Capability::Data(Data::Int64(42));
         store.import(1, cap1.into()).await.unwrap().unwrap();
@@ -584,7 +607,10 @@ mod tests {
     async fn duplicate() {
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let (event, _) = fidl::EventPair::create();
         let handle = event.into_handle();
@@ -605,7 +631,10 @@ mod tests {
     async fn duplicate_error() {
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         assert_matches!(
             store.duplicate(1, 2).await.unwrap(),

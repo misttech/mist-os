@@ -15,14 +15,15 @@ use vfs::remote::RemoteLike;
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 impl DirConnector {
-    pub(crate) fn new_with_owned_receiver(
+    pub(crate) fn new_with_fidl_receiver(
         receiver_client: ClientEnd<fsandbox::DirReceiverMarker>,
+        scope: &fasync::Scope,
     ) -> Self {
         let (sender, receiver) = mpsc::unbounded();
         let receiver = DirReceiver::new(receiver);
-        let receiver_task =
-            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy()));
-        Self::new_internal(sender, Some(Arc::new(receiver_task)))
+        // Exits when ServerEnd<DirReceiver> is closed
+        scope.spawn(receiver.handle_receiver(receiver_client.into_proxy()));
+        Self::new_sendable(sender)
     }
 }
 

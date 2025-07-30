@@ -34,7 +34,7 @@ impl Metadata<Availability> for Dict {
     fn set_metadata(&self, value: Availability) {
         let key = DictKey::new(<Self as Metadata<Availability>>::KEY)
             .expect("dict key creation failed unexpectedly");
-        match self.insert(key, Capability::Data(Data::String(value.to_string()))) {
+        match self.insert(key, Capability::Data(Data::String(value.to_string().into()))) {
             // When an entry already exists for a key in a Dict, insert() will
             // still replace that entry with the new value, even though it
             // returns an ItemAlreadyExists error. As a result, we can treat
@@ -50,7 +50,7 @@ impl Metadata<Availability> for Dict {
             .expect("dict key creation failed unexpectedly");
         let capability = self.get(&key).ok()??;
         match capability {
-            Capability::Data(Data::String(availability)) => match availability.as_str() {
+            Capability::Data(Data::String(availability)) => match &*availability {
                 "Optional" => Some(Availability::Optional),
                 "Required" => Some(Availability::Required),
                 "SameAsTarget" => Some(Availability::SameAsTarget),
@@ -164,7 +164,7 @@ impl Metadata<SubDir> for Dict {
     fn set_metadata(&self, value: SubDir) {
         let key = DictKey::new(<Self as Metadata<SubDir>>::KEY)
             .expect("dict key creation failed unexpectedly");
-        match self.insert(key, Capability::Data(Data::String(value.to_string()))) {
+        match self.insert(key, Capability::Data(Data::String(value.to_string().into()))) {
             // When an entry already exists for a key in a Dict, insert() will
             // still replace that entry with the new value, even though it
             // returns an ItemAlreadyExists error. As a result, we can treat
@@ -192,7 +192,7 @@ pub fn protocol_metadata(availability: cm_types::Availability) -> sandbox::Dict 
     metadata
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
-            sandbox::Capability::Data(sandbox::Data::String(String::from(TYPE_PROTOCOL))),
+            sandbox::Capability::Data(sandbox::Data::String(TYPE_PROTOCOL.into())),
         )
         .unwrap();
     metadata.set_metadata(availability);
@@ -205,7 +205,7 @@ pub fn dictionary_metadata(availability: cm_types::Availability) -> sandbox::Dic
     metadata
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
-            sandbox::Capability::Data(sandbox::Data::String(String::from(TYPE_DICTIONARY))),
+            sandbox::Capability::Data(sandbox::Data::String(TYPE_DICTIONARY.into())),
         )
         .unwrap();
     metadata.set_metadata(availability);
@@ -223,7 +223,7 @@ pub fn directory_metadata(
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
             sandbox::Capability::Data(sandbox::Data::String(
-                cm_rust::CapabilityTypeName::Directory.to_string(),
+                cm_rust::CapabilityTypeName::Directory.to_string().into(),
             )),
         )
         .unwrap();
@@ -249,7 +249,7 @@ pub fn config_metadata(availability: cm_types::Availability) -> sandbox::Dict {
     metadata
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
-            sandbox::Capability::Data(sandbox::Data::String(String::from(TYPE_CONFIG))),
+            sandbox::Capability::Data(sandbox::Data::String(TYPE_CONFIG.into())),
         )
         .unwrap();
     metadata.set_metadata(availability);
@@ -263,7 +263,7 @@ pub fn runner_metadata(availability: cm_types::Availability) -> sandbox::Dict {
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
             sandbox::Capability::Data(sandbox::Data::String(
-                cm_rust::CapabilityTypeName::Runner.to_string(),
+                cm_rust::CapabilityTypeName::Runner.to_string().into(),
             )),
         )
         .unwrap();
@@ -278,7 +278,7 @@ pub fn resolver_metadata(availability: cm_types::Availability) -> sandbox::Dict 
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
             sandbox::Capability::Data(sandbox::Data::String(
-                cm_rust::CapabilityTypeName::Resolver.to_string(),
+                cm_rust::CapabilityTypeName::Resolver.to_string().into(),
             )),
         )
         .unwrap();
@@ -293,7 +293,7 @@ pub fn service_metadata(availability: cm_types::Availability) -> sandbox::Dict {
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
             sandbox::Capability::Data(sandbox::Data::String(
-                cm_rust::CapabilityTypeName::Service.to_string(),
+                cm_rust::CapabilityTypeName::Service.to_string().into(),
             )),
         )
         .unwrap();

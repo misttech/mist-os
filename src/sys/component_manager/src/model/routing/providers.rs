@@ -70,7 +70,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         metadata
             .insert(
                 cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
-                sandbox::Capability::Data(sandbox::Data::String(porcelain_type.to_string())),
+                sandbox::Capability::Data(sandbox::Data::String(porcelain_type.to_string().into())),
             )
             .unwrap();
         metadata.set_metadata(Availability::Transitional);

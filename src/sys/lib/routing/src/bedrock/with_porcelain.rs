@@ -93,7 +93,7 @@ impl<
             metadata
                 .insert(
                     Name::new(METADATA_KEY_TYPE).unwrap(),
-                    Capability::Data(Data::String(porcelain_type.to_string())),
+                    Capability::Data(Data::String(porcelain_type.to_string().into())),
                 )
                 .expect("failed to build default metadata?");
             metadata.set_metadata(*availability);
@@ -144,10 +144,10 @@ fn check_porcelain_type(
         }
         .into());
     };
-    if capability_type != expected_type.to_string() {
+    if *capability_type != expected_type.to_string() {
         Err(RoutingError::BedrockWrongCapabilityType {
             moniker: moniker.clone(),
-            actual: capability_type,
+            actual: capability_type.into(),
             expected: expected_type.to_string(),
         })?;
     }
@@ -426,7 +426,7 @@ pub fn metadata_for_porcelain_type(
                 metadata
                     .insert(
                         Name::new(METADATA_KEY_TYPE).unwrap(),
-                        Capability::Data(Data::String(typename.to_string())),
+                        Capability::Data(Data::String(typename.to_string().into())),
                     )
                     .expect("failed to build default metadata?");
                 metadata.set_metadata(availability);
@@ -565,7 +565,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn success() {
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let base = Router::<Data>::new_ok(source);
         let component = fake_component();
         let proxy = base
@@ -579,7 +579,7 @@ mod tests {
         metadata
             .insert(
                 Name::new(METADATA_KEY_TYPE).unwrap(),
-                Capability::Data(Data::String(CapabilityTypeName::Protocol.to_string())),
+                Capability::Data(Data::String(CapabilityTypeName::Protocol.to_string().into())),
             )
             .unwrap();
         metadata.set_metadata(Availability::Optional);
@@ -592,14 +592,14 @@ mod tests {
             RouterResponse::<Data>::Capability(d) => d,
             _ => panic!(),
         };
-        assert_eq!(capability, Data::String("hello".to_string()));
+        assert_eq!(capability, Data::String("hello".into()));
     }
 
     #[fuchsia::test]
     async fn type_missing() {
         let reporter = TestErrorReporter::new();
         let reported = reporter.reported.clone();
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let base = Router::<Data>::new_ok(source);
         let component = fake_component();
         let proxy = base
@@ -634,7 +634,7 @@ mod tests {
     async fn type_mismatch() {
         let reporter = TestErrorReporter::new();
         let reported = reporter.reported.clone();
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let base = Router::<Data>::new_ok(source);
         let component = fake_component();
         let proxy = base
@@ -648,7 +648,7 @@ mod tests {
         metadata
             .insert(
                 Name::new(METADATA_KEY_TYPE).unwrap(),
-                Capability::Data(Data::String(CapabilityTypeName::Service.to_string())),
+                Capability::Data(Data::String(CapabilityTypeName::Service.to_string().into())),
             )
             .unwrap();
         metadata.set_metadata(Availability::Optional);
@@ -677,7 +677,7 @@ mod tests {
     async fn availability_mismatch() {
         let reporter = TestErrorReporter::new();
         let reported = reporter.reported.clone();
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let base = Router::<Data>::new_ok(source);
         let component = fake_component();
         let proxy = base
@@ -691,7 +691,7 @@ mod tests {
         metadata
             .insert(
                 Name::new(METADATA_KEY_TYPE).unwrap(),
-                Capability::Data(Data::String(CapabilityTypeName::Protocol.to_string())),
+                Capability::Data(Data::String(CapabilityTypeName::Protocol.to_string().into())),
             )
             .unwrap();
         metadata.set_metadata(Availability::Required);

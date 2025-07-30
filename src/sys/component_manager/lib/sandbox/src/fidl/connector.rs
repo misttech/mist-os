@@ -17,14 +17,15 @@ impl Connector {
         self.send(Message { channel })
     }
 
-    pub(crate) fn new_with_owned_receiver(
+    pub(crate) fn new_with_fidl_receiver(
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
+        scope: &fasync::Scope,
     ) -> Self {
         let (sender, receiver) = mpsc::unbounded();
         let receiver = Receiver::new(receiver);
-        let receiver_task =
-            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy()));
-        Self::new_internal(sender, Some(Arc::new(receiver_task)))
+        // Exits when ServerEnd<Receiver> is closed
+        scope.spawn(receiver.handle_receiver(receiver_client.into_proxy()));
+        Self::new_sendable(sender)
     }
 }
 

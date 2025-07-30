@@ -55,7 +55,8 @@ impl NamespaceCapabilityProvider {
         let (store, store_stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _store_task = fasync::Task::spawn(async move {
-            let _ = sandbox::serve_capability_store(store_stream).await;
+            let receiver_scope = fasync::Scope::new();
+            let _ = sandbox::serve_capability_store(store_stream, &receiver_scope).await;
         });
         while let Some(request) = stream.try_next().await? {
             let method_name = request.method_name();
@@ -226,7 +227,10 @@ mod tests {
 
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
+        tasks.spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            sandbox::serve_capability_store(stream, &receiver_scope).await.unwrap()
+        });
 
         let mut namespace_pairs = vec![];
         let mut next_id = 1;
@@ -293,7 +297,10 @@ mod tests {
 
         let (store, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
+        tasks.spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            sandbox::serve_capability_store(stream, &receiver_scope).await.unwrap()
+        });
 
         // Two entries with a shadowing path.
         let mut namespace_pairs = vec![];

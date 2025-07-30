@@ -99,7 +99,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rights_good() {
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::RW_STAR_DIR.into());
         let metadata = Dict::new();
@@ -113,12 +113,12 @@ mod tests {
             RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
-        assert_eq!(capability, Data::String("hello".to_string()));
+        assert_eq!(capability, Data::String("hello".into()));
     }
 
     #[fuchsia::test]
     async fn rights_bad() {
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::R_STAR_DIR.into());
         let metadata = Dict::new();
@@ -142,7 +142,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn invalid_intermediate_rights() {
-        let source = Data::String("hello".to_string());
+        let source = Data::String("hello".into());
         let base = Router::<Data>::new_ok(source)
             .with_rights(ExtendedMoniker::ComponentManager, fio::R_STAR_DIR.into());
         let intermediate =

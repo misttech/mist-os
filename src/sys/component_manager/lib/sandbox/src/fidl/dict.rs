@@ -222,7 +222,10 @@ mod tests {
     #[fuchsia::test]
     async fn create() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
         let id_gen = sandbox::CapabilityIdGenerator::new();
 
         let dict_id = id_gen.next();
@@ -251,7 +254,10 @@ mod tests {
     #[fuchsia::test]
     async fn create_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let cap = Capability::Data(Data::Int64(42));
         assert_matches!(store.import(1, cap.into()).await.unwrap(), Ok(()));
@@ -264,7 +270,10 @@ mod tests {
     #[fuchsia::test]
     async fn legacy_import() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let dict_id = 1;
         assert_matches!(store.dictionary_create(dict_id).await.unwrap(), Ok(()));
@@ -298,7 +307,10 @@ mod tests {
     #[fuchsia::test]
     async fn legacy_import_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         store.dictionary_create(10).await.unwrap().unwrap();
         let (dict_ch, server) = fidl::Channel::create();
@@ -321,7 +333,10 @@ mod tests {
     #[fuchsia::test]
     async fn legacy_export_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let (_dict_ch, server) = fidl::Channel::create();
         assert_matches!(
@@ -335,7 +350,10 @@ mod tests {
     #[fuchsia::test]
     async fn insert(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let dict = new_dict(test_type);
         let dict_ref = Capability::Dictionary(dict.clone()).into();
@@ -366,7 +384,10 @@ mod tests {
     #[fuchsia::test]
     async fn insert_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let unit = Unit::default().into();
         let value = 2;
@@ -421,7 +442,10 @@ mod tests {
     #[fuchsia::test]
     async fn remove(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let dict = new_dict(test_type);
 
@@ -454,7 +478,10 @@ mod tests {
     #[fuchsia::test]
     async fn remove_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         assert_matches!(
             store.dictionary_remove(1, "k".into(), None).await.unwrap(),
@@ -497,7 +524,10 @@ mod tests {
     #[fuchsia::test]
     async fn get(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let dict = new_dict(test_type);
 
@@ -520,7 +550,10 @@ mod tests {
     #[fuchsia::test]
     async fn get_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         assert_matches!(
             store.dictionary_get(1, "k".into(), 2).await.unwrap(),
@@ -575,7 +608,10 @@ mod tests {
     #[fuchsia::test]
     async fn copy(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         // Create a Dict with a Unit inside, and copy the Dict.
         let dict = new_dict(test_type);
@@ -612,7 +648,10 @@ mod tests {
     #[fuchsia::test]
     async fn copy_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         assert_matches!(
             store.dictionary_copy(1, 2).await.unwrap(),
@@ -651,7 +690,10 @@ mod tests {
     #[fuchsia::test]
     async fn duplicate(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let dict = new_dict(test_type);
         store.import(1, dict.clone().into()).await.unwrap().unwrap();
@@ -682,7 +724,10 @@ mod tests {
         let id_gen = sandbox::CapabilityIdGenerator::new();
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
         let dict_ref = Capability::Dictionary(dict).into();
         let dict_id = id_gen.next();
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -800,7 +845,10 @@ mod tests {
         let dict = new_dict(test_type);
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = 1;
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -919,7 +967,10 @@ mod tests {
         }
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = id_gen.next();
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -973,7 +1024,10 @@ mod tests {
         }
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = 1;
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -1009,7 +1063,10 @@ mod tests {
     #[fuchsia::test]
     async fn read_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         store.import(2, Unit::default().into()).await.unwrap().unwrap();
 
@@ -1047,7 +1104,10 @@ mod tests {
     #[fuchsia::test]
     async fn read_iterator_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         store.dictionary_create(1).await.unwrap().unwrap();
 
@@ -1214,7 +1274,10 @@ mod tests {
     #[fuchsia::test]
     async fn switch_between_vec_and_map() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         let dict = Dict::new();
         let dict_ref = Capability::Dictionary(dict.clone()).into();
@@ -1313,7 +1376,10 @@ mod tests {
         use std::sync::mpsc;
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let _server = fasync::Task::spawn(async move {
+            let receiver_scope = fasync::Scope::new();
+            serve_capability_store(stream, &receiver_scope).await
+        });
 
         #[derive(PartialEq)]
         enum Update {

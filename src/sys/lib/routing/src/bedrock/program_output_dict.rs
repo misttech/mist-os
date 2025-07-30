@@ -146,8 +146,9 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
             );
         }
         cm_rust::CapabilityDecl::Config(c) => {
-            let data =
-                sandbox::Data::Bytes(fidl::persist(&c.value.clone().native_into_fidl()).unwrap());
+            let data = sandbox::Data::Bytes(
+                fidl::persist(&c.value.clone().native_into_fidl()).unwrap().into(),
+            );
             match program_output_dict
                 .insert_capability(capability.name(), Router::<Data>::new_ok(data).into())
             {
