@@ -23,4 +23,23 @@ if (is_linux) {
     outputs = [ "data/tests/print_helper" ]
     deps = [ ":print_helper" ]
   }
+
+  executable("clone_exec_helper") {
+    testonly = true
+    emit_tool_path = false
+    sources = [ "clone_exec_helper.cc" ]
+
+    # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
+    exclude_toolchain_tags = [
+      "asan",
+      "coverage",
+    ]
+  }
+
+  resource("clone_exec_helper_resource") {
+    testonly = true
+    sources = [ "$root_out_dir/clone_exec_helper" ]
+    outputs = [ "data/tests/clone_exec_helper" ]
+    deps = [ ":clone_exec_helper" ]
+  }
 }

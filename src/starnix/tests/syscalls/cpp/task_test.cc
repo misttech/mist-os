@@ -4,6 +4,7 @@
 
 #include "src/starnix/tests/syscalls/cpp/task_test.h"
 
+#include <fcntl.h>
 #include <limits.h>
 #include <sched.h>
 #include <strings.h>
@@ -17,6 +18,7 @@
 
 #include <cerrno>
 #include <cstdint>
+#include <filesystem>
 #include <thread>
 
 #include <fbl/algorithm.h>
@@ -1061,4 +1063,114 @@ TEST(Task, CantWriteLowAddresses) {
   for (uintptr_t addr = 0x0; addr < kLowMemoryLimit; addr += page_size) {
     EXPECT_FALSE(test_helper::TryWrite(addr));
   }
+}
+
+class CloneAndExecTest : public ::testing::Test {
+ protected:
+  void SetUp() { clone_exec_helper_ = GetTestResourcePath(kCloneExecHelperBinary); }
+
+  void CloneAndExec(int clone_flags, const std::vector<std::string>& arguments) {
+    // Clone the process, with the caller-supplied flags.
+    int child_pid = static_cast<int>(SAFE_SYSCALL(
+        syscall(SYS_clone, clone_flags | SIGCHLD, nullptr, nullptr, nullptr, nullptr)));
+
+    if (child_pid == 0) {
+      // This is the child process, so exec() the specified command.
+      std::vector<char*> args;
+      args.push_back(clone_exec_helper_.data());
+      for (const std::string& argument : arguments) {
+        args.push_back(const_cast<char*>(argument.data()));
+      }
+      args.push_back(nullptr);
+      char* const envp[] = {nullptr};
+
+      SAFE_SYSCALL(execve(clone_exec_helper_.c_str(), args.data(), envp));
+      _exit(EXIT_FAILURE);
+    }
+
+    // This is the parent process. Wait for the child process to complete, then return to the caller
+    // to perform test validation.
+    int wstatus = 0;
+    SAFE_SYSCALL(waitpid(child_pid, &wstatus, 0));
+    if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
+      ADD_FAILURE() << "wait_status: WIFEXITED(wstatus) = " << WIFEXITED(wstatus)
+                    << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
+                    << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+    }
+  }
+
+  static std::string GetCurrentWorkingDirectory() {
+    std::string cwd;
+    cwd.reserve(PATH_MAX + 1);
+    if (getcwd(cwd.data(), cwd.capacity()) == nullptr) {
+      _exit(EXIT_FAILURE);
+    }
+    return cwd;
+  }
+
+  static std::string GetTestResourcePath(const std::string& resource) {
+    std::filesystem::path test_file = std::filesystem::path("/data/tests") / resource;
+
+    std::error_code ec;
+    bool file_exists = std::filesystem::exists(test_file, ec);
+    EXPECT_FALSE(ec) << "failed to check if file exists: " << ec;
+
+    if (!file_exists) {
+      char self_path[PATH_MAX];
+      realpath("/proc/self/exe", self_path);
+      std::filesystem::path directory = std::filesystem::path(self_path).parent_path();
+      return directory / resource;
+    }
+
+    return test_file;
+  }
+
+  static constexpr char kCloneExecHelperBinary[] = "clone_exec_helper";
+
+  std::string clone_exec_helper_;
+};
+
+TEST_F(CloneAndExecTest, ExecUnsharesCloneFiles) {
+  // Fork into a subprocess from which to `clone(CLONE_FILES)`, to avoid breaking the main test
+  // process if things go awry.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    // Open a temporary file to use as the "canary" for the FD table remaining shared.
+    auto fd = test_helper::ScopedTempFD();
+    ASSERT_THAT(fcntl(fd.fd(), F_GETFD), SyscallSucceeds());
+
+    // The child process will run the helper with a command to close `fd`.
+    std::vector<std::string> args{"close_fd", std::to_string(fd.fd())};
+    CloneAndExec(CLONE_FILES, args);
+
+    // Verify that the FD is still open in our FD table.
+    EXPECT_THAT(fcntl(fd.fd(), F_GETFD), SyscallSucceeds());
+
+    _exit(testing::Test::HasFailure());
+  });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(CloneAndExecTest, ExecUnsharesCloneFs) {
+  // Fork into a subprocess from which to `clone(CLONE_FS)`, to avoid breaking the main test
+  // process if things go awry.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    // The child process will run the helper with a command-line to modify the current working
+    // directory.
+    std::string original_cwd = GetCurrentWorkingDirectory();
+
+    // Create a temporary directory to use as the new CWD.
+    test_helper::ScopedTempDir new_cwd;
+    std::vector<std::string> args{"set_cwd", new_cwd.path()};
+    CloneAndExec(CLONE_FS, args);
+
+    // Verify that this process' current working directory has not changed.
+    EXPECT_EQ(original_cwd, GetCurrentWorkingDirectory());
+
+    _exit(testing::Test::HasFailure());
+  });
+
+  ASSERT_TRUE(helper.WaitForChildren());
 }
