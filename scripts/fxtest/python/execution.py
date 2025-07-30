@@ -151,7 +151,9 @@ class TestExecution:
             if (
                 self._test.build.test.create_no_exception_channel is not None
                 and self._test.build.test.create_no_exception_channel
-            ):
+                # TODO(https://fxbug.dev/434722978): Do not set --no-exception-channel by default
+                # after zxdb_e2e_test flakes have been resolved.
+            ) or self._test.build.test.create_no_exception_channel is None:
                 extra_args += [
                     "--no-exception-channel",
                 ]
