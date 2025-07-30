@@ -35,22 +35,21 @@ namespace fs_management {
 namespace {
 
 zx::result<> MkfsComponentFs(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
-                             const std::string& device_path, const MkfsOptions& options) {
-  auto device = component::Connect<fuchsia_hardware_block::Block>(device_path.c_str());
-  if (device.is_error())
-    return device.take_error();
-
+                             fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                             const MkfsOptions& options) {
   auto startup_client_end = component::ConnectAt<fuchsia_fs_startup::Startup>(exposed_dir);
   if (startup_client_end.is_error())
     return startup_client_end.take_error();
   fidl::WireSyncClient startup_client{std::move(*startup_client_end)};
 
   fidl::Arena arena;
-  auto res = startup_client->Format(std::move(*device), options.as_format_options(arena));
-  if (!res.ok())
+  auto res = startup_client->Format(std::move(device), options.as_format_options(arena));
+  if (!res.ok()) {
     return zx::error(res.status());
-  if (res->is_error())
+  }
+  if (res->is_error()) {
     return zx::error(res->error_value());
+  }
 
   return zx::ok();
 }
@@ -58,12 +57,22 @@ zx::result<> MkfsComponentFs(fidl::UnownedClientEnd<fuchsia_io::Directory> expos
 }  // namespace
 
 __EXPORT
-zx_status_t Mkfs(const char* device_path, FsComponent& component, const MkfsOptions& options) {
+zx_status_t Mkfs(fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
+                 const MkfsOptions& options) {
   auto exposed_dir = component.Connect();
   if (exposed_dir.is_error()) {
     return exposed_dir.status_value();
   }
-  return MkfsComponentFs(*exposed_dir, device_path, options).status_value();
+  return MkfsComponentFs(*exposed_dir, std::move(device), options).status_value();
+}
+
+__EXPORT
+zx_status_t Mkfs(const char* device_path, FsComponent& component, const MkfsOptions& options) {
+  zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path);
+  if (device.is_error()) {
+    return device.status_value();
+  }
+  return Mkfs(std::move(*device), component, options);
 }
 
 }  // namespace fs_management
