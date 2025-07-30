@@ -190,7 +190,7 @@ void KTrace::ReportMetadata() {
     }
   };
   const cpu_mask_t target_mask = cpu_num_to_mask(BOOT_CPU_ID);
-  mp_sync_exec(MP_IPI_TARGET_MASK, target_mask, emit_starting_records, &GetInstance());
+  mp_sync_exec(mp_ipi_target::MASK, target_mask, emit_starting_records, &GetInstance());
 
   // Emit the names of all live processes and threads to the trace buffer. Note that these records
   // will be inserted into the buffer associated with the CPU we're running on, which may not be
@@ -281,7 +281,7 @@ zx_status_t KTrace::Stop() {
     // do about that.
     curr_cpu_buffer.EmitDropStats();
   };
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, emit_drop_stats, percpu_buffers_.get());
+  mp_sync_exec(mp_ipi_target::ALL, 0, emit_drop_stats, percpu_buffers_.get());
   return ZX_OK;
 }
 
@@ -309,7 +309,7 @@ zx_status_t KTrace::Rewind() {
     curr_cpu_buffer.Drain();
     curr_cpu_buffer.ResetDropStats();
   };
-  mp_sync_exec(MP_IPI_TARGET_ALL, 0, run_drain, percpu_buffers_.get());
+  mp_sync_exec(mp_ipi_target::ALL, 0, run_drain, percpu_buffers_.get());
   return ZX_OK;
 }
 

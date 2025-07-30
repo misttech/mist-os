@@ -356,7 +356,7 @@ void arch_mp_reschedule(cpu_mask_t mask) {
   }
 
   if (needs_ipi) {
-    arch_mp_send_ipi(MP_IPI_TARGET_MASK, needs_ipi, MP_IPI_RESCHEDULE);
+    arch_mp_send_ipi(mp_ipi_target::MASK, needs_ipi, mp_ipi::RESCHEDULE);
   }
 }
 
@@ -483,37 +483,33 @@ void ArchIdlePowerThread::EnterIdleState() {
   }
 }
 
-void arch_mp_send_ipi(mp_ipi_target_t target, cpu_mask_t mask, mp_ipi_t ipi) {
+void arch_mp_send_ipi(mp_ipi_target target, cpu_mask_t mask, mp_ipi ipi) {
   uint8_t vector = 0;
   switch (ipi) {
-    case MP_IPI_GENERIC:
+    case mp_ipi::GENERIC:
       vector = X86_INT_IPI_GENERIC;
       break;
-    case MP_IPI_RESCHEDULE:
+    case mp_ipi::RESCHEDULE:
       vector = X86_INT_IPI_RESCHEDULE;
       break;
-    case MP_IPI_INTERRUPT:
+    case mp_ipi::INTERRUPT:
       vector = X86_INT_IPI_INTERRUPT;
       break;
-    case MP_IPI_HALT:
+    case mp_ipi::HALT:
       vector = X86_INT_IPI_HALT;
       break;
-    default:
-      panic("Unexpected MP IPI value: %u", static_cast<uint32_t>(ipi));
   }
 
   switch (target) {
-    case MP_IPI_TARGET_ALL_BUT_LOCAL:
+    case mp_ipi_target::ALL_BUT_LOCAL:
       apic_send_broadcast_ipi(vector, DELIVERY_MODE_FIXED);
       break;
-    case MP_IPI_TARGET_ALL:
+    case mp_ipi_target::ALL:
       apic_send_broadcast_self_ipi(vector, DELIVERY_MODE_FIXED);
       break;
-    case MP_IPI_TARGET_MASK:
+    case mp_ipi_target::MASK:
       apic_send_mask_ipi(vector, mask, DELIVERY_MODE_FIXED);
       break;
-    default:
-      panic("Unexpected MP IPI target: %u", static_cast<uint32_t>(target));
   }
 }
 

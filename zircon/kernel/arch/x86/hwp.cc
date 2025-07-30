@@ -227,7 +227,7 @@ zx_status_t CmdSetPolicy(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   mp_sync_exec(
-      MP_IPI_TARGET_ALL, 0,
+      mp_ipi_target::ALL, 0,
       [](void* policy_ptr) {
         auto policy = reinterpret_cast<ktl::optional<IntelHwpPolicy>*>(policy_ptr)->value();
         cpu_id::CpuId cpuid;
@@ -253,7 +253,7 @@ zx_status_t CmdSetFreq(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   mp_sync_exec(
-      MP_IPI_TARGET_ALL, 0,
+      mp_ipi_target::ALL, 0,
       [](void* desired_freq_ptr) {
         auto desired_freq = PerformanceLevel(
             static_cast<uint8_t>(*reinterpret_cast<unsigned long*>(desired_freq_ptr)));

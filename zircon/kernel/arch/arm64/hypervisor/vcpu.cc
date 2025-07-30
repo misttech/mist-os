@@ -280,7 +280,7 @@ void Vcpu::InterruptCpu() {
     // If the VCPU thread is still running, and we have a valid last_cpu_, send
     // the thread's CPU an IPI.
     if (thread_->state() == THREAD_RUNNING && last_cpu_ != INVALID_CPU) {
-      mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(last_cpu_));
+      mp_interrupt(mp_ipi_target::MASK, cpu_num_to_mask(last_cpu_));
     }
   }
 }

@@ -46,7 +46,7 @@ uint64_t read_msr_on_cpu(cpu_num_t cpu, uint32_t msr_id) {
 
   context.msr = msr_id;
   mask |= cpu_num_to_mask(cpu);
-  mp_sync_exec(MP_IPI_TARGET_MASK, mask, read_msr_on_cpu_task, reinterpret_cast<void*>(&context));
+  mp_sync_exec(mp_ipi_target::MASK, mask, read_msr_on_cpu_task, reinterpret_cast<void*>(&context));
   return context.val;
 }
 
@@ -67,5 +67,5 @@ void write_msr_on_cpu(cpu_num_t cpu, uint32_t msr_id, uint64_t val) {
   context.msr = msr_id;
   context.val = val;
   mask |= cpu_num_to_mask(cpu);
-  mp_sync_exec(MP_IPI_TARGET_MASK, mask, write_msr_on_cpu_task, reinterpret_cast<void*>(&context));
+  mp_sync_exec(mp_ipi_target::MASK, mask, write_msr_on_cpu_task, reinterpret_cast<void*>(&context));
 }

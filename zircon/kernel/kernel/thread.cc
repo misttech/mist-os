@@ -583,7 +583,7 @@ zx_status_t Thread::SuspendOrKillInternal(SuspendOrKillOp op) {
         // The following call is not essential.  It just makes the
         // thread suspension/kill happen sooner rather than at the next
         // timer interrupt or syscall.
-        mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(scheduler_state_.curr_cpu_));
+        mp_interrupt(mp_ipi_target::MASK, cpu_num_to_mask(scheduler_state_.curr_cpu_));
         break;
       case THREAD_BLOCKED:
       case THREAD_BLOCKED_READ_LOCK:
@@ -657,7 +657,7 @@ zx_status_t Thread::RestrictedKick() {
   }
 
   if (ipi_mask != 0) {
-    mp_interrupt(MP_IPI_TARGET_MASK, ipi_mask);
+    mp_interrupt(mp_ipi_target::MASK, ipi_mask);
   }
 
   kcounter_add(thread_restricted_kick_count, 1);

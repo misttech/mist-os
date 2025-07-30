@@ -621,7 +621,7 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
   const size_t size = count * PAGE_SIZE;
   if (IsKernel() || IsShared()) {
     SfenceVmaArgs args{.range = SfenceVmaArgs::Range{.base = vaddr, .size = size}};
-    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
+    mp_sync_exec(mp_ipi_target::ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else if (IsUser()) {
     // Flush just the aspace's asid.
     SfenceVmaArgs args{.range = SfenceVmaArgs::Range{.base = vaddr, .size = size}, .asid = asid_};
@@ -629,7 +629,7 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
     if (IsRestricted()) {
       args.unified_asid = get_unified_aspace()->asid();
     }
-    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
+    mp_sync_exec(mp_ipi_target::ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else {
     PANIC_UNIMPLEMENTED;
   }
@@ -642,7 +642,7 @@ void Riscv64ArchVmAspace::FlushAsid() const {
   if (IsKernel() || IsShared()) {
     // Perform a full flush of all cpus across all ASIDs
     SfenceVmaArgs args{};
-    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
+    mp_sync_exec(mp_ipi_target::ALL, /* cpu_mask */ 0, &SfenceVma, &args);
     kcounter_add(cm_global_invalidate, 1);
   } else {
     // Perform a full flush of all cpus of a single ASID
@@ -651,7 +651,7 @@ void Riscv64ArchVmAspace::FlushAsid() const {
     if (IsRestricted()) {
       args.unified_asid = get_unified_aspace()->asid();
     }
-    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
+    mp_sync_exec(mp_ipi_target::ALL, /* cpu_mask */ 0, &SfenceVma, &args);
     kcounter_add(cm_asid_invalidate, 1);
   }
 }

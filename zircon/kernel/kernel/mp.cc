@@ -13,6 +13,7 @@
 #include <lib/console.h>
 #include <lib/fit/defer.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
+#include <lib/lazy_init/lazy_init.h>
 #include <lib/lockup_detector.h>
 #include <lib/lockup_detector/diagnostics.h>
 #include <lib/system-topology.h>
@@ -32,7 +33,6 @@
 #include <kernel/deadline.h>
 #include <kernel/dpc.h>
 #include <kernel/event.h>
-#include <kernel/mp.h>
 #include <kernel/mutex.h>
 #include <kernel/percpu.h>
 #include <kernel/scheduler.h>
@@ -45,12 +45,52 @@
 
 #define LOCAL_TRACE 0
 
-// a global state structure, aligned on cpu cache line to minimize aliasing
-struct mp_state mp __CPU_ALIGN_EXCLUSIVE;
+namespace {
 
-// Helpers used for implementing mp_sync
-struct mp_sync_context;
-static void mp_sync_task(void* context);
+// Represents a pending task for some number of CPUs to execute.
+struct mp_ipi_task
+    : fbl::DoublyLinkedListable<mp_ipi_task*, fbl::NodeOptions::AllowRemoveFromContainer> {
+  mp_ipi_task_func_t func;
+  void* context;
+};
+
+// Global mp state to track what the cpus are up to.
+struct mp_state {
+  // Cpus that are currently online.
+  ktl::atomic<cpu_mask_t> online_cpus;
+
+  SpinLock ipi_task_lock{"mp_state:ipi_task_lock"_intern};
+  // The list of outstanding tasks for each CPU to execute. Should only be
+  // accessed with the ipi_task_lock held
+  fbl::DoublyLinkedList<mp_ipi_task*> ipi_task_list[SMP_MAX_CPUS] TA_GUARDED(ipi_task_lock);
+
+  // lock for serializing CPU hotplug/unplug operations
+  DECLARE_MUTEX(mp_state) hotplug_lock;
+
+  // Tracks the CPUs that are "ready".
+  // Used below in mp_signal_curr_cpu_ready and mp_wait_for_all_cpus_ready.
+  ktl::atomic<cpu_mask_t> ready_cpu_mask{0};
+
+  // Signals when all CPUs are ready.
+  Event ready_cpu_event;
+};
+
+// The global state structure for the mp subsystem, aligned on cpu cache line to minimize aliasing.
+mp_state mp __CPU_ALIGN_EXCLUSIVE;
+
+}  // namespace
+
+// tracks if a cpu is online and initialized
+void mp_set_cpu_online(cpu_num_t cpu, bool online) {
+  if (online) {
+    mp.online_cpus.fetch_or(cpu_num_to_mask(cpu));
+  } else {
+    mp.online_cpus.fetch_and(~cpu_num_to_mask(cpu));
+  }
+}
+
+cpu_mask_t mp_get_online_mask() { return mp.online_cpus.load(); }
+bool mp_is_cpu_online(cpu_num_t cpu) { return mp_get_online_mask() & cpu_num_to_mask(cpu); }
 
 void mp_init() {}
 
@@ -75,9 +115,11 @@ void mp_reschedule(cpu_mask_t mask, uint flags) {
   arch_mp_reschedule(mask);
 }
 
-void mp_interrupt(mp_ipi_target_t target, cpu_mask_t mask) {
-  arch_mp_send_ipi(target, mask, MP_IPI_INTERRUPT);
+void mp_interrupt(mp_ipi_target target, cpu_mask_t mask) {
+  arch_mp_send_ipi(target, mask, mp_ipi::INTERRUPT);
 }
+
+namespace {
 
 struct mp_sync_context {
   mp_sync_task_t task;
@@ -86,13 +128,15 @@ struct mp_sync_context {
   ktl::atomic<cpu_mask_t> outstanding_cpus;
 };
 
-static void mp_sync_task(void* raw_context) {
+void mp_sync_task(void* raw_context) {
   auto context = reinterpret_cast<mp_sync_context*>(raw_context);
   context->task(context->task_context);
   // use seq-cst atomic to ensure this update is not seen before the
   // side-effects of context->task
   context->outstanding_cpus.fetch_and(~cpu_num_to_mask(arch_curr_cpu_num()));
 }
+
+}  // namespace
 
 /* @brief Execute a task on the specified CPUs, and block on the calling
  *        CPU until all CPUs have finished the task.
@@ -105,12 +149,12 @@ static void mp_sync_task(void* raw_context) {
  * The callback in |task| will always be called with |arch_blocking_disallowed()|
  * set to true.
  */
-void mp_sync_exec(mp_ipi_target_t target, cpu_mask_t mask, mp_sync_task_t task, void* context) {
+void mp_sync_exec(mp_ipi_target target, cpu_mask_t mask, mp_sync_task_t task, void* context) {
   uint num_cpus = arch_max_num_cpus();
 
-  if (target == MP_IPI_TARGET_ALL) {
+  if (target == mp_ipi_target::ALL) {
     mask = mp_get_online_mask();
-  } else if (target == MP_IPI_TARGET_ALL_BUT_LOCAL) {
+  } else if (target == mp_ipi_target::ALL_BUT_LOCAL) {
     // targeting all other CPUs but the current one is hazardous
     // if the local CPU may be changed underneath us
     DEBUG_ASSERT(arch_ints_disabled());
@@ -158,7 +202,7 @@ void mp_sync_exec(mp_ipi_target_t target, cpu_mask_t mask, mp_sync_task_t task, 
   mp.ipi_task_lock.Release();
 
   // let CPUs know to begin executing
-  arch_mp_send_ipi(MP_IPI_TARGET_MASK, mask, MP_IPI_GENERIC);
+  arch_mp_send_ipi(mp_ipi_target::MASK, mask, mp_ipi::GENERIC);
 
   if (targetting_self) {
     bool previous_blocking_disallowed = arch_blocking_disallowed();
@@ -282,8 +326,10 @@ zx_status_t mp_hotplug_cpu_mask(cpu_mask_t cpu_mask) {
   return ZX_OK;
 }
 
+namespace {
+
 // Unplug a single CPU.  Must be called while holding the hotplug lock
-static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_instant_mono_t deadline) {
+zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_instant_mono_t deadline) {
   percpu& percpu_to_unplug = percpu::Get(cpu_id);
 
   // Wait for |percpu_to_unplug| to complete any in-progress DPCs and terminate its DPC thread.
@@ -312,6 +358,8 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_instant
 
   return platform_mp_cpu_unplug(cpu_id);
 }
+
+}  // namespace
 
 // Unplug the given cpus.  Blocks until the CPUs are removed or |deadline| has been reached.
 //
@@ -383,33 +431,27 @@ void mp_mbx_interrupt_irq() {
 
 zx_status_t platform_mp_cpu_hotplug(cpu_num_t cpu_id) { return arch_mp_cpu_hotplug(cpu_id); }
 
-namespace {
-
-// Tracks the CPUs that are "ready".
-ktl::atomic<cpu_mask_t> ready_cpu_mask{0};
-
-// Signals when all CPUs are ready.
-Event ready_cpu_event;
-
-}  // namespace
-
 void mp_signal_curr_cpu_ready() {
   cpu_num_t num = arch_curr_cpu_num();
   DEBUG_ASSERT_MSG(Scheduler::PeekIsActive(num), "CPU %u cannot be ready if it is not yet active",
                    num);
   cpu_mask_t mask = cpu_num_to_mask(num);
-  cpu_mask_t ready = ready_cpu_mask.fetch_or(mask) | mask;
+  cpu_mask_t ready = mp.ready_cpu_mask.fetch_or(mask) | mask;
   int ready_count = ktl::popcount(ready);
   int max_count = static_cast<int>(arch_max_num_cpus());
   DEBUG_ASSERT(ready_count <= max_count);
   if (ready_count == max_count) {
-    ready_cpu_event.Signal();
+    mp.ready_cpu_event.Signal();
   }
 }
 
-zx_status_t mp_wait_for_all_cpus_ready(Deadline deadline) { return ready_cpu_event.Wait(deadline); }
+zx_status_t mp_wait_for_all_cpus_ready(Deadline deadline) {
+  return mp.ready_cpu_event.Wait(deadline);
+}
 
-static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
+namespace {
+
+void mp_all_cpu_startup_sync_hook(unsigned int rl) {
   // Before proceeding any further, wait for a _really_ long time to make sure
   // that all of the CPUs are ready.  We really don't want to start user-mode
   // until we have seen all of our CPUs start up.  In addition, there are
@@ -447,7 +489,7 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
   // Build masks containing the CPUs that are online+ready, that are merely
   // online, and that should be online+ready so we can report the ones that are
   // missing.  Note, ready implies online.
-  const cpu_mask_t ready_mask = ready_cpu_mask.load(ktl::memory_order_relaxed);
+  const cpu_mask_t ready_mask = mp.ready_cpu_mask.load(ktl::memory_order_relaxed);
   const cpu_mask_t online_mask = mp_get_online_mask();
   cpu_mask_t expected_ready_mask = 0;
   for (system_topology::Node* node : system_topology::GetSystemTopology().processors()) {
@@ -501,7 +543,7 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
 // above).
 LK_INIT_HOOK(mp_all_cpu_startup_sync, mp_all_cpu_startup_sync_hook, LK_INIT_LEVEL_SMP_WAIT)
 
-static int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
+int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
     printf("not enough arguments\n");
   usage:
@@ -517,14 +559,14 @@ static int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
       printf("specify a cpu_id\n");
       goto usage;
     }
-    zx_status_t status = mp_unplug_cpu((cpu_num_t)argv[2].u);
+    zx_status_t status = mp_unplug_cpu(static_cast<cpu_num_t>(argv[2].u));
     printf("CPU %lu unplug %s %d\n", argv[2].u, (status == ZX_OK ? "succeeded" : "failed"), status);
   } else if (!strcmp(argv[1].str, "hotplug")) {
     if (argc < 3) {
       printf("specify a cpu_id\n");
       goto usage;
     }
-    zx_status_t status = mp_hotplug_cpu((cpu_num_t)argv[2].u);
+    zx_status_t status = mp_hotplug_cpu(static_cast<cpu_num_t>(argv[2].u));
     printf("CPU %lu hotplug %s %d\n", argv[2].u, (status == ZX_OK ? "succeeded" : "failed"),
            status);
   } else if (!strcmp(argv[1].str, "reschedule")) {
@@ -565,3 +607,5 @@ static int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
 STATIC_COMMAND_START
 STATIC_COMMAND("mp", "mp test commands", &cmd_mp)
 STATIC_COMMAND_END(mp)
+
+}  // namespace

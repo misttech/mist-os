@@ -53,7 +53,7 @@ static int deadlock_test_thread(void* arg) {
 
   ktl::atomic<int> counter(0);
   InterruptDisableGuard block_interrupts;
-  mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, counter_task, &counter);
+  mp_sync_exec(mp_ipi_target::ALL_BUT_LOCAL, 0, counter_task, &counter);
   return 0;
 }
 
@@ -99,7 +99,7 @@ static bool sync_ipi_tests() {
     LTRACEF("Sequential test\n");
     ktl::atomic<int> inorder_counter = 0;
     for (cpu_num_t j = 0; j < num_cpus; ++j) {
-      mp_sync_exec(MP_IPI_TARGET_MASK, 1u << j, inorder_count_task, &inorder_counter);
+      mp_sync_exec(mp_ipi_target::MASK, 1u << j, inorder_count_task, &inorder_counter);
       LTRACEF("  Finished signaling CPU %u\n", j);
     }
   }
@@ -112,7 +112,7 @@ static bool sync_ipi_tests() {
     {
       InterruptDisableGuard irqd;
 
-      mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, counter_task, &counter);
+      mp_sync_exec(mp_ipi_target::ALL_BUT_LOCAL, 0, counter_task, &counter);
     }
 
     LTRACEF("  Finished signaling all but local (%d)\n", counter.load());
