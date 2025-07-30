@@ -11,7 +11,11 @@ use ffx_core::ffx_command;
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "get-version")]
 pub struct GetVersionCommand {
-    /// path to product bundle directory.
+    /// when true, return version info for all included assembly artifacts.
+    #[argh(switch)]
+    pub include_dependencies: bool,
+
+    /// path to product bundle or assembly artifact directory.
     #[argh(positional)]
-    pub product_bundle: Utf8PathBuf,
+    pub artifact: Utf8PathBuf,
 }

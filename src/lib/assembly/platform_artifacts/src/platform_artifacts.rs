@@ -17,8 +17,9 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 #[assembly_container(platform_artifacts.json)]
 pub struct PlatformArtifacts {
+    /// Root directory where all platform input bundles reside.
     #[serde(skip)]
-    platform_input_bundle_dir: Utf8PathBuf,
+    pub platform_input_bundle_dir: Utf8PathBuf,
 
     /// Release information for the platform artifacts.
     pub release_info: ReleaseInfo,

@@ -13,6 +13,7 @@ ffx_plugin("ffx_product_get_version") {
   args_sources = [ "src/args.rs" ]
   sources = [
     "src/lib.rs",
+    "src/load_config.rs",
     "src/unique_release_info.rs",
   ]
 
@@ -25,17 +26,23 @@ ffx_plugin("ffx_product_get_version") {
   deps = [
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/assembly/config_schema",
+    "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
+    "//src/lib/assembly/platform_artifacts",
     "//src/lib/assembly/product_bundle",
+    "//src/lib/assembly/product_input_bundle",
     "//src/lib/assembly/release_info",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
   ]
 
   test_deps = [
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/assembly/partitions_config",
+    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:serde_json",
   ]
 }
