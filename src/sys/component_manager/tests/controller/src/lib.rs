@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use cm_rust::{ComponentDecl, FidlIntoNative};
+use cm_rust::{push_box, ComponentDecl, FidlIntoNative};
 use fidl::endpoints::{create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd};
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -149,7 +149,8 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
         .await
         .unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
-    realm_decl.collections.push(
+    push_box(
+        &mut realm_decl.collections,
         fcdecl::Collection {
             name: Some(COLLECTION_NAME.to_string()),
             durability: Some(fcdecl::Durability::Transient),

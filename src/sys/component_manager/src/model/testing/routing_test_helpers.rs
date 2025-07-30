@@ -523,9 +523,7 @@ impl RoutingTest {
             .expect("component not in component decl list");
         // Two services installed into the same dir will cause duplicates, so use a HashSet to remove
         // them.
-        let expected_paths_hs: HashSet<String> = decl
-            .uses
-            .into_iter()
+        let expected_paths_hs: HashSet<String> = IntoIterator::into_iter(decl.uses)
             .filter_map(|u| match u {
                 UseDecl::Directory(d) => Some(d.target_path.to_string()),
                 UseDecl::Service(s) => Some(s.target_path.parent().to_string()),

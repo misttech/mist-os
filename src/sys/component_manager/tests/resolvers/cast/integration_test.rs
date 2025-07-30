@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use cm_rust::push_box;
 use fuchsia_component::server as fserver;
 use fuchsia_component_test::new::{ChildOptions, LocalComponentHandles, RealmBuilder};
 use futures::channel::mpsc;
@@ -27,33 +28,40 @@ async fn resolve_cast_url() {
         .await
         .unwrap();
     let mut cast_resolver_decl = builder.get_component_decl(&cast_resolver).await.unwrap();
-    cast_resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(
-        cm_rust::ResolverDecl {
+    push_box(
+        &mut cast_resolver_decl.capabilities,
+        cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
             name: "cast_resolver".parse().unwrap(),
             source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
-        },
-    ));
-    cast_resolver_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
-        source: cm_rust::ExposeSource::Self_,
-        source_name: "cast_resolver".parse().unwrap(),
-        source_dictionary: Default::default(),
-        target: cm_rust::ExposeTarget::Parent,
-        target_name: "cast_resolver".parse().unwrap(),
-    }));
+        }),
+    );
+    push_box(
+        &mut cast_resolver_decl.exposes,
+        cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
+            source: cm_rust::ExposeSource::Self_,
+            source_name: "cast_resolver".parse().unwrap(),
+            source_dictionary: Default::default(),
+            target: cm_rust::ExposeTarget::Parent,
+            target_name: "cast_resolver".parse().unwrap(),
+        }),
+    );
     builder.replace_component_decl(&cast_resolver, cast_resolver_decl).await.unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
-    realm_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: "cast_env".parse().unwrap(),
-        extends: fdecl::EnvironmentExtends::Realm,
-        runners: vec![],
-        resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: "cast_resolver".parse().unwrap(),
-            source: cm_rust::RegistrationSource::Child("cast_resolver".to_string()),
-            scheme: "cast".to_string(),
-        }],
-        debug_capabilities: vec![],
-        stop_timeout_ms: None,
-    });
+    push_box(
+        &mut realm_decl.environments,
+        cm_rust::EnvironmentDecl {
+            name: "cast_env".parse().unwrap(),
+            extends: fdecl::EnvironmentExtends::Realm,
+            runners: Box::from([]),
+            resolvers: Box::from([cm_rust::ResolverRegistration {
+                resolver: "cast_resolver".parse().unwrap(),
+                source: cm_rust::RegistrationSource::Child("cast_resolver".to_string()),
+                scheme: "cast".to_string(),
+            }]),
+            debug_capabilities: Box::from([]),
+            stop_timeout_ms: None,
+        },
+    );
     builder.replace_realm_decl(realm_decl).await.unwrap();
     builder
         .add_child("cast_app", CAST_URL, ChildOptions::new().environment("cast_env").eager())

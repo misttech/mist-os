@@ -1,5 +1,6 @@
 use anyhow::Error;
 use assert_matches::assert_matches;
+use cm_rust::push_box;
 use fuchsia_component::server as fserver;
 use fuchsia_component_test::*;
 use futures::channel::mpsc;
@@ -141,35 +142,44 @@ async fn add_component_resolver(
         .unwrap();
     // Add resolver decl
     let mut child_decl = builder.get_component_decl(&child).await.unwrap();
-    child_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
-        name: component_resolver.name().parse().unwrap(),
-        source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
-    }));
-    child_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
-        source: cm_rust::ExposeSource::Self_,
-        source_name: component_resolver.name().parse().unwrap(),
-        source_dictionary: Default::default(),
-        target: cm_rust::ExposeTarget::Parent,
-        target_name: component_resolver.name().parse().unwrap(),
-    }));
+    push_box(
+        &mut child_decl.capabilities,
+        cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
+            name: component_resolver.name().parse().unwrap(),
+            source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
+        }),
+    );
+    push_box(
+        &mut child_decl.exposes,
+        cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
+            source: cm_rust::ExposeSource::Self_,
+            source_name: component_resolver.name().parse().unwrap(),
+            source_dictionary: Default::default(),
+            target: cm_rust::ExposeTarget::Parent,
+            target_name: component_resolver.name().parse().unwrap(),
+        }),
+    );
     builder.replace_component_decl(&child, child_decl).await.unwrap();
     // Add resolver to the test realm
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
-    realm_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: component_resolver.environment().parse().unwrap(),
-        extends: fdecl::EnvironmentExtends::Realm,
-        runners: vec![],
-        resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: component_resolver.name().parse().unwrap(),
-            source: cm_rust::RegistrationSource::Child(component_resolver.name()),
-            // The component resolver is associated with the scheme indicating the abi_revision it returns.
-            // (e.g component url "absent:xxx" is resolved by scheme "absent", served by
-            // ComponentResolver { TargetAbi::Absent }
-            scheme: component_resolver.clone().scheme(),
-        }],
-        debug_capabilities: vec![],
-        stop_timeout_ms: None,
-    });
+    push_box(
+        &mut realm_decl.environments,
+        cm_rust::EnvironmentDecl {
+            name: component_resolver.environment().parse().unwrap(),
+            extends: fdecl::EnvironmentExtends::Realm,
+            runners: Box::from([]),
+            resolvers: Box::from([cm_rust::ResolverRegistration {
+                resolver: component_resolver.name().parse().unwrap(),
+                source: cm_rust::RegistrationSource::Child(component_resolver.name()),
+                // The component resolver is associated with the scheme indicating the abi_revision it returns.
+                // (e.g component url "absent:xxx" is resolved by scheme "absent", served by
+                // ComponentResolver { TargetAbi::Absent }
+                scheme: component_resolver.clone().scheme(),
+            }]),
+            debug_capabilities: Box::from([]),
+            stop_timeout_ms: None,
+        },
+    );
     builder.replace_realm_decl(realm_decl).await.unwrap();
 }
 

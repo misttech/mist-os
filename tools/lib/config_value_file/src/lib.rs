@@ -33,7 +33,7 @@ pub fn populate_value_file(
                 .map_err(|reason| FileError::InvalidField { key: field.key.clone(), reason })?;
             Ok(ConfigValueSpec { value })
         })
-        .collect::<Result<Vec<ConfigValueSpec>, _>>()?;
+        .collect::<Result<Box<[ConfigValueSpec]>, _>>()?;
 
     // we remove the definitions from the values map above, so any remaining keys are undefined
     // in the manifest
@@ -145,17 +145,17 @@ mod tests {
             ConfigValue::Single(ConfigSingleValue::Int32(-2000000000i32)),
             ConfigValue::Single(ConfigSingleValue::Int64(-4000000000i64)),
             ConfigValue::Single(ConfigSingleValue::String("hello, world!".into())),
-            ConfigValue::Vector(ConfigVectorValue::BoolVector(vec![true, false])),
-            ConfigValue::Vector(ConfigVectorValue::Uint8Vector(vec![1, 2, 3])),
-            ConfigValue::Vector(ConfigVectorValue::Uint16Vector(vec![2, 3, 4])),
-            ConfigValue::Vector(ConfigVectorValue::Uint32Vector(vec![3, 4, 5])),
-            ConfigValue::Vector(ConfigVectorValue::Uint64Vector(vec![4, 5, 6])),
-            ConfigValue::Vector(ConfigVectorValue::Int8Vector(vec![-1, -2, 3])),
-            ConfigValue::Vector(ConfigVectorValue::Int16Vector(vec![-2, -3, 4])),
-            ConfigValue::Vector(ConfigVectorValue::Int32Vector(vec![-3, -4, 5])),
-            ConfigValue::Vector(ConfigVectorValue::Int64Vector(vec![-4, -5, 6])),
+            ConfigValue::Vector(ConfigVectorValue::BoolVector(Box::from([true, false]))),
+            ConfigValue::Vector(ConfigVectorValue::Uint8Vector(Box::from([1, 2, 3]))),
+            ConfigValue::Vector(ConfigVectorValue::Uint16Vector(Box::from([2, 3, 4]))),
+            ConfigValue::Vector(ConfigVectorValue::Uint32Vector(Box::from([3, 4, 5]))),
+            ConfigValue::Vector(ConfigVectorValue::Uint64Vector(Box::from([4, 5, 6]))),
+            ConfigValue::Vector(ConfigVectorValue::Int8Vector(Box::from([-1, -2, 3]))),
+            ConfigValue::Vector(ConfigVectorValue::Int16Vector(Box::from([-2, -3, 4]))),
+            ConfigValue::Vector(ConfigVectorValue::Int32Vector(Box::from([-3, -4, 5]))),
+            ConfigValue::Vector(ConfigVectorValue::Int64Vector(Box::from([-4, -5, 6]))),
             ConfigValue::Vector(ConfigVectorValue::StringVector(
-                vec!["hello, world!".into(), "hello, again!".into()])
+                Box::from(["hello, world!".into(), "hello, again!".into()]))
             ),
         ];
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context, Error};
-use cm_rust::{ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget};
+use cm_rust::{append_box, ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget};
 use fidl::endpoints::{self as f_end, DiscoverableProtocolMarker};
 use fidl_fuchsia_logger::LogSinkMarker;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
@@ -790,8 +790,8 @@ impl PiconetHarness {
             self.piconet_members.iter().map(|spec| spec.expose_decls.clone()).flatten().collect();
         let mut profile_member_exposes =
             self.profiles.iter().map(|spec| spec.expose_decls.clone()).flatten().collect();
-        root_decl.exposes.append(&mut piconet_member_exposes);
-        root_decl.exposes.append(&mut profile_member_exposes);
+        append_box(&mut root_decl.exposes, &mut piconet_member_exposes);
+        append_box(&mut root_decl.exposes, &mut profile_member_exposes);
 
         // Update the root decl with the modified `expose` routes.
         self.builder.replace_realm_decl(root_decl).await.expect("Should be able to set root decl");

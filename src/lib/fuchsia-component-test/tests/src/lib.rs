@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Error};
 use assert_matches::assert_matches;
-use cm_rust::FidlIntoNative;
+use cm_rust::{push_box, FidlIntoNative};
 use cm_rust_testing::*;
 use fidl::endpoints::ClientEnd;
 use fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker};
@@ -343,9 +343,10 @@ async fn get_and_replace_realm_decl() -> Result<(), Error> {
     let builder = RealmBuilder::new().await?;
     let mut root_decl = builder.get_realm_decl().await?;
     assert_eq!(root_decl, cm_rust::ComponentDecl::default());
-    root_decl
-        .children
-        .push(ChildBuilder::new().name("example-child").url("example://url").eager().build());
+    push_box(
+        &mut root_decl.children,
+        ChildBuilder::new().name("example-child").url("example://url").eager().build(),
+    );
     builder.replace_realm_decl(root_decl.clone()).await?;
     assert_eq!(root_decl, builder.get_realm_decl().await?);
     Ok(())
@@ -357,9 +358,10 @@ async fn get_and_replace_component_decl() -> Result<(), Error> {
     let child =
         builder.add_local_child("child", |_| pending().boxed(), ChildOptions::new()).await?;
     let mut child_decl = builder.get_component_decl(&child).await?;
-    child_decl
-        .children
-        .push(ChildBuilder::new().name("example-grand-child").url("example://url").eager().build());
+    push_box(
+        &mut child_decl.children,
+        ChildBuilder::new().name("example-grand-child").url("example://url").eager().build(),
+    );
     builder.replace_component_decl(&child, child_decl.clone()).await?;
     assert_eq!(child_decl, builder.get_component_decl(&child).await?);
     Ok(())
@@ -637,18 +639,24 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
         )
         .await?;
     let mut echo_client_decl = builder.get_component_decl(&echo_client).await?;
-    echo_client_decl.collections.push(CollectionBuilder::new().name(collection_name).build());
-    echo_client_decl
-        .capabilities
-        .push(CapabilityBuilder::protocol().name("fidl.examples.routing.echo.Echo").build());
-    echo_client_decl.offers.push(
+    push_box(
+        &mut echo_client_decl.collections,
+        CollectionBuilder::new().name(collection_name).build(),
+    );
+    push_box(
+        &mut echo_client_decl.capabilities,
+        CapabilityBuilder::protocol().name("fidl.examples.routing.echo.Echo").build(),
+    );
+    push_box(
+        &mut echo_client_decl.offers,
         OfferBuilder::protocol()
             .name("fidl.examples.routing.echo.Echo")
             .source(cm_rust::OfferSource::Self_)
             .target(cm_rust::OfferTarget::Collection(collection_name.parse().unwrap()))
             .build(),
     );
-    echo_client_decl.uses.push(
+    push_box(
+        &mut echo_client_decl.uses,
         UseBuilder::protocol()
             .name("fuchsia.component.Realm")
             .source(cm_rust::UseSource::Framework)
@@ -1716,7 +1724,8 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
     // We _can_ replace the realm's decl with a decl that references children added with the
     // 'add_child' calls, and thus don't yet have a valid ChildDecl in the manifest.
     let mut realm_decl = builder.get_realm_decl().await?;
-    realm_decl.exposes.push(
+    push_box(
+        &mut realm_decl.exposes,
         ExposeBuilder::protocol().name("fuchsia.examples.Echo").source_static_child("b").build(),
     );
     assert_matches!(builder.replace_realm_decl(realm_decl).await, Ok(()));

@@ -30,7 +30,7 @@ impl ConfigFields {
     pub fn resolve(
         decl: &ConfigDecl,
         base_values: ConfigValuesData,
-        parent_overrides: Option<&Vec<ConfigOverride>>,
+        parent_overrides: Option<&[ConfigOverride]>,
     ) -> Result<Self, ResolutionError> {
         // base values must have been packaged for the exact same layout as the decl contains
         if decl.checksum != base_values.checksum {
@@ -58,7 +58,9 @@ impl ConfigFields {
         }
 
         let mut resolved_fields = vec![];
-        for (decl_field, spec_field) in decl.fields.iter().zip(base_values.values.into_iter()) {
+        for (decl_field, spec_field) in
+            decl.fields.iter().zip(IntoIterator::into_iter(base_values.values))
+        {
             // see if the parent component provided a value
             let mut from_parent = None;
             if let Some(parent_overrides) = parent_overrides {
@@ -128,37 +130,37 @@ impl ConfigFields {
                     structure.field(Field::Vector(VectorField::UInt8Vector(s.into_bytes())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::BoolVector(b)) => {
-                    structure.field(Field::Vector(VectorField::BoolVector(b)))
+                    structure.field(Field::Vector(VectorField::BoolVector(b.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Uint8Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::UInt8Vector(n)))
+                    structure.field(Field::Vector(VectorField::UInt8Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Uint16Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::UInt16Vector(n)))
+                    structure.field(Field::Vector(VectorField::UInt16Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Uint32Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::UInt32Vector(n)))
+                    structure.field(Field::Vector(VectorField::UInt32Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Uint64Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::UInt64Vector(n)))
+                    structure.field(Field::Vector(VectorField::UInt64Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Int8Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::Int8Vector(n)))
+                    structure.field(Field::Vector(VectorField::Int8Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Int16Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::Int16Vector(n)))
+                    structure.field(Field::Vector(VectorField::Int16Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Int32Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::Int32Vector(n)))
+                    structure.field(Field::Vector(VectorField::Int32Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::Int64Vector(n)) => {
-                    structure.field(Field::Vector(VectorField::Int64Vector(n)))
+                    structure.field(Field::Vector(VectorField::Int64Vector(n.into())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::StringVector(s)) => {
                     structure.field(Field::Vector(
                         // TODO(https://fxbug.dev/42169377) improve string representation too
                         VectorField::UInt8VectorVector(
-                            s.into_iter().map(|s| s.into_bytes()).collect(),
+                            IntoIterator::into_iter(s).map(|s| s.into_bytes()).collect(),
                         ),
                     ))
                 }
@@ -374,16 +376,16 @@ mod tests {
             Single(Int32(-2000000000i32)),
             Single(Int64(-4000000000i64)),
             Single(String("hello, world!".into())),
-            Vector(BoolVector(vec![true, false])),
-            Vector(Uint8Vector(vec![1, 2, 3])),
-            Vector(Uint16Vector(vec![2, 3, 4])),
-            Vector(Uint32Vector(vec![3, 4, 5])),
-            Vector(Uint64Vector(vec![4, 5, 6])),
-            Vector(Int8Vector(vec![-1, -2, 3])),
-            Vector(Int16Vector(vec![-2, -3, 4])),
-            Vector(Int32Vector(vec![-3, -4, 5])),
-            Vector(Int64Vector(vec![-4, -5, 6])),
-            Vector(StringVector(vec!["valid".into(), "valid".into()])),
+            Vector(BoolVector(Box::from([true, false]))),
+            Vector(Uint8Vector(Box::from([1, 2, 3]))),
+            Vector(Uint16Vector(Box::from([2, 3, 4]))),
+            Vector(Uint32Vector(Box::from([3, 4, 5]))),
+            Vector(Uint64Vector(Box::from([4, 5, 6]))),
+            Vector(Int8Vector(Box::from([-1, -2, 3]))),
+            Vector(Int16Vector(Box::from([-2, -3, 4]))),
+            Vector(Int32Vector(Box::from([-3, -4, 5]))),
+            Vector(Int64Vector(Box::from([-4, -5, 6]))),
+            Vector(StringVector(Box::from(["valid".into(), "valid".into()]))),
         ];
 
         let resolved = ConfigFields::resolve(&decl, specs, None).unwrap();
@@ -443,52 +445,52 @@ mod tests {
                     },
                     ConfigField {
                         key: "my_vector_of_flag".to_string(),
-                        value: Vector(BoolVector(vec![true, false])),
+                        value: Vector(BoolVector(Box::from([true, false]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint8".to_string(),
-                        value: Vector(Uint8Vector(vec![1, 2, 3])),
+                        value: Vector(Uint8Vector(Box::from([1, 2, 3]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint16".to_string(),
-                        value: Vector(Uint16Vector(vec![2, 3, 4])),
+                        value: Vector(Uint16Vector(Box::from([2, 3, 4]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint32".to_string(),
-                        value: Vector(Uint32Vector(vec![3, 4, 5])),
+                        value: Vector(Uint32Vector(Box::from([3, 4, 5]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint64".to_string(),
-                        value: Vector(Uint64Vector(vec![4, 5, 6])),
+                        value: Vector(Uint64Vector(Box::from([4, 5, 6]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int8".to_string(),
-                        value: Vector(Int8Vector(vec![-1, -2, 3])),
+                        value: Vector(Int8Vector(Box::from([-1, -2, 3]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int16".to_string(),
-                        value: Vector(Int16Vector(vec![-2, -3, 4])),
+                        value: Vector(Int16Vector(Box::from([-2, -3, 4]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int32".to_string(),
-                        value: Vector(Int32Vector(vec![-3, -4, 5])),
+                        value: Vector(Int32Vector(Box::from([-3, -4, 5]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int64".to_string(),
-                        value: Vector(Int64Vector(vec![-4, -5, 6])),
+                        value: Vector(Int64Vector(Box::from([-4, -5, 6]))),
                         mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_string".to_string(),
-                        value: Vector(StringVector(vec!["valid".into(), "valid".into()])),
+                        value: Vector(StringVector(Box::from(["valid".into(), "valid".into()]))),
                         mutability: Default::default(),
                     },
                 ],
@@ -607,7 +609,7 @@ mod tests {
         };
         let specs = values_data! [
             ck@ decl.checksum.clone(),
-            ConfigValue::Vector(ConfigVectorValue::Uint8Vector(vec![1, 2, 3])),
+            ConfigValue::Vector(ConfigVectorValue::Uint8Vector(Box::from([1, 2, 3]))),
         ];
         assert_eq!(
             ConfigFields::resolve(&decl, specs, None).unwrap_err(),
@@ -626,10 +628,10 @@ mod tests {
         };
         let specs = values_data! [
             ck@ decl.checksum.clone(),
-            ConfigValue::Vector(ConfigVectorValue::StringVector(vec![
+            ConfigValue::Vector(ConfigVectorValue::StringVector(Box::from([
                 "valid".into(),
                 "invalid".into(),
-            ])),
+            ]))),
         ];
         assert_eq!(
             ConfigFields::resolve(&decl, specs, None).unwrap_err(),
@@ -648,7 +650,7 @@ mod tests {
         let overridden_key = "my_flag".to_string();
         let defaulted_key = "my_other_flag".to_string();
         let decl = cm_rust::ConfigDecl {
-            fields: vec![
+            fields: Box::from([
                 cm_rust::ConfigField {
                     key: overridden_key.clone(),
                     type_: cm_rust::ConfigValueType::Bool,
@@ -659,7 +661,7 @@ mod tests {
                     type_: cm_rust::ConfigValueType::Bool,
                     mutability: ConfigMutability::empty(),
                 },
-            ],
+            ]),
             checksum: ConfigChecksum::Sha256([0; 32]),
             value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
         };
@@ -697,11 +699,11 @@ mod tests {
     #[test]
     fn overrides_must_match_declared_fields() {
         let decl = cm_rust::ConfigDecl {
-            fields: vec![cm_rust::ConfigField {
+            fields: Box::from([cm_rust::ConfigField {
                 key: "my_flag".to_string(),
                 type_: cm_rust::ConfigValueType::Bool,
                 mutability: ConfigMutability::PARENT,
-            }],
+            }]),
             checksum: ConfigChecksum::Sha256([0; 32]),
             value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
         };
@@ -727,7 +729,7 @@ mod tests {
         let overridden_key = "my_flag".to_string();
         let defaulted_key = "my_other_flag".to_string();
         let decl = cm_rust::ConfigDecl {
-            fields: vec![
+            fields: Box::from([
                 cm_rust::ConfigField {
                     key: overridden_key.clone(),
                     type_: cm_rust::ConfigValueType::Bool,
@@ -739,7 +741,7 @@ mod tests {
                     type_: cm_rust::ConfigValueType::Bool,
                     mutability: ConfigMutability::PARENT,
                 },
-            ],
+            ]),
             checksum: ConfigChecksum::Sha256([0; 32]),
             value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
         };
@@ -763,11 +765,11 @@ mod tests {
     fn overrides_must_match_declared_type_exactly() {
         let overridden_key = "my_flag".to_string();
         let decl = cm_rust::ConfigDecl {
-            fields: vec![cm_rust::ConfigField {
+            fields: Box::from([cm_rust::ConfigField {
                 key: overridden_key.clone(),
                 type_: cm_rust::ConfigValueType::Bool,
                 mutability: ConfigMutability::PARENT,
-            }],
+            }]),
             checksum: ConfigChecksum::Sha256([0; 32]),
             value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
         };
@@ -813,16 +815,16 @@ mod tests {
                     Single(Int32(1)),
                     Single(Int64(1)),
                     Single(String("".to_string())),
-                    Vector(BoolVector(vec![])),
-                    Vector(Uint8Vector(vec![])),
-                    Vector(Uint16Vector(vec![])),
-                    Vector(Uint32Vector(vec![])),
-                    Vector(Uint64Vector(vec![])),
-                    Vector(Int8Vector(vec![])),
-                    Vector(Int16Vector(vec![])),
-                    Vector(Int32Vector(vec![])),
-                    Vector(Int64Vector(vec![])),
-                    Vector(StringVector(vec![])),
+                    Vector(BoolVector(Box::from([]))),
+                    Vector(Uint8Vector(Box::from([]))),
+                    Vector(Uint16Vector(Box::from([]))),
+                    Vector(Uint32Vector(Box::from([]))),
+                    Vector(Uint64Vector(Box::from([]))),
+                    Vector(Int8Vector(Box::from([]))),
+                    Vector(Int16Vector(Box::from([]))),
+                    Vector(Int32Vector(Box::from([]))),
+                    Vector(Int64Vector(Box::from([]))),
+                    Vector(StringVector(Box::from([]))),
                 ] {
                     let should_succeed = matches!(value, $valid_spec);
                     match ConfigField::resolve(value, &decl) {

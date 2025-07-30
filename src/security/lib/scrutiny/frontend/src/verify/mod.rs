@@ -152,7 +152,7 @@ mod tests {
     }
 
     fn new_component_decl(children: Vec<ChildDecl>) -> ComponentDecl {
-        ComponentDecl { children, ..Default::default() }
+        ComponentDecl { children: children.into(), ..Default::default() }
     }
 
     fn new_component_with_capabilities(
@@ -166,10 +166,10 @@ mod tests {
                 runner: Some("elf".parse().unwrap()),
                 ..Default::default()
             }),
-            uses,
-            offers,
-            capabilities,
-            children,
+            uses: uses.into(),
+            offers: offers.into(),
+            capabilities: capabilities.into(),
+            children: children.into(),
             ..Default::default()
         }
     }

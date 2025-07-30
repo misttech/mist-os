@@ -496,7 +496,7 @@ mod tests {
             panic!()
         }
 
-        fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
+        fn config_parent_overrides(&self) -> Option<&[cm_rust::ConfigOverride]> {
             panic!()
         }
 

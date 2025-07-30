@@ -43,11 +43,11 @@ mod tests {
                             .config_type(cm_rust::ConfigValueType::Int8),
                     )
                     .config(cm_rust::ConfigDecl {
-                        fields: vec![cm_rust::ConfigField {
+                        fields: Box::from([cm_rust::ConfigField {
                             key: "my_config".into(),
                             type_: cm_rust::ConfigValueType::Int8,
                             mutability: Default::default(),
-                        }],
+                        }]),
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                         value_source: cm_rust::ConfigValueSource::PackagePath("myfile".to_string()),
                     })
@@ -59,7 +59,7 @@ mod tests {
             .add_config(
                 "myfile",
                 ConfigValuesData {
-                    values: vec![cm_rust::ConfigValueSpec { value: package_value.into() }],
+                    values: Box::from([cm_rust::ConfigValueSpec { value: package_value.into() }]),
                     checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                 },
             )
@@ -85,11 +85,11 @@ mod tests {
                 "child",
                 ComponentDeclBuilder::new()
                     .config(cm_rust::ConfigDecl {
-                        fields: vec![cm_rust::ConfigField {
+                        fields: Box::from([cm_rust::ConfigField {
                             key: "my_config".into(),
                             type_: cm_rust::ConfigValueType::Int8,
                             mutability: Default::default(),
-                        }],
+                        }]),
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                         value_source: cm_rust::ConfigValueSource::PackagePath("myfile".to_string()),
                     })
@@ -101,7 +101,9 @@ mod tests {
             .add_config(
                 "myfile",
                 ConfigValuesData {
-                    values: vec![cm_rust::ConfigValueSpec { value: package_value.clone().into() }],
+                    values: Box::from([cm_rust::ConfigValueSpec {
+                        value: package_value.clone().into(),
+                    }]),
                     checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                 },
             )
@@ -140,7 +142,7 @@ mod tests {
                             .config_type(cm_rust::ConfigValueType::Int8),
                     )
                     .config(cm_rust::ConfigDecl {
-                        fields: vec![
+                        fields: Box::from([
                             cm_rust::ConfigField {
                                 key: "from_resolver".into(),
                                 type_: cm_rust::ConfigValueType::Int8,
@@ -151,7 +153,7 @@ mod tests {
                                 type_: cm_rust::ConfigValueType::Int8,
                                 mutability: Default::default(),
                             },
-                        ],
+                        ]),
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                         value_source: cm_rust::ConfigValueSource::PackagePath("myfile".to_string()),
                     })
@@ -163,10 +165,10 @@ mod tests {
             .add_config(
                 "myfile",
                 ConfigValuesData {
-                    values: vec![
+                    values: Box::from([
                         cm_rust::ConfigValueSpec { value: package_value.clone().into() },
                         cm_rust::ConfigValueSpec { value: package_value.clone().into() },
-                    ],
+                    ]),
                     checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                 },
             )
@@ -174,8 +176,8 @@ mod tests {
             .await;
         let config = start_component_get_config(&test, "/child").await;
         assert_eq!(
-            config.fields,
-            vec![
+            &*config.fields,
+            &[
                 config_encoder::ConfigField {
                     key: "from_resolver".to_string(),
                     value: package_value.into(),

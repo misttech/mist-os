@@ -5,6 +5,7 @@
 use crate::emulator::EMULATOR_ROOT_DRIVER_URL;
 use crate::host_realm::mpsc::Receiver;
 use anyhow::{format_err, Error};
+use cm_rust::push_box;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_bluetooth_host::{HostMarker, ReceiverMarker, ReceiverRequestStream};
 use fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy};
@@ -138,14 +139,17 @@ impl HostRealm {
 
         // Create bt-host collection
         let mut realm_decl = builder.get_realm_decl().await?;
-        realm_decl.collections.push(cm_rust::CollectionDecl {
-            name: BT_HOST_COLLECTION.parse().unwrap(),
-            durability: Durability::SingleRun,
-            environment: None,
-            allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
-            allow_long_names: false,
-            persistent_storage: None,
-        });
+        push_box(
+            &mut realm_decl.collections,
+            cm_rust::CollectionDecl {
+                name: BT_HOST_COLLECTION.parse().unwrap(),
+                durability: Durability::SingleRun,
+                environment: None,
+                allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
+                allow_long_names: false,
+                persistent_storage: None,
+            },
+        );
         builder.replace_realm_decl(realm_decl).await.unwrap();
 
         add_host_routes(&builder, Ref::collection(BT_HOST_COLLECTION.to_string())).await?;

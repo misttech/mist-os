@@ -1664,7 +1664,7 @@ mod tests {
                     .config_type(cm_rust::ConfigValueType::Uint8),
             )
             .config(cm_rust::ConfigDecl {
-                fields: Vec::new(),
+                fields: Box::from([]),
                 checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                 value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
             })
@@ -1781,7 +1781,7 @@ mod tests {
                     .config_type(cm_rust::ConfigValueType::Uint8),
             )
             .config(cm_rust::ConfigDecl {
-                fields: Vec::new(),
+                fields: Box::from([]),
                 checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                 value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
             })

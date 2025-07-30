@@ -17,6 +17,7 @@ use crate::test_suite::SuiteRealm;
 use crate::utilities::stream_fn;
 use crate::{diagnostics, facet, resolver};
 use anyhow::{anyhow, format_err, Context, Error};
+use cm_rust::push_box;
 use fidl::endpoints::{create_proxy, ClientEnd};
 use fidl_fuchsia_component_resolution::ResolverProxy;
 use fidl_fuchsia_pkg::PackageResolverProxy;
@@ -710,40 +711,49 @@ async fn get_realm(
             ChildOptions::new().eager(),
         )
         .await?;
+
     let mut debug_data_decl = wrapper_realm.get_component_decl(&debug_data).await?;
-    debug_data_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-        source: cm_rust::ExposeSource::Self_,
-        source_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
-        source_dictionary: Default::default(),
-        target: cm_rust::ExposeTarget::Parent,
-        target_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
-        availability: cm_rust::Availability::Required,
-    }));
-    debug_data_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
-        name: "fuchsia.debugdata.Publisher".parse().unwrap(),
-        source_path: Some("/svc/fuchsia.debugdata.Publisher".parse().unwrap()),
-        delivery: Default::default(),
-    }));
+    push_box(
+        &mut debug_data_decl.exposes,
+        cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
+            source: cm_rust::ExposeSource::Self_,
+            source_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
+            source_dictionary: Default::default(),
+            target: cm_rust::ExposeTarget::Parent,
+            target_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
+            availability: cm_rust::Availability::Required,
+        }),
+    );
+    push_box(
+        &mut debug_data_decl.capabilities,
+        cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
+            name: "fuchsia.debugdata.Publisher".parse().unwrap(),
+            source_path: Some("/svc/fuchsia.debugdata.Publisher".parse().unwrap()),
+            delivery: Default::default(),
+        }),
+    );
     wrapper_realm.replace_component_decl(&debug_data, debug_data_decl).await?;
 
     // Provide and expose the resolver capability from the resolver to test_wrapper.
     let mut hermetic_resolver_decl =
         wrapper_realm.get_component_decl(HERMETIC_RESOLVER_REALM_NAME).await?;
-    hermetic_resolver_decl.exposes.push(cm_rust::ExposeDecl::Resolver(
-        cm_rust::ExposeResolverDecl {
+    push_box(
+        &mut hermetic_resolver_decl.exposes,
+        cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
             source: cm_rust::ExposeSource::Self_,
             source_name: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
             source_dictionary: Default::default(),
             target: cm_rust::ExposeTarget::Parent,
             target_name: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
-        },
-    ));
-    hermetic_resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(
-        cm_rust::ResolverDecl {
+        }),
+    );
+    push_box(
+        &mut hermetic_resolver_decl.capabilities,
+        cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
             name: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
             source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
-        },
-    ));
+        }),
+    );
 
     wrapper_realm
         .replace_component_decl(HERMETIC_RESOLVER_REALM_NAME, hermetic_resolver_decl)
@@ -755,51 +765,61 @@ async fn get_realm(
 
     // Create the hermetic environment in the test_wrapper.
     let mut test_wrapper_decl = wrapper_realm.get_realm_decl().await?;
-    test_wrapper_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: TEST_ENVIRONMENT_NAME.parse().unwrap(),
-        extends: fdecl::EnvironmentExtends::Realm,
-        resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
-            source: cm_rust::RegistrationSource::Child(String::from(
-                HERMETIC_RESOLVER_CAPABILITY_NAME,
-            )),
-            scheme: String::from("fuchsia-pkg"),
-        }],
-        runners: vec![],
-        debug_capabilities: vec![cm_rust::DebugRegistration::Protocol(
-            cm_rust::DebugProtocolRegistration {
-                source_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
-                source: cm_rust::RegistrationSource::Child(DEBUG_DATA_REALM_NAME.to_string()),
-                target_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
-            },
-        )],
-        stop_timeout_ms: None,
-    });
+    push_box(
+        &mut test_wrapper_decl.environments,
+        cm_rust::EnvironmentDecl {
+            name: TEST_ENVIRONMENT_NAME.parse().unwrap(),
+            extends: fdecl::EnvironmentExtends::Realm,
+            resolvers: Box::from([cm_rust::ResolverRegistration {
+                resolver: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
+                source: cm_rust::RegistrationSource::Child(String::from(
+                    HERMETIC_RESOLVER_CAPABILITY_NAME,
+                )),
+                scheme: String::from("fuchsia-pkg"),
+            }]),
+            runners: Box::from([]),
+            debug_capabilities: Box::from([cm_rust::DebugRegistration::Protocol(
+                cm_rust::DebugProtocolRegistration {
+                    source_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
+                    source: cm_rust::RegistrationSource::Child(DEBUG_DATA_REALM_NAME.to_string()),
+                    target_name: "fuchsia.debugdata.Publisher".parse().unwrap(),
+                },
+            )]),
+            stop_timeout_ms: None,
+        },
+    );
 
     // Add the collection to hold the test. This lets us individually destroy the test.
-    test_wrapper_decl.collections.push(cm_rust::CollectionDecl {
-        name: TEST_ROOT_COLLECTION.parse().unwrap(),
-        durability: fdecl::Durability::Transient,
-        environment: Some(TEST_ENVIRONMENT_NAME.parse().unwrap()),
-        allowed_offers: cm_types::AllowedOffers::StaticOnly,
-        allow_long_names: false,
-        persistent_storage: None,
-    });
+    push_box(
+        &mut test_wrapper_decl.collections,
+        cm_rust::CollectionDecl {
+            name: TEST_ROOT_COLLECTION.parse().unwrap(),
+            durability: fdecl::Durability::Transient,
+            environment: Some(TEST_ENVIRONMENT_NAME.parse().unwrap()),
+            allowed_offers: cm_types::AllowedOffers::StaticOnly,
+            allow_long_names: false,
+            persistent_storage: None,
+        },
+    );
 
-    test_wrapper_decl.capabilities.push(cm_rust::CapabilityDecl::Storage(cm_rust::StorageDecl {
-        name: CUSTOM_ARTIFACTS_CAPABILITY_NAME.parse().unwrap(),
-        source: cm_rust::StorageDirectorySource::Child(MEMFS_REALM_NAME.to_string()),
-        backing_dir: "memfs".parse().unwrap(),
-        subdir: "custom_artifacts".parse().unwrap(),
-        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-    }));
+    push_box(
+        &mut test_wrapper_decl.capabilities,
+        cm_rust::CapabilityDecl::Storage(cm_rust::StorageDecl {
+            name: CUSTOM_ARTIFACTS_CAPABILITY_NAME.parse().unwrap(),
+            source: cm_rust::StorageDirectorySource::Child(MEMFS_REALM_NAME.to_string()),
+            backing_dir: "memfs".parse().unwrap(),
+            subdir: "custom_artifacts".parse().unwrap(),
+            storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
+        }),
+    );
 
-    test_wrapper_decl.capabilities.push(cm_rust::CapabilityDecl::Dictionary(
-        cm_rust::DictionaryDecl {
+    push_box(
+        &mut test_wrapper_decl.capabilities,
+        cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
             name: DIAGNOSTICS_DICTIONARY_NAME.parse().unwrap(),
             source_path: None,
-        },
-    ));
+        }),
+    );
 
     wrapper_realm.replace_realm_decl(test_wrapper_decl).await?;
 

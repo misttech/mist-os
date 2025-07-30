@@ -78,34 +78,34 @@ fn json_value_from_config_value(v: cm_rust::ConfigValue) -> serde_json::Value {
         },
         cm_rust::ConfigValue::Vector(v) => match v {
             cm_rust::ConfigVectorValue::BoolVector(bv) => serde_json::Value::Array(
-                bv.into_iter().map(|b| serde_json::Value::Bool(b)).collect(),
+                IntoIterator::into_iter(bv).map(|b| serde_json::Value::Bool(b)).collect(),
             ),
             cm_rust::ConfigVectorValue::Uint8Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::Uint16Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::Uint32Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::Uint64Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::Int8Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::Int16Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::Int32Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::Int64Vector(nv) => serde_json::Value::Array(
-                nv.into_iter().map(|n| serde_json::Value::Number(n.into())).collect(),
+                IntoIterator::into_iter(nv).map(|n| serde_json::Value::Number(n.into())).collect(),
             ),
             cm_rust::ConfigVectorValue::StringVector(sv) => serde_json::Value::Array(
-                sv.into_iter().map(|s| serde_json::Value::String(s)).collect(),
+                IntoIterator::into_iter(sv).map(|s| serde_json::Value::String(s)).collect(),
             ),
         },
     }

@@ -258,10 +258,12 @@ enum WrapperType {
     Option,
     /// The type is Vec<T>.
     Vec,
+    /// The type is Box<[T]>.
+    BoxArray,
 }
 
 /// Finds the wrapper type for the given type. This is used to find out whether the
-/// type is an Option<T>, Vec<T>, or just T.
+/// type is an Option<T>, Vec<T>, Box<[T]>, or just T.
 /// This is NOT fool-proof. If the type appears as std::vec::Vec<T> for instance, it
 /// won't be recognized. That is one of the reasons this macro is not exported beyond
 /// `cm_rust`.
@@ -276,6 +278,8 @@ fn wrapper_type(ty: &Type) -> WrapperType {
                             return WrapperType::Option;
                         } else if segment.ident == "Vec" {
                             return WrapperType::Vec;
+                        } else if segment.ident == "Box" {
+                            return WrapperType::BoxArray;
                         }
                     }
                 }
@@ -362,6 +366,27 @@ fn generate_struct(struct_ident: Ident, fidl_type: Type, fields: Vec<StructField
             }
             (WrapperType::Vec, _) => {
                 panic!("fidl_decl(default) attribute cannot be used with Vec types")
+            }
+            (WrapperType::BoxArray, DefaultOption::Off) => {
+                fidl_into_native_lines.push(quote_spanned! {field_ident.span()=>
+                    #field_ident: self
+                        .#field_ident
+                        .into_iter()
+                        .map(std::iter::IntoIterator::into_iter)
+                        .flatten()
+                        .map(FidlIntoNative::fidl_into_native).
+                        collect()
+                });
+                native_into_fidl_lines.push(quote_spanned! {field_ident.span()=>
+                    #field_ident: if self.#field_ident.is_empty() {
+                        None
+                    } else {
+                        Some(std::iter::IntoIterator::into_iter(self.#field_ident).map(NativeIntoFidl::native_into_fidl).collect())
+                    }
+                });
+            }
+            (WrapperType::BoxArray, _) => {
+                panic!("fidl_decl(default) attribute cannot be used with Box<[T]> types")
             }
         }
     }

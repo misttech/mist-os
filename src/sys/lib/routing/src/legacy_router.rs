@@ -231,7 +231,7 @@ where
             let mut seen_instances: HashSet<Name> = HashSet::new();
             for o in offers.iter() {
                 if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
-                    match offer_service_decl.source_instance_filter {
+                    match offer_service_decl.source_instance_filter.as_ref() {
                         None => {
                             return Err(RoutingError::unsupported_route_source(
                                 aggregation_component.moniker().clone(),
@@ -240,7 +240,7 @@ where
                             ));
                         }
                         Some(allowed_instances) => {
-                            for instance in allowed_instances.iter() {
+                            for instance in allowed_instances {
                                 if !seen_instances.insert(instance.clone()) {
                                     return Err(RoutingError::unsupported_route_source(
                                         aggregation_component.moniker().clone(),
@@ -1556,7 +1556,7 @@ pub fn find_matching_offers(
     capability_type: CapabilityTypeName,
     source_name: &Name,
     child_moniker: &BorrowedChildName,
-    offers: &Vec<OfferDecl>,
+    offers: &[OfferDecl],
 ) -> Option<RouteBundle<OfferDecl>> {
     let offers: Vec<_> = offers
         .iter()
@@ -1576,7 +1576,7 @@ pub fn find_matching_offers(
 pub fn find_matching_exposes(
     capability_type: CapabilityTypeName,
     source_name: &Name,
-    exposes: &Vec<ExposeDecl>,
+    exposes: &[ExposeDecl],
 ) -> Option<RouteBundle<ExposeDecl>> {
     let exposes: Vec<_> = exposes
         .iter()

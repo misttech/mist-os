@@ -41,7 +41,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     fn environment(&self) -> &environment::Environment<Self>;
 
     /// Returns configuration overrides applied to this component by its parent.
-    fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>>;
+    fn config_parent_overrides(&self) -> Option<&[cm_rust::ConfigOverride]>;
 
     /// Returns the `GlobalPolicyChecker` for this component instance.
     fn policy_checker(&self) -> &GlobalPolicyChecker;
@@ -142,19 +142,19 @@ pub trait ResolvedInstanceInterface: Send + Sync {
     type Component;
 
     /// Current view of this component's `uses` declarations.
-    fn uses(&self) -> Vec<UseDecl>;
+    fn uses(&self) -> Box<[UseDecl]>;
 
     /// Current view of this component's `exposes` declarations.
-    fn exposes(&self) -> Vec<ExposeDecl>;
+    fn exposes(&self) -> Box<[ExposeDecl]>;
 
     /// Current view of this component's `offers` declarations.
-    fn offers(&self) -> Vec<OfferDecl>;
+    fn offers(&self) -> Box<[OfferDecl]>;
 
     /// Current view of this component's `capabilities` declarations.
-    fn capabilities(&self) -> Vec<CapabilityDecl>;
+    fn capabilities(&self) -> Box<[CapabilityDecl]>;
 
     /// Current view of this component's `collections` declarations.
-    fn collections(&self) -> Vec<CollectionDecl>;
+    fn collections(&self) -> Box<[CollectionDecl]>;
 
     /// Returns a live child of this instance.
     fn get_child(&self, moniker: &BorrowedChildName) -> Option<Arc<Self::Component>>;
@@ -193,13 +193,12 @@ pub trait ResolvedInstanceInterfaceExt: ResolvedInstanceInterface {
                 };
                 self.get_child(&child_moniker).is_some()
             }
-            OfferSource::Collection(collection_name) => {
-                self.collections().into_iter().any(|collection| collection.name == *collection_name)
+            OfferSource::Collection(collection_name) => IntoIterator::into_iter(self.collections())
+                .any(|collection| collection.name == *collection_name),
+            OfferSource::Capability(capability_name) => {
+                IntoIterator::into_iter(self.capabilities())
+                    .any(|capability| capability.name() == capability_name)
             }
-            OfferSource::Capability(capability_name) => self
-                .capabilities()
-                .into_iter()
-                .any(|capability| capability.name() == capability_name),
         }
     }
 }
@@ -218,23 +217,23 @@ where
 {
     type Component = <T::Target as ResolvedInstanceInterface>::Component;
 
-    fn uses(&self) -> Vec<UseDecl> {
+    fn uses(&self) -> Box<[UseDecl]> {
         T::Target::uses(&*self)
     }
 
-    fn exposes(&self) -> Vec<ExposeDecl> {
+    fn exposes(&self) -> Box<[ExposeDecl]> {
         T::Target::exposes(&*self)
     }
 
-    fn offers(&self) -> Vec<cm_rust::OfferDecl> {
+    fn offers(&self) -> Box<[cm_rust::OfferDecl]> {
         T::Target::offers(&*self)
     }
 
-    fn capabilities(&self) -> Vec<cm_rust::CapabilityDecl> {
+    fn capabilities(&self) -> Box<[cm_rust::CapabilityDecl]> {
         T::Target::capabilities(&*self)
     }
 
-    fn collections(&self) -> Vec<cm_rust::CollectionDecl> {
+    fn collections(&self) -> Box<[cm_rust::CollectionDecl]> {
         T::Target::collections(&*self)
     }
 
@@ -441,7 +440,7 @@ pub mod tests {
             todo!()
         }
 
-        fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
+        fn config_parent_overrides(&self) -> Option<&[cm_rust::ConfigOverride]> {
             todo!()
         }
 

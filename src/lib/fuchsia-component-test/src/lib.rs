@@ -3811,13 +3811,13 @@ mod tests {
             .add_environment(cm_rust::EnvironmentDecl {
                 name: "driver-host-env".parse().unwrap(),
                 extends: fdecl::EnvironmentExtends::Realm,
-                runners: vec![],
-                resolvers: vec![cm_rust::ResolverRegistration {
+                runners: Box::from([]),
+                resolvers: Box::from([cm_rust::ResolverRegistration {
                     resolver: "boot-resolver".parse().unwrap(),
                     source: cm_rust::RegistrationSource::Child("fake-resolver".to_string()),
                     scheme: "fuchsia-boot".to_string(),
-                }],
-                debug_capabilities: vec![],
+                }]),
+                debug_capabilities: Box::from([]),
                 stop_timeout_ms: Some(20000),
             })
             .await

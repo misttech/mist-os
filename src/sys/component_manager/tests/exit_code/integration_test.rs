@@ -49,14 +49,14 @@ async fn build_program(exit_code: i64) -> RealmInstance {
                     },
                     ..Default::default()
                 }),
-                exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
+                exposes: Box::from([cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Framework,
                     source_name: fcomponent::BinderMarker::PROTOCOL_NAME.parse().unwrap(),
                     source_dictionary: Default::default(),
                     target: cm_rust::ExposeTarget::Parent,
                     target_name: "exit_with_code_binder".parse().unwrap(),
                     availability: Default::default(),
-                })],
+                })]),
                 ..Default::default()
             },
             ChildOptions::new().environment("elf-env"),

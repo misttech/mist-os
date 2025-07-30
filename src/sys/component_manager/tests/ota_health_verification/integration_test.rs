@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use cm_rust::push_box;
 use cm_types::{Name, RelativePath};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fuchsia_component::server as fserver;
@@ -95,25 +96,31 @@ async fn add_health_check_expose(
     component: &ChildRef,
 ) -> Result<(), Error> {
     let mut decl = builder.get_component_decl(component).await?;
-    decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
-        name: Name::new(fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME).unwrap(),
-        source_path: Some(
-            cm_types::Path::new(format!(
-                "/svc/{}",
-                fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME
-            ))
-            .unwrap(),
-        ),
-        delivery: cm_rust::DeliveryType::Immediate,
-    }));
-    decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-        source: cm_rust::ExposeSource::Self_,
-        source_name: Name::new(fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME).unwrap(),
-        source_dictionary: RelativePath::dot(),
-        target: cm_rust::ExposeTarget::Framework,
-        target_name: Name::new(fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME).unwrap(),
-        availability: cm_rust::Availability::Required,
-    }));
+    push_box(
+        &mut decl.capabilities,
+        cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
+            name: Name::new(fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME).unwrap(),
+            source_path: Some(
+                cm_types::Path::new(format!(
+                    "/svc/{}",
+                    fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME
+                ))
+                .unwrap(),
+            ),
+            delivery: cm_rust::DeliveryType::Immediate,
+        }),
+    );
+    push_box(
+        &mut decl.exposes,
+        cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
+            source: cm_rust::ExposeSource::Self_,
+            source_name: Name::new(fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME).unwrap(),
+            source_dictionary: RelativePath::dot(),
+            target: cm_rust::ExposeTarget::Framework,
+            target_name: Name::new(fupdate::ComponentOtaHealthCheckMarker::PROTOCOL_NAME).unwrap(),
+            availability: cm_rust::Availability::Required,
+        }),
+    );
     builder.replace_component_decl(component, decl).await?;
     Ok(())
 }

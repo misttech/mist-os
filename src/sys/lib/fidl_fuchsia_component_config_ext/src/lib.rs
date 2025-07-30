@@ -110,7 +110,7 @@ macro_rules! config_decl {
             });
         )*
         cm_rust::ConfigDecl {
-            fields,
+            fields: fields.into(),
             checksum: $checksum,
             value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
         }
@@ -128,7 +128,7 @@ macro_rules! values_data {
             });
         )*
         cm_rust::ConfigValuesData {
-            values,
+            values: values.into(),
             checksum: $checksum
         }
     }};

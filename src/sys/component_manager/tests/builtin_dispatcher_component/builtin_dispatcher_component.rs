@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use cm_rust::push_box;
 use cm_types::Name;
 use component_events::events::{Destroyed, Event, EventStream, Started};
 use component_events::matcher::EventMatcher;
@@ -64,14 +65,17 @@ async fn get_worker_url() -> (String, fuchsia_async::Task<()>) {
         .await
         .unwrap();
     let mut child_decl = builder.get_component_decl(&child).await.unwrap();
-    child_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-        source: cm_rust::UseSource::Parent,
-        source_name: cm_types::Name::new(fecho::EchoMarker::PROTOCOL_NAME).unwrap(),
-        source_dictionary: cm_types::RelativePath::dot(),
-        target_path: format!("/svc/{}", fecho::EchoMarker::PROTOCOL_NAME).parse().unwrap(),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
+    push_box(
+        &mut child_decl.uses,
+        cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
+            source: cm_rust::UseSource::Parent,
+            source_name: cm_types::Name::new(fecho::EchoMarker::PROTOCOL_NAME).unwrap(),
+            source_dictionary: cm_types::RelativePath::dot(),
+            target_path: format!("/svc/{}", fecho::EchoMarker::PROTOCOL_NAME).parse().unwrap(),
+            dependency_type: cm_rust::DependencyType::Strong,
+            availability: cm_rust::Availability::Required,
+        }),
+    );
     builder.replace_realm_decl(child_decl).await.unwrap();
     builder
         .add_capability(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {

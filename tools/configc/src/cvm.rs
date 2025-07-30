@@ -71,8 +71,8 @@ impl GenerateValueManifest {
                     value: config_value,
                 }))
             })
-            .collect::<Result<Vec<cm_rust::CapabilityDecl>, _>>()?;
-        let exposes: Vec<_> = capabilities
+            .collect::<Result<Box<[cm_rust::CapabilityDecl]>, _>>()?;
+        let exposes: Box<[_]> = capabilities
             .iter()
             .map(|cap| {
                 let cm_rust::CapabilityDecl::Config(config) = cap else {
@@ -89,11 +89,7 @@ impl GenerateValueManifest {
             })
             .collect();
 
-        let new_component = cm_rust::ComponentDecl {
-            capabilities: capabilities,
-            exposes: exposes,
-            ..Default::default()
-        };
+        let new_component = cm_rust::ComponentDecl { capabilities, exposes, ..Default::default() };
         let new_component = new_component.native_into_fidl();
         let encoded_output = persist(&new_component).context("encoding value file")?;
 

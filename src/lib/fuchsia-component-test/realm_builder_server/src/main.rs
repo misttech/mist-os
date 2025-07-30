@@ -4,10 +4,10 @@
 
 use anyhow::Context;
 use cm_rust::{
-    Availability, CapabilityDecl, CapabilityTypeName, DependencyType, DirectoryDecl, ExposeDecl,
-    ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget,
-    FidlIntoNative, NativeIntoFidl, OfferDecl, OfferDeclCommon, OfferSource, ProtocolDecl,
-    SourceName, UseDecl, UseProtocolDecl, UseSource,
+    append_box, push_box, Availability, CapabilityDecl, CapabilityTypeName, DependencyType,
+    DirectoryDecl, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl,
+    ExposeSource, ExposeTarget, FidlIntoNative, NativeIntoFidl, OfferDecl, OfferDeclCommon,
+    OfferSource, ProtocolDecl, SourceName, UseDecl, UseProtocolDecl, UseSource,
 };
 use cm_types::{LongName, Path, RelativePath};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd};
@@ -19,6 +19,7 @@ use futures::lock::Mutex;
 use futures::{join, FutureExt, StreamExt, TryStreamExt};
 use log::*;
 use std::collections::HashMap;
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1070,29 +1071,32 @@ impl RealmNodeState {
     ) -> Result<(), RealmBuilderError> {
         // TODO(https://fxbug.dev/42053123): Validate overrides in cm_fidl_validator before
         // converting them to cm_rust.
-        let config_overrides: Option<Vec<_>> = child_options
+        let config_overrides: Option<Box<[_]>> = child_options
             .config_overrides
             .map(|c| c.into_iter().map(|o| o.fidl_into_native()).collect());
 
-        self.decl.children.push(cm_rust::ChildDecl {
-            name: child_name,
-            url: child_url.parse().map_err(|_| RealmBuilderError::UrlInvalid)?,
-            startup: match child_options.startup {
-                Some(fcdecl::StartupMode::Lazy) => fcdecl::StartupMode::Lazy,
-                Some(fcdecl::StartupMode::Eager) => fcdecl::StartupMode::Eager,
-                None => fcdecl::StartupMode::Lazy,
+        push_box(
+            &mut self.decl.children,
+            cm_rust::ChildDecl {
+                name: child_name,
+                url: child_url.parse().map_err(|_| RealmBuilderError::UrlInvalid)?,
+                startup: match child_options.startup {
+                    Some(fcdecl::StartupMode::Lazy) => fcdecl::StartupMode::Lazy,
+                    Some(fcdecl::StartupMode::Eager) => fcdecl::StartupMode::Eager,
+                    None => fcdecl::StartupMode::Lazy,
+                },
+                environment: child_options
+                    .environment
+                    .map(|e| e.parse().map_err(|_| RealmBuilderError::EnvironmentNameInvalid))
+                    .transpose()?,
+                on_terminate: match child_options.on_terminate {
+                    Some(fcdecl::OnTerminate::None) => Some(fcdecl::OnTerminate::None),
+                    Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
+                    None => None,
+                },
+                config_overrides,
             },
-            environment: child_options
-                .environment
-                .map(|e| e.parse().map_err(|_| RealmBuilderError::EnvironmentNameInvalid))
-                .transpose()?,
-            on_terminate: match child_options.on_terminate {
-                Some(fcdecl::OnTerminate::None) => Some(fcdecl::OnTerminate::None),
-                Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
-                None => None,
-            },
-            config_overrides,
-        });
+        );
         Ok(())
     }
 
@@ -1151,7 +1155,7 @@ impl RealmNodeState {
                     }
                 };
 
-                self.decl.offers.push(decl);
+                push_box(&mut self.decl.offers, decl);
             }
         }
     }
@@ -1319,10 +1323,10 @@ impl RealmNode2 {
             self_.component_loaded_from_pkg = true;
             let mut state_guard = self_.state.lock().await;
 
-            let children = state_guard.decl.children.drain(..).collect::<Vec<_>>();
+            let children = mem::replace(&mut state_guard.decl.children, Box::from([]));
             for child in children {
                 if !is_fragment_only_url(child.url.as_str()) {
-                    state_guard.decl.children.push(child);
+                    push_box(&mut state_guard.decl.children, child);
                 } else {
                     let child_node =
                         RealmNode2::load_from_pkg(child.url.as_str(), Clone::clone(&test_pkg_dir))
@@ -1330,9 +1334,9 @@ impl RealmNode2 {
 
                     // TODO(https://fxbug.dev/42053123): Validate overrides in cm_fidl_validator before
                     // converting them to cm_rust.
-                    let config_overrides: Option<Vec<_>> = child
-                        .config_overrides
-                        .map(|c| c.into_iter().map(|o| o.native_into_fidl()).collect());
+                    let config_overrides: Option<Vec<_>> = child.config_overrides.map(|c| {
+                        IntoIterator::into_iter(c).map(|o| o.native_into_fidl()).collect()
+                    });
 
                     let child_options = ftest::ChildOptions {
                         startup: match child.startup {
@@ -1377,17 +1381,14 @@ impl RealmNode2 {
         capability: fcdecl::Capability,
     ) -> Result<(), RealmBuilderError> {
         let mut state_guard = self.state.lock().await;
-        let mut capabilities: Vec<_> = state_guard
-            .decl
-            .capabilities
-            .clone()
-            .into_iter()
-            .map(|c| c.native_into_fidl())
-            .collect();
+        let mut capabilities: Vec<_> =
+            IntoIterator::into_iter(state_guard.decl.capabilities.clone())
+                .map(|c| c.native_into_fidl())
+                .collect();
         capabilities.push(capability.clone());
         cm_fidl_validator::validate_namespace_capabilities(&capabilities)
             .map_err(|e| RealmBuilderError::CapabilityInvalid(anyhow::anyhow!(e)))?;
-        push_if_not_present(&mut state_guard.decl.capabilities, capability.fidl_into_native());
+        push_if_not_present_box(&mut state_guard.decl.capabilities, capability.fidl_into_native());
         Ok(())
     }
 
@@ -1397,7 +1398,7 @@ impl RealmNode2 {
         collection: fcdecl::Collection,
     ) -> Result<(), RealmBuilderError> {
         let mut state_guard = self.state.lock().await;
-        push_if_not_present(&mut state_guard.decl.collections, collection.fidl_into_native());
+        push_if_not_present_box(&mut state_guard.decl.collections, collection.fidl_into_native());
         Ok(())
     }
 
@@ -1407,7 +1408,7 @@ impl RealmNode2 {
         environment: fcdecl::Environment,
     ) -> Result<(), RealmBuilderError> {
         let mut state_guard = self.state.lock().await;
-        push_if_not_present(&mut state_guard.decl.environments, environment.fidl_into_native());
+        push_if_not_present_box(&mut state_guard.decl.environments, environment.fidl_into_native());
         Ok(())
     }
 
@@ -1496,13 +1497,13 @@ impl RealmNode2 {
                     }
                     let decl =
                         create_expose_decl(capability.clone(), from.clone(), ExposingIn::Realm)?;
-                    push_if_not_present(&mut state_guard.decl.exposes, decl);
+                    push_if_not_present_box(&mut state_guard.decl.exposes, decl);
                 } else if matches!(target, fcdecl::Ref::Self_(_)) {
                     let decl = create_use_decl(capability.clone(), from.clone())?;
-                    push_if_not_present(&mut state_guard.decl.uses, decl);
+                    push_if_not_present_box(&mut state_guard.decl.uses, decl);
                 } else {
                     let decl = create_offer_decl(capability.clone(), from.clone(), target.clone())?;
-                    push_if_not_present(&mut state_guard.decl.offers, decl);
+                    push_if_not_present_box(&mut state_guard.decl.offers, decl);
                 }
 
                 let () = add_use_decl_if_needed(
@@ -1547,7 +1548,7 @@ impl RealmNode2 {
                     .iter()
                     .any(|d| d.target_name().as_str() == fcomponent::BinderMarker::DEBUG_NAME)
                 {
-                    state_guard.decl.exposes.push(BINDER_EXPOSE_DECL.clone());
+                    push_box(&mut state_guard.decl.exposes, BINDER_EXPOSE_DECL.clone());
                 }
             }
 
@@ -1740,8 +1741,8 @@ async fn nested_component_manager_decl(
         component_manager_decl = cm_rust::ComponentDecl::default();
         component_manager_children = MutableChildMap::default();
         let mut state = tmp_node.state.lock().await;
-        std::mem::swap(&mut component_manager_decl, &mut state.decl);
-        std::mem::swap(&mut component_manager_children, &mut state.mutable_children);
+        mem::swap(&mut component_manager_decl, &mut state.decl);
+        mem::swap(&mut component_manager_children, &mut state.mutable_children);
     }
     match **component_manager_decl
             .program
@@ -1759,9 +1760,9 @@ async fn nested_component_manager_decl(
                 fdata::DictionaryValue::StrVec(ref mut v) => v.push(root_url.into()),
                 _ => panic!("component manager's manifest has a single value for 'args', but we were expecting a vector"),
         }
-    component_manager_decl.capabilities.append(&mut passthrough_cap_decls.clone());
-    component_manager_decl.exposes.append(&mut passthrough_expose_decls.clone());
-    component_manager_decl.uses.append(&mut passthrough_use_decls.clone());
+    append_box(&mut component_manager_decl.capabilities, &mut passthrough_cap_decls.clone());
+    append_box(&mut component_manager_decl.exposes, &mut passthrough_expose_decls.clone());
+    append_box(&mut component_manager_decl.uses, &mut passthrough_use_decls.clone());
     Ok((component_manager_decl, component_manager_children))
 }
 
@@ -1819,7 +1820,7 @@ async fn add_use_decl_if_needed(
                     )));
                 }
             }
-            push_if_not_present(
+            push_if_not_present_box(
                 &mut decl.uses,
                 create_use_decl(capability, fcdecl::Ref::Parent(fcdecl::ParentRef {}))?,
             );
@@ -1895,11 +1896,11 @@ async fn add_expose_decl_if_needed(
                     return Ok(());
                 }
             }
-            push_if_not_present(
+            push_if_not_present_box(
                 &mut decl.capabilities,
                 create_capability_decl(capability.clone())?,
             );
-            push_if_not_present(
+            push_if_not_present_box(
                 &mut decl.exposes,
                 create_expose_decl(
                     capability,
@@ -2559,9 +2560,9 @@ fn contains_child(realm: &RealmNodeState, ref_: &fcdecl::Ref) -> bool {
     }
 }
 
-fn push_if_not_present<T: PartialEq>(container: &mut Vec<T>, value: T) {
+fn push_if_not_present_box<T: PartialEq>(container: &mut Box<[T]>, value: T) {
     if !container.contains(&value) {
-        container.push(value);
+        push_box(container, value)
     }
 }
 
@@ -2826,11 +2827,11 @@ mod tests {
                 };
 
                 let mut self_ = ComponentTree { decl: decl_from_resolver, children: vec![] };
-                let children = self_.decl.children.drain(..).collect::<Vec<_>>();
+                let children = mem::replace(&mut self_.decl.children, Box::from([]));
                 for child in children {
                     match Self::new_from_resolver(child.url.as_str(), registry.clone()).await {
                         None => {
-                            self_.decl.children.push(child);
+                            push_box(&mut self_.decl.children, child);
                         }
                         Some(child_tree) => {
                             let child_options = ftest::ChildOptions {
@@ -2865,7 +2866,7 @@ mod tests {
 
         // Adds the `BINDER_EXPOSE_DECL` to the root component in the tree
         fn add_binder_expose(&mut self) {
-            self.decl.exposes.push(BINDER_EXPOSE_DECL.clone());
+            push_box(&mut self.decl.exposes, BINDER_EXPOSE_DECL.clone());
         }
 
         fn add_recursive_automatic_decls(&mut self) {
@@ -2887,21 +2888,19 @@ mod tests {
 
             for child in &self.decl.children {
                 for (kind, capability) in &*CAPABILITIES_ROUTED_TO_ALL {
-                    self.decl.offers.push(create_offer_decl(
-                        *kind,
-                        child.name.as_ref(),
-                        capability.clone(),
-                    ));
+                    push_box(
+                        &mut self.decl.offers,
+                        create_offer_decl(*kind, child.name.as_ref(), capability.clone()),
+                    );
                 }
             }
 
             for (child_name, _, _) in &self.children {
                 for (kind, capability) in &*CAPABILITIES_ROUTED_TO_ALL {
-                    self.decl.offers.push(create_offer_decl(
-                        *kind,
-                        child_name.as_ref(),
-                        capability.clone(),
-                    ));
+                    push_box(
+                        &mut self.decl.offers,
+                        create_offer_decl(*kind, child_name.as_ref(), capability.clone()),
+                    );
                 }
             }
 
@@ -3297,7 +3296,7 @@ mod tests {
     async fn build_realm_with_child_decl() {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
-                children: vec![ChildBuilder::new().name("a").build()],
+                children: Box::from([ChildBuilder::new().name("a").build()]),
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![],
@@ -3326,7 +3325,7 @@ mod tests {
     async fn build_realm_with_child_decl_and_mutable_child() {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
-                children: vec![ChildBuilder::new().name("a").build()],
+                children: Box::from([ChildBuilder::new().name("a").build()]),
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
@@ -3686,8 +3685,9 @@ mod tests {
                 .fidl_into_native();
 
         // The "a" child is rewritten by realm builder
-        realm_with_child_decl.children =
-            realm_with_child_decl.children.into_iter().filter(|c| c.name.as_str() != "a").collect();
+        realm_with_child_decl.children = IntoIterator::into_iter(realm_with_child_decl.children)
+            .filter(|c| c.name.as_str() != "a")
+            .collect();
 
         let a_decl_file =
             fuchsia_fs::file::open_in_namespace("/pkg/meta/a.cm", fuchsia_fs::PERM_READABLE)
@@ -4873,7 +4873,7 @@ mod tests {
             .expect("failed to call get_component_decl")
             .expect("get_component_decl returned an error")
             .fidl_into_native();
-        a_decl.uses.push(UseBuilder::protocol().name("example.Hippo").build());
+        push_box(&mut a_decl.uses, UseBuilder::protocol().name("example.Hippo").build());
         realm_and_builder_task
             .realm_proxy
             .replace_component_decl("a", &a_decl.clone().native_into_fidl())

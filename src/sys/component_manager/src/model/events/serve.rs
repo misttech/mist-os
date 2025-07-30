@@ -66,11 +66,11 @@ fn is_moniker_valid_within_scope(moniker: &ExtendedMoniker, route: &[ComponentEv
 
 // Returns true if the filter contains a specific Ref
 fn event_filter_contains_ref(
-    filter: &Option<Vec<EventScope>>,
+    filter: Option<&Box<[EventScope]>>,
     name: &BorrowedLongName,
     collection: Option<&BorrowedName>,
 ) -> bool {
-    filter.as_ref().map_or(true, |value| {
+    filter.map_or(true, |value| {
         value
             .iter()
             .map(|value| match value {
@@ -103,8 +103,11 @@ fn validate_component_instance(
     let mut active_scope = iter.next().unwrap().scope.clone();
     for component in iter {
         if let Some(event_part) = event_iter.next() {
-            if !event_filter_contains_ref(&active_scope, event_part.name(), event_part.collection())
-            {
+            if !event_filter_contains_ref(
+                active_scope.as_ref(),
+                event_part.name(),
+                event_part.collection(),
+            ) {
                 // Reject due to scope mismatch
                 return false;
             }
@@ -124,7 +127,7 @@ fn validate_component_instance(
     }
     match (active_scope, event_iter.next()) {
         (Some(scopes), Some(event)) => {
-            if !event_filter_contains_ref(&Some(scopes), event.name(), event.collection()) {
+            if !event_filter_contains_ref(Some(&scopes), event.name(), event.collection()) {
                 return false;
             }
         }
@@ -489,7 +492,7 @@ mod tests {
             ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "root".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Collection("coll".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("coll".parse().unwrap())])),
             },
         ];
         assert!(!validate_and_filter_event(&mut moniker, &route));
@@ -505,7 +508,7 @@ mod tests {
             ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "core".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Collection("test_manager".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("test_manager".parse().unwrap())])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef {
@@ -532,17 +535,17 @@ mod tests {
             ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "a".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Child(ChildRef {
+                scope: Some(Box::from([EventScope::Child(ChildRef {
                     name: "b".parse().unwrap(),
                     collection: None,
-                })]),
+                })])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Child(ChildRef {
+                scope: Some(Box::from([EventScope::Child(ChildRef {
                     name: "c".parse().unwrap(),
                     collection: None,
-                })]),
+                })])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
@@ -568,17 +571,17 @@ mod tests {
             ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "a".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Child(ChildRef {
+                scope: Some(Box::from([EventScope::Child(ChildRef {
                     name: "b".parse().unwrap(),
                     collection: None,
-                })]),
+                })])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Child(ChildRef {
+                scope: Some(Box::from([EventScope::Child(ChildRef {
                     name: "c".parse().unwrap(),
                     collection: None,
-                })]),
+                })])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
@@ -607,11 +610,11 @@ mod tests {
             ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "a".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Collection("b".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("b".parse().unwrap())])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Collection("c".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("c".parse().unwrap())])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
@@ -644,7 +647,7 @@ mod tests {
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Collection("c".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("c".parse().unwrap())])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
@@ -667,21 +670,21 @@ mod tests {
             ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "core".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Collection("test_manager".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("test_manager".parse().unwrap())])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef {
                     name: "test_manager".parse().unwrap(),
                     collection: None,
                 }),
-                scope: Some(vec![EventScope::Collection("test_wrapper".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("test_wrapper".parse().unwrap())])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef {
                     name: "test_wrapper".parse().unwrap(),
                     collection: None,
                 }),
-                scope: Some(vec![EventScope::Collection("test_root".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("test_root".parse().unwrap())])),
             },
         ];
         assert_eq!(super::validate_and_filter_event(&mut event, &route), false);
@@ -703,34 +706,34 @@ mod tests {
             ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
                 component: Some(ChildRef { name: "core".parse().unwrap(), collection: None }),
-                scope: Some(vec![EventScope::Child(ChildRef {
+                scope: Some(Box::from([EventScope::Child(ChildRef {
                     name: "test_manager".parse().unwrap(),
                     collection: None,
-                })]),
+                })])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef {
                     name: "test_manager".parse().unwrap(),
                     collection: None,
                 }),
-                scope: Some(vec![EventScope::Collection("tests".parse().unwrap())]),
+                scope: Some(Box::from([EventScope::Collection("tests".parse().unwrap())])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef {
                     name: "auto-3fc01a79864c741".parse().unwrap(),
                     collection: Some("tests".parse().unwrap()),
                 }),
-                scope: Some(vec![EventScope::Child(ChildRef {
+                scope: Some(Box::from([EventScope::Child(ChildRef {
                     name: "test_wrapper".parse().unwrap(),
                     collection: None,
-                })]),
+                })])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef {
                     name: "test_wrapper".parse().unwrap(),
                     collection: None,
                 }),
-                scope: Some(vec![
+                scope: Some(Box::from([
                     EventScope::Collection("test".parse().unwrap()),
                     EventScope::Child(ChildRef {
                         name: "enclosing_env".parse().unwrap(),
@@ -740,7 +743,7 @@ mod tests {
                         name: "hermetic_resolver".parse().unwrap(),
                         collection: None,
                     }),
-                ]),
+                ])),
             },
             ComponentEventRoute {
                 component: Some(ChildRef {

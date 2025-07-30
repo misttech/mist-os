@@ -82,7 +82,7 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
             name: PROJECT_CONFIGS_CAPABILITY.parse()?,
             value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
-                load_configs(mocks::fake_index()),
+                load_configs(mocks::fake_index()).into(),
             )),
         }))
         .await?;

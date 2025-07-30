@@ -1,7 +1,9 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use anyhow::{Error, Result};
+use cm_rust::push_box;
 use fidl::endpoints::{ClientEnd, ControlHandle};
 use fidl_fuchsia_driver_testing::*;
 use fidl_fuchsia_testing_harness::OperationError;
@@ -137,22 +139,28 @@ async fn add_dynamic_expose_deprecated(
     // The source of this capability is the driver test realm itself because it has manually
     // forwarded all of the requested exposes from its inner realm.
     let mut decl = builder.get_component_decl(driver_test_realm_component_name).await?;
-    decl.capabilities.push(cm_rust::CapabilityDecl::Service(cm_rust::ServiceDecl {
-        name: expose_parsed.clone(),
-        source_path: Some(
-            ("/svc/".to_owned() + &expose)
-                .parse::<cm_types::Path>()
-                .expect("service name is not a valid capability name"),
-        ),
-    }));
-    decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
-        source: cm_rust::ExposeSource::Self_,
-        source_name: expose_parsed.clone(),
-        source_dictionary: Default::default(),
-        target_name: expose_parsed.clone(),
-        target: cm_rust::ExposeTarget::Parent,
-        availability: cm_rust::Availability::Required,
-    }));
+    push_box(
+        &mut decl.capabilities,
+        cm_rust::CapabilityDecl::Service(cm_rust::ServiceDecl {
+            name: expose_parsed.clone(),
+            source_path: Some(
+                ("/svc/".to_owned() + &expose)
+                    .parse::<cm_types::Path>()
+                    .expect("service name is not a valid capability name"),
+            ),
+        }),
+    );
+    push_box(
+        &mut decl.exposes,
+        cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
+            source: cm_rust::ExposeSource::Self_,
+            source_name: expose_parsed.clone(),
+            source_dictionary: Default::default(),
+            target_name: expose_parsed.clone(),
+            target: cm_rust::ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
+        }),
+    );
     builder.replace_component_decl(driver_test_realm_component_name, decl).await?;
 
     // Add the route through the realm builder.
@@ -181,17 +189,20 @@ async fn add_dynamic_offer_deprecated(
     // The target of this capability is the realm_builder collection which is where the
     // driver_test_realm's own realm builder will spin up the driver framework and drivers.
     let mut decl = builder.get_component_decl(driver_test_realm_component_name).await?;
-    decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-        source: cm_rust::OfferSource::Parent,
-        source_name: offer_parsed.clone(),
-        source_dictionary: Default::default(),
-        target_name: offer_parsed.clone(),
-        target: cm_rust::OfferTarget::Collection(
-            "realm_builder".parse::<cm_types::Name>().unwrap(),
-        ),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
+    push_box(
+        &mut decl.offers,
+        cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+            source: cm_rust::OfferSource::Parent,
+            source_name: offer_parsed.clone(),
+            source_dictionary: Default::default(),
+            target_name: offer_parsed.clone(),
+            target: cm_rust::OfferTarget::Collection(
+                "realm_builder".parse::<cm_types::Name>().unwrap(),
+            ),
+            dependency_type: cm_rust::DependencyType::Strong,
+            availability: cm_rust::Availability::Required,
+        }),
+    );
     builder.replace_component_decl(driver_test_realm_component_name, decl).await?;
 
     // Add the route through the realm builder.

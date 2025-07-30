@@ -313,7 +313,7 @@ where
 
     fn matches(&self, other: &Other) -> Result<bool>;
 
-    fn match_one<'a>(&self, other: &'a Vec<Other>) -> Result<&'a Other, MatchOneError> {
+    fn match_one<'a>(&self, other: &'a [Other]) -> Result<&'a Other, MatchOneError> {
         // Ignore match errors: Only interested in number of positive matches.
         let matches: Vec<&'a Other> = other
             .iter()
