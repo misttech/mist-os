@@ -3163,6 +3163,40 @@ assembly_input_bundle("fshost_storage_host_gpt_fvm_minfs") {
   ]
 }
 
+# AIB for fshost's storage-host configuration with GPT+FVM+F2fs.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_storage_host_gpt_fvm_f2fs") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [
+            "//src/storage/fshost/meta/fvm_f2fs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_f2fs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_fvm.cml",
+            "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_gpt.shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+  bootfs_packages = [
+    "//src/storage/gpt/component:package",
+    "//src/storage/blobfs/bin:package",
+    "//src/storage/f2fs/bin:package",
+    "//src/storage/fvm:package",
+  ]
+}
+
 # AIB for fshost's storage-host configuration with FVM+Minfs.
 #
 # optional: product must specify its inclusion

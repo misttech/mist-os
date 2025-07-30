@@ -146,8 +146,17 @@ impl DefineSubsystemConfiguration<(&StorageConfig, &StorageToolsConfig, &Recover
                             bail!("Fxfs-in-FVM isn't supported in storage-host");
                         }
                         DataFilesystemFormat::F2fs => {
-                            // TODO(https://fxbug.dev/339491886): Implement.
-                            bail!("f2fs isn't supported yet in storage-host");
+                            context
+                                .ensure_build_type(&[BuildType::Eng], "GPT with FVM and F2FS")?;
+                            data_filesystem_format_str = "f2fs";
+                            if gpt {
+                                builder.platform_bundle("fshost_storage_host_gpt_fvm_f2fs");
+                            } else {
+                                // NOTE: There is no technical reason that this can't be supported,
+                                // but there is no need for it at this time, as no products use f2fs
+                                // without GPT.
+                                bail!("f2fs without GPT is not supported with storage-host");
+                            }
                         }
                         DataFilesystemFormat::Minfs => {
                             data_filesystem_format_str = "minfs";
