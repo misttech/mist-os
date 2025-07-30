@@ -312,6 +312,7 @@
                 "fuchsia.gpu.magma.DependencyInjectionService",
                 "fuchsia.gpu.magma.PerformanceCounterService",
                 "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TrustedService",
                 "fuchsia.hardware.adb.Service",
                 "fuchsia.hardware.adc.Service",
                 "fuchsia.hardware.audio.CodecConnectorService",
