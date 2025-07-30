@@ -21,8 +21,8 @@
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-fidl.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-fidl-adapter.h"
 
 namespace fake_display {
 
@@ -64,15 +64,18 @@ class FakeDisplayStack {
   std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_;
   std::unique_ptr<SysmemServiceProvider> sysmem_service_provider_;
 
+  fdf::SynchronizedDispatcher engine_driver_dispatcher_;
+  libsync::Completion engine_driver_dispatcher_is_shut_down_;
+
   fdf::SynchronizedDispatcher coordinator_driver_dispatcher_;
   libsync::Completion coordinator_driver_dispatcher_is_shut_down_;
 
   fdf::SynchronizedDispatcher engine_listener_dispatcher_;
   libsync::Completion engine_listener_dispatcher_is_shut_down_;
 
-  display::DisplayEngineEventsBanjo engine_events_;
+  display::DisplayEngineEventsFidl engine_events_;
   std::unique_ptr<FakeDisplay> display_engine_;
-  std::unique_ptr<display::DisplayEngineBanjoAdapter> banjo_adapter_;
+  std::unique_ptr<display::DisplayEngineFidlAdapter> fidl_adapter_;
 
   std::unique_ptr<display_coordinator::Controller> coordinator_controller_;
 

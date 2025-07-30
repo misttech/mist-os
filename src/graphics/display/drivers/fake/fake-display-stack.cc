@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
@@ -16,7 +17,7 @@
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/drivers/coordinator/engine-driver-client-banjo.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client-fidl.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
 namespace fake_display {
@@ -32,8 +33,16 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client = ConnectToSysmemAllocatorV2();
   display_engine_ = std::make_unique<FakeDisplay>(&engine_events_, std::move(sysmem_client),
                                                   device_config, inspect::Inspector{});
-  banjo_adapter_ =
-      std::make_unique<display::DisplayEngineBanjoAdapter>(display_engine_.get(), &engine_events_);
+  fidl_adapter_ =
+      std::make_unique<display::DisplayEngineFidlAdapter>(display_engine_.get(), &engine_events_);
+
+  zx::result<fdf::SynchronizedDispatcher> create_engine_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                          "display-engine-loop",
+                                          [this](fdf_dispatcher_t* dispatcher) {
+                                            engine_driver_dispatcher_is_shut_down_.Signal();
+                                          });
+  engine_driver_dispatcher_ = std::move(create_engine_dispatcher_result).value();
 
   zx::result<fdf::SynchronizedDispatcher> create_coordinator_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
@@ -59,10 +68,22 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   }
   engine_listener_dispatcher_ = std::move(create_engine_listener_dispatcher_result).value();
 
-  const display_engine_protocol_t display_engine_protocol = banjo_adapter_->GetProtocol();
-  ddk::DisplayEngineProtocolClient display_engine_client(&display_engine_protocol);
+  auto [engine_client, engine_server] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  fidl::ProtocolHandler<fuchsia_hardware_display_engine::Engine> fidl_handler =
+      fidl_adapter_->CreateHandler(*(engine_driver_dispatcher_.get()));
+  zx_status_t post_task_status = async::PostTask(
+      engine_driver_dispatcher_.async_dispatcher(),
+      [engine_server = std::move(engine_server), fidl_handler = std::move(fidl_handler)]() mutable {
+        fidl_handler(std::move(engine_server));
+      });
+  if (post_task_status != ZX_OK) {
+    ZX_PANIC("Failed to post task to bind FIDL adapter: %s",
+             zx_status_get_string(post_task_status));
+  }
+
   auto engine_driver_client =
-      std::make_unique<display_coordinator::EngineDriverClientBanjo>(display_engine_client);
+      std::make_unique<display_coordinator::EngineDriverClientFidl>(std::move(engine_client));
   zx::result<std::unique_ptr<display_coordinator::Controller>> create_controller_result =
       display_coordinator::Controller::Create(std::move(engine_driver_client),
                                               coordinator_driver_dispatcher_.borrow(),
@@ -138,6 +159,10 @@ void FakeDisplayStack::SyncShutdown() {
 
   coordinator_controller_->Stop();
   coordinator_controller_.reset();
+
+  engine_driver_dispatcher_.ShutdownAsync();
+  engine_driver_dispatcher_is_shut_down_.Wait();
+
   display_engine_.reset();
 
   sysmem_service_provider_.reset();
