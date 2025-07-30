@@ -15,12 +15,9 @@
 #   statements that are exactly one line each; empty lines and comment lines are
 #   also allowed.
 
-import argparse
-import pathlib
 import re
 import subprocess
 import sys
-import tempfile
 
 # Merged policy files must not attempt to declare new initial SIDs, which have a fixed set of
 # values and ordering that forms part of the ABI, defined by the Reference Policy.
@@ -188,41 +185,3 @@ def merge_text_policies(
 
         for line in policy_lines_from_input_files:
             output_file.write(f"{line}\n")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--initial-sids",
-        required=True,
-        type=pathlib.Path,
-        help="Path to the initial SID definitions",
-    )
-    parser.add_argument(
-        "--checkpolicy-executable",
-        required=True,
-        type=pathlib.Path,
-        help="Path to the SELinux checkpolicy utility executable",
-    )
-    parser.add_argument(
-        "--output",
-        required=True,
-        type=pathlib.Path,
-        help="Path to use for output binary policy file",
-    )
-    parser.add_argument(
-        "text_partial_policy",
-        nargs="+",
-        type=pathlib.Path,
-        help="Paths to partial policy files to be merged into combined policy",
-    )
-    args = parser.parse_args()
-
-    with tempfile.TemporaryDirectory() as temporary_directory_name:
-        text_policy_file_path = f"{temporary_directory_name}/policy.conf"
-        merge_text_policies(
-            args.initial_sids, args.text_partial_policy, text_policy_file_path
-        )
-        compile_text_policy_to_binary_policy(
-            args.checkpolicy_executable, text_policy_file_path, args.output
-        )
