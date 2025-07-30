@@ -58,8 +58,16 @@ void EngineDriverClientFidl::ApplyConfiguration(const display_config_t* display_
                                                 display::DriverConfigStamp config_stamp) {}
 
 display::EngineInfo EngineDriverClientFidl::CompleteCoordinatorConnection(
-    const display_engine_listener_protocol_t& protocol) {
-  return display::EngineInfo({});
+    const display_engine_listener_protocol_t& banjo_listener_protocol,
+    fdf::ClientEnd<fuchsia_hardware_display_engine::EngineListener> fidl_listener_client) {
+  fdf::Arena arena(kArenaTag);
+  fdf::WireUnownedResult result =
+      fidl_engine_.buffer(arena)->CompleteCoordinatorConnection(std::move(fidl_listener_client));
+  if (!result.ok()) {
+    fdf::error("CompleteCoordinatorConnection failed: {}", result.status_string());
+    ZX_ASSERT(result.ok());
+  }
+  return display::EngineInfo::From(result->engine_info);
 }
 
 void EngineDriverClientFidl::UnsetListener() {

@@ -32,7 +32,7 @@ class EngineDriverClientBanjoTest : public ::testing::Test {
 };
 
 TEST_F(EngineDriverClientBanjoTest, CompleteCoordinatorConnection) {
-  display_engine_listener_protocol_t listener_proto = {};
+  display_engine_listener_protocol_t banjo_listener_proto = {};
   static constexpr engine_info_t kEngineInfo = {
       .max_layer_count = 3,
       .max_connected_display_count = 1,
@@ -44,7 +44,10 @@ TEST_F(EngineDriverClientBanjoTest, CompleteCoordinatorConnection) {
         *out_info = kEngineInfo;
       });
 
-  display::EngineInfo result = banjo_client_.CompleteCoordinatorConnection(listener_proto);
+  auto [fidl_listener_client, fidl_listener_server] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::EngineListener>::Create();
+  display::EngineInfo result = banjo_client_.CompleteCoordinatorConnection(
+      banjo_listener_proto, std::move(fidl_listener_client));
   EXPECT_EQ(result.max_layer_count(), int{kEngineInfo.max_layer_count});
   EXPECT_EQ(result.max_connected_display_count(), int{kEngineInfo.max_connected_display_count});
   EXPECT_EQ(result.is_capture_supported(), kEngineInfo.is_capture_supported);

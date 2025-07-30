@@ -827,16 +827,38 @@ zx::result<std::unique_ptr<Controller>> Controller::Create(
 }
 
 zx::result<> Controller::Initialize() {
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->get() != engine_listener_dispatcher_->get());
+
   zx::result<> vsync_monitor_init_result = vsync_monitor_.Initialize();
   if (vsync_monitor_init_result.is_error()) {
     // VsyncMonitor::Init() logged the error.
     return vsync_monitor_init_result.take_error();
   }
 
+  auto [fidl_listener_client, fidl_listener_server] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::EngineListener>::Create();
+
+  // This binds `fidl_listener_server` to the EngineListenerFidlAdapter
+  // instance synchronously. This is to avoid the case where
+  // `engine_listener_dispatcher_` was shut down while the task is still
+  // running, causing the Bind call to fail and crash the coordinator.
+  libsync::Completion engine_listener_fidl_binding_completion;
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *engine_listener_dispatcher_->async_dispatcher(),
+      [&, fidl_listener_server = std::move(fidl_listener_server)]() mutable {
+        engine_listener_fidl_adapter_.CreateHandler()(std::move(fidl_listener_server));
+        engine_listener_fidl_binding_completion.Signal();
+      });
+  if (post_task_result.is_error()) {
+    fdf::error("Failed to dispatch EngineListener FIDL server binding task: {}", post_task_result);
+    return post_task_result.take_error();
+  }
+  engine_listener_fidl_binding_completion.Wait();
+
   engine_info_ = engine_driver_client_->CompleteCoordinatorConnection(
-      engine_listener_banjo_adapter_.GetProtocol());
+      engine_listener_banjo_adapter_.GetProtocol(), std::move(fidl_listener_client));
   fdf::info("Engine capabilities - max layers: {}, max displays: {}, display capture: {}",
-            int{engine_info_->max_layer_count()}, int{engine_info_->max_connected_display_count()},
+            engine_info_->max_layer_count(), engine_info_->max_connected_display_count(),
             engine_info_->is_capture_supported() ? "yes" : "no");
 
   return zx::ok();
@@ -881,6 +903,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
       driver_dispatcher_(std::move(driver_dispatcher)),
       engine_listener_dispatcher_(std::move(engine_listener_dispatcher)),
       engine_listener_banjo_adapter_(this, engine_listener_dispatcher_->borrow()),
+      engine_listener_fidl_adapter_(this, engine_listener_dispatcher_->borrow()),
       vsync_monitor_(root_.CreateChild("vsync_monitor"), driver_dispatcher_->async_dispatcher()),
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);

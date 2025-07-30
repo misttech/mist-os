@@ -35,6 +35,7 @@
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/coordinator/engine-listener-banjo-adapter.h"
+#include "src/graphics/display/drivers/coordinator/engine-listener-fidl-adapter.h"
 #include "src/graphics/display/drivers/coordinator/engine-listener.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -193,6 +194,7 @@ class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
   friend IntegrationTest;
 
   // Initializes logic that is not suitable for the constructor.
+  // Must not run on `engine_listener_dispatcher_`.
   zx::result<> Initialize();
 
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
@@ -224,6 +226,7 @@ class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
   fdf::UnownedSynchronizedDispatcher engine_listener_dispatcher_;
 
   EngineListenerBanjoAdapter engine_listener_banjo_adapter_;
+  EngineListenerFidlAdapter engine_listener_fidl_adapter_;
 
   VsyncMonitor vsync_monitor_;
 

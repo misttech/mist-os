@@ -59,9 +59,11 @@ void EngineDriverClientBanjo::ApplyConfiguration(const display_config_t* display
 }
 
 display::EngineInfo EngineDriverClientBanjo::CompleteCoordinatorConnection(
-    const display_engine_listener_protocol_t& protocol) {
+    const display_engine_listener_protocol_t& banjo_listener_protocol,
+    fdf::ClientEnd<fuchsia_hardware_display_engine::EngineListener> fidl_listener_client) {
   engine_info_t banjo_engine_info;
-  banjo_engine_.CompleteCoordinatorConnection(protocol.ctx, protocol.ops, &banjo_engine_info);
+  banjo_engine_.CompleteCoordinatorConnection(banjo_listener_protocol.ctx,
+                                              banjo_listener_protocol.ops, &banjo_engine_info);
   if (!display::EngineInfo::IsValid(banjo_engine_info)) {
     fdf::fatal("CompleteCoordinatorConnection returned invalid EngineInfo");
   }

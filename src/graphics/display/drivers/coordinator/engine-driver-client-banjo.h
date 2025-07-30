@@ -42,7 +42,9 @@ class EngineDriverClientBanjo : public EngineDriverClient {
   void ApplyConfiguration(const display_config_t* display_config,
                           display::DriverConfigStamp config_stamp) override;
   display::EngineInfo CompleteCoordinatorConnection(
-      const display_engine_listener_protocol_t& protocol) override;
+      const display_engine_listener_protocol_t& banjo_listener_protocol,
+      fdf::ClientEnd<fuchsia_hardware_display_engine::EngineListener> fidl_listener_client)
+      override;
   void UnsetListener() override;
   zx::result<display::DriverImageId> ImportImage(const display::ImageMetadata& image_metadata,
                                                  display::DriverBufferCollectionId collection_id,
