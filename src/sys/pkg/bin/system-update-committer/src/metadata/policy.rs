@@ -65,7 +65,10 @@ impl PolicyEngine {
             }
             paver::ConfigurationStatus::Pending => {}
             paver::ConfigurationStatus::Unbootable => {
-                return Err(PolicyError::CurrentConfigurationUnbootable((&current_config).into()));
+                return Err(PolicyError::CurrentConfigurationUnbootable(
+                    (&current_config).into(),
+                    status_and_boot_attempts.unbootable_reason,
+                ));
             }
         };
 
@@ -219,7 +222,7 @@ mod tests {
 
         assert_matches!(
             PolicyEngine::build(&paver.spawn_boot_manager_service()).await,
-            Err(PolicyError::CurrentConfigurationUnbootable(cc)) if cc == current_config.into()
+            Err(PolicyError::CurrentConfigurationUnbootable(cc, _)) if cc == current_config.into()
         );
 
         assert_eq!(

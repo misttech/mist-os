@@ -33,8 +33,10 @@ pub enum PolicyError {
     #[error("the policy engine failed to build")]
     Build(#[source] BootManagerError),
 
-    #[error("the current configuration ({_0:?}) is unbootable. This should never happen.")]
-    CurrentConfigurationUnbootable(paver::Configuration),
+    #[error(
+        "the current configuration ({_0:?}) is unbootable with reason {_1:?}. This should never happen."
+    )]
+    CurrentConfigurationUnbootable(paver::Configuration, Option<paver::UnbootableReason>),
 }
 
 /// Error condition that may be returned by HealthVerification.
