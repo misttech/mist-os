@@ -12,6 +12,8 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include "src/graphics/display/drivers/coordinator/banjo-fidl-conversion.h"
+
 namespace display_coordinator {
 
 namespace {
@@ -51,11 +53,36 @@ zx::result<> EngineDriverClientFidl::ReleaseCapture(
 
 display::ConfigCheckResult EngineDriverClientFidl::CheckConfiguration(
     const display_config_t* display_config) {
-  return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  fdf::Arena arena(kArenaTag);
+  fuchsia_hardware_display_engine::wire::DisplayConfig fidl_config =
+      ToFidlDisplayConfig(*display_config, arena);
+
+  fdf::WireUnownedResult result = fidl_engine_.buffer(arena)->CheckConfiguration(fidl_config);
+  if (!result.ok()) {
+    fdf::error("CheckConfiguration failed: {}", result.status_string());
+    ZX_ASSERT(result.ok());
+  }
+
+  fit::result<fuchsia_hardware_display_types::ConfigResult> response = result.value();
+  if (response.is_error()) {
+    return display::ConfigCheckResult(response.error_value());
+  }
+  return display::ConfigCheckResult::kOk;
 }
 
 void EngineDriverClientFidl::ApplyConfiguration(const display_config_t* display_config,
-                                                display::DriverConfigStamp config_stamp) {}
+                                                display::DriverConfigStamp config_stamp) {
+  fdf::Arena arena(kArenaTag);
+  fuchsia_hardware_display_engine::wire::DisplayConfig fidl_config =
+      ToFidlDisplayConfig(*display_config, arena);
+
+  fdf::WireUnownedResult result =
+      fidl_engine_.buffer(arena)->ApplyConfiguration(fidl_config, config_stamp.ToFidl());
+  if (!result.ok()) {
+    fdf::error("ApplyConfiguration failed: {}", result.status_string());
+    ZX_ASSERT(result.ok());
+  }
+}
 
 display::EngineInfo EngineDriverClientFidl::CompleteCoordinatorConnection(
     const display_engine_listener_protocol_t& banjo_listener_protocol,
