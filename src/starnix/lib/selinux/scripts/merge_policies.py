@@ -18,6 +18,7 @@
 import re
 import subprocess
 import sys
+from collections.abc import Collection, Sequence
 
 # Merged policy files must not attempt to declare new initial SIDs, which have a fixed set of
 # values and ordering that forms part of the ABI, defined by the Reference Policy.
@@ -26,7 +27,7 @@ _INITIAL_SID_PATTERN = re.compile(f"^{_INITIAL_SID_REGEX}$")
 
 # Lines in policy files that match these patterns must be grouped together in
 # the order the patterns appear.
-_ORDERED_POLICY_STATEMENT_REGEXS = [
+_ORDERED_POLICY_STATEMENT_REGEXS = (
     "class[ \t\v]+[^ \t\v]+",
     _INITIAL_SID_REGEX,
     "common[ \t\v]+[^ \t\v]+.*",
@@ -71,9 +72,9 @@ _ORDERED_POLICY_STATEMENT_REGEXS = [
     "fs_use_task[ \t\v]+[^ \t\v]+.*$",
     "genfscon[ \t\v]+[^ \t\v]+.*$",
     "portcon[ \t\v]+[^ \t\v]+.*$",
-]
+)
 
-_ORDERED_POLICY_STATEMENT_PATTERNS = list(
+_ORDERED_POLICY_STATEMENT_PATTERNS = tuple(
     (regex, re.compile(f"^{regex}$"))
     for regex in _ORDERED_POLICY_STATEMENT_REGEXS
 )
@@ -83,12 +84,14 @@ _ORDERED_POLICY_STATEMENT_PATTERNS = list(
 _WHITESPACE_OR_COMMENT_PATTERN = re.compile("^[ \t]*(#.*)?$")
 
 
-def _filter_lines(lines: list[str], pattern: re.Pattern) -> list[str]:
-    return list(line for line in lines if pattern.match(line) is not None)
+def _filter_lines(lines: Collection[str], pattern: re.Pattern) -> Sequence[str]:
+    return tuple(line for line in lines if pattern.match(line) is not None)
 
 
-def _negative_filter_lines(lines: list[str], pattern: re.Pattern) -> list[str]:
-    return list(line for line in lines if pattern.match(line) is None)
+def _negative_filter_lines(
+    lines: Collection[str], pattern: re.Pattern
+) -> Sequence[str]:
+    return tuple(line for line in lines if pattern.match(line) is None)
 
 
 def compile_text_policy_to_binary_policy(
