@@ -415,14 +415,14 @@ alias(
 )
 
 alias(
-    name = "bytes-1.10.0",
-    actual = "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",
+    name = "bytes-1.10.1",
+    actual = "//third_party/rust_crates/vendor/bytes-1.10.1:bytes",
     tags = ["manual"],
 )
 
 alias(
     name = "bytes",
-    actual = "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",
+    actual = "//third_party/rust_crates/vendor/bytes-1.10.1:bytes",
     tags = ["manual"],
 )
 
