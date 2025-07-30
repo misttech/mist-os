@@ -1,32 +1,26 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Power Cycle test."""
+"""Usb Power Hub test."""
 
 import logging
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.auxiliary_devices.power_switch import power_switch
+from honeydew.auxiliary_devices.usb_power_hub import usb_power_hub
 from honeydew.fuchsia_device import fuchsia_device
 from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-_DMC_MODULE: str = (
-    "honeydew.auxiliary_devices.power_switch.power_switch_using_dmc"
-)
-_DMC_CLASS: str = "PowerSwitchUsingDmc"
+class UsbDisconnectTest(fuchsia_base_test.FuchsiaBaseTest):
+    """Mobly test for testing the UsbPowerHub that works locally or in infra.
 
-
-class PowerCycleTest(fuchsia_base_test.FuchsiaBaseTest):
-    """power cycle test.
-
-    Attributes:
+     Attributes:
         dut: FuchsiaDevice object.
 
     Required Mobly Test Params:
-        num_power_cycles (int): Number of times power_cycle test need to be
+        num_usb_disconnects (int): Number of times usb_disconnect test need to be
             executed.
     """
 
@@ -35,7 +29,7 @@ class PowerCycleTest(fuchsia_base_test.FuchsiaBaseTest):
         test_arg_tuple_list: list[tuple[int]] = []
 
         for iteration in range(
-            1, int(self.user_params["num_power_cycles"]) + 1
+            1, int(self.user_params["num_usb_disconnects"]) + 1
         ):
             test_arg_tuple_list.append((iteration,))
 
@@ -49,18 +43,25 @@ class PowerCycleTest(fuchsia_base_test.FuchsiaBaseTest):
         """setup_class is called once before running tests."""
         super().setup_class()
         self.dut: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-        self._power_switch: power_switch.PowerSwitch
-        self._outlet: int | None
-        (self._power_switch, self._outlet) = self._lookup_power_switch(self.dut)
+        self._usb_power_hub: usb_power_hub.UsbPowerHub
+        self._usb_port: int | None
+        (self._usb_power_hub, self._usb_port) = self._lookup_usb_power_hub(
+            self.dut
+        )
 
     def _test_logic(self, iteration: int) -> None:
-        """Test case logic that performs power cycle of fuchsia device."""
-        _LOGGER.info("Starting the Power Cycle test iteration# %s", iteration)
-        self.dut.power_cycle(
-            power_switch=self._power_switch, outlet=self._outlet
-        )
+        """Test case logic that disconnects the USB from a fuchsia device."""
         _LOGGER.info(
-            "Successfully ended the Power Cycle test iteration# %s", iteration
+            "Starting the Usb Disconnect test iteration# %s", iteration
+        )
+        self._usb_power_hub.power_off(port=self._usb_port)
+        # self.dut.wait_for_offline()  # TODO(https://fxbug.dev/431799077): Reenable when fixed.
+        self._usb_power_hub.power_on(port=self._usb_port)
+        self.dut.wait_for_online()
+        self.dut.on_device_boot()
+        _LOGGER.info(
+            "Successfully ended the Usb Disconnect test iteration# %s",
+            iteration,
         )
 
     def _name_func(self, iteration: int) -> str:
@@ -73,7 +74,7 @@ class PowerCycleTest(fuchsia_base_test.FuchsiaBaseTest):
         Returns:
             Test case name
         """
-        return f"test_power_cycle_{iteration}"
+        return f"test_usb_disconnect_{iteration}"
 
 
 if __name__ == "__main__":
