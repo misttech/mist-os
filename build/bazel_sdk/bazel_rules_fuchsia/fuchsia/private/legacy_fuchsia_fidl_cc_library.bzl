@@ -5,10 +5,9 @@
 """A cc_library backed by a FIDL library."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 
@@ -158,7 +157,7 @@ def _fidl_cc_library(name, library, binding_level, deps = [], tags = [], **kwarg
         codegen = ":%s" % gen_name,
     )
 
-    cc_library(
+    native.cc_library(
         name = name,
         hdrs = [
             ":%s" % gen_name,

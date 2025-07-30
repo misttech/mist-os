@@ -9,12 +9,6 @@ Drop in replacements for cc_binary and cc_test:
  - fuchsia_cc_test
 """
 
-load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
-load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-load("@rules_cc//cc/common:cc_shared_library_info.bzl", "CcSharedLibraryInfo")
-load("@rules_cc//cc/common:debug_package_info.bzl", "DebugPackageInfo")
-load("//common:transition_utils.bzl", "FEATURES_LIST_TRANSITION_ATTRS", "features_list_transition")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(":fuchsia_component.bzl", "fuchsia_test_component")
@@ -25,6 +19,7 @@ load(
     "FuchsiaUnstrippedBinaryInfo",
 )
 load(":utils.bzl", "find_cc_toolchain", "forward_providers")
+load("//common:transition_utils.bzl", "FEATURES_LIST_TRANSITION_ATTRS", "features_list_transition")
 
 KNOWN_PROVIDERS = [
     CcInfo,
@@ -280,7 +275,9 @@ def fuchsia_cc_binary(
 
     native_target_name = "%s.binary" % fuchsia_cc_name
 
-    cc_binary(
+    # TODO(https://fxbug.dev/385351779): Switch to the version from `@rules_cc`
+    # once the `@rules_cc` dependency in-tree is version-bumped.
+    native.cc_binary(
         name = native_target_name,
         tags = tags + ["manual"],
         visibility = visibility,
@@ -345,7 +342,7 @@ def fuchsia_cc_test(
 
     native_target_name = "%s.binary" % fuchsia_cc_name
 
-    cc_test(
+    native.cc_test(
         name = native_target_name,
         tags = tags + ["manual"],
         deps = deps,

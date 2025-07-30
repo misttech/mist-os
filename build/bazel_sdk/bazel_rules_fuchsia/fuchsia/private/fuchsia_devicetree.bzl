@@ -4,7 +4,6 @@
 
 """Defines a devicetree to be built into a devicetree blob."""
 
-load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(":providers.bzl", "FuchsiaDeviceTreeSegmentInfo")
 load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocess_file")

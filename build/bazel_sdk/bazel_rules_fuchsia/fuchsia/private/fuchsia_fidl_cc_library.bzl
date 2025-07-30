@@ -5,10 +5,9 @@
 """A cc_library backed by a FIDL library."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 
@@ -24,7 +23,7 @@ def _typed_deps(deps, binding_type):
             # in the generator ctx, not the SDK ctx.
             # One possible better implementation is to make fuchsia_fidl carry all the transitive dependencies per
             # cc binding type, and provide them as a Provider, and then just collect them in _codegen and make them
-            # _codegen's own dependencies, which would probably cause cc_library to do the right thing.
+            # _codegen's own dependencies, which would probably cause native.cc_library to do the right thing.
             dep_label = dep.rpartition("/")[2]
             dep_label = get_cc_lib_name(dep_label, binding_type)
             dep_with_binding = "%s:%s" % (dep, dep_label)
@@ -67,7 +66,7 @@ def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_de
         **kwargs
     )
 
-    cc_library(
+    native.cc_library(
         name = name,
         hdrs = [
             ":%s" % gen_name,

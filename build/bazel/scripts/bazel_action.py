@@ -66,7 +66,6 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "bazel_skylib",
     "bazel_skylib+",
     "platforms",
-    "rules_cc",
     "rules_license",
     "rules_license+",
     "rules_python+",

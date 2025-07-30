@@ -8,7 +8,6 @@
 //build/components/fuchsia_structured_config.gni.)
 """
 
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library")
 load(":fuchsia_fidl_library.bzl", "fuchsia_fidl_library")
@@ -322,7 +321,7 @@ def fuchsia_structured_config_cpp_elf_lib(
         **kwargs
     )
 
-    cc_library(
+    native.cc_library(
         name = name,
         srcs = [":" + cpp_elf_source_target],
         deps = [

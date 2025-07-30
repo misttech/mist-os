@@ -4,8 +4,6 @@
 
 """A wrapper around cc_binary to be used for drivers targeting Fuchsia."""
 
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("//fuchsia/private:fuchsia_cc.bzl", "data_for_features", "fuchsia_cc")
 
 def fuchsia_cc_driver(
@@ -72,7 +70,7 @@ def fuchsia_cc_driver(
     # the deps in that target. Otherwise, the user has provided their own
     # cc_library as a dep in which case we can
     if len(srcs) > 0:
-        cc_library(
+        native.cc_library(
             name = name + "_srcs",
             srcs = srcs,
             deps = deps,
@@ -95,7 +93,7 @@ def fuchsia_cc_driver(
     ]
 
     cc_shared_library_name = name + "_cc_shared_library"
-    cc_shared_library(
+    native.cc_shared_library(
         name = cc_shared_library_name,
         deps = shared_library_deps,
         additional_linker_inputs = [driver_ld_target],

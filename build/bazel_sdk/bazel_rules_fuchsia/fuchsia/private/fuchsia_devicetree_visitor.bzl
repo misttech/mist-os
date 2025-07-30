@@ -4,8 +4,6 @@
 
 """Creates a fuchsia_package_resource for devicetree visitor."""
 
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load(":fuchsia_cc.bzl", "fuchsia_cc")
 
 def fuchsia_devicetree_visitor(name, output_name = None, additional_linker_inputs = [], user_link_flags = [], **kwargs):
@@ -21,7 +19,7 @@ def fuchsia_devicetree_visitor(name, output_name = None, additional_linker_input
     lib_name = "{}_lib".format(name)
     visibility = kwargs.pop("visibility", None)
 
-    cc_library(
+    native.cc_library(
         name = lib_name,
         **kwargs
     )
@@ -41,7 +39,7 @@ def fuchsia_devicetree_visitor(name, output_name = None, additional_linker_input
     additional_linker_inputs.append(visitor_ld_target)
 
     shared_lib_name = "{}_shared_lib".format(name)
-    cc_shared_library(
+    native.cc_shared_library(
         name = shared_lib_name,
         deps = [
             ":" + lib_name,

@@ -13,8 +13,6 @@ load(
     "tool_path",
     "with_feature_set",
 )
-load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
-load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load("//common:toolchains/clang/cc_features.bzl", "action_names", "get_default_compile_flags_feature")
 load(
     "//common:toolchains/clang/clang_utils.bzl",
@@ -612,7 +610,7 @@ def generate_clang_cc_toolchain(
         srcs = common_compiler_files + common_linker_files + sysroot_header_files + sysroot_library_files,
     )
 
-    cc_toolchain(
+    native.cc_toolchain(
         name = name,
         all_files = ":" + all_files,
         ar_files = ":ar",
