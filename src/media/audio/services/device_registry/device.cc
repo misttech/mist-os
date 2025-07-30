@@ -23,7 +23,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <iomanip>
 #include <memory>
 #include <optional>
 #include <string>
@@ -2444,6 +2443,30 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
         }
         ring_buffer.ring_buffer_vmo = std::move(result->ring_buffer());
         ring_buffer.num_ring_buffer_frames = result->num_frames();
+
+        // Re-calculate the size of the client "zone" (if the driver over-allocates, this is
+        // considered client space).
+        if (vmo_is_incoming) {
+          uint64_t previous_consumer_bytes = ring_buffer.ring_buffer_consumer_bytes;
+          ring_buffer.ring_buffer_consumer_bytes =
+              (*ring_buffer.num_ring_buffer_frames * ring_buffer.bytes_per_frame) -
+              ring_buffer.ring_buffer_producer_bytes;
+          if (previous_consumer_bytes != ring_buffer.ring_buffer_consumer_bytes) {
+            ADR_WARN_OBJECT() << "ring_buffer.ring_buffer_consumer_bytes was "
+                              << previous_consumer_bytes << ", is now "
+                              << ring_buffer.ring_buffer_consumer_bytes;
+          }
+        } else {
+          uint64_t previous_producer_bytes = ring_buffer.ring_buffer_producer_bytes;
+          ring_buffer.ring_buffer_producer_bytes =
+              (*ring_buffer.num_ring_buffer_frames * ring_buffer.bytes_per_frame) -
+              ring_buffer.ring_buffer_consumer_bytes;
+          if (previous_producer_bytes != ring_buffer.ring_buffer_producer_bytes) {
+            ADR_WARN_OBJECT() << "ring_buffer.ring_buffer_producer_bytes was "
+                              << previous_producer_bytes << ", is now "
+                              << ring_buffer.ring_buffer_producer_bytes;
+          }
+        }
         CheckForRingBufferReady(element_id);
       });
 }
@@ -2482,10 +2505,15 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
 
   FX_CHECK(ring_buffer.create_ring_buffer_callback);
   // This clears the "meta-command" timeout set earlier in ConnectRingBufferFidl, covering the
-  // CreateRingBuffer, GetProperties, VetVmo and initial WatchDelayInfo calls.
+  // CreateRingBuffer, GetProperties, GetVmo and initial WatchDelayInfo calls.
   ClearCommandTimeout();
 
   auto now = zx::clock::get_monotonic();
+  FX_LOGS(INFO) << "RingBuffer: total frames " << *ring_buffer.num_ring_buffer_frames
+                << " (producer "
+                << ring_buffer.ring_buffer_producer_bytes / ring_buffer.bytes_per_frame
+                << ", consumer "
+                << ring_buffer.ring_buffer_consumer_bytes / ring_buffer.bytes_per_frame << ")";
   ring_buffer.create_ring_buffer_callback(fit::success(Device::RingBufferInfo{
       .ring_buffer = fuchsia_audio::RingBuffer{{
           .buffer = fuchsia_mem::Buffer{{
@@ -2774,6 +2802,7 @@ void Device::CalculateRequiredRingBufferSizes(ElementId element_id) {
                           ring_buffer.bytes_per_frame - 1;
   driver_bytes -= (driver_bytes % ring_buffer.bytes_per_frame);
 
+  // The client memory zone is only an estimate; we'll update it based on what the driver returns.
   if (element_is_outgoing) {
     ring_buffer.ring_buffer_consumer_bytes = driver_bytes;
     ring_buffer.ring_buffer_producer_bytes =
