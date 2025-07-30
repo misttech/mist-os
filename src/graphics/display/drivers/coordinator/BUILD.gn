@@ -49,6 +49,8 @@ source_set("shared") {
   sources = [
     "added-display-info.cc",
     "added-display-info.h",
+    "banjo-fidl-conversion.cc",
+    "banjo-fidl-conversion.h",
     "capture-image.cc",
     "capture-image.h",
     "client-id.h",
@@ -129,6 +131,7 @@ source_set("preferred-scanout-image-type") {
 test("display-coordinator-unittests") {
   sources = [
     "added-display-info-test.cc",
+    "banjo-fidl-conversion-test.cc",
     "client-proxy-test.cc",
     "display-info-test.cc",
     "engine-driver-client-banjo-test.cc",
