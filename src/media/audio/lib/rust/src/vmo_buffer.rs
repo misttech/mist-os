@@ -7,6 +7,39 @@ use fuchsia_runtime::vmar_root_self;
 
 use thiserror::Error;
 
+// Given coefficients for an affine function that transforms 'a' into 'b', apply it to 'a_value'.
+// The affine function is:
+//   b = ((a_value - a_offset) * numerator / denominator) + b_offset
+//
+// Generally we use these functions to translate between a running frame and a time. 'frame_number'
+// is usually positive (and monotonic time should always be) but there are corner cases such as
+// `presentation_frame()` where the result can be negative, so params and retval are signed. To
+// retain full precision during the multiply-then-divide, we use i128. When available, we will use
+// div_floor so we always round in the same direction (toward -INF) regardless of pos or neg values.
+pub fn apply_affine_function(
+    a_value: i64,
+    numerator: u32,
+    denominator: u32,
+    a_offset: i64,
+    b_offset: i64,
+) -> i64 {
+    let numerator_i128 = numerator as i128;
+    let denominator_i128 = denominator as i128;
+
+    // TODO: When `int_roundings` is released, do this instead:
+    // let intermediate = (a_value - a_offset) as i128 * numerator_i128;
+    // /Fractions should round NEGATIVELY (toward -INF, not toward ZERO as happens in int division).
+    // intermediate.div_floor(denominator_i128) as i64 + b_offset
+
+    // Fractions should round NEGATIVELY (toward -INF, not toward ZERO as happens in int division).
+    let mut intermediate = (a_value - a_offset) as i128 * numerator_i128;
+    // Check for negative; if so, subtract "almost-one" before the DIV so it rounds toward -INF.
+    if intermediate < 0 {
+        intermediate = intermediate - denominator_i128 + 1;
+    }
+    (intermediate / denominator_i128) as i64 + b_offset
+}
+
 /// A VMO-backed ring buffer that contains frames of audio.
 pub struct VmoBuffer {
     /// VMO that contains `num_frames` of audio in `format`.
@@ -55,7 +88,7 @@ impl VmoBuffer {
             data_size_bytes
         );
 
-        Ok(Self { vmo, vmo_size_bytes, base_address, num_frames, format })
+        Ok(Self { vmo, vmo_size_bytes, num_frames, format, base_address })
     }
 
     /// Returns the size of the buffer in bytes.
@@ -277,10 +310,109 @@ mod test {
     use crate::format::SampleType;
     use assert_matches::assert_matches;
 
+    // For a given start time, validate that one second translates to a second of frames.
+    #[test]
+    fn affine_function_time_to_frames() {
+        let start_time = zx::MonotonicInstant::from_nanos(1_234_567_890);
+        let current_time = start_time + zx::MonotonicDuration::from_seconds(1);
+
+        let frames_per_second: u32 = 48000;
+        let nanos_per_second: u32 = 1_000_000_000;
+
+        let start_frame: i64 = 1_234_567;
+        let expected_frame = start_frame + (frames_per_second as i64);
+
+        let current_frame = apply_affine_function(
+            current_time.into_nanos(),
+            frames_per_second,
+            nanos_per_second,
+            start_time.into_nanos(),
+            start_frame,
+        );
+
+        assert_eq!(current_frame, expected_frame);
+    }
+
+    // For a given start frame, validate that a second of frames translates to one second.
+    #[test]
+    fn affine_function_frames_to_time() {
+        let nanos_per_second: u32 = 1_000_000_000;
+        let frames_per_second: u32 = 48000;
+
+        let start_frame: i64 = 1_234_567;
+        let current_frame: i64 = start_frame + (frames_per_second as i64);
+
+        let start_time = zx::MonotonicInstant::from_nanos(1_234_567_890);
+        let expected_time = start_time + zx::MonotonicDuration::from_seconds(1);
+
+        let time_for_frame = apply_affine_function(
+            current_frame,
+            nanos_per_second,
+            frames_per_second,
+            start_frame,
+            start_time.into_nanos(),
+        );
+
+        assert_eq!(time_for_frame, expected_time.into_nanos());
+    }
+
+    // Validate that 0.999_999_999 second leads to a frame value that is NOT rounded up -- this
+    // should result in 47999 frames, not 48000.
+    #[test]
+    fn affine_function_rounds_down() {
+        let start_time = zx::MonotonicInstant::from_nanos(1_234_567_890);
+        let current_time = start_time + zx::MonotonicDuration::from_seconds(1)
+            - zx::MonotonicDuration::from_nanos(1);
+
+        let frames_per_second: u32 = 48000;
+        let nanos_per_second: u32 = 1_000_000_000;
+
+        let start_frame: i64 = 1_234_567;
+        let expected_frame = start_frame + (frames_per_second as i64) - 1;
+
+        let current_frame = apply_affine_function(
+            current_time.into_nanos(),
+            frames_per_second,
+            nanos_per_second,
+            start_time.into_nanos(),
+            start_frame,
+        );
+
+        assert_eq!(current_frame, expected_frame);
+    }
+
+    // Affine functions should always round the same direction.
+    // Thus they must round negatively (toward -INF), rather than rounding toward zero.
+    // Validate that -1.000_000_001 second leads to a frame value that is NOT rounded up -- this
+    // should result in -48001 frames, not -48000.
+    #[test]
+    fn affine_function_rounds_negatively() {
+        let start_time = zx::MonotonicInstant::from_nanos(1_234_567_890);
+        let current_time = start_time
+            - zx::MonotonicDuration::from_seconds(1)
+            - zx::MonotonicDuration::from_nanos(1);
+
+        let frames_per_second: u32 = 48000;
+        let nanos_per_second: u32 = 1_000_000_000;
+
+        let start_frame: i64 = 1_234_567;
+        let expected_frame = start_frame - (frames_per_second as i64) - 1;
+
+        let current_frame = apply_affine_function(
+            current_time.into_nanos(),
+            frames_per_second,
+            nanos_per_second,
+            start_time.into_nanos(),
+            start_frame,
+        );
+
+        assert_eq!(current_frame, expected_frame);
+    }
+
     #[test]
     fn vmobuffer_vmo_too_small() {
         let format =
-            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 };
+            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 1 };
 
         // VMO size is rounded up to the system page size.
         let page_size = zx::system_get_page_size() as u64;
