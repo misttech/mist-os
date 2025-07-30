@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use fuchsia_async as fasync;
+use fuchsia_async::SendExecutorBuilder;
 
 fn panic() {
     panic!("I HAVE PANICKED");
 }
 
 fn async_panic() {
-    let mut executor = fasync::SendExecutor::new(4);
+    let mut executor = SendExecutorBuilder::new().num_threads(4).build();
     let async_code = async {
         panic!("async panic!");
     };
