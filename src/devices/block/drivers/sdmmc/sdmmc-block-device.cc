@@ -1293,35 +1293,36 @@ void SdmmcBlockDevice::OnRequests(PartitionDevice& partition,
       if (bytes == 0)
         return;
 
-      // We need extra when we go from 1 to 2 requests.
-      uint64_t extra = requests_.size() == 1 ? zx_system_get_page_size() : 0;
-
       if (max_bytes_ > 0) {
         for (;;) {
           const uint64_t space = max_bytes_ - total_bytes_;
-          if (bytes + extra <= space) {
+          if (bytes <= space) {
             break;
           }
 
-          if (space > extra) {
-            uint64_t amount = space - extra;
+          // Split this request if there is at least one block of free space. If not, just proceed
+          // to flush the outstanding requests and pick this one up on the next iteration.
+          const uint64_t split_amount_blocks = space / block_size_;
+          if (split_amount_blocks > 0) {
             requests_.push_back(block_server::SplitRequest(
-                request, static_cast<uint32_t>(amount / block_size_), block_size_));
-            bytes -= amount;
+                request, static_cast<uint32_t>(split_amount_blocks), block_size_));
+            bytes -= split_amount_blocks * block_size_;
           }
 
-          if (auto result = Flush(/*split_last=*/true); result.is_error()) {
+          if (auto result = Flush(split_amount_blocks > 0); result.is_error()) {
             // The partial request failed which means we ignore the rest of the request.
             return;
           }
-
-          extra = 0;
         }
       }
 
+      if (requests_.empty()) {
+        // We need an extra buffer for the packed command header when there are multiple requests.
+        total_bytes_ = zx_system_get_page_size();
+      }
       requests_.push_back(request);
-      total_bytes_ += bytes + extra;
-      if (requests_.size() >= max_requests_ || total_bytes_ == max_bytes_) {
+      total_bytes_ += bytes;
+      if (requests_.size() >= max_requests_ || total_bytes_ >= max_bytes_) {
         [[maybe_unused]] auto result = Flush();
       }
     }

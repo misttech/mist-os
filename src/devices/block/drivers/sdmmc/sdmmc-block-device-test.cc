@@ -2601,18 +2601,24 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
   runtime_.PerformBlockingWork(test_fn);
 }
 
-// TODO(https://fxbug.dev/376147833): The fake driver doesn't support packed transfers
-TEST_P(SdmmcBlockDeviceTest, DISABLED_BlockServerMaxTransferSize) {
+TEST_P(SdmmcBlockDeviceTest, BlockServerMaxTransferSize) {
+  constexpr int kMaxTransferSize = 16384;
+
+  sdmmc_.set_host_info({
+      .caps = 0,
+      .max_transfer_size = kMaxTransferSize,
+  });
+
+  sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
+    // Enabled packed commands, even though they aren't used in this test case.
+    out_data[MMC_EXT_CSD_MAX_PACKED_WRITES] = 63;
+    out_data[MMC_EXT_CSD_MAX_PACKED_READS] = 63;
+  });
+
   ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/false));
 
   runtime_.PerformBlockingWork([&] {
-    constexpr int kMaxTransferSize = 16384;
-
-    sdmmc_.set_host_info({
-        .caps = 0,
-        .max_transfer_size = kMaxTransferSize,
-    });
-
     auto client = GetRemoteBlockDeviceForBlockServer("user");
     ASSERT_OK(client);
 
@@ -2669,6 +2675,10 @@ TEST_P(SdmmcBlockDeviceTest, DISABLED_BlockServerMaxTransferSize) {
 
     EXPECT_OK(client->FifoTransaction(requests, 2));
 
+    // These requests should have resulted in two (non-packed) writes starting at address zero.
+    std::vector<uint8_t> write_data = sdmmc_.Read(0, len);
+    EXPECT_BYTES_EQ(write_data.data(), buffer.get(), len);
+
     requests[0].command.opcode = BLOCK_OPCODE_READ;
     requests[0].vmo_offset += max_transfer_size_in_blocks * 2;
     requests[1].command.opcode = BLOCK_OPCODE_READ;
@@ -2680,6 +2690,119 @@ TEST_P(SdmmcBlockDeviceTest, DISABLED_BlockServerMaxTransferSize) {
     EXPECT_OK(vmo.read(read_buffer.get(), len, len));
 
     EXPECT_BYTES_EQ(read_buffer.get(), buffer.get(), len);
+  });
+}
+
+TEST_P(SdmmcBlockDeviceTest, BlockServerSplitTransfer) {
+  constexpr int kMaxTransferSize = 16384;
+
+  sdmmc_.set_host_info({
+      .caps = 0,
+      .max_transfer_size = kMaxTransferSize,
+  });
+
+  sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
+    out_data[MMC_EXT_CSD_MAX_PACKED_WRITES] = 63;
+    out_data[MMC_EXT_CSD_MAX_PACKED_READS] = 63;
+  });
+
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/false));
+
+  runtime_.PerformBlockingWork([&] {
+    auto client = GetRemoteBlockDeviceForBlockServer("user");
+    ASSERT_OK(client);
+
+    fuchsia_hardware_block::wire::BlockInfo info;
+    EXPECT_OK(client->BlockGetInfo(&info));
+
+    ASSERT_EQ(kMaxTransferSize % info.block_size, 0);
+    const uint32_t max_transfer_size_in_blocks = kMaxTransferSize / info.block_size;
+    ASSERT_GT(max_transfer_size_in_blocks, 1);
+
+    const int len = 2 * kMaxTransferSize;
+
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(len * 2, 0, &vmo));
+
+    storage::Vmoid owned_vmoid;
+    EXPECT_OK(client->BlockAttachVmo(vmo, &owned_vmoid));
+
+    // It doesn't matter if we leak the ID.
+    vmoid_t vmoid = owned_vmoid.TakeId();
+
+    auto buffer = std::make_unique<uint8_t[]>(len);
+    uint8_t c = 0;
+    for (int i = 0; i < len / 2; ++i) {
+      buffer[i] = c;
+      c += 7;
+    }
+
+    EXPECT_OK(vmo.write(buffer.get(), 0, len));
+
+    const uint32_t blocks1 = max_transfer_size_in_blocks - 10;
+    const uint32_t blocks2 = 2 * max_transfer_size_in_blocks - blocks1;
+
+    block_fifo_request_t requests[] = {{
+                                           .command =
+                                               {
+                                                   .opcode = BLOCK_OPCODE_WRITE,
+                                               },
+                                           .vmoid = vmoid,
+                                           .length = blocks1,
+                                           .vmo_offset = 0,
+                                           .dev_offset = 0,
+                                       },
+                                       {
+                                           .command =
+                                               {
+                                                   .opcode = BLOCK_OPCODE_WRITE,
+                                               },
+                                           .vmoid = vmoid,
+                                           .length = blocks2,
+                                           .vmo_offset = blocks1,
+                                           .dev_offset = blocks1,
+                                       }};
+
+    EXPECT_OK(client->FifoTransaction(requests, 2));
+
+    // The above requests should be split by block server into three writes:
+    //   1. Write blocks [0, 21]
+    //   2. Write blocks [22, 53]
+    //   3. Write blocks [54, 63]
+    //
+    // This will result in three SDMMC requests:
+    //   1. Packed write of [0, 21] and [22, 23]
+    //   2. Non-packed write of [24, 53]
+    //   3. Non-packed write of [54, 63]
+    //
+    // The packed command header will be written to block 0, and block data intended for [0, 23]
+    // will follow it in blocks [1, 24]. Write #2 will then overwrite block 24. To account for this,
+    // skip the packed command header when reading from the fake device.
+    std::vector<uint8_t> write_data1 = sdmmc_.Read(info.block_size, 23 * info.block_size);
+    EXPECT_BYTES_EQ(write_data1.data(), buffer.get(), write_data1.size());
+
+    // Check the last two writes.
+    std::vector<uint8_t> write_data2 = sdmmc_.Read(24 * info.block_size, 40 * info.block_size);
+    EXPECT_BYTES_EQ(write_data2.data(), buffer.get() + len - write_data2.size(),
+                    write_data2.size());
+
+    requests[0].command.opcode = BLOCK_OPCODE_READ;
+    requests[0].vmo_offset += max_transfer_size_in_blocks * 2;
+    requests[1].command.opcode = BLOCK_OPCODE_READ;
+    requests[1].vmo_offset += max_transfer_size_in_blocks * 2;
+
+    EXPECT_OK(client->FifoTransaction(requests, 2));
+
+    auto read_buffer = std::make_unique<uint8_t[]>(len);
+    EXPECT_OK(vmo.read(read_buffer.get(), len, len));
+
+    // Similarly, skip the packed command header when checking read data.
+    std::span<uint8_t> read_data1{read_buffer.get() + info.block_size, 23 * info.block_size};
+    EXPECT_BYTES_EQ(read_data1.data(), buffer.get(), read_data1.size());
+
+    std::span<uint8_t> read_data2{read_buffer.get() + (24 * info.block_size), 40 * info.block_size};
+    EXPECT_BYTES_EQ(read_data2.data(), buffer.get() + len - read_data2.size(), read_data2.size());
   });
 }
 
