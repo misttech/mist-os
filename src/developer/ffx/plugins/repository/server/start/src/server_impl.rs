@@ -10,6 +10,7 @@ use ffx_command_error::{bug, return_bug, return_user_error, Result};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::{default_address, default_tunnel_addr, StartCommand};
+use ffx_target::RcsKnocker;
 use fuchsia_async as fasync;
 use fuchsia_repo::manager::RepositoryManager;
 use fuchsia_repo::repo_client::RepoClient;
@@ -30,7 +31,7 @@ use std::io::Write;
 use std::sync::Arc;
 use target_connector::Connector;
 use target_errors::FfxTargetError;
-use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
+use target_holders::{RemoteControlProxyHolder, TargetInfoHolder};
 use tuf::metadata::RawSignedMetadata;
 
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
@@ -313,8 +314,9 @@ pub async fn serve_impl_validate_args(
 }
 
 pub async fn serve_impl<W: Write + 'static>(
-    target_proxy: Connector<TargetProxyHolder>,
     rcs_proxy: Connector<RemoteControlProxyHolder>,
+    target_info: &TargetInfoHolder,
+    knocker: &impl RcsKnocker,
     cmd: StartCommand,
     context: EnvironmentContext,
     mut writer: W,
@@ -512,6 +514,7 @@ pub async fn serve_impl<W: Write + 'static>(
     } else {
         let tunnel_addr = cmd.tunnel_addr.clone().unwrap_or_else(|| default_tunnel_addr());
         let r = target::main_connect_loop(
+            &context,
             &cmd,
             &repo_path,
             server_addr,
@@ -519,7 +522,8 @@ pub async fn serve_impl<W: Write + 'static>(
             repo_manager,
             loop_stop_rx,
             rcs_proxy,
-            target_proxy,
+            target_info,
+            knocker,
             &mut writer,
             tunnel_addr,
             connection_sink,
@@ -806,7 +810,6 @@ mod test {
                         RepositoryManagerRequest::Add { repo, responder } => {
                             let mut sender = sender.clone();
                             let events_closure = events_closure.clone();
-
                             fasync::Task::local(async move {
                                 events_closure
                                     .lock()
@@ -826,6 +829,35 @@ mod test {
 
         fn take_events(&self) -> Vec<RepositoryManagerEvent> {
             self.events.lock().unwrap().drain(..).collect::<Vec<_>>()
+        }
+    }
+
+    struct FakeRcsKnocker {
+        knock_skip: Vec<usize>,
+        knock_count: Arc<Mutex<usize>>,
+    }
+
+    impl FakeRcsKnocker {
+        fn new(knock_skip: Option<Vec<usize>>) -> Self {
+            let knock_skip = if let Some(k) = knock_skip { k } else { vec![] };
+            Self { knock_count: Arc::new(Mutex::new(0)), knock_skip }
+        }
+    }
+
+    impl RcsKnocker for FakeRcsKnocker {
+        async fn knock_rcs(
+            &self,
+            _target_spec: Option<String>,
+            _env: &EnvironmentContext,
+        ) -> Result<(), ffx_target::KnockError> {
+            let mut knock_lock = self.knock_count.lock().unwrap();
+            *knock_lock += 1;
+            if self.knock_skip.contains(&*knock_lock) {
+                // In theory we could have this never respond.
+                Err(ffx_target::KnockError::CriticalError(anyhow!("rcs error")))
+            } else {
+                Ok(())
+            }
         }
     }
 
@@ -1528,7 +1560,6 @@ mod test {
 
         let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
-        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(None);
 
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
@@ -1540,10 +1571,6 @@ mod test {
                 let fake_engine = fec.clone();
                 let fake_netstack = fake_netstack.clone();
                 Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
-            }),
-            target_factory_closure: Box::new(move || {
-                let fake_target_proxy = fake_target_proxy.clone();
-                Box::pin(async { Ok(fake_target_proxy) })
             }),
             ..Default::default()
         };
@@ -1568,6 +1595,19 @@ mod test {
             (REPO_LOCALHOST_IPV4_ADDR, LOCALHOST)
         };
 
+        let target_info = if direct_target_connection {
+            TargetInfoHolder::from(TargetInfo {
+                nodename: Some("test_target_direct".to_string()),
+                ssh_host_address: Some(SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                ..Default::default()
+            })
+        } else {
+            TargetInfoHolder::from(TargetInfo {
+                nodename: Some("test_target_tunneled".to_string()),
+                ..Default::default()
+            })
+        };
+
         let serve_tool = ServerStartTool {
             cmd: StartCommand {
                 repository: Some(REPO_NAME.to_string()),
@@ -1588,12 +1628,10 @@ mod test {
                 disconnected: false,
             },
             context: env.environment_context().clone(),
-            target_proxy_connector: Connector::try_from_env(&env)
-                .await
-                .expect("Could not make target proxy test connector"),
             rcs_proxy_connector: Connector::try_from_env(&env)
                 .await
                 .expect("Could not make RCS test connector"),
+            target_info,
         };
 
         let buffers = TestBuffers::default();
@@ -1604,7 +1642,6 @@ mod test {
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
-            let _ = fake_target_rx.next().await.unwrap();
             let _ = fake_repo_rx.next().await.unwrap();
             let _ = fake_engine_rx.next().await.unwrap();
         })
@@ -1693,7 +1730,7 @@ mod test {
         let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
         // Create a target where the second and third knock requests are not answered, triggering the reconnect
         // loops in both the repository serve plugin and the Connect<TargetProxy>.
-        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(Some(vec![2, 3]));
+        let fake_rcs_knocker = FakeRcsKnocker::new(Some(vec![2, 3]));
 
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
@@ -1705,10 +1742,6 @@ mod test {
                 let fake_engine = fec.clone();
                 let fake_netstack = fake_netstack.clone();
                 Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
-            }),
-            target_factory_closure: Box::new(move || {
-                let fake_target_proxy = fake_target_proxy.clone();
-                Box::pin(async { Ok(fake_target_proxy) })
             }),
             ..Default::default()
         };
@@ -1732,6 +1765,19 @@ mod test {
             (REPO_LOCALHOST_IPV4_ADDR, LOCALHOST)
         };
 
+        let target_info = if direct_target_connection {
+            TargetInfoHolder::from(TargetInfo {
+                nodename: Some("test_target_direct".to_string()),
+                ssh_host_address: Some(SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                ..Default::default()
+            })
+        } else {
+            TargetInfoHolder::from(TargetInfo {
+                nodename: Some("test_target_tunneled".to_string()),
+                ..Default::default()
+            })
+        };
+
         // Run main in background
         let _task = fasync::Task::local(async move {
             // Use a tmp repo to allow metadata updates
@@ -1739,11 +1785,10 @@ mod test {
             let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
             test_utils::make_empty_pm_repo_dir(tmp_repo_path);
 
-            serve_impl(
-                Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make target proxy test connector"),
+            Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
+                &target_info,
+                &fake_rcs_knocker,
                 StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
@@ -1765,14 +1810,13 @@ mod test {
                 env.environment_context().clone(),
                 writer,
                 ServerMode::Foreground,
-            )
+            ))
             .await
             .unwrap()
         });
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
-            let _ = fake_target_rx.next().await.unwrap();
             let _ = fake_repo_rx.next().await.unwrap();
             let _ = fake_engine_rx.next().await.unwrap();
         })
@@ -1843,7 +1887,7 @@ mod test {
             vec!["Serving repository", "Connection to target lost", "Serving repository"];
         for expected in expected_outputs {
             let mut output_found = "";
-            'attempts: for _ in 0..30 {
+            'attempts: for _ in 0..60 {
                 let out = test_stdout.clone().into_string();
                 for line in out.split("\n") {
                     if line.starts_with(expected) {
@@ -1873,6 +1917,7 @@ mod test {
         let (fake_repo, _fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, _fake_engine_rx) = FakeEngine::new();
         let (_, fake_target_proxy, _) = FakeTarget::new(None);
+        let fake_rcs_knocker = FakeRcsKnocker::new(None);
 
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
@@ -1902,6 +1947,11 @@ mod test {
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
+        let target_info = TargetInfoHolder::from(TargetInfo {
+            nodename: Some("test_target_info".to_string()),
+            ..Default::default()
+        });
+
         // Run main in background
         let _task = fasync::Task::local(async move {
             // Use a tmp repo to allow metadata updates
@@ -1909,11 +1959,10 @@ mod test {
             let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
             test_utils::make_empty_pm_repo_dir(tmp_repo_path);
 
-            serve_impl(
-                Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make target proxy test connector"),
+            Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
+                &target_info,
+                &fake_rcs_knocker,
                 StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
@@ -1935,13 +1984,13 @@ mod test {
                 env.environment_context().clone(),
                 writer,
                 ServerMode::Foreground,
-            )
+            ))
             .await
             .unwrap()
         });
 
         // Wait for the "Serving repository ..." output
-        for _ in 0..10 {
+        for _ in 0..60 {
             if !test_stdout.clone().into_string().is_empty() {
                 break;
             }
@@ -2036,11 +2085,10 @@ mod test {
 
         let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, _fake_engine_rx) = FakeEngine::new();
-        let (_, fake_target_proxy, _) = FakeTarget::new(None);
+        let fake_rcs_knocker = FakeRcsKnocker::new(None);
 
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
-        let ftpc = fake_target_proxy.clone();
         let fake_netstack = Arc::new(FakeNetstack::new());
         let socket_provider = fake_netstack.new_socket_provider();
 
@@ -2050,10 +2098,6 @@ mod test {
                 let fake_engine = fec.clone();
                 let fake_netstack = fake_netstack.clone();
                 Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
-            }),
-            target_factory_closure: Box::new(move || {
-                let fake_target_proxy = ftpc.clone();
-                Box::pin(async { Ok(fake_target_proxy) })
             }),
             ..Default::default()
         };
@@ -2065,14 +2109,6 @@ mod test {
             .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
             .expect("set_behavior");
 
-        // Future resolves once fake target exists
-        let _timeout = timeout(time::Duration::from_secs(10), async {
-            let target = fake_target_proxy.identity().await.unwrap();
-            assert_eq!(target, to_target_info(TARGET_NODENAME.to_string()));
-        })
-        .await
-        .unwrap();
-
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
@@ -2082,13 +2118,25 @@ mod test {
             (REPO_LOCALHOST_IPV4_ADDR, LOCALHOST)
         };
 
+        let target_info = if direct_target_connection {
+            TargetInfoHolder::from(TargetInfo {
+                nodename: Some("test_target_direct".to_string()),
+                ssh_host_address: Some(SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                ..Default::default()
+            })
+        } else {
+            TargetInfoHolder::from(TargetInfo {
+                nodename: Some("test_target_tunneled".to_string()),
+                ..Default::default()
+            })
+        };
+
         // Run main in background
         let _task = fasync::Task::local(async move {
-            serve_impl(
-                Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make target proxy test connector"),
+            Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
+                &target_info,
+                &fake_rcs_knocker,
                 StartCommand {
                     repository: None,
                     trusted_root: None,
@@ -2110,7 +2158,7 @@ mod test {
                 test_env.context.clone(),
                 writer,
                 ServerMode::Foreground,
-            )
+            ))
             .await
             .unwrap()
         });
@@ -2253,6 +2301,8 @@ mod test {
         let fec = fake_engine.clone();
         let fake_netstack = Arc::new(FakeNetstack::new());
 
+        let fake_rcs_knocker = FakeRcsKnocker::new(None);
+
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
@@ -2296,19 +2346,22 @@ mod test {
         let mut serve_cmd_with_root = serve_cmd_without_root.clone();
         serve_cmd_with_root.trusted_root = trusted_root_path.clone().into();
 
+        let target_info = TargetInfoHolder::from(TargetInfo {
+            nodename: Some("test_target_info".to_string()),
+            ..Default::default()
+        });
         // Serving the repo should error out since it does not find root.json and
         // and can't initialize root of trust 1.root.json.
         assert_eq!(
-            serve_impl(
-                Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make target proxy test connector"),
+            Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
+                &target_info,
+                &fake_rcs_knocker,
                 serve_cmd_without_root,
                 test_env.context.clone(),
                 SimpleWriter::new(),
                 ServerMode::Foreground
-            )
+            ))
             .await
             .is_err(),
             true
@@ -2319,22 +2372,21 @@ mod test {
 
         // Run main in background
         let _task = fasync::Task::local(async move {
-            serve_impl(
-                Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make target proxy test connector"),
+            Box::pin(serve_impl(
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
+                &target_info,
+                &fake_rcs_knocker,
                 serve_cmd_with_root,
                 test_env.context.clone(),
                 writer,
                 ServerMode::Foreground,
-            )
+            ))
             .await
             .unwrap()
         });
 
         // Wait for the "Serving repository ..." output
-        for _ in 0..10 {
+        for _ in 0..60 {
             if !test_stdout.clone().into_string().is_empty() {
                 break;
             }

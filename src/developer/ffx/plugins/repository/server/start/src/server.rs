@@ -7,13 +7,14 @@ use crate::ServerStartTool;
 use ffx_command_error::{bug, return_user_error, user_error, FfxContext as _, Result};
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
+use ffx_target::RcsKnocker;
 use fho::FfxMain;
 use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use std::net::SocketAddr;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
+use target_holders::{RemoteControlProxyHolder, TargetInfoHolder};
 
 pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
     let mut argv: Vec<String> = vec![];
@@ -69,7 +70,8 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
 pub async fn run_foreground_server(
     start_cmd: StartCommand,
     context: EnvironmentContext,
-    target_proxy_connector: Connector<TargetProxyHolder>,
+    target_info: &TargetInfoHolder,
+    rcs_knocker: &impl RcsKnocker,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     w: <ServerStartTool as FfxMain>::Writer,
     mode: ServerMode,
@@ -90,14 +92,15 @@ pub async fn run_foreground_server(
         );
     }
 
-    serve_impl(
-        target_proxy_connector,
+    Box::pin(serve_impl(
         rcs_proxy_connector,
+        target_info,
+        rcs_knocker,
         start_cmd,
         context,
         w.simple_writer(),
         mode,
-    )
+    ))
     .await
 }
 
