@@ -624,7 +624,7 @@ mod test {
         &'static mut Locked<Unlocked>,
     ) {
         let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let (input_relay_handle, _, _, _, _, _, _, _, _, _, _) =
+        let (input_relay_handle, _, _, _, _, _, _, _, _, _, _, _) =
             start_input_relays_for_test(locked, &current_task).await;
         let dev = Arc::new(UinputDeviceFile::new(input_relay_handle));
 

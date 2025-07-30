@@ -398,10 +398,10 @@ mod test {
         keyboard_listener
     }
 
-    async fn init_button_listener(
+    async fn init_button_listeners(
         device_listener_stream: &mut fuipolicy::DeviceListenerRegistryRequestStream,
-    ) -> fuipolicy::MediaButtonsListenerProxy {
-        let buttons_listener = match device_listener_stream.next().await {
+    ) -> (fuipolicy::MediaButtonsListenerProxy, fuipolicy::TouchButtonsListenerProxy) {
+        let media_buttons_listener = match device_listener_stream.next().await {
             Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
                 listener,
                 responder,
@@ -414,7 +414,20 @@ mod test {
             }
         };
 
-        buttons_listener
+        let touch_buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterTouchButtonsListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy()
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        (media_buttons_listener, touch_buttons_listener)
     }
 
     async fn start_touch_input_inspect_and_dimensions(
@@ -461,7 +474,7 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, touch_source_stream)
     }
@@ -507,7 +520,7 @@ mod test {
         );
 
         let keyboad_listener = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, keyboad_listener)
     }
@@ -559,7 +572,7 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let button_listener = init_button_listener(&mut device_listener_stream).await;
+        let (button_listener, _) = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, button_listener)
     }
@@ -614,7 +627,7 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
 
         (input_device, input_file, mouse_source_stream)
     }
@@ -1974,7 +1987,7 @@ mod test {
         );
 
         let _ = init_keyboard_listener(&mut keyboard_stream).await;
-        let _ = init_button_listener(&mut device_listener_stream).await;
+        let _ = init_button_listeners(&mut device_listener_stream).await;
 
         relay_handle.add_touch_device(
             0,
