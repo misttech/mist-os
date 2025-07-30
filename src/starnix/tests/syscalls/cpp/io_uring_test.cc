@@ -15,10 +15,6 @@
 #define IORING_SETUP_COOP_TASKRUN (1U << 8)
 #endif
 
-#ifndef IORING_SETUP_SINGLE_ISSUER
-#define IORING_SETUP_SINGLE_ISSUER (1U << 12)
-#endif
-
 namespace {
 
 int io_uring_setup(uint32_t entries, io_uring_params* params) {
@@ -31,16 +27,6 @@ TEST(IoUringTest, IoUringSetupCoopTaskrun) {
   }
   struct io_uring_params params = {};
   params.flags = IORING_SETUP_COOP_TASKRUN;
-  fbl::unique_fd fd(io_uring_setup(1, &params));
-  ASSERT_TRUE(fd.is_valid()) << strerror(errno);
-}
-
-TEST(IoUringTest, IoUringSetupSingleIssuer) {
-  if (!test_helper::IsStarnix() && !test_helper::IsKernelVersionAtLeast(6, 0)) {
-    GTEST_SKIP() << "Skip test for unsupported feature";
-  }
-  struct io_uring_params params = {};
-  params.flags = IORING_SETUP_SINGLE_ISSUER;
   fbl::unique_fd fd(io_uring_setup(1, &params));
   ASSERT_TRUE(fd.is_valid()) << strerror(errno);
 }
