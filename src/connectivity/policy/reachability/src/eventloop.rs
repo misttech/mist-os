@@ -391,7 +391,9 @@ impl EventLoop {
                 netcheck_res = netcheck_futures.select_next_some() => {
                     self.handle_netcheck_response(netcheck_res).await;
                 },
-                () = telemetry_fut => exit_with_anyhow_error(anyhow!("unexpectedly stopped serving telemetry")),
+                telemetry_res = telemetry_fut => exit_with_anyhow_error(
+                    anyhow!("unexpectedly stopped serving telemetry: {telemetry_res:?}")
+                ),
             }
         }
     }

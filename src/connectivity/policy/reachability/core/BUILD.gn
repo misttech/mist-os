@@ -71,6 +71,9 @@ rustc_library("lib") {
     "src/telemetry/convert.rs",
     "src/telemetry/inspect.rs",
     "src/telemetry/mod.rs",
+    "src/telemetry/processors/link_properties_state.rs",
+    "src/telemetry/processors/mod.rs",
+    "src/telemetry/testing/mod.rs",
     "src/testutil.rs",
     "src/watchdog.rs",
   ]

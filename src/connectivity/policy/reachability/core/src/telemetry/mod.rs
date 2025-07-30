@@ -4,9 +4,13 @@
 
 mod convert;
 mod inspect;
+mod processors;
 
 use self::inspect::{inspect_record_stats, Stats};
 use crate::{IpVersions, State};
+use processors::link_properties_state::{
+    InterfaceTimeSeriesGrouping, InterfaceType, LinkPropertiesStateLogger,
+};
 
 use anyhow::{format_err, Context, Error};
 use cobalt_client::traits::AsEventCode;
@@ -15,13 +19,17 @@ use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
-use futures::{select, Future, StreamExt};
+use futures::{future, select, Future, StreamExt, TryFutureExt};
 use log::{info, warn};
 use static_assertions::const_assert_eq;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use windowed_stats::aggregations::SumAndCount;
+use windowed_stats::experimental::serve::serve_time_matrix_inspection;
 use {fuchsia_async as fasync, network_policy_metrics_registry as metrics};
+
+#[cfg(test)]
+mod testing;
 
 pub async fn create_metrics_logger(
     factory_proxy: fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
@@ -145,14 +153,36 @@ const TELEMETRY_EVENT_BUFFER_SIZE: usize = 100;
 
 const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
+// Add in inputs for Vec of time series groupings.
 pub fn serve_telemetry(
     cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     inspect_node: InspectNode,
-) -> (TelemetrySender, impl Future<Output = ()>) {
+) -> (TelemetrySender, impl Future<Output = Result<(), Error>>) {
     let (sender, mut receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
     let sender = TelemetrySender::new(sender);
     let cloned_sender = sender.clone();
+
+    // Inspect nodes to hold time series and metadata for other nodes.
+    const METADATA_NODE_NAME: &str = "metadata";
+    let inspect_metadata_node = inspect_node.create_child(METADATA_NODE_NAME);
+    let inspect_time_series_node = inspect_node.create_child("time_series");
+    let link_properties_state_time_series_node =
+        inspect_time_series_node.create_child("link_properties_state");
+    let (time_matrix_client, time_series_fut) =
+        serve_time_matrix_inspection(link_properties_state_time_series_node);
+
+    let link_properties_state = LinkPropertiesStateLogger::new(
+        &inspect_metadata_node,
+        &format!("root/telemetry/{METADATA_NODE_NAME}"),
+        InterfaceTimeSeriesGrouping::Type(vec![InterfaceType::Ethernet, InterfaceType::WlanClient]),
+        &time_matrix_client,
+    );
     let fut = async move {
+        // Prevent the inspect nodes from being dropped while the loop is running.
+        let _inspect_metadata_node = inspect_metadata_node;
+        let _inspect_time_series_node = inspect_time_series_node;
+        let _link_properties_state = link_properties_state;
+
         let mut report_interval_stream = fasync::Interval::new(TELEMETRY_QUERY_INTERVAL);
         const ONE_MINUTE: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
         const_assert_eq!(ONE_MINUTE.into_nanos() % TELEMETRY_QUERY_INTERVAL.into_nanos(), 0);
@@ -179,6 +209,7 @@ pub fn serve_telemetry(
             }
         }
     };
+    let fut = future::try_join(fut, time_series_fut).map_ok(|((), ())| ());
     (sender, fut)
 }
 
@@ -1084,7 +1115,7 @@ mod tests {
         }
     }
 
-    fn setup_test() -> (TestHelper, Pin<Box<impl Future<Output = ()>>>) {
+    fn setup_test() -> (TestHelper, Pin<Box<impl Future<Output = Result<(), Error>>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
@@ -1097,7 +1128,7 @@ mod tests {
         let (telemetry_sender, test_fut) = serve_telemetry(cobalt_proxy, inspect_node);
         let mut test_fut = Box::pin(test_fut);
 
-        assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_matches::assert_matches!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let test_helper = TestHelper {
             telemetry_sender,
