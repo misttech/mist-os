@@ -169,10 +169,10 @@ static_library("testing") {
     "testing/base.h",
     "testing/mock-coordinator-listener.cc",
     "testing/mock-coordinator-listener.h",
+    "testing/mock-engine-fidl.cc",
+    "testing/mock-engine-fidl.h",
     "testing/mock-engine-listener.cc",
     "testing/mock-engine-listener.h",
-    "testing/mock-fidl-engine.cc",
-    "testing/mock-fidl-engine.h",
   ]
   deps = [
     "//src/devices/testing/mock-ddk",

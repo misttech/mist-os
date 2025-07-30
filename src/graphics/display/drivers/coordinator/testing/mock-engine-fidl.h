@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_FIDL_ENGINE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_FIDL_ENGINE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_ENGINE_FIDL_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_ENGINE_FIDL_H_
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <lib/fdf/cpp/arena.h>
@@ -21,7 +21,7 @@ namespace display_coordinator::testing {
 // This is a very rare case where strict mocking is warranted. The code under
 // test is an adapter that maps C++ calls 1:1 to FIDL calls. So, the API
 // contract being tested is expressed in terms of individual function calls.
-class MockFidlEngine final : public fdf::WireServer<fuchsia_hardware_display_engine::Engine> {
+class MockEngineFidl final : public fdf::WireServer<fuchsia_hardware_display_engine::Engine> {
  public:
   // Expectation containers for fuchsia.hardware.display.engine/Engine:
   using CompleteCoordinatorConnectionChecker = fit::function<void(
@@ -66,10 +66,10 @@ class MockFidlEngine final : public fdf::WireServer<fuchsia_hardware_display_eng
   using IsAvailableChecker =
       fit::function<void(fdf::Arena& arena, IsAvailableCompleter::Sync& completer)>;
 
-  MockFidlEngine();
-  MockFidlEngine(const MockFidlEngine&) = delete;
-  MockFidlEngine& operator=(const MockFidlEngine&) = delete;
-  ~MockFidlEngine();
+  MockEngineFidl();
+  MockEngineFidl(const MockEngineFidl&) = delete;
+  MockEngineFidl& operator=(const MockEngineFidl&) = delete;
+  ~MockEngineFidl();
 
   // Expectations for fuchsia.hardware.display.engine/Engine:
   void ExpectCompleteCoordinatorConnection(CompleteCoordinatorConnectionChecker checker);
@@ -145,4 +145,4 @@ class MockFidlEngine final : public fdf::WireServer<fuchsia_hardware_display_eng
 
 }  // namespace display_coordinator::testing
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_FIDL_ENGINE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_ENGINE_FIDL_H_
