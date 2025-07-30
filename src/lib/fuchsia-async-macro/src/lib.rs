@@ -185,7 +185,7 @@ pub fn run_until_stalled(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     } else {
         quote! {
-            let mut #executor = ::fuchsia_async::TestExecutor::new_with_fake_time();
+            let mut #executor = ::fuchsia_async::TestExecutorBuilder::new().fake_time(true).build();
             let mut fut = ::std::pin::pin!(func());
             match #executor.run_until_stalled(&mut fut) {
                 ::core::task::Poll::Ready(result) => result,
@@ -234,7 +234,7 @@ pub fn run_singlethreaded(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     } else {
         quote! {
-            ::fuchsia_async::LocalExecutor::new().run_singlethreaded(func())
+            ::fuchsia_async::LocalExecutorBuilder::new().build().run_singlethreaded(func())
         }
     };
     common(item, run_executor.into(), test)
@@ -293,7 +293,7 @@ pub fn run(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     } else {
         quote! {
-            ::fuchsia_async::SendExecutor::new(#threads).run(func())
+            ::fuchsia_async::SendExecutorBuilder::new().num_threads(#threads).build().run(func())
         }
     };
     common(item, run_executor.into(), test)
