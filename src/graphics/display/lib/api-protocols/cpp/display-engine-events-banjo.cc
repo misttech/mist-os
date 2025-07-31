@@ -65,7 +65,7 @@ void DisplayEngineEventsBanjo::OnDisplayAdded(
 
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
-    fdf::warn("OnDisplayAdded() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
     return;
   }
   display_engine_listener_.OnDisplayAdded(&banjo_display_info);
@@ -76,7 +76,7 @@ void DisplayEngineEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
 
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
-    fdf::warn("OnDisplayRemoved() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayRemoved() emitted with invalid event listener; event dropped");
     return;
   }
   display_engine_listener_.OnDisplayRemoved(banjo_display_id);
@@ -90,7 +90,7 @@ void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id,
   const config_stamp_t banjo_driver_config_stamp = config_stamp.ToBanjo();
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
-    fdf::warn("OnDisplayVsync() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayVsync() emitted with invalid event listener; event dropped");
     return;
   }
   display_engine_listener_.OnDisplayVsync(banjo_display_id, banjo_timestamp,
@@ -100,7 +100,7 @@ void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id,
 void DisplayEngineEventsBanjo::OnCaptureComplete() {
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
-    fdf::warn("OnCaptureComplete() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnCaptureComplete() emitted with invalid event listener; event dropped");
     return;
   }
   display_engine_listener_.OnCaptureComplete();
