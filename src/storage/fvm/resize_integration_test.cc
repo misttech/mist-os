@@ -2,10 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver-integration-test/fixture.h>
+#include <fidl/fuchsia.driver.test/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/driver_test_realm/realm_builder/cpp/lib.h>
+#include <lib/fdio/fd.h>
 
 #include <vector>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <zxtest/zxtest.h>
 
 #include "src/storage/fvm/format.h"
@@ -100,19 +105,48 @@ void GrowFvm(const fbl::unique_fd& devfs_root, const GrowParams& params,
   ASSERT_OK(vpartition->Destroy());
 }
 
-using driver_integration_test::IsolatedDevmgr;
-
 class FvmResizeTest : public zxtest::Test {
- public:
+ protected:
   void SetUp() override {
-    IsolatedDevmgr::Args args;
-    args.disable_block_watcher = true;
+    loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
+    loop_->StartThread();
 
-    ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
+    auto realm_builder = component_testing::RealmBuilder::Create();
+    driver_test_realm::Setup(realm_builder);
+    realm_ =
+        std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop_->dispatcher()));
+
+    zx::result dtr = realm_->component().Connect<fuchsia_driver_test::Realm>();
+    ASSERT_OK(dtr.status_value());
+    fidl::Arena arena;
+    auto args_builder = fuchsia_driver_test::wire::RealmArgs::Builder(arena);
+    args_builder.root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
+    args_builder.software_devices(std::vector{
+        fuchsia_driver_test::wire::SoftwareDevice{
+            .device_name = "ram-disk",
+            .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK,
+        },
+    });
+    fidl::WireResult result = fidl::WireCall(*dtr)->Start(args_builder.Build());
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result.value().is_ok());
+
+    auto [devfs_client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
+    fidl::UnownedClientEnd<fuchsia_io::Directory> exposed(
+        realm_->component().exposed().unowned_channel());
+    ASSERT_OK(fidl::WireCall(exposed)
+                  ->Open("dev-topological", fuchsia_io::kPermReadable, {}, server.TakeChannel())
+                  .status());
+    ASSERT_OK(
+        fdio_fd_create(devfs_client.TakeChannel().release(), devfs_root_.reset_and_get_address()));
   }
 
- protected:
-  IsolatedDevmgr devmgr_;
+  const fbl::unique_fd& devfs_root_fd() const { return devfs_root_; }
+
+ private:
+  std::unique_ptr<async::Loop> loop_;
+  std::unique_ptr<component_testing::RealmRoot> realm_;
+  fbl::unique_fd devfs_root_;
 };
 
 TEST_F(FvmResizeTest, PreallocatedMetadataGrowsCorrectly) {
@@ -120,10 +154,10 @@ TEST_F(FvmResizeTest, PreallocatedMetadataGrowsCorrectly) {
   constexpr uint64_t kMaxBlockCount = (4 << 10) * kSliceSize / kTestBlockSize;
 
   std::unique_ptr<RamdiskRef> ramdisk =
-      RamdiskRef::Create(devmgr_.devfs_root(), kTestBlockSize, kInitialBlockCount);
+      RamdiskRef::Create(devfs_root_fd(), kTestBlockSize, kInitialBlockCount);
   ASSERT_TRUE(ramdisk);
   std::unique_ptr<FvmAdapter> fvm =
-      FvmAdapter::CreateGrowable(devmgr_.devfs_root(), kTestBlockSize, kInitialBlockCount,
+      FvmAdapter::CreateGrowable(devfs_root_fd(), kTestBlockSize, kInitialBlockCount,
                                  kMaxBlockCount, kSliceSize, ramdisk.get());
   ASSERT_TRUE(fvm);
 
@@ -135,7 +169,7 @@ TEST_F(FvmResizeTest, PreallocatedMetadataGrowsCorrectly) {
       Header::FromDiskSize(fvm::kMaxUsablePartitions, kMaxBlockCount * kTestBlockSize, kSliceSize);
   params.seed = zxtest::Runner::GetInstance()->options().seed;
 
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devfs_root_fd(), params, ramdisk, fvm));
 }
 
 TEST_F(FvmResizeTest, PreallocatedMetadataGrowsAsMuchAsPossible) {
@@ -143,10 +177,10 @@ TEST_F(FvmResizeTest, PreallocatedMetadataGrowsAsMuchAsPossible) {
   constexpr uint64_t kMaxBlockCount = (4 << 10) * kSliceSize / kTestBlockSize;
 
   std::unique_ptr<RamdiskRef> ramdisk =
-      RamdiskRef::Create(devmgr_.devfs_root(), kTestBlockSize, kInitialBlockCount);
+      RamdiskRef::Create(devfs_root_fd(), kTestBlockSize, kInitialBlockCount);
   ASSERT_TRUE(ramdisk);
   std::unique_ptr<FvmAdapter> fvm =
-      FvmAdapter::CreateGrowable(devmgr_.devfs_root(), kTestBlockSize, kInitialBlockCount,
+      FvmAdapter::CreateGrowable(devfs_root_fd(), kTestBlockSize, kInitialBlockCount,
                                  kMaxBlockCount, kSliceSize, ramdisk.get());
   ASSERT_TRUE(fvm);
 
@@ -165,7 +199,7 @@ TEST_F(FvmResizeTest, PreallocatedMetadataGrowsAsMuchAsPossible) {
   params.format = expected;
   params.seed = zxtest::Runner::GetInstance()->options().seed;
 
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devfs_root_fd(), params, ramdisk, fvm));
 }
 
 TEST_F(FvmResizeTest, PreallocatedMetadataRemainsValidInPartialGrowths) {
@@ -174,10 +208,10 @@ TEST_F(FvmResizeTest, PreallocatedMetadataRemainsValidInPartialGrowths) {
   constexpr uint64_t kMaxBlockCount = (8 << 10) * kSliceSize / kTestBlockSize;
 
   std::unique_ptr<RamdiskRef> ramdisk =
-      RamdiskRef::Create(devmgr_.devfs_root(), kTestBlockSize, kInitialBlockCount);
+      RamdiskRef::Create(devfs_root_fd(), kTestBlockSize, kInitialBlockCount);
   ASSERT_TRUE(ramdisk);
   std::unique_ptr<FvmAdapter> fvm =
-      FvmAdapter::CreateGrowable(devmgr_.devfs_root(), kTestBlockSize, kInitialBlockCount,
+      FvmAdapter::CreateGrowable(devfs_root_fd(), kTestBlockSize, kInitialBlockCount,
                                  kMaxBlockCount, kSliceSize, ramdisk.get());
   ASSERT_TRUE(fvm);
 
@@ -190,13 +224,13 @@ TEST_F(FvmResizeTest, PreallocatedMetadataRemainsValidInPartialGrowths) {
                                    kMaxBlockCount * kTestBlockSize, kSliceSize);
   params.seed = zxtest::Runner::GetInstance()->options().seed;
 
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devfs_root_fd(), params, ramdisk, fvm));
 
   params.format =
       Header::FromGrowableDiskSize(kMaxUsablePartitions, kMaxBlockCount * kTestBlockSize,
                                    kMaxBlockCount * kTestBlockSize, kSliceSize);
   params.target_size = kMaxBlockCount * kTestBlockSize;
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devfs_root_fd(), params, ramdisk, fvm));
 }
 
 }  // namespace

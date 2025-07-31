@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.driver.test/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
@@ -14,7 +15,7 @@
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
-#include <lib/driver-integration-test/fixture.h>
+#include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
@@ -46,6 +47,7 @@
 #include <new>
 #include <utility>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
@@ -127,20 +129,46 @@ struct PartitionChannel {
   fidl::ClientEnd<fuchsia_hardware_block_partition::Partition> partition;
 };
 
-using driver_integration_test::IsolatedDevmgr;
-
 class FvmTest : public zxtest::Test {
  protected:
   void SetUp() override {
-    IsolatedDevmgr::Args args;
-    args.disable_block_watcher = true;
+    loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
+    loop_->StartThread();
 
-    ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
+    auto realm_builder = component_testing::RealmBuilder::Create();
+    driver_test_realm::Setup(realm_builder);
+    realm_ =
+        std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop_->dispatcher()));
+
+    zx::result dtr = realm_->component().Connect<fuchsia_driver_test::Realm>();
+    ASSERT_OK(dtr.status_value());
+    fidl::Arena arena;
+    auto args_builder = fuchsia_driver_test::wire::RealmArgs::Builder(arena);
+    args_builder.root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
+    args_builder.software_devices(std::vector{
+        fuchsia_driver_test::wire::SoftwareDevice{
+            .device_name = "ram-disk",
+            .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK,
+        },
+    });
+    fidl::WireResult result = fidl::WireCall(*dtr)->Start(args_builder.Build());
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result.value().is_ok());
+
+    auto [devfs_client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
+    fidl::UnownedClientEnd<fuchsia_io::Directory> exposed(
+        realm_->component().exposed().unowned_channel());
+    ASSERT_OK(fidl::WireCall(exposed)
+                  ->Open("dev-topological", fuchsia_io::kPermReadable, {}, server.TakeChannel())
+                  .status());
+    ASSERT_OK(
+        fdio_fd_create(devfs_client.TakeChannel().release(), devfs_root_.reset_and_get_address()));
+
     ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root_fd().get(),
                                                    "sys/platform/ram-disk/ramctl"));
   }
 
-  const fbl::unique_fd& devfs_root_fd() const { return devmgr_.devfs_root(); }
+  const fbl::unique_fd& devfs_root_fd() const { return devfs_root_; }
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> devfs_root() const {
     fdio_cpp::UnownedFdioCaller caller(devfs_root_fd());
@@ -231,7 +259,9 @@ class FvmTest : public zxtest::Test {
   }
 
  private:
-  IsolatedDevmgr devmgr_;
+  std::unique_ptr<async::Loop> loop_;
+  std::unique_ptr<component_testing::RealmRoot> realm_;
+  fbl::unique_fd devfs_root_;
   ramdisk_client_t* ramdisk_ = nullptr;
 };
 
