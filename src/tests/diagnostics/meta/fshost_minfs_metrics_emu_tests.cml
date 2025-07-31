@@ -21,10 +21,10 @@
             "bootstrap/fshost:root/data_stats/data/cache:storage_size WHERE [a] And(a >= 0, (a - (4096 * (a // 4096))) == 0)",
 
             // Verify the filesystem type (which is hard-coded and stable)
-            "bootstrap/fshost/minfs:root/fs.info:type WHERE [a] a == 1852394785",
+            "bootstrap/fshost/fvm2/fs-collection*:root/fs.info:type WHERE [a] a == 1852394785",
 
             // Verify total bytes of filesystem is nonzero
-            "bootstrap/fshost/minfs:root/fs.usage:total_bytes WHERE [a] a > 0",
+            "bootstrap/fshost/fvm2/fs-collection*:root/fs.usage:total_bytes WHERE [a] a > 0",
         ],
     },
 }
