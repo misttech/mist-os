@@ -33,7 +33,7 @@ pub fn fscrypt_hkdf<const L: usize>(
 /// `initial_key_material` is the data being hashed.
 /// `info` is optional context (can be zero length string)
 /// `out` is populated with the result.
-fn hkdf<const L: usize>(initial_key_material: &[u8], info: &[u8], out: &mut [u8; L]) {
+pub fn hkdf<const L: usize>(initial_key_material: &[u8], info: &[u8], out: &mut [u8; L]) {
     const HASH_LEN: usize = 64;
     // HKDF-extract
     let mut hmac = hmac::Hmac::<sha2::Sha512>::new_from_slice(&[0; HASH_LEN]).unwrap();

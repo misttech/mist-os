@@ -406,14 +406,13 @@ mod test {
         let f2fs = F2fsReader::open_device(Arc::new(device)).await.expect("open ok");
         let root_ino = f2fs.root_ino();
         let root_entries = f2fs.readdir(root_ino).await.expect("readdir");
-        assert_eq!(root_entries.len(), 6);
+        assert_eq!(root_entries.len(), 5);
         assert_eq!(root_entries[0].filename, "a");
         assert_eq!(root_entries[0].file_type, FileType::Directory);
         assert_eq!(root_entries[1].filename, "large_dir");
         assert_eq!(root_entries[2].filename, "large_dir2");
         assert_eq!(root_entries[3].filename, "sparse.dat");
         assert_eq!(root_entries[4].filename, "fscrypt");
-        assert_eq!(root_entries[5].filename, "fscrypt_lblk32");
 
         let inlined_file_ino =
             resolve_inode_path(&f2fs, "/a/b/c/inlined").await.expect("resolve inlined");
@@ -542,18 +541,18 @@ mod test {
         //   $ sudo mount testdata/f2fs.img /mnt
         //   $ ls /mnt/fscrypt -lR
 
-        let str_a = "2t5HJwAAAAAuQMWhq8f-7u6NHW32gAX4"; // a
-        let str_b = "1yoAWgAAAADMBhUlTCdadXsBMsR13lQn"; // b
-        let str_symlink = "x6_E8QAAAADpQkQZBwcpIFjrR8sZgtkE"; // symlink
-        let bytes_symlink_content = b"AAAAAAAAAACWWJ_1EsQmJ6LGq1s0QKf6";
+        let str_a = "NKuk1QAAAADJvT0sogE0EI1H0T--cnwP"; // a
+        let str_b = "_9dQxgAAAAAwU9c2uQE1_7gk_y90HItg"; // b
+        let str_symlink = "KYMJjgAAAABsQ88j6M9Q4nmsXZ1cDnSc"; // symlink
+        let bytes_symlink_content = b"AAAAAAAAAABfxa334kxxbSt2IE22_MFy";
         let mut expected : HashSet<_> = [
-            "2paW0gAAAADUgfvyVGd09PwKYGFvEtrO",
-            "2t5HJwAAAAAuQMWhq8f-7u6NHW32gAX4",
-            "67KydQAAAAAoAsqfMHTmJge6f057J6wx",
-            "6NLwDQAAAAC4Ob3JGP77NRZPuQIzQBgO",
-            "hg-bUgAAAAB_QIYd05srvJf50NxvuMbPKketflvaYlVFCUjzS6mUNXuwnqC_2UVbFOeYe2rzgDCS7uwF88vhY0DiUZ-74Fq4acLVKCVUjOwmEWgWTwp_gQWn3XmQRcfwlqODvknOJKskGxRH9mHAbCPicN36qkJFzkbALRiSiCK_qGXbbVqJiee2xG7oO5jNmbkxWekkjSx8ZleID_s3cbjpv3uQ9Oz4Df8CzM-ZW6jvw_Js1MxX8LI5Ez_Q",
-            "m__yfAAAAAA6hASozPlJsSCCZ5NZa_l-",
-            "UNHjjwAAAAA-I-GWH-KjkF9vHO8Rlajo"].into_iter().collect();
+            "h-rU6QAAAABvcvrSi47pNbFgQEUBf_JUylLK1S2BHaDPN3I0qCqYdy1ul3ZyTgXpJUrQmfGT7kXudRqBJj1ZGPfv9OWc_VIgdWCLBNrqH2o1oOSzMk2FVFB7Woh1za03z_cPRA6T7-rOLfXyV37z92yjex24rpp6-Ws0W7aJhj7iqVAiudnW4nP-04wZV58ED6oHLpFOCfEgwGDlv37k2i7ERdXgkFhdhaqsx8IKm2ShEKqV6qywwtcwzl_t",
+            "ILcBrgAAAAAbLRmQf6nN4cFTI8retFUs",
+            "kW9d6QAAAAAhvwVPtWGcVSHUtfLThAL-",
+            "rTz5FQAAAACNkO0XR-TR6wX_gcUgo2sZ",
+            "UiuVqgAAAADTTp9HOB4lS_vON3fvD9M8",
+            "yZ50IQAAAAC7YvyCEWkvmFdkgN_SM5gJ",
+            "NKuk1QAAAADJvT0sogE0EI1H0T--cnwP" ].into_iter().collect();
 
         let device = open_test_image("/pkg/testdata/f2fs.img.zst");
 
@@ -614,24 +613,5 @@ mod test {
         let symlink_inode = Inode::try_load(&f2fs, symlink_ino).await.expect("load symlink inode");
         let symlink = f2fs.read_symlink(&symlink_inode).expect("read_symlink");
         assert_eq!(*symlink, *b"inlined");
-
-        // Check iv-ino-lblk-32 policy file contents
-        let ino = resolve_inode_path(&f2fs, "/fscrypt_lblk32/file").await.expect("lblk32 ino");
-        let inode = Inode::try_load(&f2fs, ino).await.expect("load inode");
-        assert!(
-            !inode.header.inline_flags.contains(inode::InlineFlags::Data),
-            "encrypted files shouldn't be inlined"
-        );
-        let data = f2fs.read_data(&inode, 0).await.expect("read_data").expect("non-empty page");
-        assert_eq!(
-            &data.as_slice()[..short_file.header.size as usize],
-            b"test45678abcdef_12345678"
-        );
-        let symlink_ino = resolve_inode_path(&f2fs, "/fscrypt_lblk32/symlink")
-            .await
-            .expect("resolve fscrypt symlink");
-        let symlink_inode = Inode::try_load(&f2fs, symlink_ino).await.expect("load symlink inode");
-        let symlink = f2fs.read_symlink(&symlink_inode).expect("read_symlink");
-        assert_eq!(*symlink, *b"file");
     }
 }
