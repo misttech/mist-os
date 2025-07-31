@@ -243,7 +243,7 @@ static void async_loop_cancel_all(async_loop_t* loop) {
   while ((node = list_remove_head(&loop->wait_list))) {
     mtx_unlock(&loop->lock);
     async_wait_t* wait = node_to_wait(node);
-    // Since the wait is being canceled, it would make sense to call zx_port_cancel()
+    // Since the wait is being canceled, it would make sense to call zx_port_cancel_key()
     // here before invoking the callback to ensure that the waited-upon handle is
     // no longer attached to the port.  However, the port is about to be destroyed
     // so we can optimize that step away.
@@ -612,11 +612,13 @@ static zx_status_t async_loop_cancel_wait(async_dispatcher_t* async, async_wait_
   // Next, cancel the wait.  This may be racing with another thread that
   // has read the wait's packet but not yet dispatched it.  So if we fail
   // to cancel then we assume we lost the race.
-  zx_status_t status = zx_port_cancel(loop->port, wait->object, (uintptr_t)wait);
+  uint64_t key = (uintptr_t)wait;
+  uint32_t options = 0;
+  zx_status_t status = zx_port_cancel_key(loop->port, options, key);
   if (status == ZX_OK) {
     list_delete(node);
   } else {
-    ZX_ASSERT_MSG(status == ZX_ERR_NOT_FOUND, "zx_port_cancel: status=%d", status);
+    ZX_ASSERT_MSG(status == ZX_ERR_NOT_FOUND, "zx_port_cancel_key: status=%d", status);
   }
 
   mtx_unlock(&loop->lock);
@@ -801,8 +803,9 @@ static void async_loop_restart_timer_locked(async_loop_t* loop) {
       // ZX_ERR_NOT_FOUND can happen here when a pending timer fires and
       // the packet is picked up by port_wait in another thread but has
       // not reached dispatch.
-      status = zx_port_cancel(loop->port, loop->timer, KEY_TIMER_CONTROL);
-      ZX_ASSERT_MSG(status == ZX_OK || status == ZX_ERR_NOT_FOUND, "zx_port_cancel: status=%d",
+      uint32_t options = 0;
+      status = zx_port_cancel_key(loop->port, options, KEY_TIMER_CONTROL);
+      ZX_ASSERT_MSG(status == ZX_OK || status == ZX_ERR_NOT_FOUND, "zx_port_cancel_key: status=%d",
                     status);
       loop->timer_armed = false;
     }
