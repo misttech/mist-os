@@ -68,7 +68,8 @@ inline std::string FindInterp(FileArg&& file_arg) {
 // This extracts the prefix (before '/') from a PT_INTERP string and optionally
 // registers gtest failures if it doesn't match the expected value.
 std::optional<std::string> ConfigFromInterp(  //
-    const std::filesystem::path& interp, std::optional<std::string_view> expected_config);
+    const std::filesystem::path& interp,
+    std::optional<std::string_view> expected_config = std::nullopt);
 
 }  // namespace ld::testing
 

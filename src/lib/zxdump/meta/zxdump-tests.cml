@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/gtest/default.shard.cml",
+        "//sdk/lib/syslog/client.shard.cml",
+        "//src/sys/test_runners/elf/create_raw_processes.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
-        "syslog/client.shard.cml",
     ],
     program: {
         binary: "test/zxdump-unittests",
