@@ -512,10 +512,8 @@ impl TargetCollection {
                     //
                     // To avoid that, only return network changed if the port
                     // is specified as well as a change.
-                    network_changed = if has_vsock_or_usb != to_update_has_vsock_or_usb {
-                        has_vsock_or_usb
-                    } else if has_vsock_or_usb {
-                        false
+                    network_changed = if has_vsock_or_usb {
+                        !to_update_has_vsock_or_usb
                     } else if let Some(target_ssh_port) = target.ssh_port() {
                         new_port.unwrap_or_default() != target_ssh_port
                     } else {
@@ -2080,6 +2078,96 @@ mod tests {
 
         assert_eq!(target.get_connection_state(), TargetConnectionState::Disconnected);
         assert!(target.host_pipe.borrow().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_vsock_resets_host_pipe() {
+        use crate::target::HostPipeState;
+        let local_node = overnet_core::Router::new(None).unwrap();
+        let target = Target::new_named("soggy-falafel");
+        target.set_state(TargetConnectionState::Mdns(Instant::now()));
+        target.host_pipe.borrow_mut().replace(HostPipeState {
+            task: Task::local(future::pending()),
+            overnet_node: local_node,
+            ssh_addr: None,
+            remote_overnet_id: target::RemoteOvernetIdState::Ready(Some(42)),
+        });
+        let address = "f111::1";
+        let ip = address.parse().unwrap();
+        target.set_state(TargetConnectionState::Mdns(Instant::now()));
+        target.addrs.borrow_mut().replace(TargetAddrEntry::new(
+            TargetAddr::new(ip, 0xbadf00d, 0),
+            Utc::now(),
+            TargetAddrStatus::ssh(),
+        ));
+        target.enable();
+
+        let collection = TargetCollection::new();
+        collection.merge_insert(target.clone());
+
+        let new_target = Target::new_named("soggy-falafel");
+        new_target.set_state(TargetConnectionState::Vsock(Instant::now()));
+        new_target.addrs.borrow_mut().insert(TargetAddrEntry {
+            addr: TargetAddr::VSockCtx(4),
+            timestamp: Utc::now(),
+            status: TargetAddrStatus::vsock(),
+        });
+        collection.merge_insert(new_target);
+
+        let id = target.host_pipe.borrow().as_ref().and_then(|x| {
+            if let target::RemoteOvernetIdState::Ready(y) = x.remote_overnet_id {
+                y
+            } else {
+                None
+            }
+        });
+
+        assert_ne!(Some(42), id);
+    }
+
+    #[fuchsia::test]
+    async fn test_vsock_preserves_host_pipe() {
+        use crate::target::HostPipeState;
+        let local_node = overnet_core::Router::new(None).unwrap();
+        let target = Target::new_named("soggy-falafel");
+        target.set_state(TargetConnectionState::Vsock(Instant::now()));
+        target.addrs.borrow_mut().insert(TargetAddrEntry {
+            addr: TargetAddr::VSockCtx(4),
+            timestamp: Utc::now(),
+            status: TargetAddrStatus::vsock(),
+        });
+        target.host_pipe.borrow_mut().replace(HostPipeState {
+            task: Task::local(future::pending()),
+            overnet_node: local_node,
+            ssh_addr: None,
+            remote_overnet_id: target::RemoteOvernetIdState::Ready(Some(42)),
+        });
+        target.enable();
+
+        let collection = TargetCollection::new();
+        collection.merge_insert(target.clone());
+
+        let address = "f111::1";
+        let ip = address.parse().unwrap();
+        let new_target = Target::new_named("soggy-falafel");
+        new_target.set_state(TargetConnectionState::Mdns(Instant::now()));
+        new_target.addrs.borrow_mut().replace(TargetAddrEntry::new(
+            TargetAddr::new(ip, 0xbadf00d, 0),
+            Utc::now(),
+            TargetAddrStatus::ssh(),
+        ));
+
+        collection.merge_insert(new_target);
+
+        let id = target.host_pipe.borrow().as_ref().and_then(|x| {
+            if let target::RemoteOvernetIdState::Ready(y) = x.remote_overnet_id {
+                y
+            } else {
+                None
+            }
+        });
+
+        assert_eq!(Some(42), id);
     }
 
     #[fuchsia::test]

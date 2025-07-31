@@ -271,7 +271,7 @@ impl EmulatorWatcher {
         Ok(())
     }
     fn handle_instance(instance: &EmulatorInstanceData) -> Option<ffx::TargetInfo> {
-        if instance.is_running() && instance.get_networking_mode() != &NetworkingMode::Tap {
+        if instance.is_running() {
             log::debug!(
                 "Making target from {} using ssh port {:?}",
                 &instance.get_name(),
@@ -301,7 +301,8 @@ impl EmulatorWatcher {
         }
 
         // TUN/TAP emulators are discoverable via mDNS.
-        if instance.get_networking_mode() == &NetworkingMode::Tap {
+        // TODO(435460863): Add unit tests that check this path.
+        if instance.get_networking_mode() == &NetworkingMode::Tap && vsock_device.is_none() {
             log::debug!("Skipping making target for {}, since it is tun/tap networking", nodename);
             return None;
         }
