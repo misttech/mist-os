@@ -8,6 +8,7 @@ mod array;
 mod buffer;
 mod hashmap;
 mod lock;
+mod lpm_trie;
 mod ring_buffer;
 mod vmar;
 
@@ -231,6 +232,7 @@ impl Map {
 pub enum MapValueRef<'a> {
     PlainRef(EbpfBufferPtr<'a>),
     HashMapRef(hashmap::HashMapEntryRef<'a>),
+    LpmTrieRef(lpm_trie::LpmTrieEntryRef<'a>),
 }
 
 impl<'a> MapValueRef<'a> {
@@ -242,14 +244,22 @@ impl<'a> MapValueRef<'a> {
         Self::HashMapRef(hash_map_ref)
     }
 
+    fn new_from_lpm_trie(lpm_trie_ref: lpm_trie::LpmTrieEntryRef<'a>) -> Self {
+        Self::LpmTrieRef(lpm_trie_ref)
+    }
+
     pub fn is_ref_counted(&self) -> bool {
-        matches!(&self, MapValueRef::HashMapRef(_))
+        match self {
+            Self::PlainRef(_) => false,
+            Self::HashMapRef(_) | Self::LpmTrieRef(_) => true,
+        }
     }
 
     pub fn ptr(&self) -> EbpfBufferPtr<'a> {
         match self {
-            MapValueRef::PlainRef(buf) => *buf,
-            MapValueRef::HashMapRef(hash_map_ref) => hash_map_ref.ptr(),
+            Self::PlainRef(buf) => *buf,
+            Self::HashMapRef(hash_map_ref) => hash_map_ref.ptr(),
+            Self::LpmTrieRef(lpm_trie_ref) => lpm_trie_ref.ptr(),
         }
     }
 }
@@ -262,15 +272,12 @@ fn create_map_impl(
         bpf_map_type_BPF_MAP_TYPE_ARRAY => Ok(Box::pin(array::Array::new(schema, vmo)?)),
         bpf_map_type_BPF_MAP_TYPE_HASH => Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?)),
         bpf_map_type_BPF_MAP_TYPE_RINGBUF => Ok(ring_buffer::RingBuffer::new(schema, vmo)?),
+        bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => Ok(Box::pin(lpm_trie::LpmTrie::new(schema, vmo)?)),
 
         // These types are in use, but not yet implemented. Incorrectly use Array or Hash for
         // these
         bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_DEVMAP_HASH");
-            Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
-        }
-        bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => {
-            track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_LPM_TRIE");
             Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
         }
         bpf_map_type_BPF_MAP_TYPE_PERCPU_HASH => {

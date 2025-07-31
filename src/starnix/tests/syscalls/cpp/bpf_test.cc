@@ -152,13 +152,14 @@ class BpfTestBase : public testing::Test {
   }
 
   fbl::unique_fd CreateMap(uint32_t type, uint32_t key_size, uint32_t value_size,
-                           uint32_t max_entries) {
+                           uint32_t max_entries, uint32_t flags = 0) {
     union bpf_attr attr;
     memset(&attr, 0, sizeof(attr));
     attr.map_type = type;
     attr.key_size = key_size;
     attr.value_size = value_size;
     attr.max_entries = max_entries;
+    attr.map_flags = flags;
 
     return fbl::unique_fd(SAFE_SYSCALL(bpf(BPF_MAP_CREATE, &attr)));
   }
@@ -835,6 +836,94 @@ TEST_F(BpfMapTest, NotificationsRingBufTest) {
   // A normal write will now send an event.
   WriteToRingBuffer(42);
   EXPECT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
+}
+
+TEST_F(BpfMapTest, LpmTrie) {
+  struct LpmKey {
+    uint32_t prefix_len;
+    uint32_t data;
+  };
+  fbl::unique_fd trie_fd = CreateMap(BPF_MAP_TYPE_LPM_TRIE, sizeof(LpmKey), sizeof(uint32_t), 10);
+
+  struct KeyValue {
+    LpmKey key;
+    uint32_t value;
+  };
+
+  KeyValue entries[3] = {
+      {
+          .key =
+              {
+                  .prefix_len = 8,
+                  .data = 0x0000000a,
+              },
+          .value = 1,
+      },
+      {
+          .key =
+              {
+                  .prefix_len = 24,
+                  .data = 0x000a000a,
+              },
+          .value = 2,
+      },
+
+      {
+          .key =
+              {
+                  .prefix_len = 32,
+                  .data = 0x7b0a000a,
+              },
+          .value = 3,
+      },
+  };
+
+  for (const auto& entry : entries) {
+    bpf_attr attr = {
+        .map_fd = (unsigned)trie_fd.get(),
+        .key = (uintptr_t)(&entry.key),
+        .value = (uintptr_t)(&entry.value),
+    };
+    EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM, &attr), 0) << strerror(errno);
+  }
+
+  KeyValue tests[3] = {
+      {
+          .key =
+              {
+                  .prefix_len = 32,
+                  .data = 0x7b0a000a,
+              },
+          .value = 3,
+      },
+      {
+          .key =
+              {
+                  .prefix_len = 32,
+                  .data = 0xc80a000a,
+              },
+          .value = 2,
+      },
+      {
+          .key =
+              {
+                  .prefix_len = 32,
+                  .data = 0x01000c0a,
+              },
+          .value = 1,
+      },
+  };
+
+  for (const auto& test : tests) {
+    uint32_t value;
+    bpf_attr attr = {
+        .map_fd = (unsigned)trie_fd.get(),
+        .key = (uintptr_t)(&test.key),
+        .value = (uintptr_t)(&value),
+    };
+    EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM, &attr), 0) << strerror(errno);
+    EXPECT_EQ(value, test.value);
+  }
 }
 
 class BpfCgroupTest : public BpfTestBase {

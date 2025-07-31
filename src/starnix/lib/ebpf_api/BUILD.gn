@@ -21,6 +21,7 @@ rustc_library("ebpf_api") {
     "src/maps/buffer.rs",
     "src/maps/hashmap.rs",
     "src/maps/lock.rs",
+    "src/maps/lpm_trie.rs",
     "src/maps/mod.rs",
     "src/maps/ring_buffer.rs",
     "src/maps/vmar.rs",
