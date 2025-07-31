@@ -78,7 +78,7 @@ mod test {
     static IP_TUNTAP_OUTPUT_FOUND: &str = "qemu: tap one_queue vnet_hdr persist user 12345\n";
     static IP_TUNTAP_OUTPUT_NOT_FOUND: &str = "\n";
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["id", "-u"] {
@@ -94,7 +94,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_no_tuntap_device() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["id", "-u"] {
@@ -110,7 +110,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_tuntap_found_for_different_user() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["id", "-u"] {
@@ -126,7 +126,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_success() -> Result<()> {
         let run_command: CommandRunner = |_args| {
             unreachable!();

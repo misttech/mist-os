@@ -278,7 +278,7 @@ NVIDIA Quadro K1200:
   Metal: Supported
 ";
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_graphics_cards_re() -> Result<()> {
         let supported = vec![
             "Intel Corporation HD Graphics P530 (rev NN)",
@@ -306,7 +306,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["lspci"] {
@@ -325,7 +325,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success_newer_driver_version() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["lspci"] {
@@ -344,7 +344,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success_newer_driver_version_2() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["lspci"] {
@@ -363,7 +363,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success_intel() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["lspci"] {
@@ -378,7 +378,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_no_good_cards() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["lspci"] {
@@ -393,7 +393,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_bad_driver_version() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["lspci"] {
@@ -409,7 +409,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_success_intel_hd_found() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["system_profiler", "SPDisplaysDataType"]);
@@ -422,7 +422,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_success_intel_iris_found() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["system_profiler", "SPDisplaysDataType"]);
@@ -435,7 +435,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_success_radeon_pro_found() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["system_profiler", "SPDisplaysDataType"]);
@@ -448,7 +448,7 @@ NVIDIA Quadro K1200:
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_no_good_cards() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["system_profiler", "SPDisplaysDataType"]);

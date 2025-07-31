@@ -58,7 +58,7 @@ mod test {
     use super::*;
     use crate::command_runner::ExitStatus;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success() -> Result<()> {
         env::set_var("HOME", "~");
         let run_command: CommandRunner = |args| {
@@ -75,7 +75,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_no_ssh_binary() -> Result<()> {
         env::set_var("HOME", "~");
         let run_command: CommandRunner = |args| {
@@ -92,7 +92,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_no_ssh_config() -> Result<()> {
         env::set_var("HOME", "~");
         let run_command: CommandRunner = |args| {
@@ -109,7 +109,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_success() -> Result<()> {
         env::set_var("HOME", "~");
         let run_command: CommandRunner = |args| {
@@ -126,7 +126,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_no_ssh_binary() -> Result<()> {
         env::set_var("HOME", "~");
         let run_command: CommandRunner = |args| {
@@ -143,7 +143,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_no_ssh_config() -> Result<()> {
         env::set_var("HOME", "~");
         let run_command: CommandRunner = |args| {

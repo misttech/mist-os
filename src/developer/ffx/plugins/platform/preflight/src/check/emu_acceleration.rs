@@ -176,7 +176,7 @@ power management:";
     static KERN_HV_SUPPORTED: &str = "\nkern.hv_support: 1\n";
     static KERN_HV_UNSUPPORTED: &str = "kern.hv_support: 0";
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_cpu_unsupported() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["cat", "/proc/cpuinfo"]);
@@ -189,7 +189,7 @@ power management:";
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_kvm_not_enabled() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["cat", "/proc/cpuinfo"] {
@@ -205,7 +205,7 @@ power management:";
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success_intel() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["cat", "/proc/cpuinfo"] {
@@ -221,7 +221,7 @@ power management:";
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_linux_success_amd() -> Result<()> {
         let run_command: CommandRunner = |args| {
             if args.to_vec() == vec!["cat", "/proc/cpuinfo"] {
@@ -237,7 +237,7 @@ power management:";
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_command_fails() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["sysctl", "kern.hv_support"]);
@@ -250,7 +250,7 @@ power management:";
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_unsupported() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["sysctl", "kern.hv_support"]);
@@ -263,7 +263,7 @@ power management:";
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_macos_success() -> Result<()> {
         let run_command: CommandRunner = |args| {
             assert_eq!(args.to_vec(), vec!["sysctl", "kern.hv_support"]);

@@ -207,7 +207,7 @@ mod test {
     use crate::command_runner::ExitStatus;
     use async_trait::async_trait;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_parse_macos_version() -> Result<()> {
         let mut run_command: command_runner::CommandRunner = |args| {
             assert_eq!(
@@ -240,7 +240,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn run_checks_success() -> Result<()> {
         let config = PreflightConfig { system: OperatingSystem::Linux };
         let checks: Vec<Box<dyn PreflightCheck>> = vec![Box::new(SuccessCheck {})];
@@ -275,7 +275,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn run_checks_fail_nonrecoverable() -> Result<()> {
         let config = PreflightConfig { system: OperatingSystem::Linux };
         let checks: Vec<Box<dyn PreflightCheck>> = vec![
@@ -309,7 +309,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn run_checks_fail_recoverable() -> Result<()> {
         let config = PreflightConfig { system: OperatingSystem::Linux };
         let checks: Vec<Box<dyn PreflightCheck>> = vec![
