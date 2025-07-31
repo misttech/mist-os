@@ -86,18 +86,12 @@ size_t UsableSlicesCount(size_t disk_size, size_t slice_size) {
 }
 
 struct PartitionChannel {
-  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> connect_block() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
+  fidl::ClientEnd<fuchsia_hardware_block::Block> connect_block() const {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+    EXPECT_OK(endpoints);
     auto [block_client, server] = std::move(endpoints.value());
-    if (fidl::OneWayStatus status =
-            fidl::WireCall(controller)->ConnectToDeviceFidl(server.TakeChannel());
-        !status.ok()) {
-      return zx::error(status.status());
-    }
-    return zx::ok(std::move(block_client));
+    EXPECT_TRUE(fidl::WireCall(controller)->ConnectToDeviceFidl(server.TakeChannel()).ok());
+    return std::move(block_client);
   }
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> as_block() {
@@ -109,20 +103,15 @@ struct PartitionChannel {
         partition.channel().borrow());
   }
 
-  static zx::result<PartitionChannel> Create(
-      fidl::ClientEnd<fuchsia_device::Controller> controller) {
+  static PartitionChannel Create(fidl::ClientEnd<fuchsia_device::Controller> controller) {
     PartitionChannel partition;
     partition.controller = std::move(controller);
     zx::result partition_server = fidl::CreateEndpoints(&partition.partition);
-    if (partition_server.is_error()) {
-      return partition_server.take_error();
-    }
-    if (fidl::OneWayStatus status = fidl::WireCall(partition.controller)
-                                        ->ConnectToDeviceFidl(partition_server->TakeChannel());
-        !status.ok()) {
-      return zx::error(status.status());
-    }
-    return zx::ok(std::move(partition));
+    EXPECT_OK(partition_server);
+    EXPECT_TRUE(fidl::WireCall(partition.controller)
+                    ->ConnectToDeviceFidl(partition_server->TakeChannel())
+                    .ok());
+    return partition;
   }
 
   fidl::ClientEnd<fuchsia_device::Controller> controller;
@@ -141,7 +130,7 @@ class FvmTest : public zxtest::Test {
         std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop_->dispatcher()));
 
     zx::result dtr = realm_->component().Connect<fuchsia_driver_test::Realm>();
-    ASSERT_OK(dtr.status_value());
+    ASSERT_OK(dtr);
     fidl::Arena arena;
     auto args_builder = fuchsia_driver_test::wire::RealmArgs::Builder(arena);
     args_builder.root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
@@ -224,7 +213,7 @@ class FvmTest : public zxtest::Test {
     if (controller.is_error()) {
       return controller.take_error();
     }
-    return PartitionChannel::Create(std::move(controller.value()));
+    return zx::ok(PartitionChannel::Create(std::move(controller.value())));
   }
 
   zx::result<PartitionChannel> WaitForPartition(
@@ -234,7 +223,7 @@ class FvmTest : public zxtest::Test {
     if (controller.is_error()) {
       return controller.take_error();
     }
-    return PartitionChannel::Create(std::move(controller.value()));
+    return zx::ok(PartitionChannel::Create(std::move(controller.value())));
   }
 
   struct AllocatePartitionRequest {
@@ -260,7 +249,7 @@ class FvmTest : public zxtest::Test {
     if (controller.is_error()) {
       return controller.take_error();
     }
-    return PartitionChannel::Create(std::move(controller.value()));
+    return zx::ok(PartitionChannel::Create(std::move(controller.value())));
   }
 
  private:
@@ -423,7 +412,7 @@ class VmoBuf {
   VmoBuf(fbl::RefPtr<VmoClient> client, size_t size) : client_(std::move(client)) {
     buf_ = std::make_unique<uint8_t[]>(size);
 
-    ASSERT_EQ(zx::vmo::create(size, 0, &vmo_), ZX_OK);
+    ASSERT_OK(zx::vmo::create(size, 0, &vmo_));
     zx::result vmoid = client_->RegisterVmo(vmo_);
     ASSERT_OK(vmoid);
     vmoid_ = std::move(vmoid.value());
@@ -479,7 +468,7 @@ void VmoClient::CheckWrite(VmoBuf& vbuf, size_t buf_off, size_t dev_off, size_t 
     vbuf.buf_[i + buf_off] = static_cast<uint8_t>(rand());
 
   // Write to the registered VMO
-  ASSERT_EQ(vbuf.vmo_.write(&vbuf.buf_[buf_off], buf_off, len), ZX_OK);
+  ASSERT_OK(vbuf.vmo_.write(&vbuf.buf_[buf_off], buf_off, len));
   ASSERT_EQ(len % block_size_, 0);
   ASSERT_EQ(buf_off % block_size_, 0);
   ASSERT_EQ(dev_off % block_size_, 0);
@@ -519,7 +508,7 @@ void VmoClient::CheckRead(VmoBuf& vbuf, size_t buf_off, size_t dev_off, size_t l
   Transaction(&request, 1);
 
   // Read from the registered VMO
-  ASSERT_EQ(vbuf.vmo_.read(out.get(), buf_off, len), ZX_OK);
+  ASSERT_OK(vbuf.vmo_.read(out.get(), buf_off, len));
 
   ASSERT_EQ(memcmp(&vbuf.buf_[buf_off], out.get(), len), 0);
 }
@@ -619,7 +608,7 @@ TEST_F(FvmTest, TestLarge) {
   const fuchsia_hardware_block::wire::BlockInfo& block_info = response.value()->info;
   ASSERT_LT(block_info.max_transfer_size, fvm_header.GetMetadataAllocatedBytes());
 
-  ASSERT_EQ(fs_management::FvmInit(ramdisk_block_interface(), kSliceSize), ZX_OK);
+  ASSERT_OK(fs_management::FvmInit(ramdisk_block_interface(), kSliceSize));
 
   auto resp = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
   ASSERT_OK(resp.status());
@@ -652,7 +641,7 @@ TEST_F(FvmTest, TestAllocateOne) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp = std::move(vp_or.value());
 
   // Check that the name matches what we provided
@@ -668,7 +657,7 @@ TEST_F(FvmTest, TestAllocateOne) {
   // Try accessing the block again after closing / re-opening it.
   vp = {};
   vp_or = WaitForPartition(kPartition1Matcher);
-  ASSERT_EQ(vp_or.status_value(), ZX_OK, "Couldn't re-open Data VPart");
+  ASSERT_OK(vp_or, "Couldn't re-open Data VPart");
   vp = std::move(vp_or.value());
   CheckWriteReadBlock(vp.as_block(), 0, 1);
   vp = {};
@@ -715,7 +704,7 @@ TEST_F(FvmTest, TestAllocateMany) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(data_or.status_value(), ZX_OK);
+  ASSERT_OK(data_or);
   PartitionChannel data = *std::move(data_or);
 
   zx::result blob_or = AllocatePartition({
@@ -723,7 +712,7 @@ TEST_F(FvmTest, TestAllocateMany) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartBlobName,
   });
-  ASSERT_EQ(blob_or.status_value(), ZX_OK);
+  ASSERT_OK(blob_or);
   PartitionChannel blob = *std::move(blob_or);
 
   zx::result sys_or = AllocatePartition({
@@ -731,7 +720,7 @@ TEST_F(FvmTest, TestAllocateMany) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartSystemName,
   });
-  ASSERT_EQ(sys_or.status_value(), ZX_OK);
+  ASSERT_OK(sys_or);
   PartitionChannel sys = *std::move(sys_or);
 
   CheckWriteReadBlock(data.as_block(), 0, 1);
@@ -769,7 +758,7 @@ TEST_F(FvmTest, TestVPartitionExtend) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK, "Couldn't open Volume");
+  ASSERT_OK(vp_or, "Couldn't open Volume");
   PartitionChannel vp = *std::move(vp_or);
   slices_left--;
   FVMCheckAllocatedCount(slices_total - slices_left, slices_total);
@@ -875,7 +864,7 @@ TEST_F(FvmTest, TestVPartitionExtend) {
       .guid = kTestUniqueGuid2,
       .name = kTestPartBlobName,
   });
-  ASSERT_NE(vp2_or.status_value(), ZX_OK, "Expected VPart allocation failure");
+  ASSERT_NOT_OK(vp2_or, "Expected VPart allocation failure");
 
   FVMCheckSliceSize(kSliceSize);
   ValidateFVM(ramdisk_block_interface());
@@ -893,7 +882,7 @@ TEST_F(FvmTest, TestVPartitionExtendSparse) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp = *std::move(vp_or);
   CheckWriteReadBlock(vp.as_block(), 0, 1);
 
@@ -970,7 +959,7 @@ TEST_F(FvmTest, TestVPartitionShrink) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK, "Couldn't open Volume");
+  ASSERT_OK(vp_or, "Couldn't open Volume");
   PartitionChannel vp = *std::move(vp_or);
   slices_left--;
 
@@ -1121,7 +1110,7 @@ TEST_F(FvmTest, TestVPartitionSplit) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp = *std::move(vp_or);
 
   // Confirm that the disk reports the correct number of slices
@@ -1258,7 +1247,7 @@ TEST_F(FvmTest, TestVPartitionDestroy) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(data_or.status_value(), ZX_OK);
+  ASSERT_OK(data_or);
   PartitionChannel data = *std::move(data_or);
 
   zx::result blob_or = AllocatePartition({
@@ -1266,7 +1255,7 @@ TEST_F(FvmTest, TestVPartitionDestroy) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartBlobName,
   });
-  ASSERT_EQ(blob_or.status_value(), ZX_OK);
+  ASSERT_OK(blob_or);
   PartitionChannel blob = *std::move(blob_or);
 
   zx::result sys_or = AllocatePartition({
@@ -1274,7 +1263,7 @@ TEST_F(FvmTest, TestVPartitionDestroy) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartSystemName,
   });
-  ASSERT_EQ(sys_or.status_value(), ZX_OK);
+  ASSERT_OK(sys_or);
   PartitionChannel sys = *std::move(sys_or);
 
   // We can access all three...
@@ -1327,7 +1316,7 @@ TEST_F(FvmTest, TestVPartitionQuery) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(part_or.status_value(), ZX_OK);
+  ASSERT_OK(part_or);
   PartitionChannel part = *std::move(part_or);
 
   // Create non-contiguous extent.
@@ -1438,7 +1427,7 @@ TEST_F(FvmTest, TestSliceAccessContiguous) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp = *std::move(vp_or);
   fidl::UnownedClientEnd device = vp.as_block();
 
@@ -1505,7 +1494,7 @@ TEST_F(FvmTest, TestSliceAccessMany) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp = *std::move(vp_or);
 
   fidl::UnownedClientEnd device = vp.as_block();
@@ -1597,7 +1586,7 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousPhysical) {
         .guid = kTestUniqueGuid1,
         .name = vpart.name,
     });
-    ASSERT_EQ(part_or.status_value(), ZX_OK);
+    ASSERT_OK(part_or);
     vpart.partition = *std::move(part_or);
   }
 
@@ -1736,7 +1725,7 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousVirtual) {
         .guid = kTestUniqueGuid1,
         .name = vpart.name,
     });
-    ASSERT_EQ(part_or.status_value(), ZX_OK);
+    ASSERT_OK(part_or);
     vpart.partition = *std::move(part_or);
   }
 
@@ -1809,7 +1798,7 @@ TEST_F(FvmTest, TestPersistenceSimple) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp = *std::move(vp_or);
   slices_left--;
 
@@ -1843,7 +1832,7 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   FVMRebind();
 
   vp_or = WaitForPartition(kPartition1Matcher);
-  ASSERT_OK(vp_or.status_value());
+  ASSERT_OK(vp_or);
   vp = *std::move(vp_or);
   device = vp.as_block();
 
@@ -1876,7 +1865,7 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   FVMRebind();
 
   vp_or = WaitForPartition(kPartition1Matcher);
-  ASSERT_OK(vp_or.status_value());
+  ASSERT_OK(vp_or);
   vp = *std::move(vp_or);
   device = vp.as_block();
 
@@ -1923,7 +1912,7 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   FVMRebind();
 
   vp_or = WaitForPartition(kPartition1Matcher);
-  ASSERT_OK(vp_or.status_value());
+  ASSERT_OK(vp_or);
   vp = *std::move(vp_or);
   device = vp.as_block();
 
@@ -1948,7 +1937,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
   fdio_cpp::UnownedFdioCaller devfs_caller(devfs_root.get());
   auto component = fs_management::FsComponent::FromDiskFormat(disk_format);
   // Format the VPart as |disk_format|.
-  ASSERT_EQ(fs_management::Mkfs(std::move(device), component, {}), ZX_OK);
+  ASSERT_OK(fs_management::Mkfs(std::move(device), component, {}));
 
   fuchsia_hardware_block_volume::wire::VsliceRange
       initial_ranges[fuchsia_hardware_block_volume::wire::kMaxSliceRequests];
@@ -1958,10 +1947,9 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
     zx::result controller =
         fs_management::OpenPartitionWithDevfs(devfs_caller.directory(), kPartition1Matcher, true);
     ASSERT_OK(controller);
-    zx::result vp = PartitionChannel::Create(std::move(controller.value()));
-    ASSERT_OK(vp);
+    PartitionChannel vp = PartitionChannel::Create(std::move(controller.value()));
 
-    const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+    const fidl::WireResult result = fidl::WireCall(vp.as_volume())
                                         ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
                                             const_cast<size_t*>(vslice_start), vslice_count));
     ASSERT_OK(result.status());
@@ -1979,7 +1967,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
     uint64_t offset = vslice_start[0] + response.response[0].count - 1;
     uint64_t length = 1;
     {
-      const fidl::WireResult result = fidl::WireCall(vp->as_volume())->Shrink(offset, length);
+      const fidl::WireResult result = fidl::WireCall(vp.as_volume())->Shrink(offset, length);
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
@@ -1987,7 +1975,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
 
     // Check slice allocation after manual grow/shrink
     {
-      const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+      const fidl::WireResult result = fidl::WireCall(vp.as_volume())
                                           ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
                                               const_cast<size_t*>(vslice_start), vslice_count));
       ASSERT_OK(result.status());
@@ -2002,9 +1990,8 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
     // fs process to finish and associated fidl channels to close before continuing to try and
     // prevent race conditions with the later mount call.
     fidl::ClientEnd device =
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(vp->partition.TakeChannel());
-    ASSERT_NE(fs_management::Mount(std::move(device), component, mounting_options).status_value(),
-              ZX_OK);
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(vp.partition.TakeChannel());
+    ASSERT_NOT_OK(fs_management::Mount(std::move(device), component, mounting_options));
 
     // We can't reuse the component.
     component = fs_management::FsComponent::FromDiskFormat(disk_format);
@@ -2014,21 +2001,20 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
     zx::result controller =
         fs_management::OpenPartitionWithDevfs(devfs_caller.directory(), kPartition1Matcher, true);
     ASSERT_OK(controller);
-    zx::result vp = PartitionChannel::Create(std::move(controller.value()));
-    ASSERT_OK(vp);
+    PartitionChannel vp = PartitionChannel::Create(std::move(controller.value()));
 
     // Grow back the slice we shrunk earlier.
     uint64_t offset = vslice_start[0];
     uint64_t length = 1;
     {
-      const fidl::WireResult result = fidl::WireCall(vp->as_volume())->Extend(offset, length);
+      const fidl::WireResult result = fidl::WireCall(vp.as_volume())->Extend(offset, length);
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
     }
 
     // Verify grow was successful.
-    const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+    const fidl::WireResult result = fidl::WireCall(vp.as_volume())
                                         ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
                                             const_cast<size_t*>(vslice_start), vslice_count));
     ASSERT_OK(result.status());
@@ -2046,7 +2032,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
       uint64_t offset = vslice_start[i] + response.response[i].count;
       uint64_t length = vslice_count - i;
       {
-        const fidl::WireResult result = fidl::WireCall(vp->as_volume())->Extend(offset, length);
+        const fidl::WireResult result = fidl::WireCall(vp.as_volume())->Extend(offset, length);
         ASSERT_OK(result.status());
         const fidl::WireResponse response = result.value();
         ASSERT_OK(response.status);
@@ -2055,7 +2041,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
 
     // Verify that the extensions were successful.
     {
-      const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+      const fidl::WireResult result = fidl::WireCall(vp.as_volume())
                                           ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
                                               const_cast<size_t*>(vslice_start), vslice_count));
       ASSERT_OK(result.status());
@@ -2070,19 +2056,17 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root,
 
     // Try mount again.
     fidl::ClientEnd device =
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(vp->partition.TakeChannel());
-    ASSERT_EQ(fs_management::Mount(std::move(device), component, mounting_options).status_value(),
-              ZX_OK);
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(vp.partition.TakeChannel());
+    ASSERT_OK(fs_management::Mount(std::move(device), component, mounting_options));
   }
 
   zx::result controller =
       fs_management::OpenPartitionWithDevfs(devfs_caller.directory(), kPartition1Matcher, true);
   ASSERT_OK(controller);
-  zx::result vp = PartitionChannel::Create(std::move(controller.value()));
-  ASSERT_OK(vp);
+  PartitionChannel vp = PartitionChannel::Create(std::move(controller.value()));
 
   // Verify that slices were fixed on mount.
-  const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+  const fidl::WireResult result = fidl::WireCall(vp.as_volume())
                                       ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
                                           const_cast<size_t*>(vslice_start), vslice_count));
   ASSERT_OK(result.status());
@@ -2111,7 +2095,7 @@ TEST_F(FvmTest, TestCorruptMount) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_OK(vp.status_value());
+  ASSERT_OK(vp);
 
   size_t kMinfsBlocksPerSlice = kSliceSize / minfs::kMinfsBlockSize;
   size_t minfs_vslice_count = 4;
@@ -2125,12 +2109,8 @@ TEST_F(FvmTest, TestCorruptMount) {
   fs_management::MountOptions mounting_options;
 
   // Run the test for Minfs.
-  {
-    zx::result device = vp->connect_block();
-    ASSERT_OK(device.status_value());
-    CorruptMountHelper(devfs_root_fd(), std::move(*device), mounting_options,
-                       fs_management::kDiskFormatMinfs, minfs_vslice_start, minfs_vslice_count);
-  }
+  CorruptMountHelper(devfs_root_fd(), vp->connect_block(), mounting_options,
+                     fs_management::kDiskFormatMinfs, minfs_vslice_start, minfs_vslice_count);
 
   size_t kBlobfsBlocksPerSlice = kSliceSize / blobfs::kBlobfsBlockSize;
   size_t blobfs_vslice_count = 3;
@@ -2141,12 +2121,8 @@ TEST_F(FvmTest, TestCorruptMount) {
   };
 
   // Run the test for Blobfs.
-  {
-    zx::result device = vp->connect_block();
-    ASSERT_OK(device.status_value());
-    CorruptMountHelper(devfs_root_fd(), std::move(*device), mounting_options,
-                       fs_management::kDiskFormatBlobfs, blobfs_vslice_start, blobfs_vslice_count);
-  }
+  CorruptMountHelper(devfs_root_fd(), vp->connect_block(), mounting_options,
+                     fs_management::kDiskFormatBlobfs, blobfs_vslice_start, blobfs_vslice_count);
 }
 
 TEST_F(FvmTest, TestVPartitionUpgrade) {
@@ -2163,7 +2139,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
         .name = kTestPartDataName,
         .flags = fuchsia_hardware_block_volume::wire::kAllocatePartitionFlagInactive,
     });
-    ASSERT_EQ(vp_fd_or.status_value(), ZX_OK, "Couldn't open Volume");
+    ASSERT_OK(vp_fd_or, "Couldn't open Volume");
   }
 
   {
@@ -2172,14 +2148,14 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
         .guid = kTestUniqueGuid2,
         .name = kTestPartBlobName,
     });
-    ASSERT_OK(vp_fd_or.status_value(), "Couldn't open volume");
+    ASSERT_OK(vp_fd_or, "Couldn't open volume");
   }
 
   // Release FVM device that we opened earlier
   FVMRebind();
 
   // The active partition should still exist.
-  ASSERT_OK(WaitForPartition(kPartition2Matcher).status_value());
+  ASSERT_OK(WaitForPartition(kPartition2Matcher));
   // The inactive partition should be gone.
   ASSERT_STATUS(OpenPartition(kPartition1Matcher).status_value(), ZX_ERR_NOT_FOUND);
 
@@ -2192,21 +2168,21 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
         .name = kTestPartDataName,
         .flags = fuchsia_hardware_block_volume::wire::kAllocatePartitionFlagInactive,
     });
-    ASSERT_OK(vp_fd_or.status_value(), "Couldn't open new volume");
+    ASSERT_OK(vp_fd_or, "Couldn't open new volume");
   }
 
   // Atomically set GUID1 as active and GUID2 as inactive.
   Upgrade(kTestUniqueGuid2, kTestUniqueGuid1, ZX_OK);
   // After upgrading, we should be able to open both partitions
-  ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
-  ASSERT_OK(WaitForPartition(kPartition2Matcher).status_value());
+  ASSERT_OK(WaitForPartition(kPartition1Matcher));
+  ASSERT_OK(WaitForPartition(kPartition2Matcher));
 
   // Rebind the FVM driver, check that the upgrade has succeeded.
   // The original (GUID2) should be deleted, and the new partition (GUID)
   // should exist.
   FVMRebind();
 
-  ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
+  ASSERT_OK(WaitForPartition(kPartition1Matcher));
   ASSERT_STATUS(OpenPartition(kPartition2Matcher).status_value(), ZX_ERR_NOT_FOUND);
 
   // Try upgrading when the "new" version doesn't exist.
@@ -2216,7 +2192,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   // Release FVM device that we opened earlier
   FVMRebind();
 
-  ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
+  ASSERT_OK(WaitForPartition(kPartition1Matcher));
   ASSERT_STATUS(OpenPartition(kPartition2Matcher).status_value(), ZX_ERR_NOT_FOUND);
 
   // Try upgrading when the "old" version doesn't exist.
@@ -2227,7 +2203,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
         .name = kTestPartBlobName,
         .flags = fuchsia_hardware_block_volume::wire::kAllocatePartitionFlagInactive,
     });
-    ASSERT_EQ(vp_fd_or.status_value(), ZX_OK, "Couldn't open volume");
+    ASSERT_OK(vp_fd_or, "Couldn't open volume");
   }
 
   uuid::Uuid fake_guid = {};
@@ -2237,8 +2213,8 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
 
   // We should be able to open both partitions again.
   zx::result vp_or = WaitForPartition(kPartition1Matcher);
-  ASSERT_OK(vp_or.status_value());
-  ASSERT_OK(WaitForPartition(kPartition2Matcher).status_value());
+  ASSERT_OK(vp_or);
+  ASSERT_OK(WaitForPartition(kPartition2Matcher));
 
   // Destroy and reallocate the first partition as inactive.
   {
@@ -2254,7 +2230,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
         .name = kTestPartDataName,
         .flags = fuchsia_hardware_block_volume::wire::kAllocatePartitionFlagInactive,
     });
-    ASSERT_EQ(vp_or.status_value(), ZX_OK, "Couldn't open volume");
+    ASSERT_OK(vp_or, "Couldn't open volume");
   }
 
   // Upgrade the partition with old_guid == new_guid.
@@ -2264,8 +2240,8 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   FVMRebind();
 
   // We should be able to open both partitions again.
-  ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
-  ASSERT_OK(WaitForPartition(kPartition2Matcher).status_value());
+  ASSERT_OK(WaitForPartition(kPartition1Matcher));
+  ASSERT_OK(WaitForPartition(kPartition2Matcher));
 }
 
 // Test that the FVM driver can mount filesystems.
@@ -2285,16 +2261,12 @@ TEST_F(FvmTest, TestMounting) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp(*std::move(vp_or));
 
   // Format the VPart as minfs
-  zx::result partition_block = vp.connect_block();
-  ASSERT_OK(partition_block.status_value());
   auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
-  ASSERT_EQ(
-      fs_management::Mkfs(std::move(*partition_block), component, fs_management::MkfsOptions()),
-      ZX_OK);
+  ASSERT_OK(fs_management::Mkfs(vp.connect_block(), component, fs_management::MkfsOptions()));
 
   fidl::ClientEnd device =
       fidl::ClientEnd<fuchsia_hardware_block::Block>(vp.partition.TakeChannel());
@@ -2302,11 +2274,11 @@ TEST_F(FvmTest, TestMounting) {
   // Mount the VPart
   fs_management::MountOptions mounting_options;
   auto mounted_filesystem = fs_management::Mount(std::move(device), component, mounting_options);
-  ASSERT_EQ(mounted_filesystem.status_value(), ZX_OK);
+  ASSERT_OK(mounted_filesystem);
   auto data = mounted_filesystem->DataRoot();
-  ASSERT_EQ(data.status_value(), ZX_OK);
+  ASSERT_OK(data);
   auto binding = fs_management::NamespaceBinding::Create(kMountPath, std::move(*data));
-  ASSERT_EQ(binding.status_value(), ZX_OK);
+  ASSERT_OK(binding);
 
   // Verify that the mount was successful.
   fbl::unique_fd rootfd;
@@ -2344,79 +2316,41 @@ TEST_F(FvmTest, TestMkfs) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp(*std::move(vp_or));
 
   // Format the VPart as minfs.
   auto minfs_component =
       fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
-  {
-    zx::result device = vp.connect_block();
-    ASSERT_OK(device.status_value());
-    ASSERT_EQ(
-        fs_management::Mkfs(std::move(*device), minfs_component, fs_management::MkfsOptions()),
-        ZX_OK);
-  }
+  ASSERT_OK(fs_management::Mkfs(vp.connect_block(), minfs_component, {}));
 
   // Format it as MinFS again, even though it is already formatted.
-  {
-    zx::result device = vp.connect_block();
-    ASSERT_OK(device.status_value());
-    ASSERT_EQ(
-        fs_management::Mkfs(std::move(*device), minfs_component, fs_management::MkfsOptions()),
-        ZX_OK);
-  }
+  ASSERT_OK(fs_management::Mkfs(vp.connect_block(), minfs_component, {}));
 
   // Now try reformatting as blobfs.
   auto blobfs_component =
       fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
-  {
-    zx::result device = vp.connect_block();
-    ASSERT_OK(device.status_value());
-    ASSERT_EQ(fs_management::Mkfs(std::move(*device), blobfs_component, {}), ZX_OK);
-  }
+  ASSERT_OK(fs_management::Mkfs(vp.connect_block(), blobfs_component, {}));
 
   // Demonstrate that mounting as minfs will fail, but mounting as blobfs
   // is successful.
-
-  {
-    zx::result device = vp.connect_block();
-    ASSERT_OK(device.status_value());
-    fs_management::MountOptions mounting_options;
-    ASSERT_NE(
-        fs_management::Mount(std::move(*device), minfs_component, mounting_options).status_value(),
-        ZX_OK);
-  }
+  ASSERT_NOT_OK(fs_management::Mount(vp.connect_block(), minfs_component, {}));
 
   // We can't reuse the component.
   minfs_component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
 
-  {
-    zx::result device = vp.connect_block();
-    ASSERT_OK(device.status_value());
-    ASSERT_EQ(fs_management::Mount(std::move(*device), blobfs_component, {}).status_value(), ZX_OK);
-  }
+  ASSERT_OK(fs_management::Mount(vp.connect_block(), blobfs_component, {}));
 
   // ... and reformat back to MinFS again.
-  {
-    zx::result device = vp.connect_block();
-    ASSERT_OK(device.status_value());
-    ASSERT_EQ(
-        fs_management::Mkfs(std::move(*device), minfs_component, fs_management::MkfsOptions()),
-        ZX_OK);
-  }
+  ASSERT_OK(fs_management::Mkfs(vp.connect_block(), minfs_component, {}));
 
   // Mount the VPart.
-  zx::result device = vp.connect_block();
-  ASSERT_OK(device.status_value());
-  fs_management::MountOptions mounting_options;
-  auto mounted_filesystem =
-      fs_management::Mount(std::move(device.value()), minfs_component, mounting_options);
-  ASSERT_EQ(mounted_filesystem.status_value(), ZX_OK);
+  auto mounted_filesystem = fs_management::Mount(vp.connect_block(), minfs_component, {});
+  ASSERT_OK(mounted_filesystem);
   auto data = mounted_filesystem->DataRoot();
-  ASSERT_EQ(data.status_value(), ZX_OK);
+  ASSERT_OK(data);
   auto binding = fs_management::NamespaceBinding::Create(kMountPath, std::move(*data));
-  ASSERT_EQ(binding.status_value(), ZX_OK);
+  ASSERT_OK(binding);
 
   // Verify that the mount was successful.
   fbl::unique_fd rootfd;
@@ -2454,7 +2388,7 @@ TEST_F(FvmTest, TestCorruptionOk) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp(*std::move(vp_or));
 
   // Extend the vpart (writes to primary)
@@ -2495,7 +2429,7 @@ TEST_F(FvmTest, TestCorruptionOk) {
   FVMRebind();
 
   vp_or = WaitForPartition(kPartition1Matcher);
-  ASSERT_EQ(vp_or.status_value(), ZX_OK, "Couldn't re-open Data VPart");
+  ASSERT_OK(vp_or, "Couldn't re-open Data VPart");
   vp = *std::move(vp_or);
 
   // The slice extension is still accessible.
@@ -2523,7 +2457,7 @@ TEST_F(FvmTest, TestCorruptionRegression) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp(*std::move(vp_or));
 
   // Extend the vpart (writes to primary)
@@ -2561,7 +2495,7 @@ TEST_F(FvmTest, TestCorruptionRegression) {
   FVMRebind();
 
   vp_or = WaitForPartition(kPartition1Matcher);
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   vp = *std::move(vp_or);
 
   // The slice extension is no longer accessible
@@ -2585,7 +2519,7 @@ TEST_F(FvmTest, TestCorruptionUnrecoverable) {
       .guid = kTestUniqueGuid1,
       .name = kTestPartDataName,
   });
-  ASSERT_EQ(vp_or.status_value(), ZX_OK);
+  ASSERT_OK(vp_or);
   PartitionChannel vp(*std::move(vp_or));
 
   // Extend the vpart (writes to primary)
@@ -2690,7 +2624,7 @@ TEST_F(FvmTest, TestPreventDuplicateDeviceNames) {
         .guid = kTestUniqueGuid1,
         .name = kTestPartDataName,
     });
-    ASSERT_OK(vp_or.status_value());
+    ASSERT_OK(vp_or);
     auto result = fidl::WireCall(vp_or.value().as_volume())->Destroy();
     ASSERT_OK(result.status());
     ASSERT_OK(result->status);
