@@ -45,51 +45,51 @@ impl fmt::Display for BalloonResult {
 
                 table.add_row(row![
                     "current-pages:",
-                    stats.current_pages.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.current_pages.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "requested-pages:",
-                    stats.requested_pages.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.requested_pages.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "swap-in:",
-                    stats.swap_in.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.swap_in.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "swap-out:",
-                    stats.swap_out.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.swap_out.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "major-faults:",
-                    stats.major_faults.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.major_faults.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "minor-faults:",
-                    stats.minor_faults.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.minor_faults.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "hugetlb-allocations:",
-                    stats.hugetlb_allocs.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.hugetlb_allocs.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "hugetlb-failures:",
-                    stats.hugetlb_failures.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.hugetlb_failures.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "free-memory:",
-                    stats.free_memory.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.free_memory.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "total-memory:",
-                    stats.total_memory.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.total_memory.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "available-memory:",
-                    stats.available_memory.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.available_memory.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
                 table.add_row(row![
                     "disk-caches:",
-                    stats.disk_caches.map_or("UNKNOWN".to_string(), |i| i.to_string())
+                    stats.disk_caches.map_or_else(|| "UNKNOWN".to_string(), |i| i.to_string())
                 ]);
 
                 write!(f, "{}", table)
