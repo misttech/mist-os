@@ -21,13 +21,16 @@ use bitflags::bitflags;
 use cfg_if::cfg_if;
 use flyweights::FlyByteStr;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
+use linux_uapi::BUS_ADRERR;
 use range_map::RangeMap;
 use smallvec::SmallVec;
 use starnix_ext::map_ext::EntryExt;
 use starnix_logging::{
     impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
-use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock, ThreadGroupLimits};
+use starnix_sync::{
+    LockBefore, Locked, MmDumpable, OrderedMutex, RwLock, ThreadGroupLimits, UserFaultInner,
+};
 use starnix_types::arch::ArchWidth;
 use starnix_types::futex_address::FutexAddress;
 use starnix_types::math::{round_down_to_system_page_size, round_up_to_system_page_size};
@@ -61,7 +64,7 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut, Range, RangeBounds};
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::{Arc, LazyLock};
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
@@ -1156,19 +1159,21 @@ impl MemoryManagerState {
             self.unmap(mm, src_addr, src_length, released_mappings)?;
         }
         if keep_source && private_anonymous {
-            // For MREMAP_DONTUNMAP case, replace the old range with a new one with the same flags
-            // This is done so that any new access would be a pagefault and would be
-            // zero-initialized.
+            // For MREMAP_DONTUNMAP case, uncommit the old range
             // TODO(https://fxbug.dev/381098290): Handle the case of private file-backed memory.
-            self.map_anonymous(
-                mm,
-                DesiredAddress::FixedOverwrite(src_addr),
-                src_length,
-                src_mapping.flags().access_flags(),
-                MappingOptions::ANONYMOUS,
-                src_mapping.name(),
-                released_mappings,
-            )?;
+            let memory = match src_mapping.backing() {
+                MappingBacking::Memory(backing) => backing.memory(),
+                #[cfg(feature = "alternate_anon_allocs")]
+                MappingBacking::PrivateAnonymous => &self.private_anonymous.backing,
+            };
+            let start = src_mapping.address_to_offset(src_addr);
+            memory.op_range(zx::VmoOp::ZERO, start, src_length as u64).map_err(|s| match s {
+                zx::Status::OUT_OF_RANGE => errno!(EINVAL),
+                zx::Status::NO_MEMORY => errno!(ENOMEM),
+                zx::Status::INVALID_ARGS => errno!(EINVAL),
+                zx::Status::ACCESS_DENIED => errno!(EACCES),
+                _ => impossible_error(s),
+            })?;
         }
 
         Ok(new_address)
@@ -1369,6 +1374,23 @@ impl MemoryManagerState {
         }
     }
 
+    fn protect_vmar_range(
+        &self,
+        addr: UserAddress,
+        length: usize,
+        prot_flags: ProtectionFlags,
+    ) -> Result<(), Errno> {
+        profile_duration!("Protect internal");
+        let vmar_flags = prot_flags.to_vmar_flags();
+        // SAFETY: Modifying user vmar
+        unsafe { self.user_vmar.protect(addr.ptr(), length, vmar_flags) }.map_err(|s| match s {
+            zx::Status::INVALID_ARGS => errno!(EINVAL),
+            zx::Status::NOT_FOUND => errno!(ENOMEM),
+            zx::Status::ACCESS_DENIED => errno!(EACCES),
+            _ => impossible_error(s),
+        })
+    }
+
     fn protect(
         &mut self,
         current_task: &CurrentTask,
@@ -1450,6 +1472,13 @@ impl MemoryManagerState {
         // Update the flags on each mapping in the range.
         let mut updates = vec![];
         for (range, mapping) in self.mappings.range(prot_range.clone()) {
+            if mapping.userfault().is_some() {
+                track_stub!(
+                    TODO("https://fxbug.dev/297375964"),
+                    "mprotect on uffd-registered range should not alter protections"
+                );
+                return error!(EINVAL);
+            }
             let range = range.intersect(&prot_range);
             let mut mapping = mapping.clone();
             mapping.set_flags(mapping.flags().with_access_flags(prot_flags));
@@ -3417,13 +3446,17 @@ impl MemoryManager {
     }
 
     // Register a given memory range with a userfault object.
-    pub fn register_with_uffd(
-        self: Arc<Self>,
+    pub fn register_with_uffd<L>(
+        self: &Arc<Self>,
+        locked: &mut Locked<L>,
         addr: UserAddress,
         length: usize,
-        userfault: Weak<UserFault>,
+        userfault: &Arc<UserFault>,
         mode: FaultRegisterMode,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<UserFaultInner>,
+    {
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
         let range_for_op = addr..end_addr;
         let mut updates = vec![];
@@ -3439,26 +3472,38 @@ impl MemoryManager {
             }
             let range = range.intersect(&range_for_op);
             let mut mapping = mapping.clone();
-            let registration = UserFaultRegistration::new(userfault.clone(), mode);
+            let registration = UserFaultRegistration::new(Arc::downgrade(userfault), mode);
             mapping.set_userfault(Box::new(registration));
             updates.push((range, mapping));
         }
         if updates.is_empty() {
             return error!(EINVAL);
         }
+
+        state
+            .protect_vmar_range(addr, length, ProtectionFlags::empty())
+            .expect("Failed to remove protections on uffd-registered range");
+
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
         for (range, mapping) in updates {
             state.mappings.insert(range, mapping);
         }
+
+        userfault.userfault_pages_insert(locked, range_for_op, false);
+
         Ok(())
     }
 
     // Unregister a given range from any userfault objects associated with it.
-    pub fn unregister_range_from_uffd(
-        self: Arc<Self>,
+    pub fn unregister_range_from_uffd<L>(
+        &self,
+        locked: &mut Locked<L>,
         addr: UserAddress,
         length: usize,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<UserFaultInner>,
+    {
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
         let range_for_op = addr..end_addr;
         let mut updates = vec![];
@@ -3469,30 +3514,43 @@ impl MemoryManager {
                 track_stub!(TODO("https://fxbug.dev/391599171"), "uffd for shmem and hugetlbfs");
                 return error!(EINVAL);
             }
-            let range = range.intersect(&range_for_op);
-            let mut mapping = mapping.clone();
-            mapping.clear_userfault();
-            updates.push((range, mapping));
+            if let Some(uf_registration) = mapping.userfault() {
+                let range = range.intersect(&range_for_op);
+                let mut mapping = mapping.clone();
+                mapping.clear_userfault();
+                updates.push((range.clone(), mapping));
+
+                if let Some(userfault) = uf_registration.userfault.upgrade() {
+                    userfault.userfault_pages_remove(locked, range);
+                }
+            }
         }
-        if updates.is_empty() {
-            return error!(EINVAL);
-        }
-        // Use a separate loop to avoid mutating the mappings structure while iterating over it.
         for (range, mapping) in updates {
-            state.mappings.insert(range, mapping);
+            let length = range.end - range.start;
+            let restored_flags = mapping.flags().access_flags();
+
+            state.mappings.insert(range.clone(), mapping);
+
+            state
+                .protect_vmar_range(range.start, length, restored_flags)
+                .expect("Failed to restore original protection bits on uffd-registered range");
         }
+
         Ok(())
     }
 
     // Unregister any mappings registered with a given userfault object. Used when closing the last
     // file descriptor associated to it.
-    pub fn unregister_all_from_uffd(self: Arc<Self>, userfault: Weak<UserFault>) {
+    pub fn unregister_all_from_uffd<L>(&self, locked: &mut Locked<L>, userfault: &Arc<UserFault>)
+    where
+        L: LockBefore<UserFaultInner>,
+    {
         let mut updates = vec![];
 
         let mut state = self.state.write();
         for (range, mapping) in state.mappings.iter() {
-            if let Some(uf) = mapping.userfault() {
-                if uf.userfault.ptr_eq(&userfault) {
+            if let Some(uf_registration) = mapping.userfault() {
+                if uf_registration.userfault.ptr_eq(&Arc::downgrade(userfault)) {
                     let mut mapping = mapping.clone();
                     mapping.clear_userfault();
                     updates.push((range.clone(), mapping));
@@ -3501,8 +3559,145 @@ impl MemoryManager {
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
         for (range, mapping) in updates {
-            state.mappings.insert(range, mapping);
+            let length = range.end - range.start;
+            let restored_flags = mapping.flags().access_flags();
+            state.mappings.insert(range.clone(), mapping);
+            // We can't recover from an error here as this is run during the cleanup.
+            state
+                .protect_vmar_range(range.start, length, restored_flags)
+                .expect("Failed to restore original protection bits on uffd-registered range");
         }
+
+        userfault.userfault_pages_remove(
+            locked,
+            UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
+                ..UserAddress::from_ptr(RESTRICTED_ASPACE_HIGHEST_ADDRESS),
+        );
+    }
+
+    /// Populate a range of pages registered with an userfaulfd according to a `populate` function.
+    /// This will fail if the pages were not registered with userfaultfd, or if the page at `addr`
+    /// was already populated. If any page other than the first one was populated, the `length`
+    /// is adjusted to only include the first N unpopulated pages, and this adjusted length
+    /// is then passed to `populate`. On success, returns the number of populated bytes.
+    pub fn populate_from_uffd<F, L>(
+        &self,
+        locked: &mut Locked<L>,
+        addr: UserAddress,
+        length: usize,
+        userfault: &Arc<UserFault>,
+        populate: F,
+    ) -> Result<usize, Errno>
+    where
+        F: FnOnce(&MemoryManagerState, usize) -> Result<usize, Errno>,
+        L: LockBefore<UserFaultInner>,
+    {
+        let state = self.state.read();
+
+        // Check that the addr..length range is a contiguous range of mappings which are all
+        // registered with an userfault object.
+        let mut bytes_registered_with_uffd = 0;
+        for (mapping, len) in state.get_contiguous_mappings_at(addr, length)? {
+            if let Some(uf_registration) = mapping.userfault() {
+                // Check that the mapping is registered with the same uffd. This is not required,
+                // but we don't support cross-uffd operations yet.
+                if !uf_registration.userfault.ptr_eq(&Arc::downgrade(userfault)) {
+                    track_stub!(
+                        TODO("https://fxbug.dev/391599171"),
+                        "operations across different uffds"
+                    );
+                    return error!(ENOTSUP);
+                };
+            } else {
+                return error!(ENOENT);
+            }
+            bytes_registered_with_uffd += len;
+        }
+        if bytes_registered_with_uffd != length {
+            return error!(ENOENT);
+        }
+
+        let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+
+        // Determine how many pages in the requested range are already populated
+        let first_populated =
+            userfault.get_first_populated_page_after(locked, addr).ok_or_else(|| errno!(ENOENT))?;
+        // If the very first page is already populated, uffd operations should just return EEXIST
+        if first_populated == addr {
+            return error!(EEXIST);
+        }
+        // Otherwise it is possible to do an incomplete operation by only populating pages until
+        // the first populated one.
+        let trimmed_end = std::cmp::min(first_populated, end_addr);
+        let effective_length = trimmed_end - addr;
+
+        populate(&state, effective_length)?;
+        userfault.userfault_pages_insert(locked, addr..trimmed_end, true);
+
+        // Since we used protection bits to force pagefaults, we now need to reverse this change by
+        // restoring the protections on the underlying Zircon mappings to the "real" protection bits
+        // that were kept in the Starnix mappings. This will prevent new pagefaults from being
+        // generated. Only do this on the pages that were populated by this operation.
+        for (range, mapping) in state.mappings.range(addr..trimmed_end) {
+            let range_to_protect = range.intersect(&(addr..trimmed_end));
+            let restored_flags = mapping.flags().access_flags();
+            let length = range_to_protect.end - range_to_protect.start;
+            state
+                .protect_vmar_range(range_to_protect.start, length, restored_flags)
+                .expect("Failed to restore original protection bits on uffd-registered range");
+        }
+        // Return the number of effectively populated bytes, which might be smaller than the
+        // requested number.
+        Ok(effective_length)
+    }
+
+    pub fn zero_from_uffd<L>(
+        &self,
+        locked: &mut Locked<L>,
+        addr: UserAddress,
+        length: usize,
+        userfault: &Arc<UserFault>,
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<UserFaultInner>,
+    {
+        self.populate_from_uffd(locked, addr, length, userfault, |state, effective_length| {
+            state.zero(addr, effective_length)
+        })
+    }
+
+    pub fn fill_from_uffd<L>(
+        &self,
+        locked: &mut Locked<L>,
+        addr: UserAddress,
+        buf: &[u8],
+        length: usize,
+        userfault: &Arc<UserFault>,
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<UserFaultInner>,
+    {
+        self.populate_from_uffd(locked, addr, length, userfault, |state, effective_length| {
+            state.write_memory(addr, &buf[..effective_length])
+        })
+    }
+
+    pub fn copy_from_uffd<L>(
+        &self,
+        locked: &mut Locked<L>,
+        source_addr: UserAddress,
+        dst_addr: UserAddress,
+        length: usize,
+        userfault: &Arc<UserFault>,
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<UserFaultInner>,
+    {
+        self.populate_from_uffd(locked, dst_addr, length, userfault, |state, effective_length| {
+            let mut buf = vec![std::mem::MaybeUninit::uninit(); effective_length];
+            let buf = state.read_memory(source_addr, &mut buf)?;
+            state.write_memory(dst_addr, &buf[..effective_length])
+        })
     }
 
     pub fn snapshot_to<L>(
@@ -3916,12 +4111,52 @@ impl MemoryManager {
         decoded: PageFaultExceptionReport,
         error_code: zx::Status,
     ) -> ExceptionResult {
-        // A page fault may be resolved by extending a growsdown mapping to cover the faulting
-        // address. Mark the exception handled if so. Otherwise let the regular handling proceed.
+        let addr = UserAddress::from(decoded.faulting_address);
+        // On uffd-registered range, handle according to the uffd rules
+        if error_code == zx::Status::ACCESS_DENIED {
+            let state = self.state.write();
+            if let Some((_, mapping)) = state.mappings.get(addr) {
+                if let Some(userfault_reg) = &mapping.userfault() {
+                    // TODO(https://fxbug.dev/391599171): Support other modes
+                    assert_eq!(userfault_reg.mode, FaultRegisterMode::MISSING);
 
-        // We should only attempt growth on a not-present fault and we should only extend if the
-        // access type matches the protection on the GROWSDOWN mapping.
+                    if let Some(_uffd) = userfault_reg.userfault.upgrade() {
+                        // If the SIGBUS feature was set, no event will be sent to the file.
+                        // Instead, SIGBUS is delivered to the process that triggered the fault.
+                        // TODO(https://fxbug.dev/391599171): For now we only support this feature,
+                        // so we assume it is set.
+                        // Check for the SIGBUS feature when we start supporting running without it.
+                        return ExceptionResult::Signal(SignalInfo::new(
+                            SIGBUS,
+                            BUS_ADRERR as i32,
+                            SignalDetail::SigFault { addr: decoded.faulting_address },
+                        ));
+                    };
+                }
+                let exec_denied = decoded.is_execute && !mapping.can_exec();
+                let write_denied = decoded.is_write && !mapping.can_write();
+                let read_denied = (!decoded.is_execute && !decoded.is_write) && !mapping.can_read();
+                // There is a data race resulting from uffd unregistration and page fault happening
+                // at the same time. To detect it, we check if the access was meant to be rejected
+                // according to Starnix own information about the mapping.
+                let false_reject = !exec_denied && !write_denied && !read_denied;
+                if false_reject {
+                    track_stub!(
+                        TODO("https://fxbug.dev/435171399"),
+                        "Inconsistent permission fault"
+                    );
+                    return ExceptionResult::Handled;
+                }
+            }
+            std::mem::drop(state);
+        }
+
         if decoded.not_present {
+            // A page fault may be resolved by extending a growsdown mapping to cover the faulting
+            // address. Mark the exception handled if so. Otherwise let the regular handling proceed.
+
+            // We should only attempt growth on a not-present fault and we should only extend if the
+            // access type matches the protection on the GROWSDOWN mapping.
             match self.extend_growsdown_mapping_to_address(
                 UserAddress::from(decoded.faulting_address),
                 decoded.is_write,
