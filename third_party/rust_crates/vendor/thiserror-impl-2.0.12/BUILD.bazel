@@ -6,8 +6,7 @@
 #     fx update-rustc-third-party
 ###############################################################################
 
-load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_proc_macro")
 load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
@@ -21,9 +20,9 @@ package(
 
 package_info(
     name = "package_info",
-    package_name = "thiserror",
+    package_name = "thiserror-impl",
     package_url = "https://github.com/dtolnay/thiserror",
-    package_version = "2.0.11",
+    package_version = "2.0.12",
 )
 
 license(
@@ -35,8 +34,8 @@ license(
     license_text = "LICENSE-APACHE",
 )
 
-rust_library(
-    name = "thiserror",
+rust_proc_macro(
+    name = "thiserror_impl",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -53,21 +52,14 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
-    crate_features = [
-        "default",
-        "std",
-    ],
     crate_root = "src/lib.rs",
     edition = "2021",
-    proc_macro_deps = [
-        "//third_party/rust_crates/vendor/thiserror-impl-2.0.11:thiserror_impl",
-    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=thiserror",
+        "crate-name=thiserror-impl",
         "manual",
         "noclippy",
         "norustfmt",
@@ -80,67 +72,10 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "2.0.11",
+    version = "2.0.12",
     deps = [
-        "//third_party/rust_crates/vendor/thiserror-2.0.11:build_script_build",
+        "//third_party/rust_crates/vendor/proc-macro2-1.0.94:proc_macro2",
+        "//third_party/rust_crates/vendor/quote-1.0.40:quote",
+        "//third_party/rust_crates/vendor/syn-2.0.103:syn",
     ],
-)
-
-cargo_build_script(
-    name = "_bs",
-    srcs = glob(
-        include = ["**/*.rs"],
-        allow_empty = False,
-    ),
-    compile_data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            "**/*.rs",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    crate_features = [
-        "default",
-        "std",
-    ],
-    crate_name = "build_script_build",
-    crate_root = "build.rs",
-    data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    edition = "2021",
-    pkg_name = "thiserror",
-    rustc_flags = [
-        "--cap-lints=allow",
-    ],
-    tags = [
-        "cargo-bazel",
-        "crate-name=thiserror",
-        "manual",
-        "noclippy",
-        "norustfmt",
-    ],
-    version = "2.0.11",
-    visibility = ["//visibility:private"],
-)
-
-alias(
-    name = "build_script_build",
-    actual = ":_bs",
-    tags = ["manual"],
 )

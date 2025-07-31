@@ -1077,7 +1077,7 @@ group("textwrap") {
 }
 
 group("thiserror") {
-  public_deps = [ ":thiserror-v2_0_11" ]
+  public_deps = [ ":thiserror-v2_0_12" ]
 }
 
 import("//third_party/rust_crates/private_visibility.gni")
@@ -3136,7 +3136,7 @@ rustc_library("bt-common-v0_0_1") {
   deps = []
   deps += [ ":futures-v0_3_30" ]
   deps += [ ":lazy_static-v1_5_0" ]
-  deps += [ ":thiserror-v2_0_11" ]
+  deps += [ ":thiserror-v2_0_12" ]
   deps += [ ":uuid-v1_1_2" ]
 
   rustenv = []
@@ -3171,7 +3171,7 @@ rustc_library("bt-gatt-v0_0_1") {
   deps += [ ":bt-common-v0_0_1" ]
   deps += [ ":futures-v0_3_30" ]
   deps += [ ":parking_lot-v0_12_0" ]
-  deps += [ ":thiserror-v2_0_11" ]
+  deps += [ ":thiserror-v2_0_12" ]
 
   rustenv = []
 
@@ -11006,7 +11006,7 @@ rustc_library("omaha_client-v0_2_2") {
   deps += [ ":serde_repr-v0_1_7($host_toolchain)" ]
   deps += [ ":sha2-v0_10_8" ]
   deps += [ ":signature-v1_6_4" ]
-  deps += [ ":thiserror-v2_0_11" ]
+  deps += [ ":thiserror-v2_0_12" ]
   deps += [ ":tracing-v0_1_40" ]
   deps += [ ":typed-builder-v0_10_0($host_toolchain)" ]
   deps += [ ":uuid-v1_1_2" ]
@@ -17971,39 +17971,39 @@ rustc_library("thiserror-v1_0_69") {
   applicable_licenses = [ ":thiserror-v1_0_69.license" ]
 }
 
-license("thiserror-v2_0_11.license") {
+license("thiserror-v2_0_12.license") {
   public_package_name = "thiserror"
   license_files = [
-    "//third_party/rust_crates/vendor/thiserror-2.0.11/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/thiserror-2.0.11/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/thiserror-2.0.12/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/thiserror-2.0.12/LICENSE-MIT",
   ]
 }
 
-rustc_library("thiserror-v2_0_11") {
+rustc_library("thiserror-v2_0_12") {
   crate_name = "thiserror"
-  source_root = "//third_party/rust_crates/vendor/thiserror-2.0.11/src/lib.rs"
-  output_name = "thiserror-8a3ff9093ac91484"
+  source_root = "//third_party/rust_crates/vendor/thiserror-2.0.12/src/lib.rs"
+  output_name = "thiserror-931cf9c27eba340a"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":thiserror-impl-v2_0_11($host_toolchain)" ]
+  deps += [ ":thiserror-impl-v2_0_12($host_toolchain)" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=8a3ff9093ac91484",
-    "-Cextra-filename=-8a3ff9093ac91484",
+    "-Cmetadata=931cf9c27eba340a",
+    "-Cextra-filename=-931cf9c27eba340a",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":thiserror-v2_0_11.license" ]
+  applicable_licenses = [ ":thiserror-v2_0_12.license" ]
 }
 
 license("thiserror-impl-v1_0_69.license") {
@@ -18042,19 +18042,19 @@ rustc_macro("thiserror-impl-v1_0_69") {
   applicable_licenses = [ ":thiserror-impl-v1_0_69.license" ]
 }
 
-license("thiserror-impl-v2_0_11.license") {
+license("thiserror-impl-v2_0_12.license") {
   public_package_name = "thiserror_impl"
   license_files = [
-    "//third_party/rust_crates/vendor/thiserror-impl-2.0.11/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/thiserror-impl-2.0.11/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/thiserror-impl-2.0.12/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/thiserror-impl-2.0.12/LICENSE-MIT",
   ]
 }
 
-rustc_macro("thiserror-impl-v2_0_11") {
+rustc_macro("thiserror-impl-v2_0_12") {
   crate_name = "thiserror_impl"
   source_root =
-      "//third_party/rust_crates/vendor/thiserror-impl-2.0.11/src/lib.rs"
-  output_name = "thiserror_impl-f3a0b485e9f76b86"
+      "//third_party/rust_crates/vendor/thiserror-impl-2.0.12/src/lib.rs"
+  output_name = "thiserror_impl-51ee74cdce8c37ad"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
@@ -18069,13 +18069,13 @@ rustc_macro("thiserror-impl-v2_0_11") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=f3a0b485e9f76b86",
-    "-Cextra-filename=-f3a0b485e9f76b86",
+    "-Cmetadata=51ee74cdce8c37ad",
+    "-Cextra-filename=-51ee74cdce8c37ad",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":thiserror-impl-v2_0_11.license" ]
+  applicable_licenses = [ ":thiserror-impl-v2_0_12.license" ]
 }
 
 license("thread_local-v1_1_7.license") {

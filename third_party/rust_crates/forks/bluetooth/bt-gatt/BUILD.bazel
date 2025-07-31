@@ -77,6 +77,6 @@ rust_library(
         "//third_party/rust_crates/forks/bluetooth/bt-common:bt_common",
         "//third_party/rust_crates/vendor/futures-0.3.30:futures",
         "//third_party/rust_crates/vendor/parking_lot-0.12.0:parking_lot",
-        "//third_party/rust_crates/vendor/thiserror-2.0.11:thiserror",
+        "//third_party/rust_crates/vendor/thiserror-2.0.12:thiserror",
     ],
 )

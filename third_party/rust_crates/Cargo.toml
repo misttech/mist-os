@@ -235,7 +235,7 @@ termion = "1.5.3"
 termtree = "0.5.1"
 test-case = "3.2.1"
 textwrap = { version = "0.16.2", default-features = false }
-thiserror = "2.0.11"
+thiserror = "2.0.12"
 tokio-rustls = "0.24.1"
 toml = "0.5"
 toml_edit = "0.2.1"
@@ -1060,7 +1060,7 @@ visibility = [
   "//tools/lib/reference_doc/macro:*",
 ]
 
-[gn.package.thiserror."2.0.11"]
+[gn.package.thiserror."2.0.12"]
 # Has build script but no config needed.
 
 [gn.package.thiserror."1.0.69"]
