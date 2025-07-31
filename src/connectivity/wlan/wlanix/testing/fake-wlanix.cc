@@ -336,6 +336,11 @@ void FakeWlanix::SetPskPassphrase(
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSetPskPassphrase});
 }
 
+void FakeWlanix::SetWepKey(fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetWepKeyRequest* request,
+                           SetWepKeyCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSetWepKey});
+}
+
 void FakeWlanix::Select(SelectCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSelect});
 }

@@ -4,13 +4,15 @@
 
 //! TODO(https://fxbug.dev/42084621): Types and functions in this file are taken from wlancfg. Dedupe later.
 
+pub mod wep;
+
+use crate::security::wep::WepKeys;
 use ieee80211::Bssid;
 use log::warn;
 use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use wlan_common::scan::Compatible;
-use wlan_common::security::wep::WepKey;
 use wlan_common::security::wpa::credential::Passphrase;
 use wlan_common::security::wpa::WpaDescriptor;
 use wlan_common::security::{SecurityAuthenticator, SecurityDescriptor};
@@ -21,6 +23,7 @@ pub enum Credential {
     /// used if a credential is not set.
     None,
     Password(Vec<u8>),
+    WepKey(WepKeys),
 }
 
 impl Credential {
@@ -28,6 +31,7 @@ impl Credential {
         match self {
             Credential::None => "None",
             Credential::Password(_) => "Password",
+            Credential::WepKey(_) => "WEP keys",
         }
     }
 }
@@ -71,8 +75,14 @@ fn bind_credential_to_protocol(
             _ => None,
         },
         SecurityDescriptor::Wep => match credential {
-            Credential::Password(ref key) => {
-                WepKey::parse(key).ok().and_then(|key| protocol.bind(Some(key.into())).ok())
+            Credential::WepKey(wep_keys) => {
+                let key = wep_keys.get_key();
+                protocol
+                    .bind(key.map(|k| k.into()))
+                    .inspect_err(|&e| {
+                        warn!("Error binding WEP key to get a security authenticator: {}", e);
+                    })
+                    .ok()
             }
             _ => None,
         },

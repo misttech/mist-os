@@ -56,6 +56,7 @@ enum class CommandTag {
   kSupplicantStaNetworkClearBssid,
   kSupplicantStaNetworkSetSsid,
   kSupplicantStaNetworkSetPskPassphrase,
+  kSupplicantStaNetworkSetWepKey,
   kSupplicantStaNetworkSelect,
   kSupplicantStaNetworkUnknownMethod
 };
@@ -163,6 +164,8 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
   void SetPskPassphrase(
       fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetPskPassphraseRequest* request,
       SetPskPassphraseCompleter::Sync& completer) override;
+  void SetWepKey(fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetWepKeyRequest* request,
+                 SetWepKeyCompleter::Sync& completer) override;
   void Select(SelectCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaNetwork> metadata,

@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security::wep::WepKeys;
 use crate::security::Credential;
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, format_err, Context, Error};
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_wlan_wlanix::{
     Nl80211MessageResponder, Nl80211MessageResponse, Nl80211MessageV2Responder,
@@ -713,6 +714,30 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
             info!("fidl_wlanix::SupplicantStaNetworkRequest::SetPskPassphrase");
             if let Some(passphrase) = payload.passphrase {
                 sta_network_state.lock().credential = Credential::Password(passphrase);
+            }
+        }
+        fidl_wlanix::SupplicantStaNetworkRequest::SetWepKey { payload, .. } => {
+            info!("fidl_wlanix::SupplicantStaNetworkRequest::SetWepKey");
+            let mut sta_network_state = sta_network_state.lock();
+            let key = payload.key.ok_or_else(|| format_err!("SetWepKey's key is None"))?;
+            let index =
+                payload.key_idx.ok_or_else(|| format_err!("SetWepKey's index is None"))? as usize;
+
+            match sta_network_state.credential {
+                Credential::None => {
+                    let mut wep_keys = WepKeys::new();
+                    wep_keys.set_key(key, index)?;
+
+                    sta_network_state.credential = Credential::WepKey(wep_keys);
+                }
+                Credential::Password(_) => {
+                    warn!("SetWepKey was called for a network that already has a passphrase; ignoring");
+                }
+                Credential::WepKey(ref mut wep_keys) => {
+                    wep_keys
+                        .set_key(key, index)
+                        .map_err(|e| format_err!("Error setting WEP key: {}", e))?;
+                }
             }
         }
         fidl_wlanix::SupplicantStaNetworkRequest::Select { responder } => {
@@ -1763,6 +1788,7 @@ mod tests {
     use std::pin::{pin, Pin};
     use test_case::test_case;
     use wlan_common::assert_variant;
+    use wlan_common::security::wep::WepKey;
     use {
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     };
@@ -2608,6 +2634,63 @@ mod tests {
         );
         assert_eq!(ssid, vec![b'f', b'o', b'o']);
         assert_eq!(credential, Credential::Password(passphrase));
+        assert_eq!(bssid, None);
+        let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
+        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
+
+        let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+        assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
+    }
+
+    #[test]
+    fn test_supplicant_sta_wep_network_connect_flow() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
+        let next_mcast = next_mcast_message(&mut mcast_stream);
+        let mut next_mcast = pin!(next_mcast);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+
+        let result = test_helper.supplicant_sta_network_proxy.set_ssid(
+            &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
+                ssid: Some(vec![b'f', b'o', b'o']),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+
+        let key = [b'w', b'e', b'p', b'k', b'e'];
+        let index = 0;
+        let result = test_helper.supplicant_sta_network_proxy.set_wep_key(
+            &fidl_wlanix::SupplicantStaNetworkSetWepKeyRequest {
+                key: Some(key.to_vec()),
+                key_idx: Some(index),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+
+        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+
+        let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
+        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut network_select_fut),
+            Poll::Ready(Ok(Ok(())))
+        );
+
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        let (ssid, credential, bssid) = assert_variant!(
+            iface_calls.lock()[0].clone(),
+            ClientIfaceCall::ConnectToNetwork { ssid, credential, bssid } => (ssid, credential, bssid)
+        );
+        assert_eq!(ssid, vec![b'f', b'o', b'o']);
+        assert_variant!(credential, Credential::WepKey(keys) => {
+            assert_eq!(keys.get_key(), Some(WepKey::Wep40(key)));
+        });
         assert_eq!(bssid, None);
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
