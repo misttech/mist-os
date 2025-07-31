@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -17,6 +18,10 @@
 
 #ifndef IORING_SETUP_SINGLE_ISSUER
 #define IORING_SETUP_SINGLE_ISSUER (1U << 12)
+#endif
+
+#ifndef IORING_SETUP_DEFER_TASKRUN
+#define IORING_SETUP_DEFER_TASKRUN (1U << 13)
 #endif
 
 namespace {
@@ -42,6 +47,21 @@ TEST(IoUringTest, IoUringSetupSingleIssuer) {
   struct io_uring_params params = {};
   params.flags = IORING_SETUP_SINGLE_ISSUER;
   fbl::unique_fd fd(io_uring_setup(1, &params));
+  ASSERT_TRUE(fd.is_valid()) << strerror(errno);
+}
+
+TEST(IoUringTest, IoUringSetupDeferTaskrun) {
+  if (!test_helper::IsStarnix() && !test_helper::IsKernelVersionAtLeast(6, 1)) {
+    GTEST_SKIP() << "Skip test for unsupported feature";
+  }
+  struct io_uring_params params = {};
+  params.flags = IORING_SETUP_DEFER_TASKRUN;
+  fbl::unique_fd fd(io_uring_setup(1, &params));
+  ASSERT_FALSE(fd.is_valid());
+  ASSERT_EQ(EINVAL, errno);
+
+  params.flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN;
+  fd = fbl::unique_fd(io_uring_setup(1, &params));
   ASSERT_TRUE(fd.is_valid()) << strerror(errno);
 }
 

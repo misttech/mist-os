@@ -73,11 +73,51 @@ bitflags! {
 
         /// The flags that we support. Specifying a flag outside of this set will generate an
         /// error.
-        const SupportedFlags = starnix_uapi::IORING_SETUP_CQSIZE | starnix_uapi::IORING_SETUP_COOP_TASKRUN | starnix_uapi::IORING_SETUP_SINGLE_ISSUER;
+        const SupportedFlags = starnix_uapi::IORING_SETUP_CQSIZE | starnix_uapi::IORING_SETUP_COOP_TASKRUN | starnix_uapi::IORING_SETUP_SINGLE_ISSUER | starnix_uapi::IORING_SETUP_DEFER_TASKRUN;
         /// The flags that we ignore. Specifying a flags in this set will not generate an error but
         /// will have no effect.
         // TODO(https://fxbug.dev/297431387): Implement these flags.
-        const IgnoredFlags = starnix_uapi::IORING_SETUP_COOP_TASKRUN | starnix_uapi::IORING_SETUP_SINGLE_ISSUER;
+        const IgnoredFlags = starnix_uapi::IORING_SETUP_COOP_TASKRUN | starnix_uapi::IORING_SETUP_SINGLE_ISSUER | starnix_uapi::IORING_SETUP_DEFER_TASKRUN;
+    }
+}
+
+impl IoRingSetupFlags {
+    fn build_and_validate_from(value: u32) -> Result<Self, Errno> {
+        let Some(flags) = IoRingSetupFlags::from_bits(value) else {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_setup undefined flag(s)",
+                value
+            );
+            return error!(EINVAL);
+        };
+
+        let unsupported_flags = flags.difference(IoRingSetupFlags::SupportedFlags);
+        if !unsupported_flags.is_empty() {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_setup unsupported flags",
+                unsupported_flags.bits()
+            );
+            return error!(EINVAL);
+        }
+        let ignored_flags = flags.intersection(IoRingSetupFlags::IgnoredFlags);
+        if !ignored_flags.is_empty() {
+            track_stub!(
+                TODO("https://fxbug.dev/297431387"),
+                "io_uring_setup ignored flags",
+                ignored_flags.bits()
+            );
+        }
+
+        // IORING_SETUP_COOP_TASKRUN requires IORING_SETUP_SINGLE_ISSUER
+        if flags.contains(IoRingSetupFlags::DeferTaskRun)
+            && !flags.contains(IoRingSetupFlags::SingleIssuer)
+        {
+            return error!(EINVAL);
+        }
+
+        return Ok(flags);
     }
 }
 
@@ -571,32 +611,7 @@ impl IoUringFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let Some(flags) = IoRingSetupFlags::from_bits(params.flags) else {
-            track_stub!(
-                TODO("https://fxbug.dev/297431387"),
-                "io_uring_setup undefined flag(s)",
-                params.flags
-            );
-            return error!(EINVAL);
-        };
-
-        let unsupported_flags = flags.difference(IoRingSetupFlags::SupportedFlags);
-        if !unsupported_flags.is_empty() {
-            track_stub!(
-                TODO("https://fxbug.dev/297431387"),
-                "io_uring_setup unsupported flags",
-                unsupported_flags.bits()
-            );
-            return error!(EINVAL);
-        }
-        let ignored_flags = flags.intersection(IoRingSetupFlags::IgnoredFlags);
-        if !ignored_flags.is_empty() {
-            track_stub!(
-                TODO("https://fxbug.dev/297431387"),
-                "io_uring_setup ignored flags",
-                ignored_flags.bits()
-            );
-        }
+        let flags = IoRingSetupFlags::build_and_validate_from(params.flags)?;
 
         let sq_entries = entries.next_power_of_two();
         let cq_entries = if flags.contains(IoRingSetupFlags::CqSize) {
