@@ -295,7 +295,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_valid_target_state() {
         const TEST_SOCKETADDR: &'static str = "[fe80::1%1]:22";
         let daemon = FakeDaemonBuilder::new().build();
@@ -380,7 +380,7 @@ mod tests {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_open_rcs_valid() {
         const TEST_NODE_NAME: &'static str = "villete";
         let local_node = overnet_core::Router::new(None).unwrap();

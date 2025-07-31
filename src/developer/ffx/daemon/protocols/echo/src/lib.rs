@@ -40,7 +40,7 @@ mod tests {
     use super::*;
     use protocols::testing::FakeDaemonBuilder;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_echo() {
         let daemon = FakeDaemonBuilder::new().register_fidl_protocol::<Echo>().build();
         let proxy = daemon.open_proxy::<ffx::EchoMarker>().await;

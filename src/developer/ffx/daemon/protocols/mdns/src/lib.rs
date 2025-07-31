@@ -153,7 +153,7 @@ mod tests {
         panic!("no port bound");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mdns_get_targets_empty() {
         let mdns = Rc::new(RefCell::new(Mdns {
             inner: None,
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(targets.len(), 0);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mdns_stop() {
         let daemon = FakeDaemonBuilder::new().build();
         let protocol = Rc::new(RefCell::new(Mdns {
@@ -182,7 +182,7 @@ mod tests {
         assert!(protocol.borrow().mdns_task.is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mdns_bind_event_on_first_listen() {
         let mdns = Rc::new(RefCell::new(Mdns {
             inner: None,
@@ -199,7 +199,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     #[ignore] // TODO(b/297919461) -- re-enable or delete
     async fn test_mdns_network_traffic_valid() {
         let mdns = Rc::new(RefCell::new(Mdns {
@@ -278,7 +278,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mdns_network_traffic_invalid() {
         let mdns = Rc::new(RefCell::new(Mdns {
             inner: None,
@@ -324,7 +324,7 @@ mod tests {
         assert_eq!(proxy.get_targets().await.unwrap().len(), 0);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mdns_network_traffic_wrong_protocol() {
         let mdns = Rc::new(RefCell::new(Mdns {
             inner: None,
@@ -375,7 +375,7 @@ mod tests {
         assert_eq!(proxy.get_targets().await.unwrap().len(), 0);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     #[ignore] // TODO(b/297919461) -- re-enable or delete
     async fn test_new_and_rediscovered_target() {
         let daemon = FakeDaemonBuilder::new().build();
@@ -418,7 +418,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_eviction() {
         let daemon = FakeDaemonBuilder::new().build();
         let protocol = Rc::new(RefCell::new(Mdns {
@@ -456,7 +456,7 @@ mod tests {
         assert!(new_target_found);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_eviction_timer_override() {
         let daemon = FakeDaemonBuilder::new().build();
         let protocol = Rc::new(RefCell::new(Mdns {

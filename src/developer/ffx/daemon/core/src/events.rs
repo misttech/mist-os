@@ -401,7 +401,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_receive_two_handlers() {
         let (tx_from_callback, rx_from_callback) = unbounded_channel::<bool>();
         let mut rx_from_callback = UnboundedReceiverStream::new(rx_from_callback);
@@ -416,7 +416,7 @@ mod test {
         assert!(rx_from_callback.next().await.unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_wait_for_event_once_async() {
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::new(&fake_events);
@@ -430,7 +430,7 @@ mod test {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_wait_for_event_once() {
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::new(&fake_events);
@@ -447,7 +447,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_wait_for_event_synthetic() {
         let fake_events = Rc::new(FakeEventSynthesizer {});
         let queue = Queue::new(&fake_events);
@@ -469,7 +469,7 @@ mod test {
         es.synthesize_events().await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn event_synthesis_dropped_state() {
         let fake_events = Rc::new(FakeEventSynthesizer {});
         let weak = Rc::downgrade(&fake_events);
@@ -520,7 +520,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn event_failure_drops_handler_synth_events() {
         let fake_events = Rc::new(EventFailerState {});
         let queue = Queue::new(&fake_events);
@@ -530,7 +530,7 @@ mod test {
         assert!(handler_dropped_rx.next().await.unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn event_failure_drops_handler() {
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::new(&fake_events);
@@ -546,7 +546,7 @@ mod test {
         assert!(handler_dropped_rx2.next().await.unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn event_done_drops_handler() {
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::new(&fake_events);
@@ -562,7 +562,7 @@ mod test {
         assert!(handler_dropped_rx2.next().await.unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn event_wait_for_timeout() {
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::<i32>::new(&fake_events);

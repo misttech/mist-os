@@ -1862,7 +1862,7 @@ mod test {
     }
 
     // Most of this is now handled in `task.rs`
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_disconnect_multiple_invocations() {
         let node = overnet_core::Router::new(None).unwrap();
         let t = Rc::new(Target::new_named("flabbadoobiedoo"));
@@ -1883,7 +1883,7 @@ mod test {
         expected: ffx::RemoteControlState,
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_rcs_states() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -1933,7 +1933,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_into_bridge_target() {
         let t = Target::new_named("cragdune-the-impaler");
         let a1 = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
@@ -1962,7 +1962,7 @@ mod test {
         assert_eq!(t_conv.product_config.unwrap(), DEFAULT_PRODUCT_CONFIG.to_owned(),);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_event_synthesis_wait() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -1977,7 +1977,7 @@ mod test {
         t.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await.unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_event_fire() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -1993,7 +1993,7 @@ mod test {
         fut.await.unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_update_connection_state() {
         let t = Target::new_named("have-you-seen-my-cat");
         let instant = Instant::now();
@@ -2006,7 +2006,7 @@ mod test {
         assert_eq!(TargetConnectionState::Mdns(instant), t.get_connection_state());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_connection_state_will_not_drop_rcs_on_mdns_events() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -2023,7 +2023,7 @@ mod test {
         assert_eq!(t.get_connection_state(), rcs_state);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_connection_state_will_not_drop_rcs_on_manual_events() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -2040,7 +2040,7 @@ mod test {
         assert_eq!(t.get_connection_state(), rcs_state);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_expire_state_mdns() {
         let t = Target::new_named("yo-yo-ma-plays-that-cello-ya-hear");
         let then = Instant::now() - (MDNS_MAX_AGE + Duration::from_secs(1));
@@ -2059,7 +2059,7 @@ mod test {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_expire_state_fastboot() {
         let t = Target::new_named("platypodes-are-venomous");
         let then = Instant::now() - (FASTBOOT_MAX_AGE + Duration::from_secs(1));
@@ -2078,7 +2078,7 @@ mod test {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_expire_state_zedboot() {
         let t = Target::new_named("platypodes-are-venomous");
         let then = Instant::now() - (ZEDBOOT_MAX_AGE + Duration::from_secs(1));
@@ -2097,7 +2097,7 @@ mod test {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_expire_state_manual_fastboot() {
         let t = Target::new_with_addr_entries(
             Some("platypodes-are-venomous"),
@@ -2118,7 +2118,7 @@ mod test {
         assert_eq!(t.get_connection_state(), TargetConnectionState::Fastboot(then));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_addresses_order_preserved() {
         let t = Target::new_named("this-is-a-target-i-guess");
         let addrs_pre = vec![
@@ -2154,7 +2154,7 @@ mod test {
         assert_eq!(addrs_post.drain(..).map(|e| e.addr).collect::<Vec<_>>(), t.addrs());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_addresses_order() {
         let t = Target::new_named("hi-hi-hi");
         let expected = SocketAddr::V6(SocketAddrV6::new(
@@ -2185,7 +2185,7 @@ mod test {
         assert_eq!(t.addrs().into_iter().next().unwrap(), TargetAddr::from(expected));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_set_preferred_ssh_address() {
         let target_addr: TargetIpAddr = TargetIpAddr::new("fe80::2".parse().unwrap(), 1, 0);
         let target = Target::new_with_addr_entries(
@@ -2197,7 +2197,7 @@ mod test {
         assert!(target.set_preferred_ssh_address(target_addr));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_set_preferred_ssh_address_with_non_existent_address() {
         let target = Target::new_with_addr_entries(
             Some("foo"),
@@ -2216,7 +2216,7 @@ mod test {
         )));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_ssh_address_priority() {
         let name = Some("bubba");
         let start = std::time::SystemTime::now();
@@ -2338,7 +2338,7 @@ mod test {
         assert_eq!(target.ssh_address(), Some("[fe80::2%1]:22".parse().unwrap()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ssh_address_info_no_port_provides_default_port() {
         let target = Target::new_with_addr_entries(
             Some("foo"),
@@ -2362,7 +2362,7 @@ mod test {
         assert_eq!(port, 22);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ssh_address_info_with_port() {
         let target = Target::new_with_addr_entries(
             Some("foo"),
@@ -2387,7 +2387,7 @@ mod test {
         assert_eq!(port, 8022);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_netsvc_target_has_no_ssh() {
         use std::iter::FromIterator;
         let target = Target::new_with_netsvc_addrs(
@@ -2418,7 +2418,7 @@ mod test {
         assert_eq!(target.ssh_address(), Some("[fe80::1%0]:22".parse::<SocketAddr>().unwrap()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_netsvc_ssh_address_info_should_be_none() {
         let ip = "f111::4".parse().unwrap();
         let mut addr_set = BTreeSet::new();
@@ -2428,7 +2428,7 @@ mod test {
         assert!(target.ssh_address_info().is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_is_manual() {
         let target = Target::new();
         target.addrs_insert_entry(TargetAddrEntry::new(
@@ -2442,7 +2442,7 @@ mod test {
         assert!(!target.is_manual());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_update_connection_state_manual_disconnect() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -2473,7 +2473,7 @@ mod test {
         assert_eq!(target.get_connection_state(), TargetConnectionState::Manual);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_disconnect() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let target = Target::new();
@@ -2491,7 +2491,7 @@ mod test {
         assert!(target.host_pipe.borrow().is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_host_pipe_state_borrow() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let (done_send, done_recv) = channel::oneshot::channel::<()>();
@@ -2513,7 +2513,7 @@ mod test {
         // No assertion -- we are making sure run_host_pipe() doesn't panic
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_from_target_for_targetinfo() {
         {
             let target = Target::new_for_usb("IANTHE");
@@ -2556,7 +2556,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_infer_fastboot_interface() {
         {
             let target = Target::new();
@@ -2671,7 +2671,7 @@ mod test {
     mod enabled {
         use super::*;
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_enable() {
             let target = Target::new();
 
@@ -2680,7 +2680,7 @@ mod test {
             assert!(target.is_enabled());
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_manual_targets_always_enable() {
             let target = Target::new_with_addr_entries(
                 Some("foo"),
@@ -2697,7 +2697,7 @@ mod test {
             assert!(target.is_enabled());
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_disable() {
             let target = Target::new_autoconnected("foo");
 
@@ -2709,7 +2709,7 @@ mod test {
 
         // Instant::now() - Duration panics on macOS builders.
         #[cfg(not(target_os = "macos"))]
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_transient_expire() {
             let target = Target::new_autoconnected("foo");
 
@@ -2741,7 +2741,7 @@ mod test {
 
         // Instant::now() - Duration panics on macOS builders.
         #[cfg(not(target_os = "macos"))]
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_non_transient_expire() {
             let target = Target::new_autoconnected("foo");
 
@@ -2763,7 +2763,7 @@ mod test {
             assert!(target.is_enabled());
         }
 
-        #[fuchsia_async::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn test_reset_transient_on_rediscovery() {
             let target = Target::new_autoconnected("foo");
 

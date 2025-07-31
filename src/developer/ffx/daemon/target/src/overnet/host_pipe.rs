@@ -796,7 +796,7 @@ mod test {
         ))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_host_pipe_start_and_stop_normal_operation() {
         let target = crate::target::Target::new_with_addrs(
             Some("flooooooooberdoober"),
@@ -819,7 +819,7 @@ mod test {
         // Shouldn't panic when dropped.
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_host_pipe_start_and_stop_internal_failure() {
         // TODO(awdavies): Verify the error matches.
         let target = crate::target::Target::new_with_addrs(
@@ -842,7 +842,7 @@ mod test {
         assert!(res.is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_host_pipe_start_and_stop_ssh_failure() {
         let target = crate::target::Target::new_with_addrs(
             Some("flooooooooberdoober"),

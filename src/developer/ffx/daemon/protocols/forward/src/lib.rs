@@ -346,7 +346,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_forward() {
         let forward = Forward::default();
         let context = Context::new(TestDaemon);
@@ -369,7 +369,7 @@ mod tests {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reverse() {
         let forward = Forward::default();
         let context = Context::new(TestDaemon);
