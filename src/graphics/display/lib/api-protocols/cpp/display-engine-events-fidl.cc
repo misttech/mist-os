@@ -74,11 +74,11 @@ void DisplayEngineEventsFidl::OnDisplayAdded(
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status =
+  fidl::OneWayStatus fidl_transport_status =
       fidl_client_.buffer(arena)->OnDisplayAdded(std::move(fidl_display_info));
-  if (!fidl_status.ok()) {
+  if (!fidl_transport_status.ok()) {
     FDF_LOG(ERROR, "OnDisplayAdded() FIDL failure: %s",
-            fidl_status.error().FormatDescription().c_str());
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 
@@ -91,11 +91,11 @@ void DisplayEngineEventsFidl::OnDisplayRemoved(display::DisplayId display_id) {
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status =
+  fidl::OneWayStatus fidl_transport_status =
       fidl_client_.buffer(arena)->OnDisplayRemoved(display_id.ToFidl());
-  if (!fidl_status.ok()) {
+  if (!fidl_transport_status.ok()) {
     FDF_LOG(ERROR, "OnDisplayRemoved() FIDL failure: %s",
-            fidl_status.error().FormatDescription().c_str());
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 
@@ -110,11 +110,11 @@ void DisplayEngineEventsFidl::OnDisplayVsync(display::DisplayId display_id,
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status = fidl_client_.buffer(arena)->OnDisplayVsync(
+  fidl::OneWayStatus fidl_transport_status = fidl_client_.buffer(arena)->OnDisplayVsync(
       display_id.ToFidl(), timestamp, config_stamp.ToFidl());
-  if (!fidl_status.ok()) {
+  if (!fidl_transport_status.ok()) {
     FDF_LOG(ERROR, "OnDisplayVsync() FIDL failure: %s",
-            fidl_status.error().FormatDescription().c_str());
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 
@@ -127,10 +127,10 @@ void DisplayEngineEventsFidl::OnCaptureComplete() {
   // TODO(https://fxbug.dev/430058446): Eliminate the per-call dynamic memory
   // allocation caused by fdf::Arena creation.
   fdf::Arena arena('DISP');
-  fidl::OneWayStatus fidl_status = fidl_client_.buffer(arena)->OnCaptureComplete();
-  if (!fidl_status.ok()) {
+  fidl::OneWayStatus fidl_transport_status = fidl_client_.buffer(arena)->OnCaptureComplete();
+  if (!fidl_transport_status.ok()) {
     FDF_LOG(ERROR, "OnCaptureComplete() FIDL failure: %s",
-            fidl_status.error().FormatDescription().c_str());
+            fidl_transport_status.error().FormatDescription().c_str());
   }
 }
 

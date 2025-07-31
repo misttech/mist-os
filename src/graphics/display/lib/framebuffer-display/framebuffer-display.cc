@@ -177,36 +177,40 @@ zx::result<display::DriverImageId> FramebufferDisplay::ImportImage(
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
-  fidl::WireResult check_result = collection->CheckAllBuffersAllocated();
+  fidl::WireResult check_transport_result = collection->CheckAllBuffersAllocated();
   // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
-  if (!check_result.ok()) {
-    fdf::error("failed to check buffers allocated, {}", check_result.FormatDescription().c_str());
-    return zx::error(check_result.status());
+  if (!check_transport_result.ok()) {
+    fdf::error("failed to check buffers allocated, {}",
+               check_transport_result.FormatDescription().c_str());
+    return zx::error(check_transport_result.status());
   }
-  const auto& check_response = check_result.value();
-  if (check_response.is_error()) {
-    if (check_response.error_value() == fuchsia_sysmem2::Error::kPending) {
+  fit::result<fuchsia_sysmem2::wire::Error>& check_domain_result = check_transport_result.value();
+  if (check_domain_result.is_error()) {
+    if (check_domain_result.error_value() == fuchsia_sysmem2::Error::kPending) {
       return zx::error(ZX_ERR_SHOULD_WAIT);
     }
-    return zx::error(sysmem::V1CopyFromV2Error(check_response.error_value()));
+    return zx::error(sysmem::V1CopyFromV2Error(check_domain_result.error_value()));
   }
 
-  fidl::WireResult wait_result = collection->WaitForAllBuffersAllocated();
+  fidl::WireResult wait_transport_result = collection->WaitForAllBuffersAllocated();
   // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
-  if (!wait_result.ok()) {
-    fdf::error("failed to wait for buffers allocated, {}", wait_result.FormatDescription().c_str());
-    return zx::error(wait_result.status());
+  if (!wait_transport_result.ok()) {
+    fdf::error("failed to wait for buffers allocated, {}",
+               wait_transport_result.FormatDescription().c_str());
+    return zx::error(wait_transport_result.status());
   }
-  auto& wait_response = wait_result.value();
-  if (wait_response.is_error()) {
-    return zx::error(sysmem::V1CopyFromV2Error(wait_response.error_value()));
+  fit::result<fuchsia_sysmem2::Error,
+              fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse*>&
+      wait_domain_result = wait_transport_result.value();
+  if (wait_domain_result.is_error()) {
+    return zx::error(sysmem::V1CopyFromV2Error(wait_domain_result.error_value()));
   }
   fuchsia_sysmem2::wire::BufferCollectionInfo& collection_info =
-      wait_response->buffer_collection_info();
+      wait_domain_result.value()->buffer_collection_info();
 
   if (!collection_info.settings().has_image_format_constraints()) {
     fdf::error("no image format constraints");
