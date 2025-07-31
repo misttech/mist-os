@@ -54,39 +54,39 @@ impl Executor {
     fn is_some(&self) -> bool {
         !matches!(self, Executor::Test | Executor::None { .. })
     }
-}
 
-impl quote::ToTokens for Executor {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+    fn build_token_stream(&self, func: &syn::Ident) -> TokenStream {
+        let mut tokens = TokenStream::new();
         tokens.extend(match self {
             Executor::None { thread_role } => {
                 if let Some(role) = thread_role {
-                    quote! { ::fuchsia::main_not_async_with_role(func, #role) }
+                    quote! { ::fuchsia::main_not_async_with_role(#func, #role) }
                 } else {
-                    quote! { ::fuchsia::main_not_async(func) }
+                    quote! { ::fuchsia::main_not_async(#func) }
                 }
             }
-            Executor::Test => quote! { ::fuchsia::test_not_async(func) },
+            Executor::Test => quote! { ::fuchsia::test_not_async(#func) },
             Executor::Singlethreaded { thread_role } => {
                 if let Some(role) = thread_role {
-                    quote! { ::fuchsia::main_singlethreaded_with_role(func, #role) }
+                    quote! { ::fuchsia::main_singlethreaded_with_role(#func, #role) }
                 } else {
-                    quote! { ::fuchsia::main_singlethreaded(func) }
+                    quote! { ::fuchsia::main_singlethreaded(#func) }
                 }
             }
             Executor::Multithreaded { threads, thread_role } => {
                 if let Some(role) = thread_role {
-                    quote! { ::fuchsia::main_multithreaded_with_role(func, #threads, #role) }
+                    quote! { ::fuchsia::main_multithreaded_with_role(#func, #threads, #role) }
                 } else {
-                    quote! { ::fuchsia::main_multithreaded(func, #threads) }
+                    quote! { ::fuchsia::main_multithreaded(#func, #threads) }
                 }
             }
-            Executor::SinglethreadedTest => quote! { ::fuchsia::test_singlethreaded(func) },
+            Executor::SinglethreadedTest => quote! { ::fuchsia::test_singlethreaded(#func) },
             Executor::MultithreadedTest { threads } => {
-                quote! { ::fuchsia::test_multithreaded(func, #threads) }
+                quote! { ::fuchsia::test_multithreaded(#func, #threads) }
             }
-            Executor::UntilStalledTest => quote! { ::fuchsia::test_until_stalled(func) },
-        })
+            Executor::UntilStalledTest => quote! { ::fuchsia::test_until_stalled(#func) },
+        });
+        tokens
     }
 }
 
@@ -354,9 +354,21 @@ impl Finish for Transformer {
             quote! {}
         };
 
+        let inner_func_name = if self.executor.is_test() {
+            quote! { test_entry_point }
+        } else {
+            quote! { component_entry_point }
+        };
+
+        // Using a unique, unambiguous variable name here avoids the macro hygiene issue
+        // that occurs when this proc-macro is invoked from within a declarative macro.
+        // The repeated shadowing of `let func = ...` can fail to resolve in that context.
+        let func_to_run_ident =
+            syn::Ident::new("__internal_func_to_run", proc_macro2::Span::mixed_site());
+
         // Initialize logging
         let init_logging = if !self.logging {
-            quote! { func }
+            quote! { #func_to_run_ident }
         } else if self.executor.is_test() {
             logging_tags.insert(0, LitStr::new(&ident.to_string(), ident.span()));
             let logging_options = quote! {
@@ -369,9 +381,9 @@ impl Finish for Transformer {
                 }
             };
             if self.executor.is_some() {
-                quote!(::fuchsia::init_logging_for_test_with_executor(func, #logging_options))
+                quote!(::fuchsia::init_logging_for_test_with_executor(#func_to_run_ident, #logging_options))
             } else {
-                quote!(::fuchsia::init_logging_for_test_with_threads(func, #logging_options))
+                quote!(::fuchsia::init_logging_for_test_with_threads(#func_to_run_ident, #logging_options))
             }
         } else {
             let logging_options = quote! {
@@ -384,9 +396,9 @@ impl Finish for Transformer {
                 }
             };
             if self.executor.is_some() {
-                quote!(::fuchsia::init_logging_for_component_with_executor(func, #logging_options))
+                quote!(::fuchsia::init_logging_for_component_with_executor(#func_to_run_ident, #logging_options))
             } else {
-                quote!(::fuchsia::init_logging_for_component_with_threads(func, #logging_options))
+                quote!(::fuchsia::init_logging_for_component_with_threads(#func_to_run_ident, #logging_options))
             }
         };
 
@@ -395,40 +407,33 @@ impl Finish for Transformer {
             func_attrs.push(quote!(#[test]));
         }
 
-        let func = if self.executor.is_test() {
-            quote! { test_entry_point }
-        } else {
-            quote! { component_entry_point }
-        };
-
         // Adapt the runner function based on whether it's a test and argument count
         // by providing needed arguments.
         let adapt_main = match (self.executor.is_test(), inputs.len()) {
             // Main function, no arguments - no adaption needed.
-            (false, 0) => quote! { #func },
+            (false, 0) => quote! { #inner_func_name },
             // Main function, one arguemnt - adapt by parsing command line arguments.
-            (false, 1) => quote! { ::fuchsia::adapt_to_parse_arguments(#func) },
+            (false, 1) => quote! { ::fuchsia::adapt_to_parse_arguments(#inner_func_name) },
             // Test function, no arguments - adapt by taking the run number and discarding it.
-            (true, 0) => quote! { ::fuchsia::adapt_to_take_test_run_number(#func) },
+            (true, 0) => quote! { ::fuchsia::adapt_to_take_test_run_number(#inner_func_name) },
             // Test function, one argument - no adaption needed.
-            (true, 1) => quote! { #func },
+            (true, 1) => quote! { #inner_func_name },
             // Anything with more than one argument: error.
             (_, n) => panic!("Too many ({}) arguments to function", n),
         };
-        let tokenized_executor = &self.executor;
+
+        let tts = self.executor.build_token_stream(&func_to_run_ident);
         let is_nonempty_ret_type = !matches!(ret_type, syn::ReturnType::Default);
 
         // Select executor
         let (run_executor, modified_ret_type) =
             match (self.executor.is_test(), self.logging, is_nonempty_ret_type) {
-                (_, true, false) | (_, false, false) => {
-                    (quote!(#tokenized_executor), quote!(#ret_type))
-                }
-                (_, false, true) => (quote!(#tokenized_executor), quote!(#ret_type)),
-                (true, _, _) => (quote!(#tokenized_executor), quote!(#ret_type)),
+                (_, true, false) | (_, false, false) => (quote!(#tts), quote!(#ret_type)),
+                (_, false, true) => (quote!(#tts), quote!(#ret_type)),
+                (true, _, _) => (quote!(#tts), quote!(#ret_type)),
                 (false, _, _) => (
                     quote! {
-                        let result = #tokenized_executor;
+                        let result = #tts;
                         match result {
                             std::result::Result::Ok(val) => {
                                 use std::process::Termination;
@@ -453,10 +458,10 @@ impl Finish for Transformer {
                 // analysis).
                 // TODO(https://fxbug.dev/42157203): Try to improve the Rust compiler to
                 // ease this restriction.
-                #asyncness fn #func(#inputs) #ret_type #block
+                #asyncness fn #inner_func_name(#inputs) #ret_type #block
                 #maybe_disable_lsan
-                let func = #adapt_main;
-                let func = #init_logging;
+                let #func_to_run_ident = #adapt_main;
+                let #func_to_run_ident = #init_logging;
                 #run_executor
             }
         };
