@@ -257,6 +257,7 @@ void PrimaryFidlServer::CreateContext2(CreateContext2RequestView request,
 
   uint64_t priority = static_cast<uint64_t>(request->priority);
   if (client_type_ != MagmaClientType::kTrusted && priority > MAGMA_PRIORITY_MEDIUM) {
+    MAGMA_LOG(WARNING, "Denying untrusted client that is requesting a high priority");
     SetError(&completer, MAGMA_STATUS_ACCESS_DENIED);
     return;
   }
