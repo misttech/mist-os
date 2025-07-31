@@ -29,7 +29,8 @@ use starnix_logging::{
     impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{
-    LockBefore, Locked, MmDumpable, OrderedMutex, RwLock, ThreadGroupLimits, UserFaultInner,
+    LockBefore, Locked, MmDumpable, OrderedMutex, RwLock, RwLockWriteGuard, ThreadGroupLimits,
+    UserFaultInner,
 };
 use starnix_types::arch::ArchWidth;
 use starnix_types::futex_address::FutexAddress;
@@ -418,6 +419,39 @@ impl DerefMut for MemoryManagerState {
     }
 }
 
+#[derive(Default)]
+struct ReleasedMappings {
+    doomed: Vec<Mapping>,
+}
+
+impl ReleasedMappings {
+    fn extend(&mut self, mappings: impl IntoIterator<Item = Mapping>) {
+        self.doomed.extend(mappings);
+    }
+
+    fn is_empty(&self) -> bool {
+        self.doomed.is_empty()
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.doomed.len()
+    }
+
+    fn finalize(&mut self, mm_state: RwLockWriteGuard<'_, MemoryManagerState>) {
+        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
+        // in `DirEntry`'s `drop`.
+        std::mem::drop(mm_state);
+        std::mem::take(&mut self.doomed);
+    }
+}
+
+impl Drop for ReleasedMappings {
+    fn drop(&mut self) {
+        assert!(self.is_empty());
+    }
+}
+
 fn map_in_vmar(
     vmar: &zx::Vmar,
     vmar_info: &zx::VmarInfo,
@@ -690,7 +724,7 @@ impl MemoryManagerState {
         populate: bool,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
@@ -738,7 +772,7 @@ impl MemoryManagerState {
         options: MappingOptions,
         populate: bool,
         name: MappingName,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
@@ -775,7 +809,7 @@ impl MemoryManagerState {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
         name: MappingName,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<UserAddress, Errno> {
         #[cfg(feature = "alternate_anon_allocs")]
         if !options.contains(MappingOptions::SHARED) {
@@ -816,7 +850,7 @@ impl MemoryManagerState {
         new_length: usize,
         flags: MremapFlags,
         new_addr: UserAddress,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<UserAddress, Errno> {
         // MREMAP_FIXED moves a mapping, which requires MREMAP_MAYMOVE.
         if flags.contains(MremapFlags::FIXED) && !flags.contains(MremapFlags::MAYMOVE) {
@@ -895,7 +929,7 @@ impl MemoryManagerState {
         old_addr: UserAddress,
         old_length: usize,
         new_length: usize,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<Option<UserAddress>, Errno> {
         let old_range = old_addr..old_addr.checked_add(old_length).ok_or_else(|| errno!(EINVAL))?;
         let new_range_in_place =
@@ -998,7 +1032,7 @@ impl MemoryManagerState {
         dst_addr: Option<UserAddress>,
         dst_length: usize,
         keep_source: bool,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<UserAddress, Errno> {
         let src_range = src_addr..src_addr.checked_add(src_length).ok_or_else(|| errno!(EINVAL))?;
         let (original_range, src_mapping) =
@@ -1212,7 +1246,7 @@ impl MemoryManagerState {
         mm: &Arc<MemoryManager>,
         addr: UserAddress,
         length: usize,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<(), Errno> {
         if !addr.is_aligned(*PAGE_SIZE) {
             return error!(EINVAL);
@@ -1265,7 +1299,7 @@ impl MemoryManagerState {
         mm: &Arc<MemoryManager>,
         addr: UserAddress,
         length: usize,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> Result<(), Errno> {
         profile_duration!("UpdateAfterUnmap");
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
@@ -3315,7 +3349,7 @@ impl MemoryManager {
             current_task.thread_group().get_rlimit(locked, Resource::DATA),
         );
 
-        let mut released_mappings = vec![];
+        let mut released_mappings = ReleasedMappings::default();
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let mut state = self.state.write();
@@ -3384,6 +3418,8 @@ impl MemoryManager {
         let mut new_brk = brk;
         new_brk.current = addr;
         state.brk = Some(new_brk);
+
+        released_mappings.finalize(state);
         Ok(addr)
     }
 
@@ -3393,7 +3429,7 @@ impl MemoryManager {
         old_end: UserAddress,
         delta: usize,
         brk_base: UserAddress,
-        released_mappings: &mut Vec<Mapping>,
+        released_mappings: &mut ReleasedMappings,
     ) -> bool {
         #[cfg(not(feature = "alternate_anon_allocs"))]
         {
@@ -3748,7 +3784,7 @@ impl MemoryManager {
                         memory.clone()
                     };
 
-                    let mut released_mappings = vec![];
+                    let mut released_mappings = ReleasedMappings::default();
                     target_state.map_memory(
                         target,
                         DesiredAddress::Fixed(range.start),
@@ -3921,7 +3957,7 @@ impl MemoryManager {
         let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
 
         // Unmapped mappings must be released after the state is unlocked.
-        let mut released_mappings = vec![];
+        let mut released_mappings = ReleasedMappings::default();
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let mut state = self.state.write();
@@ -3942,8 +3978,7 @@ impl MemoryManager {
         // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
         // in `DirEntry`'s `drop`.
         profile_duration!("DropReleasedMappings");
-        std::mem::drop(state);
-        std::mem::drop(released_mappings);
+        released_mappings.finalize(state);
 
         result
     }
@@ -3956,7 +3991,7 @@ impl MemoryManager {
         options: MappingOptions,
         name: MappingName,
     ) -> Result<UserAddress, Errno> {
-        let mut released_mappings = vec![];
+        let mut released_mappings = ReleasedMappings::default();
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let mut state = self.state.write();
@@ -3970,10 +4005,7 @@ impl MemoryManager {
             &mut released_mappings,
         );
 
-        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
-        // in `DirEntry`'s `drop`.
-        std::mem::drop(state);
-        std::mem::drop(released_mappings);
+        released_mappings.finalize(state);
 
         result
     }
@@ -4018,7 +4050,7 @@ impl MemoryManager {
         flags: MremapFlags,
         new_addr: UserAddress,
     ) -> Result<UserAddress, Errno> {
-        let mut released_mappings = vec![];
+        let mut released_mappings = ReleasedMappings::default();
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let mut state = self.state.write();
@@ -4033,25 +4065,19 @@ impl MemoryManager {
             &mut released_mappings,
         );
 
-        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
-        // in `DirEntry`'s `drop`.
-        std::mem::drop(state);
-        std::mem::drop(released_mappings);
+        released_mappings.finalize(state);
 
         result
     }
 
     pub fn unmap(self: &Arc<Self>, addr: UserAddress, length: usize) -> Result<(), Errno> {
-        let mut released_mappings = vec![];
+        let mut released_mappings = ReleasedMappings::default();
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let mut state = self.state.write();
         let result = state.unmap(self, addr, length, &mut released_mappings);
 
-        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
-        // in `DirEntry`'s `drop`.
-        std::mem::drop(state);
-        std::mem::drop(released_mappings);
+        released_mappings.finalize(state);
 
         result
     }
@@ -4364,7 +4390,7 @@ impl MemoryManager {
         self: &Arc<Self>,
         addr: UserAddress,
     ) -> Result<Arc<AioContext>, Errno> {
-        let mut released_mappings = vec![];
+        let mut released_mappings = ReleasedMappings::default();
 
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
@@ -4380,10 +4406,7 @@ impl MemoryManager {
         let length = range.end - range.start;
         let result = state.unmap(self, range.start, length, &mut released_mappings);
 
-        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
-        // in `DirEntry`'s `drop`.
-        std::mem::drop(state);
-        std::mem::drop(released_mappings);
+        released_mappings.finalize(state);
 
         result.map(|_| aio_context)
     }
@@ -5677,11 +5700,12 @@ mod tests {
 
         let addr = map_memory(locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
-        let mut released_mappings = vec![];
-        let unmap_result =
-            mm.state.write().unmap(mm, addr, *PAGE_SIZE as usize, &mut released_mappings);
+        let mut released_mappings = ReleasedMappings::default();
+        let mut mm_state = mm.state.write();
+        let unmap_result = mm_state.unmap(mm, addr, *PAGE_SIZE as usize, &mut released_mappings);
         assert!(unmap_result.is_ok());
         assert_eq!(released_mappings.len(), 1);
+        released_mappings.finalize(mm_state);
     }
 
     #[::fuchsia::test]
@@ -5693,11 +5717,13 @@ mod tests {
         let addr = map_memory(locked, &current_task, addr, *PAGE_SIZE);
         let _ = map_memory(locked, &current_task, (addr + 2 * *PAGE_SIZE).unwrap(), *PAGE_SIZE);
 
-        let mut released_mappings = vec![];
+        let mut released_mappings = ReleasedMappings::default();
+        let mut mm_state = mm.state.write();
         let unmap_result =
-            mm.state.write().unmap(mm, addr, (*PAGE_SIZE * 3) as usize, &mut released_mappings);
+            mm_state.unmap(mm, addr, (*PAGE_SIZE * 3) as usize, &mut released_mappings);
         assert!(unmap_result.is_ok());
         assert_eq!(released_mappings.len(), 2);
+        released_mappings.finalize(mm_state);
     }
 
     /// Maps two pages, then unmaps the first page.
