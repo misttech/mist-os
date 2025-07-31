@@ -142,16 +142,16 @@ template("fuchsia_test_package") {
     }
 
     host_test_component_target =
-        "//tools/host_test_component:test_deps($host_toolchain)"
+        "//src/developer/ffx:suite_test_data($host_toolchain)"
     host_tool_dir = get_label_info(host_test_component_target, "root_out_dir")
-    host_executable = "$host_tool_dir/host_test_component"
+    host_executable = "$host_tool_dir/ffx"
     host_executable_rebased = rebase_path(host_executable, root_build_dir)
 
     test_pilot_target = "//tools/test_pilot:test_deps($host_toolchain)"
     test_pilot_dir = get_label_info(test_pilot_target, "root_out_dir")
-    test_pilot_executable = "$test_pilot_dir/test_pilot"
+    test_pilot_executable = "$test_pilot_dir/test-pilot"
     test_pilot_executable_rebased =
-        rebase_path(test_pilot_executable, root_build_dir)
+        "./" + rebase_path(test_pilot_executable, root_build_dir)
 
     test_deps = []
 
@@ -193,22 +193,26 @@ template("fuchsia_test_package") {
       _test_config = {
       }
       _test_config = {
-        version = "0.1"
         host_test_binary = host_executable_rebased
-        requested_vars = {
-          KNOWN_VARS = [ "FUCHSIA_TARGETS" ]
-        }
+        host_test_args = [
+          "test",
+          "run",
+          "--pilot",
+          "{test_config_file}",
+        ]
+        require = [
+          "target",
+          "sdk_tool_path",
+        ]
 
         # TODO(https://fxbug.dev/327640651): Add common tags for the test.
-        execution = {
-          test_url = test_url
-          if (defined(test_specs.parallel)) {
-            parallel = test_specs.parallel
-          }
-          max_severity_logs = _max_severity_logs
-          if (defined(_min_severity_logs)) {
-            min_severity_logs = _min_severity_logs
-          }
+        target_test_url = test_url
+        if (defined(test_specs.parallel)) {
+          parallel = test_specs.parallel
+        }
+        max_severity_logs = _max_severity_logs
+        if (defined(_min_severity_logs)) {
+          min_severity_logs = _min_severity_logs
         }
       }
       test_component_output_label =
@@ -253,8 +257,6 @@ template("fuchsia_test_package") {
           final_output_config_path,
         ]
         args = [
-          "--bin-path",
-          host_executable_rebased,
           "--test-pilot",
           test_pilot_executable_rebased,
           "--component-manifest-path",

@@ -16,9 +16,6 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Generate a bash wrapper script amd test config for test components.")]
 struct Args {
-    #[structopt(long, help = "The path to the host binary.")]
-    bin_path: String,
-
     #[structopt(long, help = "The path to the test pilot.")]
     test_pilot: String,
 
@@ -45,19 +42,12 @@ pub struct TestTag {
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
-struct Execution {
-    realm: Option<String>,
-
-    #[serde(flatten)]
-    extra: HashMap<String, serde_json::Value>,
-}
-
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 struct TestConfig {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     tags: Vec<TestTag>,
 
-    execution: Execution,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    realm: Option<String>,
 
     #[serde(flatten)]
     extra: HashMap<String, serde_json::Value>,
@@ -79,11 +69,8 @@ fn generate_bash_script(args: &Args) -> Result<(), Error> {
     file.write_all(b"#!/bin/bash\n")?;
     file.write_all(b"\n")?;
     file.write_all(
-        format!(
-            "{} --fuchsia_test_bin_path {} --fuchsia_test_configuration {}\n",
-            args.test_pilot, args.bin_path, args.test_config_output_filename
-        )
-        .as_bytes(),
+        format!("{} --env --include={} $@\n", args.test_pilot, args.test_config_output_filename)
+            .as_bytes(),
     )?;
     let mut perm = file.metadata()?.permissions();
     // Add the executable bit for user, group, and others
@@ -161,7 +148,7 @@ fn create_config(args: &Args) -> Result<(), Error> {
     if test_components.len() > 0 {
         assert!(test_components.len() == 1, "Multiple test components in config");
         if let Some(moniker) = &test_components[0].test_component.moniker {
-            partial_test_config.execution.realm = Some(moniker.to_string());
+            partial_test_config.realm = Some(moniker.to_string());
             realm_tag = moniker.clone();
             hermetic = false;
         }
