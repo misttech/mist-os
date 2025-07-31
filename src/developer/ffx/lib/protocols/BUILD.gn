@@ -40,7 +40,10 @@ rustc_library("lib") {
     "//third_party/rust_crates:thiserror",
   ]
 
-  test_deps = [ "//src/developer/ffx/lib/protocols/fidl:fuchsia.ffx.test_rust" ]
+  test_deps = [
+    "//src/developer/ffx/lib/protocols/fidl:fuchsia.ffx.test_rust",
+    "//src/lib/fuchsia",
+  ]
 
   sources = [
     "src/context.rs",
