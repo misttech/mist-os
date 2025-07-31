@@ -52,7 +52,7 @@ class UnitTests : public ::testing::Test {
                 channel.handle()->wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), nullptr));
     }
 
-    WaitForDevice();
+    WaitForTestDevice();
   }
 
   void TearDown() override {

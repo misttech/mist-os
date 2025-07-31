@@ -14,6 +14,21 @@
 
 #include "magma_vendor_queries.h"
 
+inline void WaitForTestDevice() {
+  auto deadline_time = zx::clock::get_monotonic() + zx::sec(10);
+  while (zx::clock::get_monotonic() < deadline_time) {
+    zx::result result = magma::TestDeviceBase::GetTestFromVendorId(MAGMA_VENDOR_ID_MALI);
+    if (result.is_ok()) {
+      return;
+    }
+    if (result.error_value() != ZX_ERR_NOT_FOUND) {
+      GTEST_FATAL_FAILURE_("Bad result from GetTestFromVendorId") << result.status_string();
+    }
+    zx::nanosleep(zx::deadline_after(zx::msec(10)));
+  }
+  GTEST_FATAL_FAILURE_("We failed to find the test GPU before the deadline");
+}
+
 inline void WaitForDevice() {
   // Loop until a new device with the correct specs is found.
   auto deadline_time = zx::clock::get_monotonic() + zx::sec(10);
