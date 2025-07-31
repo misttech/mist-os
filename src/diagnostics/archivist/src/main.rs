@@ -29,6 +29,7 @@ use std::io::Cursor;
 use std::sync::atomic::{AtomicU64, Ordering};
 use zx::AsHandleRef;
 
+use fuchsia_async::SendExecutorBuilder;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
@@ -41,7 +42,7 @@ fn main() -> Result<(), Error> {
     } else {
         // The executor will spin up an extra thread which is only for monitoring, so we ignore
         // that.
-        let mut executor = fasync::SendExecutor::new(config.num_threads);
+        let mut executor = SendExecutorBuilder::new().num_threads(config.num_threads).build();
         executor.run(async_main(config))
     }
     .context("async main")?;

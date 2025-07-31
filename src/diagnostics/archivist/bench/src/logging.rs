@@ -9,7 +9,7 @@ use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
 use diagnostics_log_encoding::{Argument, Record};
 use diagnostics_log_types::Severity;
 use fidl_fuchsia_diagnostics::StreamMode;
-use fuchsia_async as fasync;
+use fuchsia_async::SendExecutorBuilder;
 use fuchsia_criterion::criterion::{self, Criterion};
 use fuchsia_criterion::FuchsiaCriterion;
 use futures::StreamExt;
@@ -46,7 +46,7 @@ fn get_component_identity() -> Arc<ComponentIdentity> {
 
 fn bench_fill(b: &mut criterion::Bencher, size: usize) {
     // SharedBuffer needs an executor even though we don't use it in the benchmark.
-    let _executor = fasync::SendExecutor::new(1);
+    let _executor = SendExecutorBuilder::new().build();
     let buffer = Arc::new(SharedBuffer::new(
         create_ring_buffer(RING_BUFFER_SIZE),
         Box::new(|_| {}),
@@ -70,7 +70,7 @@ struct IterateArgs {
 }
 
 fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
-    let mut executor = fasync::SendExecutor::new(1);
+    let mut executor = SendExecutorBuilder::new().build();
     let done = Arc::new(AtomicBool::new(false));
     // Messages take up a a little less than 200 bytes in the buffer.
     let buffer = Arc::new(SharedBuffer::new(
