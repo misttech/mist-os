@@ -43,6 +43,8 @@
 #include <lk/init.h>
 #include <platform/timer.h>
 
+#include <ktl/enforce.h>
+
 #define LOCAL_TRACE 0
 
 namespace {
@@ -50,6 +52,8 @@ namespace {
 // Represents a pending task for some number of CPUs to execute.
 struct mp_ipi_task
     : fbl::DoublyLinkedListable<mp_ipi_task*, fbl::NodeOptions::AllowRemoveFromContainer> {
+  mp_ipi_task(mp_ipi_task_func_t func_, void* context_) : func(func_), context(context_) {}
+
   mp_ipi_task_func_t func;
   void* context;
 };
@@ -149,8 +153,9 @@ void mp_sync_task(void* raw_context) {
  * The callback in |task| will always be called with |arch_blocking_disallowed()|
  * set to true.
  */
-void mp_sync_exec(mp_ipi_target target, cpu_mask_t mask, mp_sync_task_t task, void* context) {
-  uint num_cpus = arch_max_num_cpus();
+void mp_sync_exec(const mp_ipi_target target, cpu_mask_t mask, const mp_sync_task_t task,
+                  void* const context) {
+  const uint num_cpus = arch_max_num_cpus();
 
   if (target == mp_ipi_target::ALL) {
     mask = mp_get_online_mask();
@@ -171,21 +176,22 @@ void mp_sync_exec(mp_ipi_target target, cpu_mask_t mask, mp_sync_task_t task, vo
   const cpu_num_t local_cpu = arch_curr_cpu_num();
 
   // remove self from target lists, since no need to IPI ourselves
-  bool targetting_self = !!(mask & cpu_num_to_mask(local_cpu));
+  const bool targetting_self = mask & cpu_num_to_mask(local_cpu);
   mask &= ~cpu_num_to_mask(local_cpu);
 
   // create tasks to enqueue (we need one per target due to each containing
   // a linked list node
-  struct mp_sync_context sync_context = {
+  mp_sync_context sync_context = {
       .task = task,
       .task_context = context,
       .outstanding_cpus = mask,
   };
 
-  struct mp_ipi_task sync_tasks[SMP_MAX_CPUS] = {};
+  // Create an array up to SMP_MAX_CPUs of tasks to run, but only initialize
+  // the first num_cpus of them to avoid unnecessary work.
+  __UNINITIALIZED ktl::array<lazy_init::LazyInit<mp_ipi_task>, SMP_MAX_CPUS> sync_tasks;
   for (cpu_num_t i = 0; i < num_cpus; ++i) {
-    sync_tasks[i].func = mp_sync_task;
-    sync_tasks[i].context = &sync_context;
+    sync_tasks[i].Initialize(mp_sync_task, &sync_context);
   }
 
   // enqueue tasks
@@ -194,7 +200,7 @@ void mp_sync_exec(mp_ipi_target target, cpu_mask_t mask, mp_sync_task_t task, vo
   cpu_num_t cpu_id = 0;
   while (remaining && cpu_id < num_cpus) {
     if (remaining & 1) {
-      mp.ipi_task_list[cpu_id].push_back(&sync_tasks[cpu_id]);
+      mp.ipi_task_list[cpu_id].push_back(&sync_tasks[cpu_id].Get());
     }
     remaining >>= 1;
     cpu_id++;
@@ -252,8 +258,8 @@ void mp_sync_exec(mp_ipi_target target, cpu_mask_t mask, mp_sync_task_t task, vo
   mp.ipi_task_lock.AcquireIrqSave(irqstate);
   for (cpu_num_t i = 0; i < num_cpus; ++i) {
     // If a task is still around, it's because the CPU went offline.
-    if (sync_tasks[i].InContainer()) {
-      sync_tasks[i].RemoveFromContainer();
+    if (sync_tasks[i]->InContainer()) {
+      sync_tasks[i]->RemoveFromContainer();
     }
   }
   mp.ipi_task_lock.ReleaseIrqRestore(irqstate);
