@@ -63,7 +63,12 @@ pub(crate) trait PmtuHandler<I: Ip, BC> {
     /// the current PMTU and does not violate the minimum MTU size requirements
     /// for an IP.
     ///
-    /// Returns the new PMTU, if it was updated.
+    /// Returns the current PMTU after the update, whether or not it was updated.
+    /// `None` indicates that the PMTU was not updated and there was no existing
+    /// value in the cache.
+    //
+    // TODO(https://fxbug.dev/383355972): consider enforcing an IP version-specific
+    // minimum MTU with a type-safe MTU type.
     fn update_pmtu_if_less(
         &mut self,
         bindings_ctx: &mut BC,
@@ -75,7 +80,12 @@ pub(crate) trait PmtuHandler<I: Ip, BC> {
     /// Updates the PMTU between `src_ip` and `dst_ip` to the next lower
     /// estimate from `from`.
     ///
-    /// Returns the new PMTU, if it was updated.
+    /// Returns the current PMTU after the update, whether or not it was updated.
+    /// `None` indicates that the PMTU was not updated and there was no existing
+    /// value in the cache.
+    //
+    // TODO(https://fxbug.dev/383355972): consider enforcing an IP version-specific
+    // minimum MTU with a type-safe MTU type.
     fn update_pmtu_next_lower(
         &mut self,
         bindings_ctx: &mut BC,
@@ -110,20 +120,21 @@ fn maybe_schedule_timer<BC: PmtuBindingsContext>(
     }
 }
 
+/// Returns the current MTU after an update to the cache.
 fn handle_update_result<BC: PmtuBindingsContext>(
     bindings_ctx: &mut BC,
     timer: &mut BC::Timer,
-    result: Result<Option<Mtu>, Option<Mtu>>,
+    result: UpdateResult,
     cache_is_empty: bool,
 ) -> Option<Mtu> {
     match result {
-        Ok(Some(new_mtu)) => {
+        UpdateResult::Updated(new_mtu) => {
             maybe_schedule_timer(bindings_ctx, timer, cache_is_empty);
             Some(new_mtu)
         }
-        Ok(None) => None,
-        // TODO(https://fxbug.dev/42174290): Do something with this `Err`.
-        Err(_) => None,
+        // TODO(https://fxbug.dev/42174290): should we handle failure to update PMTU
+        // differently?
+        UpdateResult::NotUpdated(mtu) => mtu,
     }
 }
 
@@ -218,6 +229,11 @@ impl<I: Ip, BC: PmtuBindingsTypes + TimerContext> PmtuCache<I, BC> {
     }
 }
 
+enum UpdateResult {
+    Updated(Mtu),
+    NotUpdated(Option<Mtu>),
+}
+
 impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
     /// Gets the PMTU between `src_ip` and `dst_ip`.
     pub fn get_pmtu(&mut self, src_ip: I::Addr, dst_ip: I::Addr) -> Option<Mtu> {
@@ -228,30 +244,29 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
     /// current PMTU and does not violate the minimum MTU size requirements for an
     /// IP.
     ///
-    /// Returns `Ok(x)` on success, where `x` is `Some` if the update actually
-    /// resulted in a change to the PMTU, or `None` if the existing PMTU was already
-    /// less than or equal to the new PMTU (and therefore it was not updated).
-    ///
-    /// Returns `Err(x)` on failure, where `x` is the existing PMTU in the cache.
+    /// Returns the PMTU after updating the cache. Note that this could be `None` if
+    /// the cache was previously empty and the new PMTU was invalid, and could also
+    /// be a value that was already in the cache.
     fn update_pmtu_if_less(
         &mut self,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
         now: BT::Instant,
-    ) -> Result<Option<Mtu>, Option<Mtu>> {
+    ) -> UpdateResult {
         match self.get_pmtu(src_ip, dst_ip) {
             // No PMTU exists so update.
-            None => self.update_pmtu(src_ip, dst_ip, new_mtu, now).map(Some),
+            None => self.update_pmtu(src_ip, dst_ip, new_mtu, now),
             // A PMTU exists but it is greater than `new_mtu` so update.
-            Some(prev_mtu) if new_mtu < prev_mtu => {
-                self.update_pmtu(src_ip, dst_ip, new_mtu, now).map(Some)
-            }
+            Some(prev_mtu) if new_mtu < prev_mtu => self.update_pmtu(src_ip, dst_ip, new_mtu, now),
             // A PMTU exists but it is less than or equal to `new_mtu` so no need to
             // update.
             Some(prev_mtu) => {
-                trace!("update_pmtu_if_less: Not updating the PMTU between src {} and dest {} to {:?}; is {:?}", src_ip, dst_ip, new_mtu, prev_mtu);
-                Ok(None)
+                trace!(
+                    "update_pmtu_if_less: Not updating the PMTU between src {src_ip} and dst
+                    {dst_ip} to {new_mtu:?}; is {prev_mtu:?}"
+                );
+                UpdateResult::NotUpdated(Some(prev_mtu))
             }
         }
     }
@@ -273,47 +288,52 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
         dst_ip: I::Addr,
         from: Mtu,
         now: BT::Instant,
-    ) -> Result<Option<Mtu>, Option<Mtu>> {
+    ) -> UpdateResult {
         if let Some(next_pmtu) = next_lower_pmtu_plateau(from) {
             trace!(
-                "update_pmtu_next_lower: Attempting to update PMTU between src {} and dest {} to {:?}",
-                src_ip,
-                dst_ip,
-                next_pmtu
+                "update_pmtu_next_lower: Attempting to update PMTU between src {src_ip} and dst \
+                {dst_ip} to {next_pmtu:?}"
             );
 
             self.update_pmtu_if_less(src_ip, dst_ip, next_pmtu, now)
         } else {
-            // TODO(ghanan): Should we make sure the current PMTU value is set
-            //               to the IP specific minimum MTU value?
-            trace!("update_pmtu_next_lower: Not updating PMTU between src {} and dest {} as there is no lower PMTU value from {:?}", src_ip, dst_ip, from);
-            Err(self.get_pmtu(src_ip, dst_ip))
+            // TODO(https://fxbug.dev/383355972): Should we make sure the current PMTU value
+            // is set to the IP specific minimum MTU value?
+            trace!(
+                "update_pmtu_next_lower: Not updating PMTU between src {src_ip} and dst {dst_ip} \
+                as there is no lower PMTU value from {from:?}"
+            );
+            UpdateResult::NotUpdated(self.get_pmtu(src_ip, dst_ip))
         }
     }
 
     /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` does not violate
     /// IP-specific minimum MTU requirements.
     ///
-    /// Returns `Ok(x)` if the `new_mtu` is greater than or equal to the IP-specific
-    /// minimum MTU, where `x` is the new MTU; returns `Err(x)` otherwise, where `x`
-    /// is the PMTU already in the cache.
+    /// Returns the PMTU after updating the cache. Note that this could be `None` if
+    /// the cache was previously empty and the new PMTU was invalid, and could also
+    /// be a value that was already in the cache.
     fn update_pmtu(
         &mut self,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
         now: BT::Instant,
-    ) -> Result<Mtu, Option<Mtu>> {
+    ) -> UpdateResult {
         // New MTU must not be smaller than the minimum MTU for an IP.
+        //
+        // TODO(https://fxbug.dev/383355972): consider enforcing this invariant with a
+        // type-safe MTU type that forces the caller to provide a valid MTU for the
+        // given IP version.
         if new_mtu < I::MINIMUM_LINK_MTU {
-            return Err(self.get_pmtu(src_ip, dst_ip));
+            return UpdateResult::NotUpdated(self.get_pmtu(src_ip, dst_ip));
         }
         let _previous =
             self.cache.insert(PmtuCacheKey::new(src_ip, dst_ip), PmtuCacheData::new(new_mtu, now));
 
         log::debug!("updated PMTU for path {src_ip} -> {dst_ip} to {new_mtu:?}");
 
-        Ok(new_mtu)
+        UpdateResult::Updated(new_mtu)
     }
 
     fn handle_timer(&mut self, now: BT::Instant) {
@@ -681,7 +701,7 @@ mod tests {
                 fake_config.remote_ip.get(),
                 new_mtu4,
             ),
-            None
+            Some(new_mtu3)
         );
 
         // Advance time to 8s.
@@ -718,7 +738,7 @@ mod tests {
                 fake_config.remote_ip.get(),
                 low_mtu,
             ),
-            None
+            Some(new_mtu3)
         );
 
         // Advance time to 10s.

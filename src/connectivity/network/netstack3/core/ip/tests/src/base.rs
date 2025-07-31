@@ -1168,7 +1168,7 @@ fn test_ipv4_remote_no_rfc1191() {
 
     // Should have dispatched the packet.
     IpCounterExpectations::<Ipv4> {
-        receive_icmp_error: 1,
+        receive_icmp_error: 2,
         ..IpCounterExpectations::expect_dispatched(2)
     }
     .assert_counters(&ctx.core_ctx(), &device);
@@ -1196,7 +1196,7 @@ fn test_ipv4_remote_no_rfc1191() {
 
     // Should have dispatched the packet.
     IpCounterExpectations::<Ipv4> {
-        receive_icmp_error: 2,
+        receive_icmp_error: 3,
         ..IpCounterExpectations::expect_dispatched(3)
     }
     .assert_counters(&ctx.core_ctx(), &device);
@@ -1227,7 +1227,7 @@ fn test_ipv4_remote_no_rfc1191() {
 
     // Should have dispatched the packet.
     IpCounterExpectations::<Ipv4> {
-        receive_icmp_error: 2,
+        receive_icmp_error: 4,
         ..IpCounterExpectations::expect_dispatched(4)
     }
     .assert_counters(&ctx.core_ctx(), &device);

@@ -1845,7 +1845,7 @@ impl<
                 trace!(
                     "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message"
                 );
-                let new_mtu = if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
+                if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     // We are updating the path MTU from the destination address
                     // of this `packet` (which is an IP address on this node) to
                     // some remote (identified by the source address of this
@@ -1855,23 +1855,21 @@ impl<
                     // Packet Too Big message's MTU field had a value that was
                     // at least the IPv6 minimum MTU (which is required by IPv6
                     // RFC 8200).
-                    core_ctx.update_pmtu_if_less(
+                    let mtu = core_ctx.update_pmtu_if_less(
                         bindings_ctx,
                         dst_ip.get(),
                         src_ip.get(),
                         Mtu::new(packet_too_big.message().mtu()),
-                    )
-                } else {
-                    None
-                };
-                if let Some(mtu) = new_mtu {
-                    receive_icmpv6_error(
-                        core_ctx,
-                        bindings_ctx,
-                        device,
-                        &packet_too_big,
-                        Icmpv6ErrorCode::PacketTooBig(mtu),
                     );
+                    if let Some(mtu) = mtu {
+                        receive_icmpv6_error(
+                            core_ctx,
+                            bindings_ctx,
+                            device,
+                            &packet_too_big,
+                            Icmpv6ErrorCode::PacketTooBig(mtu),
+                        );
+                    }
                 }
             }
             Icmpv6Packet::Mld(packet) => {
