@@ -3708,33 +3708,6 @@ impl MemoryManager {
     where
         L: LockBefore<MmDumpable>,
     {
-        // Clones the `memory` and returns the `MemoryInfo` with the clone.
-        fn clone_memory(
-            memory: &Arc<MemoryObject>,
-            rights: zx::Rights,
-        ) -> Result<Arc<MemoryObject>, Errno> {
-            let memory_info = memory.info()?;
-            let pager_backed = memory_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
-            Ok(if pager_backed && !rights.contains(zx::Rights::WRITE) {
-                memory.clone()
-            } else {
-                let mut cloned_memory = memory
-                    .create_child(
-                        zx::VmoChildOptions::SNAPSHOT_MODIFIED | zx::VmoChildOptions::RESIZABLE,
-                        0,
-                        memory_info.size_bytes,
-                    )
-                    .map_err(MemoryManager::get_errno_for_map_err)?;
-                if rights.contains(zx::Rights::EXECUTE) {
-                    cloned_memory = cloned_memory
-                        .replace_as_executable(&VMEX_RESOURCE)
-                        .map_err(impossible_error)?;
-                }
-
-                Arc::new(cloned_memory)
-            })
-        }
-
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let state: &mut MemoryManagerState = &mut self.state.write();
@@ -3770,7 +3743,7 @@ impl MemoryManager {
                         let basic_info = backing.memory().basic_info();
                         let memory =
                             clone_cache.entry(basic_info.koid).or_insert_with_fallible(|| {
-                                clone_memory(backing.memory(), basic_info.rights)
+                                backing.memory().clone_memory(basic_info.rights)
                             })?;
                         memory.clone()
                     };
@@ -3919,7 +3892,7 @@ impl MemoryManager {
         self.state.read().executable_node.clone()
     }
 
-    fn get_errno_for_map_err(status: zx::Status) -> Errno {
+    pub fn get_errno_for_map_err(status: zx::Status) -> Errno {
         match status {
             zx::Status::INVALID_ARGS => errno!(EINVAL),
             zx::Status::ACCESS_DENIED => errno!(EPERM),

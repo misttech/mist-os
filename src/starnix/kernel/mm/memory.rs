@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{PAGE_SIZE, ZX_VM_SPECIFIC_OVERWRITE};
-
+use crate::mm::{MemoryManager, PAGE_SIZE, VMEX_RESOURCE, ZX_VM_SPECIFIC_OVERWRITE};
 use starnix_logging::{impossible_error, set_zx_name};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use std::mem::MaybeUninit;
+use std::sync::Arc;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Koid};
 
@@ -287,5 +287,28 @@ impl MemoryObject {
             Self::Vmo(vmo) => vmo.transfer_data(options, dst_offset, size, vmo, src_offset),
             Self::RingBuf(_) => Err(zx::Status::NOT_SUPPORTED),
         }
+    }
+
+    pub fn clone_memory(self: &Arc<Self>, rights: zx::Rights) -> Result<Arc<Self>, Errno> {
+        let memory_info = self.info()?;
+        let pager_backed = memory_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
+        Ok(if pager_backed && !rights.contains(zx::Rights::WRITE) {
+            self.clone()
+        } else {
+            let mut cloned_memory = self
+                .create_child(
+                    zx::VmoChildOptions::SNAPSHOT_MODIFIED | zx::VmoChildOptions::RESIZABLE,
+                    0,
+                    memory_info.size_bytes,
+                )
+                .map_err(MemoryManager::get_errno_for_map_err)?;
+            if rights.contains(zx::Rights::EXECUTE) {
+                cloned_memory = cloned_memory
+                    .replace_as_executable(&VMEX_RESOURCE)
+                    .map_err(impossible_error)?;
+            }
+
+            Arc::new(cloned_memory)
+        })
     }
 }
