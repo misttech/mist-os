@@ -53,7 +53,6 @@ namespace display_coordinator {
 
 class ClientProxy;
 class DisplayConfig;
-class IntegrationTest;
 
 // Multiplexes between display controller clients and display engine drivers.
 class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
@@ -188,8 +187,6 @@ class Controller : public fidl::WireServer<fuchsia_hardware_display::Provider>,
       OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
  private:
-  friend class IntegrationTest;
-
   // Initializes logic that is not suitable for the constructor.
   // Must not run on `engine_listener_dispatcher_`.
   zx::result<> Initialize();

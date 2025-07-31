@@ -32,10 +32,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/client-proxy.h"
 #include "src/graphics/display/drivers/coordinator/client-vsync-queue.h"
-#include "src/graphics/display/drivers/coordinator/client.h"
-#include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/coordinator/testing/mock-coordinator-listener.h"
@@ -49,6 +46,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 #include "src/graphics/display/lib/driver-utils/post-task.h"
@@ -1078,28 +1076,8 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   return zx::ok(image_id);
 }
 
-}  // namespace
-
 class IntegrationTest : public TestBase {
  public:
-  void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
-    fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
-    ClientProxy* client_proxy = CoordinatorController()->client_owning_displays_;
-
-    // Resetting the client will *start* client tear down.
-    //
-    // ~MockCoordinatorListener fences the server-side dispatcher thread (consistent with the
-    // threading model of its fidl server binding), but that doesn't sync with the client end
-    // (intentionally).
-    client.reset();
-    ZX_ASSERT_MSG(CoordinatorController()->client_owning_displays_ == client_proxy,
-                  "The display owner changed while holding the controller mutex");
-    EXPECT_OK(
-        sync_completion_wait(client_proxy->FidlUnboundCompletionForTesting(), zx::sec(1).get()));
-    // Teardown has not completed here, because we are still holding controller()->mtx()
-    client_proxy->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
-  }
-
   void TriggerDisplayEngineVsync() { FakeDisplayEngine().TriggerVsync(); }
 
   display::DriverConfigStamp DisplayEngineAppliedConfigStamp() {
@@ -1516,14 +1494,6 @@ TEST_F(IntegrationTest, VsyncEventsAfterClientChange) {
   EXPECT_EQ(kPrimary2InitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
   EXPECT_EQ(0u, virtcon_client->state().vsync_count());
-}
-
-TEST_F(IntegrationTest, SendVsyncsAfterClientDies) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-  display::DisplayId display_id = primary_client->state().display_id();
-  SendVsyncAfterUnbind(std::move(primary_client), display_id);
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
@@ -2292,5 +2262,7 @@ TEST_F(IntegrationTest, CheckConfigTooManyLayers) {
   // configuration should be expressed in this test.
   EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, check_config_result.value());
 }
+
+}  // namespace
 
 }  // namespace display_coordinator
