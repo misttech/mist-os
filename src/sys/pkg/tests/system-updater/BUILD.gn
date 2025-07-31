@@ -64,6 +64,7 @@ rustc_test("driver") {
     "src/lib.rs",
     "src/mode_force_recovery.rs",
     "src/mode_normal.rs",
+    "src/ota_manifest.rs",
     "src/progress_reporting.rs",
     "src/reboot_controller.rs",
     "src/retained_packages.rs",

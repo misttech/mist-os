@@ -49,7 +49,8 @@ pub struct OtaManifestV1 {
     pub mode: UpdateMode,
     /// The base URL of the blobs, the final URL for each blob will be
     /// "{blob_base_url}/{delivery_blob_type}/{fuchsia_merkle_root}".
-    pub blob_base_url: url::Url,
+    /// The url can be absolute or relative to the URL of the manifest.
+    pub blob_base_url: String,
     /// The images for this version.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<Image>,
@@ -164,7 +165,7 @@ mod tests {
         assert_eq!(manifest.board, "test-board");
         assert_eq!(manifest.epoch, 1);
         assert_eq!(manifest.mode, UpdateMode::Normal);
-        assert_eq!(manifest.blob_base_url.as_str(), "http://example.com/");
+        assert_eq!(manifest.blob_base_url, "http://example.com");
 
         assert_eq!(manifest.images.len(), 2);
         assert_eq!(manifest.images[0].slot, Slot::AB);
@@ -194,7 +195,7 @@ mod tests {
             board: "test-board".to_string(),
             epoch: 1,
             mode: UpdateMode::Normal,
-            blob_base_url: "http://example.com".parse().unwrap(),
+            blob_base_url: "http://example.com".into(),
             images: vec![
                 Image {
                     slot: Slot::AB,
@@ -226,7 +227,7 @@ mod tests {
                 "build_version": "1.2.3.4",
                 "board": "test-board",
                 "epoch": 1,
-                "blob_base_url": "http://example.com/",
+                "blob_base_url": "http://example.com",
                 "images": [
                     {
                         "slot": "AB",

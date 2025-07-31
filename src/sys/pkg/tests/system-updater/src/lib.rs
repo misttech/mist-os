@@ -56,6 +56,7 @@ mod fetch_packages;
 mod history;
 mod mode_force_recovery;
 mod mode_normal;
+mod ota_manifest;
 mod progress_reporting;
 mod reboot_controller;
 mod retained_packages;
@@ -116,7 +117,7 @@ fn make_manifest(
             delivery_blob_type: 1,
         }],
         blobs: blobs.into_iter().collect(),
-        blob_base_url: "http://fuchsia.com/blobs".parse().unwrap(),
+        blob_base_url: "https://fuchsia.com/blobs".into(),
         build_version: "1.2.3.4".parse().unwrap(),
     }
 }
@@ -928,10 +929,11 @@ impl MockOtaDownloaderService {
     ) -> Result<(), Error> {
         while let Some(event) = stream.try_next().await? {
             match event {
-                fpkg_internal::OtaDownloaderRequest::FetchBlob { hash, responder, .. } => {
+                fpkg_internal::OtaDownloaderRequest::FetchBlob { hash, base_url, responder } => {
                     self.interactions
                         .lock()
                         .push(OtaDownloader(OtaDownloaderEvent::FetchBlob(hash.into())));
+                    assert_eq!(base_url, "https://fuchsia.com/blobs");
                     let hash = fidl_fuchsia_pkg_ext::BlobId::from(hash).into();
                     let blocker = self.blockers.lock().remove(&hash);
                     if let Some(blocker) = blocker {

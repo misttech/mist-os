@@ -108,6 +108,9 @@ enum PrepareError {
 
     #[error("while opening blobfs")]
     OpenBlobfs(#[source] blobfs::BlobfsError),
+
+    #[error("while joining update url '{update_url}' with blob base url '{blob_base_url}'")]
+    JoinUrl { update_url: String, blob_base_url: String, source: url::ParseError },
 }
 
 impl PrepareError {
@@ -1108,13 +1111,14 @@ impl PackagelessAttempt<'_> {
         // Prepare
         let state = state::Prepare::enter(co).await;
 
-        let (current_configuration, manifest) = match self.prepare(target_version).await {
-            Ok(tuple) => tuple,
-            Err(e) => {
-                state.fail(co, e.reason()).await;
-                return Err(e.into());
-            }
-        };
+        let (current_configuration, manifest, blob_base_url) =
+            match self.prepare(target_version).await {
+                Ok(tuple) => tuple,
+                Err(e) => {
+                    state.fail(co, e.reason()).await;
+                    return Err(e.into());
+                }
+            };
 
         let blobfs = blobfs::Client::builder()
             .readable()
@@ -1133,7 +1137,7 @@ impl PackagelessAttempt<'_> {
         *phase = metrics::Phase::ImageWrite;
 
         let () = match self
-            .stage_images(co, &mut state, current_configuration, &manifest, &blobfs)
+            .stage_images(co, &mut state, current_configuration, &manifest, &blob_base_url, &blobfs)
             .await
         {
             Ok(()) => (),
@@ -1147,7 +1151,7 @@ impl PackagelessAttempt<'_> {
         let mut state = state.enter_fetch(co).await;
         *phase = metrics::Phase::PackageDownload;
 
-        let () = match self.fetch_blobs(co, &mut state, &manifest, &blobfs).await {
+        let () = match self.fetch_blobs(co, &mut state, &manifest, &blob_base_url, &blobfs).await {
             Ok(()) => (),
             Err(e) => {
                 state.fail(co, e.reason()).await;
@@ -1183,7 +1187,7 @@ impl PackagelessAttempt<'_> {
     async fn prepare(
         &mut self,
         target_version: &mut history::Version,
-    ) -> Result<(paver::CurrentConfiguration, OtaManifestV1), PrepareError> {
+    ) -> Result<(paver::CurrentConfiguration, OtaManifestV1, url::Url), PrepareError> {
         // Ensure that the partition boot metadata is ready for the update to begin. Specifically:
         // - the current configuration must be Healthy and Active, and
         // - the non-current configuration must be Unbootable.
@@ -1214,6 +1218,14 @@ impl PackagelessAttempt<'_> {
         let manifest = update_package::manifest::parse_ota_manifest(&manifest_bytes)
             .map_err(PrepareError::ParseManifest)?;
 
+        let blob_base_url = self.config.update_url.join(&manifest.blob_base_url).map_err(|e| {
+            PrepareError::JoinUrl {
+                update_url: self.config.update_url.to_string(),
+                blob_base_url: manifest.blob_base_url.clone(),
+                source: e,
+            }
+        })?;
+
         *target_version = history::Version::for_manifest(&manifest);
 
         let zbi_slot = match manifest.mode {
@@ -1243,7 +1255,7 @@ impl PackagelessAttempt<'_> {
 
         let () = validate_epoch(SOURCE_EPOCH_RAW, manifest.epoch)?;
 
-        Ok((current_config, manifest))
+        Ok((current_config, manifest, blob_base_url))
     }
 
     /// Pave the various raw images (zbi, firmware, vbmeta) for fuchsia and/or recovery.
@@ -1253,6 +1265,7 @@ impl PackagelessAttempt<'_> {
         state: &mut state::Stage,
         current_configuration: paver::CurrentConfiguration,
         manifest: &OtaManifestV1,
+        blob_base_url: &url::Url,
         blobfs: &blobfs::Client,
     ) -> Result<(), StageError> {
         // Protect all blobs to guarantee forward progress, this might cause out of space issue in a
@@ -1313,7 +1326,7 @@ impl PackagelessAttempt<'_> {
                     match self
                         .env
                         .ota_downloader
-                        .fetch_blob(&blob_id, manifest.blob_base_url.as_ref())
+                        .fetch_blob(&blob_id, blob_base_url.as_ref())
                         .await
                         .map_err(StageError::Fidl)?
                     {
@@ -1341,7 +1354,7 @@ impl PackagelessAttempt<'_> {
                             let () = self
                                 .env
                                 .ota_downloader
-                                .fetch_blob(&blob_id, manifest.blob_base_url.as_ref())
+                                .fetch_blob(&blob_id, blob_base_url.as_ref())
                                 .await
                                 .map_err(StageError::Fidl)?
                                 .map_err(|e| StageError::FetchBlob(e.into()))?;
@@ -1397,6 +1410,7 @@ impl PackagelessAttempt<'_> {
         co: &mut async_generator::Yield<fupdate_installer_ext::State>,
         state: &mut state::Fetch,
         manifest: &OtaManifestV1,
+        blob_base_url: &url::Url,
         blobfs: &blobfs::Client,
     ) -> Result<(), FetchError> {
         // Remove blobs of images from the retained_index.
@@ -1432,7 +1446,7 @@ impl PackagelessAttempt<'_> {
                 let () = self
                     .env
                     .ota_downloader
-                    .fetch_blob(&blob_id, manifest.blob_base_url.as_ref())
+                    .fetch_blob(&blob_id, blob_base_url.as_ref())
                     .await
                     .map_err(FetchError::Fidl)?
                     .map_err(|e| FetchError::FetchBlob(e.into()))?;
