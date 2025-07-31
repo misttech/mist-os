@@ -23,7 +23,7 @@ where
 mod test {
     use super::*;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_timeout() {
         assert_eq!(
             timeout(Duration::from_secs(1), async { "hello world" }).await,

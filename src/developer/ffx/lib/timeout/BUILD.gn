@@ -18,6 +18,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:thiserror",
   ]
+  test_deps = [ "//src/lib//fuchsia" ]
 }
 
 group("tests") {
