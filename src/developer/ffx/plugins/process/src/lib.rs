@@ -420,7 +420,7 @@ mod tests {
     }
 
     /// Tests that `get_raw_data` properly reads data from the process explorer query service.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn get_raw_data_test() {
         let query_proxy = setup_fake_query_svc();
         let raw_data = get_raw_data(query_proxy).await.expect("failed to get raw data");
@@ -428,7 +428,7 @@ mod tests {
     }
 
     /// Tests that `get_processes_data` properly reads and parses data from the query service.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn get_processes_data_test() {
         let query_proxy = setup_fake_query_svc();
         let processes_data =
