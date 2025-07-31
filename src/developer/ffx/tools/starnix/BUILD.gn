@@ -65,6 +65,8 @@ rustc_library("lib") {
     "src/vmo.rs",
   ]
 
+  test_deps = [ "//src/lib/fuchsia" ]
+
   features = []
   if (starnix_enable_console_tool) {
     features += [ "enable_console_tool" ]
