@@ -59,7 +59,7 @@ mod tests {
 
     use super::*;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_perform_pending_reboot() {
         let command = CollaborativeRebootCommand {
             subcommand: SubCommand::PerformPendingReboot(PerformPendingRebootCommand {}),
