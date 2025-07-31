@@ -89,14 +89,13 @@ where
     ) {
         match device_id {
             DeviceId::Ethernet(id) => {
-                if let Some(link_addr) = bytes_to_mac(link_addr) {
+                if let Some(link_address) = bytes_to_mac(link_addr) {
                     NudHandler::<I, EthernetLinkDevice, _>::handle_neighbor_update(
                         self,
                         bindings_ctx,
                         &id,
                         neighbor,
-                        link_addr,
-                        DynamicNeighborUpdateSource::Probe,
+                        DynamicNeighborUpdateSource::Probe { link_address },
                     )
                 }
             }
@@ -112,21 +111,29 @@ where
         bindings_ctx: &mut BC,
         device_id: &DeviceId<BC>,
         neighbor: SpecifiedAddr<I::Addr>,
-        link_addr: &[u8],
+        link_addr: Option<&[u8]>,
         flags: ConfirmationFlags,
     ) {
         match device_id {
             DeviceId::Ethernet(id) => {
-                if let Some(link_addr) = bytes_to_mac(link_addr) {
-                    NudHandler::<I, EthernetLinkDevice, _>::handle_neighbor_update(
-                        self,
-                        bindings_ctx,
-                        &id,
-                        neighbor,
-                        link_addr,
-                        DynamicNeighborUpdateSource::Confirmation(flags),
-                    )
-                }
+                let link_address = match link_addr {
+                    Some(link_addr) => {
+                        // Drop a confirmation with a link address that is not long enough.
+                        let Some(link_addr) = bytes_to_mac(link_addr) else {
+                            return;
+                        };
+                        Some(link_addr)
+                    }
+                    None => None,
+                };
+
+                NudHandler::<I, EthernetLinkDevice, _>::handle_neighbor_update(
+                    self,
+                    bindings_ctx,
+                    &id,
+                    neighbor,
+                    DynamicNeighborUpdateSource::Confirmation { link_address, flags },
+                )
             }
             // NUD is not supported on Loopback, Blackhole, and Pure IP devices.
             DeviceId::Loopback(LoopbackDeviceId { .. })

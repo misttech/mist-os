@@ -1146,8 +1146,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtx,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
-            _link_addr: Mac,
-            _is_confirmation: DynamicNeighborUpdateSource,
+            _source: DynamicNeighborUpdateSource<Mac>,
         ) {
             unimplemented!()
         }

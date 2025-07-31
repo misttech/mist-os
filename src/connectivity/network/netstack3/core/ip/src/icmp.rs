@@ -1493,17 +1493,6 @@ fn receive_ndp_packet<
             }
 
             let link_addr = p.body().iter().find_map(|o| o.target_link_layer_address());
-            let link_addr = match link_addr {
-                Some(a) => a,
-                None => {
-                    trace!(
-                        "dropping NA from {} targetting {} with no TLL option",
-                        src_ip,
-                        target_address
-                    );
-                    return;
-                }
-            };
 
             NudIpHandler::handle_neighbor_confirmation(
                 core_ctx,
@@ -3788,7 +3777,7 @@ mod tests {
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
-            _link_addr: &[u8],
+            _link_addr: Option<&[u8]>,
             _flags: ConfirmationFlags,
         ) {
             unimplemented!()
