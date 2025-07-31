@@ -152,7 +152,7 @@ mod tests {
         Timer::new(Duration::from_secs(3153600000)).await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn single_element_stream_drops_when_terminated() {
         let s = once(ready(Result::<_>::Ok(2u64)));
         s.try_for_each_concurrent_while_connected(None, |_| async {
@@ -163,7 +163,7 @@ mod tests {
         .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn single_element_stream_errs_before_end() {
         let s = once(ready(Result::<_>::Err(anyhow!("test err")))).chain(once(async {
             sleep_for_a_year().await;
@@ -181,7 +181,7 @@ mod tests {
         assert!(res.is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn stream_exits_with_internal_err() {
         let s = iter(0u64..100).map(Result::<_>::Ok).chain(once(async {
             sleep_for_a_year().await;
