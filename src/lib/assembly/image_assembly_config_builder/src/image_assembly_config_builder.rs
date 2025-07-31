@@ -6,14 +6,14 @@ use crate::compiled_package::CompiledPackageBuilder;
 
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_data::ConfigDataBuilder;
-use assembly_config_schema::assembly_config::{
-    AssemblyInputBundle, CompiledPackageDefinition, ShellCommands,
-};
 use assembly_config_schema::board_config::{BoardInputBundle, HardwareInfo};
 use assembly_config_schema::common::PackagedDriverDetails;
 use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
-use assembly_config_schema::platform_config::BuildType;
+use assembly_config_schema::platform_settings::BuildType;
 use assembly_config_schema::product_config::{
+    AssemblyInputBundle, CompiledPackageDefinition, ShellCommands,
+};
+use assembly_config_schema::product_settings::{
     ProductConfigData, ProductPackageDetails, ProductPackagesConfig,
 };
 use assembly_config_schema::{
@@ -1524,8 +1524,8 @@ impl std::fmt::Display for BootfsValidationError {
 mod tests {
     use super::*;
 
-    use assembly_config_schema::assembly_config::CompiledComponentDefinition;
     use assembly_config_schema::developer_overrides::KernelOptions;
+    use assembly_config_schema::product_config::CompiledComponentDefinition;
     use assembly_constants::CompiledPackageDestination;
     use assembly_constants::TestCompiledPackageDestination::ForTest;
     use assembly_file_relative_path::FileRelativePathBuf;

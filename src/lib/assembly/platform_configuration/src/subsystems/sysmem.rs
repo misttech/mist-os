@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::sysmem_config::{
+use assembly_config_schema::platform_settings::sysmem_config::{
     BoardSysmemConfig, MemorySize, PlatformSysmemConfig,
 };
 use assembly_constants::{BootfsPackageDestination, PackageSetDestination};
@@ -425,7 +425,7 @@ mod test {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
-                platform: assembly_config_schema::board_config::PlatformConfig {
+                platform: assembly_config_schema::board_config::PlatformSettings {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: Some(MemorySize::Fixed(123)),
                         protected_memory_size: Some(MemorySize::Fixed(456)),
@@ -478,7 +478,7 @@ mod test {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
-                platform: assembly_config_schema::board_config::PlatformConfig {
+                platform: assembly_config_schema::board_config::PlatformSettings {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: Some(MemorySize::Fixed(123)),
                         protected_memory_size: Some(MemorySize::Fixed(456)),
@@ -531,7 +531,7 @@ mod test {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
-                platform: assembly_config_schema::board_config::PlatformConfig {
+                platform: assembly_config_schema::board_config::PlatformSettings {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: None,
                         protected_memory_size: None,

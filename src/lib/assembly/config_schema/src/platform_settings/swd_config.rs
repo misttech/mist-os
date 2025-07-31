@@ -119,7 +119,7 @@ impl Default for PolicyConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::platform_config::PlatformConfig;
+    use crate::platform_settings::PlatformSettings;
 
     use anyhow::Result;
     use assembly_util as util;
@@ -189,15 +189,15 @@ mod tests {
 
     #[test]
     fn test_invalid_name() {
-        let platform_config_json5 = r#"
+        let platform_settings_json5 = r#"
             {
               build_type: "eng",
               swd_config: {}
             }
         "#;
 
-        let mut cursor = std::io::Cursor::new(platform_config_json5);
-        let result: Result<PlatformConfig> = util::from_reader(&mut cursor);
+        let mut cursor = std::io::Cursor::new(platform_settings_json5);
+        let result: Result<PlatformSettings> = util::from_reader(&mut cursor);
         assert!(result.is_err());
     }
 

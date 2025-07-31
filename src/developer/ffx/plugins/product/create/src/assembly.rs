@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use assembled_system::AssembledSystem;
 use assembly_artifact_cache::{Artifact, ArtifactCache};
-use assembly_config_schema::{AssemblyConfig, BoardInformation};
+use assembly_config_schema::{BoardInformation, ProductConfig};
 use assembly_container::AssemblyContainer;
 use assembly_platform_artifacts::PlatformArtifacts;
 use assembly_tool::PlatformToolProvider;
@@ -15,7 +15,7 @@ use image_assembly_config_builder::{ProductAssembly, ValidationMode};
 pub struct Assembly {
     pub platform_path: Utf8PathBuf,
     pub platform: PlatformArtifacts,
-    pub product: AssemblyConfig,
+    pub product: ProductConfig,
     pub board: BoardInformation,
 }
 
@@ -33,7 +33,7 @@ impl Assembly {
             .or_else(|_| Artifact::from_local_product_name(&product, build_dir.as_ref()))
             .context("Parsing product as local build api")?;
         let product_path = cache.resolve(&product_artifact).context("Resolving product")?;
-        let product = AssemblyConfig::from_dir(&product_path).context("Reading product")?;
+        let product = ProductConfig::from_dir(&product_path).context("Reading product")?;
 
         let board_artifact =
             Artifact::from_product_or_board_string(&board).context("Parsing board input");

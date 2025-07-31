@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::starnix_config::{
+use assembly_config_schema::platform_settings::starnix_config::{
     NetworkManagerTreatment, PlatformStarnixConfig, SocketMarkTreatment,
 };
 use starnix_features::{Feature, FeatureAndArgs};

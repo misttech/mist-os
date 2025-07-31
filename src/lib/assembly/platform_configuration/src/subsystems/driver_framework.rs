@@ -5,10 +5,10 @@
 use crate::subsystems::prelude::*;
 use anyhow::anyhow;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::driver_framework_config::{
+use assembly_config_schema::platform_settings::driver_framework_config::{
     DriverFrameworkConfig, TestFuzzingConfig,
 };
-use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_config_schema::platform_settings::storage_config::StorageConfig;
 use assembly_images_config::FilesystemImageMode;
 
 pub(crate) struct DriverFrameworkSubsystemConfig;

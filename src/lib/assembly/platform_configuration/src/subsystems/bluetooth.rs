@@ -6,10 +6,10 @@ use anyhow::format_err;
 
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::bluetooth_config::{
+use assembly_config_schema::platform_settings::bluetooth_config::{
     AudioGatewayConfig, BluetoothConfig, HandsFreeConfig, HfpCodecId, Snoop,
 };
-use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
+use assembly_config_schema::platform_settings::media_config::{AudioConfig, PlatformMediaConfig};
 
 pub(crate) struct BluetoothSubsystemConfig;
 impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>

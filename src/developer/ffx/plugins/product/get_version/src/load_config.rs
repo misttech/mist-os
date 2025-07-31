@@ -6,7 +6,7 @@ use crate::unique_release_info::{
     from_board_release_info, from_product_release_info, from_release_info, UniqueReleaseInfo,
 };
 
-use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundleSet};
+use assembly_config_schema::{BoardInformation, BoardInputBundleSet, ProductConfig};
 use assembly_partitions_config::Slot;
 use assembly_platform_artifacts::PlatformArtifacts;
 use assembly_release_info::SystemReleaseInfo;
@@ -72,7 +72,7 @@ pub fn load_platform(platform: &PlatformArtifacts) -> VersionInfo {
 }
 
 /// Load a Product artifact and return the version information.
-pub fn load_product(assembly_config: &AssemblyConfig) -> VersionInfo {
+pub fn load_product(assembly_config: &ProductConfig) -> VersionInfo {
     VersionInfo {
         human: assembly_config.product.release_info.info.version.clone(),
         machine: vec![from_product_release_info(

@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
-use assembly_config_schema::platform_config::icu_config::ICUConfig;
+use assembly_config_schema::platform_settings::icu_config::ICUConfig;
 use assembly_constants::FileEntry;
 
 const DATA_VERSION: &str = "44";

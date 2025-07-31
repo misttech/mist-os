@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::product_config::BuildInfoConfig;
+use assembly_config_schema::product_settings::BuildInfoConfig;
 use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct BuildInfoSubsystem;

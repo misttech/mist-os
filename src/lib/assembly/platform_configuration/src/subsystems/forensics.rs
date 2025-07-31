@@ -7,7 +7,7 @@ use crate::util;
 use assembly_config_schema::developer_overrides::{
     DeveloperOnlyOptions, FeedbackBuildTypeConfig, ForensicsOptions,
 };
-use assembly_config_schema::platform_config::forensics_config::{
+use assembly_config_schema::platform_settings::forensics_config::{
     FeedbackIdComponentUrl, ForensicsConfig,
 };
 use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
@@ -133,7 +133,7 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
 #[cfg(test)]
 mod test {
     use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, ForensicsOptions};
-    use assembly_config_schema::platform_config::forensics_config::FeedbackConfig;
+    use assembly_config_schema::platform_settings::forensics_config::FeedbackConfig;
     use camino::Utf8Path;
 
     use super::*;

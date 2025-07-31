@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::ui_config::{
+use assembly_config_schema::platform_settings::ui_config::{
     PlatformUiConfig, UnsignedIntegerRangeInclusive,
 };
 use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};

@@ -57,13 +57,13 @@ pub struct PlatformSysmemConfig {
     /// advantage of FIDL rust codegen), and there's no json schema for FIDL
     /// types.
     ///
-    /// In board_config::PlatformConfig.sysmem_defaults, this field must be None
+    /// In board_config::PlatformSettings.sysmem_defaults, this field must be None
     /// (see BoardProvidedConfig.sysmem_format_costs instead). In
-    /// platform_config::PlatformConfig.sysmem, this field can be Some.
+    /// platform_settings::PlatformSettings.sysmem, this field can be Some.
     ///
     /// A later entry with equal FormatCostKey will override an earlier entry
     /// (both within a single file and across files). Entries in
-    /// platform_config::PlatformConfig.sysmem field are logically after entries
+    /// platform_settings::PlatformSettings.sysmem field are logically after entries
     /// in BoardProvidedConfig.sysmem_format_costs field.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[walk_paths]

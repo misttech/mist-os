@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::Context;
-use assembly_config_schema::product_config::ProductInfoConfig;
+use assembly_config_schema::product_settings::ProductInfoConfig;
 use assembly_constants::FileEntry;
 
 pub(crate) struct HwinfoSubsystem;

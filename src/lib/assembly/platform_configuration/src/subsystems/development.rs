@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::Context;
-use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
+use assembly_config_schema::platform_settings::development_support_config::DevelopmentSupportConfig;
 use assembly_constants::{BootfsDestination, FileEntry, KernelArg};
 
 pub(crate) struct DevelopmentConfig;

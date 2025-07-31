@@ -6,7 +6,7 @@ use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::{bail, ensure};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::connectivity_config::{
+use assembly_config_schema::platform_settings::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
     WlanRecoveryProfile, WlanRoamingMode, WlanRoamingPolicy, WlanRoamingProfile,
 };

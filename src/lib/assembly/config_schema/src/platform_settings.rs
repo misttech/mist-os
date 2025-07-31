@@ -42,7 +42,7 @@ pub mod virtualization_config;
 /// platform itself, not anything provided by the product.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
-pub struct PlatformConfig {
+pub struct PlatformSettings {
     /// The minimum service-level that the platform will provide, or the main
     /// set of platform features that are necessary (or desired) by the product.
     ///
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     pub fn test_default_serialization() {
-        let value: PlatformConfig = serde_json::from_str("{\"build_type\": \"eng\"}").unwrap();
+        let value: PlatformSettings = serde_json::from_str("{\"build_type\": \"eng\"}").unwrap();
         crate::common::tests::value_serialization_helper(value);
     }
 }

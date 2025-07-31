@@ -5,11 +5,11 @@
 use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::{anyhow, bail, Context as _};
-use assembly_config_schema::assembly_config::{
+use assembly_config_schema::platform_settings::session_config::PlatformSessionConfig;
+use assembly_config_schema::product_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
-use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
-use assembly_config_schema::product_config::{
+use assembly_config_schema::product_settings::{
     GlobalPlatformTee, GlobalPlatformTeeClient, ProprietaryTee, Tee,
 };
 use assembly_config_schema::BoardInformation;
@@ -397,7 +397,7 @@ mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
     use crate::CompletedConfiguration;
-    use assembly_config_schema::product_config::{TeeClientConfigData, TeeClientFeatures};
+    use assembly_config_schema::product_settings::{TeeClientConfigData, TeeClientFeatures};
     use assembly_config_schema::BoardInformation;
     use assembly_images_config::BoardFilesystemConfig;
     use camino::{Utf8Path, Utf8PathBuf};

@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::fonts_config::FontsConfig;
+use assembly_config_schema::platform_settings::fonts_config::FontsConfig;
 
 pub(crate) struct FontsSubsystem;
 impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {

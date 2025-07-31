@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::{bail, ensure};
-use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
+use assembly_config_schema::platform_settings::media_config::{AudioConfig, PlatformMediaConfig};
 
 pub(crate) struct MediaSubsystem;
 impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {

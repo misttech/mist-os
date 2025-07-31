@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::graphics_config::GraphicsConfig;
+use assembly_config_schema::platform_settings::graphics_config::GraphicsConfig;
 
 pub(crate) struct GraphicsSubsystemConfig;
 impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
@@ -102,7 +102,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
 mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
-    use assembly_config_schema::platform_config::graphics_config::VirtconConfig;
+    use assembly_config_schema::platform_settings::graphics_config::VirtconConfig;
 
     #[test]
     fn test_user_default() {

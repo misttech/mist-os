@@ -273,7 +273,7 @@ impl<'de> Deserialize<'de> for UrlOrMoniker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::platform_config::PlatformConfig;
+    use crate::platform_settings::PlatformSettings;
 
     use assembly_util as util;
 
@@ -302,7 +302,7 @@ mod tests {
     "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
+        let config: PlatformSettings = util::from_reader(&mut cursor).unwrap();
         assert_eq!(
             config.diagnostics,
             DiagnosticsConfig {
@@ -326,7 +326,7 @@ mod tests {
     "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
+        let config: PlatformSettings = util::from_reader(&mut cursor).unwrap();
         assert_eq!(
             config.diagnostics,
             DiagnosticsConfig {
@@ -354,7 +354,7 @@ mod tests {
     "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
+        let config: PlatformSettings = util::from_reader(&mut cursor).unwrap();
         assert_eq!(
             config.diagnostics,
             DiagnosticsConfig {
@@ -393,7 +393,7 @@ mod tests {
     "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
+        let config: PlatformSettings = util::from_reader(&mut cursor).unwrap();
         assert_eq!(
             config.diagnostics,
             DiagnosticsConfig {

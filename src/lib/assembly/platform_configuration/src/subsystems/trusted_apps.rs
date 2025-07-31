@@ -4,8 +4,8 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
-use assembly_config_schema::product_config::TrustedApp as ProductTrustedApp;
-use assembly_config_schema::product_config::TrustedAppType::{BinderRPC, GlobalPlatform};
+use assembly_config_schema::product_settings::TrustedApp as ProductTrustedApp;
+use assembly_config_schema::product_settings::TrustedAppType::{BinderRPC, GlobalPlatform};
 use assembly_constants::{BootfsPackageDestination, PackageSetDestination};
 use assembly_images_config::FilesystemImageMode;
 use fuchsia_tee_manager_config::TAConfig;

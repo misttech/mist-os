@@ -4,10 +4,10 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
-use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
-use assembly_config_schema::platform_config::health_check_config::HealthCheckConfig;
-use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConfig;
-use assembly_config_schema::product_config::ComponentPolicyConfig;
+use assembly_config_schema::platform_settings::development_support_config::DevelopmentSupportConfig;
+use assembly_config_schema::platform_settings::health_check_config::HealthCheckConfig;
+use assembly_config_schema::platform_settings::starnix_config::PlatformStarnixConfig;
+use assembly_config_schema::product_settings::ComponentPolicyConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 use camino::Utf8PathBuf;
 use component_manager_config::{compile, Args, InjectedBundle, InjectedUse, InjectedUseProtocol};

@@ -5,9 +5,9 @@
 use crate::subsystems::prelude::*;
 use anyhow::{bail, ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::development_support_config::StorageToolsConfig;
-use assembly_config_schema::platform_config::recovery_config::RecoveryConfig;
-use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_config_schema::platform_settings::development_support_config::StorageToolsConfig;
+use assembly_config_schema::platform_settings::recovery_config::RecoveryConfig;
+use assembly_config_schema::platform_settings::storage_config::StorageConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 use assembly_images_config::{
     BlobfsLayout, DataFilesystemFormat, FilesystemImageMode, FvmVolumeConfig, GptMode, VolumeConfig,

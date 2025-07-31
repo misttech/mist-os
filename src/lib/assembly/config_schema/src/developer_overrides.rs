@@ -7,7 +7,7 @@ use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::assembly_config::{CompiledPackageDefinition, ShellCommands};
+use crate::product_config::{CompiledPackageDefinition, ShellCommands};
 use crate::PackageDetails;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -31,7 +31,7 @@ pub struct ForensicsOptions {
 
 // LINT.IfChange
 
-/// Developer Overrides struct that is similar to the AssemblyConfig struct,
+/// Developer Overrides struct that is similar to the ProductConfig struct,
 /// but has extra fields added that allow it to convey extra fields.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(default, deny_unknown_fields)]

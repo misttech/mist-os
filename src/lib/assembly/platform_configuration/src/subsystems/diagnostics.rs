@@ -7,11 +7,11 @@ use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_component_id_index::{ComponentIdIndexBuilder, Index};
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
-use assembly_config_schema::platform_config::diagnostics_config::{
+use assembly_config_schema::platform_settings::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, FireConfig, PipelineType, SamplerConfig,
     Severity,
 };
-use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_config_schema::platform_settings::storage_config::StorageConfig;
 use assembly_constants::{
     BootfsDestination, BootfsPackageDestination, FileEntry, PackageSetDestination,
 };
@@ -401,7 +401,7 @@ where
 mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
-    use assembly_config_schema::platform_config::diagnostics_config::{
+    use assembly_config_schema::platform_settings::diagnostics_config::{
         ComponentInitialInterest, SamplerConfig, UrlOrMoniker,
     };
     use camino::Utf8PathBuf;

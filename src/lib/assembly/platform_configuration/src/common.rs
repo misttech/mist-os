@@ -4,14 +4,14 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_capabilities::CapabilityNamedMap;
-use assembly_config_schema::assembly_config::CompiledPackageDefinition;
 use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
+use assembly_config_schema::product_config::CompiledPackageDefinition;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 
-use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
+use assembly_config_schema::platform_settings::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
 use assembly_constants::{
     BootfsDestination, CompiledPackageDestination, FileEntry, KernelArg, PackageSetDestination,
@@ -77,7 +77,7 @@ impl FeatureSetLevel {
     /// Convert a deserialized assembly_config_schema:: FeatureSetLevel into an
     /// `Option<FeatureSetLevel>`, where the `Empty` case becomes `None`.
     pub fn from_deserialized(
-        value: &assembly_config_schema::platform_config::FeatureSetLevel,
+        value: &assembly_config_schema::platform_settings::FeatureSetLevel,
     ) -> Option<Self> {
         match value {
             assembly_config_schema::FeatureSetLevel::TestKernelOnly => None,
@@ -117,7 +117,7 @@ pub(crate) trait DefineSubsystemConfiguration<T> {
 
 /// This provides the context that's passed to each subsystem's configuration
 /// module.  These are the fields from the
-/// `assembly_config_schema::platform_config::PlatformConfig` struct that are
+/// `assembly_config_schema::platform_settings::PlatformSettings` struct that are
 /// available to all subsystems to use to derive their configuration from.
 #[derive(Debug)]
 pub(crate) struct ConfigurationContext<'a> {
@@ -896,7 +896,7 @@ impl ConfigurationContext<'_> {
 
 /// This is the basis for the the context that's passed to each subsystem's configuration
 /// module.  These are the fields from the
-/// `assembly_config_schema::platform_config::PlatformConfig` struct that are
+/// `assembly_config_schema::platform_settings::PlatformSettings` struct that are
 /// available to all subsystems to use to derive their configuration from.  This is used to create
 /// the specific ConfigurationContext object that's used for each individual subsystem.
 #[derive(Debug)]

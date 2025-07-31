@@ -4,8 +4,8 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, ensure, Context, Result};
-use assembly_config_schema::platform_config::intl_config::{IntlConfig, Type};
-use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
+use assembly_config_schema::platform_settings::intl_config::{IntlConfig, Type};
+use assembly_config_schema::platform_settings::session_config::PlatformSessionConfig;
 
 pub(crate) struct IntlSubsystem;
 impl DefineSubsystemConfiguration<(&IntlConfig, &PlatformSessionConfig)> for IntlSubsystem {

@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
-use crate::platform_config::sysmem_config::BoardSysmemConfig;
+use crate::platform_settings::sysmem_config::BoardSysmemConfig;
 use crate::BuildType;
 use anyhow::{anyhow, Result};
 use assembly_constants::Arm64DebugDapSoc;
@@ -139,7 +139,7 @@ pub struct BoardInformation {
     /// Configure platform related feature
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub platform: PlatformConfig,
+    pub platform: PlatformSettings,
 
     /// GUIDs for the TAs provided by this board's TEE driver.
     #[serde(default)]
@@ -407,7 +407,7 @@ impl Default for BoardKernelConfig {
 /// This struct defines platform configurations specified by board.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
-pub struct PlatformConfig {
+pub struct PlatformSettings {
     /// Configure connectivity related features
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub connectivity: ConnectivityConfig,
@@ -601,7 +601,7 @@ mod test {
                 halt_on_panic: false,
                 arm64_event_stream_enable: false,
             },
-            platform: PlatformConfig {
+            platform: PlatformSettings {
                 connectivity: ConnectivityConfig::default(),
                 development_support: DevelopmentSupportConfig {
                     enable_debug_access_port_for_soc: Some(Arm64DebugDapSoc::AmlogicT931g),

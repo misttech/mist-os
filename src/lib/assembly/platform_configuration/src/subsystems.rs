@@ -4,8 +4,8 @@
 
 use anyhow::{bail, Context};
 use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
-use assembly_config_schema::platform_config::PlatformConfig;
-use assembly_config_schema::product_config::ProductConfig;
+use assembly_config_schema::platform_settings::PlatformSettings;
+use assembly_config_schema::product_settings::ProductSettings;
 use assembly_config_schema::{BoardInformation, BuildType, ExampleConfig};
 use camino::Utf8Path;
 
@@ -72,8 +72,8 @@ mod virtualization;
 ///
 /// Returns a map from package names to configuration updates.
 pub fn define_configuration(
-    platform: &PlatformConfig,
-    product: &ProductConfig,
+    platform: &PlatformSettings,
+    product: &ProductSettings,
     board_info: &BoardInformation,
     gendir: impl AsRef<Utf8Path>,
     resource_dir: impl AsRef<Utf8Path>,
@@ -238,8 +238,8 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
 
 fn configure_subsystems(
     context_base: &ConfigurationContextBase<'_>,
-    platform: &PlatformConfig,
-    product: &ProductConfig,
+    platform: &PlatformSettings,
+    product: &ProductSettings,
     builder: &mut dyn ConfigurationBuilder,
     include_example_aib_for_tests: bool,
 ) -> anyhow::Result<()> {
@@ -538,7 +538,7 @@ fn configure_subsystems(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_config_schema::AssemblyConfig;
+    use assembly_config_schema::ProductConfig;
     use assembly_util as util;
 
     #[test]
@@ -556,7 +556,7 @@ mod tests {
         "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let AssemblyConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
+        let ProductConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
         let result = define_configuration(
             &platform,
             &product,

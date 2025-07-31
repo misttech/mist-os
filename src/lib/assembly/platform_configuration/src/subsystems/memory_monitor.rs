@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
-use assembly_config_schema::platform_config::memory_monitor_config::{
+use assembly_config_schema::platform_settings::memory_monitor_config::{
     MemoryMonitorVersion, PlatformMemoryMonitorConfig,
 };
 

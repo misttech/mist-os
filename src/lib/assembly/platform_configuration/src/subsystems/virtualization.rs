@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
-use assembly_config_schema::platform_config::virtualization_config::PlatformVirtualizationConfig;
+use assembly_config_schema::platform_settings::virtualization_config::PlatformVirtualizationConfig;
 
 pub(crate) struct VirtualizationSubsystem;
 

@@ -6,7 +6,7 @@ use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context, Result};
 
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::timekeeper_config::TimekeeperConfig;
+use assembly_config_schema::platform_settings::timekeeper_config::TimekeeperConfig;
 
 pub(crate) struct TimekeeperSubsystem;
 impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {

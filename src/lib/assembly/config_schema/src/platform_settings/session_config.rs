@@ -13,7 +13,7 @@ pub struct PlatformSessionConfig {
     pub enabled: bool,
 
     /// If `autolaunch` is true (the default) and the `session.url` is set in
-    /// the `ProductConfig`, the named session will be launched when the device
+    /// the `ProductSettings`, the named session will be launched when the device
     /// boots up.
     pub autolaunch: bool,
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::platform_config::factory_store_providers_config::FactoryStoreProvidersConfig;
+use assembly_config_schema::platform_settings::factory_store_providers_config::FactoryStoreProvidersConfig;
 
 pub(crate) struct FactoryStoreProvidersSubsystem;
 impl DefineSubsystemConfiguration<FactoryStoreProvidersConfig> for FactoryStoreProvidersSubsystem {

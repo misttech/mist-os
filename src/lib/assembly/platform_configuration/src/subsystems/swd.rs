@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::swd_config::{
+use assembly_config_schema::platform_settings::swd_config::{
     OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
 use assembly_constants::FileEntry;

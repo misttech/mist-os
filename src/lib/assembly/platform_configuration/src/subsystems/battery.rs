@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::platform_config::battery_config::BatteryConfig;
+use assembly_config_schema::platform_settings::battery_config::BatteryConfig;
 
 pub(crate) struct BatterySubsystemConfig;
 impl DefineSubsystemConfiguration<BatteryConfig> for BatterySubsystemConfig {

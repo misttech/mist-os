@@ -30,7 +30,7 @@ impl<'a> TableOfContents<'a> {
         let mut all_types = HashSet::new();
         all_types.extend(self.data.data_types.keys());
 
-        stack.push((self.data.root.clone(), "AssemblyConfig".to_string(), 0));
+        stack.push((self.data.root.clone(), "ProductConfig".to_string(), 0));
         path.insert(self.data.root.clone());
 
         let mut last_indent_level = 0;
@@ -229,7 +229,7 @@ mod tests {
         let mut output = vec![];
         toc.write(&mut output).unwrap();
         let output = String::from_utf8(output).unwrap();
-        let expected = r"- title: AssemblyConfig
+        let expected = r"- title: ProductConfig
   section:
   - title: Overview
     path: url/root_type

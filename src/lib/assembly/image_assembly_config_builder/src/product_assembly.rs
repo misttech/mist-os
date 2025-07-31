@@ -6,11 +6,11 @@ use crate::image_assembly_config_builder::{ImageAssemblyConfigBuilder, Validatio
 
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
-use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSetLevel};
+use assembly_config_schema::{BoardInformation, BoardInputBundle, FeatureSetLevel, ProductConfig};
 use assembly_platform_artifacts::PlatformArtifacts;
 use assembly_release_info::SystemReleaseInfo;
 
-use assembly_config_schema::assembly_config::{
+use assembly_config_schema::product_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
@@ -23,7 +23,7 @@ use image_assembly_config::ImageAssemblyConfig;
 pub struct ProductAssembly {
     builder: ImageAssemblyConfigBuilder,
     platform_artifacts: PlatformArtifacts,
-    product_config: AssemblyConfig,
+    product_config: ProductConfig,
     board_config: BoardInformation,
     developer_only_options: Option<DeveloperOnlyOptions>,
     kernel_aib: Utf8PathBuf,
@@ -37,7 +37,7 @@ pub struct ProductAssembly {
 impl ProductAssembly {
     pub fn new(
         platform_artifacts: PlatformArtifacts,
-        product_config: AssemblyConfig,
+        product_config: ProductConfig,
         board_config: BoardInformation,
         include_example_aib_for_tests: bool,
     ) -> Result<Self> {
@@ -205,7 +205,7 @@ impl ProductAssembly {
         let board_config =
             BoardInformation { configuration: board_provided_config, ..board_config };
 
-        // Get platform configuration based on the AssemblyConfig and the BoardInformation.
+        // Get platform configuration based on the ProductConfig and the BoardInformation.
         let resource_dir = self.platform_artifacts.get_resources();
         let configuration = assembly_platform_configuration::define_configuration(
             &platform,

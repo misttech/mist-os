@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::power_config::PowerConfig;
+use assembly_config_schema::platform_settings::power_config::PowerConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 
 pub(crate) struct PowerManagementSubsystem;

@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_schema::board_config::SerialMode;
-use assembly_config_schema::platform_config::kernel_config::{
+use assembly_config_schema::platform_settings::kernel_config::{
     MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PagetableEvictionPolicy,
     PlatformKernelConfig,
 };

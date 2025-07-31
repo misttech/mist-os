@@ -15,7 +15,7 @@ use crate::load_config::{
 use crate::unique_release_info::UniqueReleaseInfoVector;
 
 use anyhow::{anyhow, Result};
-use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundleSet};
+use assembly_config_schema::{BoardInformation, BoardInputBundleSet, ProductConfig};
 use assembly_container::AssemblyContainer;
 use assembly_platform_artifacts::PlatformArtifacts;
 use async_trait::async_trait;
@@ -45,7 +45,7 @@ impl FfxMain for PbGetVersionTool {
             }
         } else if let Ok(platform) = PlatformArtifacts::from_dir(artifact_path) {
             load_platform(&platform).into_version_with_deps()
-        } else if let Ok(product) = AssemblyConfig::from_dir(artifact_path) {
+        } else if let Ok(product) = ProductConfig::from_dir(artifact_path) {
             load_product(&product).into_version_with_deps()
         } else if let Ok(pibs) = ProductInputBundle::from_dir(artifact_path) {
             load_pibs(&pibs).into_version_with_deps()
@@ -75,8 +75,8 @@ mod tests {
 
     use crate::load_config::VersionInfo;
 
-    use assembly_config_schema::product_config::ProductConfig;
-    use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundleSet};
+    use assembly_config_schema::product_settings::ProductSettings;
+    use assembly_config_schema::{BoardInformation, BoardInputBundleSet, ProductConfig};
     use assembly_partitions_config::{PartitionsConfig, Slot};
     use assembly_platform_artifacts::PlatformArtifacts;
     use assembly_release_info::{
@@ -324,8 +324,8 @@ mod tests {
 
     #[test]
     fn test_load_product() {
-        let assembly_config = AssemblyConfig {
-            product: ProductConfig {
+        let assembly_config = ProductConfig {
+            product: ProductSettings {
                 release_info: ProductReleaseInfo {
                     info: ReleaseInfo {
                         name: "fake_product".to_string(),
