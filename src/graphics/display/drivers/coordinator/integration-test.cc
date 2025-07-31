@@ -33,6 +33,7 @@
 
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client-proxy.h"
+#include "src/graphics/display/drivers/coordinator/client-vsync-queue.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
@@ -1096,15 +1097,6 @@ class IntegrationTest : public TestBase {
     return nullptr;
   }
 
-  display::VsyncAckCookie LastAckedCookie(ClientPriority client_priority) {
-    Controller& coordinator_controller = *CoordinatorController();
-    fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
-    ClientProxy* client_proxy = GetClientProxy(coordinator_controller, client_priority);
-    ZX_ASSERT(client_proxy != nullptr);
-
-    return client_proxy->LastVsyncAckCookieForTesting();
-  }
-
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
     ClientProxy* client_proxy = CoordinatorController()->client_owning_displays_;
@@ -1127,12 +1119,6 @@ class IntegrationTest : public TestBase {
     Controller& coordinator_controller = *CoordinatorController();
     fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
     return GetClientProxy(coordinator_controller, client_priority) != nullptr;
-  }
-
-  void SendVsyncFromCoordinatorClientProxy() {
-    fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
-    CoordinatorController()->client_owning_displays_->OnDisplayVsync(
-        display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
   }
 
   void TriggerDisplayEngineVsync() { FakeDisplayEngine().TriggerVsync(); }
@@ -1570,41 +1556,6 @@ TEST_F(IntegrationTest, SendVsyncsAfterClientDies) {
   SendVsyncAfterUnbind(std::move(primary_client), display_id);
 }
 
-TEST_F(IntegrationTest, AcknowledgeVsync) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs up to watermark level
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kVsyncMessagesWatermark; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return primary_client->state().last_vsync_ack_cookie() != display::kInvalidVsyncAckCookie;
-  }));
-  EXPECT_EQ(ClientProxy::kVsyncMessagesWatermark, primary_client->state().vsync_count());
-
-  // acknowledge
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-}
-
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
@@ -1615,310 +1566,43 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
   ASSERT_OK(create_color_layer_result);
   display::LayerId color_layer_id = create_color_layer_result.value();
 
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsync
+  // Generate VSync messages with unique configuration stamps.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  uint32_t vsync_count = ClientProxy::kMaxVsyncMessages;
-  while (vsync_count--) {
-    SendVsyncFromCoordinatorClientProxy();
+  int64_t generated_vsync_count =
+      ClientVsyncQueue::kThrottleWatermark + ClientVsyncQueue::kThrottleBufferSize;
+  for (int64_t index = 0; index < generated_vsync_count; ++index) {
+    const display::DriverConfigStamp old_driver_stamp = DisplayEngineAppliedConfigStamp();
+    const display::ConfigStamp config_stamp(1 + index);
+    ASSERT_OK(primary_client->ApplyLayers(config_stamp, {{.layer_id = color_layer_id}}));
+
+    // Wait until the engine driver receives the new configuration.
+    ASSERT_TRUE(
+        PollUntilOnLoop([&]() { return DisplayEngineAppliedConfigStamp() != old_driver_stamp; }));
+    TriggerDisplayEngineVsync();
   }
+
+  // Collect the throttled VSync messages and the ack cookie.
   {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
+    static constexpr uint64_t expected_vsync_count = ClientVsyncQueue::kThrottleWatermark;
     ASSERT_TRUE(PollUntilOnLoop(
         [&]() { return (primary_client->state().vsync_count() >= expected_vsync_count); }));
     EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
+    EXPECT_EQ(display::ConfigStamp(expected_vsync_count),
+              primary_client->state().last_vsync_config_stamp());
   }
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
+  ASSERT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
 
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  constexpr uint32_t kNumVsync = 5;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync
+  // Acknowledge VSync to unblock the throttled messages.
   ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
 
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages + kNumVsync + 1;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-}
-
-TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsyncs
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return primary_client->state().vsync_count() >= ClientProxy::kMaxVsyncMessages; }));
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a lot
-  constexpr uint32_t kNumVsync = ClientProxy::kVsyncBufferSize * 10;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
   {
     static constexpr uint64_t expected_vsync_count =
-        ClientProxy::kMaxVsyncMessages + ClientProxy::kVsyncBufferSize + 1;
+        ClientVsyncQueue::kThrottleWatermark + ClientVsyncQueue::kThrottleBufferSize;
     ASSERT_TRUE(PollUntilOnLoop(
         [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
     EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-}
-
-TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsync
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return (primary_client->state().vsync_count() >= ClientProxy::kMaxVsyncMessages); }));
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  constexpr uint32_t kNumVsync = 5;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-
-  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
-  // that the TestFidlClient processed all events coming from the Coordinator.
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync with invalid cookie
-  static constexpr display::VsyncAckCookie kInvalidCookie(0xdeadbeef);
-  ASSERT_NE(primary_client->state().last_vsync_ack_cookie(), kInvalidCookie);
-  ASSERT_OK(primary_client->AcknowledgeVsync(kInvalidCookie));
-
-  // This check can have a false positive pass, due to using a hard-coded
-  // timeout.
-  {
-    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-    PollUntilOnLoop([&]() {
-      if (zx::clock::get_monotonic() >= deadline)
-        return true;
-      return LastAckedCookie(ClientPriority::kPrimary) ==
-             primary_client->state().last_vsync_ack_cookie();
-    });
-  }
-  EXPECT_NE(LastAckedCookie(ClientPriority::kPrimary),
-            primary_client->state().last_vsync_ack_cookie());
-
-  // We should still not receive vsync events since acknowledge did not use valid cookie
-  SendVsyncFromCoordinatorClientProxy();
-  constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
-
-  // This check can have a false positive pass, due to using a hard-coded
-  // timeout.
-  {
-    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-    PollUntilOnLoop([&]() {
-      if (zx::clock::get_monotonic() >= deadline)
-        return true;
-      return primary_client->state().vsync_count() >= expected_vsync_count + 1;
-    });
-  }
-  EXPECT_LT(primary_client->state().vsync_count(), expected_vsync_count + 1);
-
-  EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-}
-
-TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
-  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
-      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
-
-  zx::result<display::LayerId> create_color_layer_result =
-      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_color_layer_result);
-  display::LayerId color_layer_id = create_color_layer_result.value();
-
-  // Apply a config so the client starts receiving VSync events.
-  static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
-
-  // send vsyncs until max vsync
-  ASSERT_EQ(0u, primary_client->state().vsync_count());
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  constexpr uint32_t kNumVsync = 5;
-  for (uint32_t i = 0; i < kNumVsync; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-
-  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
-  // that the TestFidlClient processed all events coming from the Coordinator.
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync
-
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages + kNumVsync + 1;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return (primary_client->state().vsync_count() >= expected_vsync_count); }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-
-  // save old cookie
-  display::VsyncAckCookie old_vsync_ack_cookie = primary_client->state().last_vsync_ack_cookie();
-
-  // send vsyncs until max vsync
-  for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages * 2;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return (primary_client->state().vsync_count() >= expected_vsync_count); }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->state().last_vsync_ack_cookie());
-
-  // At this point, display will not send any more vsync events. Let's confirm by sending a few
-  for (uint32_t i = 0; i < ClientProxy::kVsyncBufferSize; i++) {
-    SendVsyncFromCoordinatorClientProxy();
-  }
-  EXPECT_EQ(ClientProxy::kMaxVsyncMessages * 2, primary_client->state().vsync_count());
-
-  // now let's acknowledge vsync with old cookie
-  ASSERT_OK(primary_client->AcknowledgeVsync(old_vsync_ack_cookie));
-
-  // This check can have a false positive pass, due to using a hard-coded
-  // timeout.
-  {
-    zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-    PollUntilOnLoop([&]() {
-      if (zx::clock::get_monotonic() >= deadline)
-        return true;
-      return LastAckedCookie(ClientPriority::kPrimary) ==
-             primary_client->state().last_vsync_ack_cookie();
-    });
-  }
-  EXPECT_NE(LastAckedCookie(ClientPriority::kPrimary),
-            primary_client->state().last_vsync_ack_cookie());
-
-  // Since we did not acknowledge with most recent cookie, we should not get any vsync events back
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages * 2;
-
-    // This check can have a false positive pass, due to using a hard-coded
-    // timeout.
-    {
-      zx::time_monotonic deadline = zx::deadline_after(zx::sec(1));
-      PollUntilOnLoop([&]() {
-        if (zx::clock::get_monotonic() >= deadline)
-          return true;
-        return primary_client->state().vsync_count() >= expected_vsync_count + 1;
-      });
-    }
-    EXPECT_LT(primary_client->state().vsync_count(), expected_vsync_count + 1);
-
-    // count should still remain the same
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
-  }
-
-  // now let's acknowledge with valid cookie
-  ASSERT_OK(primary_client->AcknowledgeVsync(primary_client->state().last_vsync_ack_cookie()));
-  ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return LastAckedCookie(ClientPriority::kPrimary) ==
-           primary_client->state().last_vsync_ack_cookie();
-  }));
-
-  // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  SendVsyncFromCoordinatorClientProxy();
-  {
-    static constexpr uint64_t expected_vsync_count =
-        ClientProxy::kMaxVsyncMessages * 2 + ClientProxy::kVsyncBufferSize + 1;
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() >= expected_vsync_count; }));
-    EXPECT_EQ(expected_vsync_count, primary_client->state().vsync_count());
+    EXPECT_EQ(display::ConfigStamp(expected_vsync_count),
+              primary_client->state().last_vsync_config_stamp());
   }
 }
 

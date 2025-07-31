@@ -1621,7 +1621,13 @@ void Client::DiscardConfig() {
 void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
                               AcknowledgeVsyncCompleter::Sync& /*_completer*/) {
   display::VsyncAckCookie ack_cookie = display::VsyncAckCookie(request->cookie);
-  acked_cookie_ = ack_cookie;
+  if (ack_cookie == display::kInvalidVsyncAckCookie) {
+    fdf::error("AcknowledgeVsync() called with invalid cookie");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  proxy_->AcknowledgeVsync(ack_cookie);
   fdf::trace("Cookie {} Acked\n", ack_cookie.value());
 }
 

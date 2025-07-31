@@ -28,6 +28,7 @@
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
+#include "src/graphics/display/drivers/coordinator/client-vsync-queue.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -124,6 +125,15 @@ void ClientProxy::OnCaptureComplete() {
   enable_capture_ = false;
 }
 
+void ClientProxy::AcknowledgeVsync(display::VsyncAckCookie ack_cookie) {
+  fbl::AutoLock lock(&mtx_);
+
+  if (!vsync_queue_.Acknowledge(ack_cookie)) {
+    fdf::error("Client passed incorrect VSync ack cookie: {}", ack_cookie.value());
+  }
+  DrainVsyncQueue();
+}
+
 void ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_t timestamp,
                                  display::DriverConfigStamp driver_config_stamp) {
   AssertHeld(*controller_.mtx());
@@ -142,63 +152,20 @@ void ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_instant_mono_
     pending_applied_config_stamps_.erase(pending_applied_config_stamps_.begin(), it);
   }
 
-  display::VsyncAckCookie vsync_ack_cookie = display::kInvalidVsyncAckCookie;
-  if (number_of_vsyncs_sent_ >= (kVsyncMessagesWatermark - 1)) {
-    // Number of  vsync events sent exceed the watermark level.
-    // Check to see if client has been notified already that acknowledgement is needed.
-    if (!acknowledge_request_sent_) {
-      // We have not sent a (new) cookie to client for acknowledgement; do it now.
-      // First, increment cookie sequence.
-      ++vsync_cookie_sequence_;
-      // Generate new cookie by xor'ing initial cookie with sequence number.
-      vsync_ack_cookie = display::VsyncAckCookie(vsync_cookie_salt_ ^ vsync_cookie_sequence_);
-    } else {
-      // Client has already been notified; check if client has acknowledged it.
-      ZX_DEBUG_ASSERT(last_cookie_sent_ != display::kInvalidVsyncAckCookie);
-      if (handler_.LastAckedCookie() == last_cookie_sent_) {
-        // Client has acknowledged cookie. Reset vsync tracking states
-        number_of_vsyncs_sent_ = 0;
-        acknowledge_request_sent_ = false;
-        last_cookie_sent_ = display::kInvalidVsyncAckCookie;
-      }
-    }
+  {
+    fbl::AutoLock lock(&mtx_);
+    vsync_queue_.Push(ClientVsyncQueue::Message{.display_id = display_id,
+                                                .timestamp = zx::time_monotonic(timestamp),
+                                                .config_stamp = client_stamp});
+    DrainVsyncQueue();
   }
+}
 
-  if (number_of_vsyncs_sent_ >= kMaxVsyncMessages) {
-    // We have reached/exceeded maximum allowed vsyncs without any acknowledgement. At this point,
-    // start storing them.
-    fdf::trace("Vsync not sent due to none acknowledgment.\n");
-    ZX_DEBUG_ASSERT(vsync_ack_cookie == display::kInvalidVsyncAckCookie);
-    if (buffered_vsync_messages_.full()) {
-      buffered_vsync_messages_.pop();  // discard
-    }
-    buffered_vsync_messages_.push(VsyncMessageData{
-        .display_id = display_id,
-        .timestamp = timestamp,
-        .config_stamp = client_stamp,
-    });
-    return;
-  }
-
-  // Send buffered vsync events before sending the latest.
-  while (!buffered_vsync_messages_.empty()) {
-    VsyncMessageData vsync_message_data = buffered_vsync_messages_.front();
-    buffered_vsync_messages_.pop();
-    handler_.NotifyVsync(vsync_message_data.display_id,
-                         zx::time_monotonic{vsync_message_data.timestamp},
-                         vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
-    number_of_vsyncs_sent_++;
-  }
-
-  // Send the latest vsync event.
-  handler_.NotifyVsync(display_id, zx::time_monotonic{timestamp}, client_stamp, vsync_ack_cookie);
-
-  // Update vsync tracking states.
-  if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
-    acknowledge_request_sent_ = true;
-    last_cookie_sent_ = vsync_ack_cookie;
-  }
-  number_of_vsyncs_sent_++;
+void ClientProxy::DrainVsyncQueue() {
+  vsync_queue_.DrainUntilThrottled([&](const ClientVsyncQueue::Message& message,
+                                       display::VsyncAckCookie ack_cookie) {
+    handler_.NotifyVsync(message.display_id, message.timestamp, message.config_stamp, ack_cookie);
+  });
 }
 
 void ClientProxy::OnClientDead() {
@@ -222,11 +189,6 @@ void ClientProxy::UpdateConfigStampMapping(ConfigStampPair stamps) {
   });
 }
 
-display::VsyncAckCookie ClientProxy::LastVsyncAckCookieForTesting() {
-  fbl::AutoLock<fbl::Mutex> lock(&mtx_);
-  return handler_.LastAckedCookie();
-}
-
 sync_completion_t* ClientProxy::FidlUnboundCompletionForTesting() {
   fbl::AutoLock<fbl::Mutex> lock(&mtx_);
   return &fidl_unbound_completion_;
@@ -248,9 +210,6 @@ zx_status_t ClientProxy::Init(
       parent_node->CreateChild(fbl::StringPrintf("client-%" PRIu64, handler_.id().value()).c_str());
   node_.RecordString("priority", DebugStringFromClientPriority(handler_.priority()));
   is_owner_property_ = node_.CreateBool("is_owner", false);
-
-  unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
-  vsync_cookie_salt_ = rand_r(&seed);
 
   fidl::OnUnboundFn<Client> unbound_callback =
       [this](Client* client, fidl::UnbindInfo info,

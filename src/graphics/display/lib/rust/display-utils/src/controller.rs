@@ -369,7 +369,9 @@ impl CoordinatorInner {
         applied_config_stamp: display::ConfigStamp,
         cookie: display::VsyncAckCookie,
     ) -> Result<()> {
-        self.proxy.acknowledge_vsync(cookie.value)?;
+        if cookie.value != 0 {
+            self.proxy.acknowledge_vsync(cookie.value)?;
+        }
 
         let mut listeners_to_remove = Vec::new();
         for (pos, (sender, filter)) in self.vsync_listeners.iter().enumerate() {

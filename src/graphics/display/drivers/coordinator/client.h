@@ -99,8 +99,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
 
-  display::VsyncAckCookie LastAckedCookie() const { return acked_cookie_; }
-
   size_t ImportedImagesCountForTesting() const { return images_.size(); }
 
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
@@ -274,8 +272,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // an in-progress capture, we defer the release operation until the capture
   // completes. The deferred release is tracked here.
   display::ImageId pending_release_capture_image_id_ = display::kInvalidImageId;
-
-  display::VsyncAckCookie acked_cookie_ = display::kInvalidVsyncAckCookie;
 };
 
 }  // namespace display_coordinator
