@@ -13,7 +13,6 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
-#include <fbl/unique_fd.h>
 #include <safemath/checked_math.h>
 
 #include "src/storage/f2fs/bcache.h"
@@ -509,19 +508,23 @@ zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino, LockedPage* inode_p
     }
   }
 
+  // Invalid vnodes are allowed only during recovery.
+  if (!IsOnRecovery() && !LeToCpu(node_page->GetAddress<Node>()->i.i_links)) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  // When multiple threads attempt to make reference ptrs for the same inode number, those that come
+  // after the winner can retrieve |vnode| from the cache.
+  if (vnode_cache_->Lookup(ino, &vnode) == ZX_OK) {
+    return zx::ok(std::move(vnode));
+  }
+
   umode_t mode = LeToCpu(node_page->GetAddress<Node>()->i.i_mode);
   ZX_DEBUG_ASSERT(node_page.GetPage<NodePage>().InoOfNode() == ino);
   if (S_ISDIR(mode)) {
-    vnode = fbl::MakeRefCounted<Dir>(this, ino, mode);
+    vnode = fbl::MakeRefCounted<Dir>(this, ino, mode, std::move(node_page));
   } else {
-    vnode = fbl::MakeRefCounted<File>(this, ino, mode);
-  }
-  vnode->Init(node_page);
-
-  // VnodeCache is allowed to keep invalid vnodes only on recovery.
-  if (!IsOnRecovery() && !vnode->GetNlink()) {
-    vnode->SetFlag(InodeInfoFlag::kBad);
-    return zx::error(ZX_ERR_NOT_FOUND);
+    vnode = fbl::MakeRefCounted<File>(this, ino, mode, std::move(node_page));
   }
 
   if (zx_status_t status = vnode_cache_->Add(vnode.get()); status != ZX_OK) {
@@ -539,45 +542,13 @@ zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::CreateNewVnode(umode_t mode, std::optio
 
   fbl::RefPtr<VnodeF2fs> vnode;
   if (S_ISDIR(mode)) {
-    vnode = fbl::MakeRefCounted<Dir>(this, *ino_or, mode);
+    vnode = fbl::MakeRefCounted<Dir>(this, *ino_or, mode, gid);
   } else {
-    vnode = fbl::MakeRefCounted<File>(this, *ino_or, mode);
+    vnode = fbl::MakeRefCounted<File>(this, *ino_or, mode, gid);
   }
-
-  vnode->SetFlag(InodeInfoFlag::kNewInode);
-  if (gid) {
-    vnode->SetGid(*gid);
-    if (S_ISDIR(mode)) {
-      vnode->SetMode(mode | S_ISGID);
-    }
-  } else {
-    vnode->SetUid(getuid());
-  }
-
-  vnode->InitNlink();
-  vnode->SetBlocks(0);
-  vnode->InitTime();
-  vnode->SetGeneration(superblock_info_->GetNextGeneration());
-  superblock_info_->IncNextGeneration();
-
-  if (superblock_info_->TestOpt(MountOption::kInlineXattr)) {
-    vnode->SetFlag(InodeInfoFlag::kInlineXattr);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-
-  if (superblock_info_->TestOpt(MountOption::kInlineDentry) && vnode->IsDir()) {
-    vnode->SetFlag(InodeInfoFlag::kInlineDentry);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-
-  if (vnode->IsReg()) {
-    vnode->InitExtentTree();
-  }
-  vnode->InitFileCache();
 
   vnode_cache_->Add(vnode.get());
   vnode->SetDirty();
-
   return zx::ok(std::move(vnode));
 }
 

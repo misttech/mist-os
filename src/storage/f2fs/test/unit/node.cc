@@ -432,6 +432,7 @@ TEST_F(NodeManagerTest, NodePageExceptionCase) TA_NO_THREAD_SAFETY_ANALYSIS {
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, test_vnode);
 
   test_vnode->SetFlag(InodeInfoFlag::kNoAlloc);
+  test_vnode->ClearDirty();
   ASSERT_EQ(test_vnode->NewInodePage().status_value(), ZX_ERR_ACCESS_DENIED);
   test_vnode->ClearFlag(InodeInfoFlag::kNoAlloc);
 

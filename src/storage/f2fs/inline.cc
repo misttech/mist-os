@@ -277,18 +277,18 @@ void Dir::DeleteInlineEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, Vno
   time_->Update<Timestamps::ModificationTime>();
 
   if (vnode && vnode->IsDir()) {
-    DropNlink();
+    DecrementLinkUnsafe();
   }
 
   if (vnode) {
     vnode->SetDirty();
     vnode->SetTime<Timestamps::ChangeTime>();
-    vnode->DropNlink();
+    vnode->DecrementLink();
     if (vnode->IsDir()) {
-      vnode->DropNlink();
+      vnode->DecrementLink();
       vnode->SetSize(0);
     }
-    if (vnode->GetNlink() == 0) {
+    if (vnode->GetLinkCount() == 0) {
       vnode->SetOrphan();
     }
   }

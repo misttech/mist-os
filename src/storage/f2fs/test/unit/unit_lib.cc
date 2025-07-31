@@ -256,11 +256,9 @@ void FileTester::VnodeWithoutParent(F2fs *fs, umode_t mode, fbl::RefPtr<VnodeF2f
   } else {
     vnode = fbl::MakeRefCounted<File>(fs, inode_nid, mode);
   }
-
+  vnode->ClearFlag(InodeInfoFlag::kNewInode);
+  vnode->ClearLinkCount();
   ASSERT_EQ(vnode->Open(nullptr), ZX_OK);
-  vnode->InitTime();
-  vnode->InitFileCache();
-  vnode->InitExtentTree();
   fs->GetVCache().Add(vnode.get());
   vnode->SetDirty();
 }

@@ -278,7 +278,6 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
   }
   // If |this| is an orphan, we don't need to set dirty flag for |*pages_or|.
   if (file_cache_->IsOrphan()) {
-    ZX_DEBUG_ASSERT(!HasLink());
     return zx::ok(std::move(pages_or.value()));
   }
 

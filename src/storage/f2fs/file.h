@@ -12,7 +12,10 @@ namespace f2fs {
 class FileTester;
 class File : public VnodeF2fs, public fbl::Recyclable<File> {
  public:
-  explicit File(F2fs* fs, ino_t ino, umode_t mode);
+  // Constructor for files loaded from disk
+  explicit File(F2fs* fs, ino_t ino, umode_t mode, LockedPage node_page);
+  // Constructor for newly created files
+  explicit File(F2fs* fs, ino_t ino, umode_t mode, std::optional<gid_t> gid = std::nullopt);
 
   // Required for memory management, see the class comment above Vnode for more.
   void fbl_recycle() { RecycleNode(); }

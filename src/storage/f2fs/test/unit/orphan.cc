@@ -54,7 +54,7 @@ TEST(OrphanInode, RecoverOrphanInode) {
   ASSERT_EQ(fs->GetSuperblockInfo().GetValidBlockCount(), static_cast<uint64_t>(kOrphanCnt + 2));
 
   for (const auto &iter : vnodes) {
-    ASSERT_EQ(iter->GetNlink(), static_cast<uint32_t>(1));
+    ASSERT_EQ(iter->GetLinkCount(), static_cast<uint32_t>(1));
   }
 
   // 2. Make orphan inodes
@@ -63,7 +63,7 @@ TEST(OrphanInode, RecoverOrphanInode) {
   ASSERT_EQ(fs->GetVnodeSetSize(VnodeSet::kOrphan), kOrphanCnt);
 
   for (const auto &iter : vnodes) {
-    ASSERT_EQ(iter->GetNlink(), (uint32_t)0);
+    ASSERT_EQ(iter->GetLinkCount(), (uint32_t)0);
   }
 
   fs->SyncFs();

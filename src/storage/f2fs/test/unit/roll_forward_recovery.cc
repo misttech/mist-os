@@ -356,14 +356,14 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   file_fs_vnode = root_dir->Create("fsync_file_nlink", fs::CreationType::kFile);
   ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
   fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
-  fsync_vnode->IncNlink();
+  fsync_vnode->IncrementLink();
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // fsync should trigger checkpoint
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
-  fsync_vnode->DropNlink();
+  fsync_vnode->DecrementLink();
   fsync_vnode->SetDirty();
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);

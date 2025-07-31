@@ -10,6 +10,7 @@
 #include <span>
 
 #include <fbl/string_buffer.h>
+#include <fbl/unique_fd.h>
 
 #include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/dir.h"
@@ -25,17 +26,45 @@
 
 namespace f2fs {
 
-VnodeF2fs::VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode)
+VnodeF2fs::VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode, LockedPage node_page)
     : PagedVnode(*fs->vfs()),
       superblock_info_(fs->GetSuperblockInfo()),
       ino_(ino),
       fs_(fs),
       mode_(mode) {
+  Activate();
   if (IsMeta() || IsNode()) {
     InitFileCache();
+    return;
   }
-  SetFlag(InodeInfoFlag::kInit);
-  Activate();
+
+  InitExtentTree();
+  if (node_page) {
+    InitializeFromPage(node_page);
+    return;
+  }
+
+  SetFlag(InodeInfoFlag::kNewInode);
+  num_blocks_ = 0;
+  nlink_ = 1;
+  uid_ = getuid();
+
+  timespec cur;
+  clock_gettime(CLOCK_REALTIME, &cur);
+  time_ = Timestamps(UpdateMode::kRelative, cur, cur, cur, cur);
+
+  generation_ = superblock_info_.GetNextGeneration();
+  superblock_info_.IncNextGeneration();
+  if (superblock_info_.TestOpt(MountOption::kInlineXattr)) {
+    SetFlag(InodeInfoFlag::kInlineXattr);
+    inline_xattr_size_ = kInlineXattrAddrs;
+  }
+
+  if (superblock_info_.TestOpt(MountOption::kInlineDentry) && IsDir()) {
+    SetFlag(InodeInfoFlag::kInlineDentry);
+    SetInlineXattrAddrs(kInlineXattrAddrs);
+  }
+  InitFileCache();
 }
 
 VnodeF2fs::~VnodeF2fs() {
@@ -278,7 +307,7 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
     fbl::RefPtr<VnodeF2fs> vnode = fbl::ImportFromRawPtr(this);
     [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&vnode);
     Deactivate();
-  } else if (GetNlink()) {
+  } else if (GetLinkCountUnsafe()) {
     // It should not happen since f2fs removes the last reference of dirty vnodes at checkpoint time
     // during which any file operations are not allowed.
     if (GetDirtyPageCount()) {
@@ -310,7 +339,7 @@ zx::result<fs::VnodeAttributes> VnodeF2fs::GetAttributes() const {
   a.id = ino_;
   a.content_size = vmo_manager().GetContentSize();
   a.storage_size = GetBlocks() * kBlockSize;
-  a.link_count = nlink_;
+  a.link_count = GetLinkCountUnsafe();
   const auto &atime = GetTime<Timestamps::AccessTime>();
   const auto &btime = GetTime<Timestamps::BirthTime>();
   const auto &mtime = GetTime<Timestamps::ModificationTime>();
@@ -415,7 +444,7 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page, bool update_size) {
   inode.i_advise = advise_;
   inode.i_uid = CpuToLe(uid_);
   inode.i_gid = CpuToLe(gid_);
-  inode.i_links = CpuToLe(GetNlink());
+  inode.i_links = CpuToLe(GetLinkCountUnsafe());
   // For on-disk i_blocks, we keep counting inode block for backward compatibility.
   inode.i_blocks = CpuToLe(safemath::CheckAdd<uint64_t>(GetBlocks(), 1).ValueOrDie());
 
@@ -607,7 +636,7 @@ void VnodeF2fs::Purge() {
     return;
   }
 
-  if (GetNlink() || IsBad()) {
+  if (GetLinkCount() || TestFlag(InodeInfoFlag::kBad)) {
     return;
   }
 
@@ -652,14 +681,7 @@ zx_status_t VnodeF2fs::InitFileCacheUnsafe(uint64_t nbytes) {
   return ZX_OK;
 }
 
-void VnodeF2fs::InitTime() {
-  std::lock_guard lock(mutex_);
-  timespec cur;
-  clock_gettime(CLOCK_REALTIME, &cur);
-  time_ = Timestamps(UpdateMode::kRelative, cur, cur, cur, cur);
-}
-
-void VnodeF2fs::Init(LockedPage &node_page) {
+void VnodeF2fs::InitializeFromPage(LockedPage &node_page) {
   std::lock_guard lock(mutex_);
   Inode &inode = node_page->GetAddress<Node>()->i;
   std::string_view name(reinterpret_cast<char *>(inode.i_name),
@@ -668,7 +690,7 @@ void VnodeF2fs::Init(LockedPage &node_page) {
   name_ = name;
   uid_ = LeToCpu(inode.i_uid);
   gid_ = LeToCpu(inode.i_gid);
-  SetNlink(LeToCpu(inode.i_links));
+  nlink_ = LeToCpu(inode.i_links);
   // Don't count the in-memory inode.i_blocks for compatibility with the generic
   // filesystem including linux f2fs.
   SetBlocks(safemath::CheckSub<uint64_t>(LeToCpu(inode.i_blocks), 1).ValueOrDie());
@@ -710,7 +732,6 @@ void VnodeF2fs::Init(LockedPage &node_page) {
   if (inode.i_inline & kDataExist) {
     SetFlag(InodeInfoFlag::kDataExist);
   }
-  InitExtentTree();
   if (extent_tree_ && inode.i_ext.blk_addr) {
     auto extent_info = ExtentInfo{.fofs = LeToCpu(inode.i_ext.fofs),
                                   .blk_addr = LeToCpu(inode.i_ext.blk_addr),
@@ -721,7 +742,7 @@ void VnodeF2fs::Init(LockedPage &node_page) {
   }
 
   // During recovery, only orphan vnodes create file cache.
-  if (!fs()->IsOnRecovery() || !GetNlink()) {
+  if (!fs()->IsOnRecovery() || !GetLinkCountUnsafe()) {
     InitFileCacheUnsafe(LeToCpu(inode.i_size));
   }
 }
@@ -743,7 +764,7 @@ bool VnodeF2fs::NeedToCheckpoint() {
   if (!IsReg()) {
     return true;
   }
-  if (GetNlink() != 1) {
+  if (GetLinkCount() != 1) {
     return true;
   }
   if (TestFlag(InodeInfoFlag::kNeedCp)) {
@@ -872,13 +893,17 @@ zx::result<PageBitmap> VnodeF2fs::GetBitmap(fbl::RefPtr<Page> page) {
 void VnodeF2fs::SetOrphan() {
   // Clean the current dirty pages and set the orphan flag that prevents additional dirty pages.
   if (!file_cache_->SetOrphan()) {
+    if (fs()->IsOnRecovery()) {
+      // No other operations are required during recovery.
+      return;
+    }
     file_cache_->ClearDirtyPages();
     fs()->AddToVnodeSet(VnodeSet::kOrphan, GetKey());
     if (IsDir()) {
       Notify(".", fuchsia_io::wire::WatchEvent::kDeleted);
     }
     ClearDirty();
-    // Update the inode pages of orphans to be logged on disk.
+    // Update the inode pages of orphans and make them dirty.
     LockedPage node_page;
     ZX_ASSERT(fs()->GetNodeManager().GetNodePage(GetKey(), &node_page) == ZX_OK);
     UpdateInodePage(node_page);
@@ -1196,7 +1221,7 @@ zx_status_t VnodeF2fs::InitInodeMetadataUnsafe() {
   ipage.SetDirty();
 
   if (TestFlag(InodeInfoFlag::kIncLink)) {
-    IncNlink();
+    IncrementLinkUnsafe();
     SetDirty();
   }
   return ZX_OK;
