@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <errno.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.driver.test/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
@@ -40,11 +39,9 @@
 #include <zircon/syscalls.h>
 
 #include <algorithm>
-#include <climits>
 #include <iterator>
 #include <limits>
 #include <memory>
-#include <new>
 #include <utility>
 
 #include <bind/fuchsia/platform/cpp/bind.h>
@@ -59,7 +56,6 @@
 #include <zxtest/zxtest.h>
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
-#include "src/lib/fxl/strings/string_printf.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/fvm_check.h"
@@ -159,21 +155,9 @@ class FvmTest : public zxtest::Test {
 
   const fbl::unique_fd& devfs_root_fd() const { return devfs_root_; }
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> devfs_root() const {
-    fdio_cpp::UnownedFdioCaller caller(devfs_root_fd());
-    return component::Clone(caller.directory());
-  }
-
   void TearDown() override { ASSERT_OK(ramdisk_destroy(ramdisk_)); }
 
-  fbl::String fvm_path() const { return fxl::StringPrintf("%s/fvm", ramdisk_get_path(ramdisk_)); }
-
-  zx::result<fbl::unique_fd> fvm_device_fd() const {
-    fbl::unique_fd fd;
-    zx_status_t status =
-        fdio_open3_fd_at(devfs_root_fd().get(), fvm_path().c_str(), 0, fd.reset_and_get_address());
-    return zx::make_result(status, std::move(fd));
-  }
+  std::string fvm_path() const { return std::string(ramdisk_get_path(ramdisk_)) + "/fvm"; }
 
   fidl::UnownedClientEnd<fuchsia_device::Controller> ramdisk_controller_interface() const {
     return fidl::UnownedClientEnd<fuchsia_device::Controller>(
@@ -185,9 +169,13 @@ class FvmTest : public zxtest::Test {
         ramdisk_get_block_interface(ramdisk_));
   }
 
-  const ramdisk_client* ramdisk() const { return ramdisk_; }
-
   void FVMRebind();
+
+  void StartFVM() {
+    auto resp = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
+    ASSERT_OK(resp.status());
+    ASSERT_TRUE(resp->is_ok());
+  }
 
   void CreateFVM(uint64_t block_size, uint64_t block_count, uint64_t slice_size);
 
@@ -208,8 +196,9 @@ class FvmTest : public zxtest::Test {
   void Upgrade(const uuid::Uuid& old_guid, const uuid::Uuid& new_guid, zx_status_t status) const;
 
   zx::result<PartitionChannel> OpenPartition(const fs_management::PartitionMatcher& matcher) const {
+    fdio_cpp::UnownedFdioCaller caller(devfs_root_fd());
     zx::result controller =
-        fs_management::OpenPartitionWithDevfs(devfs_root().value(), matcher, false);
+        fs_management::OpenPartitionWithDevfs(caller.directory(), matcher, false);
     if (controller.is_error()) {
       return controller.take_error();
     }
@@ -218,8 +207,9 @@ class FvmTest : public zxtest::Test {
 
   zx::result<PartitionChannel> WaitForPartition(
       const fs_management::PartitionMatcher& matcher) const {
+    fdio_cpp::UnownedFdioCaller caller(devfs_root_fd());
     zx::result controller =
-        fs_management::OpenPartitionWithDevfs(devfs_root().value(), matcher, true);
+        fs_management::OpenPartitionWithDevfs(caller.directory(), matcher, true);
     if (controller.is_error()) {
       return controller.take_error();
     }
@@ -239,13 +229,11 @@ class FvmTest : public zxtest::Test {
     if (fvm.is_error()) {
       return fvm.take_error();
     }
-    zx::result devfs = devfs_root();
-    if (devfs.is_error()) {
-      return devfs.take_error();
-    }
+    fdio_cpp::UnownedFdioCaller caller(devfs_root_fd());
 
     zx::result controller = fs_management::FvmAllocatePartitionWithDevfs(
-        *devfs, *fvm, request.slice_count, request.type, request.guid, request.name, request.flags);
+        caller.directory(), *fvm, request.slice_count, request.type, request.guid, request.name,
+        request.flags);
     if (controller.is_error()) {
       return controller.take_error();
     }
@@ -254,12 +242,9 @@ class FvmTest : public zxtest::Test {
 
  private:
   zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> fvm_device() const {
-    zx::result devfs = devfs_root();
-    if (devfs.is_error()) {
-      return devfs.take_error();
-    }
-    return component::ConnectAt<fuchsia_hardware_block_volume::VolumeManager>(devfs.value(),
-                                                                              fvm_path().c_str());
+    fdio_cpp::UnownedFdioCaller caller(devfs_root_fd());
+    return component::ConnectAt<fuchsia_hardware_block_volume::VolumeManager>(caller.directory(),
+                                                                              fvm_path());
   }
 
   std::unique_ptr<async::Loop> loop_;
@@ -281,9 +266,7 @@ void FvmTest::CreateFVM(uint64_t block_size, uint64_t block_count, uint64_t slic
   ASSERT_OK(fs_management::FvmInitPreallocated(ramdisk_block_interface(), block_count * block_size,
                                                block_count * block_size, slice_size));
 
-  auto resp = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
-  ASSERT_OK(resp.status());
-  ASSERT_TRUE(resp->is_ok());
+  StartFVM();
 
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root_fd().get(), fvm_path().c_str()));
 }
@@ -610,9 +593,7 @@ TEST_F(FvmTest, TestLarge) {
 
   ASSERT_OK(fs_management::FvmInit(ramdisk_block_interface(), kSliceSize));
 
-  auto resp = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
-  ASSERT_OK(resp.status());
-  ASSERT_TRUE(resp->is_ok());
+  StartFVM();
 
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root_fd().get(), fvm_path().c_str()));
   ValidateFVM(ramdisk_block_interface());
