@@ -162,7 +162,7 @@ mod tests {
     const ONE_SEC: Duration = Duration::from_secs(1);
 
     /// Tests that invalid arguments are rejected.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_invalid_args() {
         let (proxy, _) = fidl::endpoints::create_proxy::<fstats::StatsMarker>();
         assert!(measure(proxy, Duration::from_secs(0), &mut std::io::stdout()).await.is_err());
@@ -170,7 +170,7 @@ mod tests {
 
     /// Tests that the input parameter for duration is correctly converted between seconds and
     /// nanoseconds. The test uses a duration parameter of one second.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_cpu_load_duration() {
         let (duration_request_sender, mut duration_request_receiver) = mpsc::channel(1);
 
@@ -197,7 +197,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_cpu_load_output() {
         let proxy = fidl_test_util::spawn_stream_handler(move |req| async move {
             let data = vec![0.66f32, 1.56, 0.83, 0.71];
@@ -226,7 +226,7 @@ Total: 3.76%
     }
 
     /// Confirms that the start logging request is dispatched to FIDL requests as expected.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_request_dispatch_start_logging() {
         // Start logging: interval=1s, duration=4s
         let args = args_mod::StartCommand {
@@ -260,7 +260,7 @@ Total: 3.76%
     }
 
     /// Confirms that the start logging forever request is dispatched to FIDL requests as expected.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_request_dispatch_start_logging_forever() {
         // Start logging: interval=1s, duration=forever
         let args =
@@ -290,7 +290,7 @@ Total: 3.76%
     }
 
     /// Confirms that the stop logging request is dispatched to FIDL requests as expected.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_request_dispatch_stop_logging() {
         // Stop logging
         let (mut sender, mut receiver) = mpsc::channel(1);
@@ -306,7 +306,7 @@ Total: 3.76%
         assert_matches!(receiver.try_next().unwrap(), Some(()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_logging_error() {
         let proxy = fake_proxy(move |req| match req {
             fmetrics::RecorderRequest::StopLogging { responder, .. } => {
@@ -318,7 +318,7 @@ Total: 3.76%
         assert!(error.to_string().contains("Stop logging returned false"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_interval_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -330,7 +330,7 @@ Total: 3.76%
         assert!(error.to_string().contains("invalid sampling interval"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_interval_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
@@ -339,7 +339,7 @@ Total: 3.76%
         assert!(error.to_string().contains("invalid sampling interval"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_already_active_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -351,7 +351,7 @@ Total: 3.76%
         assert!(error.to_string().contains("already active"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_already_active_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
@@ -360,7 +360,7 @@ Total: 3.76%
         assert!(error.to_string().contains("already active"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_too_many_clients_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -372,7 +372,7 @@ Total: 3.76%
         assert!(error.to_string().contains("too many clients"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_too_many_clients_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
@@ -381,7 +381,7 @@ Total: 3.76%
         assert!(error.to_string().contains("too many clients"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_internal_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -393,7 +393,7 @@ Total: 3.76%
         assert!(error.to_string().contains("an internal error"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_internal_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };

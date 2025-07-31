@@ -260,7 +260,7 @@ mod tests {
     }
 
     /// Tests that `get_raw_data` properly reads data from the memory monitor service.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn get_raw_data_test() {
         let collector = create_fake_collector_proxy();
         let raw_data = get_raw_data(&collector).await.expect("failed to get raw data");
@@ -268,7 +268,7 @@ mod tests {
     }
 
     /// Tests that `get_output` properly reads and parses data from the memory monitor service.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn get_output_test() {
         let collector = create_fake_collector_proxy();
         let output = get_output(&collector).await.expect("failed to get output");

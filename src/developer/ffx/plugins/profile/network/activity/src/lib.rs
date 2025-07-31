@@ -121,7 +121,7 @@ mod tests {
     const ONE_SEC: Duration = Duration::from_secs(1);
 
     /// Confirms that the start logging request is dispatched to FIDL requests as expected.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_request_dispatch_start_logging() {
         // Start logging: interval=1s, duration=4s
         let args = args_mod::StartCommand {
@@ -158,7 +158,7 @@ mod tests {
     }
 
     /// Confirms that the start logging forever request is dispatched to FIDL requests as expected.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_request_dispatch_start_logging_forever() {
         // Start logging: interval=1s, duration=forever
         let args =
@@ -191,7 +191,7 @@ mod tests {
     }
 
     /// Confirms that the stop logging request is dispatched to FIDL requests as expected.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_request_dispatch_stop_logging() {
         // Stop logging
         let (mut sender, mut receiver) = mpsc::channel(1);
@@ -207,7 +207,7 @@ mod tests {
         assert_matches!(receiver.try_next().unwrap(), Some(()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_logging_error() {
         let proxy = fake_proxy(move |req| match req {
             fmetrics::RecorderRequest::StopLogging { responder, .. } => {
@@ -219,7 +219,7 @@ mod tests {
         assert!(error.to_string().contains("Stop logging returned false"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_interval_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -231,7 +231,7 @@ mod tests {
         assert!(error.to_string().contains("invalid sampling interval"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_interval_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
@@ -240,7 +240,7 @@ mod tests {
         assert!(error.to_string().contains("invalid sampling interval"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_already_active_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -252,7 +252,7 @@ mod tests {
         assert!(error.to_string().contains("already active"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_already_active_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
@@ -261,7 +261,7 @@ mod tests {
         assert!(error.to_string().contains("already active"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_too_many_clients_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -273,7 +273,7 @@ mod tests {
         assert!(error.to_string().contains("too many clients"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_too_many_clients_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
@@ -282,7 +282,7 @@ mod tests {
         assert!(error.to_string().contains("too many clients"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_no_driver_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -294,7 +294,7 @@ mod tests {
         assert!(error.to_string().contains("no compatible network driver"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_no_driver_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
@@ -303,7 +303,7 @@ mod tests {
         assert!(error.to_string().contains("no compatible network driver"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_internal_error() {
         let args = args_mod::StartCommand {
             interval: ONE_SEC,
@@ -315,7 +315,7 @@ mod tests {
         assert!(error.to_string().contains("an internal error"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_logging_forever_internal_error() {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
