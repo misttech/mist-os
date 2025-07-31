@@ -1431,12 +1431,12 @@ void Dispatcher::EventWaiter::HandleEvent(std::unique_ptr<EventWaiter> event_wai
                                           async_dispatcher_t* dispatcher, async::WaitBase* wait,
                                           zx_status_t status, const zx_packet_signal_t* signal) {
   if (status == ZX_ERR_CANCELED) {
-    LOGF(TRACE, "Dispatcher: event waiter shutting down\n");
+    LOGF(TRACE, "Dispatcher: event waiter shutting down");
     event_waiter->dispatcher_ref_->SetEventWaiter(nullptr);
     event_waiter->dispatcher_ref_ = nullptr;
     return;
   } else if (status != ZX_OK) {
-    LOGF(ERROR, "Dispatcher: event waiter error: %d\n", status);
+    LOGF(ERROR, "Dispatcher: event waiter error: %d", status);
     event_waiter->dispatcher_ref_->SetEventWaiter(nullptr);
     event_waiter->dispatcher_ref_ = nullptr;
     return;
@@ -1447,7 +1447,7 @@ void Dispatcher::EventWaiter::HandleEvent(std::unique_ptr<EventWaiter> event_wai
     fbl::RefPtr<Dispatcher> dispatcher_ref = std::move(event_waiter->dispatcher_ref_);
     event_waiter->InvokeCallback(std::move(event_waiter), dispatcher_ref);
   } else {
-    LOGF(ERROR, "Dispatcher: event waiter got unexpected signals: %x\n", signal->observed);
+    LOGF(ERROR, "Dispatcher: event waiter got unexpected signals: %x", signal->observed);
   }
 }
 
@@ -1950,7 +1950,7 @@ void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
     zx_status_t status = SetRoleProfile();
     if (status != ZX_OK) {
       // Failing to set the role profile is not a fatal error.
-      LOGF(WARNING, "Failed to set scheduler role: %d\n", status);
+      LOGF(WARNING, "Failed to set scheduler role: %d", status);
     }
     thread_context::SetRoleProfileStatus(status);
   }
@@ -1970,7 +1970,7 @@ void Dispatcher::ThreadPool::ScanThreadsForStalls() {
     zx::time timestamp(slot->load());
     if (timestamp != zx::time(0) && timestamp < stalled_time) {
       if (timestamp > stale_time) {
-        LOGF(WARNING, "Found a thread that has been stalled for %ld ms\n",
+        LOGF(WARNING, "Found a thread that has been stalled for %ld ms",
              (current_time - timestamp).to_msecs());
       }
       stalled_threads++;
