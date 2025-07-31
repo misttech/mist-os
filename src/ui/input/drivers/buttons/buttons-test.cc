@@ -142,12 +142,19 @@ class FakeSystemActivityGovernor
     completer.Reply(AcquireWakeLease());
   }
 
-  void RegisterListener(RegisterListenerRequest& request,
-                        RegisterListenerCompleter::Sync& completer) override {
-    listener_client_.Bind(std::move(request.listener().value()),
-                          fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    listener_client_->OnSuspendStarted().Then([this](auto unused) { on_suspend_started_ = true; });
-    completer.Reply();
+  void RegisterSuspendBlocker(RegisterSuspendBlockerRequest& request,
+                              RegisterSuspendBlockerCompleter::Sync& completer) override {
+    suspend_blocker_client_.Bind(std::move(request.suspend_blocker().value()),
+                                 fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    suspend_blocker_client_->BeforeSuspend().Then([this](auto unused) { suspend_started_ = true; });
+
+    // Use a fake lease token. There's no need to keep our handle alive.
+    zx::eventpair lease_token, peer;
+    zx::eventpair::create(0, &lease_token, &peer);
+    fuchsia_power_system::ActivityGovernorRegisterSuspendBlockerResponse response;
+    response.token() = std::move(lease_token);
+
+    completer.Reply(fit::ok(std::move(response)));
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -161,8 +168,8 @@ class FakeSystemActivityGovernor
 
  private:
   std::vector<zx::eventpair> wake_leases_;
-  bool on_suspend_started_ = false;
-  fidl::Client<fuchsia_power_system::ActivityGovernorListener> listener_client_;
+  bool suspend_started_ = false;
+  fidl::Client<fuchsia_power_system::SuspendBlocker> suspend_blocker_client_;
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
   bool has_wake_lease_been_taken_ = false;
 };

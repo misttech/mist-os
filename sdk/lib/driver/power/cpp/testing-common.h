@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef LIB_DRIVER_POWER_CPP_TESTING_COMMON_H_
+#define LIB_DRIVER_POWER_CPP_TESTING_COMMON_H_
+
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/fidl/cpp/client.h>
@@ -23,7 +26,7 @@ class SystemActivityGovernor
  public:
   SystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive,
                          async_dispatcher_t* dispatcher)
-      : listener_(std::nullopt),
+      : suspend_blocker_(std::nullopt),
         exec_state_opportunistic_(std::move(exec_state_opportunistic)),
         wake_handling_assertive_(std::move(wake_handling_assertive)),
         dispatcher_(dispatcher) {}
@@ -41,36 +44,52 @@ class SystemActivityGovernor
     completer.Reply({{std::move(elements)}});
   }
 
-  void RegisterListener(RegisterListenerRequest& request,
-                        RegisterListenerCompleter::Sync& completer) override {
-    fidl::ClientEnd<fuchsia_power_system::ActivityGovernorListener> listener =
-        std::move(request.listener().value());
+  void RegisterSuspendBlocker(RegisterSuspendBlockerRequest& request,
+                              RegisterSuspendBlockerCompleter::Sync& completer) override {
+    fidl::ClientEnd<fuchsia_power_system::SuspendBlocker> suspend_blocker =
+        std::move(request.suspend_blocker().value());
 
-    // only support one listener
-    ASSERT_EQ(listener_, std::nullopt);
+    // only support one suspend blocker
+    ASSERT_EQ(suspend_blocker_, std::nullopt);
 
-    listener_.emplace(fidl::Client<fuchsia_power_system::ActivityGovernorListener>(
-        std::move(listener), dispatcher_));
-    completer.Reply();
+    suspend_blocker_.emplace(fidl::Client<fuchsia_power_system::SuspendBlocker>(
+        std::move(suspend_blocker), dispatcher_));
+
+    // Use a fake lease token. Our fake doesn't currently keep it alive or use it to prevent
+    // suspension.
+    zx::eventpair client_token, server_token;
+    zx::eventpair::create(0, &client_token, &server_token);
+    server_lease_token_.emplace(std::move(server_token));
+    fuchsia_power_system::ActivityGovernorRegisterSuspendBlockerResponse response;
+    response.token() = std::move(client_token);
+
+    completer.Reply(fit::ok(std::move(response)));
   }
 
-  void SendSuspend() {
-    if (!listener_) {
+  void SendBeforeSuspend() {
+    if (!suspend_blocker_) {
       return;
     }
+
     // If there's an error, do something?
-    listener_.value()->OnSuspendStarted().ThenExactlyOnce(
-        [](fidl::Result<fuchsia_power_system::ActivityGovernorListener::OnSuspendStarted>& result) {
-        });
+    suspend_blocker_.value()->BeforeSuspend().ThenExactlyOnce(
+        [](fidl::Result<fuchsia_power_system::SuspendBlocker::BeforeSuspend>& result) {});
   }
 
-  void SendResume() {
-    if (!listener_) {
+  void SendAfterResume() {
+    if (!suspend_blocker_) {
       return;
     }
+
+    // Ensure that the wake lease was dropped.
+    ASSERT_TRUE(server_lease_token_);
+    ASSERT_EQ(ZX_OK, server_lease_token_->wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite(),
+                                                   nullptr));
+    server_lease_token_.reset();
+
     // If there's an error, do something?
-    listener_.value()->OnResume().ThenExactlyOnce(
-        [](fidl::Result<fuchsia_power_system::ActivityGovernorListener::OnResume>& result) {});
+    suspend_blocker_.value()->AfterResume().ThenExactlyOnce(
+        [](fidl::Result<fuchsia_power_system::SuspendBlocker::AfterResume>& result) {});
   }
 
   void AcquireWakeLease(AcquireWakeLeaseRequest& request,
@@ -90,7 +109,8 @@ class SystemActivityGovernor
   }
 
  private:
-  std::optional<fidl::Client<fuchsia_power_system::ActivityGovernorListener>> listener_;
+  std::optional<fidl::Client<fuchsia_power_system::SuspendBlocker>> suspend_blocker_;
+  std::optional<zx::eventpair> server_lease_token_;
   zx::event exec_state_opportunistic_;
   zx::event wake_handling_assertive_;
   async_dispatcher_t* dispatcher_;
@@ -98,3 +118,4 @@ class SystemActivityGovernor
 }  // namespace power_lib_test
 
 #endif
+#endif  // LIB_DRIVER_POWER_CPP_TESTING_COMMON_H_

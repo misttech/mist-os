@@ -33,7 +33,7 @@ namespace fdf_power {
 // performance advantages over using a WakeLease directly because the
 // `ManualWakeLease` monitors system state over its lifetime, allowing it to
 // avoid certain operations vs a series of shorter-lived `WakeLease` instances.
-class ManualWakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernorListener> {
+class ManualWakeLease : public fidl::WireServer<fuchsia_power_system::SuspendBlocker> {
  public:
   ManualWakeLease(async_dispatcher_t* dispatcher, std::string_view name,
                   fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
@@ -75,14 +75,14 @@ class ManualWakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGo
   // a wake lease.
   zx::result<zx::eventpair> GetWakeLeaseCopy();
 
-  // fuchsia.power.system/ActivityGovernorListener implementation. This is used to avoid creating
+  // fuchsia.power.system/SuspendBlocker implementation. This is used to avoid creating
   // wake leases in cases where the system is resumed and `HandleInterrupt` is called.
-  void OnResume(OnResumeCompleter::Sync& completer) override;
+  void AfterResume(AfterResumeCompleter::Sync& completer) override;
 
-  void OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) override;
+  void BeforeSuspend(BeforeSuspendCompleter::Sync& completer) override;
 
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
+      fidl::UnknownMethodMetadata<fuchsia_power_system::SuspendBlocker> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void SetSuspended(bool suspended) { system_suspended_ = suspended; }
@@ -96,8 +96,7 @@ class ManualWakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGo
   std::string lease_name_;
   bool log_;
   fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> sag_client_;
-  std::optional<fidl::ServerBinding<fuchsia_power_system::ActivityGovernorListener>>
-      listener_binding_;
+  std::optional<fidl::ServerBinding<fuchsia_power_system::SuspendBlocker>> suspend_blocker_binding_;
   bool system_suspended_ = true;
   bool active_ = false;
 

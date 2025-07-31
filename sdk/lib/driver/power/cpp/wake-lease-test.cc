@@ -87,7 +87,7 @@ void StartOperationWhenResumedThenSuspend(
 
   EXPECT_TRUE(op->Start());
   EXPECT_TRUE(op->GetWakeLeaseCopy().is_error());
-  async::PostTask(server_loop.dispatcher(), [sag]() { sag->SendSuspend(); });
+  async::PostTask(server_loop.dispatcher(), [sag]() { sag->SendBeforeSuspend(); });
   DoOperationAfterSuspend(op, client_loop, do_after_suspended);
 }
 
@@ -202,7 +202,8 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenResumed) {
           };
 
   DoWakeLeaseTest<fdf_power::ManualWakeLease>(
-      test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendResume(); });
+      test_func,
+      [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendAfterResume(); });
 }
 
 // After the ManualWakeLease is created, have it observe a resume and then
@@ -233,7 +234,8 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseStartAndEndAfterResumeIsObserved) {
           };
 
   DoWakeLeaseTest<fdf_power::ManualWakeLease>(
-      test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendResume(); });
+      test_func,
+      [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendAfterResume(); });
 }
 
 // Test ManualWakeLease when it starts while the system is suspended. Also
@@ -311,7 +313,7 @@ TEST_F(WakeLeaseTest, TestManagedWakeLeaseWhenResumedThenSuspend) {
 
       // We want to test what ManualWakeLease does while the system is resumed,
       // so have the server send the resume event.
-      async::PostTask(server_loop.dispatcher(), [&sag_server]() { sag_server->SendResume(); });
+      async::PostTask(server_loop.dispatcher(), [&sag_server]() { sag_server->SendAfterResume(); });
 
       // Trigger the start of the atomic operation.
       async::PostTask(client_loop.dispatcher(), [op, &client_loop, &server_loop, &sag_server]() {
@@ -479,7 +481,7 @@ TEST_F(WakeLeaseTest, ActiveTimeoutWakeLeaseGetsLeaseOnSuspend) {
             EXPECT_TRUE(op->GetWakeLeaseCopy().is_error());
 
             // Have the fake SAG tell teh wake lease we've suspended.
-            async::PostTask(sag_loop.dispatcher(), [&sag]() { sag->SendSuspend(); });
+            async::PostTask(sag_loop.dispatcher(), [&sag]() { sag->SendBeforeSuspend(); });
 
             // Run the function that will wait to observe the suspend and then
             // confirms we didn't take a wake lease.
@@ -488,7 +490,7 @@ TEST_F(WakeLeaseTest, ActiveTimeoutWakeLeaseGetsLeaseOnSuspend) {
 
   DoWakeLeaseTest<fdf_power::TimeoutWakeLease>(
       run_after_resume_observed,
-      [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendResume(); });
+      [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendAfterResume(); });
 }
 
 // Verify that an inactive TimeoutWakeLease does nothing across a
@@ -552,7 +554,7 @@ TEST_F(WakeLeaseTest, InactiveTimeoutWakeLeaseDoesNothingOnSuspend) {
             auto discard = op->TakeWakeLease();
 
             // Have the fake SAG tell teh wake lease we've suspended.
-            async::PostTask(sag_loop.dispatcher(), [&sag]() { sag->SendSuspend(); });
+            async::PostTask(sag_loop.dispatcher(), [&sag]() { sag->SendBeforeSuspend(); });
 
             // Run the function that will wait to observe the suspend and then
             // confirms we didn't take a wake lease.
@@ -561,7 +563,7 @@ TEST_F(WakeLeaseTest, InactiveTimeoutWakeLeaseDoesNothingOnSuspend) {
 
   DoWakeLeaseTest<fdf_power::TimeoutWakeLease>(
       run_after_resume_observed,
-      [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendResume(); });
+      [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendAfterResume(); });
 }
 
 TEST_F(WakeLeaseTest, TestWakeLeaseTimeouts) {
