@@ -88,7 +88,7 @@ mod test {
     const LIGHT_VAL_1: f64 = 0.2;
     const LIGHT_VAL_2: f64 = 0.42;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         let proxy = fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
@@ -130,7 +130,7 @@ mod test {
         };
         "Test light set() output with a different non-empty input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_light_set_output(expected_light: LightGroup) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
@@ -184,7 +184,7 @@ mod test {
         };
         "Test light watch() output with different values."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_light_watch_output(
         expected_light_settings: LightGroupSettings,
     ) -> Result<()> {
@@ -235,7 +235,7 @@ mod test {
         };
         "Test individual light watch() output with different values."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_light_watch_individual_output(
         expected_light_settings: LightGroupSettings,
     ) -> Result<()> {

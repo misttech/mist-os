@@ -30,7 +30,7 @@ ffx_plugin("ffx_setui_audio") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:test-case",
   ]
 

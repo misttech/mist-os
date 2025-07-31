@@ -69,7 +69,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         const ALLOWED: bool = true;
 
@@ -95,7 +95,7 @@ mod test {
         false;
         "Test factory reset set() output with is_local_reset_allowed as false."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_factory_reset_set_output(
         expected_is_local_reset_allowed: bool,
     ) -> Result<()> {
@@ -134,7 +134,7 @@ mod test {
         Some(true);
         "Test factory reset watch() output with is_local_reset_allowed as true."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_factory_reset_watch_output(
         expected_is_local_reset_allowed: Option<bool>,
     ) -> Result<()> {

@@ -61,7 +61,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         const USER: bool = true;
         const NIGHT_MODE: bool = false;
@@ -101,7 +101,7 @@ mod test {
         };
         "Test do not disturb set() output with user_dnd and night_mode_dnd as true."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_do_not_disturb_set_output(
         expected_do_not_disturb: DoNotDisturb,
     ) -> Result<()> {
@@ -136,7 +136,7 @@ mod test {
         };
         "Test do not disturb watch() output with non-empty DoNotDisturb."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_do_not_disturb_watch_output(
         expected_do_not_disturb: DoNotDisturb,
     ) -> Result<()> {

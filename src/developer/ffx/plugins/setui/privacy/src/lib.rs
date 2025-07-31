@@ -66,7 +66,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         const CONSENT: bool = true;
 
@@ -92,7 +92,7 @@ mod test {
         false;
         "Test privacy set() output with user_data_sharing_consent as false."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_privacy_set_output(expected_user_data_sharing_consent: bool) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             PrivacyRequest::Set { responder, .. } => {
@@ -126,7 +126,7 @@ mod test {
         Some(true);
         "Test privacy watch() output with user_data_sharing_consent as true."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_privacy_watch_output(
         expected_user_data_sharing_consent: Option<bool>,
     ) -> Result<()> {

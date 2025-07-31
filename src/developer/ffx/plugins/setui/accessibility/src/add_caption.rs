@@ -63,7 +63,7 @@ mod test {
 
     const TEST_COLOR: ColorRgba = ColorRgba { red: 238.0, green: 23.0, blue: 128.0, alpha: 255.0 };
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_caption() {
         const TRUE: bool = true;
         let proxy = fake_proxy(move |req| match req {
@@ -115,7 +115,7 @@ mod test {
         };
         "Test add caption settings with different inputs."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_accessibility_add_caption(expected_add: CaptionArgs) -> Result<()> {
         let add_clone = expected_add.clone();
         let proxy = fake_proxy(move |req| match req {

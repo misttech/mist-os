@@ -66,7 +66,7 @@ mod test {
     use target_holders::fake_proxy;
     use test_case::test_case;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_command() {
         const ENABLED: bool = true;
 
@@ -92,7 +92,7 @@ mod test {
         false;
         "Test night mode set() output with night_mode_enabled as false."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_night_mode_set_output(expected_night_mode_enabled: bool) -> Result<()> {
         let proxy = fake_proxy(move |req| match req {
             NightModeRequest::Set { responder, .. } => {
@@ -126,7 +126,7 @@ mod test {
         Some(true);
         "Test night mode watch() output with night_mode_enabled as true."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_night_mode_watch_output(
         expected_night_mode_enabled: Option<bool>,
     ) -> Result<()> {

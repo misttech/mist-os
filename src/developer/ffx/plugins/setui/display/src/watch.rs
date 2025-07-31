@@ -44,7 +44,7 @@ mod test {
         };
         "Test display watch() output with non-empty input."
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn validate_display_watch_output(expected_display: SetArgs) -> Result<()> {
         let expected_display_clone = expected_display.clone();
         let proxy = fake_proxy(move |req| match req {

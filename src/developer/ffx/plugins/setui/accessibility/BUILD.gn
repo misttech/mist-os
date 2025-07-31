@@ -30,7 +30,7 @@ ffx_plugin("ffx_setui_accessibility") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.ui.types:fuchsia.ui.types_rust",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:test-case",
   ]
 
