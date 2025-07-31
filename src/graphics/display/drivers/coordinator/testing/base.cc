@@ -54,9 +54,8 @@ void TestBase::SetUp() {
 
 void TestBase::TearDown() {
   fake_display_stack_->SyncShutdown();
-  async::PostTask(loop_.dispatcher(), [this]() { loop_.Quit(); });
 
-  // Wait for loop_.Quit() to execute.
+  async::PostTask(loop_.dispatcher(), [this]() { loop_.Quit(); });
   loop_.JoinThreads();
 }
 

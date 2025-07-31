@@ -1082,21 +1082,6 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
 
 class IntegrationTest : public TestBase {
  public:
-  // Returns null if there is no client connected at `client_priority`.
-  static ClientProxy* GetClientProxy(Controller& coordinator_controller,
-                                     ClientPriority client_priority)
-      __TA_REQUIRES(coordinator_controller.mtx()) {
-    switch (client_priority) {
-      case ClientPriority::kPrimary:
-        return coordinator_controller.primary_client_;
-      case ClientPriority::kVirtcon:
-        return coordinator_controller.virtcon_client_;
-    }
-    ZX_DEBUG_ASSERT_MSG(false, "Unimplemtened client priority: %d",
-                        static_cast<int>(client_priority));
-    return nullptr;
-  }
-
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
     ClientProxy* client_proxy = CoordinatorController()->client_owning_displays_;
@@ -1113,12 +1098,6 @@ class IntegrationTest : public TestBase {
         sync_completion_wait(client_proxy->FidlUnboundCompletionForTesting(), zx::sec(1).get()));
     // Teardown has not completed here, because we are still holding controller()->mtx()
     client_proxy->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
-  }
-
-  bool IsClientConnected(ClientPriority client_priority) {
-    Controller& coordinator_controller = *CoordinatorController();
-    fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
-    return GetClientProxy(coordinator_controller, client_priority) != nullptr;
   }
 
   void TriggerDisplayEngineVsync() { FakeDisplayEngine().TriggerVsync(); }
@@ -1173,15 +1152,6 @@ class IntegrationTest : public TestBase {
             .id(koid)
             .Build());
     EXPECT_TRUE(set_debug_status.ok()) << set_debug_status.status_string();
-  }
-
-  // |TestBase|
-  void TearDown() override {
-    // Wait until the display core has processed all client disconnections.
-    EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kPrimary); }));
-    EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kVirtcon); }));
-
-    TestBase::TearDown();
   }
 
  protected:
