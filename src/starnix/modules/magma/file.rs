@@ -127,8 +127,8 @@ use magma::{
     virtio_magma_semaphore_reset_resp_t, virtio_magma_semaphore_signal_ctrl_t,
     virtio_magma_semaphore_signal_resp_t, virtmagma_buffer_set_name_wrapper,
     MAGMA_CACHE_POLICY_CACHED, MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, MAGMA_POLL_CONDITION_SIGNALED,
-    MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_MEMORY_ERROR,
-    MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
+    MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_PRIORITY_MEDIUM, MAGMA_STATUS_INVALID_ARGS,
+    MAGMA_STATUS_MEMORY_ERROR, MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
 };
 use starnix_core::fileops_impl_nonseekable;
 use starnix_core::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
@@ -651,11 +651,18 @@ impl FileOps for MagmaFile {
                 ) = read_control_and_response(current_task, &command)?;
                 let connection = self.get_connection(control.connection)?;
 
+                // TODO(b/402461734) - remove this workaround when trusted clients are supported.
+                let priority = if control.priority > MAGMA_PRIORITY_MEDIUM {
+                    MAGMA_PRIORITY_MEDIUM
+                } else {
+                    control.priority
+                };
+
                 let mut context_id_out = 0;
                 response.result_return = unsafe {
                     magma_connection_create_context2(
                         connection.handle,
-                        control.priority,
+                        priority,
                         &mut context_id_out,
                     ) as u64
                 };
