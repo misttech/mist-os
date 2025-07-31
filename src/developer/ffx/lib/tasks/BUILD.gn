@@ -16,7 +16,10 @@ rustc_library("lib") {
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]
-  test_deps = [ "//third_party//rust_crates:async-channel" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party//rust_crates:async-channel",
+  ]
 }
 
 group("tests") {
