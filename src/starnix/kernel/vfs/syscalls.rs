@@ -148,6 +148,43 @@ uapi::check_arch_independent_layout! {
         stx_atomic_write_unit_max,
         stx_atomic_write_segments_max,
     }
+
+    io_sqring_offsets {
+        head,
+        tail,
+        ring_mask,
+        ring_entries,
+        flags,
+        dropped,
+        array,
+        resv1,
+        user_addr,
+    }
+
+    io_cqring_offsets {
+        head,
+        tail,
+        ring_mask,
+        ring_entries,
+        overflow,
+        cqes,
+        flags,
+        resv1,
+        user_addr,
+    }
+
+    io_uring_params {
+        sq_entries,
+        cq_entries,
+        flags,
+        sq_thread_cpu,
+        sq_thread_idle,
+        features,
+        wq_fd,
+        resv,
+        sq_off,
+        cq_off,
+    }
 }
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -3737,19 +3774,21 @@ mod arch32 {
         sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_io_cancel as sys_arch32_io_cancel,
         sys_io_destroy as sys_arch32_io_destroy, sys_io_getevents as sys_arch32_io_getevents,
         sys_io_setup as sys_arch32_io_setup, sys_io_submit as sys_arch32_io_submit,
-        sys_lgetxattr as sys_arch32_lgetxattr, sys_linkat as sys_arch32_linkat,
-        sys_listxattr as sys_arch32_listxattr, sys_llistxattr as sys_arch32_llistxattr,
-        sys_lsetxattr as sys_arch32_lsetxattr, sys_mkdirat as sys_arch32_mkdirat,
-        sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
-        sys_pidfd_open as sys_arch32_pidfd_open, sys_ppoll as sys_arch32_ppoll,
-        sys_preadv as sys_arch32_preadv, sys_pselect6 as sys_arch32_pselect6,
-        sys_readv as sys_arch32_readv, sys_removexattr as sys_arch32_removexattr,
-        sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
-        sys_sendfile as sys_arch32_sendfile, sys_setxattr as sys_arch32_setxattr,
-        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
-        sys_statx as sys_arch32_statx, sys_symlinkat as sys_arch32_symlinkat,
-        sys_sync as sys_arch32_sync, sys_tee as sys_arch32_tee,
-        sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_io_uring_enter as sys_arch32_io_uring_enter,
+        sys_io_uring_register as sys_arch32_io_uring_register,
+        sys_io_uring_setup as sys_arch32_io_uring_setup, sys_lgetxattr as sys_arch32_lgetxattr,
+        sys_linkat as sys_arch32_linkat, sys_listxattr as sys_arch32_listxattr,
+        sys_llistxattr as sys_arch32_llistxattr, sys_lsetxattr as sys_arch32_lsetxattr,
+        sys_mkdirat as sys_arch32_mkdirat, sys_mknodat as sys_arch32_mknodat,
+        sys_pidfd_getfd as sys_arch32_pidfd_getfd, sys_pidfd_open as sys_arch32_pidfd_open,
+        sys_ppoll as sys_arch32_ppoll, sys_preadv as sys_arch32_preadv,
+        sys_pselect6 as sys_arch32_pselect6, sys_readv as sys_arch32_readv,
+        sys_removexattr as sys_arch32_removexattr, sys_renameat2 as sys_arch32_renameat2,
+        sys_select as sys_arch32__newselect, sys_sendfile as sys_arch32_sendfile,
+        sys_setxattr as sys_arch32_setxattr, sys_splice as sys_arch32_splice,
+        sys_statfs as sys_arch32_statfs, sys_statx as sys_arch32_statx,
+        sys_symlinkat as sys_arch32_symlinkat, sys_sync as sys_arch32_sync,
+        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,
