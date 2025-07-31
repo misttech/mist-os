@@ -183,8 +183,20 @@ impl FsNodeOps for ExtDirectory {
         fs.get_or_create_node(inode_num, || {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
-            let owner =
-                FsCred { uid: ext_node.inode.e2di_uid.into(), gid: ext_node.inode.e2di_gid.into() };
+
+            fn merge_low_high_16(low: u32, high: u32) -> u32 {
+                low | (high << 16)
+            }
+
+            let uid_lower: u32 = ext_node.inode.e2di_uid.into();
+            let uid_upper: u32 = ext_node.inode.e2di_uid_high.into();
+            let uid = merge_low_high_16(uid_lower, uid_upper);
+
+            let gid_lower: u32 = ext_node.inode.e2di_gid.into();
+            let gid_upper: u32 = ext_node.inode.e2di_gid_high.into();
+            let gid = merge_low_high_16(gid_lower, gid_upper);
+
+            let owner = FsCred { uid, gid };
             let size = u32::from(ext_node.inode.e2di_size) as usize;
             let nlink = ext_node.inode.e2di_nlink.into();
 
