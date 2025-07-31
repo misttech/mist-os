@@ -4,7 +4,6 @@
 @available(added=7)
 library fuchsia.migration;
 using fuchsia.io;
-using zx;
 
 type MigrationStatus = strict enum {
     UNKNOWN = 1;
@@ -59,15 +58,4 @@ closed protocol State {
     strict Watch() -> (struct {
         state MigrationState;
     });
-};
-
-/// Protocol to provision Fxfs partition.
-@available(added=HEAD)
-@discoverable
-open protocol FxfsProvisioner {
-    @selector("fuchsia.migration/FxfsProvisioner.Provision")
-    flexible Provision(resource struct {
-        // TODO(https://fxbug.dev/411312604): Limit this to just passing in the protocols needed.
-        partition_manager client_end:fuchsia.io.Directory;
-    }) -> () error zx.Status;
 };

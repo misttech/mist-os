@@ -27,6 +27,14 @@ fuchsia_structured_config_rust_lib("fshost_config_rust") {
   cm_label = ":fshost_manifest_for_config_lib"
 }
 
+fidl("fuchsia.fshost.fxfsprovisioner") {
+  sources = [ "src/fxfsprovisioner.fidl" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.io",
+    "//zircon/vdso/zx",
+  ]
+}
+
 rustc_binary("fshost") {
   edition = "2021"
   deps = [
