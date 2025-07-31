@@ -66,9 +66,9 @@ TEST(RecorderTest, MaybeRecordAllocation) {
     void RecordAllocation(fuchsia_memory_sampler::wire::SamplerRecordAllocationRequest* request,
                           RecordAllocationCompleter::Sync& completer) override {
       called_ = true;
-      EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address);
-      EXPECT_EQ(kTestSize, request->size);
-      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().size());
+      EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address());
+      EXPECT_EQ(kTestSize, request->size());
+      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace().stack_frames().size());
     }
     ~Sampler() override { EXPECT_TRUE(called_); }
 
@@ -98,8 +98,8 @@ TEST(RecorderTest, ForgetAllocation) {
     void RecordDeallocation(fuchsia_memory_sampler::wire::SamplerRecordDeallocationRequest* request,
                             RecordAllocationCompleter::Sync& completer) override {
       called_ = true;
-      EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address);
-      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace.stack_frames().size());
+      EXPECT_EQ(reinterpret_cast<uint64_t>(kTestAddress), request->address());
+      EXPECT_LE(kMeaningfulStackTraceLength, request->stack_trace().stack_frames().size());
     }
     ~Sampler() override { EXPECT_TRUE(called_); }
 
@@ -177,12 +177,12 @@ TEST(RecorderTest, SampledAllocationCausesSampledDeallocation) {
     using SamplerImpl::SamplerImpl;
     void RecordAllocation(fuchsia_memory_sampler::wire::SamplerRecordAllocationRequest* request,
                           RecordAllocationCompleter::Sync& completer) override {
-      if (request->address == reinterpret_cast<uint64_t>(kTestAddress))
+      if (request->address() == reinterpret_cast<uint64_t>(kTestAddress))
         allocation_registered_ = true;
     }
     void RecordDeallocation(fuchsia_memory_sampler::wire::SamplerRecordDeallocationRequest* request,
                             RecordDeallocationCompleter::Sync& completer) override {
-      if (request->address == reinterpret_cast<uint64_t>(kTestAddress))
+      if (request->address() == reinterpret_cast<uint64_t>(kTestAddress))
         deallocation_registered_ = true;
     }
 

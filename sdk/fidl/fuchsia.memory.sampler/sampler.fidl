@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-@available(added=HEAD)
+@available(added=NEXT)
 library fuchsia.memory.sampler;
 
 using zx;
@@ -36,12 +36,12 @@ type StackTrace = table {
 };
 
 /// Interface used to exfiltrate process allocation information.
-@discoverable
-closed protocol Sampler {
+@discoverable(server="platform")
+open protocol Sampler {
     /// Record an allocation.
-    strict RecordAllocation(struct {
+    flexible RecordAllocation(table {
         /// Address of the allocation, to uniquely identify it.
-        address uint64;
+        1: address uint64;
         /// Stack frames collected at the allocation point.
         ///
         /// A client is free to truncate their stack traces to a size below the
@@ -49,14 +49,14 @@ closed protocol Sampler {
         /// client sends a StackTrace that causes to exceed the maximum size of
         /// the message, then the record will be dropped until RFC-0196 is
         /// implemented.
-        stack_trace StackTrace;
+        2: stack_trace StackTrace;
         /// Size (in bytes) of this allocation.
-        size uint64;
+        3: size uint64;
     });
     /// Record a deallocation.
-    strict RecordDeallocation(struct {
+    flexible RecordDeallocation(table {
         /// Address of the deallocation, to uniquely identify it.
-        address uint64;
+        1: address uint64;
         /// Stack frames collected at the deallocation point.
         ///
         /// A client is free to truncate their stack traces to a size below the
@@ -64,7 +64,7 @@ closed protocol Sampler {
         /// client sends a StackTrace that causes to exceed the maximum size of
         /// the message, then the record will be dropped until RFC-0196 is
         /// implemented.
-        stack_trace StackTrace;
+        2: stack_trace StackTrace;
     });
     /// Communicate relevant process information to facilitate symbolization.
     ///
@@ -72,7 +72,7 @@ closed protocol Sampler {
     /// `module_map` is added to the existing map for the process. If a client
     /// needs to send a `module_map` that does not fit in a single message, they
     /// can split it and send it across several messages.
-    strict SetProcessInfo(table {
+    flexible SetProcessInfo(table {
         /// Name of the instrumented process.
         1: process_name string:zx.MAX_NAME_LEN;
         /// Current module layout, for symbolization.

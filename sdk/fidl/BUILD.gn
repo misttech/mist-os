@@ -291,6 +291,7 @@ _prebuilt_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.device:fuchsia.device",
   "//sdk/fidl/fuchsia.fs:fuchsia.fs",
   "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty",
+  "//sdk/fidl/fuchsia.memory.sampler:fuchsia.memory.sampler",
   "//sdk/fidl/fuchsia.net.name:fuchsia.net.name",
   "//sdk/fidl/fuchsia.posix:fuchsia.posix",
   "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket",

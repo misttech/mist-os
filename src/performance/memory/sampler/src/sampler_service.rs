@@ -9,9 +9,10 @@
 use crate::crash_reporter::ProfileReport;
 use crate::profile_builder::ProfileBuilder;
 
-use anyhow::{Context, Error};
+use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_memory_sampler::{
-    SamplerRequest, SamplerRequestStream, SamplerSetProcessInfoRequest,
+    SamplerRecordAllocationRequest, SamplerRecordDeallocationRequest, SamplerRequest,
+    SamplerRequestStream, SamplerSetProcessInfoRequest,
 };
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
@@ -43,15 +44,49 @@ async fn process_sampler_request<'a>(
     mut time_of_last_profile: Instant,
 ) -> Result<(&'a mut ProfileBuilder, &'a mut mpsc::Sender<ProfileReport>, Instant), Error> {
     match request {
-        SamplerRequest::RecordAllocation { address, stack_trace, size, .. } => {
-            builder.allocate(address, stack_trace.stack_frames.unwrap_or_default(), size);
+        SamplerRequest::RecordAllocation {
+            payload: SamplerRecordAllocationRequest { address, stack_trace, size, .. },
+            ..
+        } => {
+            builder.allocate(
+                address.ok_or_else(|| {
+                    anyhow!("Unsupported record allocation request: missing address")
+                })?,
+                stack_trace
+                    .ok_or_else(|| {
+                        anyhow!("Unsupported record allocation request: missing stack_trace")
+                    })?
+                    .stack_frames
+                    .ok_or_else(|| anyhow!("Unsupported stack trace: missing stack frames"))?,
+                size.ok_or_else(|| {
+                    anyhow!("Unsupporterd record allocation request: missing size")
+                })?,
+            );
         }
-        SamplerRequest::RecordDeallocation { address, stack_trace, .. } => {
-            builder.deallocate(address, stack_trace.stack_frames.unwrap_or_default());
+        SamplerRequest::RecordDeallocation {
+            payload: SamplerRecordDeallocationRequest { address, stack_trace, .. },
+            ..
+        } => {
+            builder.deallocate(
+                address
+                    .ok_or_else(|| anyhow!("Unsupported deallocation request: missing address"))?,
+                stack_trace
+                    .ok_or_else(|| {
+                        anyhow!("Unsupported deallocation request: missing stack trace")
+                    })?
+                    .stack_frames
+                    .ok_or_else(|| anyhow!("Unsupported stack_trace: missing stack frames"))?,
+            );
         }
-        SamplerRequest::SetProcessInfo { payload, .. } => {
-            let SamplerSetProcessInfoRequest { process_name, module_map, .. } = payload;
+        SamplerRequest::SetProcessInfo {
+            payload: SamplerSetProcessInfoRequest { process_name, module_map, .. },
+            ..
+        } => {
             builder.set_process_info(process_name, module_map.into_iter().flatten());
+        }
+        unknown_method @ _ => {
+            log::debug!("Unknowned, unhandled method: {:?}", unknown_method);
+            return Ok((builder, tx, time_of_last_profile));
         }
     };
 
@@ -141,17 +176,12 @@ pub fn setup_sampler_service(
 
 #[cfg(test)]
 mod test {
-    use anyhow::Error;
+    use super::*;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream};
-    use fidl_fuchsia_memory_sampler::{
-        ExecutableSegment, ModuleMap, SamplerMarker, SamplerRequest, SamplerSetProcessInfoRequest,
-        StackTrace,
-    };
-    use futures::channel::mpsc;
+    use fidl_fuchsia_memory_sampler::{ExecutableSegment, ModuleMap, SamplerMarker, StackTrace};
     use futures::{join, StreamExt};
     use itertools::{assert_equal, sorted};
     use prost::Message;
-    use std::time::Instant;
     use zx::Vmo;
 
     use crate::crash_reporter::ProfileReport;
@@ -211,9 +241,23 @@ mod test {
             module_map: Some(module_map),
             ..Default::default()
         })?;
-        client.record_allocation(0x100, &allocation_stack_trace, 100)?;
-        client.record_allocation(0x200, &allocation_stack_trace, 1000)?;
-        client.record_deallocation(0x100, &deallocation_stack_trace)?;
+        client.record_allocation(&SamplerRecordAllocationRequest {
+            address: Some(0x100),
+            stack_trace: Some(allocation_stack_trace.clone()),
+            size: Some(100),
+            ..Default::default()
+        })?;
+        client.record_allocation(&SamplerRecordAllocationRequest {
+            address: Some(0x200),
+            stack_trace: Some(allocation_stack_trace),
+            size: Some(1000),
+            ..Default::default()
+        })?;
+        client.record_deallocation(&SamplerRecordDeallocationRequest {
+            address: Some(0x100),
+            stack_trace: Some(deallocation_stack_trace),
+            ..Default::default()
+        })?;
         drop(client);
 
         if let ProfileReport::Final { process_name, size, profile } = profile_future.await? {
@@ -253,9 +297,12 @@ mod test {
             &mut builder,
             &mut tx,
             SamplerRequest::RecordAllocation {
-                address: RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD as u64,
-                stack_trace,
-                size: 10,
+                payload: SamplerRecordAllocationRequest {
+                    address: Some(RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD as u64),
+                    stack_trace: Some(stack_trace),
+                    size: Some(10),
+                    ..Default::default()
+                },
                 control_handle: request_stream.control_handle(),
             },
             TEST_INDEX,
@@ -291,9 +338,12 @@ mod test {
             &mut builder,
             &mut tx,
             SamplerRequest::RecordAllocation {
-                address: 1,
-                stack_trace,
-                size: 10,
+                payload: SamplerRecordAllocationRequest {
+                    address: Some(1),
+                    stack_trace: Some(stack_trace),
+                    size: Some(10),
+                    ..Default::default()
+                },
                 control_handle: request_stream.control_handle(),
             },
             TEST_INDEX,
@@ -440,7 +490,12 @@ mod test {
         let allocation_stack_trace =
             StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
 
-        client.record_allocation(0x100, &allocation_stack_trace, 100)?;
+        client.record_allocation(&SamplerRecordAllocationRequest {
+            address: Some(0x100),
+            stack_trace: Some(allocation_stack_trace),
+            size: Some(100),
+            ..Default::default()
+        })?;
         drop(client);
 
         if let ProfileReport::Final { process_name, profile, size } = profile_future.await? {
@@ -462,7 +517,11 @@ mod test {
 
         let stack_trace = StackTrace { stack_frames: Some(vec![3000, 3001]), ..Default::default() };
 
-        client.record_deallocation(0x100, &stack_trace)?;
+        client.record_deallocation(&SamplerRecordDeallocationRequest {
+            address: Some(0x100),
+            stack_trace: Some(stack_trace),
+            ..Default::default()
+        })?;
         drop(client);
 
         if let ProfileReport::Final { process_name, profile, size } = profile_future.await? {
