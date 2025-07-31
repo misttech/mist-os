@@ -34,7 +34,7 @@ void CreateRing(std::vector<Rectangle2D>& renderables,
     float y = static_cast<float>(radius * sin(curr_offset) + center_y);
 
     Rectangle2D renderable(vec2(x, y), vec2(100, 100));
-    RectangleCompositor::ColorData color_data(colors[i % 3], true);
+    RectangleCompositor::ColorData color_data(colors[i % 3], RectangleCompositor::Opacity::Opaque);
 
     renderables.emplace_back(renderable);
     color_datas.emplace_back(color_data);

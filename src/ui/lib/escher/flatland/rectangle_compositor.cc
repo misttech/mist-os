@@ -204,7 +204,7 @@ void TraverseBatch(CommandBuffer* cmd_buf, vec3 bounds, ShaderProgramPtr program
 
     float z = 1.f;
     for (int64_t i = num_renderables - 1; i >= 0; i--) {
-      if (color_data[i].is_opaque) {
+      if (color_data[i].opacity == RectangleCompositor::Opacity::Opaque) {
         DrawSingle(cmd_buf, program, rectangles[i], textures[i].get(), color_data[i].color, z);
       }
       z += 1.f;
@@ -217,7 +217,15 @@ void TraverseBatch(CommandBuffer* cmd_buf, vec3 bounds, ShaderProgramPtr program
     cmd_buf->SetDepthTestAndWrite(true, false);
     float z = static_cast<float>(rectangles.size());
     for (int64_t i = 0; i < num_renderables; i++) {
-      if (!color_data[i].is_opaque) {
+      if (color_data[i].opacity != RectangleCompositor::Opacity::Opaque) {
+        if (color_data[i].opacity == RectangleCompositor::Opacity::Translucent) {
+          cmd_buf->SetBlendFactors(vk::BlendFactor::eOne, vk::BlendFactor::eOneMinusSrcAlpha);
+        } else if (color_data[i].opacity ==
+                   RectangleCompositor::Opacity::NonPremultipliedTranslucent) {
+          cmd_buf->SetBlendFactors(vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOne,
+                                   vk::BlendFactor::eOneMinusSrcAlpha,
+                                   vk::BlendFactor::eOneMinusSrcAlpha);
+        }
         DrawSingle(cmd_buf, program, rectangles[i], textures[i].get(), color_data[i].color, z);
       }
       z -= 1.f;
@@ -517,6 +525,11 @@ void RectangleCompositor::WarmPipelineCache(vk::Format output_format,
     cbps.SetDepthTestAndWrite(true, false);
     WarmProgramHelper(escher->pipeline_layout_cache(), standard_program_, &cbps,
                       immutable_samplers);
+
+    cbps.SetToDefaultState(CommandBuffer::DefaultState::kStraightAlpha);
+    cbps.SetDepthTestAndWrite(true, false);
+    WarmProgramHelper(escher->pipeline_layout_cache(), standard_program_, &cbps,
+                      immutable_samplers);
   }
 
   // Check if a "color correction" render pass is already cached, or a new one needs to be
@@ -542,6 +555,11 @@ void RectangleCompositor::WarmPipelineCache(vk::Format output_format,
 
     // Draw transluscent rects.
     cbps.SetToDefaultState(CommandBuffer::DefaultState::kPremultipliedAlpha);
+    cbps.SetDepthTestAndWrite(true, false);
+    WarmProgramHelper(escher->pipeline_layout_cache(), standard_program_, &cbps,
+                      immutable_samplers);
+
+    cbps.SetToDefaultState(CommandBuffer::DefaultState::kStraightAlpha);
     cbps.SetDepthTestAndWrite(true, false);
     WarmProgramHelper(escher->pipeline_layout_cache(), standard_program_, &cbps,
                       immutable_samplers);

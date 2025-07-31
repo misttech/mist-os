@@ -1483,10 +1483,14 @@ INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorFallbackParameterizedPix
                                            fuchsia::images2::PixelFormat::NV12,
                                            fuchsia::images2::PixelFormat::I420));
 
+class DisplayCompositorTransparencyPixelTest : public DisplayCompositorPixelTest,
+                                               public ::testing::WithParamInterface<BlendMode> {};
+
 // Test to make sure that the engine can handle rendering a transparent object overlapping an
 // opaque one.
-VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
+VK_TEST_P(DisplayCompositorTransparencyPixelTest, OverlappingTransparencyTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
+  auto blend_mode_param = GetParam();
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
 
@@ -1516,7 +1520,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   // Create the image metadatas.
   ImageMetadata image_metadatas[2];
   for (uint32_t i = 0; i < 2; i++) {
-    auto blend_mode = (i != 1) ? BlendMode::kReplace() : BlendMode::kPremultipliedAlpha();
+    auto blend_mode = (i == 0) ? BlendMode::kReplace() : blend_mode_param;
     image_metadatas[i] = {.collection_id = kTextureCollectionId,
                           .identifier = allocation::GenerateUniqueImageId(),
                           .vmo_index = i,
@@ -1530,7 +1534,12 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      flatland::DisplayCompositorConfig{});
+      flatland::DisplayCompositorConfig{
+          // Force GPU composition.
+          // This setting is redundant because `max_display_layers == 1` so we
+          // fall back to GPU composition anyway, but this is not obvious.
+          .enable_direct_to_display = false,
+      });
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId,
@@ -1542,10 +1551,14 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
       });
 
   // Write to the two textures. Make the first blue and opaque and the second red and
-  // half transparent. Format is BGRA32.
+  // half transparent. Format is BGRA32 in sRGB color space.
   constexpr uint32_t kBgraBlue = (255 << 24) | (255U << 0);
-  constexpr uint32_t kBgraRedTranslucent = (128 << 24) | (255U << 16);
-  constexpr uint32_t kBgraColors[] = {kBgraBlue, kBgraRedTranslucent};
+  constexpr uint32_t kBgraRedTranslucent = (128 << 24) | (188U << 16);
+  constexpr uint32_t kBgraRedTranslucentNonPremultiplied = (128 << 24) | (255U << 16);
+  std::vector<uint32_t> kBgraColors = {
+      kBgraBlue,
+      (blend_mode_param == BlendMode::kPremultipliedAlpha() ? kBgraRedTranslucent
+                                                            : kBgraRedTranslucentNonPremultiplied)};
   for (uint32_t i = 0; i < 2; i++) {
     std::vector<uint32_t> write_values;
     write_values.assign(kTextureWidth * kTextureHeight, kBgraColors[i]);
@@ -1570,7 +1583,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   display_compositor->AddDisplay(display, display_info, /*num_vmos*/ 2, &render_target_info);
 
   // Now we can finally render.
-  const uint32_t kNumOverlappingRows = 25;
+  const uint32_t kNumOverlappingColumns = 25;
   RenderData render_data;
   {
     uint32_t width = display->width_in_px() / 2;
@@ -1580,9 +1593,9 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
     // displays.
     render_data.display_id = display->display_id();
     render_data.rectangles.push_back(
-        {glm::vec2(0, 0), glm::vec2(width + kNumOverlappingRows, height)});
-    render_data.rectangles.push_back({glm::vec2(width - kNumOverlappingRows, 0),
-                                      glm::vec2(width + kNumOverlappingRows, height)});
+        {glm::vec2(0, 0), glm::vec2(width + kNumOverlappingColumns, height)});
+    render_data.rectangles.push_back({glm::vec2(width - kNumOverlappingColumns, 0),
+                                      glm::vec2(width + kNumOverlappingColumns, height)});
 
     render_data.images.push_back(image_metadatas[0]);
     render_data.images.push_back(image_metadatas[1]);
@@ -1636,9 +1649,9 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
               GTEST_FAIL() << "Unsupported pixel format "
                            << static_cast<int>(render_target_pixel_format_type);
           }
-          if (current_color_bgra == kBgraColors[0]) {
+          if (current_color_bgra == kBgraBlue) {
             num_blue++;
-          } else if (current_color_bgra == kBgraColors[1]) {
+          } else if (current_color_bgra == kBgraRedTranslucent) {
             num_red++;
           } else if (current_color_bgra != 0) {
             num_overlap++;
@@ -1648,13 +1661,17 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
         // Due to image formating, the number of "pixels" in the image above might not be
         // the same as the number of pixels that are actually on the screen.
         uint32_t num_screen_pixels =
-            (display->width_in_px() / 2 - kNumOverlappingRows) * display->height_in_px();
+            (display->width_in_px() / 2 - kNumOverlappingColumns) * display->height_in_px();
         EXPECT_EQ(num_blue, num_screen_pixels);
         EXPECT_EQ(num_red, num_screen_pixels);
         EXPECT_EQ(num_overlap,
                   (display->width_in_px() * display->height_in_px()) - 2 * num_screen_pixels);
       });
 }
+
+INSTANTIATE_TEST_SUITE_P(BlendModesOverlappingTransparency, DisplayCompositorTransparencyPixelTest,
+                         ::testing::Values(BlendMode::kPremultipliedAlpha(),
+                                           BlendMode::kStraightAlpha()));
 
 class DisplayCompositorParameterizedTest
     : public DisplayCompositorPixelTest,

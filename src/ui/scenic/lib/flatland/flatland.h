@@ -189,14 +189,12 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
   // |fuchsia_ui_composition::Flatland|
   void SetImageBlendingFunction(SetImageBlendingFunctionRequest& request,
                                 SetImageBlendingFunctionCompleter::Sync& completer) override;
-  void SetImageBlendingFunction(ContentId image_id, BlendMode blend_mode);
 
   // |fuchsia_ui_composition::Flatland|
   void SetImageBlendMode(SetImageBlendModeRequest& request,
-                         SetImageBlendModeCompleter::Sync& completer) override {
-    FX_LOGS(ERROR) << "SetImageBlendMode not yet implemented";
-    FX_CHECK(false);
-  }
+                         SetImageBlendModeCompleter::Sync& completer) override;
+  void SetImageBlendMode(ContentId image_id, BlendMode blend_mode);
+
   // |fuchsia_ui_composition::Flatland|
   void SetImageFlip(SetImageFlipRequest& request, SetImageFlipCompleter::Sync& completer) override;
   void SetImageFlip(ContentId image_id, fuchsia_ui_composition::ImageFlip flip);
