@@ -654,14 +654,14 @@ zx::result<> Fastboot::OemAddStagedBootloaderFile(const std::string& command,
     return zx::error(svc_root.status_value());
   }
 
-  auto connect_result = component::ConnectAt<fuchsia_fshost::Admin>(*svc_root);
+  auto connect_result = component::ConnectAt<fuchsia_fshost::Recovery>(*svc_root);
   if (connect_result.is_error()) {
     return SendResponse(ResponseType::kFail, "Failed to connect to fshost", transport,
                         zx::error(connect_result.status_value()));
   }
 
-  fidl::WireSyncClient fshost_admin{std::move(connect_result.value())};
-  auto resp = fshost_admin->WriteDataFile(
+  fidl::WireSyncClient fshost_recovery{std::move(connect_result.value())};
+  auto resp = fshost_recovery->WriteDataFile(
       fidl::StringView::FromExternal(sshd_host::kAuthorizedKeyPathInData),
       download_vmo_mapper_.Release());
 

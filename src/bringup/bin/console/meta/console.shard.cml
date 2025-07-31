@@ -236,9 +236,10 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.fshost.Admin" ],
+            protocol: "fuchsia.fshost.Recovery",
             from: "#fshost",
             to: "#console-launcher",
+            availability: "optional",
             source_availability: "unknown",
         },
         {

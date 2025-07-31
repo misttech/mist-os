@@ -52,7 +52,8 @@ class GptDevicePartitioner {
   // for the system GPT, and use that.
   //
   // If the system GPT was not formatted correctly, attempts to format it by calling
-  // fshost.Admin.InitGpt.  This won't be done on directly provided `block_controller` instances.
+  // fuchsia.fshost/Recovery.InitSystemPartitionTable.  This won't be done on directly provided
+  // `block_controller` instances.
   static zx::result<InitializeGptResult> InitializeGpt(
       const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_controller);

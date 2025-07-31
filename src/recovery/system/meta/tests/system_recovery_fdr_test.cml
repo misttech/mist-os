@@ -27,7 +27,7 @@
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.Recovery",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.paver.Paver",
                 "fuchsia.posix.socket.Provider",

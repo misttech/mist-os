@@ -159,14 +159,14 @@ async fn main() -> Result<(), Error> {
             service::fshost_admin(
                 env.clone(),
                 config.clone(),
-                ramdisk_device.as_ref().map(|d| d.topological_path().to_string()),
-                launcher,
-                matcher_lock.clone(),
             ),
         fshost::RecoveryMarker::PROTOCOL_NAME =>
             service::fshost_recovery(
                 env.clone(),
                 config.clone(),
+                ramdisk_device.as_ref().map(|d| d.topological_path().to_string()),
+                launcher,
+                matcher_lock.clone(),
             ),
     };
     if config.fxfs_blob {
