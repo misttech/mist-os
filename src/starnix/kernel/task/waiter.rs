@@ -6,6 +6,7 @@ use crate::signals::RunState;
 use crate::task::CurrentTask;
 use crate::vfs::FdNumber;
 use fuchsia_inspect_contrib::profile_duration;
+use slab::Slab;
 use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_stack::clean_stack;
 use starnix_sync::{
@@ -299,18 +300,17 @@ impl WaitCanceler {
                 }) => {
                     let Some(wait_queue) = wait_queue.upgrade() else { return };
                     waiter.remove_callback(&wait_key);
-                    match wait_queue.lock().waiters.entry(key) {
-                        dense_map::Entry::Vacant(_) => {}
-                        dense_map::Entry::Occupied(entry) => {
-                            // The map of waiters in a wait queue uses a
-                            // `DenseMap` which recycles keys. To make sure we
-                            // are removing the right entry, make sure the ID
-                            // value matches what we expect to remove.
-                            if entry.get().id == id {
-                                entry.remove();
-                            }
+                    let mut wait_queue = wait_queue.lock();
+                    let waiters = &mut wait_queue.waiters;
+                    if let Some(entry) = waiters.get_mut(key) {
+                        // The map of waiters in a wait queue uses a `Slab` which
+                        // recycles keys. To make sure we are removing the right
+                        // entry, make sure the ID value matches what we expect
+                        // to remove.
+                        if entry.id == id {
+                            waiters.remove(key);
                         }
-                    };
+                    }
                 }
                 WaitCancelerInner::Port(WaitCancelerPort { inner }) => {
                     inner.cancel();
@@ -754,7 +754,7 @@ impl Drop for Waiter {
         let wait_queues = std::mem::take(&mut *self.inner.wait_queues.lock()).into_values();
         for wait_queue in wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.lock().waiters.key_ordered_retain(|entry| entry.entry.waiter != *self)
+                wait_queue.lock().waiters.retain(|_, entry| entry.entry.waiter != *self)
             }
         }
     }
@@ -787,10 +787,7 @@ impl Drop for SimpleWaiter {
     fn drop(&mut self) {
         for wait_queue in &self.wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue
-                    .lock()
-                    .waiters
-                    .key_ordered_retain(|entry| entry.entry.waiter != self.event)
+                wait_queue.lock().waiters.retain(|_, entry| entry.entry.waiter != self.event)
             }
         }
     }
@@ -960,7 +957,7 @@ struct WaitEntryWithId {
 }
 
 struct WaitEntryId {
-    key: dense_map::Key,
+    key: usize,
     id: u64,
 }
 
@@ -975,7 +972,7 @@ struct WaitQueueImpl {
     /// The list of waiters.
     ///
     /// The waiter's wait_queues lock is nested inside this lock.
-    waiters: dense_map::DenseMap<WaitEntryWithId>,
+    waiters: Slab<WaitEntryWithId>,
 }
 
 /// An entry in a WaitQueue.
@@ -999,7 +996,7 @@ impl WaitQueue {
             .checked_add(1)
             .expect("all possible wait entry ID values exhausted");
         wait_queue.next_wait_entry_id = id;
-        WaitEntryId { key: wait_queue.waiters.push(WaitEntryWithId { entry, id }), id }
+        WaitEntryId { key: wait_queue.waiters.insert(WaitEntryWithId { entry, id }), id }
     }
 
     /// Establish a wait for the given entry.
@@ -1080,7 +1077,7 @@ impl WaitQueue {
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         profile_duration!("NotifyEventsCount");
         let mut woken = 0;
-        self.0.lock().waiters.key_ordered_retain(|WaitEntryWithId { entry, id: _ }| {
+        self.0.lock().waiters.retain(|_, WaitEntryWithId { entry, id: _ }| {
             if limit > 0 && entry.filter.intercept(&events) {
                 if entry.waiter.notify(&entry.key, events) {
                     limit -= 1;
