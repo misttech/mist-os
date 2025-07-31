@@ -43,7 +43,7 @@ mod test {
     use fidl_fuchsia_session::RestarterRequest;
     use target_holders::fake_proxy;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_restart_session() {
         let proxy = fake_proxy(|req| match req {
             RestarterRequest::Restart { responder } => {

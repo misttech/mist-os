@@ -87,7 +87,7 @@ mod test {
     use fidl_fuchsia_session::LauncherRequest;
     use target_holders::fake_proxy;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_launch_session() {
         const SESSION_URL: &str = "Session URL";
 

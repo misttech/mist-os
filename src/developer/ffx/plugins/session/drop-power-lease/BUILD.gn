@@ -20,7 +20,7 @@ ffx_plugin("ffx_session_drop_power_lease") {
   ]
   test_deps = [
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
   ]
 
   args_sources = [ "src/args.rs" ]
