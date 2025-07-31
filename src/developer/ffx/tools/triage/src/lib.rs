@@ -131,6 +131,8 @@ fn flatten_error(e: anyhow::Error) -> anyhow::Error {
     .into()
 }
 
+#[allow(unused_macros)]
+#[allow(dead_code)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,8 +246,7 @@ mod tests {
          $(golden_structured_outfile: $golden_structured_outfile: literal)?
          should_contain: $should_contain: expr
          ) => {
-            // TODO(https://fxbug.dev/42157685): use fuchsia::test
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn $name() -> Result<()> {
                 let config = vec![$($($config),+)?];
                 let config_tempdir = tempdir()?;
