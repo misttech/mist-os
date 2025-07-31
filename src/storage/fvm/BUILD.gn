@@ -78,6 +78,7 @@ static_library("fvm") {
 }
 
 static_library("test_support") {
+  visibility = [ "//src/storage/fvm/*" ]
   testonly = true
 
   sources = [

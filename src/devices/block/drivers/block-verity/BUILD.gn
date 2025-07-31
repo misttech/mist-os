@@ -178,7 +178,6 @@ test("block-verity-test") {
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/digest",
-    "//src/storage/fvm:test_support",
     "//src/storage/lib/block_client/cpp",
     "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/fdio-caller",
