@@ -45,30 +45,6 @@ ffx_plugin("ffx_list") {
   ]
 
   sources = [ "src/lib.rs" ]
-
-  inputs = [
-    "test_data/target_formatter_addresses_format_golden",
-    "test_data/target_formatter_build_config_board_missing_golden",
-    "test_data/target_formatter_build_config_full_golden",
-    "test_data/target_formatter_build_config_product_missing_golden",
-    "test_data/target_formatter_device_finder_format_golden",
-    "test_data/target_formatter_device_finder_format_ipv4_only_golden",
-    "test_data/target_formatter_device_finder_format_ipv6_only_golden",
-    "test_data/target_formatter_empty_formatter_golden",
-    "test_data/target_formatter_empty_nodename_no_default_golden",
-    "test_data/target_formatter_empty_nodename_with_default_golden",
-    "test_data/target_formatter_empty_nodename_with_default_multiple_unknown_golden",
-    "test_data/target_formatter_json_build_config_board_missing_golden",
-    "test_data/target_formatter_json_build_config_both_missing_golden",
-    "test_data/target_formatter_json_build_config_full_golden",
-    "test_data/target_formatter_json_build_config_full_default_target_golden",
-    "test_data/target_formatter_json_build_config_product_missing_golden",
-    "test_data/target_formatter_one_target_no_default_golden",
-    "test_data/target_formatter_one_target_with_default_golden",
-    "test_data/target_formatter_name_only_formatter_with_default_golden",
-    "test_data/target_formatter_name_only_multiple_unknown_formatter_with_default_golden",
-    "test_data/target_formatter_simple_formatter_with_default_golden",
-  ]
 }
 
 group("list") {
@@ -78,5 +54,8 @@ group("list") {
 group("tests") {
   testonly = true
 
-  deps = [ ":ffx_list_tests($host_toolchain)" ]
+  deps = [
+    ":ffx_list_tests($host_toolchain)",
+    "target_formatter:target_formatter_test($host_toolchain)",
+  ]
 }

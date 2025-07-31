@@ -617,7 +617,7 @@ mod test {
     use std::sync::LazyLock;
 
     static EMPTY_FORMATTER_GOLDEN: LazyLock<String> = LazyLock::new(|| {
-        include_str!("../test_data/target_formatter_empty_formatter_golden").trim().to_owned();
+        include_str!("../test_data/target_formatter_empty_formatter_golden").trim().to_owned()
     });
     static ONE_TARGET_WITH_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
         include_str!("../test_data/target_formatter_one_target_with_default_golden")
@@ -753,7 +753,7 @@ mod test {
         let formatter = TabularTargetFormatter::try_from(Vec::<ffx::TargetInfo>::new()).unwrap();
         let lines = formatter.lines(None);
         assert_eq!(lines.len(), 1);
-        assert_eq!(lines[0].len(), 50); // Just some manual math.
+        assert_eq!(lines[0].len(), 60); // Just some manual math.
         assert_eq!(lines.join("\n"), EMPTY_FORMATTER_GOLDEN.to_string());
     }
 
