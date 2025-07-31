@@ -5,16 +5,18 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_LAZY_DIR_H_
 #define SRC_STORAGE_LIB_VFS_CPP_LAZY_DIR_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <zircon/types.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
 
-#include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 #include <fbl/vector.h>
 
-#include "vnode.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

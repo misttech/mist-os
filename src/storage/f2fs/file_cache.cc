@@ -9,6 +9,7 @@
 #include "src/storage/f2fs/vmo_manager.h"
 #include "src/storage/f2fs/vnode.h"
 #include "src/storage/f2fs/writeback.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 

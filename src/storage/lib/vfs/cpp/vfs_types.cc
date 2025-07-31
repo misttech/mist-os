@@ -4,9 +4,15 @@
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
-#include <lib/fit/function.h>
+#include <lib/fdio/vfs.h>
+#include <lib/zx/result.h>
+#include <zircon/availability.h>
+#include <zircon/errors.h>
+
+#include <cstdint>
 
 #include "src/storage/lib/vfs/cpp/vnode.h"
 

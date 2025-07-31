@@ -8,7 +8,8 @@
 #include <safemath/checked_math.h>
 
 #include "src/storage/f2fs/f2fs.h"
-#include "unit_lib.h"
+#include "src/storage/f2fs/test/unit/unit_lib.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 namespace {

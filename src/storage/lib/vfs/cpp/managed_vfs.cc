@@ -5,14 +5,25 @@
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fit/defer.h>
 #include <lib/fit/function.h>
-#include <lib/sync/completion.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
+#include <algorithm>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

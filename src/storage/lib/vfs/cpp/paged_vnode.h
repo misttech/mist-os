@@ -7,12 +7,15 @@
 
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
-#include <lib/zx/port.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls/port.h>
+#include <zircon/types.h>
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 #include <fbl/recycler.h>
 #include <fbl/ref_ptr.h>

@@ -15,6 +15,7 @@
 #include "src/storage/f2fs/timestamp.h"
 #include "src/storage/f2fs/xattr.h"
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/lib/vfs/cpp/watcher.h"
 

@@ -2,41 +2,50 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/minfs/mount.h"
+
 #include <dirent.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.fs/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/markers.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.unknown/cpp/markers.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fd.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/defer.h>
-#include <sys/stat.h>
-#include <sys/statfs.h>
-#include <sys/statvfs.h>
-#include <sys/types.h>
-#include <time.h>
+#include <lib/zx/result.h>
 #include <unistd.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstring>
+#include <memory>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
-#include <fbl/string.h>
-#include <fbl/string_buffer.h>
 #include <fbl/unique_fd.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <ramdevice-client/ramdisk.h>
 
-#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/component.h"
+#include "src/storage/lib/fs_management/cpp/format.h"
+#include "src/storage/lib/fs_management/cpp/options.h"
+#include "src/storage/minfs/bcache.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/runner.h"
 #include "src/storage/testing/ram_disk.h"
 
 namespace minfs {
 namespace {
-
-namespace fio = fuchsia_io;
 
 template <bool repairable>
 class MountTestTemplate : public testing::Test {

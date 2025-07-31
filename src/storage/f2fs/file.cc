@@ -10,6 +10,7 @@
 #include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 

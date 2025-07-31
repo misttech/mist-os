@@ -6,11 +6,12 @@
 #define SRC_STORAGE_LIB_VFS_CPP_REF_COUNTED_H_
 
 #include <zircon/assert.h>
-#include <zircon/compiler.h>
-#include <zircon/types.h>
 
 #include <atomic>
+#include <cstdint>
 
+#include <fbl/macros.h>
+#include <fbl/ref_counted_internal.h>
 #include <fbl/ref_counted_upgradeable.h>
 
 namespace fs {

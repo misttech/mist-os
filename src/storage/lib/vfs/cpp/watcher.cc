@@ -4,19 +4,34 @@
 
 #include "src/storage/lib/vfs/cpp/watcher.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/async/dispatcher.h>
 #include <lib/fdio/limits.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/defer.h>
 #include <string.h>
-#include <sys/stat.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls/port.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <string_view>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/intrusive_container_utils.h>
+#include <fbl/intrusive_double_list.h>
+#include <fbl/macros.h>
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;

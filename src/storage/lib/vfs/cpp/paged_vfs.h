@@ -10,6 +10,7 @@
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <cstddef>
@@ -134,7 +135,7 @@ class PagedVfs : public ManagedVfs {
   // created in the future, it needs to stay continuously registered in case of race conditions.
   // See PagedVno::OnNoPagedVmoClones() for more.
   //
-  // Protected by the registred vnode lock so creating nodes in the main lock doesn't attempt to
+  // Protected by the registered vnode lock so creating nodes in the main lock doesn't attempt to
   // reenter the lock by registering.
   uint64_t next_node_id_ __TA_GUARDED(live_nodes_lock_) = 1;
   std::map<uint64_t, PagedVnode*> paged_nodes_ __TA_GUARDED(live_nodes_lock_);

@@ -5,28 +5,16 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_VFS_TYPES_H_
 #define SRC_STORAGE_LIB_VFS_CPP_VFS_TYPES_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/zx/result.h>
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
-#include <zircon/types.h>
-
-#ifdef __Fuchsia__
-#include <lib/zx/channel.h>
-#include <lib/zx/event.h>
-#include <lib/zx/eventpair.h>
-#include <lib/zx/handle.h>
-#include <lib/zx/socket.h>
-#include <lib/zx/stream.h>
-#include <lib/zx/vmo.h>
-#endif
 
 #include <cstdint>
-#include <cstring>
 #include <optional>
-
-#include <fbl/bits.h>
+#include <type_traits>
 
 // The filesystem server exposes various FIDL protocols on top of the Vnode abstractions. This
 // header defines some helper types composed with the fuchsia.io protocol types to better express

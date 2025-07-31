@@ -4,16 +4,23 @@
 
 #include "src/storage/lib/vfs/cpp/vmo_file.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <limits.h>
-#include <string.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
 #include <zircon/syscalls.h>
+#include <zircon/types.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <utility>
 
 #include <fbl/algorithm.h>
-#include <fbl/auto_lock.h>
 
-#include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace fio = fuchsia_io;
@@ -58,9 +65,7 @@ zx_status_t VmoFile::Read(void* data, size_t length, size_t offset, size_t* out_
   }
 
   size_t remaining_length = length_ - offset;
-  if (length > remaining_length) {
-    length = remaining_length;
-  }
+  length = std::min(length, remaining_length);
   zx_status_t status = vmo_.read(data, offset, length);
   if (status != ZX_OK) {
     return status;
@@ -79,9 +84,7 @@ zx_status_t VmoFile::Write(const void* data, size_t length, size_t offset, size_
   }
 
   size_t remaining_length = length_ - offset;
-  if (length > remaining_length) {
-    length = remaining_length;
-  }
+  length = std::min(length, remaining_length);
   zx_status_t status = vmo_.write(data, offset, length);
   if (status == ZX_OK) {
     *out_actual = length;

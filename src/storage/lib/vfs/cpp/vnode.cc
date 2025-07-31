@@ -4,21 +4,40 @@
 
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <lib/zx/result.h>
+#include <limits.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <mutex>
 #include <string_view>
-#include <utility>
+
+#include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 #ifdef __Fuchsia__
-
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/string_view.h>
+#include <lib/file-lock/file-lock.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/stream.h>
+#include <lib/zx/vmo.h>
+#include <zircon/availability.h>
+
+#include <map>
+#include <memory>
+#include <utility>
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
-
 #endif  // __Fuchsia__
 
 namespace fio = fuchsia_io;
@@ -32,8 +51,7 @@ std::map<const Vnode*, std::shared_ptr<file_lock::FileLock>> Vnode::gLockMap;
 
 #ifdef __Fuchsia__
 Vnode::~Vnode() {
-  ZX_DEBUG_ASSERT_MSG(gLockMap.find(this) == gLockMap.end(),
-                      "lock entry in gLockMap not cleaned up for Vnode");
+  ZX_DEBUG_ASSERT_MSG(!gLockMap.contains(this), "lock entry in gLockMap not cleaned up for Vnode");
 }
 #else
 Vnode::~Vnode() = default;
@@ -100,7 +118,7 @@ bool Vnode::DeleteFileLock(zx_koid_t owner) {
 
 // There is no guard here, as the connection is in teardown.
 bool Vnode::DeleteFileLockInTeardown(zx_koid_t owner) {
-  if (gLockMap.find(this) == gLockMap.end()) {
+  if (!gLockMap.contains(this)) {
     return false;
   }
   return DeleteFileLock(owner);

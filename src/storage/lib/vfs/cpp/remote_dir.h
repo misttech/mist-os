@@ -5,11 +5,16 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_REMOTE_DIR_H_
 #define SRC_STORAGE_LIB_VFS_CPP_REMOTE_DIR_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/string_view.h>
+#include <zircon/availability.h>
 
 #include <fbl/macros.h>
+#include <fbl/ref_ptr.h>
 
-#include "vnode.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

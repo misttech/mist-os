@@ -9,16 +9,19 @@
 #error "Fuchsia-only header"
 #endif
 
-#include <lib/zx/channel.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <zircon/types.h>
 
-#include <memory>
-#include <mutex>
+#include <cstdint>
+#include <shared_mutex>
 #include <string_view>
 
 #include <fbl/intrusive_double_list.h>
-#include <fbl/macros.h>
 
-#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

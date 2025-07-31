@@ -5,23 +5,24 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_VFS_H_
 #define SRC_STORAGE_LIB_VFS_CPP_VFS_H_
 
-#include <lib/fdio/vfs.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/zx/result.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <memory>
 #include <mutex>
-#include <set>
+#include <optional>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 
-#include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"

@@ -5,6 +5,7 @@
 #include "src/storage/f2fs/vnode_cache.h"
 
 #include "src/storage/f2fs/vnode.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 

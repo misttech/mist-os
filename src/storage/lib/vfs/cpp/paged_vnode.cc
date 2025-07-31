@@ -4,13 +4,24 @@
 
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
 
-#include <lib/async/task.h>
+#include <lib/async/cpp/wait.h>
+#include <lib/async/dispatcher.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/syscalls/port.h>
+#include <zircon/types.h>
 
-#include <memory>
+#include <cstdint>
 #include <mutex>
+#include <utility>
+
+#include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

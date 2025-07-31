@@ -10,6 +10,7 @@
 #include "src/storage/f2fs/superblock_info.h"
 #include "src/storage/f2fs/vnode.h"
 #include "src/storage/f2fs/writeback.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 size_t SegmentManager::GetGcCost(uint32_t segno, const VictimSelPolicy &policy) const {

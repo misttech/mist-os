@@ -4,7 +4,10 @@
 
 #include "src/storage/lib/vfs/cpp/service.h"
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <lib/zx/channel.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <utility>
 

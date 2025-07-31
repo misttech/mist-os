@@ -4,17 +4,18 @@
 
 #include "src/storage/lib/vfs/cpp/pager_thread_pool.h"
 
+#include <lib/zx/port.h>
+#include <lib/zx/result.h>
+#include <lib/zx/thread.h>
+#include <lib/zx/time.h>
 #include <zircon/assert.h>
-// TODO(https://fxbug.dev/415034348): Switch to `syscalls.h` or disable this
-// code when not targeting `HEAD` or `PLATFORM`.
-#define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
-#include <zircon/syscalls-next.h>
-#undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
+#include <zircon/errors.h>
 #include <zircon/syscalls/port.h>
-#include <zircon/syscalls/types.h>
 #include <zircon/threads.h>
+#include <zircon/types.h>
 
-#include <fbl/auto_lock.h>
+#include <thread>
+#include <vector>
 
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
 

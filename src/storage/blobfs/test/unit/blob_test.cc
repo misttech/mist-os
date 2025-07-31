@@ -4,32 +4,54 @@
 
 #include "src/storage/blobfs/blob.h"
 
-#include <zircon/assert.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <lib/sync/completion.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
+#include <limits.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
-#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
 
-#include <gmock/gmock.h>
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
+#include <storage/buffer/vmo_buffer.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/node-digest.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/common.h"
+#include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/fsck.h"
 #include "src/storage/blobfs/mkfs.h"
+#include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/blobfs_test_setup.h"
 #include "src/storage/blobfs/test/test_scoped_vnode_open.h"
 #include "src/storage/blobfs/test/unit/utils.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
-#include "zircon/compiler.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
@@ -373,7 +395,7 @@ TEST_P(BlobTest, VmoChildDeletedTriggersPurging) {
   EXPECT_TRUE(deleted);
 }
 
-// Some paging failures result in permenent failure. Failed block ops should not.
+// Some paging failures result in permanent failure. Failed block ops should not.
 TEST_P(BlobTest, ReadErrorsTemporary) {
   std::unique_ptr<BlobInfo> info = GenerateRealisticBlob("", 1 << 16);
   auto root = OpenRoot();

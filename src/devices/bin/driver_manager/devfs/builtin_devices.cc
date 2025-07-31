@@ -4,6 +4,8 @@
 
 #include "src/devices/bin/driver_manager/devfs/builtin_devices.h"
 
+#include <lib/fdio/vfs.h>
+
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace driver_manager {

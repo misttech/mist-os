@@ -4,17 +4,29 @@
 
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
 
-// TODO(https://fxbug.dev/415034348): Switch to `syscalls.h` or disable this
-// code when not targeting `HEAD` or `PLATFORM`.
-#define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
-#include <zircon/syscalls-next.h>
-#undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
+#include <lib/async/dispatcher.h>
+#include <lib/zx/pager.h>
+#include <lib/zx/result.h>
+#include <lib/zx/thread.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <mutex>
+#include <utility>
+#include <vector>
 
-#include <fbl/auto_lock.h>
+#include <fbl/ref_counted_upgradeable.h>
+#include <fbl/ref_ptr.h>
 
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
+#include "src/storage/lib/vfs/cpp/pager_thread_pool.h"
 
 namespace fs {
 
@@ -36,7 +48,7 @@ PagedVfs::~PagedVfs() {
   // releasing them all implicitly will cause a lot of unnecessary locking.
   //
   // This implementation removes the Vfs backpointer in the Vnode and unregisters from the Vfs'
-  // live node set from within one lock, avoiding the reentrant unregisteration. Owning references
+  // live node set from within one lock, avoiding the reentrant unregistration. Owning references
   // to the nodes are kept during this transition to prevent use-after-free for nodes that may
   // release other nodes as a result of the notification (hopefully won't happen but better to be
   // safe).

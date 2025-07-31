@@ -11,6 +11,7 @@
 #include "src/storage/f2fs/node_page.h"
 #include "src/storage/f2fs/superblock_info.h"
 #include "src/storage/f2fs/vnode.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 
 namespace f2fs {
 static CursegType GetSegmentType2(Page &page, PageType p_type) {

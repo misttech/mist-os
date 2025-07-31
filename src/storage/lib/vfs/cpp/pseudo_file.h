@@ -5,7 +5,10 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_PSEUDO_FILE_H_
 #define SRC_STORAGE_LIB_VFS_CPP_PSEUDO_FILE_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <lib/fit/function.h>
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include <cstddef>
@@ -15,7 +18,8 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 
-#include "vnode.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fs {
 

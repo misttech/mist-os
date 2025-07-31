@@ -13,6 +13,7 @@
 
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
 #include "src/storage/volume_image/utils/lz4_decompress_reader.h"
 #include "src/storage/volume_image/utils/lz4_decompressor.h"
 

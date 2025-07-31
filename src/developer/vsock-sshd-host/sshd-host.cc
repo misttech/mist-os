@@ -6,6 +6,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>

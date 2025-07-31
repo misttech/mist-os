@@ -4,21 +4,30 @@
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/sync/completion.h>
+#include <lib/zx/channel.h>
 #include <lib/zx/event.h>
-#include <lib/zx/process.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <threads.h>
-#include <unistd.h>
+#include <lib/zx/object.h>
+#include <lib/zx/result.h>
+#include <lib/zx/stream.h>
 #include <zircon/assert.h>
 #include <zircon/availability.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <string_view>
 #include <utility>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
