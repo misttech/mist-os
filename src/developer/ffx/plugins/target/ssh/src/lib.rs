@@ -125,7 +125,7 @@ mod test {
     use std::fs;
     use std::str::FromStr;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_address_family() -> Result<()> {
         let test_env = test_init().await?;
         let keys = [
@@ -159,7 +159,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_custom_config_file() -> Result<()> {
         let test_env = test_init().await?;
         let keys = [

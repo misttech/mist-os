@@ -60,7 +60,7 @@ mod test {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_off() {
         let admin_proxy = setup_fake_admin_server();
         let result = off(admin_proxy, OffCommand {}).await;

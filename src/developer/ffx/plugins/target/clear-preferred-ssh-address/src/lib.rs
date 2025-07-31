@@ -52,7 +52,7 @@ mod tests {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn clear_preferred_ssh_address_invoked() {
         clear_preferred_ssh_address_impl(
             &setup_fake_target_server(),

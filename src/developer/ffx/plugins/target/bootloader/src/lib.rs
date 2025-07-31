@@ -615,7 +615,7 @@ mod test {
     use ffx_writer::Format;
     use tempfile::NamedTempFile;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_stages_file_and_calls_boot() -> fho::Result<()> {
         let zbi_file = NamedTempFile::new().expect("tmp access failed");
         let zbi_file_name = zbi_file.path().to_string_lossy().to_string();
@@ -645,7 +645,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_stages_file_and_calls_boot_with_just_zbi() -> fho::Result<()> {
         let zbi_file = NamedTempFile::new().expect("tmp access failed");
         let zbi_file_name = zbi_file.path().to_string_lossy().to_string();
@@ -673,7 +673,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_fails_with_just_vbmeta() {
         let vbmeta_file = NamedTempFile::new().expect("tmp access failed");
         let vbmeta_file_name = vbmeta_file.path().to_string_lossy().to_string();
@@ -698,7 +698,7 @@ mod test {
         .is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_lock_calls_oem_command() -> fho::Result<()> {
         let (state, proxy) = setup();
         {

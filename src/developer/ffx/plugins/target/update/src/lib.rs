@@ -912,7 +912,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_wait_for_commit() {
         let proxy = fake_async_proxy(async move |req| {
             let CommitStatusProviderRequest::IsCurrentSystemCommitted { responder } = req;
