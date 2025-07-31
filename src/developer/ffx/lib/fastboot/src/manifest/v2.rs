@@ -147,7 +147,7 @@ mod test {
         ]
     }"#;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_matching_revision_should_work() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
@@ -199,7 +199,7 @@ mod test {
         .await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_mismatching_revision_should_err() -> Result<()> {
         let v: FlashManifest = from_str(MISMATCH_MANIFEST)?;
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
@@ -227,7 +227,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_no_creds_and_requires_unlock_should_err() -> Result<()> {
         let v: FlashManifest = from_str(NO_CREDS_MANIFEST)?;
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
@@ -256,7 +256,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_minimal_manifest_succeeds() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();

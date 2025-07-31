@@ -80,7 +80,7 @@ mod test {
     use tempfile::NamedTempFile;
     use tokio::sync::mpsc;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_minimal_manifest_succeeds() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
@@ -137,7 +137,7 @@ mod test {
         .await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_full_manifest_succeeds() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();

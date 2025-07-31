@@ -95,7 +95,7 @@ mod test {
         }
     ]"#;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_deserializing_should_work() -> Result<()> {
         let v: FlashManifest = from_str(MANIFEST)?;
         let zedboot: &Product = &v.0[0];
