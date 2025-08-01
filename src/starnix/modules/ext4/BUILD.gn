@@ -43,6 +43,8 @@ rustc_library("ext4") {
     "//src/storage/ext4/read-only:ext4-read-only",
     "//third_party/rust_crates:once_cell",
   ]
+
+  test_deps = [ "//third_party/rust_crates:zerocopy" ]
 }
 
 fuchsia_unittest_package("starnix-ext4-tests") {

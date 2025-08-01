@@ -184,20 +184,12 @@ impl FsNodeOps for ExtDirectory {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
 
-            fn merge_low_high_16(low: u32, high: u32) -> u32 {
-                low | (high << 16)
-            }
-
-            let uid_lower: u32 = ext_node.inode.e2di_uid.into();
-            let uid_upper: u32 = ext_node.inode.e2di_uid_high.into();
-            let uid = merge_low_high_16(uid_lower, uid_upper);
-
-            let gid_lower: u32 = ext_node.inode.e2di_gid.into();
-            let gid_upper: u32 = ext_node.inode.e2di_gid_high.into();
-            let gid = merge_low_high_16(gid_lower, gid_upper);
-
+            let uid = get_uid_from_node(&ext_node);
+            let gid = get_gid_from_node(&ext_node);
             let owner = FsCred { uid, gid };
-            let size = u32::from(ext_node.inode.e2di_size) as usize;
+
+            let size = get_size_from_node(&ext_node, &mode);
+            let blocks = get_blocks_from_node(&ext_node);
             let nlink = ext_node.inode.e2di_nlink.into();
 
             let ops: Box<dyn FsNodeOps> = match entry_type {
@@ -233,14 +225,50 @@ impl FsNodeOps for ExtDirectory {
                 FsNodeInfo { mode, uid: owner.uid, gid: owner.gid, ..Default::default() },
             );
             child.update_info(|info| {
-                info.size = size;
+                info.size = size as usize;
                 info.link_count = nlink;
                 info.blksize = DEFAULT_BYTES_PER_BLOCK;
-                info.blocks = size.div_ceil(DEFAULT_BYTES_PER_BLOCK);
+                info.blocks = blocks as usize;
             });
             Ok(child)
         })
     }
+}
+
+fn merge_low_high_16(low: u32, high: u32) -> u32 {
+    low | (high << 16)
+}
+
+fn merge_low_high_32(low: u64, high: u64) -> u64 {
+    low | (high << 32)
+}
+
+fn get_uid_from_node(ext_node: &ExtNode) -> u32 {
+    let uid_lower: u32 = ext_node.inode.e2di_uid.into();
+    let uid_upper: u32 = ext_node.inode.e2di_uid_high.into();
+    merge_low_high_16(uid_lower, uid_upper)
+}
+
+fn get_gid_from_node(ext_node: &ExtNode) -> u32 {
+    let gid_lower: u32 = ext_node.inode.e2di_gid.into();
+    let gid_upper: u32 = ext_node.inode.e2di_gid_high.into();
+    merge_low_high_16(gid_lower, gid_upper)
+}
+
+fn get_size_from_node(ext_node: &ExtNode, mode: &FileMode) -> u64 {
+    if mode.is_reg() {
+        let size_lower: u64 = ext_node.inode.e2di_size.into();
+        let size_upper: u64 = ext_node.inode.e2di_size_high.into();
+        merge_low_high_32(size_lower, size_upper)
+    } else {
+        ext_node.inode.e2di_size.into()
+    }
+}
+
+fn get_blocks_from_node(ext_node: &ExtNode) -> u64 {
+    let blocks_lower: u64 = ext_node.inode.e2di_nblock.into();
+    let blocks_upper: u64 = ext_node.inode.e2di_nblock_high.into();
+    merge_low_high_32(blocks_lower, blocks_upper)
 }
 
 struct ExtFile {
@@ -387,5 +415,65 @@ fn directory_entry_type(entry_type: EntryType) -> DirectoryEntryType {
         EntryType::FIFO => DirectoryEntryType::FIFO,
         EntryType::Socket => DirectoryEntryType::SOCK,
         EntryType::SymLink => DirectoryEntryType::LNK,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ext4_read_only::structs::INode;
+    use starnix_uapi::file_mode::mode;
+    use zerocopy::byteorder::little_endian::{U16 as LE16, U32 as LE32};
+    use zerocopy::FromBytes;
+
+    fn default_inode() -> INode {
+        let zero = vec![0; 160];
+        INode::read_from_bytes(&zero).expect("failed to read from bytes")
+    }
+
+    fn create_test_ext_node(inode: INode) -> ExtNode {
+        ExtNode { inode_num: 1, inode, xattrs: ExtXattrMap::default() }
+    }
+
+    #[test]
+    fn test_get_uid_from_node() {
+        let mut inode = default_inode();
+        inode.e2di_uid = LE16::new(1001);
+        inode.e2di_uid_high = LE16::new(1);
+        let node = create_test_ext_node(inode);
+        assert_eq!(get_uid_from_node(&node), (1 << 16) | 1001);
+    }
+
+    #[test]
+    fn test_get_gid_from_node() {
+        let mut inode = default_inode();
+        inode.e2di_gid = LE16::new(1002);
+        inode.e2di_gid_high = LE16::new(2);
+        let node = create_test_ext_node(inode);
+        assert_eq!(get_gid_from_node(&node), (2 << 16) | 1002);
+    }
+
+    #[test]
+    fn test_get_size_from_node() {
+        // Test with a regular file.
+        let mut inode = default_inode();
+        inode.e2di_size = LE32::new(0x12345678);
+        inode.e2di_size_high = LE32::new(0x9);
+        let node = create_test_ext_node(inode);
+        let mode = mode!(IFREG, 0o777);
+        assert_eq!(get_size_from_node(&node, &mode), (0x9 << 32) | 0x12345678);
+
+        // Test with a directory, where size_high should be ignored.
+        let mode = mode!(IFDIR, 0o777);
+        assert_eq!(get_size_from_node(&node, &mode), 0x12345678);
+    }
+
+    #[test]
+    fn test_get_blocks_from_node() {
+        let mut inode = default_inode();
+        inode.e2di_nblock = LE32::new(0xABCDE);
+        inode.e2di_nblock_high = LE16::new(0x3);
+        let node = create_test_ext_node(inode);
+        assert_eq!(get_blocks_from_node(&node), (0x3 << 32) | 0xABCDE);
     }
 }
