@@ -4155,6 +4155,8 @@ template("static_library") {
           forward_variables_from(invoker.metadata, "*")
         }
       }
+    } else {
+      forward_variables_from(invoker, [ "metadata" ])
     }
   }
 }
