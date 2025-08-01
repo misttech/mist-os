@@ -1559,7 +1559,7 @@ if (current_toolchain == default_toolchain) {
 tlsdesc = {
   if (current_cpu == "arm64") {
     enable_dialect = "desc"
-    disable_dialect = "traditional"
+    disable_dialect = "trad"
     have_tlsdesc = 1
 
     # On arm64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under GCC, but is always enabled for Clang.
@@ -1573,7 +1573,7 @@ tlsdesc = {
 
     can_enable = true
     can_disable = true
-    compiler_default = !is_gcc
+    compiler_default = true
   } else if (current_cpu == "x64") {
     enable_dialect = "gnu2"
     disable_dialect = "gnu"
