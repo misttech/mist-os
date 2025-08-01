@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -25,8 +26,6 @@
 
 #include "src/graphics/display/drivers/goldfish-display/display-engine.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
-#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 
 namespace goldfish {
 namespace {
@@ -157,16 +156,9 @@ zx::result<> DisplayDriver::Start() {
   display_event_dispatcher_ = std::move(create_dispatcher_result).value();
 
   fbl::AllocChecker alloc_checker;
-  engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsBanjo>(&alloc_checker);
-  if (!alloc_checker.check()) {
-    fdf::error("Failed to allocate memory for DisplayEngineEventsBanjo");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
   display_engine_ = fbl::make_unique_checked<DisplayEngine>(
       &alloc_checker, std::move(control), std::move(pipe), std::move(sysmem_allocator),
-      std::move(render_control), display_event_dispatcher_.async_dispatcher(),
-      engine_events_.get());
+      std::move(render_control), display_event_dispatcher_.async_dispatcher());
   if (!alloc_checker.check()) {
     fdf::error("Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -178,19 +170,16 @@ zx::result<> DisplayDriver::Start() {
     return init_result.take_error();
   }
 
-  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
-      &alloc_checker, display_engine_.get(), engine_events_.get());
-  if (!alloc_checker.check()) {
-    fdf::error("Failed to allocate memory for DisplayEngineBanjoAdapter");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
+  banjo_server_ = compat::BanjoServer(ZX_PROTOCOL_DISPLAY_ENGINE, /*ctx=*/display_engine_.get(),
+                                      /*ops=*/display_engine_->display_engine_protocol_ops());
+  compat::DeviceServer::BanjoConfig banjo_config;
+  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_ENGINE] = banjo_server_->callback();
   zx::result<> compat_server_init_result =
       compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
                                 /*forward_metadata=*/compat::ForwardMetadata::None(),
-                                /*banjo_config=*/engine_banjo_adapter_->CreateBanjoConfig());
+                                /*banjo_config=*/std::move(banjo_config));
   if (compat_server_init_result.is_error()) {
     return compat_server_init_result.take_error();
   }
