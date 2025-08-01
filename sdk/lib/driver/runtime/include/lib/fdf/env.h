@@ -35,6 +35,12 @@ struct fdf_env_driver_shutdown_observer {
 // roles previously registered via the `fdf_env_add_allowed_scheduler_role_for_driver` API.
 #define FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES ((uint32_t)1u << 0)
 
+// Enable on-demand spawning of threads for dispatchers that allow sync calls, rather than always
+// starting a new thread when the dispatcher is created. If this flag is used, the caller is
+// responsible for periodically calling `fdf_env_scan_threads_for_stalls` to make sure threads
+// are spawned when all threads are blocked from making progress.
+#define FDF_ENV_DYNAMIC_THREAD_SPAWNING ((uint32_t)1u << 1)
+
 // Start the driver runtime. This sets up the initial thread that the dispatchers run on.
 zx_status_t fdf_env_start(uint32_t options);
 

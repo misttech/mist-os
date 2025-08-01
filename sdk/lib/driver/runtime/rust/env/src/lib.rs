@@ -257,6 +257,9 @@ pub struct Environment;
 impl Environment {
     /// Whether the environment should enforce scheduler roles. Used with [`Self::start`].
     pub const ENFORCE_ALLOWED_SCHEDULER_ROLES: u32 = 1;
+    /// Whether the environment should dynamically spawn threads on-demand for sync call dispatchers.
+    /// Used with [`Self::start`].
+    pub const DYNAMIC_THREAD_SPAWNING: u32 = 2;
 
     /// Start the driver runtime. This sets up the initial thread that the dispatchers run on.
     pub fn start(options: u32) -> Result<Environment, Status> {

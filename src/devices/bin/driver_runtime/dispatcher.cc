@@ -316,6 +316,8 @@ Dispatcher::Dispatcher(uint32_t options, std::string_view name, bool unsynchroni
   name_.Append(name);
 }
 
+bool g_dynamic_thread_spawning = false;
+
 // static
 zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
                                         std::string_view scheduler_role, const void* owner,
@@ -334,7 +336,7 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (allow_sync_calls) {
+  if (allow_sync_calls && !g_dynamic_thread_spawning) {
     zx_status_t status = adder();
     if (status != ZX_OK) {
       return status;
@@ -1855,6 +1857,7 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
 
 zx_status_t DispatcherCoordinator::Start(uint32_t options) {
   g_enforce_allowed_scheduler_roles = options & FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES;
+  g_dynamic_thread_spawning = options & FDF_ENV_DYNAMIC_THREAD_SPAWNING;
   DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
   fbl::AutoLock lock(&coordinator.lock_);
   auto thread_pool = coordinator.default_thread_pool();
@@ -2067,8 +2070,9 @@ zx_status_t Dispatcher::ThreadPool::RemoveThread() {
   }
 
   fbl::AutoLock lock(&lock_);
-  ZX_ASSERT(dispatcher_threads_needed_ > 0);
-  dispatcher_threads_needed_--;
+  if (dispatcher_threads_needed_ > 0) {
+    dispatcher_threads_needed_--;
+  }
   return ZX_OK;
 }
 
@@ -2081,9 +2085,8 @@ void Dispatcher::ThreadPool::OnDispatcherRemoved(Dispatcher& dispatcher) {
   fbl::AutoLock lock(&lock_);
 
   // We need to check the process shared dispatcher matches as tests inject their own.
-  if (!is_unmanaged_ && dispatcher.allow_sync_calls() &&
+  if (!is_unmanaged_ && dispatcher_threads_needed_ > 0 && dispatcher.allow_sync_calls() &&
       dispatcher.process_shared_dispatcher() == loop()->dispatcher()) {
-    ZX_ASSERT(dispatcher_threads_needed_ > 0);
     dispatcher_threads_needed_--;
   }
 

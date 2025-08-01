@@ -93,10 +93,26 @@ class DispatcherTest : public RuntimeTestCase {
   std::vector<std::unique_ptr<DispatcherShutdownObserver>> observers_;
 };
 
+// Like `DispatcherTest` but sets up the environment to spawn threads dynamically.
+class DynamicEnvDispatcherTest : public DispatcherTest {
+ public:
+  void SetUp() override;
+};
+
 void DispatcherTest::SetUp() {
   // Make sure each test starts with exactly one thread.
   driver_runtime::GetDispatcherCoordinator().Reset();
   ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start(0));
+
+  ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch_, &remote_ch_));
+  ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch2_, &remote_ch2_));
+}
+
+void DynamicEnvDispatcherTest::SetUp() {
+  // Make sure each test starts with exactly one thread.
+  driver_runtime::GetDispatcherCoordinator().Reset();
+  ASSERT_EQ(ZX_OK,
+            driver_runtime::GetDispatcherCoordinator().Start(FDF_ENV_DYNAMIC_THREAD_SPAWNING));
 
   ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch_, &remote_ch_));
   ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch2_, &remote_ch2_));
@@ -751,6 +767,72 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotBlockGlobalLoop) {
   }
 
   ASSERT_OK(sync_completion_wait(&read_completion, ZX_TIME_INFINITE));
+  ASSERT_NO_FATAL_FAILURE(AssertRead(remote_ch_, nullptr, 0, nullptr, 0));
+
+  // Signal and wait for the blocking read handler to return.
+  complete_blocking_read.Signal();
+
+  WaitUntilIdle(dispatcher);
+  WaitUntilIdle(blocking_dispatcher);
+
+  fdf_handle_close(blocking_local_ch);
+  fdf_handle_close(blocking_remote_ch);
+}
+
+// Tests that a blocking dispatcher does not block the global async loop shared between
+// all dispatchers in a process when running on an environment set up with dynamic thread spawning
+// and running the stall checker periodically.
+// We will register a blocking callback, and ensure we can receive other callbacks
+// at the same time.
+TEST_F(DynamicEnvDispatcherTest, AllowSyncCallsDoesNotBlockGlobalLoopWithDynamicSpawning) {
+  const void* driver = CreateFakeDriver();
+  fdf_dispatcher_t* dispatcher;
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
+
+  const void* blocking_driver = CreateFakeDriver();
+  fdf_dispatcher_t* blocking_dispatcher;
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                           blocking_driver, &blocking_dispatcher));
+
+  fdf_handle_t blocking_local_ch, blocking_remote_ch;
+  ASSERT_EQ(ZX_OK, fdf_channel_create(0, &blocking_local_ch, &blocking_remote_ch));
+
+  // Queue a blocking read.
+  libsync::Completion entered_callback;
+  libsync::Completion complete_blocking_read;
+  ASSERT_NO_FATAL_FAILURE(RegisterAsyncReadBlock(blocking_remote_ch, blocking_dispatcher,
+                                                 &entered_callback, &complete_blocking_read));
+
+  // Write a message for the blocking dispatcher.
+  {
+    thread_context::PushDriver(blocking_driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
+    ASSERT_EQ(ZX_OK, fdf_channel_write(blocking_local_ch, 0, nullptr, nullptr, 0, nullptr, 0));
+  }
+
+  ASSERT_OK(entered_callback.Wait(zx::time::infinite()));
+
+  sync_completion_t read_completion;
+  ASSERT_NO_FATAL_FAILURE(SignalOnChannelReadable(remote_ch_, dispatcher, &read_completion));
+
+  {
+    // Write a message which will be read on the non-blocking dispatcher.
+    // Make the call reentrant so that the request is queued for the async loop.
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
+    ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
+  }
+
+  while (true) {
+    zx_duration_mono_t wait_time =
+        driver_runtime::GetDispatcherCoordinator().ScanThreadsForStalls();
+    zx_status_t read_status = sync_completion_wait(&read_completion, wait_time);
+    if (read_status == ZX_OK) {
+      break;
+    }
+    ASSERT_EQ(ZX_ERR_TIMED_OUT, read_status);
+  }
+
   ASSERT_NO_FATAL_FAILURE(AssertRead(remote_ch_, nullptr, 0, nullptr, 0));
 
   // Signal and wait for the blocking read handler to return.
