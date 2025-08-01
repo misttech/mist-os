@@ -115,7 +115,9 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .timing = {},
       .color_conversion =
           {
-              .flags = 0u,
+              .preoffsets = {0.f, 0.f, 0.f},
+              .coefficients = {{1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {0.f, 0.f, 1.f}},
+              .postoffsets = {0.f, 0.f, 0.f},
           },
       .layers_list = test_layers_1,
       .layers_count = 1,
@@ -143,7 +145,9 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .timing = {},
       .color_conversion =
           {
-              .flags = 0u,
+              .preoffsets = {0.f, 0.f, 0.f},
+              .coefficients = {{1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {0.f, 0.f, 1.f}},
+              .postoffsets = {0.f, 0.f, 0.f},
           },
       .layers_list = test_layers_2,
       .layers_count = 1,

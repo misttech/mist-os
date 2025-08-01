@@ -55,7 +55,6 @@ TEST(BanjoFidlConversionTest, ToFidlDisplayConfig) {
           },
       .color_conversion =
           {
-              .flags = 1,
               .preoffsets = {0.1f, 0.2f, 0.3f},
               .coefficients =
                   {
@@ -76,7 +75,6 @@ TEST(BanjoFidlConversionTest, ToFidlDisplayConfig) {
   EXPECT_EQ(fidl_config.display_id.value, 1u);
   EXPECT_EQ(fidl_config.timing.h_addressable, 1920u);
   EXPECT_EQ(fidl_config.timing.v_addressable, 1080u);
-  EXPECT_EQ(fidl_config.color_conversion.flags, 1u);
   EXPECT_THAT(fidl_config.color_conversion.preoffsets, ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
   ASSERT_EQ(fidl_config.color_conversion.coefficients.size(), 3u);
   EXPECT_THAT(fidl_config.color_conversion.coefficients[0],

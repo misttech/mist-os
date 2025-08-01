@@ -240,24 +240,12 @@ type DisplayTiming = struct {
     flags uint32;
 };
 
-type ColorConversionFlags = strict enum : uint32 {
-    /// If set, use the 0 vector for the color conversion preoffset
-    PREOFFSET = 0x1;
-    /// If set, use the identity matrix for the color conversion coefficients
-    COEFFICIENTS = 0x2;
-    /// If set, use the 0 vector for the color conversion postoffset
-    POSTOFFSET = 0x4;
-};
-
 /// Color conversion is applied to each pixel according to the formula:
 ///
 /// (coefficients * (pixel + preoffsets)) + postoffsets
 ///
 /// where pixel is a column vector consisting of the pixel's 3 components.
 type ColorConversion = struct {
-    /// Bitmask of flags defined in the ColorConversion enum.
-    flags uint32;
-
     preoffsets array<float32, 3>;
     coefficients array<array<float32, 3>, 3>;
     postoffsets array<float32, 3>;

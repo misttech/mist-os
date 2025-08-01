@@ -209,8 +209,37 @@ uint32_t VideoInputUnit::FloatToFixed3_10(float f) {
   return fixed_num & kFloatToFixed3_10Mask;
 }
 
+namespace {
+
+bool IsIdentityColorConversion(const color_conversion_t& color_conversion) {
+  if (!std::ranges::equal(std::span(color_conversion.preoffsets),
+                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[0]),
+                          std::array<float, 3>{1.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[1]),
+                          std::array<float, 3>{0.0f, 1.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[2]),
+                          std::array<float, 3>{0.0f, 0.0f, 1.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.postoffsets),
+                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+
+  return true;
+}
+
+}  // namespace
+
 void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t& config) {
-  if (!config.color_conversion.flags) {
+  if (IsIdentityColorConversion(config.color_conversion)) {
     // Disable color conversion engine
     rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_EN_CTRL,
                              vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) & ~(1 << 0));
@@ -222,42 +251,24 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
                            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) | (1 << 0));
 
   // Load PreOffset values (or 0 if none entered)
-  auto offset0_1 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
-                        ? (FloatToFixed2_10(config.color_conversion.preoffsets[0]) << 16 |
-                           FloatToFixed2_10(config.color_conversion.preoffsets[1]) << 0)
-                        : 0);
+  auto offset0_1 = FloatToFixed2_10(config.color_conversion.preoffsets[0]) << 16 |
+                   FloatToFixed2_10(config.color_conversion.preoffsets[1]) << 0;
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET0_1, offset0_1);
-  auto offset2 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
-                      ? (FloatToFixed2_10(config.color_conversion.preoffsets[2]) << 0)
-                      : 0);
+  auto offset2 = FloatToFixed2_10(config.color_conversion.preoffsets[2]) << 0;
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
   fdf::trace("pre offset0_1={} offset2={}", offset0_1, offset2);
 
   // Load PostOffset values (or 0 if none entered)
-  offset0_1 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_POSTOFFSET
-                   ? (FloatToFixed2_10(config.color_conversion.postoffsets[0]) << 16 |
-                      FloatToFixed2_10(config.color_conversion.postoffsets[1]) << 0)
-                   : 0);
-  offset2 = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
-                 ? (FloatToFixed2_10(config.color_conversion.postoffsets[2]) << 0)
-                 : 0);
+  offset0_1 = FloatToFixed2_10(config.color_conversion.postoffsets[0]) << 16 |
+              FloatToFixed2_10(config.color_conversion.postoffsets[1]) << 0;
+  offset2 = FloatToFixed2_10(config.color_conversion.postoffsets[2]) << 0;
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET0_1, offset0_1);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
   fdf::trace("post offset0_1={} offset2={}", offset0_1, offset2);
 
-  // clang-format off
-  const float identity[3][3] = {
-      {1, 0, 0,},
-      {0, 1, 0,},
-      {0, 0, 1,},
-  };
-  // clang-format on
-
-  const auto* ccm = (config.color_conversion.flags & COLOR_CONVERSION_FLAGS_COEFFICIENTS)
-                        ? config.color_conversion.coefficients
-                        : identity;
+  const auto* ccm = config.color_conversion.coefficients;
 
   // Load up the coefficient matrix registers
   auto coef00_01 = FloatToFixed3_10(ccm[0][0]) << 16 | FloatToFixed3_10(ccm[0][1]) << 0;

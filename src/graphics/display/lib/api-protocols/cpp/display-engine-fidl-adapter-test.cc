@@ -47,6 +47,15 @@ namespace display {
 
 namespace {
 
+// Returns a ColorConversion for no (identity) color conversion.
+constexpr fuchsia_hardware_display_engine::wire::ColorConversion CreateIdentityColorConversion() {
+  return fuchsia_hardware_display_engine::wire::ColorConversion{
+      .preoffsets = {0.f, 0.f, 0.f},
+      .coefficients = {.data_ = {{1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {0.f, 0.f, 1.f}}},
+      .postoffsets = {0.f, 0.f, 0.f},
+  };
+}
+
 class DisplayEngineFidlAdapterTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -346,6 +355,7 @@ TEST_F(DisplayEngineFidlAdapterTest, CheckConfigurationSingleLayerSuccess) {
   std::array<fuchsia_hardware_display_engine::wire::Layer, 1> fidl_layers = {kLayers[0].ToFidl()};
   const fuchsia_hardware_display_engine::wire::DisplayConfig fidl_display_config = {
       .display_id = kDisplayId.ToFidl(),
+      .color_conversion = CreateIdentityColorConversion(),
       .layers =
           fidl::VectorView<fuchsia_hardware_display_engine::wire::Layer>::FromExternal(fidl_layers),
   };
@@ -378,6 +388,7 @@ TEST_F(DisplayEngineFidlAdapterTest, CheckConfigurationMultiLayerSuccess) {
       kLayers[0].ToFidl(), kLayers[1].ToFidl(), kLayers[2].ToFidl(), kLayers[3].ToFidl()};
   const fuchsia_hardware_display_engine::wire::DisplayConfig fidl_display_config = {
       .display_id = kDisplayId.ToFidl(),
+      .color_conversion = CreateIdentityColorConversion(),
       .layers =
           fidl::VectorView<fuchsia_hardware_display_engine::wire::Layer>::FromExternal(fidl_layers),
   };
@@ -411,6 +422,7 @@ TEST_F(DisplayEngineFidlAdapterTest, CheckConfigurationAdapterErrorLayerCountPas
   }
   const fuchsia_hardware_display_engine::wire::DisplayConfig fidl_display_config = {
       .display_id = kDisplayId.ToFidl(),
+      .color_conversion = CreateIdentityColorConversion(),
       .layers =
           fidl::VectorView<fuchsia_hardware_display_engine::wire::Layer>::FromExternal(fidl_layers),
   };
@@ -437,6 +449,7 @@ TEST_F(DisplayEngineFidlAdapterTest, CheckConfigurationEngineError) {
   std::array<fuchsia_hardware_display_engine::wire::Layer, 1> fidl_layers = {kLayers[0].ToFidl()};
   const fuchsia_hardware_display_engine::wire::DisplayConfig fidl_display_config = {
       .display_id = kDisplayId.ToFidl(),
+      .color_conversion = CreateIdentityColorConversion(),
       .layers =
           fidl::VectorView<fuchsia_hardware_display_engine::wire::Layer>::FromExternal(fidl_layers),
   };
@@ -465,6 +478,7 @@ TEST_F(DisplayEngineFidlAdapterTest, ApplyConfigurationSingleLayer) {
   std::array<fuchsia_hardware_display_engine::wire::Layer, 1> fidl_layers = {kLayers[0].ToFidl()};
   const fuchsia_hardware_display_engine::wire::DisplayConfig fidl_display_config = {
       .display_id = kDisplayId.ToFidl(),
+      .color_conversion = CreateIdentityColorConversion(),
       .layers =
           fidl::VectorView<fuchsia_hardware_display_engine::wire::Layer>::FromExternal(fidl_layers),
   };
@@ -496,6 +510,7 @@ TEST_F(DisplayEngineFidlAdapterTest, ApplyConfigurationMultiLayer) {
       kLayers[0].ToFidl(), kLayers[1].ToFidl(), kLayers[2].ToFidl(), kLayers[3].ToFidl()};
   const fuchsia_hardware_display_engine::wire::DisplayConfig fidl_display_config = {
       .display_id = kDisplayId.ToFidl(),
+      .color_conversion = CreateIdentityColorConversion(),
       .layers =
           fidl::VectorView<fuchsia_hardware_display_engine::wire::Layer>::FromExternal(fidl_layers),
   };

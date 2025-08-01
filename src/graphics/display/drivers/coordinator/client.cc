@@ -91,6 +91,19 @@ constexpr uint64_t kMaxLayers = 65536;
 
 namespace display_coordinator {
 
+namespace {
+
+// Returns a ColorConversion for no (identity) color conversion.
+constexpr color_conversion_t CreateIdentityColorConversion() {
+  return color_conversion_t{
+      .preoffsets = {0.f, 0.f, 0.f},
+      .coefficients = {{1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {0.f, 0.f, 1.f}},
+      .postoffsets = {0.f, 0.f, 0.f},
+  };
+}
+
+}  // namespace
+
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Display::Client::ImportImage");
 
@@ -502,25 +515,22 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
   }
   DisplayConfig& display_config = *display_configs_it;
 
-  display_config.draft_.color_conversion.flags = 0;
-  if (!std::isnan(request->preoffsets[0])) {
-    display_config.draft_.color_conversion.flags |= COLOR_CONVERSION_FLAGS_PREOFFSET;
+  display_config.draft_.color_conversion = CreateIdentityColorConversion();
+  if (std::isfinite(request->preoffsets[0])) {
     std::memcpy(display_config.draft_.color_conversion.preoffsets, request->preoffsets.data(),
                 sizeof(request->preoffsets.data_));
     static_assert(sizeof(request->preoffsets) ==
                   sizeof(display_config.draft_.color_conversion.preoffsets));
   }
 
-  if (!std::isnan(request->coefficients[0])) {
-    display_config.draft_.color_conversion.flags |= COLOR_CONVERSION_FLAGS_COEFFICIENTS;
+  if (std::isfinite(request->coefficients[0])) {
     std::memcpy(display_config.draft_.color_conversion.coefficients, request->coefficients.data(),
                 sizeof(request->coefficients.data_));
     static_assert(sizeof(request->coefficients) ==
                   sizeof(display_config.draft_.color_conversion.coefficients));
   }
 
-  if (!std::isnan(request->postoffsets[0])) {
-    display_config.draft_.color_conversion.flags |= COLOR_CONVERSION_FLAGS_POSTOFFSET;
+  if (std::isfinite(request->postoffsets[0])) {
     std::memcpy(display_config.draft_.color_conversion.postoffsets, request->postoffsets.data(),
                 sizeof(request->postoffsets.data_));
     static_assert(sizeof(request->postoffsets) ==
@@ -1328,8 +1338,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
       return display_timings[0];
     }();
     display_config->applied_.timing = display::ToBanjoDisplayTiming(timing);
-
-    display_config->applied_.color_conversion.flags = 0;
+    display_config->applied_.color_conversion = CreateIdentityColorConversion();
 
     display_config->draft_ = display_config->applied_;
 

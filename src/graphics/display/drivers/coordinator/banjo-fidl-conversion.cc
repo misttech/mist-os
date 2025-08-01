@@ -61,7 +61,6 @@ fuchsia_hardware_display_engine::wire::DisplayConfig ToFidlDisplayConfig(
       .timing = timing,
       .color_conversion =
           {
-              .flags = banjo_config.color_conversion.flags,
               .preoffsets = ToFidlPreoffsets(banjo_config.color_conversion.preoffsets),
               .coefficients = ToFidlCoefficients(banjo_config.color_conversion.coefficients),
               .postoffsets = ToFidlPostoffsets(banjo_config.color_conversion.postoffsets),

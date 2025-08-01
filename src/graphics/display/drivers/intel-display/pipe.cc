@@ -81,6 +81,35 @@ uint32_t encode_pipe_color_component(uint8_t component) {
 
 namespace intel_display {
 
+namespace {
+
+bool IsIdentityColorConversion(const color_conversion_t& color_conversion) {
+  if (!std::ranges::equal(std::span(color_conversion.preoffsets),
+                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[0]),
+                          std::array<float, 3>{1.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[1]),
+                          std::array<float, 3>{0.0f, 1.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[2]),
+                          std::array<float, 3>{0.0f, 0.0f, 1.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.postoffsets),
+                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+
+  return true;
+}
+
+}  // namespace
+
 Pipe::Pipe(fdf::MmioBuffer* mmio_space, registers::Platform platform, PipeId pipe_id,
            PowerWellRef pipe_power)
     : mmio_space_(mmio_space),
@@ -402,51 +431,26 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   registers::pipe_arming_regs_t regs;
   registers::PipeRegs pipe_regs(pipe_id_);
 
-  if (banjo_display_config->color_conversion.flags) {
-    float zero_offset[3] = {};
-    SetColorConversionOffsets(
-        true, banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET
-                  ? banjo_display_config->color_conversion.preoffsets
-                  : zero_offset);
-    SetColorConversionOffsets(
-        false, banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_POSTOFFSET
-                   ? banjo_display_config->color_conversion.postoffsets
-                   : zero_offset);
+  SetColorConversionOffsets(true, banjo_display_config->color_conversion.preoffsets);
+  SetColorConversionOffsets(false, banjo_display_config->color_conversion.postoffsets);
+  for (uint32_t i = 0; i < 3; i++) {
+    for (uint32_t j = 0; j < 3; j++) {
+      float val = banjo_display_config->color_conversion.coefficients[i][j];
+      ZX_DEBUG_ASSERT(std::isfinite(val));
 
-    float identity[3][3] = {
-        {
-            1,
-            0,
-            0,
-        },
-        {
-            0,
-            1,
-            0,
-        },
-        {
-            0,
-            0,
-            1,
-        },
-    };
-    for (uint32_t i = 0; i < 3; i++) {
-      for (uint32_t j = 0; j < 3; j++) {
-        float val =
-            banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_COEFFICIENTS
-                ? banjo_display_config->color_conversion.coefficients[i][j]
-                : identity[i][j];
-
-        auto reg = pipe_regs.CscCoeff(i, j).ReadFrom(mmio_space_);
-        reg.coefficient(i, j).set(float_to_intel_display_csc_coefficient(val));
-        reg.WriteTo(mmio_space_);
-      }
+      auto reg = pipe_regs.CscCoeff(i, j).ReadFrom(mmio_space_);
+      reg.coefficient(i, j).set(float_to_intel_display_csc_coefficient(val));
+      reg.WriteTo(mmio_space_);
     }
   }
+
   regs.csc_mode = pipe_regs.CscMode().ReadFrom(mmio_space_).reg_value();
 
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
-  bottom_color.set_csc_enable(!!banjo_display_config->color_conversion.flags);
+
+  const bool should_enable_color_space_conversion =
+      !IsIdentityColorConversion(banjo_display_config->color_conversion);
+  bottom_color.set_csc_enable(should_enable_color_space_conversion);
   bool has_color_layer =
       banjo_display_config->layers_count &&
       (banjo_display_config->layers_list[0].image_metadata.dimensions.width == 0 ||
@@ -486,7 +490,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
         break;
       }
     }
-    ConfigurePrimaryPlane(plane, primary, !!banjo_display_config->color_conversion.flags,
+    ConfigurePrimaryPlane(plane, primary, /*enable_csc=*/should_enable_color_space_conversion,
                           &scaler_1_claimed, &regs, config_stamp, get_gtt_region_fn,
                           get_pixel_format);
   }

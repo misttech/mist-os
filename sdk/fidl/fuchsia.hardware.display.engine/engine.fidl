@@ -151,8 +151,6 @@ type Layer = struct {
 // The color conversion API is subject to change. Only in-tree display engine
 // drivers may use it.
 type ColorConversion = struct {
-    flags uint32;
-
     preoffsets array<float32, 3>;
     coefficients array<array<float32, 3>, 3>;
     postoffsets array<float32, 3>;

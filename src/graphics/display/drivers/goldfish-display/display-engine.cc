@@ -55,6 +55,31 @@ constexpr uint32_t FB_FPS = 5;
 constexpr uint32_t GL_RGBA = 0x1908;
 constexpr uint32_t GL_BGRA_EXT = 0x80E1;
 
+bool IsIdentityColorConversion(const color_conversion_t& color_conversion) {
+  if (!std::ranges::equal(std::span(color_conversion.preoffsets),
+                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[0]),
+                          std::array<float, 3>{1.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[1]),
+                          std::array<float, 3>{0.0f, 1.0f, 0.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.coefficients[2]),
+                          std::array<float, 3>{0.0f, 0.0f, 1.0f})) {
+    return false;
+  }
+  if (!std::ranges::equal(std::span(color_conversion.postoffsets),
+                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
+    return false;
+  }
+
+  return true;
+}
+
 }  // namespace
 
 DisplayEngine::DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
@@ -361,7 +386,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   ZX_DEBUG_ASSERT(display_id == kPrimaryDisplayId);
 
-  if (display_config.color_conversion.flags != 0) {
+  if (!IsIdentityColorConversion(display_config.color_conversion)) {
     // Color Correction is not supported, but we will pretend we do.
     // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic
     // requests color correction. For now, lets pretend we support it, until a proper fix is

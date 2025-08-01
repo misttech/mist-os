@@ -14,6 +14,8 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <utility>
 
@@ -30,6 +32,38 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace display {
+
+namespace {
+
+bool IsIdentityColorConversion(const color_conversion_t& color_conversion) {
+  if (!std::equal(std::begin(color_conversion.preoffsets), std::end(color_conversion.preoffsets),
+                  std::array<float, 3>{0.0f, 0.0f, 0.0f}.begin())) {
+    return false;
+  }
+  if (!std::equal(std::begin(color_conversion.coefficients[0]),
+                  std::end(color_conversion.coefficients[0]),
+                  std::array<float, 3>{1.0f, 0.0f, 0.0f}.begin())) {
+    return false;
+  }
+  if (!std::equal(std::begin(color_conversion.coefficients[1]),
+                  std::end(color_conversion.coefficients[1]),
+                  std::array<float, 3>{0.0f, 1.0f, 0.0f}.begin())) {
+    return false;
+  }
+  if (!std::equal(std::begin(color_conversion.coefficients[2]),
+                  std::end(color_conversion.coefficients[2]),
+                  std::array<float, 3>{0.0f, 0.0f, 1.0f}.begin())) {
+    return false;
+  }
+  if (!std::equal(std::begin(color_conversion.postoffsets), std::end(color_conversion.postoffsets),
+                  std::array<float, 3>{0.0f, 0.0f, 0.0f}.begin())) {
+    return false;
+  }
+
+  return true;
+}
+
+}  // namespace
 
 DisplayEngineBanjoAdapter::DisplayEngineBanjoAdapter(DisplayEngineInterface* engine,
                                                      DisplayEngineEventsBanjo* engine_events)
@@ -128,8 +162,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
-  // This adapter does not currently support color correction.
-  if (banjo_display_config->color_conversion.flags != 0) {
+  // This adapter does not currently support non-identity color correction.
+  if (!IsIdentityColorConversion(banjo_display_config->color_conversion)) {
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
@@ -159,9 +193,9 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
   ZX_DEBUG_ASSERT_MSG(banjo_layers.size() <= display::EngineInfo::kMaxAllowedMaxLayerCount,
                       "Display coordinator applied rejected config with too many layers");
 
-  // This adapter does not currently support color correction.
-  ZX_DEBUG_ASSERT_MSG(banjo_display_config->color_conversion.flags == 0,
-                      "Display coordinator applied rejected color-correction config");
+  // This adapter does not currently support non-identity color correction.
+  ZX_DEBUG_ASSERT_MSG(IsIdentityColorConversion(banjo_display_config->color_conversion),
+                      "Display coordinator applied rejected non-identity color-correction config");
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>
       layers;

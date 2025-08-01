@@ -356,7 +356,6 @@ TEST_F(EngineDriverClientBanjoTest, CheckConfiguration) {
           },
       .color_conversion =
           {
-              .flags = 1,
               .preoffsets = {0.1f, 0.2f, 0.3f},
               .coefficients = {{1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}, {7.0f, 8.0f, 9.0f}},
               .postoffsets = {0.4f, 0.5f, 0.6f},
@@ -372,8 +371,6 @@ TEST_F(EngineDriverClientBanjoTest, CheckConfiguration) {
 
     EXPECT_EQ(display_config->timing.h_addressable, banjo_config.timing.h_addressable);
     EXPECT_EQ(display_config->timing.v_addressable, banjo_config.timing.v_addressable);
-
-    EXPECT_EQ(display_config->color_conversion.flags, banjo_config.color_conversion.flags);
 
     EXPECT_THAT(display_config->color_conversion.preoffsets,
                 ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
@@ -423,7 +420,6 @@ TEST_F(EngineDriverClientBanjoTest, ApplyConfiguration) {
           },
       .color_conversion =
           {
-              .flags = 1,
               .preoffsets = {0.1f, 0.2f, 0.3f},
               .coefficients = {{1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}, {7.0f, 8.0f, 9.0f}},
               .postoffsets = {0.4f, 0.5f, 0.6f},
@@ -442,8 +438,6 @@ TEST_F(EngineDriverClientBanjoTest, ApplyConfiguration) {
 
         EXPECT_EQ(display_config->timing.h_addressable, banjo_config.timing.h_addressable);
         EXPECT_EQ(display_config->timing.v_addressable, banjo_config.timing.v_addressable);
-
-        EXPECT_EQ(display_config->color_conversion.flags, banjo_config.color_conversion.flags);
 
         EXPECT_THAT(display_config->color_conversion.preoffsets,
                     ::testing::ElementsAre(0.1f, 0.2f, 0.3f));

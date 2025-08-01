@@ -1586,18 +1586,22 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
          banjo_display_config->layers_list[0].image_metadata.dimensions.height == 0);
     merge_all = banjo_display_config->layers_count > 4 || layer0_is_solid_color_fill;
   }
-  if (!merge_all && banjo_display_config->color_conversion.flags) {
-    if (banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET) {
-      for (int i = 0; i < 3; i++) {
-        merge_all |= banjo_display_config->color_conversion.preoffsets[i] <= -1;
-        merge_all |= banjo_display_config->color_conversion.preoffsets[i] >= 1;
+
+  if (!merge_all) {
+    for (float preoffset : banjo_display_config->color_conversion.preoffsets) {
+      merge_all |= !std::isfinite(preoffset);
+      merge_all |= preoffset <= -1;
+      merge_all |= preoffset >= 1;
+    }
+    for (const auto& coefficient_row : banjo_display_config->color_conversion.coefficients) {
+      for (float coefficient : coefficient_row) {
+        merge_all |= !std::isfinite(coefficient);
       }
     }
-    if (banjo_display_config->color_conversion.flags & COLOR_CONVERSION_FLAGS_POSTOFFSET) {
-      for (int i = 0; i < 3; i++) {
-        merge_all |= banjo_display_config->color_conversion.postoffsets[i] <= -1;
-        merge_all |= banjo_display_config->color_conversion.postoffsets[i] >= 1;
-      }
+    for (float postoffset : banjo_display_config->color_conversion.postoffsets) {
+      merge_all |= !std::isfinite(postoffset);
+      merge_all |= postoffset <= -1;
+      merge_all |= postoffset >= 1;
     }
   }
 

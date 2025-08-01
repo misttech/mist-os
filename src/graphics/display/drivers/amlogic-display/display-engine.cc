@@ -467,23 +467,25 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 
     // TODO(https://fxbug.dev/42080882): Move color conversion validation code to a common
     // library.
-    if (display_config.color_conversion.flags) {
-      // Make sure cc values are correct
-      if (display_config.color_conversion.flags & COLOR_CONVERSION_FLAGS_PREOFFSET) {
-        for (float preoffset : display_config.color_conversion.preoffsets) {
-          if (preoffset <= -1 || preoffset >= 1) {
-            fdf::warn("CheckConfig failure: cc_preoffset {} out of range (-1, 1)", preoffset);
-            return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-          }
+    for (float preoffset : display_config.color_conversion.preoffsets) {
+      if (preoffset <= -1 || preoffset >= 1) {
+        fdf::warn("CheckConfig failure: preoffset {} out of range (-1, 1)", preoffset);
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      }
+    }
+    for (const auto& coefficient_row : display_config.color_conversion.coefficients) {
+      for (float coefficient : coefficient_row) {
+        if (!std::isfinite(coefficient)) {
+          fdf::warn("CheckConfig failure: coefficient has invalid coefficient value: {}",
+                    coefficient);
+          return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
       }
-      if (display_config.color_conversion.flags & COLOR_CONVERSION_FLAGS_POSTOFFSET) {
-        for (float postoffset : display_config.color_conversion.postoffsets) {
-          if (postoffset <= -1 || postoffset >= 1) {
-            fdf::warn("CheckConfig failure: cc_postoffset {} out of range (-1, 1)", postoffset);
-            return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-          }
-        }
+    }
+    for (float postoffset : display_config.color_conversion.postoffsets) {
+      if (postoffset <= -1 || postoffset >= 1) {
+        fdf::warn("CheckConfig failure: postoffset {} out of range (-1, 1)", postoffset);
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
     }
 
