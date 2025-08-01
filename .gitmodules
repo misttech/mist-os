@@ -83,11 +83,6 @@
 	url = https://fuchsia.googlesource.com/cobalt-registry
 	name = cobalt-registry
 	ignore = all
-[submodule "third_party/curl"]
-	path = third_party/curl
-	url = https://fuchsia.googlesource.com/third_party/curl
-	name = third_party/curl
-	ignore = all
 [submodule "third_party/dart-pkg/pub"]
 	path = third_party/dart-pkg/pub
 	url = https://fuchsia.googlesource.com/third_party/dart-pkg
@@ -702,4 +697,9 @@
 	path = third_party/glog/src
 	url = https://fuchsia.googlesource.com/third_party/glog
 	name = third_party/glog
+	ignore = all
+[submodule "third_party/curl/src"]
+	path = third_party/curl/src
+	url = https://fuchsia.googlesource.com/third_party/curl
+	name = third_party/curl
 	ignore = all
