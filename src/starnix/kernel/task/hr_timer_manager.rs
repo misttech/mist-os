@@ -600,7 +600,7 @@ impl HrTimerManager {
                         wake_alarm_id
                     );
                     ftrace::duration!(c"alarms", c"starnix:hrtimer:start", "timer_id" => timer_id);
-                    ftrace::flow_step!(c"alarms", c"hrtimer_lifecycle", trace_id);
+                    ftrace::flow_begin!(c"alarms", c"hrtimer_lifecycle", trace_id);
 
                     let maybe_cancel = self.lock().pending_timers.remove(&timer_id);
                     cancel_by_id(
