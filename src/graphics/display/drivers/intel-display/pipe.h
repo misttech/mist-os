@@ -115,7 +115,7 @@ class Pipe {
                              const GetImagePixelFormatFunc& get_pixel_format);
   void DisableCursorPlane(registers::pipe_arming_regs* regs,
                           display::DriverConfigStamp config_stamp);
-  void SetColorConversionOffsets(bool preoffsets, const float vals[3]);
+  void SetColorConversionOffsets(bool preoffsets, std::span<const float, 3> vals);
   void ResetActiveTranscoder();
   void ResetScaler();
 

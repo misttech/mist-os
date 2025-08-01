@@ -15,6 +15,7 @@
 #include <sdk/lib/driver/logging/cpp/logger.h>
 
 #include "src/graphics/display/lib/api-protocols/cpp/inplace-vector.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
@@ -26,39 +27,6 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
 namespace display {
-
-namespace {
-
-bool IsIdentityColorConversion(
-    const fuchsia_hardware_display_engine::wire::ColorConversion& color_conversion) {
-  if (!std::equal(std::begin(color_conversion.preoffsets), std::end(color_conversion.preoffsets),
-                  std::array<float, 3>{0.0f, 0.0f, 0.0f}.begin())) {
-    return false;
-  }
-  if (!std::equal(std::begin(color_conversion.coefficients[0]),
-                  std::end(color_conversion.coefficients[0]),
-                  std::array<float, 3>{1.0f, 0.0f, 0.0f}.begin())) {
-    return false;
-  }
-  if (!std::equal(std::begin(color_conversion.coefficients[1]),
-                  std::end(color_conversion.coefficients[1]),
-                  std::array<float, 3>{0.0f, 1.0f, 0.0f}.begin())) {
-    return false;
-  }
-  if (!std::equal(std::begin(color_conversion.coefficients[2]),
-                  std::end(color_conversion.coefficients[2]),
-                  std::array<float, 3>{0.0f, 0.0f, 1.0f}.begin())) {
-    return false;
-  }
-  if (!std::equal(std::begin(color_conversion.postoffsets), std::end(color_conversion.postoffsets),
-                  std::array<float, 3>{0.0f, 0.0f, 0.0f}.begin())) {
-    return false;
-  }
-
-  return true;
-}
-
-}  // namespace
 
 DisplayEngineFidlAdapter::DisplayEngineFidlAdapter(DisplayEngineInterface* engine,
                                                    DisplayEngineEventsFidl* engine_events)
@@ -168,8 +136,14 @@ void DisplayEngineFidlAdapter::CheckConfiguration(
     return;
   }
 
+  if (!display::ColorConversion::IsValid(display_config.color_conversion)) {
+    completer.buffer(arena).ReplyError(display::ConfigCheckResult::kInvalidConfig.ToFidl());
+    return;
+  }
+
   // This adapter does not currently support non-identity color correction.
-  if (!IsIdentityColorConversion(display_config.color_conversion)) {
+  display::ColorConversion color_conversion(display_config.color_conversion);
+  if (color_conversion != display::ColorConversion::kIdentity) {
     completer.buffer(arena).ReplyError(display::ConfigCheckResult::kUnsupportedConfig.ToFidl());
     return;
   }
@@ -207,7 +181,10 @@ void DisplayEngineFidlAdapter::ApplyConfiguration(
                       "Display coordinator applied rejected config with too many layers");
 
   // This adapter does not currently support non-identity color correction.
-  ZX_DEBUG_ASSERT_MSG(IsIdentityColorConversion(display_config.color_conversion),
+  ZX_DEBUG_ASSERT_MSG(display::ColorConversion::IsValid(display_config.color_conversion),
+                      "Display coordinator applied rejected invalid color-correction config");
+  ZX_DEBUG_ASSERT_MSG(display::ColorConversion(display_config.color_conversion) ==
+                          display::ColorConversion::kIdentity,
                       "Display coordinator applied rejected non-identity color-correction config");
 
   internal::InplaceVector<display::DriverLayer, display::EngineInfo::kMaxAllowedMaxLayerCount>

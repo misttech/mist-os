@@ -62,6 +62,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -1578,6 +1579,11 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
+  if (!display::ColorConversion::IsValid(banjo_display_config->color_conversion)) {
+    return CONFIG_CHECK_RESULT_INVALID_CONFIG;
+  }
+  const display::ColorConversion color_conversion(banjo_display_config->color_conversion);
+
   config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   bool merge_all = false;
   if (banjo_display_config->layers_count > 3) {
@@ -1588,18 +1594,11 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
   }
 
   if (!merge_all) {
-    for (float preoffset : banjo_display_config->color_conversion.preoffsets) {
-      merge_all |= !std::isfinite(preoffset);
+    for (float preoffset : color_conversion.preoffsets()) {
       merge_all |= preoffset <= -1;
       merge_all |= preoffset >= 1;
     }
-    for (const auto& coefficient_row : banjo_display_config->color_conversion.coefficients) {
-      for (float coefficient : coefficient_row) {
-        merge_all |= !std::isfinite(coefficient);
-      }
-    }
-    for (float postoffset : banjo_display_config->color_conversion.postoffsets) {
-      merge_all |= !std::isfinite(postoffset);
+    for (float postoffset : color_conversion.postoffsets()) {
       merge_all |= postoffset <= -1;
       merge_all |= postoffset >= 1;
     }

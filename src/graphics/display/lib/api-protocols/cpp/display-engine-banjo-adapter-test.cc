@@ -22,6 +22,7 @@
 
 #include "src/graphics/display/lib/api-protocols/cpp/mock-banjo-display-engine-listener.h"
 #include "src/graphics/display/lib/api-protocols/cpp/mock-display-engine.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -41,16 +42,6 @@
 namespace display {
 
 namespace {
-
-// Returns a ColorConversion for no (identity) color conversion.
-constexpr color_conversion_t CreateIdentityColorConversion() {
-  return color_conversion_t{
-      .preoffsets = {0.f, 0.f, 0.f},
-      .coefficients = {{1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {0.f, 0.f, 1.f}},
-      .postoffsets = {0.f, 0.f, 0.f},
-  };
-}
-
 class DisplayEngineBanjoAdapterTest : public ::testing::Test {
  public:
   void TearDown() override { mock_.CheckAllCallsReplayed(); }
@@ -253,9 +244,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSingleLayerSuccess) {
   static constexpr std::array<display::DriverLayer, 1> kLayers = {CreateValidLayerWithSeed(0)};
 
   static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
-  static constexpr display_config_t kBanjoDisplayConfig = {
+  const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = CreateIdentityColorConversion(),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
       .layers_list = kBanjoLayers.data(),
       .layers_count = kBanjoLayers.size(),
   };
@@ -280,9 +271,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationMultiLayerSuccess) {
 
   static constexpr std::array<layer_t, 4> banjo_layers = {
       kLayers[0].ToBanjo(), kLayers[1].ToBanjo(), kLayers[2].ToBanjo(), kLayers[3].ToBanjo()};
-  static constexpr display_config_t kBanjoDisplayConfig = {
+  const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = CreateIdentityColorConversion(),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
       .layers_list = banjo_layers.data(),
       .layers_count = banjo_layers.size(),
   };
@@ -311,7 +302,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationAdapterErrorLayerCountPa
 
   const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = CreateIdentityColorConversion(),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
       .layers_list = banjo_layers.data(),
       .layers_count = banjo_layers.size(),
   };
@@ -328,9 +319,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationEngineError) {
   static constexpr display::DisplayId kDisplayId(42);
 
   static constexpr std::array<layer_t, 1> kBanjoLayers = {CreateValidLayerWithSeed(0).ToBanjo()};
-  static constexpr display_config_t kBanjoDisplayConfig = {
+  const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = CreateIdentityColorConversion(),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
       .layers_list = kBanjoLayers.data(),
       .layers_count = kBanjoLayers.size(),
   };
@@ -350,9 +341,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationSingleLayer) {
   static constexpr display::DriverConfigStamp kConfigStamp(4242);
 
   static constexpr std::array<layer_t, 1> kBanjoLayers = {kLayers[0].ToBanjo()};
-  static constexpr display_config_t kBanjoDisplayConfig = {
+  const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = CreateIdentityColorConversion(),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
       .layers_list = kBanjoLayers.data(),
       .layers_count = kBanjoLayers.size(),
   };
@@ -378,9 +369,9 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfigurationMultiLayer) {
 
   static constexpr std::array<layer_t, 4> banjo_layers = {
       kLayers[0].ToBanjo(), kLayers[1].ToBanjo(), kLayers[2].ToBanjo(), kLayers[3].ToBanjo()};
-  static constexpr display_config_t kBanjoDisplayConfig = {
+  const display_config_t kBanjoDisplayConfig = {
       .display_id = kDisplayId.ToBanjo(),
-      .color_conversion = CreateIdentityColorConversion(),
+      .color_conversion = display::ColorConversion::kIdentity.ToBanjo(),
       .layers_list = banjo_layers.data(),
       .layers_count = banjo_layers.size(),
   };

@@ -12,6 +12,8 @@ source_set("cpp") {
     "backlight-state.cc",
     "backlight-state.h",
     "buffer-collection-id.h",
+    "color-conversion.cc",
+    "color-conversion.h",
     "color.cc",
     "color.h",
     "config-check-result.cc",
@@ -68,6 +70,7 @@ source_set("cpp") {
 test_sources = [
   "alpha-mode-test.cc",
   "backlight-state-test.cc",
+  "color-conversion-test.cc",
   "color-test.cc",
   "config-check-result-test.cc",
   "coordinate-transformation-test.cc",

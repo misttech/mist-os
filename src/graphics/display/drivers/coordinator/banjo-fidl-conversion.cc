@@ -8,42 +8,12 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/fdf/cpp/arena.h>
 
-#include <algorithm>
-#include <span>
-
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 
 namespace display_coordinator {
-
-namespace {
-
-// `banjo_preoffsets` must point to an array of size 3.
-fidl::Array<float, 3> ToFidlPreoffsets(const float* banjo_preoffsets) {
-  fidl::Array<float, 3> fidl_preoffsets;
-  std::ranges::copy(std::span(banjo_preoffsets, 3), fidl_preoffsets.begin());
-  return fidl_preoffsets;
-}
-
-// `banjo_coefficients` must point to an array of size 3, and each element
-// of `banjo_coefficients` must point to an array of size 3.
-fidl::Array<fidl::Array<float, 3>, 3> ToFidlCoefficients(const float (*banjo_coefficients)[3]) {
-  fidl::Array<fidl::Array<float, 3>, 3> fidl_coefficients;
-  for (size_t i = 0; i < 3; ++i) {
-    std::ranges::copy(std::span(banjo_coefficients[i], 3), fidl_coefficients[i].begin());
-  }
-  return fidl_coefficients;
-}
-
-// `banjo_postoffsets` must point to an array of size 3.
-fidl::Array<float, 3> ToFidlPostoffsets(const float* banjo_postoffsets) {
-  fidl::Array<float, 3> fidl_postoffsets;
-  std::ranges::copy(std::span(banjo_postoffsets, 3), fidl_postoffsets.begin());
-  return fidl_postoffsets;
-}
-
-}  // namespace
 
 fuchsia_hardware_display_engine::wire::DisplayConfig ToFidlDisplayConfig(
     const display_config_t& banjo_config, fdf::Arena& arena) {
@@ -59,12 +29,7 @@ fuchsia_hardware_display_engine::wire::DisplayConfig ToFidlDisplayConfig(
   return fuchsia_hardware_display_engine::wire::DisplayConfig{
       .display_id = display::DisplayId(banjo_config.display_id).ToFidl(),
       .timing = timing,
-      .color_conversion =
-          {
-              .preoffsets = ToFidlPreoffsets(banjo_config.color_conversion.preoffsets),
-              .coefficients = ToFidlCoefficients(banjo_config.color_conversion.coefficients),
-              .postoffsets = ToFidlPostoffsets(banjo_config.color_conversion.postoffsets),
-          },
+      .color_conversion = display::ColorConversion(banjo_config.color_conversion).ToFidl(),
       .layers = layers,
   };
 }

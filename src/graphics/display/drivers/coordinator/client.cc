@@ -47,6 +47,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
@@ -90,19 +91,6 @@ constexpr uint64_t kMaxLayers = 65536;
 }  // namespace
 
 namespace display_coordinator {
-
-namespace {
-
-// Returns a ColorConversion for no (identity) color conversion.
-constexpr color_conversion_t CreateIdentityColorConversion() {
-  return color_conversion_t{
-      .preoffsets = {0.f, 0.f, 0.f},
-      .coefficients = {{1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {0.f, 0.f, 1.f}},
-      .postoffsets = {0.f, 0.f, 0.f},
-  };
-}
-
-}  // namespace
 
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Display::Client::ImportImage");
@@ -515,7 +503,7 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
   }
   DisplayConfig& display_config = *display_configs_it;
 
-  display_config.draft_.color_conversion = CreateIdentityColorConversion();
+  display_config.draft_.color_conversion = display::ColorConversion::kIdentity.ToBanjo();
   if (std::isfinite(request->preoffsets[0])) {
     std::memcpy(display_config.draft_.color_conversion.preoffsets, request->preoffsets.data(),
                 sizeof(request->preoffsets.data_));
@@ -1338,7 +1326,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
       return display_timings[0];
     }();
     display_config->applied_.timing = display::ToBanjoDisplayTiming(timing);
-    display_config->applied_.color_conversion = CreateIdentityColorConversion();
+    display_config->applied_.color_conversion = display::ColorConversion::kIdentity.ToBanjo();
 
     display_config->draft_ = display_config->applied_;
 

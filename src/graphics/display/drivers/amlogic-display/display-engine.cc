@@ -47,6 +47,7 @@
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -467,22 +468,19 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 
     // TODO(https://fxbug.dev/42080882): Move color conversion validation code to a common
     // library.
-    for (float preoffset : display_config.color_conversion.preoffsets) {
+    if (!display::ColorConversion::IsValid(display_config.color_conversion)) {
+      fdf::warn("CheckConfig failure: Invalid color conversion config");
+      return CONFIG_CHECK_RESULT_INVALID_CONFIG;
+    }
+
+    display::ColorConversion color_conversion(display_config.color_conversion);
+    for (float preoffset : color_conversion.preoffsets()) {
       if (preoffset <= -1 || preoffset >= 1) {
         fdf::warn("CheckConfig failure: preoffset {} out of range (-1, 1)", preoffset);
         return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
     }
-    for (const auto& coefficient_row : display_config.color_conversion.coefficients) {
-      for (float coefficient : coefficient_row) {
-        if (!std::isfinite(coefficient)) {
-          fdf::warn("CheckConfig failure: coefficient has invalid coefficient value: {}",
-                    coefficient);
-          return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        }
-      }
-    }
-    for (float postoffset : display_config.color_conversion.postoffsets) {
+    for (float postoffset : color_conversion.postoffsets()) {
       if (postoffset <= -1 || postoffset >= 1) {
         fdf::warn("CheckConfig failure: postoffset {} out of range (-1, 1)", postoffset);
         return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;

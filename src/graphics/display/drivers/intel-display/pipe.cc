@@ -22,6 +22,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -80,35 +81,6 @@ uint32_t encode_pipe_color_component(uint8_t component) {
 }  // namespace
 
 namespace intel_display {
-
-namespace {
-
-bool IsIdentityColorConversion(const color_conversion_t& color_conversion) {
-  if (!std::ranges::equal(std::span(color_conversion.preoffsets),
-                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
-    return false;
-  }
-  if (!std::ranges::equal(std::span(color_conversion.coefficients[0]),
-                          std::array<float, 3>{1.0f, 0.0f, 0.0f})) {
-    return false;
-  }
-  if (!std::ranges::equal(std::span(color_conversion.coefficients[1]),
-                          std::array<float, 3>{0.0f, 1.0f, 0.0f})) {
-    return false;
-  }
-  if (!std::ranges::equal(std::span(color_conversion.coefficients[2]),
-                          std::array<float, 3>{0.0f, 0.0f, 1.0f})) {
-    return false;
-  }
-  if (!std::ranges::equal(std::span(color_conversion.postoffsets),
-                          std::array<float, 3>{0.0f, 0.0f, 0.0f})) {
-    return false;
-  }
-
-  return true;
-}
-
-}  // namespace
 
 Pipe::Pipe(fdf::MmioBuffer* mmio_space, registers::Platform platform, PipeId pipe_id,
            PowerWellRef pipe_power)
@@ -431,11 +403,13 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   registers::pipe_arming_regs_t regs;
   registers::PipeRegs pipe_regs(pipe_id_);
 
-  SetColorConversionOffsets(true, banjo_display_config->color_conversion.preoffsets);
-  SetColorConversionOffsets(false, banjo_display_config->color_conversion.postoffsets);
+  ZX_DEBUG_ASSERT(display::ColorConversion::IsValid((banjo_display_config->color_conversion)));
+  display::ColorConversion color_conversion(banjo_display_config->color_conversion);
+  SetColorConversionOffsets(true, color_conversion.preoffsets());
+  SetColorConversionOffsets(false, color_conversion.postoffsets());
   for (uint32_t i = 0; i < 3; i++) {
     for (uint32_t j = 0; j < 3; j++) {
-      float val = banjo_display_config->color_conversion.coefficients[i][j];
+      float val = color_conversion.coefficients()[i][j];
       ZX_DEBUG_ASSERT(std::isfinite(val));
 
       auto reg = pipe_regs.CscCoeff(i, j).ReadFrom(mmio_space_);
@@ -449,7 +423,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
 
   const bool should_enable_color_space_conversion =
-      !IsIdentityColorConversion(banjo_display_config->color_conversion);
+      color_conversion != display::ColorConversion::kIdentity;
   bottom_color.set_csc_enable(should_enable_color_space_conversion);
   bool has_color_layer =
       banjo_display_config->layers_count &&
@@ -795,7 +769,7 @@ display::DriverConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>
   return pending_eviction_config_stamps_.front();
 }
 
-void Pipe::SetColorConversionOffsets(bool preoffsets, const float vals[3]) {
+void Pipe::SetColorConversionOffsets(bool preoffsets, std::span<const float, 3> vals) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   for (uint32_t i = 0; i < 3; i++) {
