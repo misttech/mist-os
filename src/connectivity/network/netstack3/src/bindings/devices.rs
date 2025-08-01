@@ -144,10 +144,27 @@ impl<C> Devices<C>
 where
     C: Clone + Debug + PartialEq,
 {
+    /// Adds a new device with the id and start publishing events to FIDL.
+    pub(crate) fn add_device_and_start_publishing(&self, id: BindingIdAllocation, core_id: C)
+    where
+        C: DeviceIdExt,
+    {
+        self.add_device(id, core_id.clone());
+        core_id
+            .external_state()
+            .with_common_info(|info| info.events.start_publishing())
+            .expect("failed to start publishing events to FIDL");
+    }
+
     /// Adds a new device with the id corresponding to the given [`BindingIdAllocation`].
     ///
     /// Consumes the [`BindingIdAllocation`] witness.
-    pub(crate) fn add_device(&self, id: BindingIdAllocation, core_id: C) {
+    ///
+    /// Note: This method only adds the core ID into the mapping and it does
+    /// not start publishing events to FIDL, which might not be the behavior
+    /// you want. See [`add_device_and_start_publishing`] for a more common
+    /// use case.
+    fn add_device(&self, id: BindingIdAllocation, core_id: C) {
         let mut inner = self.inner.write();
         let DevicesInner { id_map, last_id: _ } = inner.deref_mut();
 

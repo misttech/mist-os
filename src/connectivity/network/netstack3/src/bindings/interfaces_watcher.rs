@@ -114,26 +114,29 @@ impl EventQueue {
                 has_default_ipv4_route,
                 has_default_ipv6_route,
                 enabled,
+                publish_to_fidl,
             } = state;
-            let mut event = finterfaces::Event::Existing(
-                finterfaces_ext::Properties {
-                    id: *id,
-                    name: name.clone(),
-                    online: enabled.online(),
-                    addresses: Worker::collect_addresses(addresses),
-                    has_default_ipv4_route: *has_default_ipv4_route,
-                    has_default_ipv6_route: *has_default_ipv6_route,
-                    port_class: *port_class,
-                }
-                .into(),
-            );
-            apply_interest_options(&mut event, watcher_options);
-            event
+            (*publish_to_fidl).then(|| {
+                let mut event = finterfaces::Event::Existing(
+                    finterfaces_ext::Properties {
+                        id: *id,
+                        name: name.clone(),
+                        online: enabled.online(),
+                        addresses: Worker::collect_addresses(addresses),
+                        has_default_ipv4_route: *has_default_ipv4_route,
+                        has_default_ipv6_route: *has_default_ipv6_route,
+                        port_class: *port_class,
+                    }
+                    .into(),
+                );
+                apply_interest_options(&mut event, watcher_options);
+                event
+            })
         };
         Ok(Self {
             events: state
                 .iter()
-                .map(state_to_event)
+                .filter_map(state_to_event)
                 .chain(std::iter::once(finterfaces::Event::Idle(finterfaces::Empty {})))
                 .collect(),
         })
@@ -326,6 +329,7 @@ pub(crate) struct InterfaceState {
     addresses: HashMap<IpAddr, AddressProperties>,
     has_default_ipv4_route: bool,
     has_default_ipv6_route: bool,
+    publish_to_fidl: bool,
 }
 
 /// Caches IPv4 and IPv6 enabled state to produce a unified `online` signal.
@@ -379,7 +383,8 @@ pub(crate) struct AddressState {
 #[derive(Debug)]
 #[cfg_attr(test, derive(Clone))]
 pub(crate) enum InterfaceEvent {
-    Added { id: BindingId, properties: InterfaceProperties },
+    Added { id: BindingId },
+    Reserved { id: BindingId, properties: InterfaceProperties },
     Changed { id: BindingId, event: InterfaceUpdate },
     Removed(BindingId),
 }
@@ -404,6 +409,13 @@ impl InterfaceEventProducer {
             }
         })
     }
+
+    pub(crate) fn start_publishing(&self) -> Result<(), WorkerClosedError> {
+        let Self { id, channel } = self;
+        channel
+            .unbounded_send(InterfaceEvent::Added { id: *id })
+            .map_err(|_: mpsc::TrySendError<_>| WorkerClosedError {})
+    }
 }
 
 impl Drop for InterfaceEventProducer {
@@ -426,6 +438,10 @@ pub(crate) enum WorkerError {
     RemoveNonexistentInterface(BindingId),
     #[error("attempted to update nonexisting interface with id {0}")]
     UpdateNonexistentInterface(BindingId),
+    #[error("attempted to publish nonexisting interface with id {0}")]
+    PublishedNonexistentInterface(BindingId),
+    #[error("attempted to publish interface {0} again")]
+    PublishedDuplicateInterface(BindingId),
     #[error("attempted to assign already assigned address {addr} on interface {interface}")]
     AssignExistingAddr { interface: BindingId, addr: IpAddr },
     #[error("attempted to unassign nonexisting interface address {addr} on interface {interface}")]
@@ -651,43 +667,72 @@ impl Worker {
         event: InterfaceEvent,
     ) -> Result<Option<(finterfaces::Event, ChangedAddressProperties)>, WorkerError> {
         match event {
-            InterfaceEvent::Added { id, properties: InterfaceProperties { name, port_class } } => {
+            InterfaceEvent::Reserved {
+                id,
+                properties: InterfaceProperties { name, port_class },
+            } => {
                 let enabled = IpEnabledState::default();
                 let has_default_ipv4_route = false;
                 let has_default_ipv6_route = false;
+                let publish_to_fidl = false;
                 match state.insert(
                     id,
                     InterfaceState {
-                        properties: InterfaceProperties { name: name.clone(), port_class },
+                        properties: InterfaceProperties { name, port_class },
                         enabled,
                         addresses: HashMap::new(),
                         has_default_ipv4_route,
                         has_default_ipv6_route,
+                        publish_to_fidl,
                     },
                 ) {
                     Some(old) => Err(WorkerError::AddedDuplicateInterface { interface: id, old }),
-                    None => Ok(Some((
+                    None => Ok(None),
+                }
+            }
+            InterfaceEvent::Added { id } => match state.get_mut(&id) {
+                None => Err(WorkerError::PublishedNonexistentInterface(id)),
+                Some(state) => {
+                    let InterfaceState {
+                        properties: InterfaceProperties { name, port_class },
+                        enabled,
+                        addresses,
+                        has_default_ipv4_route,
+                        has_default_ipv6_route,
+                        publish_to_fidl,
+                    } = state;
+                    if std::mem::replace(publish_to_fidl, true) {
+                        return Err(WorkerError::PublishedDuplicateInterface(id));
+                    }
+                    let name = name.clone();
+                    let port_class = port_class.clone();
+                    let has_default_ipv4_route = *has_default_ipv4_route;
+                    let has_default_ipv6_route = *has_default_ipv6_route;
+                    let online = enabled.online();
+                    Ok(Some((
                         finterfaces::Event::Added(
                             finterfaces_ext::Properties::<finterfaces_ext::AllInterest> {
                                 id,
                                 name,
                                 port_class,
-                                online: enabled.online(),
-                                addresses: Vec::new(),
+                                online,
+                                addresses: Self::collect_addresses(addresses),
                                 has_default_ipv4_route,
                                 has_default_ipv6_route,
                             }
                             .into(),
                         ),
                         ChangedAddressProperties::InterestNotApplicable,
-                    ))),
+                    )))
                 }
-            }
+            },
             InterfaceEvent::Removed(rm) => match state.remove(&rm) {
-                Some(InterfaceState { .. }) => Ok(Some((
-                    finterfaces::Event::Removed(rm.get()),
-                    ChangedAddressProperties::InterestNotApplicable,
-                ))),
+                Some(InterfaceState { publish_to_fidl, .. }) => Ok(publish_to_fidl.then(|| {
+                    (
+                        finterfaces::Event::Removed(rm.get()),
+                        ChangedAddressProperties::InterestNotApplicable,
+                    )
+                })),
                 None => Err(WorkerError::RemoveNonexistentInterface(rm)),
             },
             InterfaceEvent::Changed { id, event } => {
@@ -697,7 +742,9 @@ impl Worker {
                     addresses,
                     has_default_ipv4_route,
                     has_default_ipv6_route,
+                    publish_to_fidl,
                 } = state.get_mut(&id).ok_or(WorkerError::UpdateNonexistentInterface(id))?;
+                let publish_to_fidl = *publish_to_fidl;
                 match event {
                     InterfaceUpdate::AddressAdded {
                         addr,
@@ -721,16 +768,18 @@ impl Worker {
                             Some(AddressProperties { .. }) => {
                                 Err(WorkerError::AssignExistingAddr { interface: id, addr })
                             }
-                            None => Ok(Some((
-                                finterfaces::Event::Changed(finterfaces::Properties {
-                                    id: Some(id.get()),
-                                    addresses: Some(Self::collect_addresses(addresses)),
-                                    ..Default::default()
-                                }),
-                                ChangedAddressProperties::AssignmentStateChanged {
-                                    involves_assigned: is_assigned(assignment_state),
-                                },
-                            ))),
+                            None => Ok(publish_to_fidl.then(|| {
+                                (
+                                    finterfaces::Event::Changed(finterfaces::Properties {
+                                        id: Some(id.get()),
+                                        addresses: Some(Self::collect_addresses(addresses)),
+                                        ..Default::default()
+                                    }),
+                                    ChangedAddressProperties::AssignmentStateChanged {
+                                        involves_assigned: is_assigned(assignment_state),
+                                    },
+                                )
+                            })),
                         }
                     }
                     InterfaceUpdate::AddressAssignmentStateChanged { addr, new_state } => {
@@ -757,14 +806,18 @@ impl Worker {
 
                         *assignment_state = new_state;
 
-                        Ok(Some((
-                            finterfaces::Event::Changed(finterfaces::Properties {
-                                id: Some(id.get()),
-                                addresses: Some(Self::collect_addresses(addresses)),
-                                ..Default::default()
-                            }),
-                            ChangedAddressProperties::AssignmentStateChanged { involves_assigned },
-                        )))
+                        Ok(publish_to_fidl.then(|| {
+                            (
+                                finterfaces::Event::Changed(finterfaces::Properties {
+                                    id: Some(id.get()),
+                                    addresses: Some(Self::collect_addresses(addresses)),
+                                    ..Default::default()
+                                }),
+                                ChangedAddressProperties::AssignmentStateChanged {
+                                    involves_assigned,
+                                },
+                            )
+                        }))
                     }
                     InterfaceUpdate::AddressRemoved(addr) => match addresses.remove(&addr) {
                         Some(AddressProperties { prefix_len: _, state }) => {
@@ -773,16 +826,18 @@ impl Worker {
                                 valid_until: _,
                                 preferred_lifetime: _,
                             } = state;
-                            Ok(Some((
-                                finterfaces::Event::Changed(finterfaces::Properties {
-                                    id: Some(id.get()),
-                                    addresses: (Some(Self::collect_addresses(addresses))),
-                                    ..Default::default()
-                                }),
-                                ChangedAddressProperties::AssignmentStateChanged {
-                                    involves_assigned: is_assigned(assignment_state),
-                                },
-                            )))
+                            Ok(publish_to_fidl.then(|| {
+                                (
+                                    finterfaces::Event::Changed(finterfaces::Properties {
+                                        id: Some(id.get()),
+                                        addresses: (Some(Self::collect_addresses(addresses))),
+                                        ..Default::default()
+                                    }),
+                                    ChangedAddressProperties::AssignmentStateChanged {
+                                        involves_assigned: is_assigned(assignment_state),
+                                    },
+                                )
+                            }))
                         }
                         None => Err(WorkerError::UnassignNonexistentAddr { interface: id, addr }),
                     },
@@ -805,23 +860,25 @@ impl Worker {
                                 *state = new_value;
                                 *prop = Some(new_value);
                             })
-                            .map(move |()| {
-                                (
+                            .and_then(|()| {
+                                publish_to_fidl.then_some((
                                     finterfaces::Event::Changed(table),
                                     ChangedAddressProperties::InterestNotApplicable,
-                                )
+                                ))
                             }))
                     }
                     InterfaceUpdate::IpEnabledChanged { version, enabled: new_enabled } => {
-                        Ok(enabled.update(version, new_enabled).map(|new_online| {
-                            (
-                                finterfaces::Event::Changed(finterfaces::Properties {
-                                    id: Some(id.get()),
-                                    online: Some(new_online),
-                                    ..Default::default()
-                                }),
-                                ChangedAddressProperties::InterestNotApplicable,
-                            )
+                        Ok(enabled.update(version, new_enabled).and_then(|new_online| {
+                            publish_to_fidl.then(|| {
+                                (
+                                    finterfaces::Event::Changed(finterfaces::Properties {
+                                        id: Some(id.get()),
+                                        online: Some(new_online),
+                                        ..Default::default()
+                                    }),
+                                    ChangedAddressProperties::InterestNotApplicable,
+                                )
+                            })
                         }))
                     }
                     InterfaceUpdate::AddressPropertiesChanged {
@@ -862,17 +919,19 @@ impl Worker {
 
                         let is_assigned = is_assigned(*assignment_state);
 
-                        Ok(Some((
-                            finterfaces::Event::Changed(finterfaces::Properties {
-                                id: Some(id.get()),
-                                addresses: Some(Self::collect_addresses(addresses)),
-                                ..Default::default()
-                            }),
-                            ChangedAddressProperties::PropertiesChanged {
-                                address_properties: changed_properties,
-                                is_assigned,
-                            },
-                        )))
+                        Ok(publish_to_fidl.then(|| {
+                            (
+                                finterfaces::Event::Changed(finterfaces::Properties {
+                                    id: Some(id.get()),
+                                    addresses: Some(Self::collect_addresses(addresses)),
+                                    ..Default::default()
+                                }),
+                                ChangedAddressProperties::PropertiesChanged {
+                                    address_properties: changed_properties,
+                                    is_assigned,
+                                },
+                            )
+                        }))
                     }
                 }
             }
@@ -967,27 +1026,29 @@ pub(crate) struct WorkerInterfaceSink {
 }
 
 impl WorkerInterfaceSink {
-    /// Adds a new interface `id` with fixed properties `properties`.
+    /// Reserves a new interface `id` with fixed properties `properties`.
     ///
     /// Added interfaces are always assumed to be offline and have no assigned
     /// address or default routes.
     ///
     /// The returned [`InterfaceEventProducer`] can be used to feed interface
-    /// changes to be notified to FIDL watchers. On drop,
-    /// `InterfaceEventProducer` notifies the [`Worker`] that the interface was
-    /// removed.
+    /// changes to the interface watcher server to build up-to-date interface
+    /// state for the reserved id. However those events are not published to
+    /// FIDL watchers until [`InterfaceEvent::Added`] is subsequently sent
+    /// on the producer. On drop, `InterfaceEventProducer` notifies the
+    /// [`Worker`] that the interface was removed.
     ///
     /// Note that the [`Worker`] will exit with an error if two interfaces with
     /// the same identifier are created at the same time, but that is not
-    /// observable from `add_interface`. It does not provide guardrails to
+    /// observable from `reserve_interface`. It does not provide guardrails to
     /// prevent identifier reuse, however.
-    pub(crate) fn add_interface(
+    pub(crate) fn reserve_interface(
         &self,
         id: BindingId,
         properties: InterfaceProperties,
     ) -> Result<InterfaceEventProducer, WorkerClosedError> {
         self.sender
-            .unbounded_send(InterfaceEvent::Added { id, properties })
+            .unbounded_send(InterfaceEvent::Reserved { id, properties })
             .map_err(|_: mpsc::TrySendError<_>| WorkerClosedError {})?;
         Ok(InterfaceEventProducer { id, channel: self.sender.clone() })
     }
@@ -1070,11 +1131,12 @@ mod tests {
         assert_eq!(watcher.next().await, Some(finterfaces::Event::Idle(finterfaces::Empty {})));
 
         let producer = interface_sink
-            .add_interface(
+            .reserve_interface(
                 IFACE1_ID,
                 InterfaceProperties { name: IFACE1_NAME.to_string(), port_class: IFACE1_TYPE },
             )
             .expect("add interface");
+        producer.start_publishing().expect("start publishing");
 
         assert_eq!(
             watcher.next().await,
@@ -1199,15 +1261,20 @@ mod tests {
         let mut watcher = watcher_sink.create_watcher_event_stream();
         assert_eq!(watcher.next().await, Some(finterfaces::Event::Idle(finterfaces::Empty {})));
         let producer1 = interface_sink
-            .add_interface(
+            .reserve_interface(
                 IFACE1_ID,
                 InterfaceProperties { name: IFACE1_NAME.to_string(), port_class: IFACE1_TYPE },
             )
             .expect(" add interface");
-        let _producer2 = interface_sink.add_interface(
-            IFACE2_ID,
-            InterfaceProperties { name: IFACE2_NAME.to_string(), port_class: IFACE2_TYPE },
-        );
+        producer1.start_publishing().expect("start publishing");
+
+        let producer2 = interface_sink
+            .reserve_interface(
+                IFACE2_ID,
+                InterfaceProperties { name: IFACE2_NAME.to_string(), port_class: IFACE2_TYPE },
+            )
+            .expect("add interface");
+        producer2.start_publishing().expect("start publishing");
         assert_matches!(
             watcher.next().await,
             Some(finterfaces::Event::Added(finterfaces::Properties {
@@ -1250,8 +1317,175 @@ mod tests {
                 addresses: Default::default(),
                 has_default_ipv4_route: false,
                 has_default_ipv6_route: false,
+                publish_to_fidl: true,
             },
         )
+    }
+
+    #[test]
+    fn consume_interface_added_without_reserve() {
+        let mut state = HashMap::new();
+
+        assert_eq!(
+            Worker::consume_event(&mut state, InterfaceEvent::Added { id: IFACE1_ID },),
+            Err(WorkerError::PublishedNonexistentInterface(IFACE1_ID))
+        );
+    }
+
+    #[test]
+    fn consume_interface_added_twice() {
+        let mut state = HashMap::new();
+
+        let (id, initial_state) = iface1_initial_state();
+
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Reserved { id, properties: initial_state.properties.clone() }
+            ),
+            Ok(None)
+        );
+
+        assert_eq!(
+            Worker::consume_event(&mut state, InterfaceEvent::Added { id }),
+            Ok(Some((
+                finterfaces::Event::Added(
+                    finterfaces_ext::Properties::<finterfaces_ext::AllInterest> {
+                        id,
+                        name: initial_state.properties.name.clone(),
+                        port_class: initial_state.properties.port_class.clone(),
+                        online: false,
+                        addresses: Default::default(),
+                        has_default_ipv4_route: false,
+                        has_default_ipv6_route: false,
+                    }
+                    .into()
+                ),
+                ChangedAddressProperties::InterestNotApplicable
+            )))
+        );
+
+        assert_eq!(
+            Worker::consume_event(&mut state, InterfaceEvent::Added { id }),
+            Err(WorkerError::PublishedDuplicateInterface(IFACE1_ID))
+        );
+    }
+
+    #[test]
+    fn consume_interface_reserved_consolidate_after_added() {
+        let mut state = HashMap::new();
+        let (id, initial_state) = iface1_initial_state();
+
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Reserved { id, properties: initial_state.properties.clone() }
+            ),
+            Ok(None)
+        );
+        assert_eq!(
+            state.get(&id),
+            Some(&InterfaceState { publish_to_fidl: false, ..initial_state.clone() })
+        );
+
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::IpEnabledChanged {
+                        enabled: true,
+                        version: IpVersion::V4
+                    }
+                }
+            ),
+            Ok(None)
+        );
+
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::DefaultRouteChanged {
+                        version: IpVersion::V6,
+                        has_default_route: true
+                    },
+                }
+            ),
+            Ok(None)
+        );
+
+        let addr = AddrSubnetEither::V6(
+            AddrSubnet::new(*Ipv6::LOOPBACK_IPV6_ADDRESS, Ipv6Addr::BYTES * 8).unwrap(),
+        );
+        let valid_until = finterfaces_ext::PositiveMonotonicInstant::from_nanos(1234).unwrap();
+        let preferred_lifetime_info = finterfaces_ext::PreferredLifetimeInfo::PreferredUntil(
+            finterfaces_ext::PositiveMonotonicInstant::from_nanos(999).unwrap(),
+        );
+        let assignment_state = IpAddressState::Assigned;
+
+        // Add address.
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::AddressAdded {
+                        addr: addr.clone(),
+                        assignment_state,
+                        valid_until: valid_until.into(),
+                        preferred_lifetime: preferred_lifetime_info.into_core(),
+                    },
+                }
+            ),
+            Ok(None)
+        );
+
+        assert_eq!(
+            Worker::consume_event(&mut state, InterfaceEvent::Added { id }),
+            Ok(Some((
+                finterfaces::Event::Added(
+                    finterfaces_ext::Properties::<finterfaces_ext::AllInterest> {
+                        id,
+                        name: initial_state.properties.name.clone(),
+                        port_class: initial_state.properties.port_class.clone(),
+                        online: true,
+                        addresses: vec![finterfaces_ext::Address::<finterfaces_ext::AllInterest> {
+                            addr: addr.clone().into_fidl(),
+                            valid_until,
+                            assignment_state: assignment_state.into_fidl(),
+                            preferred_lifetime_info,
+                        }],
+                        has_default_ipv4_route: false,
+                        has_default_ipv6_route: true,
+                    }
+                    .into()
+                ),
+                ChangedAddressProperties::InterestNotApplicable
+            )))
+        );
+    }
+
+    #[test]
+    fn consume_interface_removed_after_reserved() {
+        let mut state = HashMap::new();
+        let (id, initial_state) = iface1_initial_state();
+
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Reserved { id, properties: initial_state.properties }
+            ),
+            Ok(None)
+        );
+
+        assert!(state.contains_key(&id));
+
+        // Remove interface but it should not publish the event over fidl.
+        assert_eq!(Worker::consume_event(&mut state, InterfaceEvent::Removed(id)), Ok(None));
+
+        assert!(!state.contains_key(&id));
     }
 
     #[test]
@@ -1259,11 +1493,13 @@ mod tests {
         let mut state = HashMap::new();
         let (id, initial_state) = iface1_initial_state();
 
-        let event = InterfaceEvent::Added { id, properties: initial_state.properties.clone() };
+        let event = InterfaceEvent::Reserved { id, properties: initial_state.properties.clone() };
 
         // Add interface.
+        assert_eq!(Worker::consume_event(&mut state, event.clone()), Ok(None));
+
         assert_eq!(
-            Worker::consume_event(&mut state, event.clone()),
+            Worker::consume_event(&mut state, InterfaceEvent::Added { id }),
             Ok(Some((
                 finterfaces::Event::Added(
                     finterfaces_ext::Properties::<finterfaces_ext::AllInterest> {
@@ -2068,11 +2304,12 @@ mod tests {
             .zip(futures::stream::iter(range.clone().map(|i| {
                 let i = BindingId::new(i).unwrap();
                 let producer = interface_sink
-                    .add_interface(
+                    .reserve_interface(
                         i,
                         InterfaceProperties { name: format!("if{}", i), port_class: IFACE1_TYPE },
                     )
                     .expect("failed to add interface");
+                producer.start_publishing().expect("start publishing");
                 (producer, i)
             })))
             .map(|(event, (producer, i))| {
@@ -2118,12 +2355,13 @@ mod tests {
         // NB: Every round generates two events, addition and removal because we
         // drop the producer.
         for i in 1..=(MAX_EVENTS / 2 + 1).try_into().unwrap() {
-            let _: InterfaceEventProducer = interface_sink
-                .add_interface(
+            let producer = interface_sink
+                .reserve_interface(
                     BindingId::new(i).unwrap(),
                     InterfaceProperties { name: format!("if{}", i), port_class: IFACE1_TYPE },
                 )
                 .expect("failed to add interface");
+            producer.start_publishing().expect("start publishing");
         }
         // Watcher gets closed.
         assert_eq!(watcher.on_closed().await, Ok(zx::Signals::CHANNEL_PEER_CLOSED));
@@ -2171,11 +2409,12 @@ mod tests {
 
         for addrs in [ADDR1, ADDR2, ADDR3].into_iter().permutations(3) {
             let producer = interface_sink
-                .add_interface(
+                .reserve_interface(
                     IFACE1_ID,
                     InterfaceProperties { name: IFACE1_NAME.to_string(), port_class: IFACE1_TYPE },
                 )
                 .expect("failed to add interface");
+            producer.start_publishing().expect("start publishing");
             assert_matches!(
                 watcher.next().await,
                 Some(finterfaces::Event::Added(finterfaces::Properties {

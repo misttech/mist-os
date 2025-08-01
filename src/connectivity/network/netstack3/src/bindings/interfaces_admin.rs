@@ -217,7 +217,7 @@ async fn run_blackhole_interface(
     ns.ctx.apply_interface_defaults(&core_id);
 
     info!("created interface {:?}", core_id);
-    ns.ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);
+    ns.ctx.bindings_ctx().devices.add_device_and_start_publishing(binding_id_alloc, core_id);
 
     let interface_control_fut = pin!(run_interface_control(
         ns.ctx.clone(),
@@ -2145,19 +2145,23 @@ mod tests {
         // Filter for only events on this interface.
         let event_receiver = event_receiver
             .filter(|event| match event {
-                InterfaceEvent::Added { id, properties: _ }
+                InterfaceEvent::Added { id }
+                | InterfaceEvent::Reserved { id, properties: _ }
                 | InterfaceEvent::Changed { id, event: _ }
                 | InterfaceEvent::Removed(id) => futures::future::ready(id.get() == binding_id),
             })
             .fuse();
         let mut event_receiver = pin!(event_receiver);
 
-        // We should see the interface get added.
+        // We should see the interface get reserved and added.
         let event = event_receiver.next().await;
-        assert_matches!(event, Some(InterfaceEvent::Added {
+        assert_matches!(event, Some(InterfaceEvent::Reserved {
             id,
             properties: _,
          }) if id.get() == binding_id);
+        assert_matches!(event_receiver.next().await, Some(InterfaceEvent::Added {
+            id,
+        }) if id.get() == binding_id);
 
         // Add an address.
         let (asp_client_end, asp_server_end) =
