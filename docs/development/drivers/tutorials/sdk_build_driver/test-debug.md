@@ -199,14 +199,28 @@ file to the project with the following contents:
 `qemu_edu/tests/meta/qemu_edu_system_test.cml`:
 
 ```json5
-{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/tests/meta/qemu_edu_system_test.cml" region_tag="example_snippet" adjust_indentation="auto" %}
-
+{
+    include: [
+        "//sdk/lib/gtest/gtest.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "gtest_runner",
+        test: "bin/qemu_edu_system_test",
+    },
+    use: [
+        {
+            service: "fuchsia.examples.qemuedu.DeviceService",
+            from: "parent",
+        },
+    ],
+}
 ```
 
-Similar to `eductl`, the test component discovers and accesses the driver using
-the `dev` directory capability. This component also includes the
-`elf_test_runner.shard.cml`, which enables it to run using the Test Runner
-Framework.
+The test component discovers and accesses the driver using the
+`fuchsia.examples.qemuedu.DeviceService` service capability. This component
+also includes the `elf_test_runner.shard.cml`, which enables it to run using
+the Test Runner Framework.
 
 Create a new `qemu_edu/tests/qemu_edu_system_test.cc` file with the following
 contents to implement the tests:
@@ -220,7 +234,7 @@ contents to implement the tests:
 
 ```
 
-Each test case opens the device driver and exercises one of its exposed
+Each test case connects to the driver service and exercises one of its exposed
 functions.
 
 Add the following new rules to the project's build configuration to build the
