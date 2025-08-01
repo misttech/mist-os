@@ -4,7 +4,7 @@
 
 mod assembly;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use assembly::Assembly;
 use assembly_artifact_cache::ArtifactCache;
 use assembly_tool::PlatformToolProvider;
@@ -104,6 +104,9 @@ enum CreateResult {
 
     /// Run assembly and generate the outputs to this path.
     Out(Utf8PathBuf),
+
+    /// Run assembly and generates the outputs to the default location.
+    Default,
 }
 
 /// Parse the input command, and ensure that the user formatted it correctly,
@@ -114,10 +117,12 @@ impl TryFrom<CreateCommand> for SanitizedCreateCommand {
 
     fn try_from(cmd: CreateCommand) -> Result<Self> {
         let platform = cmd.platform;
+
+        // Determine what result we want from this command.
         let result = match (cmd.stage, cmd.out) {
             (true, _) => CreateResult::Stage,
             (false, Some(out)) => CreateResult::Out(out),
-            (false, None) => bail!("--stage or --out must be supplied"),
+            (false, None) => CreateResult::Default,
         };
 
         // Choose between a product_config.board_config combo and --product --board flags.
@@ -128,12 +133,8 @@ impl TryFrom<CreateCommand> for SanitizedCreateCommand {
                     .context("product_config.board_config combo must have a period")?;
                 (p.to_string(), b.to_string())
             } else {
-                let p = cmd.product_config.context(
-                "--product-config must be supplied when product_config.board_config combo is not",
-            )?;
-                let b = cmd.board_config.context(
-                    "--board-config must be supplied when product_config.board_config combo is not",
-                )?;
+                let p = cmd.product_config.context("--product-config is missing")?;
+                let b = cmd.board_config.context("--board-config is missing")?;
                 (p, b)
             };
 
@@ -141,6 +142,13 @@ impl TryFrom<CreateCommand> for SanitizedCreateCommand {
         let tuf_keys = cmd.tuf_keys;
         Ok(Self { platform, product_config, board_config, version, tuf_keys, result })
     }
+}
+
+fn default_path_for_product_bundle_name(name: impl AsRef<str>) -> Result<Utf8PathBuf> {
+    let home = std::env::home_dir().context("Getting the home dir")?;
+    let home = Utf8PathBuf::from_path_buf(home)
+        .map_err(|e| anyhow!("error converting path to utf8: {:?}", e))?;
+    Ok(home.join(".fuchsia").join("product_bundles").join(name.as_ref()))
 }
 
 /// Construct a product bundle using sanitized inputs.
@@ -157,15 +165,16 @@ async fn sanitized_product_bundle_create(
         Assembly::new(&cache, cmd.platform, cmd.product_config, cmd.board_config, build_dir)?;
     writer.line(format!("Staged the artifacts\n{}", assembly.version_string()))?;
 
-    // Return early if we are only staging the inputs.
-    let out = match cmd.result {
-        CreateResult::Stage => return Ok(()),
-        CreateResult::Out(out) => out,
-    };
-
     let product_name = assembly.product_config.product.release_info.info.name.clone();
     let board_name = assembly.board_config.release_info.info.name.clone();
     let name = format!("{}.{}", product_name, board_name);
+
+    // Return early if we are only staging the inputs.
+    let out = match cmd.result {
+        CreateResult::Stage => return Ok(()),
+        CreateResult::Out(out) => Ok(out),
+        CreateResult::Default => default_path_for_product_bundle_name(&name),
+    }?;
 
     let version = cmd
         .version
