@@ -18,7 +18,7 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
                 .add_domain_config(PackageSetDestination::Blob(PackageDestination::BuildInfo))
                 .skip_expose()
                 .directory("data");
-            dir.entry_from_contents("board", &context.board_info.name)?;
+            dir.entry_from_contents("board", &context.board_config.name)?;
             dir.entry_from_contents("product", &build_info.name)?;
             dir.entry(FileEntry {
                 source: build_info.version.clone(),

@@ -151,7 +151,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Some(&developer_only_options),
@@ -178,7 +178,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Some(&developer_only_options),
@@ -205,7 +205,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::UserDebug,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Some(&developer_only_options),
@@ -224,7 +224,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::UserDebug,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),
@@ -259,7 +259,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Utf8Path::from_path(resource_dir.path()).unwrap().to_path_buf(),
             developer_only_options: Default::default(),
@@ -295,7 +295,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Utf8Path::from_path(resource_dir.path()).unwrap().to_path_buf(),
             developer_only_options: Default::default(),
@@ -331,7 +331,7 @@ mod test {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Utf8Path::from_path(resource_dir.path()).unwrap().to_path_buf(),
             developer_only_options: Default::default(),

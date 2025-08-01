@@ -21,13 +21,13 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         //
         // See: b/308199171
         let utc_start_at_startup =
-            context.board_info.provides_feature("fuchsia::utc_start_at_startup");
+            context.board_config.provides_feature("fuchsia::utc_start_at_startup");
 
         // Soft crypto boards don't yet have crypto support, so we exit timekeeper
         // early instead of having it crash repeatedly.
         //
         // See: b/299320231
-        let early_exit = context.board_info.provides_feature("fuchsia::soft_crypto");
+        let early_exit = context.board_config.provides_feature("fuchsia::soft_crypto");
 
         // Some e2e tests need to change Timekeeper behavior at runtime. This setting
         // allows Timekeeper to serve an endpoint for such runtime behavior changes.
@@ -51,7 +51,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             builder.platform_bundle("timekeeper_persistence");
         }
 
-        let has_aml_timer = context.board_info.provides_feature("fuchsia::aml-hrtimer");
+        let has_aml_timer = context.board_config.provides_feature("fuchsia::aml-hrtimer");
 
         // If set, Timekeeper will serve `fuchsia.time.alarms` and will connect
         // to the appropriate hardware device to do so.
@@ -76,14 +76,14 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
 
         // Always on counter is used instead of a persistent RTC on some platforms.
         let has_always_on_counter =
-            context.board_info.provides_feature("fuchsia::always_on_counter");
+            context.board_config.provides_feature("fuchsia::always_on_counter");
 
         // The always on counter is useless without persistent storage to persist the
         // counter values as would be done in an RTC chip.
         let use_always_on_counter = has_always_on_counter && use_persistent_storage;
 
         // Allows Timekeeper to short-circuit RTC driver detection at startup.
-        let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock")
+        let has_real_time_clock = context.board_config.provides_feature("fuchsia::real_time_clock")
             || use_always_on_counter;
 
         // Refer to //src/sys/time/timekeeper/config.shard.cml

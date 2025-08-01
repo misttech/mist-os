@@ -127,7 +127,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         }
 
         if let Some(soc) =
-            &context.board_info.platform.development_support.enable_debug_access_port_for_soc
+            &context.board_config.platform.development_support.enable_debug_access_port_for_soc
         {
             builder.kernel_arg(KernelArg::Arm64DebugDap(soc.clone()));
         }

@@ -32,7 +32,7 @@ impl DefineSubsystemConfiguration<UsbConfig> for UsbSubsystemConfig {
         )?;
 
         // Include xHCI driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::xhci") {
+        if context.board_config.provides_feature("fuchsia::xhci") {
             builder.platform_bundle("xhci_driver");
         }
 

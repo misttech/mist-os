@@ -514,7 +514,7 @@ template("assembled_system") {
 
     if (defined(files.board_config)) {
       args += [
-        "--board-info",
+        "--board-config",
         rebase_path(files.board_config_dir, root_build_dir),
       ]
       inputs += [ files.board_config ]

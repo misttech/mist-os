@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use assembled_system::AssembledSystem;
 use assembly_artifact_cache::{Artifact, ArtifactCache};
-use assembly_config_schema::{BoardInformation, ProductConfig};
+use assembly_config_schema::{BoardConfig, ProductConfig};
 use assembly_container::AssemblyContainer;
 use assembly_platform_artifacts::PlatformArtifacts;
 use assembly_tool::PlatformToolProvider;
@@ -16,7 +16,7 @@ pub struct Assembly {
     pub platform_path: Utf8PathBuf,
     pub platform: PlatformArtifacts,
     pub product: ProductConfig,
-    pub board: BoardInformation,
+    pub board: BoardConfig,
 }
 
 impl Assembly {
@@ -41,7 +41,7 @@ impl Assembly {
             .or_else(|_| Artifact::from_local_board_name(&board, build_dir.as_ref()))
             .context("Parsing board as local build api")?;
         let board_path = cache.resolve(&board_artifact).context("Resolving board")?;
-        let board = BoardInformation::from_dir(&board_path).context("Reading board")?;
+        let board = BoardConfig::from_dir(&board_path).context("Reading board")?;
 
         let platform_artifact = Artifact::from_platform(platform, &board.arch, build_dir.as_ref())?;
         let platform_path = cache.resolve(&platform_artifact).context("Resolving platform")?;

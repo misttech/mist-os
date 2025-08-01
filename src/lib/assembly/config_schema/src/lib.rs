@@ -14,7 +14,7 @@ pub mod platform_settings;
 pub mod product_settings;
 
 pub use board_config::{
-    Architecture, BoardInformation, BoardInputBundle, BoardProvidedConfig, IncludeInBuildType,
+    Architecture, BoardConfig, BoardInputBundle, BoardProvidedConfig, IncludeInBuildType,
 };
 pub use board_input_bundle_set::{BoardInputBundleEntry, BoardInputBundleSet};
 pub use common::{

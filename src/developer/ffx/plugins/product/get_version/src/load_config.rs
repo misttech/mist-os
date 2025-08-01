@@ -6,7 +6,7 @@ use crate::unique_release_info::{
     from_board_release_info, from_product_release_info, from_release_info, UniqueReleaseInfo,
 };
 
-use assembly_config_schema::{BoardInformation, BoardInputBundleSet, ProductConfig};
+use assembly_config_schema::{BoardConfig, BoardInputBundleSet, ProductConfig};
 use assembly_partitions_config::Slot;
 use assembly_platform_artifacts::PlatformArtifacts;
 use assembly_release_info::SystemReleaseInfo;
@@ -91,7 +91,7 @@ pub fn load_pibs(pibs: &ProductInputBundle) -> VersionInfo {
 }
 
 /// Load a Board Config artifact and return the version information.
-pub fn load_board(board: &BoardInformation) -> VersionInfoWithDependencies {
+pub fn load_board(board: &BoardConfig) -> VersionInfoWithDependencies {
     let mut info = VersionInfoWithDependencies {
         version: VersionInfo {
             human: board.release_info.info.version.clone(),

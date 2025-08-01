@@ -222,7 +222,7 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
             FeatureSetLevel::Bootstrap | FeatureSetLevel::Utility | FeatureSetLevel::Embeddable => {
             }
             FeatureSetLevel::Standard => {
-                if context.board_info.provides_feature("fuchsia::mali_gpu") {
+                if context.board_config.provides_feature("fuchsia::mali_gpu") {
                     builder.platform_bundle("diagnostics_triage_detect_mali");
                 }
             }

@@ -31,7 +31,7 @@ impl DefineSubsystemConfiguration<Option<ProductInfoConfig>> for HwinfoSubsystem
         // Set the board name to be returned by hardware_info.  If the board
         // doesn't provide a separate value, use the name of the board instead.
         let hwinfo_board_name =
-            context.board_info.hardware_info.name.as_ref().unwrap_or(&context.board_info.name);
+            context.board_config.hardware_info.name.as_ref().unwrap_or(&context.board_config.name);
         let contents_value = serde_json::json!({
             "name": hwinfo_board_name,
             "revision": "1"

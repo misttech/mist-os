@@ -172,7 +172,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
         //
         // This needs to always be set, in case recovery is being added by products directly,
         // and not via assembly.
-        if let Some(display_rotation) = &context.board_info.platform.graphics.display.rotation {
+        if let Some(display_rotation) = &context.board_config.platform.graphics.display.rotation {
             builder.set_config_capability(
                 "fuchsia.recovery.DisplayRotation",
                 Config::new(

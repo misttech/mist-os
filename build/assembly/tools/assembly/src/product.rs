@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use assembly_cli_args::{PackageValidationHandling, ProductArgs};
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
-use assembly_config_schema::{BoardInformation, ProductConfig};
+use assembly_config_schema::{BoardConfig, ProductConfig};
 use assembly_container::AssemblyContainer;
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_platform_artifacts::PlatformArtifacts;
@@ -20,7 +20,7 @@ use log::info;
 pub fn assemble(args: ProductArgs) -> Result<()> {
     let ProductArgs {
         product,
-        board_info,
+        board_config,
         outdir,
         gendir: _,
         input_bundles_dir,
@@ -52,7 +52,7 @@ Resulting product is not supported and may misbehave!
     let product_config =
         ProductConfig::from_dir(&product).context("Reading product configuration")?;
     let board_config =
-        BoardInformation::from_dir(&board_info).context("Reading board configuration")?;
+        BoardConfig::from_dir(&board_config).context("Reading board configuration")?;
     let developer_overrides = if let Some(overrides_path) = developer_overrides {
         let developer_overrides = read_config::<DeveloperOverrides>(&overrides_path)
             .context("Reading developer overrides")?

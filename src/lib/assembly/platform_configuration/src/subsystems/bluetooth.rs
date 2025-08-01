@@ -35,7 +35,7 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
         }
 
         // Include bt-transport-uart driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::bt_transport_uart")
+        if context.board_config.provides_feature("fuchsia::bt_transport_uart")
             && (*context.feature_set_level == FeatureSetLevel::Standard
                 || *context.feature_set_level == FeatureSetLevel::Utility)
         {

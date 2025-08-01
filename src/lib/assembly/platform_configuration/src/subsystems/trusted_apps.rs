@@ -69,7 +69,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
-            board_info: &Default::default(),
+            board_config: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
             developer_only_options: Default::default(),

@@ -6,7 +6,7 @@ use anyhow::{bail, Context};
 use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
 use assembly_config_schema::platform_settings::PlatformSettings;
 use assembly_config_schema::product_settings::ProductSettings;
-use assembly_config_schema::{BoardInformation, BuildType, ExampleConfig};
+use assembly_config_schema::{BoardConfig, BuildType, ExampleConfig};
 use camino::Utf8Path;
 
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl, ConfigurationContextBase};
@@ -15,7 +15,7 @@ pub(crate) mod prelude {
 
     #[allow(unused)]
     pub(crate) use crate::common::{
-        BoardInformationExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
+        BoardConfigExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
         DefaultByBuildType, DefineSubsystemConfiguration, FeatureSetLevel,
         OptionDefaultByBuildTypeExt,
     };
@@ -74,7 +74,7 @@ mod virtualization;
 pub fn define_configuration(
     platform: &PlatformSettings,
     product: &ProductSettings,
-    board_info: &BoardInformation,
+    board_config: &BoardConfig,
     gendir: impl AsRef<Utf8Path>,
     resource_dir: impl AsRef<Utf8Path>,
     developer_only_options: Option<&DeveloperOnlyOptions>,
@@ -97,7 +97,7 @@ pub fn define_configuration(
             base_context: ConfigurationContext {
                 feature_set_level,
                 build_type,
-                board_info,
+                board_config,
                 gendir,
                 resource_dir,
                 developer_only_options,
@@ -557,15 +557,8 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let ProductConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
-        let result = define_configuration(
-            &platform,
-            &product,
-            &BoardInformation::default(),
-            "",
-            "",
-            None,
-            true,
-        );
+        let result =
+            define_configuration(&platform, &product, &BoardConfig::default(), "", "", None, true);
 
         assert!(result.is_err());
     }

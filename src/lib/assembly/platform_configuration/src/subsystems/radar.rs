@@ -11,7 +11,7 @@ impl DefineSubsystemConfiguration<()> for RadarSubsystemConfig {
         _: &(),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if context.board_info.provides_feature("fuchsia::radar")
+        if context.board_config.provides_feature("fuchsia::radar")
             && matches!(context.feature_set_level, FeatureSetLevel::Standard)
         {
             if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {

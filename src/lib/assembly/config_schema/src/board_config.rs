@@ -48,7 +48,7 @@ impl std::fmt::Display for Architecture {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, WalkPaths)]
 #[serde(deny_unknown_fields)]
 #[assembly_container(board_configuration.json)]
-pub struct BoardInformation {
+pub struct BoardConfig {
     /// The name of the board.
     pub name: String,
 
@@ -149,7 +149,7 @@ pub struct BoardInformation {
     /// GUIDs for the TAs provided by this board's TEE driver.
     ///
     /// NOTE: This is the deprecated name for
-    /// `BoardInformation::global_platform_tee_trusted_app_guids`. At most one of the two fields
+    /// `BoardConfig::global_platform_tee_trusted_app_guids`. At most one of the two fields
     /// may be non-empty.
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -183,7 +183,7 @@ pub struct HardwareInfo {
     pub revision: Option<u32>,
 }
 
-impl BoardInformation {
+impl BoardConfig {
     /// Add the names of the BIBs to the map.
     pub fn add_bib_names(mut self) -> Result<Self> {
         self.input_bundles = self
@@ -228,7 +228,7 @@ pub struct BoardInputBundle {
 
     /// Board-provided configuration for platform services.  Each field of this
     /// structure can only be provided by one of the BoardInputBundles that a
-    /// BoardInformation uses.
+    /// BoardConfig uses.
     #[walk_paths]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub configuration: Option<BoardProvidedConfig>,
@@ -327,7 +327,7 @@ pub struct BoardProvidedConfig {
     /// using FIDL types (to avoid repetition and to take advantage of FIDL rust
     /// codegen), and there's no json schema for FIDL types.
     ///
-    /// See BoardInformation.platform.sysmem_defaults for other board-level
+    /// See BoardConfig.platform.sysmem_defaults for other board-level
     /// sysmem config.
     #[serde(default)]
     #[walk_paths]
@@ -505,15 +505,15 @@ mod test {
             }
         });
 
-        let parsed: BoardInformation = serde_json::from_value(json).unwrap();
-        let expected = BoardInformation { name: "sample board".to_owned(), ..Default::default() };
+        let parsed: BoardConfig = serde_json::from_value(json).unwrap();
+        let expected = BoardConfig { name: "sample board".to_owned(), ..Default::default() };
 
         assert_eq!(parsed, expected);
     }
 
     #[test]
     fn test_board_default_serialization() {
-        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\", \"arch\": \"x64\", \"release_info\": {\"info\": { \"name\": \"\", \"repository\": \"\", \"version\": \"\" }, \"bib_sets\": [] }}").unwrap();
+        let value: BoardConfig = serde_json::from_str("{\"name\": \"foo\", \"arch\": \"x64\", \"release_info\": {\"info\": { \"name\": \"\", \"repository\": \"\", \"version\": \"\" }, \"bib_sets\": [] }}").unwrap();
         crate::common::tests::value_serialization_helper(value);
     }
 
@@ -578,9 +578,9 @@ mod test {
             }
         });
         serde_json::to_writer(config_file, &json).unwrap();
-        let resolved = BoardInformation::from_dir(&dir_path).unwrap();
+        let resolved = BoardConfig::from_dir(&dir_path).unwrap();
 
-        let expected = BoardInformation {
+        let expected = BoardConfig {
             name: "sample board".to_owned(),
             hardware_info: HardwareInfo {
                 name: Some("hwinfo_name".into()),

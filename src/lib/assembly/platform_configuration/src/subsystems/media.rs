@@ -19,10 +19,10 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
         {
             builder.platform_bundle("audio_development_support");
 
-            if context.board_info.provides_feature("fuchsia::video_encoders") {
+            if context.board_config.provides_feature("fuchsia::video_encoders") {
                 builder.platform_bundle("video_development_support");
             }
-            if context.board_info.provides_feature("fuchsia::intel_hda") {
+            if context.board_config.provides_feature("fuchsia::intel_hda") {
                 builder.platform_bundle("intel_hda");
             }
         }
@@ -30,7 +30,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
         match &media_config.audio {
             Some(AudioConfig::FullStack(config)) => {
                 builder.platform_bundle("audio_core_routing");
-                if !context.board_info.provides_feature("fuchsia::custom_audio_core") {
+                if !context.board_config.provides_feature("fuchsia::custom_audio_core") {
                     builder.platform_bundle("audio_core");
                 }
                 if config.use_adc_device {

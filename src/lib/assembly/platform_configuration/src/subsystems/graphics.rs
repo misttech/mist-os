@@ -48,7 +48,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
             Config::new(ConfigValueType::Bool, (!enable_virtual_console).into()),
         )?;
 
-        if let Some(rotation) = context.board_info.platform.graphics.display.rotation {
+        if let Some(rotation) = context.board_config.platform.graphics.display.rotation {
             builder.set_config_capability(
                 "fuchsia.virtcon.DisplayRotation",
                 Config::new(ConfigValueType::Uint32, rotation.into()),
@@ -86,7 +86,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
 
         builder.set_config_capability("fuchsia.virtcon.KeyRepeat", Config::new_void())?;
 
-        let rounded_corners = context.board_info.platform.graphics.display.rounded_corners;
+        let rounded_corners = context.board_config.platform.graphics.display.rounded_corners;
         builder.set_config_capability(
             "fuchsia.virtcon.RoundedCorners",
             Config::new(ConfigValueType::Bool, rounded_corners.into()),

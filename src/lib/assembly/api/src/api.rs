@@ -45,14 +45,14 @@ mod tests {
         let assembly_tool = tools.get_tool("assembly").unwrap();
 
         let product = Utf8PathBuf::from("path/to/product");
-        let board_info = Utf8PathBuf::from("path/to/board_info");
+        let board_config = Utf8PathBuf::from("path/to/board_config");
         let outdir = Utf8PathBuf::from("path/to/outdir");
         let gendir = Utf8PathBuf::from("path/to/gendir");
         let input_bundles_dir = Utf8PathBuf::from("path/to/bundles");
 
         let args = ProductArgs {
             product: product.clone(),
-            board_info: board_info.clone(),
+            board_config: board_config.clone(),
             outdir: outdir.clone(),
             gendir: gendir.clone(),
             input_bundles_dir: input_bundles_dir.clone(),
@@ -75,8 +75,8 @@ mod tests {
                         "product",
                         "--product",
                         product,
-                        "--board-info",
-                        board_info,
+                        "--board-config",
+                        board_config,
                         "--outdir",
                         outdir,
                         "--input-bundles-dir",

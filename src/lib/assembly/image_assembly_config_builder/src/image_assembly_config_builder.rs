@@ -17,7 +17,7 @@ use assembly_config_schema::product_settings::{
     ProductConfigData, ProductPackageDetails, ProductPackagesConfig,
 };
 use assembly_config_schema::{
-    BoardInformation, DriverDetails, FeatureSetLevel, PackageDetails, PackageSet,
+    BoardConfig, DriverDetails, FeatureSetLevel, PackageDetails, PackageSet,
 };
 use assembly_constants::{
     BootfsDestination, BootfsPackageDestination, FileEntry, PackageDestination,
@@ -441,11 +441,11 @@ impl ImageAssemblyConfigBuilder {
     }
 
     /// Set the (optional) arguments for the Board Driver.
-    pub fn set_board_driver_arguments(&mut self, board_info: &BoardInformation) -> Result<()> {
+    pub fn set_board_driver_arguments(&mut self, board_config: &BoardConfig) -> Result<()> {
         if self.board_driver_arguments.is_some() {
             bail!("Board driver arguments have already been set");
         }
-        self.board_driver_arguments = match &board_info.hardware_info {
+        self.board_driver_arguments = match &board_config.hardware_info {
             HardwareInfo {
                 name,
                 vendor_id: Some(vendor_id),
@@ -455,11 +455,11 @@ impl ImageAssemblyConfigBuilder {
                 vendor_id: *vendor_id,
                 product_id: *product_id,
                 revision: *revision,
-                name: name.as_ref().unwrap_or(&board_info.name).clone(),
+                name: name.as_ref().unwrap_or(&board_config.name).clone(),
             }),
             HardwareInfo { name: _, vendor_id: None, product_id: None, revision: None } => None,
             _ => {
-                bail!("If any of 'vendor_id', 'product_id', or 'revision' are set, all must be provided: {:?}", &board_info.hardware_info);
+                bail!("If any of 'vendor_id', 'product_id', or 'revision' are set, all must be provided: {:?}", &board_config.hardware_info);
             }
         };
         Ok(())
