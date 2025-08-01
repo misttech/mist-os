@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mm::memory::MemoryObject;
+use crate::mm::memory_manager::MemoryManagerState;
 use crate::mm::{
     FaultRegisterMode, MappingOptions, MlockMapping, ProtectionFlags, UserFault,
     GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS, PAGE_SIZE,
@@ -63,39 +64,23 @@ static_assertions::assert_eq_size!(Mapping, [u8; 48]);
 
 impl Mapping {
     pub fn new(
-        base: UserAddress,
-        memory: Arc<MemoryObject>,
-        memory_offset: u64,
+        backing: MappingBacking,
         flags: MappingFlags,
         max_access: Access,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
-        Self::with_name(
-            base,
-            memory,
-            memory_offset,
-            flags,
-            max_access,
-            MappingName::None,
-            file_write_guard,
-        )
+        Self::with_name(backing, flags, max_access, MappingName::None, file_write_guard)
     }
 
     pub fn with_name(
-        base: UserAddress,
-        memory: Arc<MemoryObject>,
-        memory_offset: u64,
+        backing: MappingBacking,
         flags: MappingFlags,
         max_access: Access,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
         MappingUnsplit {
-            backing: MappingBacking::Memory(Box::new(MappingBackingMemory {
-                base,
-                memory,
-                memory_offset,
-            })),
+            backing,
             flags,
             max_access,
             name,
@@ -119,11 +104,11 @@ impl Mapping {
         self.max_access
     }
 
-    pub fn backing(&self) -> &MappingBacking {
+    pub fn get_backing_internal(&self) -> &MappingBacking {
         &self.backing
     }
 
-    pub fn set_backing(&mut self, backing: MappingBacking) {
+    pub fn set_backing_internal(&mut self, backing: MappingBacking) {
         self.backing = backing;
     }
 
@@ -295,15 +280,22 @@ impl Mapping {
         string
     }
 
-    pub fn split_prefix_off(&mut self, start: UserAddress, prefix_len: u64) -> Self {
+    pub fn split_prefix_off(
+        &mut self,
+        mm_state: &MemoryManagerState,
+        start: UserAddress,
+        prefix_len: u64,
+    ) -> Self {
         match &mut self.backing {
             MappingBacking::Memory(backing) => {
                 // Shrink the range of the named mapping to only the named area.
                 backing.memory_offset = prefix_len;
                 Mapping::new(
-                    start,
-                    backing.memory.clone(),
-                    backing.memory_offset,
+                    mm_state.create_memory_backing(
+                        start,
+                        backing.memory.clone(),
+                        backing.memory_offset,
+                    ),
                     self.flags,
                     self.max_access,
                     self.file_write_guard.clone(),
@@ -376,6 +368,10 @@ pub struct MappingBackingMemory {
 }
 
 impl MappingBackingMemory {
+    pub fn new(base: UserAddress, memory: Arc<MemoryObject>, memory_offset: u64) -> Self {
+        Self { base, memory, memory_offset }
+    }
+
     pub fn base(&self) -> UserAddress {
         self.base
     }
@@ -534,7 +530,7 @@ pub struct MappingSummary {
 }
 
 impl MappingSummary {
-    pub fn add(&mut self, mapping: &Mapping) {
+    pub fn add(&mut self, mm_state: &MemoryManagerState, mapping: &Mapping) {
         let kind_summary = match mapping.name() {
             MappingName::None => &mut self.no_kind,
             MappingName::Stack => &mut self.stack,
@@ -562,7 +558,7 @@ impl MappingSummary {
         if mapping.file_write_guard().0.is_some() {
             kind_summary.num_file_write_guards += 1;
         }
-        match &mapping.backing {
+        match mm_state.get_mapping_backing(mapping) {
             MappingBacking::Memory(m) => {
                 kind_summary.num_memory_objects += 1;
                 if m.memory_offset != 0 {
