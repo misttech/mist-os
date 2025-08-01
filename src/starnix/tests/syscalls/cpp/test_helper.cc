@@ -129,7 +129,6 @@ CloneHelper::~CloneHelper() { munmap(this->_childStack, CloneHelper::_childStack
 
 int CloneHelper::runInClonedChild(unsigned int cloneFlags, int (*childFunction)(void *)) {
   int childPid = clone(childFunction, this->_childStackBegin, cloneFlags, NULL);
-  assert(errno == 0);
   assert(childPid != -1);
   return childPid;
 }
