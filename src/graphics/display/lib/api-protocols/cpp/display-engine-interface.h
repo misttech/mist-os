@@ -11,6 +11,7 @@
 
 #include <cstdint>
 
+#include "src/graphics/display/lib/api-types/cpp/color-conversion.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -57,12 +58,31 @@ class DisplayEngineInterface {
   virtual zx::result<display::DriverCaptureImageId> ImportImageForCapture(
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) = 0;
   virtual void ReleaseImage(display::DriverImageId driver_image_id) = 0;
+
+  // Display engine drivers must override **exactly one** of the following
+  // `CheckConfiguration()` methods.
+
   virtual display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers) = 0;
+      cpp20::span<const display::DriverLayer> layers);
+  // Out-of-tree drivers must not override this overload, because it will be
+  // reworked.
+  virtual display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id, display::ModeId display_mode_id,
+      display::ColorConversion color_conversion, cpp20::span<const display::DriverLayer> layers);
+
+  // Display engine drivers must override **exactly one** of the following
+  // `ApplyConfiguration()` methods.
+
   virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                   cpp20::span<const display::DriverLayer> layers,
-                                  display::DriverConfigStamp driver_config_stamp) = 0;
+                                  display::DriverConfigStamp driver_config_stamp);
+  // Out-of-tree drivers must not override this overload, because it will be
+  // reworked.
+  virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
+                                  display::ColorConversion color_conversion,
+                                  cpp20::span<const display::DriverLayer> layers,
+                                  display::DriverConfigStamp driver_config_stamp);
 
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
