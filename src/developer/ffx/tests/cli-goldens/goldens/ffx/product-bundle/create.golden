@@ -1,0 +1,106 @@
+{
+  "name": "create",
+  "description": "Construct a product bundle using a platform, product config, and board config.\nThe inputs can be local paths or CIPD references.\n\nArtifact formats:\n  path/to/artifacts: Use local artifact with specified path\n  cipd://path/to/artifact@1.2.3.4: Use artifact from CIPD with specified url\n\nAdditional formats for the platform:\n  <omitted>: Use default local platform\n  1.2.3.4: Use platform from CIPD with specified version",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "platform"
+        }
+      },
+      "optionality": "optional",
+      "long": "--platform",
+      "short": null,
+      "description": "the platform artifacts to use.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "product-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--product-config",
+      "short": null,
+      "description": "the product config to use.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "board-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--board-config",
+      "short": null,
+      "description": "the board config to use.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "version"
+        }
+      },
+      "optionality": "optional",
+      "long": "--version",
+      "short": null,
+      "description": "the version of the product to use.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "tuf-keys"
+        }
+      },
+      "optionality": "optional",
+      "long": "--tuf-keys",
+      "short": null,
+      "description": "the tuf keys to use.",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--stage",
+      "short": null,
+      "description": "prepare the assembly inputs, but do not run assembly yet.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "out"
+        }
+      },
+      "optionality": "optional",
+      "long": "--out",
+      "short": null,
+      "description": "the location to write the product bundle to.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "product_config_board_config_combo",
+      "description": "product_config.board_config combination to build when inside a fuchsia checkout.",
+      "optionality": "optional",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

@@ -1,6 +1,6 @@
 {
   "name": "product-bundle",
-  "description": "DEPRECATED. Please use `ffx product` instead. More information on how to map your usage of product-bundle to product can be found in each of the subcommands.",
+  "description": "Manage the construction and usage of a product bundle.",
   "examples": [],
   "flags": [
     {

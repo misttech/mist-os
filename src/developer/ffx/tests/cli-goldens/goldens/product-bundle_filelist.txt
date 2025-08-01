@@ -1,0 +1,11 @@
+ffx/product-bundle.golden
+ffx/product-bundle/create-old.golden
+ffx/product-bundle/create.golden
+ffx/product-bundle/download.golden
+ffx/product-bundle/get-artifacts.golden
+ffx/product-bundle/get-image-path.golden
+ffx/product-bundle/get-repository.golden
+ffx/product-bundle/get-version.golden
+ffx/product-bundle/list.golden
+ffx/product-bundle/lookup.golden
+ffx/product-bundle/show.golden

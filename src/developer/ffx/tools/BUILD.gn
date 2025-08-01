@@ -19,6 +19,7 @@ _tools = [
   "//src/developer/ffx/plugins/package",
   "//src/developer/ffx/plugins/profile",
   "//src/developer/ffx/plugins/product",
+  "//src/developer/ffx/plugins/product_bundle",
   "//src/developer/ffx/plugins/process",
   "//src/developer/ffx/plugins/repository",
   "//src/developer/ffx/plugins/scrutiny",
