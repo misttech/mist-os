@@ -121,7 +121,7 @@ for archive in "${sorted_archives[@]}"; do
   # Extracts the commit ID from the version tag at HEAD (if present)
   # Matches "refs/tags/" followed by optional letters, hyphens, or underscores,
   # and then the version number at the end of the line.
-  if matching_tag=$(echo "$all_tags" |
+  if ! matching_tag=$(echo "$all_tags" |
       grep -P "refs/tags/[-_a-zA-Z]*${version}$" |
       head -n 1); then
     echo -e "${RED}Error: No matching tag found for $noext.${NORM}"
