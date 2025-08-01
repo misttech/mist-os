@@ -108,7 +108,7 @@ void ZeroPage(vm_page_t* p) {
 
 bool IsZeroPage(vm_page_t* p) {
   uint64_t* base = (uint64_t*)paddr_to_physmap(p->paddr());
-  for (int i = 0; i < PAGE_SIZE / (int)sizeof(uint64_t); i++) {
+  for (size_t i = 0; i < PAGE_SIZE / sizeof(uint64_t); i++) {
     if (base[i] != 0)
       return false;
   }

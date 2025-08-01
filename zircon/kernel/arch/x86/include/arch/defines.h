@@ -12,9 +12,9 @@
 #define PAGE_SIZE_SHIFT 12
 #define PAGE_MASK (PAGE_SIZE - 1)
 #ifndef PAGE_SIZE
-#define PAGE_SIZE (1L << PAGE_SIZE_SHIFT)
+#define PAGE_SIZE (1UL << PAGE_SIZE_SHIFT)
 #else
-static_assert(PAGE_SIZE == (1L << PAGE_SIZE_SHIFT), "Page size mismatch!");
+static_assert(PAGE_SIZE == (1UL << PAGE_SIZE_SHIFT), "Page size mismatch!");
 #endif
 
 // Align the heap to 2MiB to optionally support large page mappings in it.
