@@ -30,6 +30,7 @@ class SendBufferGenerator {
   std::string GetSndStr();
   bool SetSendBufHex(const char* arg);
   bool SetSendBufText(const char* arg);
+  bool SetSendBufLen(size_t len);
 
  private:
   std::string snd_str_;
@@ -117,6 +118,7 @@ class SockScripter {
   bool Recvmsg(char* arg);
   bool SetSendBufHex(char* arg);
   bool SetSendBufText(char* arg);
+  bool SetSendBufLen(char* arg);
   bool Sleep(char* arg);
 
 #if PACKET_SOCKETS

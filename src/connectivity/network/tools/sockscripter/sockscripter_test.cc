@@ -29,6 +29,12 @@ TEST(SendBufferGenTest, LoadHexBuffer) {
   EXPECT_FALSE(gen.SetSendBufHex("-08"));
 }
 
+TEST(SendBufferGenTest, SetBufferLen) {
+  SendBufferGenerator gen;
+  EXPECT_TRUE(gen.SetSendBufLen(10));
+  EXPECT_EQ(gen.GetSndStr(), std::string(10, 0xAA));
+}
+
 TEST(SendBufferGenTest, CounterBuffer) {
   // SendBufferGenerator defaults to sending strings with incrementing packet count.
   SendBufferGenerator gen;

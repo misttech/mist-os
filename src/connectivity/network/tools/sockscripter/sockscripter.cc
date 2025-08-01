@@ -33,28 +33,28 @@
 #define PRINT_SOCK_OPT_VAL(level, name) \
   LOG(INFO) << #level "=" << (level) << " " << #name << "=" << name
 
-#define SET_SOCK_OPT_VAL(level, name, val)                                     \
-  {                                                                            \
-    if (api_->setsockopt(sockfd_, (level), (name), &(val), sizeof(val)) < 0) { \
-      LOG(ERROR) << "Failed to set socket option " #level ":" #name "-"        \
-                 << "[" << errno << "]" << strerror(errno);                    \
-      return false;                                                            \
-    }                                                                          \
-    LOG(INFO) << "Set " #level ":" #name " = " << (int)(val);                  \
-    return true;                                                               \
+#define SET_SOCK_OPT_VAL(level, name, val)                                                     \
+  {                                                                                            \
+    if (api_->setsockopt(sockfd_, (level), (name), &(val), sizeof(val)) < 0) {                 \
+      LOG(ERROR) << "Failed to set socket option " #level ":" #name "-" << "[" << errno << "]" \
+                 << strerror(errno);                                                           \
+      return false;                                                                            \
+    }                                                                                          \
+    LOG(INFO) << "Set " #level ":" #name " = " << (int)(val);                                  \
+    return true;                                                                               \
   }
 
-#define LOG_SOCK_OPT_VAL(level, name, type_val)                             \
-  {                                                                         \
-    type_val opt = 0;                                                       \
-    socklen_t opt_len = sizeof(opt);                                        \
-    if (api_->getsockopt(sockfd_, (level), (name), &(opt), &opt_len) < 0) { \
-      LOG(ERROR) << "Error-Getting " #level ":" #name "-"                   \
-                 << "[" << errno << "]" << strerror(errno);                 \
-      return false;                                                         \
-    }                                                                       \
-    LOG(INFO) << #level ":" #name " is set to " << (int)opt;                \
-    return true;                                                            \
+#define LOG_SOCK_OPT_VAL(level, name, type_val)                                  \
+  {                                                                              \
+    type_val opt = 0;                                                            \
+    socklen_t opt_len = sizeof(opt);                                             \
+    if (api_->getsockopt(sockfd_, (level), (name), &(opt), &opt_len) < 0) {      \
+      LOG(ERROR) << "Error-Getting " #level ":" #name "-" << "[" << errno << "]" \
+                 << strerror(errno);                                             \
+      return false;                                                              \
+    }                                                                            \
+    LOG(INFO) << #level ":" #name " is set to " << (int)opt;                     \
+    return true;                                                                 \
   }
 
 bool TestRepeatCfg::Parse(const std::string& cmd) {
@@ -229,6 +229,8 @@ const struct Command {
      &SockScripter::SetSendBufHex},
     {"set-send-buf-text", "\"<string>\" ", "set send-buffer with text chars",
      &SockScripter::SetSendBufText},
+    {"set-send-buf-len", "<len>", "set send-buffer to <len> bytes of 0xAA",
+     &SockScripter::SetSendBufLen},
     {"sleep", "<sleep-secs>", "sleeps", &SockScripter::Sleep},
 #if PACKET_SOCKETS
     {"packet-bind", "<protocol>:<if-name-string>",
@@ -1493,6 +1495,15 @@ bool SockScripter::SetSendBufHex(char* arg) { return snd_buf_gen_.SetSendBufHex(
 
 bool SockScripter::SetSendBufText(char* arg) { return snd_buf_gen_.SetSendBufText(arg); }
 
+bool SockScripter::SetSendBufLen(char* arg) {
+  int len;
+  if (!str2int(arg, &len) || len < 0) {
+    LOG(ERROR) << "Error: Invalid length='" << arg << "'!";
+    return false;
+  }
+  return snd_buf_gen_.SetSendBufLen(static_cast<size_t>(len));
+}
+
 bool SockScripter::Sleep(char* arg) {
   int sleeptime;
   if (!str2int(arg, &sleeptime) || sleeptime < 0) {
@@ -1543,10 +1554,18 @@ bool SendBufferGenerator::SetSendBufHex(const char* arg) {
     ss.put(v);
   }
   snd_str_ = ss.str();
+  mode_ = STATIC_TEXT;
   return true;
 }
 
 bool SendBufferGenerator::SetSendBufText(const char* arg) {
   snd_str_ = arg;
+  mode_ = STATIC_TEXT;
+  return true;
+}
+
+bool SendBufferGenerator::SetSendBufLen(size_t len) {
+  snd_str_ = std::string(len, 0xAA);
+  mode_ = STATIC_TEXT;
   return true;
 }
