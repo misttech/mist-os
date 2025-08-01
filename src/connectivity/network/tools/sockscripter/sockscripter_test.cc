@@ -318,6 +318,19 @@ TEST(CommandLine, TcpShutdown) {
   EXPECT_EQ(test.RunCommandLine("tcp shutdown wrd"), 0);
 }
 
+TEST(CommandLine, LogError) {
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  EXPECT_CALL(test, socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)).WillOnce(testing::Return(kSockFd));
+  EXPECT_CALL(test, getsockopt(kSockFd, SOL_SOCKET, SO_ERROR, testing::_, testing::_))
+      .WillOnce([](int, int, int, void* optval, socklen_t* optlen) {
+        *static_cast<int*>(optval) = ECONNREFUSED;
+        *optlen = sizeof(int);
+        return 0;
+      });
+  EXPECT_EQ(test.RunCommandLine("udp log-error"), 0);
+}
+
 TEST(CommandLine, JoinBlockDropMcast) {
   testing::StrictMock<TestApi> test;
   testing::InSequence s;

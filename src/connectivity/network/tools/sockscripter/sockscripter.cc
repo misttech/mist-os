@@ -200,6 +200,7 @@ const struct Command {
     {"log-tclass", nullptr, "log IPV6_TCLASS option value", &SockScripter::LogTClass},
     {"set-tos", "<tos>", "set IP_TOS option", &SockScripter::SetTos},
     {"log-tos", nullptr, "log IP_TOS option value", &SockScripter::LogTos},
+    {"log-error", nullptr, "log SO_ERROR option value", &SockScripter::LogError},
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
     {"drop4", "<mcast-ip>-<local-intf-Addr>",
@@ -949,6 +950,18 @@ bool SockScripter::SetTos(char* arg) {
 
 bool SockScripter::LogTos(char* arg) {
   LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_TOS, int);
+  return true;
+}
+
+bool SockScripter::LogError(char* arg) {
+  int error = 0;
+  socklen_t len = sizeof(error);
+  if (api_->getsockopt(sockfd_, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+    LOG(ERROR) << "Error-Getting SO_ERROR failed-"
+               << "[" << errno << "]" << strerror(errno);
+    return false;
+  }
+  LOG(INFO) << "SO_ERROR is set to " << error << " (" << strerror(error) << ")";
   return true;
 }
 

@@ -96,6 +96,7 @@ class SockScripter {
   bool LogTClass(char* arg);
   bool SetTos(char* arg);
   bool LogTos(char* arg);
+  bool LogError(char* arg);
   bool Bind(char* arg);
   bool Shutdown(char* arg);
   bool Connect(char* arg);
