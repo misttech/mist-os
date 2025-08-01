@@ -105,7 +105,7 @@
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="91582664cf9631a23102de4eee3b42ade75cd8e8"/>
     <project name="third_party/curl"
-             path="third_party/curl"
+             path="third_party/curl/src"
              remote="https://fuchsia.googlesource.com/third_party/curl"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="0605361a38cc37ede3a30d194294e892b956d81f"/>

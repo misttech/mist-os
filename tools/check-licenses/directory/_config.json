@@ -632,6 +632,15 @@
                 "paths": [
                     "build/secondary/third_party/gflags"
                 ]
+            },
+            {
+                "paths": [
+                    "build/secondary/third_party/curl"
+                ],
+                "notes": [
+                    "Temporarily disabled to allow for third party repository moves.",
+                    "See https://fxbug.dev/432038197 for details."
+                ]
             }
         ]
     }
