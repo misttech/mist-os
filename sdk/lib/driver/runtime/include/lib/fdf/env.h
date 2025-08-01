@@ -152,13 +152,24 @@ zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver)
 // Scans active thread pools for threads that are stalled on long running tasks and potentially
 // spawn new threads to compensate.
 //
-// Returns the amount of time the caller should wait before calling this again as a `zx_duration_t`.
+// # Thread requirements
+//
+// This should not be called from a thread managed by the driver runtime, such as from tasks or
+// ChannelRead callbacks.
+void fdf_env_scan_threads_for_stalls(void)
+    ZX_DEPRECATED_SINCE(28, NEXT, "use fdf_env_scan_threads_for_stalls_wait_time instead");
+
+// Scans active thread pools for threads that are stalled on long running tasks and potentially
+// spawn new threads to compensate.
+//
+// Returns the amount of time the caller should wait before calling this again as a
+// `zx_duration_mono_t`.
 //
 // # Thread requirements
 //
-// This should not be called from a thread managed by the driver runtime,
-// such as from tasks or ChannelRead callbacks.
-zx_duration_mono_t fdf_env_scan_threads_for_stalls(void) ZX_AVAILABLE_SINCE(HEAD);
+// This should not be called from a thread managed by the driver runtime, such as from tasks or
+// ChannelRead callbacks.
+zx_duration_mono_t fdf_env_scan_threads_for_stalls_wait_time(void) ZX_AVAILABLE_SINCE(NEXT);
 
 __END_CDECLS
 

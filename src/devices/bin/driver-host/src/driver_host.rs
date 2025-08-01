@@ -203,7 +203,7 @@ impl DriverHost {
             loop {
                 // SAFETY: this call does not use any memory allocated by rust and only does
                 // anything if the fdf_env is currently set up, otherwise it does nothing.
-                let next_wait = unsafe { fdf_sys::fdf_env_scan_threads_for_stalls() };
+                let next_wait = unsafe { fdf_sys::fdf_env_scan_threads_for_stalls_wait_time() };
                 Timer::new(zx::MonotonicDuration::from_nanos(next_wait)).await;
             }
         });
